@@ -1,0 +1,6 @@
+# The channel is the nightly the compute pods carry on their shared toolchain root, where every build,
+# test and gate of this workspace runs. A dated pin is adopted only once the pods carry that date,
+# because a worker account cannot install a toolchain there; the components are the ones installed.
+[toolchain]
+channel = "nightly"
+components = ["rustfmt", "clippy"]

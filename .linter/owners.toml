@@ -1,0 +1,15 @@
+# Declares the repository owner over the root files, the declared surface and the documents; a package owner joins with its partition as the package lands.
+namespace = "org.naturrhythmuszentrum.linter.owners"
+version = [1, 0, 0]
+
+owners = [
+  "NRZ",
+]
+
+partitions = [
+  { name = "declared-surface", owner = "NRZ", pattern = '%s".linter" [ "/" *VCHAR ]' },
+  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"Cargo.lock" / %s"Cargo.toml" / %s"README.md" / %s"rust-toolchain.toml" )' },
+  { name = "documents", owner = "NRZ", pattern = '%s"docs" [ "/" *VCHAR ]' },
+]
+
+may_cite = []

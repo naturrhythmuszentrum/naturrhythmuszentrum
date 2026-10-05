@@ -1,0 +1,12 @@
+# Activates the label checks for the repository owner.
+namespace = "org.naturrhythmuszentrum.linter.policies"
+version = [1, 0, 0]
+
+policies = [
+  { owner = "NRZ", policy = "labels.mints-well-formed" },
+  { owner = "NRZ", policy = "labels.mints-kind-conform" },
+  { owner = "NRZ", policy = "labels.mints-unique" },
+  { owner = "NRZ", policy = "labels.heads-conform" },
+  { owner = "NRZ", policy = "labels.citations-local-resolve" },
+  { owner = "NRZ", policy = "owners.reach-conform" },
+]

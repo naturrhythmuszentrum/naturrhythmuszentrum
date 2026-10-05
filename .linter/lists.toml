@@ -1,0 +1,21 @@
+# Declares empty allowance lists for every activation, so each check measures the whole share it governs.
+namespace = "org.naturrhythmuszentrum.linter.lists"
+version = [1, 0, 0]
+
+[NRZ."labels.mints-well-formed"]
+allowances = []
+
+[NRZ."labels.mints-kind-conform"]
+allowances = []
+
+[NRZ."labels.mints-unique"]
+allowances = []
+
+[NRZ."labels.heads-conform"]
+allowances = []
+
+[NRZ."labels.citations-local-resolve"]
+allowances = []
+
+[NRZ."owners.reach-conform"]
+allowances = []

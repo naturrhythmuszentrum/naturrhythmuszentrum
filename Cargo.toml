@@ -1,0 +1,56 @@
+# Workspace of the Naturrhythmuszentrum engine: a matrix-based physics calculation engine whose
+# quantities carry their SI units in the type system. Packages live under packages/ and join the
+# member list as they land. The lint posture below is the workspace's; no package relaxes it, and
+# a package that needs an exception scopes an explicit allow to the smallest item with its reason.
+
+[workspace]
+resolver = "3"
+members = []
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+publish = false
+authors = ["Naturrhythmuszentrum"]
+repository = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum"
+
+[workspace.dependencies]
+
+[workspace.lints.rust]
+deprecated_safe = { level = "deny", priority = -1 }
+future_incompatible = { level = "deny", priority = -1 }
+let_underscore = { level = "deny", priority = -1 }
+nonstandard_style = { level = "deny", priority = -1 }
+rust_2018_compatibility = { level = "deny", priority = -1 }
+rust_2018_idioms = { level = "deny", priority = -1 }
+rust_2021_compatibility = { level = "deny", priority = -1 }
+rust_2024_compatibility = { level = "deny", priority = -1 }
+unsafe_code = "forbid"
+unused = { level = "deny", priority = -2 }
+warnings = { level = "deny", priority = -1 }
+missing_docs = "deny"
+missing_debug_implementations = "deny"
+unreachable_pub = "deny"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+complexity = { level = "deny", priority = -1 }
+correctness = { level = "deny", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+perf = { level = "deny", priority = -1 }
+style = { level = "deny", priority = -1 }
+suspicious = { level = "deny", priority = -1 }
+dbg_macro = { level = "deny", priority = 0 }
+exit = { level = "deny", priority = 0 }
+missing_docs_in_private_items = { level = "warn", priority = 0 }
+print_stderr = { level = "deny", priority = 0 }
+print_stdout = { level = "deny", priority = 0 }
+todo = { level = "deny", priority = 0 }
+unimplemented = { level = "deny", priority = 0 }
+unwrap_used = { level = "deny", priority = 0 }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

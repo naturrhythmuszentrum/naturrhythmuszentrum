@@ -1,0 +1,9 @@
+# Declares the tracked corpus and the exclusions of build output and lane state, so the census covers live text only.
+namespace = "org.naturrhythmuszentrum.linter.shape"
+version = [1, 0, 0]
+
+universe = "tracked-exclusive"
+ignore = [
+  { name = "build-target", pattern = '%s"target/" *VCHAR' },
+  { name = "lane-state", pattern = '[ *VCHAR "/" ] %s".lane/" *VCHAR' },
+]
