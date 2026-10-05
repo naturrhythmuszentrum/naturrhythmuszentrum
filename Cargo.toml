@@ -2,6 +2,8 @@
 # quantities carry their SI units in the type system. Packages live under packages/ and join the
 # member list as they land. The lint posture below is the workspace's; no package relaxes it, and
 # a package that needs an exception scopes an explicit allow to the smallest item with its reason.
+# Code is licensed AGPL-3.0-only, named here and inherited by every package; data and documentation
+# (inputs, datasets, templates and their renders) are CC0-1.0, stated in LICENSE-DOCS at the root.
 
 [workspace]
 resolver = "3"
@@ -10,6 +12,7 @@ members = []
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+license = "AGPL-3.0-only"
 publish = false
 authors = ["Naturrhythmuszentrum"]
 repository = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum"
