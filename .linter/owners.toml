@@ -4,12 +4,14 @@ version = [1, 0, 0]
 
 owners = [
   "NRZ",
+  "DOCGEN",
 ]
 
 partitions = [
   { name = "declared-surface", owner = "NRZ", pattern = '%s".linter" [ "/" *VCHAR ]' },
-  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"README.md" / %s"rust-toolchain.toml" )' },
+  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"CONTRIBUTING.md" / %s"CONTRIBUTING.md.j2" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"README.md" / %s"README.md.j2" / %s"rust-toolchain.toml" )' },
   { name = "documents", owner = "NRZ", pattern = '%s"docs" [ "/" *VCHAR ]' },
+  { name = "docgen", owner = "DOCGEN", pattern = '%s"packages/docgen" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

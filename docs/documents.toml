@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.docs.manifest"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = []
+
+[[document]]
+template = "README.md.j2"
+output = "README.md"
+requires = []
+
+[[document]]
+template = "CONTRIBUTING.md.j2"
+output = "CONTRIBUTING.md"
+requires = []
+
+[[document]]
+template = "docs/architecture.md.j2"
+output = "docs/architecture.md"
+requires = []
+
+[[document]]
+template = "docs/exemplars.md.j2"
+output = "docs/exemplars.md"
+requires = []
+
+[[document]]
+template = "docs/plan.md.j2"
+output = "docs/plan.md"
+requires = []
+
+[[document]]
+template = "packages/docgen/README.md.j2"
+output = "packages/docgen/README.md"
+requires = ["census", "project"]

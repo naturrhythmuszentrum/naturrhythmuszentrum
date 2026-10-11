@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.docs.input.project"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["guide:docgen:overview"]
+name = "Naturrhythmuszentrum"
+description = "Naturrhythmuszentrum is a matrix-based physics calculation engine for researchers, engineers, and developers who need inspectable dimensions, accuracy, and assumptions."
+repository = "https://github.com/naturrhythmuszentrum/naturrhythmuszentrum"
+bites = [
+  { id = "1", title = "Documentation generator" },
+  { id = "1b", title = "Exemplar register" },
+  { id = "2", title = "Numerical feasibility" },
+  { id = "3", title = "Units design" },
+  { id = "4", title = "Units and numerical foundations" },
+  { id = "5", title = "Certified matrix core" },
+  { id = "6", title = "Initial physics core" },
+  { id = "7", title = "Advanced matrix domains" },
+  { id = "8", title = "Accuracy and benchmarks" },
+]

@@ -19,3 +19,21 @@ allowances = []
 
 [NRZ."owners.reach-conform"]
 allowances = []
+
+[DOCGEN."labels.mints-well-formed"]
+allowances = []
+
+[DOCGEN."labels.mints-kind-conform"]
+allowances = []
+
+[DOCGEN."labels.mints-unique"]
+allowances = []
+
+[DOCGEN."labels.heads-conform"]
+allowances = []
+
+[DOCGEN."labels.citations-local-resolve"]
+allowances = []
+
+[DOCGEN."owners.reach-conform"]
+allowances = []

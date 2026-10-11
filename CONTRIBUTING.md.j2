@@ -1,0 +1,62 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Contributing to Naturrhythmuszentrum · `guide:nrz:contributing`
+
+## Commits · `sec:nrz:contributing-commits`
+
+**Rule (Coherent main commits)** · `rule:nrz:coherent-main-commits`
+
+A commit on main is one meaningful unit of work: one coherent change that is reviewable alone and green alone. It is neither a fragment, a mixture of unrelated work, nor a repair needed to make the preceding commit acceptable. Tests accompany the behavior they validate. An indivisible change across packages remains together when splitting it would make intermediate commits incoherent. This preserves a history whose boundaries explain and verify the change independently (`rule:vision:meaningful-commit-series`), (`prin:vision:reviewable-boundaries`).
+
+**Rule (Commit subject and body)** · `rule:nrz:commit-subject-and-body`
+
+Each commit has one Conventional Commits subject of at most 72 characters and a non-empty body stating why the change is needed. The subject names the coherent change; the body supplies its justification so the reviewer can assess purpose as well as implementation. The gate checks the commit policy over every commit past the base (`gate:nrz:verification-of-candidate`).
+
+**Rule (Generated artifacts accompany their causes)** · `rule:nrz:generated-artifacts-with-causes`
+
+Renders, derived datasets, and the lock file belong in the commit that causes them to change. During import, a server-generated lock file is amended into the commit that changed dependencies. Keeping causes and generated effects together makes each commit reproducible and prevents a later repair commit from supplying evidence missing from its predecessor (`rule:vision:meaningful-commit-series`), (`rule:vision:fixed-point-gate-and-bootstrap`), (`alg:nrz:import-commit-series`).
+
+**Rule (Fold working squashes before shipping)** · `rule:nrz:fold-working-squashes`
+
+Squash commits are a lane's working commits and are folded before the lane ships its named series. They never appear on main, and the gate rejects squash prefixes. This keeps the shipped history composed of meaningful, independently green units rather than intermediate working fragments (`gate:nrz:verification-of-candidate`). The signed import of the named series follows (`alg:nrz:import-commit-series`).
+
+## Documentation · `sec:nrz:contributing-documentation`
+
+**Rule (Edit documentation sources)** · `rule:nrz:edit-documentation-sources`
+
+Every repository Markdown file is a committed render of a minijinja template. Change the owning template and TOML inputs, regenerate derived JSON and Markdown, and include the effects in the causing commit. Templates remain beside their outputs; root and cross-cutting inputs and datasets use `docs/`. Input envelopes identify the document or dataset, labels, ownership reference, license classification, and source relationships; exact fields follow the actual linter schema. Derived data excludes live clocks, network responses, unordered traversal, and live benchmark timings because reproducibility requires committed, identified sources (`prin:vision:documentation-is-reproducible`), (`dec:vision:documentation-layout`), (`rule:vision:documentation-envelope-and-derivation`), (`rule:nrz:generated-artifacts-with-causes`).
+
+**Rule (Verify the documentation fixed point)** · `rule:nrz:document-fixed-point`
+
+Use `nrz-docgen data` to derive datasets, `nrz-docgen render` to render documents, and `nrz-docgen check` to verify the committed result. The check regenerates into an isolated output area, compares bytes and output inventory, and verifies that another generation produces no change. It exits 3 on drift. This catches edited renders, stale or missing outputs, and transformations that feed their own output back into later generations (`rule:vision:fixed-point-gate-and-bootstrap`), (`step:nrz:bite-documentation-generator`).
+
+**Rule (Stable labels and resolving citations)** · `rule:nrz:stable-labels-and-citations`
+
+A label has three colon-separated components: a lowercase alphanumeric kind, a lowercase alphanumeric area, and a lowercase semantic name with hyphens between words. Each name is unique within its area, including across kinds, and remains stable across file moves. A head mints its label in one backtick span after the middle-dot separator: document titles use a level-one heading, sections use a section heading, and environment heads use the bold environment name and title as the first line of a paragraph. These identities make references independent of file layout (`dec:vision:labels-and-ownership`).
+
+Document-title kinds are `spec` for the architecture, `reg` for the register, `plan` for the plan, and `guide` for the readme and contributing guide. Sections use `sec`. Environment name and kind pairs are Definition `def`, Decision `dec`, Rule `rule`, Requirement `req`, Principle `prin`, Convention `conv`, Table `tab`, Step `step`, Caveat `cav`, Open Question `open`, Example `ex`, Problem `prob`, Counterexample `cex`, Criterion `crit`, Procedure `alg`, Gate `gate`, and Register `reg`. The architecture uses area `vision`, the register uses `exemplars`, and these three new documents use `nrz`.
+
+A citation is its label as a backtick span inside parentheses in running text, never in square brackets, and resolves to exactly one mint. These five documents share one owner, so citations across them use the same ordinary form. Never enclose an inline-code span in bare square brackets. Prose paragraphs occupy one line, tables use Markdown, and these five documents use no code fences except the readme's single three-command fence. The linter checks the label and citation structure so that a rendered explanation remains traceable.
+
+**Rule (Check ownership and metadata)** · `rule:nrz:linter-and-ownership`
+
+Sources, inputs, templates, datasets, and renders carry the required metadata and pass the host linter's `check` and `fmt --check`. Ownership follows the declared subtree responsibility; root policy remains with its declared owner until an explicit partition update is committed. Use the actual linter configuration to resolve owner identities and envelope fields. This keeps generated and handwritten material within the same ownership and traceability rules (`dec:vision:labels-and-ownership`), (`rule:vision:metadata-and-licenses`), (`cav:vision:estate-schema-and-reproducibility`).
+
+## Verification · `sec:nrz:contributing-verification`
+
+**Rule (Required verification)** · `rule:nrz:required-verification`
+
+Every shipped unit must meet the gate of record (`gate:nrz:verification-of-candidate`). The gate fetches the candidate, checks commit policy over every commit past the base, checks pinned nightly rustfmt, runs `cargo clippy --workspace --all-targets -- -D warnings`, runs `cargo doc --no-deps` with warnings denied, runs `cargo test --workspace --no-fail-fast`, runs `nrz-docgen check`, and runs the host linter's `check` and `fmt --check`. Appropriate package and integration tests, dimensional acceptance and rejection cases, architecture dependency checks, and relevant supported feature configurations supply the required evidence (`rule:vision:gate-of-record`), (`rule:vision:verification-locations`), (`rule:vision:layer-enforcement`).
+
+Workspace rustc and clippy groups are denied except nursery and cargo, which are configured to warn; the gate still uses its stated warnings-denied clippy invocation. Unsafe code is forbidden. Missing documentation, missing Debug implementations, unreachable public items, unwrap, todo, unimplemented, dbg, and print macros are denied. Routine tooling output uses fallible I/O. Numerical verification combines exact or independently bounded cases, adversarial fixtures, structural identities, and whole worked problems because any one oracle has limited coverage (`rule:vision:gate-of-record`), (`rule:vision:independent-numerical-evidence`). The workspace safety rule does not assert that dependency internals contain no unsafe code (`cav:vision:transitive-unsafe-code`).
+
+**Procedure (READY FOR VERIFY handoff)** · `alg:nrz:ready-for-verify-handoff`
+
+The worker uses READY FOR VERIFY to hand its named commit series to superloop verification. Acceptance depends on the gate of record, and import follows the named-commit procedure (`gate:nrz:verification-of-candidate`), (`alg:nrz:import-commit-series`). Readiness, verification results, and bite status belong in the superloop's records; the plan retains its obligations and completion criteria (`conv:nrz:status-records`), (`rule:vision:completion-boundaries`).
+
+## Licensing · `sec:nrz:contributing-licensing`
+
+**Rule (Source license classification)** · `rule:nrz:source-license-classification`
+
+Code is AGPL-3.0-only under `LICENSE-CODE`; data and documentation are CC0-1.0 under `LICENSE-DOCS`. Code sources, including generator logic, carry `SPDX-License-Identifier: AGPL-3.0-only`. Documentation, data inputs, and narrative documentation templates carry `SPDX-License-Identifier: CC0-1.0`. Fixtures and generated outputs receive their applicable explicit classification, so generation does not transfer a tooling file's license to unrelated content. Third-party material retains its applicable attribution. These distinctions preserve the intended code and content boundaries through the generation pipeline (`rule:vision:metadata-and-licenses`).

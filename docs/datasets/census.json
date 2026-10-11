@@ -1,0 +1,25 @@
+{
+  "namespace": "org.naturrhythmuszentrum.docs.dataset.census",
+  "version": [
+    1,
+    0,
+    0
+  ],
+  "owner": "NRZ",
+  "license": "CC0-1.0",
+  "sources": [
+    "Cargo.toml",
+    "packages/docgen/Cargo.toml"
+  ],
+  "labels": [
+    "guide:docgen:overview"
+  ],
+  "members": [
+    {
+      "description": "Deterministic documentation datasets, rendering, and fixed-point checks",
+      "has_readme_template": true,
+      "name": "nrz-docgen",
+      "path": "packages/docgen"
+    }
+  ]
+}

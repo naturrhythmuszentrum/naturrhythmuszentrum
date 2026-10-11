@@ -1,0 +1,161 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Exemplars to design against · `reg:exemplars:reference-register`
+
+This register names the reference systems whose choices the engine borrows or deliberately refuses, and the reference problems whose answers are known, so that every bite proves itself against something outside itself. Each entry states what it exemplifies, what to take, what to refuse, and which bite of the plan it binds.
+
+## Reference systems · `sec:exemplars:reference-systems`
+
+### Verified linear algebra · `sec:exemplars:verified-linear-algebra`
+
+**Example (INTLAB)** · `ex:exemplars:intlab`
+
+Rump's MATLAB toolbox for verified computation is the direct ancestor of the certified solve: an approximate inverse, a validated bound on the norm of the identity minus its product with the matrix, and a Neumann-series enclosure of the inverse norm. Take the certificate shape and its honesty about what a failed certificate does not prove; refuse the interactive-environment ergonomics, which the engine replaces with typed results. Binds (`rule:vision:conditioning-and-refusal`), (`dec:vision:primary-error-model`), (`tab:vision:error-model-operation-composition`), (`def:vision:certified-solve-contract`), (`dec:vision:inverse-norm-certificate`), (`rule:vision:solves-and-inverses`), (`def:vision:operation-result-and-failure`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-certified-matrix-core`).
+
+**Example (Arb)** · `ex:exemplars:arb`
+
+Johansson's ball arithmetic library carries every value as a midpoint and a radius and propagates rigorous bounds through arithmetic and matrix functions. Take the center-plus-radius companion as the public value shape and the discipline of a rigorous bound per operation; refuse arbitrary precision as a first capability, which the architecture admits only behind evidence. Binds (`dec:vision:precision-selection`), (`tab:vision:precision-alternatives`), (`def:vision:admissible-values`), (`dec:vision:primary-error-model`), (`tab:vision:error-model-comparison`), (`tab:vision:error-model-operation-composition`), (`def:vision:error-companion-surface`), (`rule:vision:arithmetic-closure`), (`rule:vision:matrix-function-guarantees`), (`step:nrz:bite-units-and-foundations`), (`step:nrz:bite-advanced-matrix-domains`).
+
+### Error analysis as doctrine · `sec:exemplars:error-analysis-doctrine`
+
+**Example (Higham's Accuracy and Stability of Numerical Algorithms)** · `ex:exemplars:higham-accuracy-and-stability`
+
+The text on backward error analysis of dense linear algebra. Take the backward-error vocabulary, the perturbation theorems and the catalogue of stable and unstable algorithms as the design's reference frame; refuse any guarantee the text cannot state as a theorem. Binds (`dec:vision:accuracy-policy`), (`dec:vision:factorizations-and-scaling`), (`rule:vision:equilibration`), (`dec:vision:primary-error-model`), (`tab:vision:error-model-comparison`), (`tab:vision:error-model-operation-composition`), (`rule:vision:arithmetic-closure`), (`def:vision:certified-solve-contract`), (`rule:vision:decomposition-objects`), (`rule:vision:solves-and-inverses`), (`rule:vision:spectral-guarantees`), (`rule:vision:matrix-function-guarantees`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-advanced-matrix-domains`).
+
+**Example (Extra-precise iterative refinement in LAPACK)** · `ex:exemplars:extra-precise-iterative-refinement`
+
+The LAPACK work on iterative refinement with extended-precision residuals and its error bounds shows mixed precision as a demonstrated improvement with a bound, not a hope that iterations restore digits. Take the stopping rules, the componentwise and normwise bound reporting and the refusal to accept an unverified result; refuse the assumption of a particular backend summation order. Binds (`dec:vision:reductions-and-residuals`), (`dec:vision:refinement-and-mixed-precision`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Example (Error-free transformations)** · `ex:exemplars:error-free-transformations`
+
+Ogita, Rump and Oishi's accurate sum and dot product through error-free transformations show compensated reductions whose error is itself bounded. Take the transformations for engine-controlled reductions and residuals; refuse treating compensation as a certificate on its own. Binds (`dec:vision:reductions-and-residuals`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-units-and-foundations`), (`step:nrz:bite-certified-matrix-core`).
+
+### Scalar certification and diagnostics · `sec:exemplars:scalar-certification-and-diagnostics`
+
+**Example (FPTaylor and Gappa)** · `ex:exemplars:fptaylor-and-gappa`
+
+Rigorous rounding-error bounds on floating-point formulas, by symbolic Taylor forms and by interval reasoning with proof output. Take the standard they set for a validated arithmetic path, including subnormals, overflow and fused operations; refuse their offline-tool shape, since the engine's bounds are computed at run time. Binds (`dec:vision:independent-verification-arithmetic`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-units-and-foundations`).
+
+**Example (Herbie)** · `ex:exemplars:herbie`
+
+Automatic rewriting of floating-point expressions for accuracy. Take the lesson that an expression's form is part of its accuracy and belongs under test; refuse automatic rewriting inside the engine, where every formula is written once with its bound. Binds (`tab:vision:package-structure`), (`rule:vision:independent-numerical-evidence`), (`step:nrz:bite-units-and-foundations`).
+
+**Example (CADNA and Verificarlo)** · `ex:exemplars:cadna-and-verificarlo`
+
+Stochastic arithmetic by randomised rounding across repeated evaluations. Take the method as a diagnostic and a test technique for sensitivity; refuse it as evidence that rounding error lies within a deterministic budget, which it never promises. Binds (`tab:vision:error-model-comparison`), (`tab:vision:error-model-operation-composition`), (`dec:vision:alternative-error-model-roles`), (`rule:vision:assurance-and-correlation`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+### Units in the type system · `sec:exemplars:units-in-the-type-system`
+
+**Example (mp-units)** · `ex:exemplars:mp-units`
+
+The C++ library behind the international standard proposal for quantities and units carries quantity kinds, affine points against differences, and a complete dimension algebra. Take the quantity-kind distinctions, the affine treatment of offset scales and the system of dimensions; refuse the template machinery as a surface, since the engine's representation is decided by the units design bite. Binds (`rule:vision:canonical-quantities-and-affine-coordinates`), (`req:vision:powers-and-factor-dimensions`), (`step:nrz:bite-units-design`), (`step:nrz:bite-units-and-foundations`).
+
+**Example (F# units of measure)** · `ex:exemplars:fsharp-units-of-measure`
+
+Compiler-integrated units with inference and readable diagnostics. Take the standard for inference quality and error messages that the units design must meet on compile-only prototypes; refuse the dependence on compiler support the engine does not have. Binds (`req:vision:units-design-criteria`), (`step:nrz:bite-units-design`).
+
+**Example (uom and dimensioned)** · `ex:exemplars:uom-and-dimensioned`
+
+The two Rust attempts at type-level dimensions, one over type-level integers and one over earlier generic machinery. Take their measured compile-time cost, diagnostic quality and public-surface complexity as the baseline the units design bite compares against; refuse adopting either wholesale, because the engine's unit lives on a matrix owner and must meet the lint posture. Binds (`dec:vision:homogeneous-numerical-leaves`), (`tab:vision:dimension-representation-candidates`), (`req:vision:units-design-criteria`), (`step:nrz:bite-units-design`).
+
+### Scalar type as a design axis · `sec:exemplars:scalar-type-as-design-axis`
+
+**Example (Drake)** · `ex:exemplars:drake`
+
+The robotics systems framework parameterises every system over a scalar type, plain floating point, automatic differentiation or symbolic expression, with one model. Take the separation of the physical model from the scalar it computes with, and the context object that carries state and parameters; refuse its runtime graph builder as a surface, since the engine's graphs are petgraph values. Binds (`dec:vision:precision-selection`), (`tab:vision:precision-alternatives`), (`dec:vision:physical-and-computational-graphs`), (`step:nrz:bite-physics-core`).
+
+### Uncertainty with correlation · `sec:exemplars:uncertainty-with-correlation`
+
+**Example (Measurements.jl)** · `ex:exemplars:measurements-jl`
+
+Linear uncertainty propagation that tracks shared sources so correlated inputs are not treated as independent. Take the source identifiers and cross-covariance retention for the optional covariance layer; refuse its implicit independence of fresh values, which the engine makes explicit at construction. Binds (`tab:vision:error-model-comparison`), (`tab:vision:error-model-operation-composition`), (`dec:vision:alternative-error-model-roles`), (`def:vision:error-companion-surface`), (`rule:vision:imports-and-exactness`), (`rule:vision:assurance-and-correlation`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Example (IntervalArithmetic.jl)** · `ex:exemplars:interval-arithmetic-jl`
+
+A clean interval substrate with directed rounding and standard-conformant operations. Take it as the oracle shape for the validated arithmetic path on small problems; refuse full interval matrices as the primary model, which the architecture admits only after measured tightness. Binds (`tab:vision:error-model-comparison`), (`dec:vision:alternative-error-model-roles`), (`dec:vision:independent-verification-arithmetic`), (`rule:vision:independent-numerical-evidence`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-units-and-foundations`), (`step:nrz:bite-advanced-matrix-domains`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+### Physics structure as graphs · `sec:exemplars:physics-structure-as-graphs`
+
+**Example (Modelica)** · `ex:exemplars:modelica`
+
+Equation-based, acausal modelling where a model is a graph of relations and scheduling is a separate transformation. Take the distinction between a physical graph and a computational graph and the explicit assembly of coupled constraints into systems; refuse the language and its index-reduction machinery as a dependency. Binds (`dec:vision:physical-and-computational-graphs`), (`step:nrz:bite-physics-core`).
+
+**Example (SUNDIALS and DifferentialEquations.jl)** · `ex:exemplars:sundials-and-differentialequations-jl`
+
+Integrator suites with error control, step adaptation and documentation that states each method's guarantees. Take the error-controlled stepping, the tolerance vocabulary and the documentation standard; refuse adaptive heuristics that report no bound. Binds (`dec:vision:accuracy-policy`), (`rule:vision:local-and-observable-budgets`), (`step:nrz:bite-physics-core`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+### Rust neighbours · `sec:exemplars:rust-neighbours`
+
+**Example (faer)** · `ex:exemplars:faer`
+
+The engine's linear-algebra backend. Take its safe public surface for candidates and its scalar contract as the boundary the matrix package adapts; refuse reaching into its kernels or assuming its reduction order. Binds (`dec:vision:storage-and-scalar-wrapping`), (`tab:vision:package-structure`), (`rule:vision:backend-boundaries`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-certified-matrix-core`).
+
+**Example (nalgebra)** · `ex:exemplars:nalgebra`
+
+Compile-time matrix shapes through const generics and generic scalars. Take the evidence on what const generics cost and afford in a numerical crate; refuse per-element wrapper storage in hot paths. Binds (`dec:vision:homogeneous-numerical-leaves`), (`dec:vision:storage-and-scalar-wrapping`), (`tab:vision:dimension-representation-candidates`), (`req:vision:units-design-criteria`), (`step:nrz:bite-units-design`), (`step:nrz:bite-certified-matrix-core`).
+
+**Example (The estate's tools repository and the templated-documentation epic)** · `ex:exemplars:estate-tools-and-templated-documentation`
+
+Labels, the linter's owner graph, and the four-stage templated documentation of the tracker's epic. Take the label calculus, the owner partitions and the fixed-point pipeline as given; refuse hand-edited Markdown anywhere. Binds (`tab:vision:package-structure`), (`dec:vision:documentation-layout`), (`rule:vision:documentation-envelope-and-derivation`), (`rule:vision:fixed-point-gate-and-bootstrap`), (`dec:vision:labels-and-ownership`), (`rule:vision:metadata-and-licenses`), (`rule:vision:gate-of-record`), (`step:nrz:bite-documentation-generator`), (`step:nrz:bite-exemplar-register`).
+
+## Reference problems · `sec:exemplars:reference-problems`
+
+**Convention (Problem entry shape)** · `conv:exemplars:problem-entry-shape`
+
+Every reference problem states its physical model, its inputs with units and declared uncertainty, its expected observables with their closed-form or independently computed values, the error classes it bounds, estimates or excludes, and the architectural claim it stresses, because a problem that cannot say what a correct answer is cannot judge an engine.
+
+**Problem (Spring-mass truss statics)** · `prob:exemplars:spring-mass-truss`
+
+A planar truss of springs under static loads, with one member far stiffer than the rest. Observables are the node displacements in metres and member forces in newtons from a stiffness matrix in newtons per metre; the answer follows from linear elasticity by hand for small trusses. Stresses typed heterogeneous blocks, the certified solve and refusal under ill-conditioning. Binds (`rule:vision:heterogeneous-assembly`), (`rule:vision:verification-locations`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-units-design`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-physics-core`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Problem (Resistor network by modified nodal analysis)** · `prob:exemplars:resistor-network`
+
+A resistor network with voltage and current sources under Kirchhoff's laws, assembled by modified nodal analysis into one block system in volts and amperes. Observables are node voltages and branch currents with closed forms for ladder and bridge networks. Stresses the second heterogeneous block case and the quotient-dimension rule of assembly. Binds (`dec:vision:homogeneous-numerical-leaves`), (`rule:vision:heterogeneous-assembly`), (`rule:vision:verification-locations`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-units-design`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-physics-core`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Problem (Coupled oscillators and normal modes)** · `prob:exemplars:coupled-oscillators-normal-modes`
+
+Masses on springs with a symmetric stiffness and mass matrix, including a configuration with a degenerate mode pair. Observables are the mode frequencies in radians per second and the mode shapes; the symmetric chain has closed-form modes. Stresses spectral guarantees, invariant subspaces for repeated eigenvalues and the generalised eigenproblem's dimensions. Binds (`rule:vision:spectral-guarantees`), (`req:vision:powers-and-factor-dimensions`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-units-design`), (`step:nrz:bite-advanced-matrix-domains`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Problem (Kepler two-body orbit)** · `prob:exemplars:kepler-two-body-orbit`
+
+Two bodies under gravitation with known period, energy, angular momentum and eccentricity vector. Observables are the conserved quantities over many orbits and the position against the closed-form ellipse. Stresses integrator error control and long-run drift as measured error. Binds (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Problem (Damped driven harmonic oscillator)** · `prob:exemplars:damped-driven-harmonic-oscillator`
+
+A mass, spring, damper and sinusoidal drive with the closed-form transient and steady state. Observables are amplitude, phase and energy over time. Stresses stiffness as damping grows and the separation of discretisation error from rounding error. Binds (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-physics-core`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Problem (One-dimensional heat conduction)** · `prob:exemplars:heat-conduction-one-dimensional`
+
+Steady and transient conduction in a rod with fixed end temperatures, discretised to a tridiagonal system whose conditioning grows with the grid. Observables are the temperature profile in kelvin against the analytic solution. Stresses the ledger's separation of discretisation and modelling error from numerical error, and affine temperature coordinates. Binds (`def:vision:error-companion-surface`), (`rule:vision:canonical-quantities-and-affine-coordinates`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-units-design`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Problem (Gravitational acceleration from pendulum periods)** · `prob:exemplars:pendulum-gravity-estimate`
+
+Estimating gravitational acceleration from measured periods and lengths with stated uncertainties and shared instruments. Observables are the estimate and its uncertainty under declared correlations. Stresses the covariance layer, source identifiers and the distinction between probabilistic and deterministic claims. Binds (`rule:vision:imports-and-exactness`), (`rule:vision:assurance-and-correlation`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+## Adversarial fixtures · `sec:exemplars:adversarial-fixtures`
+
+**Example (Hilbert matrices)** · `ex:exemplars:hilbert-matrices`
+
+Exactly known, catastrophically conditioned at modest order. Take them as the first refusal test: a certified solve must decline a budget it cannot meet rather than return confident digits. Binds (`rule:vision:conditioning-and-refusal`), (`def:vision:operation-result-and-failure`), (`rule:vision:independent-numerical-evidence`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Example (Kahan and Wilkinson matrices)** · `ex:exemplars:kahan-and-wilkinson-matrices`
+
+Matrices built to defeat pivoting, growth control and rank revelation. Take them as fixtures for factorization choices and equilibration. Binds (`dec:vision:factorizations-and-scaling`), (`rule:vision:equilibration`), (`rule:vision:decomposition-objects`), (`rule:vision:independent-numerical-evidence`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-advanced-matrix-domains`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+**Counterexample (Rump's polynomial)** · `cex:exemplars:rump-polynomial`
+
+A bivariate polynomial whose naive evaluation gives a confidently wrong value and even a wrong sign at every ordinary precision. Take it as the first certification test of the validated arithmetic path, where the correct behaviour is a wide enclosure or a refusal, never a confident wrong number. Binds (`dec:vision:independent-verification-arithmetic`), (`def:vision:operation-result-and-failure`), (`rule:vision:independent-numerical-evidence`), (`step:nrz:bite-exemplar-register`), (`step:nrz:bite-numerical-feasibility`), (`step:nrz:bite-units-and-foundations`), (`step:nrz:bite-accuracy-and-benchmarks`).
+
+## Use in the plan · `sec:exemplars:use-in-the-plan`
+
+**Decision (An exemplar bite precedes numerical feasibility)** · `dec:exemplars:exemplar-bite`
+
+One short design bite renders this register into the repository and seeds the problems tree with the reference problems above, each in the entry shape, before the feasibility stage, because the feasibility experiments need targets with known answers and the later bites need a fixed list to cite.
+
+**Rule (Take and refuse are stated per exemplar)** · `rule:exemplars:take-and-refuse`
+
+Every exemplar entry states what the engine takes and what it refuses, because a reference admired whole imports its compromises along with its insights, and a later bite citing the entry inherits a decision rather than an inspiration.
+
+**Rule (Adversarial fixtures gate certification first)** · `rule:exemplars:adversarial-fixtures-gate-first`
+
+The feasibility bite meets the adversarial fixtures before any physics problem, because an engine that produces a confident wrong sign on a known counterexample has nothing to certify yet, and the fixtures are cheap to run and exact to judge.

@@ -9,4 +9,10 @@ policies = [
   { owner = "NRZ", policy = "labels.heads-conform" },
   { owner = "NRZ", policy = "labels.citations-local-resolve" },
   { owner = "NRZ", policy = "owners.reach-conform" },
+  { owner = "DOCGEN", policy = "labels.mints-well-formed" },
+  { owner = "DOCGEN", policy = "labels.mints-kind-conform" },
+  { owner = "DOCGEN", policy = "labels.mints-unique" },
+  { owner = "DOCGEN", policy = "labels.heads-conform" },
+  { owner = "DOCGEN", policy = "labels.citations-local-resolve" },
+  { owner = "DOCGEN", policy = "owners.reach-conform" },
 ]
