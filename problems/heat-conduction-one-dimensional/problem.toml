@@ -1,0 +1,190 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.problem"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:heat-conduction-one-dimensional"]
+
+[problem]
+slug = "heat-conduction-one-dimensional"
+title = "One-dimensional heat conduction"
+register = "prob:exemplars:heat-conduction-one-dimensional"
+kind = "problem"
+model = """
+A uniform rod has constant conductivity and diffusivity, no internal heat generation and fixed end temperatures. Steady conduction satisfies T''=0. The transient model is T_t=alpha*T_xx. A central second difference uses three interior points with spacing h=L/4. Temperature coordinates are converted to kelvin before assembly.
+The temperature-scale selector chooses either the kelvin endpoint parameters or their Celsius alternatives. Celsius parameters are alternative coordinates of the same boundary temperatures, not additional uncertain physical inputs. The time-regime selector chooses steady or transient use.
+"""
+instance = """
+The rod occupies 0<=x<=1 m. Its ends are at 273.15 K and 373.15 K. Interior nodes are at 1/4,1/2,3/4 m. For the transient variant, the open rod interior is initially uniform at 273.15 K; the boundary values are imposed for positive time, so the initial right-end mismatch is intentional.
+"""
+
+[[parameters]]
+name = "L"
+description = "rod length"
+value = "1"
+unit = { display = "m", m = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "conductivity"
+description = "thermal conductivity"
+value = "1"
+unit = { display = "W/(m*K)", m = 1, kg = 1, s = -3, K = -1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "alpha"
+description = "thermal diffusivity"
+value = "1/100"
+unit = { display = "m^2/s", m = 2, s = -1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "T_left"
+description = "left endpoint in kelvin"
+value = "273.15"
+unit = { display = "K", K = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "T_right"
+description = "right endpoint in kelvin"
+value = "373.15"
+unit = { display = "K", K = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "T_left_C"
+description = "alternative left endpoint used only by the Celsius variant"
+value = "0"
+unit = { display = "degC", K = 1, offset = "273.15" }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "T_right_C"
+description = "alternative right endpoint used only by the Celsius variant"
+value = "100"
+unit = { display = "degC", K = 1, offset = "273.15" }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "T_initial"
+description = "uniform initial interior temperature for transient conduction"
+value = "273.15"
+unit = { display = "K", K = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "temperature_scale"
+description = "zero uses kelvin endpoints and one uses Celsius endpoints"
+value = "0"
+unit = { display = "1" }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "time_regime"
+description = "zero selects steady conduction and one selects transient conduction"
+value = "0"
+unit = { display = "1" }
+uncertainty = { kind = "none" }
+
+[[observables]]
+name = "T1"
+description = "steady temperature at x=L/4"
+unit = { display = "K", K = 1 }
+closed_form = "T_left+(T_right-T_left)/4"
+value = "298.15"
+value_kind = "exact"
+derivation = """
+The steady continuum solution is T(x)=T_left+(T_right-T_left)*x/L. At the first node this gives 273.15+100/4=298.15 K. The discrete system is A*T=[T_left,0,T_right]^T, with A=[[2,-1,0],[-1,2,-1],[0,-1,2]] dimensionless and both sides in K. Multiplying by conductivity/h^2 restores the physical conduction operator, whose dimension is W/(m^3*K), and an equation residual in W/m^3.
+A second difference of a linear profile vanishes exactly. Consequently these nodal values have no spatial discretisation error for this specific steady model.
+"""
+second_route = "none"
+
+[[observables]]
+name = "T2"
+description = "steady temperature at x=L/2"
+unit = { display = "K", K = 1 }
+closed_form = "(T_left+T_right)/2"
+value = "323.15"
+value_kind = "exact"
+derivation = """
+The linear profile at the midpoint is 273.15+100/2=323.15 K.
+"""
+second_route = "The inverse of A is [[3,2,1],[2,4,2],[1,2,3]]/4. Its middle row applied to [273.15,0,373.15]^T gives (273.15+373.15)/2=323.15 K."
+
+[[observables]]
+name = "T3"
+description = "steady temperature at x=3*L/4"
+unit = { display = "K", K = 1 }
+closed_form = "T_left+3*(T_right-T_left)/4"
+value = "348.15"
+value_kind = "exact"
+derivation = """
+The linear profile gives 273.15+3*100/4=348.15 K. Successive endpoint and interior differences are all exactly 25 K.
+"""
+second_route = "none"
+
+[[observables]]
+name = "condition_number"
+description = "spectral condition number of the three-point second-difference matrix"
+unit = { display = "1" }
+closed_form = "(2+sqrt(2))/(2-sqrt(2))"
+value = "5.82842712475"
+value_kind = "decimal-12"
+derivation = """
+The eigenvalues are 2-2*cos(j*pi/4), for j=1,2,3: 2-sqrt(2), 2 and 2+sqrt(2). The ratio of largest to smallest is (2+sqrt(2))/(2-sqrt(2))=3+2*sqrt(2). Squaring rational endpoints gives 1.4142135623730950<sqrt(2)<1.4142135623730951, which fixes the reported rounding.
+"""
+second_route = "none"
+
+[[observables]]
+name = "heat_flux"
+description = "steady heat flux in the positive x direction"
+unit = { display = "W/m^2", kg = 1, s = -3 }
+closed_form = "-conductivity*(T_right-T_left)/L"
+value = "-100"
+value_kind = "exact"
+derivation = """
+Fourier's law gives flux=-conductivity*dT/dx=-1*(373.15-273.15)/1=-100 W/m^2. Heat flows towards decreasing x.
+"""
+second_route = "none"
+
+[[observables]]
+name = "continuum_first_mode_decay_rate"
+description = "positive decay rate of the first transient sine mode"
+unit = { display = "s^-1", s = -1 }
+closed_form = "alpha*pi^2/L^2"
+value = "0.0986960440109"
+value_kind = "decimal-12"
+derivation = """
+After subtracting the steady profile, the homogeneous endpoint problem has eigenfunctions sin(j*pi*x/L) and decay rates alpha*(j*pi/L)^2. The first rate is pi^2/100 s^(-1). Evaluating pi through 16*atan(1/5)-4*atan(1/239), with alternating-series remainder bounds, gives pi^2=9.869604401089358... and the stated rate.
+"""
+second_route = "none"
+
+[[variants]]
+name = "celsius-endpoints"
+description = "pose the same boundary temperatures as affine Celsius coordinates"
+overrides = { temperature_scale = "1" }
+expected = """
+The Celsius endpoint values 0 and 100 map to 273.15 K and 373.15 K by adding the exact offset 273.15 K. The Celsius interior coordinates are exactly 25,50,75; the corresponding kelvin temperatures are 298.15,323.15,348.15.
+Every temperature difference is unchanged: each grid increment is 25 K and the total endpoint difference is 100 K. Absolute coordinate numbers shift by 273.15. Assembly operates on canonical kelvin temperatures; multiplying an absolute Celsius coordinate as though it were a multiplicative unit is not the conversion rule. Decimal-to-binary conversion accounting remains distinct from the exact affine mathematical conversion.
+"""
+
+[[variants]]
+name = "transient-uniform-interior"
+description = "decay from the stated uniform interior temperature"
+overrides = { time_regime = "1" }
+expected = """
+For 0<x<L at time zero, subtracting the steady profile gives theta(x,0)=-100*x/L K. Its sine-series coefficient is b_j=(2/L)*integral(theta(x,0)*sin(j*pi*x/L),x=0..L)=200*(-1)^j/(j*pi) K. In particular the first coefficient is -200/pi K and its decay rate is pi^2/100 s^(-1).
+For the three-interior-point method of lines, the first discrete decay rate is (alpha/h^2)*(2-sqrt(2))=(4/25)*(2-sqrt(2)) s^(-1), approximately 0.0937258300203 s^(-1) to twelve significant digits. This differs from the continuum rate 0.0986960440109 s^(-1). The difference follows from the different spatial operators and belongs to the discretisation claim, separately from the arithmetic and verification ledger. Time discretisation, if introduced, adds a further separately stated claim.
+"""
+
+[errors]
+bounded = ["representation and arithmetic contributions in the discrete steady solve", "verification contributions for the discrete system", "zero steady nodal spatial discretisation error for the stated linear profile"]
+estimated = ["transient discretisation discrepancy against the continuum solution"]
+excluded = ["material and boundary-condition modelling error", "promotion of a discrete arithmetic certificate to a continuum error bound"]
+
+[stress]
+claims = ["def:vision:error-companion-surface", "rule:vision:canonical-quantities-and-affine-coordinates"]
+bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-accuracy-and-benchmarks"]

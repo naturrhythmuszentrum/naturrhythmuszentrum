@@ -1,0 +1,143 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.problem"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:damped-driven-harmonic-oscillator"]
+
+[problem]
+slug = "damped-driven-harmonic-oscillator"
+title = "Damped driven harmonic oscillator"
+register = "prob:exemplars:damped-driven-harmonic-oscillator"
+kind = "problem"
+model = """
+The displacement satisfies m*x''+c*x'+k*x=F*cos(omega*t). The spring and viscous damper are linear, the drive is prescribed, and the initial displacement and velocity vanish. Phase lag is measured relative to the cosine drive and lies between zero and pi for positive damping.
+"""
+instance = """
+A 4 kg mass is attached to a spring of stiffness 13 N/m and a damper of coefficient 12 N*s/m. A 15 N cosine force with angular frequency 1 rad/s starts at time zero. The transient displacement is requested at t=1 s.
+"""
+
+[[parameters]]
+name = "m"
+description = "mass"
+value = "4"
+unit = { display = "kg", kg = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "k"
+description = "spring stiffness"
+value = "13"
+unit = { display = "N/m", kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "c"
+description = "viscous damping coefficient"
+value = "12"
+unit = { display = "N*s/m", kg = 1, s = -1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "F"
+description = "drive force amplitude"
+value = "15"
+unit = { display = "N", m = 1, kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "omega"
+description = "drive angular frequency"
+value = "1"
+unit = { display = "rad/s", s = -1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "t"
+description = "time of the transient displacement observable"
+value = "1"
+unit = { display = "s", s = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "x0"
+description = "initial displacement"
+value = "0"
+unit = { display = "m", m = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "v0"
+description = "initial velocity"
+value = "0"
+unit = { display = "m/s", m = 1, s = -1 }
+uncertainty = { kind = "none" }
+
+[[observables]]
+name = "steady_amplitude"
+description = "steady-state displacement amplitude"
+unit = { display = "m", m = 1 }
+closed_form = "F / sqrt((k-m*omega^2)^2+(c*omega)^2)"
+value = "1"
+value_kind = "exact"
+derivation = """
+The real and imaginary stiffness components are k-m*omega^2=9 N/m and c*omega=12 N/m. Their magnitude is sqrt(9^2+12^2)=15 N/m, so the displacement amplitude is 15/15=1 m.
+"""
+second_route = "Substitute x=a*cos(t)+b*sin(t), with time in seconds. Coefficient matching gives 9*a+12*b=15 and -12*a+9*b=0, hence a=3/5 m and b=4/5 m. Their Euclidean amplitude is sqrt(9/25+16/25)=1 m."
+
+[[observables]]
+name = "phase_lag"
+description = "steady-state lag behind the cosine force"
+unit = { display = "rad" }
+closed_form = "atan(4/3)"
+value = "0.927295218002"
+value_kind = "decimal-12"
+derivation = """
+Both stiffness components are positive, so the phase is atan((c*omega)/(k-m*omega^2))=atan(4/3)=2*atan(1/2). The alternating series for atan(1/2), through j=22 in sum((-1)^j*(1/2)^(2*j+1)/(2*j+1)), has a next-term bound below 2e-16 after multiplication by two. It gives 0.927295218001612... rad and the stated rounding.
+"""
+second_route = "none"
+
+[[observables]]
+name = "damped_natural_frequency"
+description = "angular frequency of the decaying homogeneous oscillation"
+unit = { display = "rad/s", s = -1 }
+closed_form = "sqrt(k/m-(c/(2*m))^2)"
+value = "1"
+value_kind = "exact"
+derivation = """
+The decay coefficient is alpha=c/(2*m)=3/2 s^(-1). The squared damped frequency is 13/4-9/4=1 s^(-2), so its positive root is exactly 1 rad/s.
+"""
+second_route = "none"
+
+[[observables]]
+name = "displacement_at_t"
+description = "displacement from rest at the stated time"
+unit = { display = "m", m = 1 }
+closed_form = "(3/5)*cos(omega*t)+(4/5)*sin(omega*t)-exp(-3*t/(2 s))*((3/5)*cos(omega*t)+(17/10)*sin(omega*t))"
+value = "0.605835682824"
+value_kind = "decimal-12"
+derivation = """
+The particular displacement is (3/5)*cos(t)+(4/5)*sin(t) m, with t expressed in seconds. The homogeneous displacement is exp(-3*t/2)*(C*cos(t)+D*sin(t)). Zero initial displacement gives C=-3/5 m; zero initial velocity gives D=-17/10 m. This yields the displayed closed form.
+At one second, cos(1)=0.5403023058681397..., sin(1)=0.8414709848078965... and exp(-3/2)=0.2231301601484298.... The particular term is 0.9973581713672010... m and the subtracted transient term is 0.3915224885429073... m. Their difference is 0.6058356828242937... m. These evaluations can be reproduced with the alternating sine and cosine series through j=9 and the exponential series through degree 30; their remainder bounds are smaller than the rounding margin for twelve significant digits.
+"""
+second_route = "none"
+
+[[variants]]
+name = "overdamped"
+description = "raise damping to separate the fast and slow homogeneous timescales"
+overrides = { c = "400" }
+expected = """
+The characteristic roots are r_plus=(-100+sqrt(9987))/2 and r_minus=(-100-sqrt(9987))/2 in s^(-1). Both are negative. The ratio of their magnitudes is (100+sqrt(9987))/(100-sqrt(9987)), strictly between 3000 and 3100. This separates the initial fast decay from the slow relaxation and stresses time-stepping stiffness.
+The steady amplitude is 15/sqrt(160081) m and the phase lag is atan(400/9). Writing a=135/160081 m and b=6000/160081 m, the exact displacement is a*cos(t)+b*sin(t)+((r_minus*a-b/(1 s))/(r_plus-r_minus))*exp(r_plus*t)+((b/(1 s)-r_plus*a)/(r_plus-r_minus))*exp(r_minus*t), with the trigonometric argument t/(1 s). The coefficients enforce zero initial displacement and velocity.
+A stepping comparison records discretisation error against this closed form separately from representation, arithmetic and verification contributions. A small arithmetic radius alone does not certify a trajectory's discretisation error.
+"""
+
+[errors]
+bounded = ["arithmetic and verification contributions of a validated closed-form evaluation"]
+estimated = ["time-discretisation error measured against the closed-form trajectory"]
+excluded = ["unproved deterministic bounds for a stepping method", "nonlinear spring and damping modelling error", "drive uncertainty not declared as input"]
+
+[stress]
+claims = ["def:vision:error-companion-surface", "rule:vision:local-and-observable-budgets", "rule:vision:independent-numerical-evidence"]
+bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-physics-core", "step:nrz:bite-accuracy-and-benchmarks"]

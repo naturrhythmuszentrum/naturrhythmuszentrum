@@ -1,0 +1,175 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.problem"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:spring-mass-truss"]
+
+[problem]
+slug = "spring-mass-truss"
+title = "Spring-mass truss statics"
+register = "prob:exemplars:spring-mass-truss"
+kind = "problem"
+model = """
+Three axial springs support one free planar node. Linearisation fixes the member directions at their undeformed values. Positive member force denotes tension. The node mass does not enter static equilibrium; gravity is omitted from the prescribed loading. Geometric nonlinearity and material nonlinearity are outside the model.
+"""
+instance = """
+The free node is initially at (0,0). Fixed anchors are at (-L,0), (0,-L), and (-L,-L). The horizontal and vertical members each have length L; the diagonal member has length L*sqrt(2). Their independent axial stiffnesses are kx, ky, and kd. The applied nodal load is (Fx,Fy). The two free degrees of freedom are ux and uy.
+"""
+
+[[parameters]]
+name = "L"
+description = "undeformed length of each orthogonal member"
+value = "1"
+unit = { display = "m", m = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "mass"
+description = "mass attached to the free node"
+value = "1"
+unit = { display = "kg", kg = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "kx"
+description = "horizontal member stiffness"
+value = "1000"
+unit = { display = "N/m", kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "ky"
+description = "vertical member stiffness"
+value = "1"
+unit = { display = "N/m", kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "kd"
+description = "diagonal member axial stiffness"
+value = "1"
+unit = { display = "N/m", kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "Fx"
+description = "horizontal applied force"
+value = "1"
+unit = { display = "N", m = 1, kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "Fy"
+description = "vertical applied force"
+value = "1/1000"
+unit = { display = "N", m = 1, kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "relative_budget"
+description = "maximum certified two-norm radius divided by candidate displacement norm"
+value = "1/1000000"
+unit = { display = "1" }
+uncertainty = { kind = "none" }
+
+[[observables]]
+name = "ux"
+description = "horizontal displacement"
+unit = { display = "m", m = 1 }
+closed_form = "2999/3001000"
+value = "2999/3001000"
+value_kind = "exact"
+derivation = """
+The member direction vectors are (1,0), (0,1), and (1,1)/sqrt(2). Their stiffness contributions give K=[[kx+kd/2,kd/2],[kd/2,ky+kd/2]]=[[2001/2,1/2],[1/2,3/2]] N/m. The load is [1,1/1000]^T N, and det(K)=3001/2 (N/m)^2. Elimination gives ux=(2999/2000)/(3001/2)=2999/3001000 m.
+A mixed assembly can retain three member forces f and use the direction matrix B whose columns are the three stated vectors: [[0,B],[B^T,-D^(-1)]]*[u,f]^T=[F,0]^T, where D=diag(kx,ky,kd). The top block has dimension N and the bottom block m. The four operator blocks have dimensions N/m, 1, 1, and m/N. Eliminating f gives K=B*D*B^T.
+"""
+second_route = "Cramer's rule replaces the first stiffness column by the load and gives numerator (3/2)*1-(1/2)*(1/1000)=2999/2000 N^2/m; division by det(K) independently gives 2999/3001000 m."
+
+[[observables]]
+name = "uy"
+description = "vertical displacement"
+unit = { display = "m", m = 1 }
+closed_form = "1001/3001000"
+value = "1001/3001000"
+value_kind = "exact"
+derivation = """
+Eliminating ux from the coupled stiffness equations gives uy=1001/3001000 m. Direct substitution yields (1/2)*(2999/3001000)+(3/2)*(1001/3001000)=1/1000 N.
+"""
+second_route = "The potential energy is u^T*K*u/2-F^T*u. Its positive-definite Hessian is K; the unique stationary point satisfies K*u=F. Cramer's rule gives uy=((2001/2)*(1/1000)-(1/2)*1)/(3001/2)=1001/3001000 m."
+
+[[observables]]
+name = "horizontal_member_force"
+description = "tension in the horizontal member"
+unit = { display = "N", m = 1, kg = 1, s = -2 }
+closed_form = "kx*ux"
+value = "2999/3001"
+value_kind = "exact"
+derivation = """
+The horizontal extension is ux, so its tensile force is 1000*(2999/3001000)=2999/3001 N.
+"""
+second_route = "The diagonal force contributes (kd/2)*(ux+uy)=2/3001 N in the horizontal direction. Force balance gives 1-2/3001=2999/3001 N."
+
+[[observables]]
+name = "vertical_member_force"
+description = "tension in the vertical member"
+unit = { display = "N", m = 1, kg = 1, s = -2 }
+closed_form = "ky*uy"
+value = "1001/3001000"
+value_kind = "exact"
+derivation = """
+The vertical extension is uy, so its tensile force is 1*(1001/3001000)=1001/3001000 N.
+"""
+second_route = "The diagonal member contributes 2/3001 N vertically. Force balance gives 1/1000-2/3001=1001/3001000 N."
+
+[[observables]]
+name = "diagonal_member_force"
+description = "tension in the diagonal member"
+unit = { display = "N", m = 1, kg = 1, s = -2 }
+closed_form = "kd*(ux+uy)/sqrt(2) = 2*sqrt(2)/3001"
+value = "0.000942494876623"
+value_kind = "decimal-12"
+derivation = """
+The diagonal axial extension is (ux+uy)/sqrt(2)=4/(3001*sqrt(2)) m. Its tensile force is 2*sqrt(2)/3001 N, or 0.000942494876623 N to twelve significant digits. Its component along either free coordinate is 2/3001 N.
+"""
+second_route = "Both force-balance equations independently give a diagonal component: 1-2999/3001=2/3001 N and 1/1000-1001/3001000=2/3001 N. Multiplying either component by sqrt(2) recovers the axial force."
+
+[[observables]]
+name = "condition_number"
+description = "spectral condition number of the stiffness matrix in the stated SI coordinates"
+unit = { display = "1" }
+closed_form = "(1002+sqrt(998002))/(1002-sqrt(998002))"
+value = "667.111463346"
+value_kind = "decimal-12"
+derivation = """
+For symmetric positive-definite K, the eigenvalues are (1002+sqrt(998002))/2 and (1002-sqrt(998002))/2 N/m. Their ratio is (1002+sqrt(998002))/(1002-sqrt(998002))=667.111463346 to twelve significant digits. Positivity follows also from the positive leading entry and det(K)=3001/2.
+"""
+second_route = "The characteristic polynomial is lambda^2-1002*lambda+3001/2. Its two positive roots reproduce the eigenvalues and their ratio."
+
+[[variants]]
+name = "base-certification"
+description = "certification expectation for the base instance"
+overrides = { kx = "1000" }
+expected = """
+Use binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, and no refinement or higher precision. Import an exactly representable rational entry, including these integer and dyadic matrix entries, with zero representation radius; enclose only an inexact import such as Fy=1/1000 by half an ulp. Let rho bound the represented-center residual norm, rA and rB bound input perturbations, and xnorm bound the candidate norm. An approximate inverse Z supplies validated q>=norm_2(I-Z*A); if q<1, use g=norm_2(Z)/(1-q). The certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA), provided g*rA<1. Success requires R/norm_2(xhat)<=relative_budget.
+Success is expected for the base condition number 667.111463346 and relative budget 1e-6: kappa*2^(-53) is about 7.4e-14, rA is zero for the exact matrix import, and the right-hand-side import radius is far below the budget after inverse amplification. The feasibility bite must record the actual validated q, residual, and radius; conditioning alone is not a certificate.
+"""
+
+[[variants]]
+name = "millionfold-stiff-member"
+description = "multiply the horizontal member stiffness by one million"
+overrides = { kx = "1000000000" }
+expected = """
+The stiffness matrix is [[2000000001/2,1/2],[1/2,3/2]] N/m, with determinant 3000000001/2 (N/m)^2. The exact displacement is [2999/3000000001000,1999999001/3000000001000]^T m. The horizontal, vertical, and diagonal tensile forces are respectively 2999000000/3000000001 N, 1999999001/3000000001000 N, and 1000001*sqrt(2)/3000000001 N; the diagonal force is 0.000471404992038 N to twelve significant digits. Their projected components satisfy both exact force-balance equations.
+The eigenvalues are (1000000002+sqrt(999999998000000002))/2 and (1000000002-sqrt(999999998000000002))/2 N/m, giving spectral condition number (1000000002+sqrt(999999998000000002))/(1000000002-sqrt(999999998000000002))=666666667.111 to twelve significant digits. The matrix entries and large stiffness import exactly, so rA=0. The estimate kappa*2^(-53) is about 7.4e-8, below the relative budget 1e-6; success remains expected, subject to the actual residual and inverse validation. Refusal is required if q>=1 or the validated radius exceeds the budget, and would concern this certificate, not exact singularity. Under the former blanket half-unit policy, an exactly represented stiffness of 1000000000000 could alone have exhausted this budget; that policy does not apply here.
+"""
+
+[errors]
+bounded = ["declared representation contributions at rational import", "arithmetic and verification contributions when a solve certificate succeeds"]
+estimated = ["conditioning-based certification expectations"]
+excluded = ["geometric and material modelling error", "unmodelled loads", "a singularity conclusion from refusal"]
+
+[stress]
+claims = ["rule:vision:heterogeneous-assembly", "rule:vision:verification-locations", "rule:vision:conditioning-and-refusal", "def:vision:certified-solve-contract"]
+bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-certified-matrix-core", "step:nrz:bite-physics-core", "step:nrz:bite-accuracy-and-benchmarks"]

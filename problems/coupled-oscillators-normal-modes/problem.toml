@@ -1,0 +1,246 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.problem"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:coupled-oscillators-normal-modes"]
+
+[problem]
+slug = "coupled-oscillators-normal-modes"
+title = "Coupled oscillators and normal modes"
+register = "prob:exemplars:coupled-oscillators-normal-modes"
+kind = "problem"
+model = """
+Three equal point masses undergo small longitudinal displacements. Springs are linear and massless, with no damping. Mode shapes are dimensionless ratios, with their first component fixed to one for the chain. The ring variant uses cyclic scalar displacement coordinates and three nearest-neighbour springs.
+"""
+instance = """
+For the chain, walls are at coordinates 0 and 4*spacing, and masses are at spacing, 2*spacing and 3*spacing. Four equal springs connect successive walls and masses. The base boundary selector is zero. Selector one closes the three masses into a cyclic chain and removes the wall springs.
+"""
+
+[[parameters]]
+name = "m"
+description = "each mass"
+value = "1"
+unit = { display = "kg", kg = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "k"
+description = "each spring stiffness"
+value = "1"
+unit = { display = "N/m", kg = 1, s = -2 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "spacing"
+description = "undeformed chain spacing"
+value = "1"
+unit = { display = "m", m = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "boundary"
+description = "zero for fixed-wall chain and one for ring"
+value = "0"
+unit = { display = "1" }
+uncertainty = { kind = "none" }
+
+[[observables]]
+name = "omega1_squared"
+description = "lowest squared angular frequency"
+unit = { display = "s^-2", s = -2 }
+closed_form = "(2 - sqrt(2)) * k / m"
+value = "0.585786437627"
+value_kind = "decimal-12"
+derivation = """
+The generalised eigenproblem is K*v=lambda*M*v, with K=k*[[2,-1,0],[-1,2,-1],[0,-1,2]] in N/m and M=m*I in kg. Thus lambda has dimension s^(-2), and omega has dimension rad/s. For z=lambda*m/k, the characteristic polynomial is (2-z)*((2-z)^2-2). Its smallest root is 2-sqrt(2).
+The rational inequalities 1.4142135623730950<sqrt(2)<1.4142135623730951 follow by squaring their endpoints and suffice to round the squared frequencies and middle shape components to twelve significant digits.
+"""
+second_route = "none"
+
+[[observables]]
+name = "omega2_squared"
+description = "middle squared angular frequency"
+unit = { display = "s^-2", s = -2 }
+closed_form = "2 * k / m"
+value = "2"
+value_kind = "exact"
+derivation = """
+The central root of (2-z)*((2-z)^2-2) is z=2. With k/m=1 s^(-2), the eigenvalue is 2 s^(-2).
+"""
+second_route = "Direct multiplication gives K*[1,0,-1]^T=2*[1,0,-1]^T N/m, while M is the identity in kg."
+
+[[observables]]
+name = "omega3_squared"
+description = "highest squared angular frequency"
+unit = { display = "s^-2", s = -2 }
+closed_form = "(2 + sqrt(2)) * k / m"
+value = "3.41421356237"
+value_kind = "decimal-12"
+derivation = """
+The largest root of the displayed characteristic polynomial is 2+sqrt(2). The stated rational bracket for sqrt(2) gives the recorded decimal.
+"""
+second_route = "none"
+
+[[observables]]
+name = "omega1"
+description = "lowest angular frequency"
+unit = { display = "rad/s", s = -1 }
+closed_form = "sqrt((2 - sqrt(2)) * k / m)"
+value = "0.765366864730"
+value_kind = "decimal-12"
+derivation = """
+Take the positive square root of the lowest eigenvalue. Squaring rational endpoints, together with the bracket for sqrt(2), gives 0.7653668647301795<omega1<0.7653668647301796 in rad/s.
+"""
+second_route = "none"
+
+[[observables]]
+name = "omega2"
+description = "middle angular frequency"
+unit = { display = "rad/s", s = -1 }
+closed_form = "sqrt(2 * k / m)"
+value = "1.41421356237"
+value_kind = "decimal-12"
+derivation = """
+The positive square root of 2 s^(-2) is sqrt(2) rad/s. The bracket obtained by rational squaring fixes the twelve-digit rounding.
+"""
+second_route = "none"
+
+[[observables]]
+name = "omega3"
+description = "highest angular frequency"
+unit = { display = "rad/s", s = -1 }
+closed_form = "sqrt((2 + sqrt(2)) * k / m)"
+value = "1.84775906502"
+value_kind = "decimal-12"
+derivation = """
+The positive square root of the highest eigenvalue lies between 1.8477590650225734 and 1.8477590650225736 rad/s, as checked by squaring and using the bracket for sqrt(2).
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode1_component1"
+description = "first component of the lowest-frequency shape"
+unit = { display = "1" }
+closed_form = "1"
+value = "1"
+value_kind = "exact"
+derivation = """
+The scale convention fixes the first component to one.
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode1_component2"
+description = "second component of the lowest-frequency shape"
+unit = { display = "1" }
+closed_form = "sqrt(2)"
+value = "1.41421356237"
+value_kind = "decimal-12"
+derivation = """
+The first row gives v2=(2-z)*v1. For z=2-sqrt(2) and v1=1, this gives v2=sqrt(2).
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode1_component3"
+description = "third component of the lowest-frequency shape"
+unit = { display = "1" }
+closed_form = "1"
+value = "1"
+value_kind = "exact"
+derivation = """
+The final row gives (2-z)*v3=v2. Both factors on the right and left are sqrt(2), so v3=1. The complete shape is [1,sqrt(2),1].
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode2_component1"
+description = "first component of the middle-frequency shape"
+unit = { display = "1" }
+closed_form = "1"
+value = "1"
+value_kind = "exact"
+derivation = """
+The scale convention fixes the first component to one.
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode2_component2"
+description = "second component of the middle-frequency shape"
+unit = { display = "1" }
+closed_form = "0"
+value = "0"
+value_kind = "exact"
+derivation = """
+For z=2 the first row gives v2=0.
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode2_component3"
+description = "third component of the middle-frequency shape"
+unit = { display = "1" }
+closed_form = "-1"
+value = "-1"
+value_kind = "exact"
+derivation = """
+The middle row with v2=0 gives -v1-v3=0. The complete shape is [1,0,-1].
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode3_component1"
+description = "first component of the highest-frequency shape"
+unit = { display = "1" }
+closed_form = "1"
+value = "1"
+value_kind = "exact"
+derivation = """
+The scale convention fixes the first component to one.
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode3_component2"
+description = "second component of the highest-frequency shape"
+unit = { display = "1" }
+closed_form = "-sqrt(2)"
+value = "-1.41421356237"
+value_kind = "decimal-12"
+derivation = """
+The first row gives v2=(2-z)*v1=-sqrt(2).
+"""
+second_route = "none"
+
+[[observables]]
+name = "mode3_component3"
+description = "third component of the highest-frequency shape"
+unit = { display = "1" }
+closed_form = "1"
+value = "1"
+value_kind = "exact"
+derivation = """
+The final row gives -sqrt(2)*v3=-sqrt(2), hence v3=1. The complete shape is [1,-sqrt(2),1]. The three displayed chain shapes have pairwise zero Euclidean inner products.
+"""
+second_route = "none"
+
+[[variants]]
+name = "three-mass-ring"
+description = "cyclic coupling with one rigid-body mode and a repeated eigenvalue"
+overrides = { boundary = "1" }
+expected = """
+The stiffness is k*[[2,-1,-1],[-1,2,-1],[-1,-1,2]]=k*(3*I-J), where J is the all-ones matrix; the mass matrix remains m*I. The exact squared angular frequencies are 0,3*k/m,3*k/m, hence 0,3,3 s^(-2). The frequencies are 0 and sqrt(3) twice, with sqrt(3)=1.73205080757 rad/s to twelve significant digits.
+A rigid-body shape is [1,1,1]. An orthogonal basis for the repeated eigenspace is [1,-1,0] and [1,1,-2]. The repeated eigenspace is exactly the plane v1+v2+v3=0, with orthogonal projector I-J/3. Correct spectral evidence identifies this invariant subspace; individual basis vectors inside it are not uniquely determined. On that plane J*v=0, so direct multiplication independently gives K*v=3*k*v.
+"""
+
+[errors]
+bounded = ["representation and arithmetic contributions in validated spectral quantities", "verification residuals for eigenpairs or invariant subspaces"]
+estimated = []
+excluded = ["spring and mass modelling error", "uniqueness of individual vectors in a repeated eigenspace", "a relative error claim for the zero eigenvalue without an absolute budget"]
+
+[stress]
+claims = ["rule:vision:spectral-guarantees", "req:vision:powers-and-factor-dimensions"]
+bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-advanced-matrix-domains", "step:nrz:bite-accuracy-and-benchmarks"]

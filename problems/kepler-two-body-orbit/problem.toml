@@ -1,0 +1,174 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.problem"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:kepler-two-body-orbit"]
+
+[problem]
+slug = "kepler-two-body-orbit"
+title = "Kepler two-body orbit"
+register = "prob:exemplars:kepler-two-body-orbit"
+kind = "problem"
+model = """
+A test body moves in the Newtonian inverse-square field of a fixed primary, with gravitational parameter mu=G*M. The test-body limit neglects the primary's recoil. Periapsis radius rp and eccentricity e specify the orbit geometry. The initial speed is derived as sqrt(mu*(1+e)/rp), so changing G changes that speed coherently while keeping the geometric ellipse fixed. The speed is not an independently exact measured input.
+The reported exact values are nominal mathematical values at the stated central G. G carries a probabilistic standard uncertainty, so these nominal exact values do not assert deterministic enclosure of the physical orbit.
+"""
+instance = """
+The primary is at the origin. The test body starts at (rp,0), with velocity (0,sqrt(mu*(1+e)/rp)). The exact primary mass is chosen so that the nominal mu is 1 m^3/s^2. The periapsis radius is 2/5 m and eccentricity is 3/5.
+"""
+
+[[parameters]]
+name = "G"
+description = "CODATA 2018 recommended gravitational constant"
+value = "6.67430e-11"
+unit = { display = "m^3/(kg*s^2)", m = 3, kg = -1, s = -2 }
+uncertainty = { kind = "standard", sigma = "1.5e-15", source = "codata-2018" }
+
+[[parameters]]
+name = "M"
+description = "exact mass of the constructed primary"
+value = "1000000000000000/66743"
+unit = { display = "kg", kg = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "rp"
+description = "periapsis radius"
+value = "2/5"
+unit = { display = "m", m = 1 }
+uncertainty = { kind = "none" }
+
+[[parameters]]
+name = "e"
+description = "eccentricity specifying the initial-condition family"
+value = "3/5"
+unit = { display = "1" }
+uncertainty = { kind = "none" }
+
+[[observables]]
+name = "periapsis_speed"
+description = "derived initial transverse speed at the nominal gravitational constant"
+unit = { display = "m/s", m = 1, s = -1 }
+closed_form = "sqrt(G*M*(1+e)/rp)"
+value = "2"
+value_kind = "exact"
+derivation = """
+The nominal G is 66743/1000000000000000 in SI units, so G*M=1 m^3/s^2. The speed squared is (1+3/5)/(2/5)=4 m^2/s^2; its positive square root is exactly 2 m/s.
+"""
+second_route = "none"
+
+[[observables]]
+name = "semi_major_axis"
+description = "semi-major axis"
+unit = { display = "m", m = 1 }
+closed_form = "rp / (1-e)"
+value = "1"
+value_kind = "exact"
+derivation = """
+Periapsis satisfies rp=a*(1-e). Therefore a=(2/5)/(2/5)=1 m.
+"""
+second_route = "none"
+
+[[observables]]
+name = "period"
+description = "nominal orbital period"
+unit = { display = "s", s = 1 }
+closed_form = "2*pi*sqrt((rp/(1-e))^3/(G*M))"
+value = "6.28318530718"
+value_kind = "decimal-12"
+derivation = """
+Kepler's period formula gives T=2*pi*sqrt(a^3/mu)=2*pi s. A reproducible rational evaluation uses pi=16*atan(1/5)-4*atan(1/239), with atan(z)=sum from j=0 to N of (-1)^j*z^(2*j+1)/(2*j+1) and the next term bounding the truncation. Taking N=20 for 1/5 and N=6 for 1/239 gives more than the precision needed for the displayed twelve-digit result.
+"""
+second_route = "The semi-minor axis is a*sqrt(1-e^2)=4/5 m. Ellipse area pi*a*b divided by areal speed h/2=(4/5)/2 gives T=2*pi s."
+
+[[observables]]
+name = "specific_energy"
+description = "specific mechanical energy"
+unit = { display = "J/kg", m = 2, s = -2 }
+closed_form = "-G*M/(2*(rp/(1-e)))"
+value = "-1/2"
+value_kind = "exact"
+derivation = """
+For an ellipse, the conserved specific energy is -mu/(2*a). With mu=1 and a=1, this is -1/2 J/kg.
+"""
+second_route = "At periapsis, v^2/2-mu/rp=4/2-1/(2/5)=2-5/2=-1/2 J/kg."
+
+[[observables]]
+name = "specific_angular_momentum"
+description = "positive out-of-plane specific angular momentum"
+unit = { display = "m^2/s", m = 2, s = -1 }
+closed_form = "sqrt(G*M*(rp/(1-e))*(1-e^2))"
+value = "4/5"
+value_kind = "exact"
+derivation = """
+The squared specific angular momentum is mu*a*(1-e^2)=1-9/25=16/25 m^4/s^2. The chosen counterclockwise motion gives the positive root, 4/5 m^2/s.
+"""
+second_route = "The perpendicular initial radius and velocity give h=rp*vp=(2/5)*2=4/5 m^2/s."
+
+[[observables]]
+name = "eccentricity"
+description = "eccentricity reconstructed from the conserved quantities"
+unit = { display = "1" }
+closed_form = "sqrt(1 + 2*specific_energy*specific_angular_momentum^2/(G*M)^2)"
+value = "3/5"
+value_kind = "exact"
+derivation = """
+Substitution gives e^2=1+2*(-1/2)*(16/25)=9/25, so e=3/5. At the chosen periapsis the eccentricity vector is (3/5,0).
+"""
+second_route = "none"
+
+[[observables]]
+name = "radius_quarter_turn"
+description = "radius at true anomaly pi/2"
+unit = { display = "m", m = 1 }
+closed_form = "(rp/(1-e))*(1-e^2)"
+value = "16/25"
+value_kind = "exact"
+derivation = """
+The polar ellipse is r(f)=a*(1-e^2)/(1+e*cos(f)). At f=pi/2 the cosine vanishes, so r=16/25 m.
+"""
+second_route = "none"
+
+[[observables]]
+name = "radius_half_turn"
+description = "apoapsis radius at true anomaly pi"
+unit = { display = "m", m = 1 }
+closed_form = "(rp/(1-e))*(1+e)"
+value = "8/5"
+value_kind = "exact"
+derivation = """
+At f=pi the polar denominator is 1-e, leaving a*(1+e)=8/5 m.
+"""
+second_route = "none"
+
+[[observables]]
+name = "relative_period_standard_uncertainty"
+description = "first-order relative standard uncertainty of period at fixed orbital geometry"
+unit = { display = "1" }
+closed_form = "sigma_G/(2*G)"
+value = "3/266972"
+value_kind = "exact"
+derivation = """
+With a and M fixed, logarithmic differentiation of T=2*pi*a^(3/2)*(G*M)^(-1/2) gives dT/T=-(1/2)*dG/G. Thus u(T)/T=u(G)/(2*G). The supplied standard uncertainty gives (1.5e-15)/(2*6.67430e-11)=3/266972 exactly as a first-order propagation coefficient. This is a probabilistic linearisation result, not a deterministic radius.
+"""
+second_route = "none"
+
+[[variants]]
+name = "long-run-conservation"
+description = "compare a many-orbit trajectory with the exact ellipse and conserved quantities"
+overrides = { e = "3/5" }
+expected = """
+At the nominal inputs, every completed orbital period returns the state to (2/5,0) m and (0,2) m/s. Energy remains -1/2 J/kg and specific angular momentum remains 4/5 m^2/s. Radius is 16/25 m at quarter-turn true anomaly and 8/5 m at half-turn true anomaly.
+An integration experiment records observable budgets, time-stepping error and arithmetic contributions separately, and reports measured long-run drift against these constants. True anomaly is a geometric angle and is not assumed proportional to elapsed time. The probabilistic uncertainty in G does not provide the deterministic input enclosure required for a strict physical-value certificate.
+"""
+
+[errors]
+bounded = ["arithmetic and verification contributions conditional on fixed nominal inputs and a validated implementation"]
+estimated = ["probabilistic-only linear propagation of the gravitational constant uncertainty", "measured integration drift"]
+excluded = ["deterministic physical-input enclosure from a standard uncertainty", "test-body and Newtonian modelling error", "unproved time-discretisation bounds"]
+
+[stress]
+claims = ["rule:vision:local-and-observable-budgets", "def:vision:error-companion-surface", "rule:vision:imports-and-exactness"]
+bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-accuracy-and-benchmarks"]
