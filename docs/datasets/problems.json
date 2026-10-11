@@ -1,0 +1,2710 @@
+{
+  "namespace": "org.naturrhythmuszentrum.docs.dataset.problems",
+  "version": [
+    1,
+    0,
+    0
+  ],
+  "owner": "NRZ",
+  "license": "CC0-1.0",
+  "sources": [
+    "problems/coupled-oscillators-normal-modes/problem.toml",
+    "problems/damped-driven-harmonic-oscillator/problem.toml",
+    "problems/heat-conduction-one-dimensional/problem.toml",
+    "problems/kepler-two-body-orbit/problem.toml",
+    "problems/pendulum-gravity-estimate/problem.toml",
+    "problems/resistor-network/problem.toml",
+    "problems/spring-mass-truss/problem.toml",
+    "problems/fixtures/hilbert-matrices/fixture.toml",
+    "problems/fixtures/kahan-and-wilkinson-matrices/fixture.toml",
+    "problems/fixtures/rump-polynomial/fixture.toml"
+  ],
+  "labels": [],
+  "entries": [
+    {
+      "errors": {
+        "bounded": [
+          "representation and arithmetic contributions in validated spectral quantities",
+          "verification residuals for eigenpairs or invariant subspaces"
+        ],
+        "estimated": [],
+        "excluded": [
+          "spring and mass modelling error",
+          "uniqueness of individual vectors in a repeated eigenspace",
+          "a relative error claim for the zero eigenvalue without an absolute budget"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "(2 - sqrt(2)) * k / m",
+          "derivation": "The generalised eigenproblem is K*v=lambda*M*v, with K=k*[[2,-1,0],[-1,2,-1],[0,-1,2]] in N/m and M=m*I in kg. Thus lambda has dimension s^(-2), and omega has dimension rad/s. For z=lambda*m/k, the characteristic polynomial is (2-z)*((2-z)^2-2). Its smallest root is 2-sqrt(2).\nThe rational inequalities 1.4142135623730950<sqrt(2)<1.4142135623730951 follow by squaring their endpoints and suffice to round the squared frequencies and middle shape components to twelve significant digits.\n",
+          "description": "lowest squared angular frequency",
+          "name": "omega1_squared",
+          "second_route": "none",
+          "unit": {
+            "display": "s^-2",
+            "s": -2
+          },
+          "value": "0.585786437627",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "2 * k / m",
+          "derivation": "The central root of (2-z)*((2-z)^2-2) is z=2. With k/m=1 s^(-2), the eigenvalue is 2 s^(-2).\n",
+          "description": "middle squared angular frequency",
+          "name": "omega2_squared",
+          "second_route": "Direct multiplication gives K*[1,0,-1]^T=2*[1,0,-1]^T N/m, while M is the identity in kg.",
+          "unit": {
+            "display": "s^-2",
+            "s": -2
+          },
+          "value": "2",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "(2 + sqrt(2)) * k / m",
+          "derivation": "The largest root of the displayed characteristic polynomial is 2+sqrt(2). The stated rational bracket for sqrt(2) gives the recorded decimal.\n",
+          "description": "highest squared angular frequency",
+          "name": "omega3_squared",
+          "second_route": "none",
+          "unit": {
+            "display": "s^-2",
+            "s": -2
+          },
+          "value": "3.41421356237",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "sqrt((2 - sqrt(2)) * k / m)",
+          "derivation": "Take the positive square root of the lowest eigenvalue. Squaring rational endpoints, together with the bracket for sqrt(2), gives 0.7653668647301795<omega1<0.7653668647301796 in rad/s.\n",
+          "description": "lowest angular frequency",
+          "name": "omega1",
+          "second_route": "none",
+          "unit": {
+            "display": "rad/s",
+            "s": -1
+          },
+          "value": "0.765366864730",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "sqrt(2 * k / m)",
+          "derivation": "The positive square root of 2 s^(-2) is sqrt(2) rad/s. The bracket obtained by rational squaring fixes the twelve-digit rounding.\n",
+          "description": "middle angular frequency",
+          "name": "omega2",
+          "second_route": "none",
+          "unit": {
+            "display": "rad/s",
+            "s": -1
+          },
+          "value": "1.41421356237",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "sqrt((2 + sqrt(2)) * k / m)",
+          "derivation": "The positive square root of the highest eigenvalue lies between 1.8477590650225734 and 1.8477590650225736 rad/s, as checked by squaring and using the bracket for sqrt(2).\n",
+          "description": "highest angular frequency",
+          "name": "omega3",
+          "second_route": "none",
+          "unit": {
+            "display": "rad/s",
+            "s": -1
+          },
+          "value": "1.84775906502",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The scale convention fixes the first component to one.\n",
+          "description": "first component of the lowest-frequency shape",
+          "name": "mode1_component1",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "sqrt(2)",
+          "derivation": "The first row gives v2=(2-z)*v1. For z=2-sqrt(2) and v1=1, this gives v2=sqrt(2).\n",
+          "description": "second component of the lowest-frequency shape",
+          "name": "mode1_component2",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1.41421356237",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The final row gives (2-z)*v3=v2. Both factors on the right and left are sqrt(2), so v3=1. The complete shape is [1,sqrt(2),1].\n",
+          "description": "third component of the lowest-frequency shape",
+          "name": "mode1_component3",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The scale convention fixes the first component to one.\n",
+          "description": "first component of the middle-frequency shape",
+          "name": "mode2_component1",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "0",
+          "derivation": "For z=2 the first row gives v2=0.\n",
+          "description": "second component of the middle-frequency shape",
+          "name": "mode2_component2",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "0",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "-1",
+          "derivation": "The middle row with v2=0 gives -v1-v3=0. The complete shape is [1,0,-1].\n",
+          "description": "third component of the middle-frequency shape",
+          "name": "mode2_component3",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The scale convention fixes the first component to one.\n",
+          "description": "first component of the highest-frequency shape",
+          "name": "mode3_component1",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "-sqrt(2)",
+          "derivation": "The first row gives v2=(2-z)*v1=-sqrt(2).\n",
+          "description": "second component of the highest-frequency shape",
+          "name": "mode3_component2",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-1.41421356237",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The final row gives -sqrt(2)*v3=-sqrt(2), hence v3=1. The complete shape is [1,-sqrt(2),1]. The three displayed chain shapes have pairwise zero Euclidean inner products.\n",
+          "description": "third component of the highest-frequency shape",
+          "name": "mode3_component3",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "each mass",
+          "name": "m",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "kg",
+            "kg": 1
+          },
+          "value": "1"
+        },
+        {
+          "description": "each spring stiffness",
+          "name": "k",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N/m",
+            "kg": 1,
+            "s": -2
+          },
+          "value": "1"
+        },
+        {
+          "description": "undeformed chain spacing",
+          "name": "spacing",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "1"
+        },
+        {
+          "description": "zero for fixed-wall chain and one for ring",
+          "name": "boundary",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        }
+      ],
+      "problem": {
+        "instance": "For the chain, walls are at coordinates 0 and 4*spacing, and masses are at spacing, 2*spacing and 3*spacing. Four equal springs connect successive walls and masses. The base boundary selector is zero. Selector one closes the three masses into a cyclic chain and removes the wall springs.\n",
+        "kind": "problem",
+        "model": "Three equal point masses undergo small longitudinal displacements. Springs are linear and massless, with no damping. Mode shapes are dimensionless ratios, with their first component fixed to one for the chain. The ring variant uses cyclic scalar displacement coordinates and three nearest-neighbour springs.\n",
+        "register": "prob:exemplars:coupled-oscillators-normal-modes",
+        "slug": "coupled-oscillators-normal-modes",
+        "title": "Coupled oscillators and normal modes"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-units-design",
+          "step:nrz:bite-advanced-matrix-domains",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "rule:vision:spectral-guarantees",
+          "req:vision:powers-and-factor-dimensions"
+        ]
+      },
+      "variants": [
+        {
+          "description": "cyclic coupling with one rigid-body mode and a repeated eigenvalue",
+          "expected": "The stiffness is k*[[2,-1,-1],[-1,2,-1],[-1,-1,2]]=k*(3*I-J), where J is the all-ones matrix; the mass matrix remains m*I. The exact squared angular frequencies are 0,3*k/m,3*k/m, hence 0,3,3 s^(-2). The frequencies are 0 and sqrt(3) twice, with sqrt(3)=1.73205080757 rad/s to twelve significant digits.\nA rigid-body shape is [1,1,1]. An orthogonal basis for the repeated eigenspace is [1,-1,0] and [1,1,-2]. The repeated eigenspace is exactly the plane v1+v2+v3=0, with orthogonal projector I-J/3. Correct spectral evidence identifies this invariant subspace; individual basis vectors inside it are not uniquely determined. On that plane J*v=0, so direct multiplication independently gives K*v=3*k*v.\n",
+          "name": "three-mass-ring",
+          "overrides": {
+            "boundary": "1"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "arithmetic and verification contributions of a validated closed-form evaluation"
+        ],
+        "estimated": [
+          "time-discretisation error measured against the closed-form trajectory"
+        ],
+        "excluded": [
+          "unproved deterministic bounds for a stepping method",
+          "nonlinear spring and damping modelling error",
+          "drive uncertainty not declared as input"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "F / sqrt((k-m*omega^2)^2+(c*omega)^2)",
+          "derivation": "The real and imaginary stiffness components are k-m*omega^2=9 N/m and c*omega=12 N/m. Their magnitude is sqrt(9^2+12^2)=15 N/m, so the displacement amplitude is 15/15=1 m.\n",
+          "description": "steady-state displacement amplitude",
+          "name": "steady_amplitude",
+          "second_route": "Substitute x=a*cos(t)+b*sin(t), with time in seconds. Coefficient matching gives 9*a+12*b=15 and -12*a+9*b=0, hence a=3/5 m and b=4/5 m. Their Euclidean amplitude is sqrt(9/25+16/25)=1 m.",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "atan(4/3)",
+          "derivation": "Both stiffness components are positive, so the phase is atan((c*omega)/(k-m*omega^2))=atan(4/3)=2*atan(1/2). The alternating series for atan(1/2), through j=22 in sum((-1)^j*(1/2)^(2*j+1)/(2*j+1)), has a next-term bound below 2e-16 after multiplication by two. It gives 0.927295218001612... rad and the stated rounding.\n",
+          "description": "steady-state lag behind the cosine force",
+          "name": "phase_lag",
+          "second_route": "none",
+          "unit": {
+            "display": "rad"
+          },
+          "value": "0.927295218002",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "sqrt(k/m-(c/(2*m))^2)",
+          "derivation": "The decay coefficient is alpha=c/(2*m)=3/2 s^(-1). The squared damped frequency is 13/4-9/4=1 s^(-2), so its positive root is exactly 1 rad/s.\n",
+          "description": "angular frequency of the decaying homogeneous oscillation",
+          "name": "damped_natural_frequency",
+          "second_route": "none",
+          "unit": {
+            "display": "rad/s",
+            "s": -1
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "(3/5)*cos(omega*t)+(4/5)*sin(omega*t)-exp(-3*t/(2 s))*((3/5)*cos(omega*t)+(17/10)*sin(omega*t))",
+          "derivation": "The particular displacement is (3/5)*cos(t)+(4/5)*sin(t) m, with t expressed in seconds. The homogeneous displacement is exp(-3*t/2)*(C*cos(t)+D*sin(t)). Zero initial displacement gives C=-3/5 m; zero initial velocity gives D=-17/10 m. This yields the displayed closed form.\nAt one second, cos(1)=0.5403023058681397..., sin(1)=0.8414709848078965... and exp(-3/2)=0.2231301601484298.... The particular term is 0.9973581713672010... m and the subtracted transient term is 0.3915224885429073... m. Their difference is 0.6058356828242937... m. These evaluations can be reproduced with the alternating sine and cosine series through j=9 and the exponential series through degree 30; their remainder bounds are smaller than the rounding margin for twelve significant digits.\n",
+          "description": "displacement from rest at the stated time",
+          "name": "displacement_at_t",
+          "second_route": "none",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "0.605835682824",
+          "value_kind": "decimal-12"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "mass",
+          "name": "m",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "kg",
+            "kg": 1
+          },
+          "value": "4"
+        },
+        {
+          "description": "spring stiffness",
+          "name": "k",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N/m",
+            "kg": 1,
+            "s": -2
+          },
+          "value": "13"
+        },
+        {
+          "description": "viscous damping coefficient",
+          "name": "c",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N*s/m",
+            "kg": 1,
+            "s": -1
+          },
+          "value": "12"
+        },
+        {
+          "description": "drive force amplitude",
+          "name": "F",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N",
+            "kg": 1,
+            "m": 1,
+            "s": -2
+          },
+          "value": "15"
+        },
+        {
+          "description": "drive angular frequency",
+          "name": "omega",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "rad/s",
+            "s": -1
+          },
+          "value": "1"
+        },
+        {
+          "description": "time of the transient displacement observable",
+          "name": "t",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "1"
+        },
+        {
+          "description": "initial displacement",
+          "name": "x0",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "0"
+        },
+        {
+          "description": "initial velocity",
+          "name": "v0",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m/s",
+            "m": 1,
+            "s": -1
+          },
+          "value": "0"
+        }
+      ],
+      "problem": {
+        "instance": "A 4 kg mass is attached to a spring of stiffness 13 N/m and a damper of coefficient 12 N*s/m. A 15 N cosine force with angular frequency 1 rad/s starts at time zero. The transient displacement is requested at t=1 s.\n",
+        "kind": "problem",
+        "model": "The displacement satisfies m*x''+c*x'+k*x=F*cos(omega*t). The spring and viscous damper are linear, the drive is prescribed, and the initial displacement and velocity vanish. Phase lag is measured relative to the cosine drive and lies between zero and pi for positive damping.\n",
+        "register": "prob:exemplars:damped-driven-harmonic-oscillator",
+        "slug": "damped-driven-harmonic-oscillator",
+        "title": "Damped driven harmonic oscillator"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-physics-core",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "def:vision:error-companion-surface",
+          "rule:vision:local-and-observable-budgets",
+          "rule:vision:independent-numerical-evidence"
+        ]
+      },
+      "variants": [
+        {
+          "description": "raise damping to separate the fast and slow homogeneous timescales",
+          "expected": "The characteristic roots are r_plus=(-100+sqrt(9987))/2 and r_minus=(-100-sqrt(9987))/2 in s^(-1). Both are negative. The ratio of their magnitudes is (100+sqrt(9987))/(100-sqrt(9987)), strictly between 3000 and 3100. This separates the initial fast decay from the slow relaxation and stresses time-stepping stiffness.\nThe steady amplitude is 15/sqrt(160081) m and the phase lag is atan(400/9). Writing a=135/160081 m and b=6000/160081 m, the exact displacement is a*cos(t)+b*sin(t)+((r_minus*a-b/(1 s))/(r_plus-r_minus))*exp(r_plus*t)+((b/(1 s)-r_plus*a)/(r_plus-r_minus))*exp(r_minus*t), with the trigonometric argument t/(1 s). The coefficients enforce zero initial displacement and velocity.\nA stepping comparison records discretisation error against this closed form separately from representation, arithmetic and verification contributions. A small arithmetic radius alone does not certify a trajectory's discretisation error.\n",
+          "name": "overdamped",
+          "overrides": {
+            "c": "400"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "representation and arithmetic contributions in the discrete steady solve",
+          "verification contributions for the discrete system",
+          "zero steady nodal spatial discretisation error for the stated linear profile"
+        ],
+        "estimated": [
+          "transient discretisation discrepancy against the continuum solution"
+        ],
+        "excluded": [
+          "material and boundary-condition modelling error",
+          "promotion of a discrete arithmetic certificate to a continuum error bound"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "T_left+(T_right-T_left)/4",
+          "derivation": "The steady continuum solution is T(x)=T_left+(T_right-T_left)*x/L. At the first node this gives 273.15+100/4=298.15 K. The discrete system is A*T=[T_left,0,T_right]^T, with A=[[2,-1,0],[-1,2,-1],[0,-1,2]] dimensionless and both sides in K. Multiplying by conductivity/h^2 restores the physical conduction operator, whose dimension is W/(m^3*K), and an equation residual in W/m^3.\nA second difference of a linear profile vanishes exactly. Consequently these nodal values have no spatial discretisation error for this specific steady model.\n",
+          "description": "steady temperature at x=L/4",
+          "name": "T1",
+          "second_route": "none",
+          "unit": {
+            "K": 1,
+            "display": "K"
+          },
+          "value": "298.15",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "(T_left+T_right)/2",
+          "derivation": "The linear profile at the midpoint is 273.15+100/2=323.15 K.\n",
+          "description": "steady temperature at x=L/2",
+          "name": "T2",
+          "second_route": "The inverse of A is [[3,2,1],[2,4,2],[1,2,3]]/4. Its middle row applied to [273.15,0,373.15]^T gives (273.15+373.15)/2=323.15 K.",
+          "unit": {
+            "K": 1,
+            "display": "K"
+          },
+          "value": "323.15",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "T_left+3*(T_right-T_left)/4",
+          "derivation": "The linear profile gives 273.15+3*100/4=348.15 K. Successive endpoint and interior differences are all exactly 25 K.\n",
+          "description": "steady temperature at x=3*L/4",
+          "name": "T3",
+          "second_route": "none",
+          "unit": {
+            "K": 1,
+            "display": "K"
+          },
+          "value": "348.15",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "(2+sqrt(2))/(2-sqrt(2))",
+          "derivation": "The eigenvalues are 2-2*cos(j*pi/4), for j=1,2,3: 2-sqrt(2), 2 and 2+sqrt(2). The ratio of largest to smallest is (2+sqrt(2))/(2-sqrt(2))=3+2*sqrt(2). Squaring rational endpoints gives 1.4142135623730950<sqrt(2)<1.4142135623730951, which fixes the reported rounding.\n",
+          "description": "spectral condition number of the three-point second-difference matrix",
+          "name": "condition_number",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "5.82842712475",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "-conductivity*(T_right-T_left)/L",
+          "derivation": "Fourier's law gives flux=-conductivity*dT/dx=-1*(373.15-273.15)/1=-100 W/m^2. Heat flows towards decreasing x.\n",
+          "description": "steady heat flux in the positive x direction",
+          "name": "heat_flux",
+          "second_route": "none",
+          "unit": {
+            "display": "W/m^2",
+            "kg": 1,
+            "s": -3
+          },
+          "value": "-100",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "alpha*pi^2/L^2",
+          "derivation": "After subtracting the steady profile, the homogeneous endpoint problem has eigenfunctions sin(j*pi*x/L) and decay rates alpha*(j*pi/L)^2. The first rate is pi^2/100 s^(-1). Evaluating pi through 16*atan(1/5)-4*atan(1/239), with alternating-series remainder bounds, gives pi^2=9.869604401089358... and the stated rate.\n",
+          "description": "positive decay rate of the first transient sine mode",
+          "name": "continuum_first_mode_decay_rate",
+          "second_route": "none",
+          "unit": {
+            "display": "s^-1",
+            "s": -1
+          },
+          "value": "0.0986960440109",
+          "value_kind": "decimal-12"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "rod length",
+          "name": "L",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "1"
+        },
+        {
+          "description": "thermal conductivity",
+          "name": "conductivity",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "K": -1,
+            "display": "W/(m*K)",
+            "kg": 1,
+            "m": 1,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "thermal diffusivity",
+          "name": "alpha",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m^2/s",
+            "m": 2,
+            "s": -1
+          },
+          "value": "1/100"
+        },
+        {
+          "description": "left endpoint in kelvin",
+          "name": "T_left",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "K": 1,
+            "display": "K"
+          },
+          "value": "273.15"
+        },
+        {
+          "description": "right endpoint in kelvin",
+          "name": "T_right",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "K": 1,
+            "display": "K"
+          },
+          "value": "373.15"
+        },
+        {
+          "description": "alternative left endpoint used only by the Celsius variant",
+          "name": "T_left_C",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "K": 1,
+            "display": "degC",
+            "offset": "273.15"
+          },
+          "value": "0"
+        },
+        {
+          "description": "alternative right endpoint used only by the Celsius variant",
+          "name": "T_right_C",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "K": 1,
+            "display": "degC",
+            "offset": "273.15"
+          },
+          "value": "100"
+        },
+        {
+          "description": "uniform initial interior temperature for transient conduction",
+          "name": "T_initial",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "K": 1,
+            "display": "K"
+          },
+          "value": "273.15"
+        },
+        {
+          "description": "zero uses kelvin endpoints and one uses Celsius endpoints",
+          "name": "temperature_scale",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        },
+        {
+          "description": "zero selects steady conduction and one selects transient conduction",
+          "name": "time_regime",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        }
+      ],
+      "problem": {
+        "instance": "The rod occupies 0<=x<=1 m. Its ends are at 273.15 K and 373.15 K. Interior nodes are at 1/4,1/2,3/4 m. For the transient variant, the open rod interior is initially uniform at 273.15 K; the boundary values are imposed for positive time, so the initial right-end mismatch is intentional.\n",
+        "kind": "problem",
+        "model": "A uniform rod has constant conductivity and diffusivity, no internal heat generation and fixed end temperatures. Steady conduction satisfies T''=0. The transient model is T_t=alpha*T_xx. A central second difference uses three interior points with spacing h=L/4. Temperature coordinates are converted to kelvin before assembly.\nThe temperature-scale selector chooses either the kelvin endpoint parameters or their Celsius alternatives. Celsius parameters are alternative coordinates of the same boundary temperatures, not additional uncertain physical inputs. The time-regime selector chooses steady or transient use.\n",
+        "register": "prob:exemplars:heat-conduction-one-dimensional",
+        "slug": "heat-conduction-one-dimensional",
+        "title": "One-dimensional heat conduction"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-units-design",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "def:vision:error-companion-surface",
+          "rule:vision:canonical-quantities-and-affine-coordinates"
+        ]
+      },
+      "variants": [
+        {
+          "description": "pose the same boundary temperatures as affine Celsius coordinates",
+          "expected": "The Celsius endpoint values 0 and 100 map to 273.15 K and 373.15 K by adding the exact offset 273.15 K. The Celsius interior coordinates are exactly 25,50,75; the corresponding kelvin temperatures are 298.15,323.15,348.15.\nEvery temperature difference is unchanged: each grid increment is 25 K and the total endpoint difference is 100 K. Absolute coordinate numbers shift by 273.15. Assembly operates on canonical kelvin temperatures; multiplying an absolute Celsius coordinate as though it were a multiplicative unit is not the conversion rule. Decimal-to-binary conversion accounting remains distinct from the exact affine mathematical conversion.\n",
+          "name": "celsius-endpoints",
+          "overrides": {
+            "temperature_scale": "1"
+          }
+        },
+        {
+          "description": "decay from the stated uniform interior temperature",
+          "expected": "For 0<x<L at time zero, subtracting the steady profile gives theta(x,0)=-100*x/L K. Its sine-series coefficient is b_j=(2/L)*integral(theta(x,0)*sin(j*pi*x/L),x=0..L)=200*(-1)^j/(j*pi) K. In particular the first coefficient is -200/pi K and its decay rate is pi^2/100 s^(-1).\nFor the three-interior-point method of lines, the first discrete decay rate is (alpha/h^2)*(2-sqrt(2))=(4/25)*(2-sqrt(2)) s^(-1), approximately 0.0937258300203 s^(-1) to twelve significant digits. This differs from the continuum rate 0.0986960440109 s^(-1). The difference follows from the different spatial operators and belongs to the discretisation claim, separately from the arithmetic and verification ledger. Time discretisation, if introduced, adds a further separately stated claim.\n",
+          "name": "transient-uniform-interior",
+          "overrides": {
+            "time_regime": "1"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "arithmetic and verification contributions conditional on fixed nominal inputs and a validated implementation"
+        ],
+        "estimated": [
+          "probabilistic-only linear propagation of the gravitational constant uncertainty",
+          "measured integration drift"
+        ],
+        "excluded": [
+          "deterministic physical-input enclosure from a standard uncertainty",
+          "test-body and Newtonian modelling error",
+          "unproved time-discretisation bounds"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "sqrt(G*M*(1+e)/rp)",
+          "derivation": "The nominal G is 66743/1000000000000000 in SI units, so G*M=1 m^3/s^2. The speed squared is (1+3/5)/(2/5)=4 m^2/s^2; its positive square root is exactly 2 m/s.\n",
+          "description": "derived initial transverse speed at the nominal gravitational constant",
+          "name": "periapsis_speed",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s",
+            "m": 1,
+            "s": -1
+          },
+          "value": "2",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "rp / (1-e)",
+          "derivation": "Periapsis satisfies rp=a*(1-e). Therefore a=(2/5)/(2/5)=1 m.\n",
+          "description": "semi-major axis",
+          "name": "semi_major_axis",
+          "second_route": "none",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "2*pi*sqrt((rp/(1-e))^3/(G*M))",
+          "derivation": "Kepler's period formula gives T=2*pi*sqrt(a^3/mu)=2*pi s. A reproducible rational evaluation uses pi=16*atan(1/5)-4*atan(1/239), with atan(z)=sum from j=0 to N of (-1)^j*z^(2*j+1)/(2*j+1) and the next term bounding the truncation. Taking N=20 for 1/5 and N=6 for 1/239 gives more than the precision needed for the displayed twelve-digit result.\n",
+          "description": "nominal orbital period",
+          "name": "period",
+          "second_route": "The semi-minor axis is a*sqrt(1-e^2)=4/5 m. Ellipse area pi*a*b divided by areal speed h/2=(4/5)/2 gives T=2*pi s.",
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "6.28318530718",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "-G*M/(2*(rp/(1-e)))",
+          "derivation": "For an ellipse, the conserved specific energy is -mu/(2*a). With mu=1 and a=1, this is -1/2 J/kg.\n",
+          "description": "specific mechanical energy",
+          "name": "specific_energy",
+          "second_route": "At periapsis, v^2/2-mu/rp=4/2-1/(2/5)=2-5/2=-1/2 J/kg.",
+          "unit": {
+            "display": "J/kg",
+            "m": 2,
+            "s": -2
+          },
+          "value": "-1/2",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "sqrt(G*M*(rp/(1-e))*(1-e^2))",
+          "derivation": "The squared specific angular momentum is mu*a*(1-e^2)=1-9/25=16/25 m^4/s^2. The chosen counterclockwise motion gives the positive root, 4/5 m^2/s.\n",
+          "description": "positive out-of-plane specific angular momentum",
+          "name": "specific_angular_momentum",
+          "second_route": "The perpendicular initial radius and velocity give h=rp*vp=(2/5)*2=4/5 m^2/s.",
+          "unit": {
+            "display": "m^2/s",
+            "m": 2,
+            "s": -1
+          },
+          "value": "4/5",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "sqrt(1 + 2*specific_energy*specific_angular_momentum^2/(G*M)^2)",
+          "derivation": "Substitution gives e^2=1+2*(-1/2)*(16/25)=9/25, so e=3/5. At the chosen periapsis the eccentricity vector is (3/5,0).\n",
+          "description": "eccentricity reconstructed from the conserved quantities",
+          "name": "eccentricity",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "3/5",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "(rp/(1-e))*(1-e^2)",
+          "derivation": "The polar ellipse is r(f)=a*(1-e^2)/(1+e*cos(f)). At f=pi/2 the cosine vanishes, so r=16/25 m.\n",
+          "description": "radius at true anomaly pi/2",
+          "name": "radius_quarter_turn",
+          "second_route": "none",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "16/25",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "(rp/(1-e))*(1+e)",
+          "derivation": "At f=pi the polar denominator is 1-e, leaving a*(1+e)=8/5 m.\n",
+          "description": "apoapsis radius at true anomaly pi",
+          "name": "radius_half_turn",
+          "second_route": "none",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "8/5",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "sigma_G/(2*G)",
+          "derivation": "With a and M fixed, logarithmic differentiation of T=2*pi*a^(3/2)*(G*M)^(-1/2) gives dT/T=-(1/2)*dG/G. Thus u(T)/T=u(G)/(2*G). The supplied standard uncertainty gives (1.5e-15)/(2*6.67430e-11)=3/266972 exactly as a first-order propagation coefficient. This is a probabilistic linearisation result, not a deterministic radius.\n",
+          "description": "first-order relative standard uncertainty of period at fixed orbital geometry",
+          "name": "relative_period_standard_uncertainty",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "3/266972",
+          "value_kind": "exact"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "CODATA 2018 recommended gravitational constant",
+          "name": "G",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "1.5e-15",
+            "source": "codata-2018"
+          },
+          "unit": {
+            "display": "m^3/(kg*s^2)",
+            "kg": -1,
+            "m": 3,
+            "s": -2
+          },
+          "value": "6.67430e-11"
+        },
+        {
+          "description": "exact mass of the constructed primary",
+          "name": "M",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "kg",
+            "kg": 1
+          },
+          "value": "1000000000000000/66743"
+        },
+        {
+          "description": "periapsis radius",
+          "name": "rp",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "2/5"
+        },
+        {
+          "description": "eccentricity specifying the initial-condition family",
+          "name": "e",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "3/5"
+        }
+      ],
+      "problem": {
+        "instance": "The primary is at the origin. The test body starts at (rp,0), with velocity (0,sqrt(mu*(1+e)/rp)). The exact primary mass is chosen so that the nominal mu is 1 m^3/s^2. The periapsis radius is 2/5 m and eccentricity is 3/5.\n",
+        "kind": "problem",
+        "model": "A test body moves in the Newtonian inverse-square field of a fixed primary, with gravitational parameter mu=G*M. The test-body limit neglects the primary's recoil. Periapsis radius rp and eccentricity e specify the orbit geometry. The initial speed is derived as sqrt(mu*(1+e)/rp), so changing G changes that speed coherently while keeping the geometric ellipse fixed. The speed is not an independently exact measured input.\nThe reported exact values are nominal mathematical values at the stated central G. G carries a probabilistic standard uncertainty, so these nominal exact values do not assert deterministic enclosure of the physical orbit.\n",
+        "register": "prob:exemplars:kepler-two-body-orbit",
+        "slug": "kepler-two-body-orbit",
+        "title": "Kepler two-body orbit"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "rule:vision:local-and-observable-budgets",
+          "def:vision:error-companion-surface",
+          "rule:vision:imports-and-exactness"
+        ]
+      },
+      "variants": [
+        {
+          "description": "compare a many-orbit trajectory with the exact ellipse and conserved quantities",
+          "expected": "At the nominal inputs, every completed orbital period returns the state to (2/5,0) m and (0,2) m/s. Energy remains -1/2 J/kg and specific angular momentum remains 4/5 m^2/s. Radius is 16/25 m at quarter-turn true anomaly and 8/5 m at half-turn true anomaly.\nAn integration experiment records observable budgets, time-stepping error and arithmetic contributions separately, and reports measured long-run drift against these constants. True anomaly is a geometric angle and is not assumed proportional to elapsed time. The probabilistic uncertainty in G does not provide the deterministic input enclosure required for a strict physical-value certificate.\n",
+          "name": "long-run-conservation",
+          "overrides": {
+            "e": "3/5"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "deterministic input envelope in the explicitly enclosed variant",
+          "representation arithmetic and verification contributions when separately validated"
+        ],
+        "estimated": [
+          "probabilistic-only first-order standard uncertainties and shared-source covariances"
+        ],
+        "excluded": [
+          "deterministic coverage inferred from standard uncertainty",
+          "variance inferred from an enclosure",
+          "nonlinear corrections to the probabilistic propagation",
+          "finite-amplitude and pendulum construction modelling error"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "4*pi^2*l1/t1^2",
+          "derivation": "At zero nominal calibration offsets, g1=4*pi^2*(621/625)/4=(621/625)*pi^2. Using pi=16*atan(1/5)-4*atan(1/239), with alternating-series remainder bounds, gives pi^2=9.869604401089358... and g1=9.806438932922386... m/s^2.\n",
+          "description": "first nominal gravity estimate",
+          "name": "g1",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "9.80643893292",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "4*pi^2*l2/t2^2",
+          "derivation": "The second nominal length and period equal the first, so g2=(621/625)*pi^2 m/s^2. Its independent reading uncertainty differs, but that does not change its central value.\n",
+          "description": "second nominal gravity estimate",
+          "name": "g2",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "9.80643893292",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "4*pi^2*l3/t3^2",
+          "derivation": "The third nominal length and period give g3=(621/625)*pi^2 m/s^2.\n",
+          "description": "third nominal gravity estimate",
+          "name": "g3",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "9.80643893292",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "(g1+g2+g3)/3",
+          "derivation": "All three central estimates equal (621/625)*pi^2, so their unweighted mean has the same value. It differs from the exact comparison acceleration by approximately -0.000211067077614 m/s^2.\n",
+          "description": "unweighted mean of the three nominal estimates",
+          "name": "mean_gravity",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "9.80643893292",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "7*pi^2/5000",
+          "derivation": "At the nominal inputs, each length derivative is pi^2, each period derivative is -(621/625)*pi^2 per second, the shared ruler derivative is pi^2, and the shared rate derivative is -2*(621/625)*pi^2. Use w=pi^2/25000 m/s^2 as a common propagated scale. The independent length contributions are 40*w,25*w,20*w; the three independent timing contributions have magnitude 10*w each. The shared ruler contribution is 18*w to every estimate, and the shared stopwatch contribution is -24*w to every estimate.\nConsequently Cov(g_i,g_j)=900*w^2 for i!=j, and the diagonal entries are 2600*w^2,1625*w^2,1400*w^2. Equivalently, the full covariance matrix is w^2*[[2600,900,900],[900,1625,900],[900,900,1400]]. The variance of the mean is (2600+1625+1400+6*900)*w^2/9=1225*w^2. Its standard uncertainty is 35*w=7*pi^2/5000=0.0138174461615251... m/s^2. The covariance formula is a linear probabilistic estimate, not a deterministic certificate.\n",
+          "description": "probabilistic-only first-order standard uncertainty retaining shared sources",
+          "name": "mean_standard_uncertainty_correlated",
+          "second_route": "Group contributions by independent source before forming output covariances. The six individual contributions give mean variance (40^2+25^2+20^2+3*10^2)*w^2/9=325*w^2. The two shared contributions give (18^2+24^2)*w^2=900*w^2. Their sum is again 1225*w^2.",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "0.0138174461615",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "pi^2/1000",
+          "derivation": "Treating the three estimates as independent drops the six off-diagonal covariance terms. The resulting mean variance is (2600+1625+1400)*w^2/9=625*w^2, so its standard uncertainty is 25*w=pi^2/1000. This is a comparison calculation that contradicts the declared shared sources.\n",
+          "description": "incorrect comparison obtained by dropping cross-covariances while retaining marginal variances",
+          "name": "mean_standard_uncertainty_independence_assumed",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "0.00986960440109",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "pi^2/2500",
+          "derivation": "The difference is (35-25)*w=10*pi^2/25000=pi^2/2500=0.00394784176043574... m/s^2.\n",
+          "description": "correlated standard uncertainty minus the independence-assumed comparison",
+          "name": "standard_uncertainty_difference",
+          "second_route": "none",
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "0.00394784176044",
+          "value_kind": "decimal-12"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "zero selects probabilistic propagation and one the deterministic enclosure variant",
+          "name": "uncertainty_mode",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        },
+        {
+          "description": "first measured pendulum length",
+          "name": "l1",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "0.0016",
+            "source": "reading-l1"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "621/625"
+        },
+        {
+          "description": "second measured pendulum length",
+          "name": "l2",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "0.001",
+            "source": "reading-l2"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "621/625"
+        },
+        {
+          "description": "third measured pendulum length",
+          "name": "l3",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "0.0008",
+            "source": "reading-l3"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "621/625"
+        },
+        {
+          "description": "first measured period",
+          "name": "t1",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "1/2484",
+            "source": "timing-t1"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "2"
+        },
+        {
+          "description": "second measured period",
+          "name": "t2",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "1/2484",
+            "source": "timing-t2"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "2"
+        },
+        {
+          "description": "third measured period",
+          "name": "t3",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "1/2484",
+            "source": "timing-t3"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "2"
+        },
+        {
+          "description": "shared additive length calibration error",
+          "name": "ruler_offset",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "9/12500",
+            "source": "ruler"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "0"
+        },
+        {
+          "description": "shared relative period calibration error",
+          "name": "stopwatch_rate",
+          "uncertainty": {
+            "kind": "standard",
+            "sigma": "1/2070",
+            "source": "stopwatch"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        },
+        {
+          "description": "alternative deterministic declaration of the first length",
+          "name": "l1_enclosed",
+          "uncertainty": {
+            "half_width": "0.0016",
+            "kind": "enclosure",
+            "source": "reading-l1"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "621/625"
+        },
+        {
+          "description": "alternative deterministic declaration of the second length",
+          "name": "l2_enclosed",
+          "uncertainty": {
+            "half_width": "0.001",
+            "kind": "enclosure",
+            "source": "reading-l2"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "621/625"
+        },
+        {
+          "description": "alternative deterministic declaration of the third length",
+          "name": "l3_enclosed",
+          "uncertainty": {
+            "half_width": "0.0008",
+            "kind": "enclosure",
+            "source": "reading-l3"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "621/625"
+        },
+        {
+          "description": "alternative deterministic declaration of the first period",
+          "name": "t1_enclosed",
+          "uncertainty": {
+            "half_width": "1/2484",
+            "kind": "enclosure",
+            "source": "timing-t1"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "2"
+        },
+        {
+          "description": "alternative deterministic declaration of the second period",
+          "name": "t2_enclosed",
+          "uncertainty": {
+            "half_width": "1/2484",
+            "kind": "enclosure",
+            "source": "timing-t2"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "2"
+        },
+        {
+          "description": "alternative deterministic declaration of the third period",
+          "name": "t3_enclosed",
+          "uncertainty": {
+            "half_width": "1/2484",
+            "kind": "enclosure",
+            "source": "timing-t3"
+          },
+          "unit": {
+            "display": "s",
+            "s": 1
+          },
+          "value": "2"
+        },
+        {
+          "description": "alternative deterministic declaration of the shared ruler offset",
+          "name": "ruler_offset_enclosed",
+          "uncertainty": {
+            "half_width": "9/12500",
+            "kind": "enclosure",
+            "source": "ruler"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "0"
+        },
+        {
+          "description": "alternative deterministic declaration of the shared stopwatch rate",
+          "name": "stopwatch_rate_enclosed",
+          "uncertainty": {
+            "half_width": "1/2070",
+            "kind": "enclosure",
+            "source": "stopwatch"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        },
+        {
+          "description": "exact defined standard acceleration used for comparison",
+          "name": "standard_gravity",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m/s^2",
+            "m": 1,
+            "s": -2
+          },
+          "value": "9.80665"
+        }
+      ],
+      "problem": {
+        "instance": "Three nominally identical pendulums each have measured length 621/625 m and period 2 s. They have different independent length-reading uncertainties and identical independent timing uncertainties. Their shared ruler offset and stopwatch rate have nominal value zero. The exact defined standard acceleration 9.80665 m/s^2 is supplied only for comparison.\n",
+        "kind": "problem",
+        "model": "The small-angle simple-pendulum model gives g_i=4*pi^2*L_i/T_i^2. The measurement equations are L_i=l_i+ruler_offset and T_i=t_i*(1+stopwatch_rate). Each measured l_i and t_i has its own independent standard uncertainty. The common ruler offset and stopwatch rate are shared random inputs, independent of one another and of the six independent readings. First-order propagation retains their induced cross-covariances.\nUncertainty mode zero uses the standard-uncertainty records. Mode one instead uses the corresponding records ending in _enclosed. Each pair describes alternative declarations of the same measurement or instrument source and is never composed as two inputs. The enclosure records impose additional deterministic assumptions; their half-widths are not confidence limits inferred from the standard uncertainties and supply no variances.\n",
+        "register": "prob:exemplars:pendulum-gravity-estimate",
+        "slug": "pendulum-gravity-estimate",
+        "title": "Gravitational acceleration from pendulum periods"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "rule:vision:imports-and-exactness",
+          "rule:vision:assurance-and-correlation",
+          "def:vision:error-companion-surface"
+        ]
+      },
+      "variants": [
+        {
+          "description": "replace the probabilistic declarations by separately assumed deterministic bounds on every relevant input",
+          "expected": "Use the eight _enclosed records in the same measurement equations. All lengths and periods stay positive throughout their enclosures. Each gravity estimate increases with its length and the shared ruler offset, and decreases with its measured period and the shared stopwatch rate. Therefore simultaneous endpoint choices attain the exact extrema of the unweighted mean.\nThe average independent length half-width is (0.0016+0.001+0.0008)/3=17/15000 m. Adding the shared ruler half-width gives 139/75000 m. Thus the upper and lower mean length numerators are 74659/75000 m and 74381/75000 m. The measured period endpoints are 4967/2484 s and 4969/2484 s, and the shared rate factors are 2069/2070 and 2071/2070.\nThe exact mean enclosure is [g_lower,g_upper], where g_lower=4*pi^2*(74381/75000)*(2484/4969)^2*(2070/2071)^2 and g_upper=4*pi^2*(74659/75000)*(2484/4967)^2*(2070/2069)^2, both in m/s^2. A radius about the nominal mean g0=(621/625)*pi^2 is max(g0-g_lower,g_upper-g0). These nonlinear endpoint expressions include interaction effects and provide a worst-case bound under the declared enclosure assumptions.\nThe half-widths are independent deterministic declarations, even where their magnitudes equal the standard uncertainties in the other mode. An enclosure supplies no variance. Conversely, the standard uncertainties alone do not provide this deterministic bound.\n",
+          "name": "deterministic-instrument-and-reading-enclosures",
+          "overrides": {
+            "uncertainty_mode": "1"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "representation contributions from rational resistance and voltage imports",
+          "arithmetic and verification contributions in a certified assembled solve"
+        ],
+        "estimated": [],
+        "excluded": [
+          "resistor tolerance not declared as input uncertainty",
+          "source nonideality",
+          "temperature dependence and parasitic circuit modelling error"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "Vs",
+          "derivation": "The ladder MNA system is [[G,B],[B^T,D]]*[v,iV]^T=[j,e]^T, with G=[[1,-1,0,0],[-1,3,-1,0],[0,-1,3,-1],[0,0,-1,2]] S, B=[1,0,0,0]^T, D=[0] ohm, j=[0,0,0,0]^T A and e=[Vs] V. G has shape 4 by 4, B has shape 4 by 1, B^T has shape 1 by 4 and D has shape 1 by 1. The voltage vector has four entries in V and iV has one entry in A.\nThe current equations require [G]=A/V=S and [B]=A/A=1. The voltage equation requires [B^T]=V/V=1 and [D]=V/A=ohm, including when D is zero. This is the quotient-dimension check; the concatenated unknown vector has no single physical dimension. The final equation is v0=Vs=1 V.\n",
+          "description": "ladder source-node voltage",
+          "name": "v0",
+          "second_route": "none",
+          "unit": {
+            "A": -1,
+            "display": "V",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "5 * Vs / 13",
+          "derivation": "The final nodal equation gives v2=2*v3. The next equation gives v1=3*v2-v3=5*v3. The first interior equation gives v0=3*v1-v2=13*v3. Hence v1=5/13 V.\n",
+          "description": "first ladder rung voltage",
+          "name": "v1",
+          "second_route": "From the far end, the node-2 load is 1||(1+1)=2/3 ohm and the node-1 load is 1||(1+2/3)=5/8 ohm. Voltage division across R1 and this load gives v1=(5/8)/(1+5/8)=5/13 V.",
+          "unit": {
+            "A": -1,
+            "display": "V",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "5/13",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "2 * Vs / 13",
+          "derivation": "The nodal recurrence gives v2=2*v3 and v0=13*v3, so v2=2/13 V.\n",
+          "description": "second ladder rung voltage",
+          "name": "v2",
+          "second_route": "none",
+          "unit": {
+            "A": -1,
+            "display": "V",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "2/13",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "Vs / 13",
+          "derivation": "Back substitution from the last rung gives v0=13*v3; the imposed source voltage is 1 V.\n",
+          "description": "third ladder rung voltage",
+          "name": "v3",
+          "second_route": "none",
+          "unit": {
+            "A": -1,
+            "display": "V",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1/13",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "-8 * Vs / (13 ohm)",
+          "derivation": "Node 0 gives iV=-(v0-v1)/R1=-(1-5/13)=-8/13 A. The series-branch currents towards the far end are 8/13,3/13,1/13 A, and the shunt currents are 5/13,2/13,1/13 A. Each interior node satisfies Kirchhoff's current law.\n",
+          "description": "ladder voltage-source current, positive towards ground",
+          "name": "i_voltage_source",
+          "second_route": "Series and parallel reduction gives input resistance 1+5/8=13/8 ohm. The delivered current is 1/(13/8)=8/13 A, so the stated source-current orientation gives -8/13 A.",
+          "unit": {
+            "A": 1,
+            "display": "A"
+          },
+          "value": "-8/13",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "R1 + (R4 || (R2 + (R5 || (R3 + R6))))",
+          "derivation": "The symbol || denotes parallel combination ab/(a+b). Starting at the last rung gives 1||(1+1)=2/3, then 1||(1+2/3)=5/8, then 1+5/8=13/8 ohm.\n",
+          "description": "ladder resistance seen by the voltage source",
+          "name": "input_resistance",
+          "second_route": "none",
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "13/8",
+          "value_kind": "exact"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "zero selects the ladder and one selects the bridge",
+          "name": "configuration",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "0"
+        },
+        {
+          "description": "resistance of branch 1",
+          "name": "R1",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "resistance of branch 2",
+          "name": "R2",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "resistance of branch 3",
+          "name": "R3",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "resistance of branch 4",
+          "name": "R4",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "resistance of branch 5",
+          "name": "R5",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "resistance of the final ladder shunt",
+          "name": "R6",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -2,
+            "display": "ohm",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "ladder source voltage",
+          "name": "Vs",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": -1,
+            "display": "V",
+            "kg": 1,
+            "m": 2,
+            "s": -3
+          },
+          "value": "1"
+        },
+        {
+          "description": "bridge source current, inactive in the ladder",
+          "name": "Is",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "A": 1,
+            "display": "A"
+          },
+          "value": "0"
+        }
+      ],
+      "problem": {
+        "instance": "The ladder has nodes 0,1,2,3. A voltage source Vs fixes node 0. R1, R2 and R3 connect 0 to 1, 1 to 2 and 2 to 3. R4, R5 and R6 connect nodes 1,2,3 respectively to ground. Every ladder resistance is 1 ohm.\nThe bridge variant has top node t, midpoint nodes l and r, and ground at the bottom. R1 connects t to l, R2 connects l to ground, R3 connects t to r, R4 connects r to ground, and R5 connects l to r. A current source injects Is from ground into t. R6 and Vs are inactive in this configuration.\n",
+        "kind": "problem",
+        "model": "Resistors are linear, sources are ideal, and all voltages are relative to one ground node. Source current in the voltage-source MNA variable is positive from its positive terminal towards ground. Configuration zero selects the ladder; configuration one selects the bridge and removes the voltage-source unknown.\n",
+        "register": "prob:exemplars:resistor-network",
+        "slug": "resistor-network",
+        "title": "Resistor network by modified nodal analysis"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-units-design",
+          "step:nrz:bite-certified-matrix-core",
+          "step:nrz:bite-physics-core",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "dec:vision:homogeneous-numerical-leaves",
+          "rule:vision:heterogeneous-assembly",
+          "rule:vision:verification-locations"
+        ]
+      },
+      "variants": [
+        {
+          "description": "replace the ladder topology by the specified unbalanced bridge",
+          "expected": "The exact node voltages are vt=155/74 V, vl=51/37 V and vr=46/37 V. The source injects exactly 1 A. The bridge MNA system has no voltage-source unknown: G*v=j with G=[[4/3,-1,-1/3],[-1,17/10,-1/5],[-1/3,-1/5,47/60]] S and j=[1,0,0]^T A. Its B block has shape 3 by 0 and its voltage-equation block has zero rows.\nMultiplying the midpoint equations by 10 and 60 gives -10*vt+17*vl-2*vr=0 and -20*vt-12*vl+47*vr=0. Elimination gives vr=46*vl/51 and vt=155*vl/102. Total current into ground is vl/2+vr/4=1, giving vl=51/37 and the stated remaining voltages.\nThe currents t-to-l, l-to-ground, t-to-r, r-to-ground and l-to-r are respectively 53/74,51/74,21/74,23/74 and 1/37 A. These independently satisfy 53/74+21/74=1 and both midpoint current balances. The nonzero cross-branch current establishes that the bridge is unbalanced.\n",
+          "name": "unbalanced-current-driven-bridge",
+          "overrides": {
+            "Is": "1",
+            "R1": "1",
+            "R2": "2",
+            "R3": "3",
+            "R4": "4",
+            "R5": "5",
+            "Vs": "0",
+            "configuration": "1"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "declared representation contributions at rational import",
+          "arithmetic and verification contributions when a solve certificate succeeds"
+        ],
+        "estimated": [
+          "conditioning-based certification expectations"
+        ],
+        "excluded": [
+          "geometric and material modelling error",
+          "unmodelled loads",
+          "a singularity conclusion from refusal"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "2999/3001000",
+          "derivation": "The member direction vectors are (1,0), (0,1), and (1,1)/sqrt(2). Their stiffness contributions give K=[[kx+kd/2,kd/2],[kd/2,ky+kd/2]]=[[2001/2,1/2],[1/2,3/2]] N/m. The load is [1,1/1000]^T N, and det(K)=3001/2 (N/m)^2. Elimination gives ux=(2999/2000)/(3001/2)=2999/3001000 m.\nA mixed assembly can retain three member forces f and use the direction matrix B whose columns are the three stated vectors: [[0,B],[B^T,-D^(-1)]]*[u,f]^T=[F,0]^T, where D=diag(kx,ky,kd). The top block has dimension N and the bottom block m. The four operator blocks have dimensions N/m, 1, 1, and m/N. Eliminating f gives K=B*D*B^T.\n",
+          "description": "horizontal displacement",
+          "name": "ux",
+          "second_route": "Cramer's rule replaces the first stiffness column by the load and gives numerator (3/2)*1-(1/2)*(1/1000)=2999/2000 N^2/m; division by det(K) independently gives 2999/3001000 m.",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "2999/3001000",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1001/3001000",
+          "derivation": "Eliminating ux from the coupled stiffness equations gives uy=1001/3001000 m. Direct substitution yields (1/2)*(2999/3001000)+(3/2)*(1001/3001000)=1/1000 N.\n",
+          "description": "vertical displacement",
+          "name": "uy",
+          "second_route": "The potential energy is u^T*K*u/2-F^T*u. Its positive-definite Hessian is K; the unique stationary point satisfies K*u=F. Cramer's rule gives uy=((2001/2)*(1/1000)-(1/2)*1)/(3001/2)=1001/3001000 m.",
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "1001/3001000",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "kx*ux",
+          "derivation": "The horizontal extension is ux, so its tensile force is 1000*(2999/3001000)=2999/3001 N.\n",
+          "description": "tension in the horizontal member",
+          "name": "horizontal_member_force",
+          "second_route": "The diagonal force contributes (kd/2)*(ux+uy)=2/3001 N in the horizontal direction. Force balance gives 1-2/3001=2999/3001 N.",
+          "unit": {
+            "display": "N",
+            "kg": 1,
+            "m": 1,
+            "s": -2
+          },
+          "value": "2999/3001",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "ky*uy",
+          "derivation": "The vertical extension is uy, so its tensile force is 1*(1001/3001000)=1001/3001000 N.\n",
+          "description": "tension in the vertical member",
+          "name": "vertical_member_force",
+          "second_route": "The diagonal member contributes 2/3001 N vertically. Force balance gives 1/1000-2/3001=1001/3001000 N.",
+          "unit": {
+            "display": "N",
+            "kg": 1,
+            "m": 1,
+            "s": -2
+          },
+          "value": "1001/3001000",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "kd*(ux+uy)/sqrt(2) = 2*sqrt(2)/3001",
+          "derivation": "The diagonal axial extension is (ux+uy)/sqrt(2)=4/(3001*sqrt(2)) m. Its tensile force is 2*sqrt(2)/3001 N, or 0.000942494876623 N to twelve significant digits. Its component along either free coordinate is 2/3001 N.\n",
+          "description": "tension in the diagonal member",
+          "name": "diagonal_member_force",
+          "second_route": "Both force-balance equations independently give a diagonal component: 1-2999/3001=2/3001 N and 1/1000-1001/3001000=2/3001 N. Multiplying either component by sqrt(2) recovers the axial force.",
+          "unit": {
+            "display": "N",
+            "kg": 1,
+            "m": 1,
+            "s": -2
+          },
+          "value": "0.000942494876623",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "(1002+sqrt(998002))/(1002-sqrt(998002))",
+          "derivation": "For symmetric positive-definite K, the eigenvalues are (1002+sqrt(998002))/2 and (1002-sqrt(998002))/2 N/m. Their ratio is (1002+sqrt(998002))/(1002-sqrt(998002))=667.111463346 to twelve significant digits. Positivity follows also from the positive leading entry and det(K)=3001/2.\n",
+          "description": "spectral condition number of the stiffness matrix in the stated SI coordinates",
+          "name": "condition_number",
+          "second_route": "The characteristic polynomial is lambda^2-1002*lambda+3001/2. Its two positive roots reproduce the eigenvalues and their ratio.",
+          "unit": {
+            "display": "1"
+          },
+          "value": "667.111463346",
+          "value_kind": "decimal-12"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "undeformed length of each orthogonal member",
+          "name": "L",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "m",
+            "m": 1
+          },
+          "value": "1"
+        },
+        {
+          "description": "mass attached to the free node",
+          "name": "mass",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "kg",
+            "kg": 1
+          },
+          "value": "1"
+        },
+        {
+          "description": "horizontal member stiffness",
+          "name": "kx",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N/m",
+            "kg": 1,
+            "s": -2
+          },
+          "value": "1000"
+        },
+        {
+          "description": "vertical member stiffness",
+          "name": "ky",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N/m",
+            "kg": 1,
+            "s": -2
+          },
+          "value": "1"
+        },
+        {
+          "description": "diagonal member axial stiffness",
+          "name": "kd",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N/m",
+            "kg": 1,
+            "s": -2
+          },
+          "value": "1"
+        },
+        {
+          "description": "horizontal applied force",
+          "name": "Fx",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N",
+            "kg": 1,
+            "m": 1,
+            "s": -2
+          },
+          "value": "1"
+        },
+        {
+          "description": "vertical applied force",
+          "name": "Fy",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "N",
+            "kg": 1,
+            "m": 1,
+            "s": -2
+          },
+          "value": "1/1000"
+        },
+        {
+          "description": "maximum certified two-norm radius divided by candidate displacement norm",
+          "name": "relative_budget",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/1000000"
+        }
+      ],
+      "problem": {
+        "instance": "The free node is initially at (0,0). Fixed anchors are at (-L,0), (0,-L), and (-L,-L). The horizontal and vertical members each have length L; the diagonal member has length L*sqrt(2). Their independent axial stiffnesses are kx, ky, and kd. The applied nodal load is (Fx,Fy). The two free degrees of freedom are ux and uy.\n",
+        "kind": "problem",
+        "model": "Three axial springs support one free planar node. Linearisation fixes the member directions at their undeformed values. Positive member force denotes tension. The node mass does not enter static equilibrium; gravity is omitted from the prescribed loading. Geometric nonlinearity and material nonlinearity are outside the model.\n",
+        "register": "prob:exemplars:spring-mass-truss",
+        "slug": "spring-mass-truss",
+        "title": "Spring-mass truss statics"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-units-design",
+          "step:nrz:bite-certified-matrix-core",
+          "step:nrz:bite-physics-core",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "rule:vision:heterogeneous-assembly",
+          "rule:vision:verification-locations",
+          "rule:vision:conditioning-and-refusal",
+          "def:vision:certified-solve-contract"
+        ]
+      },
+      "variants": [
+        {
+          "description": "certification expectation for the base instance",
+          "expected": "Use binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, and no refinement or higher precision. Import an exactly representable rational entry, including these integer and dyadic matrix entries, with zero representation radius; enclose only an inexact import such as Fy=1/1000 by half an ulp. Let rho bound the represented-center residual norm, rA and rB bound input perturbations, and xnorm bound the candidate norm. An approximate inverse Z supplies validated q>=norm_2(I-Z*A); if q<1, use g=norm_2(Z)/(1-q). The certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA), provided g*rA<1. Success requires R/norm_2(xhat)<=relative_budget.\nSuccess is expected for the base condition number 667.111463346 and relative budget 1e-6: kappa*2^(-53) is about 7.4e-14, rA is zero for the exact matrix import, and the right-hand-side import radius is far below the budget after inverse amplification. The feasibility bite must record the actual validated q, residual, and radius; conditioning alone is not a certificate.\n",
+          "name": "base-certification",
+          "overrides": {
+            "kx": "1000"
+          }
+        },
+        {
+          "description": "multiply the horizontal member stiffness by one million",
+          "expected": "The stiffness matrix is [[2000000001/2,1/2],[1/2,3/2]] N/m, with determinant 3000000001/2 (N/m)^2. The exact displacement is [2999/3000000001000,1999999001/3000000001000]^T m. The horizontal, vertical, and diagonal tensile forces are respectively 2999000000/3000000001 N, 1999999001/3000000001000 N, and 1000001*sqrt(2)/3000000001 N; the diagonal force is 0.000471404992038 N to twelve significant digits. Their projected components satisfy both exact force-balance equations.\nThe eigenvalues are (1000000002+sqrt(999999998000000002))/2 and (1000000002-sqrt(999999998000000002))/2 N/m, giving spectral condition number (1000000002+sqrt(999999998000000002))/(1000000002-sqrt(999999998000000002))=666666667.111 to twelve significant digits. The matrix entries and large stiffness import exactly, so rA=0. The estimate kappa*2^(-53) is about 7.4e-8, below the relative budget 1e-6; success remains expected, subject to the actual residual and inverse validation. Refusal is required if q>=1 or the validated radius exceeds the budget, and would concern this certificate, not exact singularity. Under the former blanket half-unit policy, an exactly represented stiffness of 1000000000000 could alone have exhausted this budget; that policy does not apply here.\n",
+          "name": "millionfold-stiff-member",
+          "overrides": {
+            "kx": "1000000000"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "representation input perturbations under the prescribed import policy",
+          "arithmetic and verification contributions when a certificate succeeds"
+        ],
+        "estimated": [
+          "conditioning-based success and refusal expectations"
+        ],
+        "excluded": [
+          "a guarantee inferred from a literature condition estimate",
+          "a singularity or candidate-inaccuracy conclusion from refusal"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "1/(1+1-1)",
+          "derivation": "The defining denominator is 1+1-1=1.\n",
+          "description": "order-three entry in row 1 column 1",
+          "name": "h3_11",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1/(1+2-1)",
+          "derivation": "The defining denominator is 2; symmetry gives the transposed entry.\n",
+          "description": "order-three entries in positions 12 and 21",
+          "name": "h3_12",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/2",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1/(1+3-1)",
+          "derivation": "The defining denominator is 3.\n",
+          "description": "order-three entries in positions 13 and 31",
+          "name": "h3_13",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/3",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1/(2+2-1)",
+          "derivation": "The defining denominator is 3.\n",
+          "description": "order-three entry in row 2 column 2",
+          "name": "h3_22",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/3",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1/(2+3-1)",
+          "derivation": "The defining denominator is 4.\n",
+          "description": "order-three entries in positions 23 and 32",
+          "name": "h3_23",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/4",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1/(3+3-1)",
+          "derivation": "The defining denominator is 5.\n",
+          "description": "order-three entry in row 3 column 3",
+          "name": "h3_33",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/5",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "60*15/100",
+          "derivation": "Set C=60*H_3=[[60,30,20],[30,20,15],[20,15,12]]. Its adjugate is [[15,-60,50],[-60,320,-300],[50,-300,300]], and its determinant is 60*15+30*(-60)+20*50=100. Therefore H_3^(-1)=60*adj(C)/100, giving the stated entry.\nFor general order, H_n^(-1)[i,j]=(-1)^(i+j)*(i+j-1)*binom(n+i-1,n-j)*binom(n+j-1,n-i)*binom(i+j-2,i-1)^2. This follows by interpolating R(z)=sum_j x_j/(z+j-1) with R(i)=delta(i,k). With D(z)=product_j(z+j-1), the numerator for column k is D(k)*product over l!=k of (z-l)/(k-l); residues at z=1-j give the displayed integer formula.\n",
+          "description": "order-three inverse entry in row 1 column 1",
+          "name": "inverse3_11",
+          "second_route": "Multiplication of H_3 by the proposed first inverse column [9,-36,30]^T gives [9-18+10,9/2-12+15/2,3-9+6]^T=[1,0,0]^T. Multiplying the other displayed columns likewise gives the remaining identity columns.",
+          "unit": {
+            "display": "1"
+          },
+          "value": "9",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "60*(-60)/100",
+          "derivation": "The signed cofactor in the adjugate is -(30*12-15*20)=-60. Multiplication by 60/100 gives -36.\n",
+          "description": "order-three inverse entries in positions 12 and 21",
+          "name": "inverse3_12",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-36",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "60*50/100",
+          "derivation": "The corresponding cofactor is 30*15-20*20=50. Multiplication by 60/100 gives 30.\n",
+          "description": "order-three inverse entries in positions 13 and 31",
+          "name": "inverse3_13",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "30",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "60*320/100",
+          "derivation": "The cofactor is 60*12-20*20=320. Multiplication by 60/100 gives 192.\n",
+          "description": "order-three inverse entry in row 2 column 2",
+          "name": "inverse3_22",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "192",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "60*(-300)/100",
+          "derivation": "The signed cofactor is -(60*15-30*20)=-300. Multiplication by 60/100 gives -180.\n",
+          "description": "order-three inverse entries in positions 23 and 32",
+          "name": "inverse3_23",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-180",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "60*300/100",
+          "derivation": "The cofactor is 60*20-30*30=300. Multiplication by 60/100 gives 180.\n",
+          "description": "order-three inverse entry in row 3 column 3",
+          "name": "inverse3_33",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "180",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "By construction, (H_n*ones)_i=sum_j H_n[i,j]=b_i. At order three these row sums are 11/6,13/12,47/60. Invertibility makes this solution unique.\n",
+          "description": "every component of the exact solution for the prescribed row-sum right-hand side",
+          "name": "solution_component",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "lambda_max(H_3)/lambda_min(H_3)",
+          "derivation": "This is a literature value supplied by the dispatch, following standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility bite. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.\n",
+          "description": "tabulated two-norm condition number at order three",
+          "name": "condition_order3",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "524.1",
+          "value_kind": "decimal-4"
+        },
+        {
+          "closed_form": "lambda_max(H_4)/lambda_min(H_4)",
+          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "description": "tabulated two-norm condition number at order four",
+          "name": "condition_order4",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1.551e4",
+          "value_kind": "decimal-4"
+        },
+        {
+          "closed_form": "lambda_max(H_5)/lambda_min(H_5)",
+          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "description": "tabulated two-norm condition number at order five",
+          "name": "condition_order5",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "4.766e5",
+          "value_kind": "decimal-4"
+        },
+        {
+          "closed_form": "lambda_max(H_6)/lambda_min(H_6)",
+          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "description": "tabulated two-norm condition number at order six",
+          "name": "condition_order6",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1.495e7",
+          "value_kind": "decimal-4"
+        },
+        {
+          "closed_form": "lambda_max(H_7)/lambda_min(H_7)",
+          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "description": "tabulated two-norm condition number at order seven",
+          "name": "condition_order7",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "4.754e8",
+          "value_kind": "decimal-4"
+        },
+        {
+          "closed_form": "lambda_max(H_8)/lambda_min(H_8)",
+          "derivation": "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n",
+          "description": "tabulated two-norm condition number at order eight",
+          "name": "condition_order8",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1.526e10",
+          "value_kind": "decimal-4"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "matrix order",
+          "name": "n",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "3"
+        },
+        {
+          "description": "relative two-norm certificate radius budget",
+          "name": "relative_budget",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/1000000"
+        }
+      ],
+      "problem": {
+        "instance": "The base order is three: H_3=[[1,1/2,1/3],[1/2,1/3,1/4],[1/3,1/4,1/5]], b=[11/6,13/12,47/60]^T, and x=[1,1,1]^T. The exact inverse is [[9,-36,30],[-36,192,-180],[30,-180,180]].\n",
+        "kind": "fixture",
+        "model": "The dimensionless Hilbert matrix is H_n[i,j]=1/(i+j-1), with indices starting at one. It is symmetric positive definite. The exact right-hand side is b_i=sum from j=1 to n of 1/(i+j-1), so the exact solution is the all-ones vector. The six entry observables and six inverse-entry observables below specify the upper triangles at order three; symmetry specifies their lower triangles.\nCertification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting and no recovery. Exactly representable matrix and right-hand-side entries import without a representation radius; entries binary64 cannot represent receive a half-ulp enclosure. A validated bound q on norm_2(I-Z*A), for an approximate inverse Z, gives g=norm_2(Z)/(1-q) if q<1. With residual bound rho, input bounds rA and rB, and candidate norm bound xnorm, the certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA) if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget; otherwise the requested guarantee is refused. Conditioning estimates below predict outcomes and do not replace these checks.\n",
+        "register": "ex:exemplars:hilbert-matrices",
+        "slug": "hilbert-matrices",
+        "title": "Hilbert matrices"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-numerical-feasibility",
+          "step:nrz:bite-certified-matrix-core",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "rule:vision:conditioning-and-refusal",
+          "def:vision:operation-result-and-failure",
+          "rule:vision:independent-numerical-evidence",
+          "def:vision:certified-solve-contract",
+          "dec:vision:inverse-norm-certificate"
+        ]
+      },
+      "variants": [
+        {
+          "description": "first certification expectation",
+          "expected": "The exact solution is three ones. Success under the stated procedure and relative budget 1e-6 is expected. The order-of-magnitude estimate kappa*u is about 5.8e-14 for u=2^(-53), leaving substantial margin for representation, residual and verification contributions. The actual validated radius remains the acceptance test.\n",
+          "name": "order3-success",
+          "overrides": {
+            "n": "3"
+          }
+        },
+        {
+          "description": "certification expectation at order four",
+          "expected": "The exact solution is four ones. Success is expected under the stated procedure. The estimate kappa*u is about 1.7e-12, well below the relative budget 1e-6.\n",
+          "name": "order4-success",
+          "overrides": {
+            "n": "4"
+          }
+        },
+        {
+          "description": "certification expectation at order five",
+          "expected": "The exact solution is five ones. Success is expected under the stated procedure. The estimate kappa*u is about 5.3e-11. It is an estimate of scale, not a substitute for validated inverse and residual bounds.\n",
+          "name": "order5-success",
+          "overrides": {
+            "n": "5"
+          }
+        },
+        {
+          "description": "certification expectation at order six",
+          "expected": "The exact solution is six ones. Success is expected under the stated procedure. The estimate kappa*u is about 1.7e-9, below the relative budget 1e-6 with room for moderate certificate factors.\n",
+          "name": "order6-success",
+          "overrides": {
+            "n": "6"
+          }
+        },
+        {
+          "description": "last expected success among the supplied orders",
+          "expected": "The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility bite must confirm or correct this expectation from its recorded certificate.\n",
+          "name": "order7-success",
+          "overrides": {
+            "n": "7"
+          }
+        },
+        {
+          "description": "first expected refusal among the supplied orders",
+          "expected": "The exact solution is eight ones. Refusal of the relative budget 1e-6 is expected without refinement or higher precision. The estimate kappa*u is about 1.7e-6 before further certificate factors, so conversion accounting and residual amplification are expected to exhaust the budget.\nThis prediction does not assert a universal condition-number cutoff. The recorded reason must be q>=1, g*rA>=1, or a validated radius exceeding the budget. Failure to certify proves neither singularity nor inaccuracy of the candidate.\n",
+          "name": "order8-refusal",
+          "overrides": {
+            "n": "8"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "exact elimination growth for the stated tie rule",
+          "singular-value and conditioning bounds derived from exact matrices",
+          "representation arithmetic and verification contributions in successful certificates"
+        ],
+        "estimated": [
+          "conditioning-based certification expectations"
+        ],
+        "excluded": [
+          "exact rank deficiency inferred from small singular values",
+          "accuracy inferred from QR diagonals alone",
+          "failure inferred from growth alone",
+          "unspecified partial-pivoting tie behaviour"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "atan(4/3)",
+          "derivation": "The angle lies in the first quadrant and has tangent s/c=4/3. The identity atan(4/3)=2*atan(1/2), evaluated by the alternating arctangent series through j=22, gives the displayed twelve-digit value with a remainder below 2e-16.\n",
+          "description": "angle determined by the rational sine and cosine",
+          "name": "kahan_angle",
+          "second_route": "none",
+          "unit": {
+            "display": "rad"
+          },
+          "value": "0.927295218002",
+          "value_kind": "decimal-12"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The first row scale is s^0=1 and the diagonal of U is one.\n",
+          "description": "first Kahan diagonal entry",
+          "name": "kahan_11",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "-c",
+          "derivation": "Both first-row upper entries are the row scale one times -c.\n",
+          "description": "the two strictly upper entries in the first row",
+          "name": "kahan_12_and_13",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-3/5",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "s",
+          "derivation": "The second row scale is s=4/5.\n",
+          "description": "second Kahan diagonal entry",
+          "name": "kahan_22",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "4/5",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "-s*c",
+          "derivation": "Multiplication gives -(4/5)*(3/5)=-12/25.\n",
+          "description": "third entry in the second Kahan row",
+          "name": "kahan_23",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-12/25",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "s^2",
+          "derivation": "The third row scale is s^2=16/25. Since K is already upper triangular with positive diagonal, unpivoted QR can take Q=I and R=K.\n",
+          "description": "last diagonal entry and last unpivoted QR diagonal at order three",
+          "name": "kahan_trailing_diagonal",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "16/25",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "0",
+          "derivation": "U is upper triangular, and left diagonal scaling preserves its zero lower triangle.\n",
+          "description": "each of the entries 21,31,32",
+          "name": "kahan_lower_entry",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "0",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "c^2*sum(s^(2*i),i=0..j-2)+s^(2*(j-1))",
+          "derivation": "Because 1-s^2=c^2, the geometric sum is 1-s^(2*(j-1)); adding the final diagonal square gives one. The first column has norm one directly.\n",
+          "description": "squared Euclidean norm of every Kahan column",
+          "name": "kahan_column_norm_squared",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "256/(24^2+15^2+25^2)",
+          "derivation": "For v=[24,15,25]^T, exact multiplication gives K*v=[0,0,16]^T. The Rayleigh quotient for K^T*K is 16^2/(24^2+15^2+25^2)=256/1426=128/713. The smallest eigenvalue cannot exceed this quotient. Thus sigma_min(K)<=sqrt(128/713)<1/2, while every unpivoted QR diagonal is at least 16/25>1/2. A diagonal-only rank diagnostic at the stated threshold misses the small singular value.\nFor general n, U^(-1)[i,j]=c*(1+c)^(j-i-1) for i<j, with unit diagonal. The last inverse column therefore gives sigma_min(K_n)<=s^(n-1)/sqrt(1+c^2*sum((1+c)^(2*j),j=0..n-2)). Keeping just its first entry gives the simpler bound sigma_min(K_n)<=16/(3*2^n). This exposes the growing separation from the trailing QR diagonal s^(n-1). Every finite matrix remains exactly nonsingular.\n",
+          "description": "exact upper bound on the square of the smallest singular value at order three",
+          "name": "kahan_smallest_singular_value_squared_upper_bound",
+          "second_route": "The last inverse column is [3/2,15/16,25/16]^T, with squared norm 713/128. Since norm_2(K^(-1)) is at least that column norm, sigma_min(K)^2<=128/713 independently reproduces the bound.",
+          "unit": {
+            "display": "1"
+          },
+          "value": "128/713",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "This is the defining diagonal of the specified Wilkinson construction.\n",
+          "description": "every diagonal entry of the growth matrix",
+          "name": "wilkinson_diagonal",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "-1",
+          "derivation": "All strictly lower entries are minus one by construction.\n",
+          "description": "every entry strictly below the diagonal",
+          "name": "wilkinson_lower",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "The last column consists of ones, including its diagonal entry.\n",
+          "description": "every entry in the last column",
+          "name": "wilkinson_last_column",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "0",
+          "derivation": "These are the remaining entries in the defining construction; at order three this is entry 12.\n",
+          "description": "strictly upper entries outside the last column",
+          "name": "wilkinson_other_upper",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "0",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "2^(n_wilkinson-1)",
+          "derivation": "Each pivot before the last is one and every lower multiplier is minus one. Updating the last column doubles its active entries at each elimination stage. The final pivot is 2^(n-1), while the largest original entry magnitude is one. Thus the growth factor is 2^(n-1), equal to four at order three.\n",
+          "description": "element growth factor under the specified partial-pivoting tie rule",
+          "name": "wilkinson_growth_factor",
+          "second_route": "At order three the successive upper rows are [1,0,1], [0,1,2] and [0,0,4], displaying the same maximum entry four.",
+          "unit": {
+            "display": "1"
+          },
+          "value": "4",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "1",
+          "derivation": "For Kahan, row i sums to s^(i-1)*(1-c*(n-i)), giving the stated order-three right-hand side. For Wilkinson, a row i<n sums to 1-(i-1)+1=3-i, and the final row sums to 1-(n-1)=2-n. Thus both exact right-hand sides have the all-ones solution.\n",
+          "description": "every component of either prescribed exact solution",
+          "name": "solution_component",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "1",
+          "value_kind": "exact"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "Kahan matrix order",
+          "name": "n_kahan",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "3"
+        },
+        {
+          "description": "Wilkinson matrix order",
+          "name": "n_wilkinson",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "3"
+        },
+        {
+          "description": "cosine of the Kahan angle",
+          "name": "c",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "3/5"
+        },
+        {
+          "description": "sine of the Kahan angle",
+          "name": "s",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "4/5"
+        },
+        {
+          "description": "absolute singular-value threshold used to compare rank diagnostics",
+          "name": "rank_threshold",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/2"
+        },
+        {
+          "description": "relative two-norm solve-certificate budget",
+          "name": "relative_budget",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/1000000"
+        }
+      ],
+      "problem": {
+        "instance": "At order three, K=[[1,-3/5,-3/5],[0,4/5,-12/25],[0,0,16/25]], with right-hand side [-1/5,8/25,16/25]^T. Its inverse is [[1,3/4,3/2],[0,5/4,15/16],[0,0,25/16]].\nAt order three, W=[[1,0,1],[-1,1,1],[-1,-1,1]], with right-hand side [2,1,-1]^T. For general order, the Wilkinson right-hand side is b_i=3-i for i<n and b_n=2-n.\n",
+        "kind": "fixture",
+        "model": "The Kahan matrix is K_n=D*U, where D=diag(1,s,...,s^(n-1)), U has unit diagonal, entries -c above the diagonal and zero entries below it, and c^2+s^2=1. The fixed angle has c=3/5 and s=4/5. Every column has Euclidean norm one, while an unpivoted QR factorisation has Q=I and R=K_n.\nThe Wilkinson construction here is the Gaussian-elimination partial-pivoting growth matrix: diagonal entries are one, entries below the diagonal are minus one, the last column is all ones, and remaining entries are zero. Equal-magnitude pivot candidates are resolved by choosing the smallest row index, so elimination makes no row swaps. This is the growth construction, rather than the symmetric tridiagonal eigenvalue example, because the fixture stresses elimination growth and factorisation choices.\nFor both matrices the exact right-hand side is the matrix times the all-ones vector. Certification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, exact import for binary64-representable entries and half-ulp enclosures only for inexact imports, and no recovery. With q>=norm_2(I-Z*A), use g=norm_2(Z)/(1-q) only if q<1. With validated rho,rA,rB,xnorm, use R=g*(rho+rB+rA*xnorm)/(1-g*rA) only if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget. All outcome predictions remain expectations to be confirmed or corrected by the feasibility bite.\n",
+        "register": "ex:exemplars:kahan-and-wilkinson-matrices",
+        "slug": "kahan-and-wilkinson-matrices",
+        "title": "Kahan and Wilkinson matrices"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-numerical-feasibility",
+          "step:nrz:bite-certified-matrix-core",
+          "step:nrz:bite-advanced-matrix-domains",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "dec:vision:factorizations-and-scaling",
+          "rule:vision:equilibration",
+          "rule:vision:decomposition-objects",
+          "rule:vision:independent-numerical-evidence",
+          "rule:vision:conditioning-and-refusal"
+        ]
+      },
+      "variants": [
+        {
+          "description": "well-conditioned solve despite the rank-diagnostic example",
+          "expected": "The exact solution is [1,1,1]. Under the stated binary64 certificate procedure, success at relative budget 1e-6 is expected. The Frobenius norm squared of K is 3, and that of its displayed inverse is 1113/128. Therefore kappa_2(K)<=sqrt(3339/128)<6, so kappa*u is below 7e-16. The rank threshold is a separate diagnostic choice and is not the solve budget.\n",
+          "name": "kahan-order3-success",
+          "overrides": {
+            "n_kahan": "3",
+            "rank_threshold": "1/2"
+          }
+        },
+        {
+          "description": "large separation between triangular diagonals and the smallest singular value",
+          "expected": "The exact solution remains forty ones. The trailing QR diagonal is (4/5)^39, greater than 1e-4, whereas sigma_min is at most 16/(3*2^40), less than 5e-12. A diagonal-only QR diagnostic therefore fails to report a singular value below the threshold 1e-8.\nSince norm_2(K)>=1, the singular-value bound gives kappa_2(K)>=3*2^40/16=206158430208. The resulting conditioning estimate kappa*u is at least about 2.3e-5. Refusal of the relative solve budget 1e-6 is expected under the prescribed half-ulp import policy and absence of recovery. This remains an expectation subject to the actual inverse and residual certificate, not a declaration of exact rank deficiency.\n",
+          "name": "kahan-order40-refusal",
+          "overrides": {
+            "n_kahan": "40",
+            "rank_threshold": "1e-8"
+          }
+        },
+        {
+          "description": "large growth with an exactly representable all-ones candidate",
+          "expected": "The exact growth factor is 2^53=9007199254740992. Nevertheless, the all-ones candidate is exactly recovered by the specified elimination: the transformed right-hand side is 1+2^(i-1) for i<n and 2^(n-1) in the last row. At n=54 these integers are representable in binary64, and back substitution gives every component exactly one.\nThe inverse has last row entries 2^(-j) for j<n and 2^(-(n-1)) for j=n. For i<n, its row has zeros before column i, entry 1/2 in column i, entries -2^(i-j-1) for i<j<n, and entry -2^(i-n) in the last column. Every absolute row sum and column sum is one. Thus norm_2(W^(-1))<=1 and norm_2(W)<=n, giving kappa_2(W)<=54 and a conditioning estimate kappa*u below 6e-15.\nSuccess under the stated certificate and relative budget 1e-6 is expected. The inverse entries are dyadic, and the independent residual of the exact candidate is zero. Conversion and verification bounds still have to be recorded. The large elimination growth alone is not grounds for refusal.\n",
+          "name": "wilkinson-order54-success",
+          "overrides": {
+            "n_wilkinson": "54"
+          }
+        },
+        {
+          "description": "the transformed right-hand side loses a unit in binary64",
+          "expected": "The exact solution is fifty-five ones and the exact growth factor is 2^54=18014398509481984. At elimination stage 53, the transformed entry in row 54 becomes 2^53+1, which rounds to 2^53 under ties-to-even. The last-row entry at that stage is 2^53-1; adding the rounded row-54 entry produces 2^54-1, which rounds to 2^54. Back substitution therefore gives xhat_54=0 and every other component one.\nThe exact represented-center residual is b-W*xhat=W*e_54, with entries 1 and -1 in rows 54 and 55 and zeros elsewhere. Its norm is sqrt(2), and the actual candidate error has norm one. Any honest enclosing radius is therefore at least one, far above the relative budget 1e-6 for a candidate norm sqrt(54). Refusal is required for this candidate even though kappa_2(W)<=55 and kappa*u is only about 6e-15. This distinguishes a poor candidate caused by growth and rounding from ill-conditioning of the underlying problem.\n",
+          "name": "wilkinson-order55-refusal",
+          "overrides": {
+            "n_wilkinson": "55"
+          }
+        }
+      ]
+    },
+    {
+      "errors": {
+        "bounded": [
+          "arithmetic and verification contributions when the validated path returns an enclosure",
+          "representation contributions under the declared import policy"
+        ],
+        "estimated": [],
+        "excluded": [
+          "deterministic assurance inferred from naive evaluation",
+          "truth inferred solely from higher ordinary precision",
+          "a portable floating-point output without a fixed arithmetic convention"
+        ]
+      },
+      "observables": [
+        {
+          "closed_form": "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8",
+          "derivation": "Set t=b^2 and u=a^2. Direct integer squaring gives t=1095345216 and u=6024398689. Since (11/2)*t=6024398688, the exact relation is u=(11/2)*t+1.\nThe polynomial part is P=(1335/4)*t^3+11*u^2*t-u*t^3-121*u*t^2-2*u+(11/2)*t^4. Substituting u=(11/2)*t+1 gives 11*u^2*t=(1331/4)*t^3+121*t^2+11*t, -u*t^3=-(11/2)*t^4-t^3, -121*u*t^2=-(1331/2)*t^3-121*t^2, and -2*u=-11*t-2. Fourth-, second- and first-degree terms cancel pairwise. The cubic coefficient is (1335+1331-4-2662)/4=0. Therefore P=-2 exactly.\n",
+          "description": "exact expression excluding the final quotient",
+          "name": "polynomial_part",
+          "second_route": "Polynomial division gives the independently checkable identity P+2=(u-(11/2)*t-1)*(11*t*u-t^3-(121/2)*t^2+11*t-2). Expanding verifies this identity without numerical cancellation. The first factor is zero at the stated integer squares, again giving P=-2.",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-2",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "a/(2*b)",
+          "derivation": "The denominator is 2*33096=66192, so the quotient is exactly 77617/66192.\n",
+          "description": "exact final quotient",
+          "name": "quotient_term",
+          "second_route": "none",
+          "unit": {
+            "display": "1"
+          },
+          "value": "77617/66192",
+          "value_kind": "exact"
+        },
+        {
+          "closed_form": "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b)",
+          "derivation": "The complete value is -2+77617/66192=(-132384+77617)/66192=-54767/66192. The denominator is positive and the numerator negative, so the exact sign is negative.\nRump's 1988 account in Algorithms for verified inclusions: theory and practice, and Loh and Walster's 2002 note Rump's example revisited, are the published accounts named by the dispatch. They report illustrative naive evaluations at common precisions with the wrong sign and magnitude near one; the latter account explains dependence on the arithmetic and expression form. This is an attributed literature claim, not a numerical prediction for the evaluation convention fixed in this file.\n",
+          "description": "exact value of the complete expression",
+          "name": "exact_value",
+          "second_route": "Combining the quotient with the polynomial-division remainder directly over denominator 2*b gives (a-4*b)/(2*b)=(77617-132384)/66192=-54767/66192.",
+          "unit": {
+            "display": "1"
+          },
+          "value": "-54767/66192",
+          "value_kind": "exact"
+        }
+      ],
+      "parameters": [
+        {
+          "description": "first exact coordinate",
+          "name": "a",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "77617"
+        },
+        {
+          "description": "second exact coordinate",
+          "name": "b",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "33096"
+        },
+        {
+          "description": "significand precision for the naive-evaluation experiment",
+          "name": "precision_bits",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "53"
+        },
+        {
+          "description": "requested relative radius for a budgeted validated scalar result",
+          "name": "relative_budget",
+          "uncertainty": {
+            "kind": "none"
+          },
+          "unit": {
+            "display": "1"
+          },
+          "value": "1/1000000"
+        }
+      ],
+      "problem": {
+        "instance": "Evaluate at a=77617 and b=33096. The exact polynomial part equals -2, while a/(2*b)=77617/66192, leaving a negative exact result. The precision selector is the significand bit count: 24 for binary32 and 53 for binary64.\n",
+        "kind": "fixture",
+        "model": "The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.\nThe measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility bite records the resulting floating-point outputs. No such output is asserted here.\n",
+        "register": "cex:exemplars:rump-polynomial",
+        "slug": "rump-polynomial",
+        "title": "Rump's polynomial"
+      },
+      "stress": {
+        "bites": [
+          "step:nrz:bite-exemplar-register",
+          "step:nrz:bite-numerical-feasibility",
+          "step:nrz:bite-units-and-foundations",
+          "step:nrz:bite-accuracy-and-benchmarks"
+        ],
+        "claims": [
+          "dec:vision:independent-verification-arithmetic",
+          "def:vision:operation-result-and-failure",
+          "rule:vision:independent-numerical-evidence"
+        ]
+      },
+      "variants": [
+        {
+          "description": "measure naive binary32 and require honest validated behaviour",
+          "expected": "The mathematical target remains -54767/66192. The feasibility bite measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.\nA validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.\n",
+          "name": "binary32-naive-and-validated",
+          "overrides": {
+            "precision_bits": "24"
+          }
+        },
+        {
+          "description": "measure naive binary64 under the same operation-order convention",
+          "expected": "The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.\nThe accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility bite records the measured naive output and the validated path's evidence separately.\n",
+          "name": "binary64-naive-and-validated",
+          "overrides": {
+            "precision_bits": "53"
+          }
+        }
+      ]
+    }
+  ]
+}

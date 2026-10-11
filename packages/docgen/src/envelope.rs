@@ -237,7 +237,7 @@ fn invalid(path: &str, detail: &str) -> Error {
 }
 
 /// Check the three-part estate label grammar.
-fn valid_label(label: &str) -> bool {
+pub(crate) fn valid_label(label: &str) -> bool {
     let parts: Vec<&str> = label.split(':').collect();
     parts.len() == 3
         && parts[0].bytes().all(lower_alnum)

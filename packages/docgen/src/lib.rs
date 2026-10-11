@@ -30,6 +30,11 @@ mod manifest;
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
 )]
+mod problems;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
 mod project;
 #[expect(
     clippy::redundant_pub_crate,
@@ -106,13 +111,16 @@ pub fn check(root: &Path) -> Result<Vec<Finding>, Error> {
 fn datasets(root: &Path, owners: &BTreeSet<String>) -> Result<DatasetGeneration, Error> {
     let (project_bytes, project_value) = project::derive(root, owners)?;
     let (census_bytes, census_value) = census::derive(root)?;
+    let (problems_bytes, problems_value) = problems::derive(root, owners)?;
     let files = BTreeMap::from([
         (project::DATASET.to_owned(), project_bytes),
         (census::DATASET.to_owned(), census_bytes),
+        (problems::DATASET.to_owned(), problems_bytes),
     ]);
     let values = BTreeMap::from([
         ("project".to_owned(), project_value),
         ("census".to_owned(), census_value),
+        ("problems".to_owned(), problems_value),
     ]);
     Ok((files, values))
 }
@@ -133,6 +141,7 @@ fn dataset_path(name: &str) -> Option<&'static str> {
     match name {
         "project" => Some(project::DATASET),
         "census" => Some(census::DATASET),
+        "problems" => Some(problems::DATASET),
         _ => None,
     }
 }
@@ -142,6 +151,7 @@ fn validate_dataset(name: &str, value: &Value, owners: &BTreeSet<String>) -> Res
     match name {
         "project" => project::validate_dataset(value, owners),
         "census" => census::validate_dataset(value, owners),
+        "problems" => problems::validate_dataset(value, owners),
         _ => Err(Error::DatasetCompatibility {
             document: String::new(),
             dataset: name.to_owned(),

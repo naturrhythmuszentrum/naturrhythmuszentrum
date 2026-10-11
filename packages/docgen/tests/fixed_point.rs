@@ -55,7 +55,22 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
             "# {{ project.name }}\n",
         ),
     )?;
+    write_problem(root, "alpha", "problem")?;
     Ok(())
+}
+
+/// Write one minimal valid problem-stage input under its declared kind.
+fn write_problem(root: &Path, slug: &str, kind: &str) -> Result<(), std::io::Error> {
+    let (directory, filename) = if kind == "fixture" {
+        (format!("problems/fixtures/{slug}"), "fixture.toml")
+    } else {
+        (format!("problems/{slug}"), "problem.toml")
+    };
+    fs::create_dir_all(root.join(&directory))?;
+    let source = format!(
+        "# SPDX-License-Identifier: CC0-1.0\nnamespace = \"org.naturrhythmuszentrum.problems.{kind}\"\nversion = [1, 0, 0]\nowner = \"NRZ\"\nlicense = \"CC0-1.0\"\nsources = []\nlabels = [\"prob:exemplars:{slug}\"]\n[problem]\nslug = \"{slug}\"\ntitle = \"Sample\"\nregister = \"prob:exemplars:{slug}\"\nkind = \"{kind}\"\nmodel = \"Model\"\ninstance = \"Instance\"\n[[parameters]]\nname = \"p\"\ndescription = \"Input\"\nvalue = \"1\"\nunit = {{ display = \"1\" }}\nuncertainty = {{ kind = \"none\" }}\n[[observables]]\nname = \"answer\"\ndescription = \"Output\"\nunit = {{ display = \"1\" }}\nclosed_form = \"p\"\nvalue = \"1\"\nvalue_kind = \"exact\"\nderivation = \"Direct\"\nsecond_route = \"none\"\n[errors]\nbounded = []\nestimated = []\nexcluded = []\n[stress]\nclaims = []\nbites = [\"step:nrz:bite-exemplar-register\"]\n"
+    );
+    fs::write(root.join(directory).join(filename), source)
 }
 
 /// Run the built binary against one fixture root.
@@ -137,5 +152,61 @@ fn binary_fixed_point_and_exit_classes() -> Result<(), Box<dyn std::error::Error
     );
     assert_eq!(run(root, "data")?.status.code(), Some(0));
     assert_eq!(run(root, "unknown")?.status.code(), Some(2));
+    Ok(())
+}
+
+/// Data writes problems before fixtures, with bytewise slug order in each group.
+/// ´test:integration:orders-problem-dataset-entries´
+#[test]
+fn orders_problem_dataset_entries() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    write_problem(root, "aardvark", "problem")?;
+    write_problem(root, "beta", "fixture")?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    let value: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("docs/datasets/problems.json"))?)?;
+    assert_eq!(
+        value["sources"],
+        serde_json::json!([
+            "problems/aardvark/problem.toml",
+            "problems/alpha/problem.toml",
+            "problems/fixtures/beta/fixture.toml"
+        ])
+    );
+    assert_eq!(value["entries"][0]["problem"]["slug"], "aardvark");
+    assert_eq!(value["entries"][2]["problem"]["slug"], "beta");
+    Ok(())
+}
+
+/// A changed input value makes check report the derived dataset as changed.
+/// ´test:integration:detects-changed-problem-value´
+#[test]
+fn detects_changed_problem_value() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    let path = root.join("problems/alpha/problem.toml");
+    let source = fs::read_to_string(&path)?;
+    fs::write(&path, source.replacen("value = \"1\"", "value = \"2\"", 1))?;
+    let checked = run(root, "check")?;
+    assert_eq!(checked.status.code(), Some(3));
+    assert!(
+        String::from_utf8_lossy(&checked.stdout).contains("changed docs/datasets/problems.json")
+    );
+    Ok(())
+}
+
+/// Data rejects a root from which the entire problems tree was removed.
+/// ´test:integration:refuses-missing-problems-tree´
+#[test]
+fn refuses_missing_problems_tree() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    fs::remove_dir_all(root.join("problems"))?;
+    assert_eq!(run(root, "data")?.status.code(), Some(1));
     Ok(())
 }

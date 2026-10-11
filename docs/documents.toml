@@ -35,3 +35,8 @@ requires = []
 template = "packages/docgen/README.md.j2"
 output = "packages/docgen/README.md"
 requires = ["census", "project"]
+
+[[document]]
+template = "problems/README.md.j2"
+output = "problems/README.md"
+requires = ["problems"]

@@ -11,8 +11,8 @@
 
 ## Stages · `sec:docgen:stages`
 
-- Inputs: edit `docs/inputs/project.toml` and the workspace manifests that describe packages.
-- Data: derive `docs/datasets/project.json` and `docs/datasets/census.json` in stable order.
+- Inputs: edit `docs/inputs/project.toml`, the files under `problems/`, and the workspace manifests that describe packages.
+- Data: derive `docs/datasets/project.json`, `docs/datasets/census.json`, and `docs/datasets/problems.json` in stable order.
 - Render: evaluate the document manifest's adjacent templates over their declared datasets.
 - Check: compare two in-memory generations with each other and with committed output.
 

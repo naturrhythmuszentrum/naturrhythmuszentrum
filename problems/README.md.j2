@@ -1,0 +1,12 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+{# requires problems v1 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Reference problems and fixtures · `guide:nrz:problem-catalogue`
+
+The files under `problems/` state each exemplar of the register as data: its model, its inputs with units and declared uncertainty, its expected observables with their derivations, the error classes it bounds, estimates or excludes, and the claims it stresses (`conv:exemplars:problem-entry-shape`). This catalogue is rendered from them.
+
+|Entry|Kind|File|Parameters|Observables|Variants|Claims|Bites|
+|-----|----|----|----------|-----------|--------|------|-----|
+{% for entry in problems.entries %}|{{ entry.problem.title }} (`{{ entry.problem.register }}`)|{{ entry.problem.kind }}|`{{ problems.sources[loop.index0] }}`|{{ entry.parameters | length }}|{{ entry.observables | length }}|{{ entry.variants | length }}|{% for label in entry.stress.claims %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|{% for label in entry.stress.bites %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|
+{% endfor -%}
