@@ -256,7 +256,7 @@ fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
 #[test]
 fn adversarial_matrix_fixtures() {
     let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/datasets/problems.json");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/datasets/problems.json");
     let data: Value =
         serde_json::from_str(&std::fs::read_to_string(path).expect("dataset")).expect("JSON");
     for entry in data["entries"].as_array().expect("entries") {

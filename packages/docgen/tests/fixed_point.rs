@@ -10,11 +10,12 @@ use std::process::{Command, Output};
 /// Build a minimal complete documentation tree.
 fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(root.join(".linter"))?;
-    fs::create_dir_all(root.join("docs/inputs"))?;
+    fs::create_dir_all(root.join("data/inputs"))?;
+    fs::create_dir_all(root.join("templates/docs/design"))?;
     fs::write(root.join(".linter/owners.toml"), "owners = [\"NRZ\"]\n")?;
     fs::write(root.join("Cargo.toml"), "[workspace]\nmembers = []\n")?;
     fs::write(
-        root.join("docs/inputs/project.toml"),
+        root.join("data/inputs/project.toml"),
         concat!(
             "# SPDX-License-Identifier: CC0-1.0\n",
             "namespace = \"org.naturrhythmuszentrum.docs.input.project\"\n",
@@ -30,7 +31,7 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
         ),
     )?;
     fs::write(
-        root.join("docs/documents.toml"),
+        root.join("data/documents.toml"),
         concat!(
             "# SPDX-License-Identifier: CC0-1.0\n",
             "namespace = \"org.naturrhythmuszentrum.docs.manifest\"\n",
@@ -40,13 +41,12 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
             "sources = []\n",
             "labels = []\n",
             "[[document]]\n",
-            "template = \"docs/example.md.j2\"\n",
-            "output = \"docs/example.md\"\n",
+            "output = \"docs/design/example.md\"\n",
             "requires = [\"census\", \"project\"]\n",
         ),
     )?;
     fs::write(
-        root.join("docs/example.md.j2"),
+        root.join("templates/docs/design/example.md.j2"),
         concat!(
             "{# SPDX-License-Identifier: CC0-1.0 -#}\n",
             "{# requires census v1 -#}\n",
@@ -64,9 +64,9 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
 /// TODO ´todo:test:seed-explicit-quantity-and-metadata-roles´: seed explicit quantity and metadata roles with checkable observable expressions for fixed-point fixtures under req:vision:unit-data-migration.
 fn write_problem(root: &Path, slug: &str, kind: &str) -> Result<(), std::io::Error> {
     let (directory, filename) = if kind == "fixture" {
-        (format!("problems/fixtures/{slug}"), "fixture.toml")
+        (format!("data/problems/fixtures/{slug}"), "fixture.toml")
     } else {
-        (format!("problems/{slug}"), "problem.toml")
+        (format!("data/problems/{slug}"), "problem.toml")
     };
     fs::create_dir_all(root.join(&directory))?;
     let source = format!(
@@ -124,38 +124,38 @@ fn binary_fixed_point_and_exit_classes() -> Result<(), Box<dyn std::error::Error
     fixture(root)?;
     assert_eq!(run(root, "data")?.status.code(), Some(0));
     assert_eq!(run(root, "render")?.status.code(), Some(0));
-    let original = fs::read(root.join("docs/example.md"))?;
+    let original = fs::read(root.join("docs/design/example.md"))?;
     assert_eq!(run(root, "render")?.status.code(), Some(0));
-    assert_eq!(fs::read(root.join("docs/example.md"))?, original);
+    assert_eq!(fs::read(root.join("docs/design/example.md"))?, original);
     let before = snapshot(root)?;
     assert_eq!(run(root, "check")?.status.code(), Some(0));
     assert_eq!(snapshot(root)?, before);
 
-    fs::write(root.join("docs/example.md"), "changed\n")?;
+    fs::write(root.join("docs/design/example.md"), "changed\n")?;
     let changed = run(root, "check")?;
     assert_eq!(changed.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&changed.stdout).contains("changed docs/example.md"));
+    assert!(String::from_utf8_lossy(&changed.stdout).contains("changed docs/design/example.md"));
     assert_eq!(run(root, "render")?.status.code(), Some(0));
 
-    fs::remove_file(root.join("docs/example.md"))?;
+    fs::remove_file(root.join("docs/design/example.md"))?;
     let missing = run(root, "check")?;
     assert_eq!(missing.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&missing.stdout).contains("missing docs/example.md"));
+    assert!(String::from_utf8_lossy(&missing.stdout).contains("missing docs/design/example.md"));
     assert_eq!(run(root, "render")?.status.code(), Some(0));
 
-    fs::write(root.join("docs/extra.md"), "extra\n")?;
+    fs::write(root.join("docs/design/extra.md"), "extra\n")?;
     let stale = run(root, "check")?;
     assert_eq!(stale.status.code(), Some(3));
-    assert!(String::from_utf8_lossy(&stale.stdout).contains("stale docs/extra.md"));
-    fs::remove_file(root.join("docs/extra.md"))?;
+    assert!(String::from_utf8_lossy(&stale.stdout).contains("stale docs/design/extra.md"));
+    fs::remove_file(root.join("docs/design/extra.md"))?;
 
-    fs::remove_file(root.join("docs/datasets/project.json"))?;
+    fs::remove_file(root.join("data/datasets/project.json"))?;
     assert_eq!(run(root, "render")?.status.code(), Some(1));
     let absent_dataset = run(root, "check")?;
     assert_eq!(absent_dataset.status.code(), Some(3));
     assert!(
         String::from_utf8_lossy(&absent_dataset.stdout)
-            .contains("missing docs/datasets/project.json")
+            .contains("missing data/datasets/project.json")
     );
     assert_eq!(run(root, "data")?.status.code(), Some(0));
     assert_eq!(run(root, "unknown")?.status.code(), Some(2));
@@ -173,13 +173,13 @@ fn orders_problem_dataset_entries() -> Result<(), Box<dyn std::error::Error>> {
     write_problem(root, "beta", "fixture")?;
     assert_eq!(run(root, "data")?.status.code(), Some(0));
     let value: serde_json::Value =
-        serde_json::from_slice(&fs::read(root.join("docs/datasets/problems.json"))?)?;
+        serde_json::from_slice(&fs::read(root.join("data/datasets/problems.json"))?)?;
     assert_eq!(
         value["sources"],
         serde_json::json!([
-            "problems/aardvark/problem.toml",
-            "problems/alpha/problem.toml",
-            "problems/fixtures/beta/fixture.toml"
+            "data/problems/aardvark/problem.toml",
+            "data/problems/alpha/problem.toml",
+            "data/problems/fixtures/beta/fixture.toml",
         ])
     );
     assert_eq!(value["entries"][0]["problem"]["slug"], "aardvark");
@@ -198,13 +198,13 @@ fn detects_changed_problem_value() -> Result<(), Box<dyn std::error::Error>> {
     let root = directory.path();
     fixture(root)?;
     assert_eq!(run(root, "data")?.status.code(), Some(0));
-    let path = root.join("problems/alpha/problem.toml");
+    let path = root.join("data/problems/alpha/problem.toml");
     let source = fs::read_to_string(&path)?;
     fs::write(&path, source.replacen("value = \"1\"", "value = \"2\"", 1))?;
     let checked = run(root, "check")?;
     assert_eq!(checked.status.code(), Some(3));
     assert!(
-        String::from_utf8_lossy(&checked.stdout).contains("changed docs/datasets/problems.json")
+        String::from_utf8_lossy(&checked.stdout).contains("changed data/datasets/problems.json")
     );
     Ok(())
 }
@@ -216,7 +216,162 @@ fn refuses_missing_problems_tree() -> Result<(), Box<dyn std::error::Error>> {
     let directory = tempfile::tempdir()?;
     let root = directory.path();
     fixture(root)?;
-    fs::remove_dir_all(root.join("problems"))?;
+    fs::remove_dir_all(root.join("data/problems"))?;
     assert_eq!(run(root, "data")?.status.code(), Some(1));
+    Ok(())
+}
+
+/// A second complete generation leaves every byte and the inventory unchanged.
+/// ´test:integration:repeats-complete-generation´
+#[test]
+fn repeats_complete_generation() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    let before = snapshot(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    assert_eq!(run(root, "check")?.status.code(), Some(0));
+    assert_eq!(snapshot(root)?, before);
+    Ok(())
+}
+
+/// Changed templates produce render drift; absent templates fail without writes.
+/// ´test:integration:checks-mirrored-template-sources´
+#[test]
+fn checks_mirrored_template_sources() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    let path = root.join("templates/docs/design/example.md.j2");
+    let source = fs::read_to_string(&path)?;
+    fs::write(
+        &path,
+        source.replace("# {{ project.name }}", "# Updated {{ project.name }}"),
+    )?;
+    let before = snapshot(root)?;
+    let checked = run(root, "check")?;
+    assert_eq!(checked.status.code(), Some(3));
+    assert!(String::from_utf8_lossy(&checked.stdout).contains("changed docs/design/example.md"));
+    assert_eq!(snapshot(root)?, before);
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    assert_eq!(run(root, "check")?.status.code(), Some(0));
+    fs::remove_file(path)?;
+    let before = snapshot(root)?;
+    for stage in ["render", "check"] {
+        let absent = run(root, stage)?;
+        assert_eq!(absent.status.code(), Some(1));
+        assert!(
+            String::from_utf8_lossy(&absent.stderr).contains("templates/docs/design/example.md.j2")
+        );
+        assert_eq!(snapshot(root)?, before);
+    }
+    Ok(())
+}
+
+/// Find undeclared sources, renders and datasets throughout the live tree.
+/// ´test:integration:checks-complete-managed-inventory´
+#[test]
+fn checks_complete_managed_inventory() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    let stale = [
+        "templates/unused.md.j2",
+        "loose.md.j2",
+        "crates/unused/README.md",
+        "tools/unused/README.md",
+        "prototypes/unused/README.md",
+        "data/datasets/nested/unused.json",
+    ];
+    for path in stale {
+        let path = root.join(path);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, "unused\n")?;
+    }
+    for ignored in [".git", "target", ".lane", "nested/target"] {
+        fs::create_dir_all(root.join(ignored))?;
+        for name in ["ignored.md", "ignored.md.j2"] {
+            fs::write(root.join(ignored).join(name), "ignored\n")?;
+        }
+    }
+    let before = snapshot(root)?;
+    let checked = run(root, "check")?;
+    assert_eq!(checked.status.code(), Some(3));
+    let output = String::from_utf8(checked.stdout)?;
+    assert_eq!(output.lines().count(), stale.len());
+    assert_eq!(snapshot(root)?, before);
+    for path in stale {
+        let expected = format!("stale {path}");
+        assert!(output.lines().any(|line| line == expected));
+        fs::remove_file(root.join(path))?;
+    }
+    assert_eq!(run(root, "check")?.status.code(), Some(0));
+    assert_eq!(before.len(), snapshot(root)?.len() + stale.len());
+    Ok(())
+}
+
+/// Problem data accepts neither catalogue renders nor catalogue templates.
+/// ´test:integration:refuses-catalogue-in-problem-data´
+#[test]
+fn refuses_catalogue_in_problem_data() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    for name in ["README.md", "README.md.j2"] {
+        let path = root.join("data/problems").join(name);
+        fs::write(&path, "catalogue\n")?;
+        assert_eq!(run(root, "data")?.status.code(), Some(1));
+        assert_eq!(run(root, "check")?.status.code(), Some(1));
+        fs::remove_file(path)?;
+    }
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    Ok(())
+}
+
+/// Reject linked sources and outputs without following directory aliases.
+/// ´test:integration:refuses-linked-document-paths´
+#[cfg(unix)]
+#[test]
+fn refuses_linked_document_paths() -> Result<(), Box<dyn std::error::Error>> {
+    use std::os::unix::fs::symlink;
+
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    symlink(root, root.join("cycle"))?;
+    assert_eq!(run(root, "check")?.status.code(), Some(0));
+    symlink("absent", root.join("orphan.md.j2"))?;
+    let orphan = run(root, "check")?;
+    assert_eq!(orphan.status.code(), Some(3));
+    assert!(String::from_utf8_lossy(&orphan.stdout).contains("stale orphan.md.j2"));
+    fs::remove_file(root.join("orphan.md.j2"))?;
+    for path in [
+        "docs/design/example.md",
+        "templates/docs/design/example.md.j2",
+    ] {
+        let path = root.join(path);
+        let bytes = fs::read(&path)?;
+        fs::remove_file(&path)?;
+        symlink("absent", &path)?;
+        assert_eq!(run(root, "check")?.status.code(), Some(1));
+        assert_eq!(run(root, "render")?.status.code(), Some(1));
+        fs::remove_file(&path)?;
+        fs::write(path, bytes)?;
+    }
+    fs::rename(root.join("templates"), root.join("saved-templates"))?;
+    symlink("saved-templates", root.join("templates"))?;
+    assert_eq!(run(root, "check")?.status.code(), Some(1));
+    assert_eq!(run(root, "render")?.status.code(), Some(1));
     Ok(())
 }

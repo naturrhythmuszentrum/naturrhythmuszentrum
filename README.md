@@ -32,7 +32,7 @@ Only the matrix package integrates faer, and only the physics package integrates
 
 ## Documentation · `sec:nrz:overview-documentation`
 
-Every repository Markdown file is a committed render of a minijinja template. Edit the template and its owning TOML inputs; derive JSON datasets and regenerate the render in the same meaningful commit. Templates sit beside outputs, with central `docs/` inputs and datasets for root and cross-cutting documents (`prin:vision:documentation-is-reproducible`), (`dec:vision:documentation-layout`), (`rule:vision:documentation-envelope-and-derivation`).
+Every repository Markdown file is a committed render of a minijinja template. Edit the template and its owning TOML inputs; derive JSON datasets and regenerate the render in the same meaningful commit. Templates live at `templates/{output}.j2`, with inputs and datasets under `data/` (`prin:vision:documentation-is-reproducible`), (`dec:vision:documentation-layout`), (`rule:vision:documentation-envelope-and-derivation`).
 
 The generator interface is established by (`step:nrz:bite-documentation-generator`):
 

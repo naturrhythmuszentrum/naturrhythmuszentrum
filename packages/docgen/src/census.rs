@@ -12,9 +12,10 @@ use serde_json::{Map, Value};
 
 use crate::envelope;
 use crate::error::{self, Error};
+use crate::manifest;
 
 /// Path of the generated census.
-pub(crate) const DATASET: &str = "docs/datasets/census.json";
+pub(crate) const DATASET: &str = "data/datasets/census.json";
 /// Namespace of the generated census.
 const NAMESPACE: &str = "org.naturrhythmuszentrum.docs.dataset.census";
 /// Path of the root Cargo manifest.
@@ -30,7 +31,7 @@ struct Member {
     path: String,
     /// Description or absence of one.
     description: Option<String>,
-    /// Whether a regular adjacent README template exists.
+    /// Whether a regular mirrored README template exists.
     has_readme_template: bool,
 }
 
@@ -151,7 +152,8 @@ fn inspect_member(
             ));
         }
     };
-    let template = format!("{path}/README.md.j2");
+    let template = manifest::template_path(&format!("{path}/README.md"));
+    manifest::check_symlinks(root, &template)?;
     let has_readme_template = match fs::symlink_metadata(root.join(&template)) {
         Ok(metadata) if metadata.file_type().is_file() => true,
         Ok(_) => {
@@ -244,28 +246,68 @@ mod tests {
     use super::derive;
     use crate::error::Error;
 
-    /// Create two member manifests with distinct description and template states.
+    /// Create three member manifests with distinct description and template states.
     fn fixture(root: &Path) -> Result<(), std::io::Error> {
-        fs::create_dir_all(root.join("packages/first"))?;
-        fs::create_dir_all(root.join("packages/second"))?;
+        fs::create_dir_all(root.join("crates/first"))?;
+        fs::create_dir_all(root.join("templates/crates/first"))?;
+        fs::create_dir_all(root.join("tools/second"))?;
+        fs::create_dir_all(root.join("prototypes/third"))?;
         fs::write(
             root.join("Cargo.toml"),
             concat!(
                 "[workspace]\n",
-                "members = [\"packages/first\", \"packages/second\"]\n",
+                "members = [\"crates/first\", \"tools/second\", \"prototypes/third\"]\n",
                 "[workspace.package]\n",
                 "description = \"Shared description\"\n",
             ),
         )?;
         fs::write(
-            root.join("packages/first/Cargo.toml"),
+            root.join("crates/first/Cargo.toml"),
             "[package]\nname = \"first\"\ndescription = { workspace = true }\n",
         )?;
-        fs::write(root.join("packages/first/README.md.j2"), "template\n")?;
         fs::write(
-            root.join("packages/second/Cargo.toml"),
+            root.join("templates/crates/first/README.md.j2"),
+            "template\n",
+        )?;
+        fs::write(
+            root.join("tools/second/Cargo.toml"),
             "[package]\nname = \"second\"\n",
         )?;
+        fs::write(
+            root.join("prototypes/third/Cargo.toml"),
+            "[package]\nname = \"third\"\n",
+        )?;
+        Ok(())
+    }
+
+    /// Use explicit members across all three roots and only mirrored README sources.
+    /// ´test:unit:census-across-workspace-roots´
+    #[test]
+    fn census_across_workspace_roots() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let root = directory.path();
+        fixture(root)?;
+        fs::write(root.join("tools/second/README.md.j2"), "adjacent\n")?;
+        fs::create_dir_all(root.join("templates/prototypes/third"))?;
+        fs::write(
+            root.join("templates/prototypes/third/README.md.j2"),
+            "mirrored\n",
+        )?;
+        let (_, census) = derive(root)?;
+        assert_eq!(
+            census["sources"],
+            serde_json::json!([
+                "Cargo.toml",
+                "crates/first/Cargo.toml",
+                "tools/second/Cargo.toml",
+                "prototypes/third/Cargo.toml",
+            ])
+        );
+        assert_eq!(census["members"][0]["path"], "crates/first");
+        assert_eq!(census["members"][1]["path"], "tools/second");
+        assert_eq!(census["members"][2]["path"], "prototypes/third");
+        assert_eq!(census["members"][1]["has_readme_template"], false);
+        assert_eq!(census["members"][2]["has_readme_template"], true);
         Ok(())
     }
 
@@ -295,9 +337,9 @@ mod tests {
         let directory = tempfile::tempdir()?;
         fixture(directory.path())?;
         for members in [
-            "[\"packages/*\"]",
-            "[\"packages/../first\"]",
-            "[\"packages/first\", \"packages/first\"]",
+            "[\"crates/*\"]",
+            "[\"crates/../first\"]",
+            "[\"crates/first\", \"crates/first\"]",
         ] {
             fs::write(
                 directory.path().join("Cargo.toml"),

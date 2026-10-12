@@ -17,7 +17,7 @@ pub enum Class {
     Missing,
     /// A generated file differs from its committed bytes.
     Changed,
-    /// A managed file on disk has no generator output.
+    /// A managed file on disk has no declared output or template.
     Stale,
     /// A second generation differs from the first.
     Unstable,
@@ -50,6 +50,7 @@ pub(crate) fn compare(
     root: &Path,
     first: &BTreeMap<String, Vec<u8>>,
     second: &BTreeMap<String, Vec<u8>>,
+    templates: &BTreeSet<String>,
 ) -> Result<Vec<Finding>, Error> {
     let mut findings = BTreeSet::new();
     for (path, expected) in first {
@@ -75,7 +76,7 @@ pub(crate) fn compare(
         }
     }
     for path in inventory(root)? {
-        if !first.contains_key(&path) {
+        if !first.contains_key(&path) && !templates.contains(&path) {
             findings.extend([(path, Class::Stale)]);
         }
     }
@@ -85,7 +86,7 @@ pub(crate) fn compare(
         .collect())
 }
 
-/// Enumerate every regular managed JSON or Markdown file without following links.
+/// Enumerate managed datasets, renders and templates without following links.
 fn inventory(root: &Path) -> Result<BTreeSet<String>, Error> {
     let mut found = BTreeSet::new();
     walk(root, root, &mut found)?;
@@ -109,16 +110,13 @@ fn walk(root: &Path, directory: &Path, found: &mut BTreeSet<String>) -> Result<(
             );
             error::io(&display, source)
         })?;
-        if metadata.file_type().is_symlink() {
-            continue;
-        }
         if metadata.file_type().is_dir() {
             if name != "target" && name != ".git" && name != ".lane" {
                 walk(root, &path, found)?;
             }
             continue;
         }
-        if !metadata.file_type().is_file() {
+        if !metadata.file_type().is_file() && !metadata.file_type().is_symlink() {
             continue;
         }
         let relative = path.strip_prefix(root).map_or_else(
@@ -130,11 +128,9 @@ fn walk(root: &Path, directory: &Path, found: &mut BTreeSet<String>) -> Result<(
             || file.file_name() == Some(OsStr::new(".md"));
         let json = file.extension() == Some(OsStr::new("json"))
             || file.file_name() == Some(OsStr::new(".json"));
-        if markdown
-            || (relative.starts_with("docs/datasets/")
-                && relative["docs/datasets/".len()..].find('/').is_none()
-                && json)
-        {
+        let template = file.extension() == Some(OsStr::new("j2"))
+            || file.file_name() == Some(OsStr::new(".j2"));
+        if markdown || template || (relative.starts_with("data/datasets/") && json) {
             found.extend([relative]);
         }
     }

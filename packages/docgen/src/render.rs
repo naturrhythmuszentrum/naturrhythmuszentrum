@@ -10,7 +10,7 @@ use minijinja::{AutoEscape, Environment, UndefinedBehavior};
 use serde_json::{Map, Value};
 
 use crate::error::{self, Error};
-use crate::manifest::Document;
+use crate::manifest::{Document, template_path};
 
 /// Render all manifest documents over their declared whole datasets.
 pub(crate) fn all(
@@ -23,22 +23,24 @@ pub(crate) fn all(
     environment.set_undefined_behavior(UndefinedBehavior::Strict);
     environment.set_auto_escape_callback(|_| AutoEscape::None);
     for document in documents {
-        let bytes = fs::read(root.join(&document.template))
-            .map_err(|source| error::io(&document.template, source))?;
+        let template_path = template_path(&document.output);
+        let bytes = fs::read(root.join(&template_path))
+            .map_err(|source| error::io(&template_path, source))?;
         let source = String::from_utf8(bytes).map_err(|problem| Error::Template {
-            path: document.template.clone(),
+            path: template_path.clone(),
             detail: problem.to_string(),
         })?;
         validate_header(document, &source, datasets)?;
         environment
-            .add_template_owned(document.template.clone(), source)
+            .add_template_owned(template_path.clone(), source)
             .map_err(|problem| Error::Template {
-                path: document.template.clone(),
+                path: template_path,
                 detail: problem.to_string(),
             })?;
     }
     let mut output = BTreeMap::new();
     for document in documents {
+        let template_path = template_path(&document.output);
         let mut context = Map::new();
         for name in &document.requires {
             let value = datasets
@@ -51,15 +53,15 @@ pub(crate) fn all(
             context.extend([(name.clone(), value.clone())]);
         }
         let template = environment
-            .get_template(&document.template)
+            .get_template(&template_path)
             .map_err(|problem| Error::Template {
-                path: document.template.clone(),
+                path: template_path.clone(),
                 detail: problem.to_string(),
             })?;
         let rendered = template
             .render(context)
             .map_err(|problem| Error::Template {
-                path: document.template.clone(),
+                path: template_path,
                 detail: problem.to_string(),
             })?;
         output.extend([(document.output.clone(), rendered.into_bytes())]);
@@ -73,10 +75,11 @@ fn validate_header(
     source: &str,
     datasets: &BTreeMap<String, Value>,
 ) -> Result<(), Error> {
+    let template_path = template_path(&document.output);
     let mut lines = source.lines();
     if lines.next() != Some("{# SPDX-License-Identifier: CC0-1.0 -#}") {
         return Err(header(
-            &document.template,
+            &template_path,
             "first line must be the CC0 SPDX header",
         ));
     }
@@ -87,25 +90,22 @@ fn validate_header(
             let declaration = line
                 .strip_prefix("{# requires ")
                 .and_then(|rest| rest.strip_suffix(" -#}"))
-                .ok_or_else(|| header(&document.template, "malformed requires declaration"))?;
+                .ok_or_else(|| header(&template_path, "malformed requires declaration"))?;
             let (name, version) = declaration.split_once(" v").ok_or_else(|| {
-                header(
-                    &document.template,
-                    "requires declaration lacks a major version",
-                )
+                header(&template_path, "requires declaration lacks a major version")
             })?;
             if !valid_name(name)
                 || version.is_empty()
                 || !version.bytes().all(|byte| byte.is_ascii_digit())
             {
                 return Err(header(
-                    &document.template,
+                    &template_path,
                     "invalid dataset name or major version",
                 ));
             }
             let major = version
                 .parse::<u32>()
-                .map_err(|problem| header(&document.template, &problem.to_string()))?;
+                .map_err(|problem| header(&template_path, &problem.to_string()))?;
             seen.push((name.to_owned(), major));
         } else {
             first_body = Some(line);
@@ -114,7 +114,7 @@ fn validate_header(
     }
     if seen.len() != document.requires.len() {
         return Err(header(
-            &document.template,
+            &template_path,
             &format!(
                 "requires declarations differ from manifest datasets {:?}",
                 document.requires
@@ -124,7 +124,7 @@ fn validate_header(
     for ((name, major), required) in seen.iter().zip(&document.requires) {
         if name != required {
             return Err(header(
-                &document.template,
+                &template_path,
                 &format!("dataset {name} differs from manifest dataset {required}"),
             ));
         }
@@ -150,15 +150,14 @@ fn validate_header(
                 document: document.output.clone(),
                 dataset: name.clone(),
                 detail: format!(
-                    "template {} requires v{major}, dataset has v{actual}",
-                    document.template
+                    "template {template_path} requires v{major}, dataset has v{actual}",
                 ),
             });
         }
     }
     if first_body != Some("<!-- SPDX-License-Identifier: CC0-1.0 -->") || lines.next() != Some("") {
         return Err(header(
-            &document.template,
+            &template_path,
             "body must begin with the CC0 SPDX comment and a blank line",
         ));
     }
@@ -196,8 +195,7 @@ mod tests {
     #[test]
     fn refuses_requirement_mismatch() {
         let document = Document {
-            template: "docs/example.md.j2".to_owned(),
-            output: "docs/example.md".to_owned(),
+            output: "docs/design/example.md".to_owned(),
             requires: vec!["project".to_owned()],
         };
         let datasets = BTreeMap::from([("project".to_owned(), json!({ "version": [1, 0, 0] }))]);
@@ -213,8 +211,7 @@ mod tests {
     #[test]
     fn refuses_wrong_dataset_major() {
         let document = Document {
-            template: "docs/example.md.j2".to_owned(),
-            output: "docs/example.md".to_owned(),
+            output: "docs/design/example.md".to_owned(),
             requires: vec!["project".to_owned()],
         };
         let datasets = BTreeMap::from([("project".to_owned(), json!({ "version": [1, 0, 0] }))]);

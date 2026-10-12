@@ -7,81 +7,65 @@ sources = []
 labels = []
 
 [[document]]
-template = "README.md.j2"
 output = "README.md"
 requires = []
 
 [[document]]
-template = "CONTRIBUTING.md.j2"
 output = "CONTRIBUTING.md"
 requires = []
 
 [[document]]
-template = "docs/architecture.md.j2"
 output = "docs/architecture.md"
 requires = []
 
 [[document]]
-template = "docs/exemplars.md.j2"
 output = "docs/exemplars.md"
 requires = []
 
 [[document]]
-template = "docs/plan.md.j2"
 output = "docs/plan.md"
 requires = []
 
 [[document]]
-template = "packages/docgen/README.md.j2"
 output = "packages/docgen/README.md"
 requires = ["census", "project"]
 
 [[document]]
-template = "problems/README.md.j2"
 output = "problems/README.md"
 requires = ["problems"]
 
 [[document]]
-template = "packages/scalar/README.md.j2"
 output = "packages/scalar/README.md"
 requires = []
 
 [[document]]
-template = "packages/matrix/README.md.j2"
 output = "packages/matrix/README.md"
 requires = []
 
 [[document]]
-template = "docs/feasibility.md.j2"
 output = "docs/feasibility.md"
 requires = []
 
 [[document]]
-template = "packages/algebra/README.md.j2"
 output = "packages/algebra/README.md"
 requires = []
 
 [[document]]
-template = "packages/units/README.md.j2"
 output = "packages/units/README.md"
 requires = []
 
 [[document]]
-template = "docs/shapes.md.j2"
 output = "docs/shapes.md"
 requires = []
 
 [[document]]
-template = "docs/computation.md.j2"
 output = "docs/computation.md"
 requires = []
 
 [[document]]
-template = "packages/descriptor-prototype/README.md.j2"
 output = "packages/descriptor-prototype/README.md"
 requires = []
 
 [[document]]
-template = "docs/units-design.md.j2"
 output = "docs/units-design.md"
 requires = []

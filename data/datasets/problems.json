@@ -8,16 +8,16 @@
   "owner": "NRZ",
   "license": "CC0-1.0",
   "sources": [
-    "problems/coupled-oscillators-normal-modes/problem.toml",
-    "problems/damped-driven-harmonic-oscillator/problem.toml",
-    "problems/heat-conduction-one-dimensional/problem.toml",
-    "problems/kepler-two-body-orbit/problem.toml",
-    "problems/pendulum-gravity-estimate/problem.toml",
-    "problems/resistor-network/problem.toml",
-    "problems/spring-mass-truss/problem.toml",
-    "problems/fixtures/hilbert-matrices/fixture.toml",
-    "problems/fixtures/kahan-and-wilkinson-matrices/fixture.toml",
-    "problems/fixtures/rump-polynomial/fixture.toml"
+    "data/problems/coupled-oscillators-normal-modes/problem.toml",
+    "data/problems/damped-driven-harmonic-oscillator/problem.toml",
+    "data/problems/heat-conduction-one-dimensional/problem.toml",
+    "data/problems/kepler-two-body-orbit/problem.toml",
+    "data/problems/pendulum-gravity-estimate/problem.toml",
+    "data/problems/resistor-network/problem.toml",
+    "data/problems/spring-mass-truss/problem.toml",
+    "data/problems/fixtures/hilbert-matrices/fixture.toml",
+    "data/problems/fixtures/kahan-and-wilkinson-matrices/fixture.toml",
+    "data/problems/fixtures/rump-polynomial/fixture.toml"
   ],
   "labels": [],
   "entries": [

@@ -104,7 +104,11 @@ pub fn check(root: &Path) -> Result<Vec<Finding>, Error> {
     // Generated paths are disjoint from every input path, member manifest, and template.
     // Laying this generation over the tree therefore leaves the second read set unchanged.
     let second = generation(root, &owners, &documents)?;
-    check::compare(root, &first, &second)
+    let templates = documents
+        .iter()
+        .map(|document| manifest::template_path(&document.output))
+        .collect();
+    check::compare(root, &first, &second, &templates)
 }
 
 /// Derive dataset bytes and parsed values together.

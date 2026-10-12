@@ -13,7 +13,7 @@ use crate::envelope;
 use crate::error::{self, Error};
 
 /// Path of the derived exemplar dataset.
-pub(crate) const DATASET: &str = "docs/datasets/problems.json";
+pub(crate) const DATASET: &str = "data/datasets/problems.json";
 /// Dataset namespace.
 const DATASET_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.dataset.problems";
 /// Problem input namespace.
@@ -274,37 +274,38 @@ pub(crate) fn validate_dataset(value: &Value, owners: &BTreeSet<String>) -> Resu
 
 /// Discover the permitted layout without following symbolic links.
 fn layout(root: &Path) -> Result<Vec<Location>, Error> {
-    let base = root.join("problems");
+    crate::manifest::check_symlinks(root, "data/problems")?;
+    let base = root.join("data/problems");
     let metadata = fs::symlink_metadata(&base).map_err(|source| {
         invalid(
-            "problems",
+            "data/problems",
             "layout",
             &format!("cannot read directory: {source}"),
         )
     })?;
     if !metadata.file_type().is_dir() {
-        return Err(invalid("problems", "layout", "expected a real directory"));
+        return Err(invalid(
+            "data/problems",
+            "layout",
+            "expected a real directory",
+        ));
     }
     let mut problems = Vec::new();
     let mut fixtures = Vec::new();
-    for entry in fs::read_dir(&base).map_err(|source| error::io("problems", source))? {
-        let entry = entry.map_err(|source| error::io("problems", source))?;
+    for entry in fs::read_dir(&base).map_err(|source| error::io("data/problems", source))? {
+        let entry = entry.map_err(|source| error::io("data/problems", source))?;
         let name = entry
             .file_name()
             .into_string()
-            .map_err(|_| invalid("problems", "layout", "entry name is not UTF-8"))?;
-        let path = format!("problems/{name}");
+            .map_err(|_| invalid("data/problems", "layout", "entry name is not UTF-8"))?;
+        let path = format!("data/problems/{name}");
         let kind = entry
             .file_type()
             .map_err(|source| error::io(&path, source))?;
         if kind.is_symlink() {
             return Err(invalid(&path, "layout", "symbolic link is not allowed"));
         }
-        if name == "README.md" || name == "README.md.j2" {
-            if !kind.is_file() {
-                return Err(invalid(&path, "layout", "expected a regular file"));
-            }
-        } else if name == "fixtures" {
+        if name == "fixtures" {
             if !kind.is_dir() {
                 return Err(invalid(&path, "layout", "expected a real directory"));
             }
@@ -393,8 +394,8 @@ fn exact_file(root: &Path, directory: &str, filename: &str) -> Result<(), Error>
 fn location_from_source(source: &str) -> Result<Location, Error> {
     let parts: Vec<&str> = source.split('/').collect();
     let (kind, slug) = match parts.as_slice() {
-        ["problems", slug, "problem.toml"] => ("problem", *slug),
-        ["problems", "fixtures", slug, "fixture.toml"] => ("fixture", *slug),
+        ["data", "problems", slug, "problem.toml"] => ("problem", *slug),
+        ["data", "problems", "fixtures", slug, "fixture.toml"] => ("fixture", *slug),
         _ => return Err(invalid(source, "identity", "invalid entry source path")),
     };
     if !valid_slug(slug) {
@@ -736,7 +737,7 @@ mod tests {
     fn invalid_sample(value: Value) -> Result<(), Box<dyn std::error::Error>> {
         let entry: Entry = serde_json::from_value(value)?;
         let location = Location {
-            path: "problems/alpha/problem.toml".to_owned(),
+            path: "data/problems/alpha/problem.toml".to_owned(),
             slug: "alpha".to_owned(),
             kind: "problem",
         };
@@ -749,9 +750,9 @@ mod tests {
     /// TODO ´todo:code:write-migrated-problem-and-fixture-declarations´: write migrated problem and fixture declarations for data-time unit cases under req:vision:unit-data-migration.
     fn write_entry(root: &Path, kind: &str, slug: &str) -> Result<(), std::io::Error> {
         let (directory, filename) = if kind == "fixture" {
-            (format!("problems/fixtures/{slug}"), "fixture.toml")
+            (format!("data/problems/fixtures/{slug}"), "fixture.toml")
         } else {
-            (format!("problems/{slug}"), "problem.toml")
+            (format!("data/problems/{slug}"), "problem.toml")
         };
         fs::create_dir_all(root.join(&directory))?;
         let source = format!(
@@ -787,7 +788,7 @@ mod tests {
     fn layout_refuses_stray_file() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         write_entry(directory.path(), "problem", "alpha")?;
-        fs::write(directory.path().join("problems/stray.txt"), "stray")?;
+        fs::write(directory.path().join("data/problems/stray.txt"), "stray")?;
         assert!(matches!(
             layout(directory.path()),
             Err(Error::Payload { .. })
@@ -801,7 +802,7 @@ mod tests {
     fn layout_refuses_second_file() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         write_entry(directory.path(), "problem", "alpha")?;
-        fs::write(directory.path().join("problems/alpha/extra"), "extra")?;
+        fs::write(directory.path().join("data/problems/alpha/extra"), "extra")?;
         assert!(matches!(
             layout(directory.path()),
             Err(Error::Payload { .. })
@@ -828,7 +829,7 @@ mod tests {
     fn envelope_refuses_wrong_namespace() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         write_entry(directory.path(), "problem", "alpha")?;
-        let path = directory.path().join("problems/alpha/problem.toml");
+        let path = directory.path().join("data/problems/alpha/problem.toml");
         let source = fs::read_to_string(&path)?;
         fs::write(
             &path,
@@ -847,7 +848,7 @@ mod tests {
     fn envelope_refuses_second_label() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         write_entry(directory.path(), "problem", "alpha")?;
-        let path = directory.path().join("problems/alpha/problem.toml");
+        let path = directory.path().join("data/problems/alpha/problem.toml");
         let source = fs::read_to_string(&path)?;
         fs::write(
             &path,
@@ -935,7 +936,7 @@ mod tests {
     fn envelope_precedes_payload_error() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         write_entry(directory.path(), "problem", "alpha")?;
-        let path = directory.path().join("problems/alpha/problem.toml");
+        let path = directory.path().join("data/problems/alpha/problem.toml");
         let source = fs::read_to_string(&path)?;
         fs::write(
             &path,

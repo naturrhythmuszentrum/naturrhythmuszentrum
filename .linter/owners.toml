@@ -15,15 +15,16 @@ owners = [
 
 partitions = [
   { name = "declared-surface", owner = "NRZ", pattern = '%s".linter" [ "/" *VCHAR ]' },
-  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"CONTRIBUTING.md" / %s"CONTRIBUTING.md.j2" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"README.md" / %s"README.md.j2" / %s"rust-toolchain.toml" )' },
-  { name = "documents", owner = "NRZ", pattern = '%s"docs" [ "/" *VCHAR ]' },
-  { name = "problems", owner = "NRZ", pattern = '%s"problems" [ "/" *VCHAR ]' },
-  { name = "docgen", owner = "DOCGEN", pattern = '%s"packages/docgen" [ "/" *VCHAR ]' },
-  { name = "scalar", owner = "SCALAR", pattern = '%s"packages/scalar" [ "/" *VCHAR ]' },
-  { name = "matrix", owner = "MATRIX", pattern = '%s"packages/matrix" [ "/" *VCHAR ]' },
-  { name = "algebra", owner = "ALGEBRA", pattern = '%s"packages/algebra" [ "/" *VCHAR ]' },
-  { name = "units", owner = "UNITS", pattern = '%s"packages/units" [ "/" *VCHAR ]' },
-  { name = "descriptors", owner = "DESCRIPTORS", pattern = '%s"packages/descriptor-prototype" [ "/" *VCHAR ]' },
+  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"CONTRIBUTING.md" / %s"templates/CONTRIBUTING.md.j2" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"README.md" / %s"templates/README.md.j2" / %s"rust-toolchain.toml" )' },
+  { name = "documents", owner = "NRZ", pattern = '[ %s"templates/" ] %s"docs" [ "/" *VCHAR ]' },
+  { name = "data", owner = "NRZ", pattern = '%s"data" [ "/" *VCHAR ]' },
+  { name = "problems", owner = "NRZ", pattern = '[ %s"templates/" ] %s"problems" [ "/" *VCHAR ]' },
+  { name = "docgen", owner = "DOCGEN", pattern = '[ %s"templates/" ] %s"packages/docgen" [ "/" *VCHAR ]' },
+  { name = "scalar", owner = "SCALAR", pattern = '[ %s"templates/" ] %s"packages/scalar" [ "/" *VCHAR ]' },
+  { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"packages/matrix" [ "/" *VCHAR ]' },
+  { name = "algebra", owner = "ALGEBRA", pattern = '[ %s"templates/" ] %s"packages/algebra" [ "/" *VCHAR ]' },
+  { name = "units", owner = "UNITS", pattern = '[ %s"templates/" ] %s"packages/units" [ "/" *VCHAR ]' },
+  { name = "descriptors", owner = "DESCRIPTORS", pattern = '[ %s"templates/" ] %s"packages/descriptor-prototype" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

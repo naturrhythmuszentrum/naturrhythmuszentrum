@@ -71,7 +71,7 @@ fn field<'a>(entry: &'a Value, group: &str, name: &str) -> &'a str {
 #[test]
 fn rump_polynomial_enclosure() {
     let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/datasets/problems.json");
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data/datasets/problems.json");
     let data: Value =
         serde_json::from_str(&std::fs::read_to_string(path).expect("dataset")).expect("JSON");
     let entry = data["entries"]

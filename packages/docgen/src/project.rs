@@ -13,9 +13,9 @@ use crate::envelope;
 use crate::error::{self, Error};
 
 /// Path of the only hand-edited documentation input.
-const INPUT: &str = "docs/inputs/project.toml";
+const INPUT: &str = "data/inputs/project.toml";
 /// Path of the derived project dataset.
-pub(crate) const DATASET: &str = "docs/datasets/project.json";
+pub(crate) const DATASET: &str = "data/datasets/project.json";
 /// Namespace of the hand-edited input.
 const INPUT_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.input.project";
 /// Namespace of the derived project dataset.
@@ -47,7 +47,7 @@ struct Project {
 
 /// Derive the deterministic project dataset from the only input.
 pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>, Value), Error> {
-    let directory = "docs/inputs";
+    let directory = "data/inputs";
     for entry in
         fs::read_dir(root.join(directory)).map_err(|source| error::io(directory, source))?
     {
@@ -55,7 +55,7 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
         if entry.file_name() != "project.toml" {
             return Err(Error::Payload {
                 path: format!("{directory}/{}", entry.file_name().to_string_lossy()),
-                detail: "only project.toml is accepted in docs/inputs".to_owned(),
+                detail: "only project.toml is accepted in data/inputs".to_owned(),
             });
         }
     }

@@ -126,7 +126,7 @@ A later componentwise certificate may use a validated nonnegative bound `V ≥ a
 
 **Assumption (Illustrative source-voltage uncertainty)** · `assum:nrz:resistor-source-uncertainty`
 
-Use the ladder in `problems/resistor-network/problem.toml`, with its six exact `1 Ω` resistors and source center `s = 1 V` (`prob:exemplars:resistor-network`). For this documentation scenario alone, assign that one shared source a standard uncertainty `u_s = 1/100 V` and hence variance `U_s = 1/10000 V²`. All resistor values remain exact and there are no other uncertain inputs. Only finite second moments are assumed; no normal distribution, coverage factor or deterministic physical enclosure is inferred. The seed's declared uncertainty is unchanged and supplies none of this additional scenario. The pendulum seed is independent of this example.
+Use the ladder in `data/problems/resistor-network/problem.toml`, with its six exact `1 Ω` resistors and source center `s = 1 V` (`prob:exemplars:resistor-network`). For this documentation scenario alone, assign that one shared source a standard uncertainty `u_s = 1/100 V` and hence variance `U_s = 1/10000 V²`. All resistor values remain exact and there are no other uncertain inputs. Only finite second moments are assumed; no normal distribution, coverage factor or deterministic physical enclosure is inferred. The seed's declared uncertainty is unchanged and supplies none of this additional scenario. The pendulum seed is independent of this example.
 
 **Example (Mixed voltage and current covariance)** · `ex:nrz:resistor-shape-covariance`
 

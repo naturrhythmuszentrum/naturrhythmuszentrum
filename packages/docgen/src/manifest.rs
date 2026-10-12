@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-//! The manifest of adjacent templates and renders.
+//! The manifest of renders and their mirrored template sources.
 
 use std::collections::BTreeSet;
 use std::ffi::OsStr;
@@ -15,7 +15,7 @@ use crate::envelope;
 use crate::error::{self, Error};
 
 /// Path of the document manifest.
-const PATH: &str = "docs/documents.toml";
+const PATH: &str = "data/documents.toml";
 /// Manifest namespace.
 const NAMESPACE: &str = "org.naturrhythmuszentrum.docs.manifest";
 
@@ -23,8 +23,6 @@ const NAMESPACE: &str = "org.naturrhythmuszentrum.docs.manifest";
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Document {
-    /// Adjacent template path.
-    pub(crate) template: String,
     /// Markdown output path.
     pub(crate) output: String,
     /// Dataset names in header and context order.
@@ -37,6 +35,11 @@ pub(crate) struct Document {
 struct Manifest {
     /// Documents in render order.
     document: Vec<Document>,
+}
+
+/// Derive the sole template location for a root-relative output path.
+pub(crate) fn template_path(output: &str) -> String {
+    format!("templates/{output}.j2")
 }
 
 /// Parse and validate the entire manifest before writing any output.
@@ -71,17 +74,23 @@ pub(crate) fn read(root: &Path, owners: &BTreeSet<String>) -> Result<Vec<Documen
                 "output must be a root-relative .md path",
             ));
         }
-        if document.template != format!("{}.j2", document.output) {
+        if document.output.starts_with("templates/")
+            || document.output.starts_with("data/")
+            || document
+                .output
+                .split('/')
+                .any(|part| matches!(part, ".git" | "target" | ".lane"))
+        {
             return Err(invalid(
-                &document.template,
-                "template must equal output plus .j2",
+                &document.output,
+                "output must be outside source and ignored directories",
             ));
         }
         if !outputs.insert(document.output.clone()) {
             return Err(invalid(&document.output, "duplicate output"));
         }
         check_symlinks(root, &document.output)?;
-        check_symlinks(root, &document.template)?;
+        check_symlinks(root, &template_path(&document.output))?;
         let mut requirements = BTreeSet::new();
         for name in &document.requires {
             if name != "project" && name != "census" && name != "problems" {
@@ -102,7 +111,7 @@ pub(crate) fn read(root: &Path, owners: &BTreeSet<String>) -> Result<Vec<Documen
 }
 
 /// Reject a symbolic link at any existing path component.
-fn check_symlinks(root: &Path, path: &str) -> Result<(), Error> {
+pub(crate) fn check_symlinks(root: &Path, path: &str) -> Result<(), Error> {
     let mut current = String::new();
     for component in path.split('/') {
         if !current.is_empty() {
@@ -142,39 +151,57 @@ mod tests {
     /// Write a manifest with one configurable document row.
     fn write_manifest(
         root: &std::path::Path,
-        template: &str,
         output: &str,
         duplicate: bool,
     ) -> Result<(), std::io::Error> {
-        fs::create_dir_all(root.join("docs"))?;
+        fs::create_dir_all(root.join("data"))?;
         let mut text = format!(
-            "namespace = \"org.naturrhythmuszentrum.docs.manifest\"\nversion = [1, 0, 0]\nowner = \"NRZ\"\nlicense = \"CC0-1.0\"\nsources = []\nlabels = []\n[[document]]\ntemplate = \"{template}\"\noutput = \"{output}\"\nrequires = []\n"
+            "namespace = \"org.naturrhythmuszentrum.docs.manifest\"\nversion = [1, 0, 0]\nowner = \"NRZ\"\nlicense = \"CC0-1.0\"\nsources = []\nlabels = []\n[[document]]\noutput = \"{output}\"\nrequires = []\n"
         );
         if duplicate {
-            write!(
-                text,
-                "[[document]]\ntemplate = \"{template}\"\noutput = \"{output}\"\nrequires = []\n"
-            )
-            .map_err(std::io::Error::other)?;
+            write!(text, "[[document]]\noutput = \"{output}\"\nrequires = []\n")
+                .map_err(std::io::Error::other)?;
         }
-        fs::write(root.join("docs/documents.toml"), text)
+        fs::write(root.join("data/documents.toml"), text)
     }
 
-    /// Refuse nonadjacent templates, escaping paths, and repeated outputs.
+    /// Refuse source-directory outputs, escaping paths, and repeated outputs.
     /// ´test:unit:refuses-invalid-document-rows´
     #[test]
     fn refuses_invalid_document_rows() -> Result<(), Box<dyn std::error::Error>> {
         let directory = tempfile::tempdir()?;
         let root = directory.path();
         let owners = BTreeSet::from(["NRZ".to_owned()]);
-        for (template, output, duplicate) in [
-            ("docs/other.md.j2", "docs/example.md", false),
-            ("../escape.md.j2", "../escape.md", false),
-            ("docs/example.md.j2", "docs/example.md", true),
+        for (output, duplicate) in [
+            ("templates/docs/design/example.md", false),
+            ("data/example.md", false),
+            ("../escape.md", false),
+            ("/absolute.md", false),
+            ("docs/design/../escape.md", false),
+            ("docs/target/example.md", false),
+            (".git/example.md", false),
+            (".lane/example.md", false),
+            ("docs/design/example.md", true),
         ] {
-            write_manifest(root, template, output, duplicate)?;
+            write_manifest(root, output, duplicate)?;
             assert!(matches!(read(root, &owners), Err(Error::Manifest { .. })));
         }
+        Ok(())
+    }
+
+    /// Refuse even a correctly mirrored template override in the manifest.
+    /// ´test:unit:refuses-explicit-template-path´
+    #[test]
+    fn refuses_explicit_template_path() -> Result<(), Box<dyn std::error::Error>> {
+        let directory = tempfile::tempdir()?;
+        let root = directory.path();
+        write_manifest(root, "docs/design/example.md", false)?;
+        let path = root.join("data/documents.toml");
+        let mut source = fs::read_to_string(&path)?;
+        source.push_str("template = \"templates/docs/design/example.md.j2\"\n");
+        fs::write(path, source)?;
+        let owners = BTreeSet::from(["NRZ".to_owned()]);
+        assert!(matches!(read(root, &owners), Err(Error::Payload { .. })));
         Ok(())
     }
 }
