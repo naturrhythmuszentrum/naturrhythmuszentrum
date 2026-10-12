@@ -70,3 +70,8 @@ requires = []
 template = "docs/shapes.md.j2"
 output = "docs/shapes.md"
 requires = []
+
+[[document]]
+template = "docs/computation.md.j2"
+output = "docs/computation.md"
+requires = []

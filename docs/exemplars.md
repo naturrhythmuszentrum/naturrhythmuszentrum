@@ -82,11 +82,27 @@ Joint Committee for Guides in Metrology, *Evaluation of measurement data — Sup
 
 Gene H. Golub and Charles F. Van Loan, *Matrix Computations*, fourth edition, Johns Hopkins University Press, 2013. Take matrix structure, factorization relations, permutations and metric-dependent orthogonality as numerical linear-algebra design constraints. The engine attaches physical axes, normalization maps, structure scope and separately shaped factor evidence to those relations (`def:nrz:shape-structure`), (`rule:nrz:shape-factorizations`). Refuse inferring positive definiteness from symmetry, preserving structure flags after unsupported perturbations, assigning every physical factor a dimensionless descriptor, or confusing triangular backend storage with a physical uncertainty restriction. Structured uncertainty coordinates must account for repeated entries and their norm weights (`rule:nrz:structured-companion-coordinates`). Binds (`rule:vision:decomposition-objects`), (`step:nrz:bite-certified-matrix-core`), (`step:nrz:bite-advanced-matrix-domains`).
 
+### Data indirection and experiment families · `sec:exemplars:data-indirection-and-experiment-families`
+
+**Example (Direct3D 12 descriptor heaps and tables)** · `ex:exemplars:direct3d12-descriptor-heaps`
+
+Microsoft, Direct3D 12 published documentation, “Descriptor Heaps” and “Descriptor Tables.” Take the indirection between an operation's resource references and the metadata describing stored resources: a plan can retain stable slot contracts while bindings select actual data. Refuse GPU targeting, hardware residency, alignment policy and graphics-specific resource lifetimes as engine requirements. Safe generational references, independent value versions, alias checks and evidence invalidation are the engine's decisions, argued by (`def:nrz:descriptor-reference`), (`rule:nrz:descriptor-layout-validation`), (`rule:nrz:descriptor-lifetime-and-mutation`), not attributed to this source. Binds (`dec:nrz:heap-ownership-and-sharing`), (`step:nrz:bite-certified-matrix-core`).
+
+**Example (Apache Arrow columnar format)** · `ex:exemplars:apache-arrow-columnar-format`
+
+Apache Software Foundation, Apache Arrow published documentation, “Arrow Columnar Format.” Take separation of metadata from plain value buffers and explicit offsets for collections whose members have different extents; these support shared schemas and inspectable binding columns without per-scalar physical wrappers. Refuse importing Arrow's schema, null semantics, alignment conventions or a new runtime dependency as engine rules. Quantity schemas, companion identities, safe access and source covariance remain governed by the engine. Binds (`def:nrz:scalar-arena`), (`def:nrz:heap-descriptor`), (`def:nrz:computation-batch`), (`step:nrz:bite-certified-matrix-core`).
+
+**Example (Box, Hunter and Hunter's experimental design)** · `ex:exemplars:box-hunter-experimental-design`
+
+George E. P. Box, J. Stuart Hunter and William G. Hunter, Statistics for Experimenters: Design, Innovation, and Discovery, second edition, Wiley, 2005. Take explicit factors, levels and runs as vocabulary for describing a family of experiments, with a recorded design rather than an inferred Cartesian grid. Refuse restricting batches to full factorial designs, treating repeated runs as independent measurements, or claiming an experimental-design algorithm merely by storing its bindings. Batch ordering, admitted graph variation and common-source covariance are the engine's choices. Binds (`def:nrz:batch-axis`), (`rule:nrz:batch-variation`), (`rule:nrz:batch-source-covariance`), (`step:nrz:bite-physics-core`).
+
 ### Scalar type as a design axis · `sec:exemplars:scalar-type-as-design-axis`
 
 **Example (Drake)** · `ex:exemplars:drake`
 
 The robotics systems framework parameterises every system over a scalar type, plain floating point, automatic differentiation or symbolic expression, with one model. Take the separation of the physical model from the scalar it computes with, and the context object that carries state and parameters; refuse its runtime graph builder as a surface, since the engine's graphs are petgraph values. Binds (`dec:vision:precision-selection`), (`tab:vision:precision-alternatives`), (`dec:vision:physical-and-computational-graphs`), (`step:nrz:bite-physics-core`).
+
+For computation, take the separation of a reusable model from bound state and parameters; refuse inferring that a reusable model makes different point values or uncertainties identical. Plan/binding separation is specified by (`def:nrz:computation-plan`), (`def:nrz:plan-binding`); generation, invalidation and batch-order rules are the engine’s own choices.
 
 ### Uncertainty with correlation · `sec:exemplars:uncertainty-with-correlation`
 
@@ -103,6 +119,8 @@ A clean interval substrate with directed rounding and standard-conformant operat
 **Example (Modelica)** · `ex:exemplars:modelica`
 
 Equation-based, acausal modelling where a model is a graph of relations and scheduling is a separate transformation. Take the distinction between a physical graph and a computational graph and the explicit assembly of coupled constraints into systems; refuse the language and its index-reduction machinery as a dependency. Binds (`dec:vision:physical-and-computational-graphs`), (`step:nrz:bite-physics-core`).
+
+For computation, take explicit translation from physical relations to computational dependencies and supported coupled systems; refuse treating arbitrary physical topology changes as legal bindings of an unchanged computation. The admitted structural alternatives belong to (`rule:nrz:batch-variation`), without adding an equation language or index-reduction dependency.
 
 **Example (SUNDIALS and DifferentialEquations.jl)** · `ex:exemplars:sundials-and-differentialequations-jl`
 

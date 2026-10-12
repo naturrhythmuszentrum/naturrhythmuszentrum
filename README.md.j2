@@ -13,6 +13,8 @@ Accuracy governs acceptance before speed; dimensions, measures, kinds and affine
 
 The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The generic algebra package supplies exact original expressions and collection forms; the units client checks declared physical operations before normalization. Static quantity design, numerical integration and problem-data migration remain the obligations described by (`dec:nrz:algebra-and-data-time-units-boundary`).
 
+The computation contract connects storage and graph evaluation through (`spec:nrz:descriptor-heap-computation`); its implementation responsibilities remain in the existing bites (`dec:nrz:computation-model-implementation-boundary`).
+
 **Table (Workspace packages)** · `tab:nrz:workspace-packages`
 
 |Directory|Crate|Responsibility|Engine dependencies|Architecture|
@@ -21,8 +23,8 @@ The baseline is a virtual nightly Cargo workspace. The packages below are the ta
 |`packages/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
 |`packages/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
 |`packages/units`|`nrz-units`|Data-time dimensions, exact measures, kinds and algebraic checks; later typed quantities|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
-|`packages/matrix`|`nrz-matrix`|Matrices with checked block descriptors, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
-|`packages/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation graphs using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
+|`packages/matrix`|`nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked views, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
+|`packages/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
 |`packages/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|
 |`packages/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|No runtime engine dependency|(`tab:vision:package-structure`)|
 
@@ -48,6 +50,7 @@ The commands derive datasets, render documents, and verify the committed generat
 |--------|-----------|----|
 |Conceptual architecture of the Naturrhythmuszentrum engine|(`spec:vision:conceptual-architecture`)|Defines purpose, guarantees, dimensions, measures, counts, algebraic unit checks, uncertainty contracts, numerical boundaries, repository structure, and completion obligations.|
 |Matrix shapes, uncertainties and numerical errors|(`spec:nrz:matrix-shapes`)|Defines ordered physical axes, admissible operations, independently shaped uncertainty and numerical-error companions, and their implementation evidence.|
+|Descriptor heaps, computation plans and batches|(`spec:nrz:descriptor-heap-computation`)|Defines safe scalar storage and versioned references, plan/binding checks, per-point evidence, shared-source covariance and deterministic replay.|
 |Exemplars to design against|(`reg:exemplars:reference-register`)|Records the systems, problems, and adversarial fixtures that inform and test those decisions.|
 |The engine's plan|(`plan:nrz:engine-plan`)|Orders implementation bites and states their deliverables, verification, exclusions, import procedure, and gate.|
 |Naturrhythmuszentrum|(`guide:nrz:overview`)|Provides the workspace and documentation entry point.|
