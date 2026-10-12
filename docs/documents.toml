@@ -80,3 +80,8 @@ requires = []
 template = "packages/descriptor-prototype/README.md.j2"
 output = "packages/descriptor-prototype/README.md"
 requires = []
+
+[[document]]
+template = "docs/units-design.md.j2"
+output = "docs/units-design.md"
+requires = []

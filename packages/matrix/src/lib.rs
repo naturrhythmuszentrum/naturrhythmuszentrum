@@ -23,6 +23,8 @@ mod backend;
 /// TODO ´todo:code:own-ordered-domain-and-codomain-shapes´: own ordered domain and codomain shapes with structural scope and separate companion extents under def:nrz:matrix-shape and def:nrz:companion-shape.
 ///
 /// TODO ´todo:code:replace-owned-center-vectors-with-matrix´: replace owned center vectors with matrix owned arena descriptors under dec:nrz:heap-ownership-and-sharing.
+///
+/// TODO ´todo:code:require-bound-normalized-descriptor-views-before´: require bound normalized descriptor views before production kernel entry under def:nrz:checked-descriptor-boundary.
 #[derive(Debug, Clone)]
 pub struct DenseSystem {
     /// Matrix order.

@@ -70,6 +70,8 @@ pub struct NodeEvidence {
 /// TODO ´todo:code:own-checked-logical-shapes-and-indexed´: own checked logical shapes and indexed companion evidence before coordinate normalization under rule:nrz:shape-data-time-evidence.
 ///
 /// TODO ´todo:code:associate-reusable-checks-with-immutable-declaration´: associate reusable checks with immutable declaration and operation snapshots under rule:nrz:plan-validation.
+///
+/// TODO ´todo:code:retain-checked-schema-admission-witnesses-for´: retain checked schema admission witnesses for descriptor publication under rule:nrz:descriptor-publication-validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CheckedExpression {
     /// Original source operations, including those that a normal form would erase.
