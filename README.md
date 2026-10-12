@@ -10,7 +10,7 @@ Accuracy governs acceptance before speed; dimensions, measures, kinds and affine
 
 ## Workspace · `sec:nrz:overview-workspace`
 
-The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`).
+The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The generic algebra package supplies exact original expressions and collection forms; the units client checks declared physical operations before normalization. Static quantity design, numerical integration and problem-data migration remain the obligations described by (`dec:nrz:algebra-and-data-time-units-boundary`).
 
 **Table (Workspace packages)** · `tab:nrz:workspace-packages`
 
@@ -58,8 +58,8 @@ The plan gives the dependencies and completion evidence for these bites (`plan:n
 - Bite 1, documentation generator: establish reproducible datasets, templates, and the five renders (`step:nrz:bite-documentation-generator`).
 - Bite 1b, exemplar register: seed the seven reference problems and bind adversarial fixtures to feasibility tests (`step:nrz:bite-exemplar-register`).
 - Bite 2, numerical feasibility: establish safe backend and validated-arithmetic feasibility before broad APIs (`step:nrz:bite-numerical-feasibility`).
-- Bite 3, units design: decide dimensions, measures, counts and uncertainty descriptors through static and data-time prototypes over the agreed generic expression contract (`step:nrz:bite-units-design`), (`req:vision:expression-and-symbol-contract`).
-- Bite 4, units and numerical foundations: implement the quantity and intrinsic uncertainty contracts, conversions, algebraic checks and planned data migration around scalar and accuracy foundations (`step:nrz:bite-units-and-foundations`), (`req:vision:unit-data-migration`).
+- Bite 3, units design: choose static quantity and exponent contracts through prototypes compared with the data-time descriptor checker (`step:nrz:bite-units-design`), (`req:vision:expression-and-symbol-contract`).
+- Bite 4, units and numerical foundations: integrate numerical quantities, intrinsic uncertainties, conversion bounds and the data-time checker with scalar and accuracy foundations and the planned data migration (`step:nrz:bite-units-and-foundations`), (`req:vision:unit-data-migration`).
 - Bite 5, certified matrix core: establish supported matrix storage, arithmetic, and square solve guarantees (`step:nrz:bite-certified-matrix-core`).
 - Bite 6, initial physics core: assemble and evaluate supported physical problems with explicit error coverage (`step:nrz:bite-physics-core`).
 - Bite 7, advanced matrix domains: admit further operations through their own domain checks and certificates (`step:nrz:bite-advanced-matrix-domains`).
