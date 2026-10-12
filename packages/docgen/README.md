@@ -37,5 +37,6 @@ Inputs, the document manifest, and datasets identify themselves with `namespace`
 |`nrz-matrix`|`packages/matrix`|Safe dense solve candidates with independent numerical certificates|
 |`nrz-algebra`|`packages/algebra`|Exact symbolic expressions and deterministic collection normal forms|
 |`nrz-units`|`packages/units`|Data-time quantity descriptors and checks over original symbolic expressions|
+|`nrz-descriptor-prototype`|`packages/descriptor-prototype`|Descriptor schema interning and checked computation boundary prototypes|
 
 Naturrhythmuszentrum has 9 planned bites.

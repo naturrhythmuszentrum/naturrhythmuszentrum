@@ -75,3 +75,8 @@ requires = []
 template = "docs/computation.md.j2"
 output = "docs/computation.md"
 requires = []
+
+[[document]]
+template = "packages/descriptor-prototype/README.md.j2"
+output = "packages/descriptor-prototype/README.md"
+requires = []

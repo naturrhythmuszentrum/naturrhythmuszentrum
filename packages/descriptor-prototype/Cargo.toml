@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-descriptor-prototype"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Descriptor schema interning and checked computation boundary prototypes"
+readme = "README.md"
+keywords = ["units", "descriptors", "prototype"]
+categories = ["mathematics", "science"]
+
+[dependencies]
+nrz-units = { path = "../units" }
+nrz-algebra.workspace = true
+
+[lints]
+workspace = true

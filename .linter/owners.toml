@@ -10,6 +10,7 @@ owners = [
   "MATRIX",
   "ALGEBRA",
   "UNITS",
+  "DESCRIPTORS",
 ]
 
 partitions = [
@@ -22,6 +23,7 @@ partitions = [
   { name = "matrix", owner = "MATRIX", pattern = '%s"packages/matrix" [ "/" *VCHAR ]' },
   { name = "algebra", owner = "ALGEBRA", pattern = '%s"packages/algebra" [ "/" *VCHAR ]' },
   { name = "units", owner = "UNITS", pattern = '%s"packages/units" [ "/" *VCHAR ]' },
+  { name = "descriptors", owner = "DESCRIPTORS", pattern = '%s"packages/descriptor-prototype" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

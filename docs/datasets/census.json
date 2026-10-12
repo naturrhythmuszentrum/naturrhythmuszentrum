@@ -13,7 +13,8 @@
     "packages/scalar/Cargo.toml",
     "packages/matrix/Cargo.toml",
     "packages/algebra/Cargo.toml",
-    "packages/units/Cargo.toml"
+    "packages/units/Cargo.toml",
+    "packages/descriptor-prototype/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -48,6 +49,12 @@
       "has_readme_template": true,
       "name": "nrz-units",
       "path": "packages/units"
+    },
+    {
+      "description": "Descriptor schema interning and checked computation boundary prototypes",
+      "has_readme_template": true,
+      "name": "nrz-descriptor-prototype",
+      "path": "packages/descriptor-prototype"
     }
   ]
 }

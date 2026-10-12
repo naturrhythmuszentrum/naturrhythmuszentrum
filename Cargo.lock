@@ -593,6 +593,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrz-descriptor-prototype"
+version = "0.1.0"
+dependencies = [
+ "nrz-algebra",
+ "nrz-units",
+]
+
+[[package]]
 name = "nrz-docgen"
 version = "0.1.0"
 dependencies = [
