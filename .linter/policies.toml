@@ -15,4 +15,10 @@ policies = [
   { owner = "DOCGEN", policy = "labels.heads-conform" },
   { owner = "DOCGEN", policy = "labels.citations-local-resolve" },
   { owner = "DOCGEN", policy = "owners.reach-conform" },
+  { owner = "SCALAR", policy = "labels.mints-well-formed" },
+  { owner = "SCALAR", policy = "labels.mints-kind-conform" },
+  { owner = "SCALAR", policy = "labels.mints-unique" },
+  { owner = "SCALAR", policy = "labels.heads-conform" },
+  { owner = "SCALAR", policy = "labels.citations-local-resolve" },
+  { owner = "SCALAR", policy = "owners.reach-conform" },
 ]

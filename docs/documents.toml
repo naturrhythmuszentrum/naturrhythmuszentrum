@@ -40,3 +40,8 @@ requires = ["census", "project"]
 template = "problems/README.md.j2"
 output = "problems/README.md"
 requires = ["problems"]
+
+[[document]]
+template = "packages/scalar/README.md.j2"
+output = "packages/scalar/README.md"
+requires = []

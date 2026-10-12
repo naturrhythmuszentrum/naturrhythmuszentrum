@@ -7,7 +7,7 @@
 
 [workspace]
 resolver = "3"
-members = ["packages/docgen"]
+members = ["packages/docgen", "packages/scalar"]
 
 [workspace.package]
 version = "0.1.0"
@@ -24,6 +24,7 @@ serde_json = "1"
 toml = "1"
 clap = { version = "4", features = ["derive"] }
 thiserror = "2"
+nrz-scalar = { path = "packages/scalar" }
 tempfile = "3"
 
 [workspace.lints.rust]

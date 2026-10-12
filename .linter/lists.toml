@@ -37,3 +37,21 @@ allowances = []
 
 [DOCGEN."owners.reach-conform"]
 allowances = []
+
+[SCALAR."labels.mints-well-formed"]
+allowances = []
+
+[SCALAR."labels.mints-kind-conform"]
+allowances = []
+
+[SCALAR."labels.mints-unique"]
+allowances = []
+
+[SCALAR."labels.heads-conform"]
+allowances = []
+
+[SCALAR."labels.citations-local-resolve"]
+allowances = []
+
+[SCALAR."owners.reach-conform"]
+allowances = []

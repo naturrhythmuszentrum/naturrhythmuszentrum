@@ -1,0 +1,21 @@
+[package]
+name = "nrz-scalar"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Validated scalar arithmetic prototype for Naturrhythmuszentrum"
+readme = "README.md"
+keywords = ["numerics", "interval", "validation"]
+categories = ["mathematics", "science"]
+
+[dependencies]
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

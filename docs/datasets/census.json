@@ -9,7 +9,8 @@
   "license": "CC0-1.0",
   "sources": [
     "Cargo.toml",
-    "packages/docgen/Cargo.toml"
+    "packages/docgen/Cargo.toml",
+    "packages/scalar/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -20,6 +21,12 @@
       "has_readme_template": true,
       "name": "nrz-docgen",
       "path": "packages/docgen"
+    },
+    {
+      "description": "Validated scalar arithmetic prototype for Naturrhythmuszentrum",
+      "has_readme_template": true,
+      "name": "nrz-scalar",
+      "path": "packages/scalar"
     }
   ]
 }
