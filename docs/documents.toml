@@ -50,3 +50,8 @@ requires = []
 template = "packages/matrix/README.md.j2"
 output = "packages/matrix/README.md"
 requires = []
+
+[[document]]
+template = "docs/feasibility.md.j2"
+output = "docs/feasibility.md"
+requires = []

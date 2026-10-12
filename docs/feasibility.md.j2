@@ -1,0 +1,88 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Numerical feasibility record · `guide:nrz:feasibility-record`
+
+## Scope · `sec:nrz:feasibility-scope`
+
+This bite prototypes finite enclosures in `nrz-scalar` for binary32 and binary64 and a binary64 dense solve in `nrz-matrix`. Its types and functions are provisional until the units and matrix bites settle their interfaces. The purpose is to test the arithmetic, backend and certificate assumptions before broader APIs are fixed (`step:nrz:bite-numerical-feasibility`), (`cav:vision:backend-capability-uncertainty`).
+
+## Arithmetic · `sec:nrz:feasibility-arithmetic`
+
+**Assumption (IEEE binary formats)** · `assum:nrz:binary-formats`
+
+The validated path assumes IEEE 754 binary32 and binary64 with gradual underflow, finite endpoints and adjacent representable values supplied by the standard library. It declines any arithmetic that needs an infinite endpoint (`cav:vision:validated-arithmetic-assumptions`), (`dec:vision:precision-selection`).
+
+**Assumption (Single rounding mode)** · `assum:nrz:round-to-nearest`
+
+Every primitive is interpreted under round-to-nearest, ties-to-even. The path does not change the process rounding mode and does not claim a guarantee if a target violates this assumption (`cav:vision:validated-arithmetic-assumptions`).
+
+**Assumption (Fused residual)** · `assum:nrz:fused-residual`
+
+The standard library's `mul_add` is assumed to perform one correctly rounded fused operation. An exactness proof from its residual is used only when the residual cannot underflow; subnormal and nearby cases step both bounds outward (`dec:vision:independent-verification-arithmetic`), (`cav:vision:validated-arithmetic-assumptions`).
+
+**Assumption (Supported gate targets)** · `assum:nrz:gate-targets`
+
+The first gate ran on `x86_64-unknown-linux-gnu` with rustc 1.101.0-nightly (21b707e3f, 2026-09-30), LLVM 23.1.1 and an AMD EPYC 7C13 that reports FMA; tests used the default debug profile. This is the measured target, and no other target is implied (`cav:vision:validated-arithmetic-assumptions`).
+
+**Result (Primitive enclosures)** · `result:nrz:primitive-enclosures`
+
+The compute-server gate passed all scalar unit tests: exact small cases stayed tight; cancellation, product rounding and subnormal boundaries were enclosed; invalid inputs and overflow refused; and widening and narrowing enclosed in both binary formats (`dec:vision:independent-verification-arithmetic`), (`rule:vision:precision-conversions`).
+
+**Result (Controlled reductions)** · `result:nrz:controlled-reductions`
+
+The scalar path reduces plain slices in its own order and scales Frobenius bounds by a power of two, so a norm can remain finite when direct squares overflow. Its reduction and scaled-norm tests passed in both binary formats; no backend reduction supplies verification evidence (`dec:vision:independent-verification-arithmetic`).
+
+**Result (Rump polynomial outcome)** · `result:nrz:rump-outcome`
+
+The Rump integration test passed in both binary formats: each interval evaluation either refused or enclosed the exact rational value -54767/66192. Its pass does not distinguish those two permitted outcomes; the test asserts that neither format can return a narrow false enclosure (`cex:exemplars:rump-polynomial`), (`rule:vision:independent-numerical-evidence`).
+
+## Backend · `sec:nrz:feasibility-backend`
+
+**Decision (Safe faer adapter)** · `dec:nrz:faer-adapter`
+
+`nrz-matrix` selects faer 0.24.4 with default features disabled and only `std` and `linalg` enabled. One private module obtains candidate and approximate-inverse columns through partially pivoted LU; the certificate consumes only plain binary64 slices (`rule:vision:backend-boundaries`), (`dec:vision:inverse-norm-certificate`).
+
+**Caveat (Transitive unsafe code)** · `cav:nrz:faer-unsafe-boundary`
+
+The workspace forbids unsafe code in its own crates. The supplied backend measurement counted 1,184 occurrences of the word unsafe in faer's source; that dependency remains inside the trust boundary and its safe API is the only interface used here (`cav:vision:transitive-unsafe-code`).
+
+**Caveat (Duplicate dependency versions)** · `cav:nrz:duplicate-versions`
+
+The server resolved 57 new lock entries for faer, all with registry checksums. Duplicate versions occur in `equator` (0.2.2 and 0.6.0), `equator-macro`, `syn` (1.0.109, 2.0.119 and 3.0.7), `thiserror` (1.0.69 and 2.0.21) and `thiserror-impl`. A crate-root expectation for `clippy::multiple_crate_versions` records this third-party fact (`cav:vision:lint-feasibility`).
+
+## Certificate · `sec:nrz:feasibility-certificate`
+
+**Result (Hilbert outcomes)** · `result:nrz:hilbert-outcomes`
+
+The gate certified Hilbert orders three through seven under relative budget 1e-6 and refused order eight. Every certified candidate lay within its radius of the all-ones exact solution; the order-eight refusal establishes only that this requested guarantee was not met (`def:vision:certified-solve-contract`), (`rule:vision:conditioning-and-refusal`), (`rule:vision:independent-numerical-evidence`).
+
+**Result (Kahan outcomes)** · `result:nrz:kahan-outcomes`
+
+The gate certified Kahan order three and refused order forty. Rational construction accounts for representation and right-hand-side import radii, and the certified candidate lay within its radius of the all-ones solution (`rule:vision:imports-and-exactness`), (`rule:vision:independent-numerical-evidence`).
+
+**Result (Wilkinson outcomes)** · `result:nrz:wilkinson-outcomes`
+
+The gate certified Wilkinson order fifty-four despite elimination growth and refused order fifty-five. The certified candidate lay within its radius of the all-ones solution; the refusal at the next order establishes only that the requested guarantee was not met, and growth alone is not a certificate outcome (`rule:vision:conditioning-and-refusal`), (`rule:vision:independent-numerical-evidence`).
+
+**Experiment (Certificate operation count)** · `expt:nrz:certificate-cost`
+
+For order n, inverse defect construction uses n squared independently enclosed length-n dots, hence cubic scalar work; residual uses n more length-n dots, and the remaining matrix and vector norms use quadratic and linear work. The faer factorization and n-plus-one right-hand sides also have cubic cost. The Frobenius bound is conservative relative to the two-norm contract (`dec:vision:inverse-norm-certificate`), (`cav:vision:certificate-cost-and-looseness`).
+
+**Experiment (Gate wall times)** · `expt:nrz:gate-walls`
+
+The compute-server debug-profile test report measured all ten adversarial matrix variants together at under 0.202 s and the Rump test at under 0.003 s; each listed scalar and matrix unit test displayed under 0.000 s at libtest precision. Compilation, documentation and host-linter walls were not supplied by this gate report (`cav:vision:lint-feasibility`).
+
+## Limitations · `sec:nrz:feasibility-limitations`
+
+**Caveat (Extended precision)** · `cav:nrz:no-extended-precision`
+
+The sealed scalar contract admits only binary32 and binary64; extended precision remains an admission path requiring separate evidence (`dec:vision:precision-selection`).
+
+**Caveat (Binary32 solves)** · `cav:nrz:no-binary32-solves`
+
+The scalar arithmetic covers binary32, while certified dense solves in this prototype use binary64 only (`def:vision:certified-solve-contract`).
+
+**Caveat (Other backend operations)** · `cav:nrz:unexercised-backend`
+
+The prototype exercises only dense partially pivoted LU candidate solves and approximate-inverse columns; it provides no evidence for other faer operations (`cav:vision:backend-capability-uncertainty`).
