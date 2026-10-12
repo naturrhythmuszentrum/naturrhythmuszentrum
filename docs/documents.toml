@@ -65,3 +65,8 @@ requires = []
 template = "packages/units/README.md.j2"
 output = "packages/units/README.md"
 requires = []
+
+[[document]]
+template = "docs/shapes.md.j2"
+output = "docs/shapes.md"
+requires = []

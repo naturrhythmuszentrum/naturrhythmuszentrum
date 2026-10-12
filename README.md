@@ -46,6 +46,7 @@ The commands derive datasets, render documents, and verify the committed generat
 |Document|Title label|Role|
 |--------|-----------|----|
 |Conceptual architecture of the Naturrhythmuszentrum engine|(`spec:vision:conceptual-architecture`)|Defines purpose, guarantees, dimensions, measures, counts, algebraic unit checks, uncertainty contracts, numerical boundaries, repository structure, and completion obligations.|
+|Matrix shapes, uncertainties and numerical errors|(`spec:nrz:matrix-shapes`)|Defines ordered physical axes, admissible operations, independently shaped uncertainty and numerical-error companions, and their implementation evidence.|
 |Exemplars to design against|(`reg:exemplars:reference-register`)|Records the systems, problems, and adversarial fixtures that inform and test those decisions.|
 |The engine's plan|(`plan:nrz:engine-plan`)|Orders implementation bites and states their deliverables, verification, exclusions, import procedure, and gate.|
 |Naturrhythmuszentrum|(`guide:nrz:overview`)|Provides the workspace and documentation entry point.|
