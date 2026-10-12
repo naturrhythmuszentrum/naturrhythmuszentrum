@@ -1,0 +1,26 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# nrz-units · `guide:units:overview`
+
+The units package interprets the generic algebra core through data-time quantity descriptors. It depends on nrz-algebra and no numerical engine package. Descriptors do not choose a compile-time quantity representation or a numerical storage type.
+
+**Definition (Quantity descriptors)** · `def:units:quantity-descriptors`
+
+A descriptor combines a seven-axis SI dimension, an explicit semantic kind, an exact measure and an affine point or difference role. Dimensions use checked rational exponents; an integral-only policy can reject fractional results. Kind identity is declared, never inferred from equal dimension vectors. Named kinds bind invariant dimensions in a registry. Nested kind relationships have a depth limit of 128.
+
+**Rule (Exact measure conversion)** · `rule:units:measure-conversion`
+
+A measure maps coordinates to coherent coordinates by a positive rational scale and a rational offset. Conversion checks dimension, kind and role before applying scale and shift. Differences have zero offset, even when associated with an affine point measure. Symbolic or irrational scales return `UnsupportedMeasureScale`, including angle measures requiring pi. This boundary permits a later enclosed or symbolic scale representation without pretending a rational approximation is exact.
+
+**Rule (Semantic operations)** · `rule:units:semantic-operations`
+
+Addition and subtraction require compatible kinds and the affine role table. Point minus point is a difference; point plus difference and difference plus point are points; point plus point, difference minus point and multiplicative point operations are refused. Products and powers require explicit kind rules beyond the standard continuous ratio and uncertainty relationships. Rules are ordered, checked against dimension arithmetic and rejected on duplicate registration. Registry declarations are assumptions about physical meaning, not proofs of them.
+
+**Definition (Count domains)** · `def:units:count-domains`
+
+A count has a declared thing and an integer domain, remains distinct from a continuous ratio and from amount of substance, and uses scale one with zero offset. Imports must be integers in the domain. Signed and nonnegative domains have conservative closure rules; bounded domains refuse unproved arithmetic. Known whole-number scaling checks domain closure. Dividing counts requires `count_ratio` and preserves divisor definedness as an original operation. No count is silently rounded or promoted to a continuous value.
+
+**Definition (Uncertainty descriptors)** · `def:units:uncertainty-descriptors`
+
+Radius, standard uncertainty, relative radius, relative standard uncertainty, variance and covariance have distinct kinds and their own measures. Absolute companions use difference dimensions and scales; variance squares them, and covariance takes the product of the two values' difference dimensions and scales. Relative descriptors require a compatible declared nonzero difference reference; the general descriptor constructor refuses a raw relative kind, and construction refuses a relative kind nested within any other uncertainty kind. Explicit relative conversion checks that reference, while ordinary division by a ratio coefficient preserves the uncertainty kind. Descriptor-only multiplication of standard uncertainties does not infer a variance, because value identity is unavailable at that layer. A standard uncertainty of a count is continuous, while the value remains discrete. These declarations provide neither numerical uncertainty propagation nor a proof of an assurance claim.

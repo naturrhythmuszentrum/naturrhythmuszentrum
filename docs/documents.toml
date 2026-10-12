@@ -60,3 +60,8 @@ requires = []
 template = "packages/algebra/README.md.j2"
 output = "packages/algebra/README.md"
 requires = []
+
+[[document]]
+template = "packages/units/README.md.j2"
+output = "packages/units/README.md"
+requires = []

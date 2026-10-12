@@ -34,4 +34,10 @@ policies = [
   { owner = "ALGEBRA", policy = "labels.heads-conform" },
   { owner = "ALGEBRA", policy = "labels.citations-local-resolve" },
   { owner = "ALGEBRA", policy = "owners.reach-conform" },
+  { owner = "UNITS", policy = "labels.mints-well-formed" },
+  { owner = "UNITS", policy = "labels.mints-kind-conform" },
+  { owner = "UNITS", policy = "labels.mints-unique" },
+  { owner = "UNITS", policy = "labels.heads-conform" },
+  { owner = "UNITS", policy = "labels.citations-local-resolve" },
+  { owner = "UNITS", policy = "owners.reach-conform" },
 ]

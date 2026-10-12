@@ -19,7 +19,7 @@ The baseline is a virtual nightly Cargo workspace. The packages below are the ta
 |`packages/algebra`|`nrz-algebra`|Exact symbolic scalar expressions and collection normal forms|None of the other engine packages|(`tab:vision:package-structure`)|
 |`packages/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
 |`packages/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
-|`packages/units`|`nrz-units`|Dimensions, measures, counts and kinds, typed quantities, conversions and algebraic checks|`nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
+|`packages/units`|`nrz-units`|Data-time dimensions, exact measures, kinds and algebraic checks; later typed quantities|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
 |`packages/matrix`|`nrz-matrix`|Matrices with checked block descriptors, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
 |`packages/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation graphs using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
 |`packages/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|

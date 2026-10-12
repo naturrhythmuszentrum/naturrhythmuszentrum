@@ -92,3 +92,21 @@ allowances = []
 
 [ALGEBRA."owners.reach-conform"]
 allowances = []
+
+[UNITS."labels.mints-well-formed"]
+allowances = []
+
+[UNITS."labels.mints-kind-conform"]
+allowances = []
+
+[UNITS."labels.mints-unique"]
+allowances = []
+
+[UNITS."labels.heads-conform"]
+allowances = []
+
+[UNITS."labels.citations-local-resolve"]
+allowances = []
+
+[UNITS."owners.reach-conform"]
+allowances = []

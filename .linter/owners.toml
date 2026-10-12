@@ -9,6 +9,7 @@ owners = [
   "SCALAR",
   "MATRIX",
   "ALGEBRA",
+  "UNITS",
 ]
 
 partitions = [
@@ -20,6 +21,7 @@ partitions = [
   { name = "scalar", owner = "SCALAR", pattern = '%s"packages/scalar" [ "/" *VCHAR ]' },
   { name = "matrix", owner = "MATRIX", pattern = '%s"packages/matrix" [ "/" *VCHAR ]' },
   { name = "algebra", owner = "ALGEBRA", pattern = '%s"packages/algebra" [ "/" *VCHAR ]' },
+  { name = "units", owner = "UNITS", pattern = '%s"packages/units" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

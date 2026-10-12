@@ -8,7 +8,7 @@
 
 [workspace]
 resolver = "3"
-members = ["packages/docgen", "packages/scalar", "packages/matrix", "packages/algebra"]
+members = ["packages/docgen", "packages/scalar", "packages/matrix", "packages/algebra", "packages/units"]
 
 [workspace.package]
 version = "0.1.0"

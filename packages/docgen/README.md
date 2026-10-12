@@ -36,5 +36,6 @@ Inputs, the document manifest, and datasets identify themselves with `namespace`
 |`nrz-scalar`|`packages/scalar`|Validated scalar arithmetic prototype for Naturrhythmuszentrum|
 |`nrz-matrix`|`packages/matrix`|Safe dense solve candidates with independent numerical certificates|
 |`nrz-algebra`|`packages/algebra`|Exact symbolic expressions and deterministic collection normal forms|
+|`nrz-units`|`packages/units`|Data-time quantity descriptors and checks over original symbolic expressions|
 
 Naturrhythmuszentrum has 9 planned bites.

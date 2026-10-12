@@ -624,6 +624,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrz-units"
+version = "0.1.0"
+dependencies = [
+ "nrz-algebra",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "num-complex"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
