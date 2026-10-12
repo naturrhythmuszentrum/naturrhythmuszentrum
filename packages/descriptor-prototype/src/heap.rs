@@ -556,3 +556,84 @@ impl<P: Scalar> Heap<P> {
         self.companion_values(handle)
     }
 }
+
+/// Pair created in one semantic publication transaction.
+#[expect(
+    unreachable_pub,
+    reason = "the publication pair is internal to the private heap module"
+)]
+pub type PublishedPair<P> = (Handle<Value, P>, Handle<Companion, P>);
+
+impl<P: Scalar> Heap<P> {
+    /// Prepare all fallible checks before appending either published object.
+    pub(crate) fn publish_pair(
+        &mut self,
+        value_shape: ShapeId,
+        values: Vec<P>,
+        covariance_shape: ShapeId,
+        covariance: Vec<P>,
+    ) -> Result<PublishedPair<P>, Error> {
+        self.validate_values(value_shape, &values)?;
+        self.validate_values(covariance_shape, &covariance)?;
+        let center = self.schemas.shape_definition(value_shape)?;
+        let paired = self.schemas.shape_definition(covariance_shape)?;
+        if center.columns.len() != 1 || paired.rows != center.rows || paired.columns != center.rows
+        {
+            return Err(Error::Shape);
+        }
+        for (column, right) in center.entries.iter().enumerate() {
+            for (row, left) in center.entries.iter().enumerate() {
+                let expected = uncertainty(
+                    UncertaintyMode::Covariance,
+                    self.schemas.descriptor(*left)?,
+                    Some(self.schemas.descriptor(*right)?),
+                    None,
+                )?;
+                let index = row + center.entries.len() * column;
+                if self.schemas.descriptor(paired.entries[index])? != &expected {
+                    return Err(Error::Shape);
+                }
+            }
+        }
+        let value = Handle {
+            heap: self.id,
+            slot: self.records.len(),
+            generation: 0,
+            arena: self.arena,
+            marker: PhantomData,
+        };
+        let companion = Handle {
+            heap: self.id,
+            slot: self.records.len().checked_add(1).ok_or(Error::Exhausted)?,
+            generation: 0,
+            arena: self.arena,
+            marker: PhantomData,
+        };
+        let target = Target {
+            value,
+            version: 0,
+            entries: (0..values.len()).collect(),
+        };
+        let center_record = Record {
+            category: Category::Value,
+            shape: value_shape,
+            values,
+            generation: 0,
+            version: 0,
+            live: true,
+            targets: Vec::new(),
+        };
+        let companion_record = Record {
+            category: Category::Companion,
+            shape: covariance_shape,
+            values: covariance,
+            generation: 0,
+            version: 0,
+            live: true,
+            targets: vec![target.clone(), target],
+        };
+        // No fallible semantic work follows this single append of both prepared records.
+        self.records.extend([center_record, companion_record]);
+        Ok((value, companion))
+    }
+}
