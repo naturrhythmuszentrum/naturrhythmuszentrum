@@ -57,6 +57,9 @@ pub enum UnitError {
     /// A covariance needs exactly two value descriptors.
     #[error("uncertainty relationship has the wrong number of value descriptors")]
     UncertaintyRelationship,
+    /// An expression belongs to different value or reference symbols than its companion.
+    #[error("uncertainty value or reference identity differs from its declaration")]
+    UncertaintyIdentity,
     /// Relative uncertainty requires an explicit compatible nonzero difference reference.
     #[error("relative uncertainty requires a compatible nonzero difference reference")]
     RelativeReference,
