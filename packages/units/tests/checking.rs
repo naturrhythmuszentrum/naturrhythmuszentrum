@@ -79,6 +79,8 @@ fn refusal(context: &Context, source: &str, expected: &Failure) -> TestResult {
 ///
 /// TODO ´todo:test:test-typed-matrix-zeros-and-cancelled´: test typed matrix zeros and cancelled contractions retain original axis checks under rule:nrz:shape-entry-contract and rule:nrz:shape-data-time-evidence.
 ///
+/// TODO ´todo:test:test-invalid-original-operations-inside-unselected´: test invalid original operations inside unselected plan alternatives remain refusals under rule:nrz:plan-validation.
+///
 /// ´test:integration:original-operations-before-normalization´
 #[test]
 fn original_operations_before_normalization() -> TestResult {
@@ -150,6 +152,8 @@ fn original_operations_before_normalization() -> TestResult {
 ///
 /// TODO ´todo:test:test-operator-normalization-and-paired-covariance´: test operator normalization and paired covariance conversions preserve coordinate meaning under def:nrz:shape-normalization and def:nrz:covariance-shape.
 ///
+/// TODO ´todo:test:test-changed-declaration-snapshots-cannot-reuse´: test changed declaration snapshots cannot reuse old binding conversion checks under rule:nrz:binding-validation.
+///
 /// ´test:integration:coordinate-evidence´
 #[test]
 fn coordinate_evidence() -> TestResult {
@@ -218,6 +222,8 @@ fn coordinate_evidence() -> TestResult {
 ///
 /// TODO ´todo:test:test-rectangular-block-extents-and-ordered´: test rectangular block extents and ordered equation axes alongside scalar descriptor checks under def:nrz:matrix-shape and rule:nrz:shape-entry-contract.
 ///
+/// TODO ´todo:test:test-parameterized-block-bindings-discharge-concrete´: test parameterized block bindings discharge concrete shape constraints before evaluation under rule:nrz:binding-validation.
+///
 /// ´test:integration:observables-equations-and-blocks´
 #[test]
 fn observables_equations_and_blocks() -> TestResult {
@@ -279,6 +285,8 @@ fn observables_equations_and_blocks() -> TestResult {
 /// Function signatures distinguish angles, ratios and unrelated dimensionless kinds.
 ///
 /// TODO ´todo:test:test-matrix-function-signatures-reject-wrong´: test matrix function signatures reject wrong axes and unsupported contraction semantics under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:test:test-changed-function-declarations-require-fresh´: test changed function declarations require fresh reusable plan checks under rule:nrz:plan-validation.
 ///
 /// ´test:integration:function-signatures´
 #[test]
@@ -519,6 +527,8 @@ fn uncertainty_expressions() -> TestResult {
 }
 
 /// Unknown dependencies, unused cycles and exhausted budgets produce typed refusals.
+///
+/// TODO ´todo:test:test-undeclared-binding-inputs-fail-before´: test undeclared binding inputs fail before any numerical operation executes under rule:nrz:binding-validation.
 ///
 /// ´test:integration:declaration-refusals´
 #[test]

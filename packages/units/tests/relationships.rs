@@ -138,6 +138,8 @@ fn ratio_uncertainty_scaling_and_references() -> TestResult {
 ///
 /// TODO ´todo:test:test-equal-shape-values-retain-distinct´: test equal shape values retain distinct identities and shared source relationships under def:nrz:companion-shape and dec:nrz:shape-descriptor-ownership.
 ///
+/// TODO ´todo:test:test-reused-descriptor-slots-cannot-revive´: test reused descriptor slots cannot revive previous companion evidence under rule:nrz:descriptor-lifetime-and-mutation.
+///
 /// ´test:integration:uncertainty-value-and-reference-identities´
 #[test]
 fn uncertainty_value_and_reference_identities() -> TestResult {
@@ -390,6 +392,8 @@ fn registered_count_composition() -> TestResult {
 ///
 /// TODO ´todo:test:test-shaped-declaration-snapshots-preserve-provenance´: test shaped declaration snapshots preserve provenance without asserting statistical validity under rule:nrz:shape-data-time-evidence.
 ///
+/// TODO ´todo:test:test-binding-refusals-retain-point-context´: test binding refusals retain point context alongside original declaration diagnostics under rule:nrz:binding-validation.
+///
 /// ´test:integration:declaration-source-and-descriptor-evidence´
 #[test]
 fn declaration_source_and_descriptor_evidence() -> TestResult {
@@ -557,6 +561,8 @@ fn observable_companion(
 ///
 /// TODO ´todo:test:test-indexed-sensitivity-contractions-retain-source´: test indexed sensitivity contractions retain source closures across multiple outputs under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
 ///
+/// TODO ´todo:test:test-conflicting-shared-source-snapshots-across´: test conflicting shared source snapshots across binding points remain refusals under rule:nrz:batch-source-covariance.
+///
 /// ´test:integration:derived-uncertainty-propagation´
 #[test]
 fn derived_uncertainty_propagation() -> TestResult {
@@ -717,6 +723,8 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
 /// Covariance propagation admits contributors from either value and records the declared pair.
 ///
 /// TODO ´todo:test:test-the-mixed-voltage-current-covariance´: test the mixed voltage current covariance and structured duplication maps exactly under ex:nrz:resistor-shape-covariance and rule:nrz:structured-companion-coordinates.
+///
+/// TODO ´todo:test:test-common-source-dependencies-survive-propagation´: test common source dependencies survive propagation across distinct binding points under rule:nrz:batch-source-covariance.
 ///
 /// ´test:integration:covariance-propagation´
 #[test]

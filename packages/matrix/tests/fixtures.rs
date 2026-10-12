@@ -111,6 +111,8 @@ fn nearest(value: Rational) -> (f64, f64) {
 /// TODO ´todo:test:construct-quantity-carrying-fixtures-with-declared´: construct quantity-carrying fixtures with declared leaf measures, block quotients and intrinsic input and computational companions under rule:vision:heterogeneous-assembly and def:vision:intrinsic-uncertainty-companions.
 ///
 /// TODO ´todo:test:import-fixture-entries-with-logical-axes´: import fixture entries with logical axes and shaped representation bounds under def:nrz:matrix-shape and def:nrz:numerical-error-shapes.
+///
+/// TODO ´todo:test:construct-equivalent-checked-arena-layouts-for´: construct equivalent checked arena layouts for each exact fixture under req:nrz:computation-implementation-evidence.
 fn system(entries: &[Rational], n: usize) -> DenseSystem {
     let mut a = Vec::with_capacity(entries.len());
     let mut a_errors = Vec::with_capacity(entries.len());
@@ -223,6 +225,8 @@ fn parameter(entry: &Value, variant: &Value, name: &str) -> Rational {
 /// TODO ´todo:test:validate-variant-selectors-as-metadata-and´: validate variant selectors as metadata and preserve quantity descriptors through fixture dispatch under rule:vision:counts-and-metadata and req:vision:algebraic-unit-checks.
 ///
 /// TODO ´todo:test:dispatch-fixture-variants-with-declared-axes´: dispatch fixture variants with declared axes and independently shaped companions under def:nrz:matrix-shape and def:nrz:companion-shape.
+///
+/// TODO ´todo:test:bind-fixture-structure-changes-only-through´: bind fixture structure changes only through declared plan parameters or variants under rule:nrz:batch-variation.
 fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
     let name = variant["name"].as_str().expect("variant name");
     if name.starts_with("order") {
@@ -245,6 +249,8 @@ fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
 /// TODO ´todo:test:verify-adversarial-outcomes-with-independently-typed´: verify adversarial outcomes with independently typed radii, residuals, inverse bounds and ratio budgets after measure conversion under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
 ///
 /// TODO ´todo:test:test-descriptor-preserving-fixture-solves-and´: test descriptor preserving fixture solves and packed structure norms against independent enclosures under rule:nrz:structured-companion-coordinates and rule:nrz:shape-certified-solve.
+///
+/// TODO ´todo:test:verify-mixed-batch-successes-and-refusals´: verify mixed batch successes and refusals retain original point order under rule:nrz:batch-outcomes.
 ///
 /// ´test:integration:adversarial-matrix-fixtures´
 #[test]

@@ -8,6 +8,8 @@ use crate::{Descriptor, UnitError};
 /// An original operation's position, including any expanded declaration chain.
 ///
 /// TODO ´todo:code:locate-axis-block-and-paired-covariance´: locate axis block and paired covariance indices alongside original expression paths under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:preserve-original-locations-when-clients-add´: preserve original locations when clients add binding point and node context under def:nrz:operation-record.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Location {
     /// Zero-based operand indices from the current root.
@@ -21,6 +23,8 @@ pub struct Location {
 /// A diagnostic expectation can be a concrete descriptor or an operation rule.
 ///
 /// TODO ´todo:code:describe-expected-operator-and-companion-shapes´: describe expected operator and companion shapes including contraction coordinate meanings under def:nrz:matrix-shape and def:nrz:companion-shape.
+///
+/// TODO ´todo:code:identify-the-client-slot-contract-that´: identify the client slot contract that a bound descriptor violates under rule:nrz:binding-validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Expectation {
     /// A caller or declaration supplied this exact descriptor constraint.
@@ -32,6 +36,8 @@ pub enum Expectation {
 /// The reason a check could not establish its contract.
 ///
 /// TODO ´todo:code:distinguish-malformed-extents-from-incompatible-axes´: distinguish malformed extents from incompatible axes and stale companion targets under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:distinguish-stale-checking-snapshots-from-physical´: distinguish stale checking snapshots from physical descriptor refusals at client boundaries under rule:nrz:binding-validation.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum Failure {
     /// Descriptor algebra refused the operation.
@@ -71,6 +77,8 @@ pub enum Failure {
 /// A refusal with original location, expected constraint and derived operands.
 ///
 /// TODO ´todo:code:report-expected-and-derived-indexed-shapes´: report expected and derived indexed shapes without implying numerical certification under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:allow-callers-to-attach-point-node´: allow callers to attach point node and slot context to binding refusals under rule:nrz:binding-validation.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 #[error("{failure} at {location:?}; expected {expected:?}; derived {derived:?}")]
 pub struct Diagnostic {

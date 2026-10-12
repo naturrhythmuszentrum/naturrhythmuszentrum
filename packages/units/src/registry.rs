@@ -24,6 +24,8 @@ pub enum BinaryOp {
 }
 
 /// A data-time semantic contract; equal dimensions never manufacture a kind.
+///
+/// TODO ´todo:code:expose-semantic-rule-snapshot-identities-for´: expose semantic rule snapshot identities for reusable client plan checks under rule:nrz:plan-validation.
 #[derive(Clone, Debug)]
 pub struct Registry {
     /// Admitted dimension exponents, independent of static representation choices.
@@ -49,6 +51,8 @@ impl Registry {
     }
 
     /// Admit a descriptor and bind all named kinds to invariant dimensions.
+    ///
+    /// TODO ´todo:code:advance-rule-snapshot-identity-after-successful´: advance rule snapshot identity after successful kind inventory changes under rule:nrz:plan-validation.
     ///
     /// # Errors
     /// Refuses conflicting names, unsupported dimensions and malformed kinds.
@@ -90,6 +94,8 @@ impl Registry {
     /// remains the explicit `count_ratio` operation and cannot be registered here.
     ///
     /// TODO ´todo:code:register-explicit-sensitivity-and-covariance-pairing´: register explicit sensitivity and covariance pairing relations without inferring semantic coercions from dimensions under rule:nrz:shape-sensitivity-propagation.
+    ///
+    /// TODO ´todo:code:invalidate-binary-dependent-checks-when-registered´: invalidate binary dependent checks when registered rule snapshots change under rule:nrz:computation-cache-validity.
     ///
     /// # Errors
     /// Refuses additive rules, duplicate keys, count results or inconsistent dimensions.
@@ -136,6 +142,8 @@ impl Registry {
     /// Register a power relation without inferring semantic identity from its dimension.
     ///
     /// TODO ´todo:code:keep-scalar-exponent-admission-distinct-from´: keep scalar exponent admission distinct from matrix branch and composition evidence under rule:nrz:shape-powers-and-functions.
+    ///
+    /// TODO ´todo:code:invalidate-power-dependent-checks-when-registered´: invalidate power dependent checks when registered rule snapshots change under rule:nrz:computation-cache-validity.
     ///
     /// # Errors
     /// Refuses duplicate rules, count rules and incompatible dimensions or policies.

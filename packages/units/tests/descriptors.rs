@@ -69,6 +69,8 @@ fn dimension_laws() -> TestResult {
 ///
 /// TODO ´todo:test:test-shaped-point-origins-never-translate´: test shaped point origins never translate difference or covariance companions under def:nrz:shape-normalization and def:nrz:covariance-shape.
 ///
+/// TODO ´todo:test:test-compatible-measure-variation-across-bindings´: test compatible measure variation across bindings preserves checked conversion evidence under rule:nrz:binding-validation.
+///
 /// ´test:integration:affine-measures´
 #[test]
 fn affine_measures() -> TestResult {
@@ -327,6 +329,8 @@ fn count_domains() -> TestResult {
 /// Uncertainty companions have independent dimensions, measures and semantic kinds.
 ///
 /// TODO ´todo:test:test-vector-and-matrix-covariance-extents´: test vector and matrix covariance extents with mixed product dimensions under def:nrz:covariance-shape.
+///
+/// TODO ´todo:test:test-shared-schemas-preserve-distinct-bound´: test shared schemas preserve distinct bound value and source identities under def:nrz:heap-descriptor.
 ///
 /// ´test:integration:uncertainty-descriptors´
 #[test]

@@ -114,6 +114,8 @@ fn collect(
 ///
 /// TODO ´todo:test:verify-migrated-unit-and-uncertainty-data´: verify migrated unit and uncertainty data reach a fixed point while invalid expressions fail validation under req:vision:unit-data-migration.
 ///
+/// TODO ´todo:test:verify-migrated-binding-tables-preserve-point´: verify migrated binding tables preserve point order and shared source references under conv:nrz:batch-order-and-replay.
+///
 /// ´test:integration:binary-fixed-point-and-exit-classes´
 #[test]
 fn binary_fixed_point_and_exit_classes() -> Result<(), Box<dyn std::error::Error>> {

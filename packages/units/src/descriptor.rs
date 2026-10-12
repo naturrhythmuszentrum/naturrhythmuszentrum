@@ -17,6 +17,8 @@ pub enum Role {
 /// A validated data-time quantity descriptor, independent of numerical storage.
 ///
 /// TODO ´todo:code:reuse-scalar-descriptors-on-ordered-matrix´: reuse scalar descriptors on ordered matrix axes without inferring value identity from equality under def:nrz:matrix-shape and dec:nrz:shape-descriptor-ownership.
+///
+/// TODO ´todo:code:share-immutable-quantity-schemas-without-merging´: share immutable quantity schemas without merging bound value identities under def:nrz:heap-descriptor.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Descriptor {
     /// Cached dimension derived from the kind declaration.
@@ -141,6 +143,8 @@ impl Descriptor {
     ///
     /// TODO ´todo:code:compose-scalar-conversions-into-declared-axis´: compose scalar conversions into declared axis maps and paired covariance conversions under def:nrz:shape-normalization and def:nrz:covariance-shape.
     ///
+    /// TODO ´todo:code:key-reusable-conversion-maps-by-both´: key reusable conversion maps by both bound descriptor snapshots under rule:nrz:binding-validation.
+    ///
     /// # Errors
     /// Refuses incompatible descriptors and exact conversion overflow.
     pub fn conversion_to(&self, other: &Self) -> Result<Conversion, UnitError> {
@@ -169,6 +173,8 @@ impl Descriptor {
 /// nonzero condition. The condition is an input assumption, not a numerical proof.
 ///
 /// TODO ´todo:code:derive-each-indexed-companion-descriptor-independently´: derive each indexed companion descriptor independently of its target extent and representation under def:nrz:companion-shape and def:nrz:covariance-shape.
+///
+/// TODO ´todo:code:instantiate-companion-schemas-separately-for-each´: instantiate companion schemas separately for each bound target identity under def:nrz:heap-descriptor.
 ///
 /// # Errors
 /// Refuses malformed relationships, incompatible relative references and exact overflow.

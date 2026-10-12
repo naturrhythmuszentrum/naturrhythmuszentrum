@@ -8,6 +8,8 @@ use nrz_algebra::{Expr, Limits, Rational, Symbol};
 use crate::{Descriptor, Diagnostic, Failure, Registry, UncertaintyMode, UnitError};
 
 /// Provenance and assurance are supplied claims, not certified by a units check.
+///
+/// TODO ´todo:code:identify-versioned-shared-source-declarations-separately´: identify versioned shared source declarations separately from descriptive provenance under rule:nrz:batch-source-covariance.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct Evidence {
     /// Source identifier or explanatory provenance.
@@ -19,6 +21,8 @@ pub struct Evidence {
 /// An observable's declared contract and its original expression.
 ///
 /// TODO ´todo:code:attach-declared-output-shapes-and-indexed´: attach declared output shapes and indexed dependencies to future matrix observables under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:retain-original-observable-dependencies-when-clients´: retain original observable dependencies when clients assign plan slots under def:nrz:plan-binding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Observable {
     /// Expected dimension, kind, role and output coordinate measure.
@@ -32,6 +36,8 @@ pub struct Observable {
 /// Named value relationships for an independent uncertainty companion.
 ///
 /// TODO ´todo:code:bind-uncertainty-targets-to-ordered-value´: bind uncertainty targets to ordered value entries and versions rather than scalar names alone under def:nrz:companion-shape.
+///
+/// TODO ´todo:code:represent-companion-relationships-across-distinct-binding´: represent companion relationships across distinct binding points without inferring independence under rule:nrz:batch-source-covariance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Companion {
     /// Absolute, relative, variance or covariance interpretation.
@@ -55,6 +61,8 @@ pub struct Companion {
 /// A symbol's data-time meaning.
 ///
 /// TODO ´todo:code:extend-declared-quantities-with-ordered-shapes´: extend declared quantities with ordered shapes while keeping extents separate from physical counts under def:nrz:matrix-shape.
+///
+/// TODO ´todo:code:identify-immutable-declaration-versions-for-reusable´: identify immutable declaration versions for reusable plan validation under rule:nrz:plan-validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Declaration {
     /// A numerical input with an explicit nonzero assumption if required.
@@ -133,6 +141,8 @@ impl Declaration {
 /// A fixed ordered function signature; measures specify its argument and return coordinates.
 ///
 /// TODO ´todo:code:declare-shaped-arguments-results-and-dependency´: declare shaped arguments results and dependency maps for matrix valued applications under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:freeze-declared-function-interfaces-across-all´: freeze declared function interfaces across all bindings of one plan under rule:nrz:batch-variation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionSignature {
     /// Expected ordered descriptors, including affine roles.
@@ -144,6 +154,8 @@ pub struct FunctionSignature {
 /// A reusable declaration environment; checks own snapshots of all evidence they use.
 ///
 /// TODO ´todo:code:retain-shape-and-value-identity-snapshots´: retain shape and value identity snapshots independently of later declarations or batch reuse under dec:nrz:shape-descriptor-ownership.
+///
+/// TODO ´todo:code:expose-stable-declaration-snapshot-identities-for´: expose stable declaration snapshot identities for client binding reuse under rule:nrz:binding-validation.
 #[derive(Clone, Debug)]
 pub struct Context {
     /// Explicit physical operation rules.
@@ -171,6 +183,8 @@ impl Context {
     /// Add a declaration atomically; forward references are checked during resolution.
     ///
     /// TODO ´todo:code:validate-shape-declarations-and-companion-target´: validate shape declarations and companion target maps atomically at the context boundary under rule:nrz:shape-data-time-evidence.
+    ///
+    /// TODO ´todo:code:invalidate-client-binding-checks-after-successful´: invalidate client binding checks after successful declaration environment changes under rule:nrz:computation-cache-validity.
     ///
     /// # Errors
     /// Refuses duplicate names, inconsistent kinds and invalid exact count imports.
@@ -215,6 +229,8 @@ impl Context {
     /// Add an uninterpreted function's physical signature atomically.
     ///
     /// TODO ´todo:code:validate-function-contraction-and-output-axes´: validate function contraction and output axes alongside the declared scalar signatures under rule:nrz:shape-data-time-evidence.
+    ///
+    /// TODO ´todo:code:invalidate-dependent-plan-checks-when-function´: invalidate dependent plan checks when function declaration snapshots change under rule:nrz:plan-validation.
     ///
     /// # Errors
     /// Refuses inconsistent descriptors and duplicate or builtin function names.

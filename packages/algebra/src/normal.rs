@@ -24,6 +24,8 @@ enum Form {
 ///
 /// This form does not retain the original operations or their domain restrictions.
 /// A client performing typed checks must retain and check its original `Expr` first.
+///
+/// TODO ´todo:code:document-client-validation-from-original-trees´: document client validation from original trees before reusing collection forms under rule:nrz:plan-validation.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NormalForm(Form);
 

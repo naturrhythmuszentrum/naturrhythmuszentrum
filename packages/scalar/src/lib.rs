@@ -12,6 +12,8 @@ use core::ops::{Add, Div, Mul, Neg, Sub};
 /// TODO ´todo:code:keep-the-binary-scalar-contract-dimension´: keep the binary scalar contract dimension-neutral beneath quantity and discrete-count wrappers under dec:vision:storage-and-scalar-wrapping.
 ///
 /// TODO ´todo:code:keep-logical-shapes-at-the-caller´: keep logical shapes at the caller while precision changes preserve descriptor meaning under dec:nrz:shape-descriptor-ownership.
+///
+/// TODO ´todo:code:expose-primitive-precision-identity-for-typed´: expose primitive precision identity for typed arena resolution at callers under def:nrz:scalar-arena.
 pub trait Scalar:
     private::Sealed
     + Copy
@@ -194,6 +196,8 @@ pub enum ArithmeticFailure {
 /// TODO ´todo:code:wrap-intervals-with-value-dimensions-measures´: wrap intervals with value dimensions, measures and kinds and intrinsic measurement and computational companions under dec:vision:storage-and-scalar-wrapping and def:vision:intrinsic-uncertainty-companions.
 ///
 /// TODO ´todo:code:bind-scalar-enclosures-to-named-entry´: bind scalar enclosures to named entry or norm targets at the quantity owner under def:nrz:numerical-error-shapes.
+///
+/// TODO ´todo:code:associate-reused-enclosure-evidence-with-owner´: associate reused enclosure evidence with owner value versions at integration boundaries under rule:nrz:descriptor-lifetime-and-mutation.
 #[derive(Debug, Clone, Copy)]
 pub struct Interval<T: Scalar> {
     /// Lower endpoint.
@@ -468,6 +472,8 @@ impl<T: Scalar> Interval<T> {
 ///
 /// TODO ´todo:code:require-callers-to-validate-contraction-axes´: require callers to validate contraction axes before reducing plain scalar slices under rule:nrz:shape-composition.
 ///
+/// TODO ´todo:code:specify-reduction-input-order-for-reproducible´: specify reduction input order for reproducible bound computation at callers under conv:nrz:batch-order-and-replay.
+///
 /// # Errors
 ///
 /// A length mismatch, non-finite input or overflow returns an `ArithmeticFailure`.
@@ -488,6 +494,8 @@ pub fn dot<T: Scalar>(left: &[T], right: &[T]) -> Result<Interval<T>, Arithmetic
 ///
 /// TODO ´todo:code:require-callers-to-supply-compatible-coordinates´: require callers to supply compatible coordinates and structural multiplicities before squaring entries under rule:nrz:shape-norms-and-conditioning and rule:nrz:structured-companion-coordinates.
 ///
+/// TODO ´todo:code:preserve-declared-reduction-order-when-callers´: preserve declared reduction order when callers gather strided input regions under conv:nrz:batch-order-and-replay.
+///
 /// # Errors
 ///
 /// A non-finite input or overflow returns an `ArithmeticFailure`.
@@ -504,6 +512,8 @@ pub fn sum_squares<T: Scalar>(values: &[T]) -> Result<Interval<T>, ArithmeticFai
 /// TODO ´todo:code:assign-norm-bounds-their-block-or´: assign norm bounds their block or normalized-coordinate dimension while keeping numeric scaling separate from measures under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
 ///
 /// TODO ´todo:code:distinguish-numerical-power-scaling-from-physical´: distinguish numerical power scaling from physical normalization and packed entry weights at callers under def:nrz:shape-normalization and rule:nrz:structured-companion-coordinates.
+///
+/// TODO ´todo:code:require-frozen-validated-region-views-throughout´: require frozen validated region views throughout owner norm scans under rule:nrz:descriptor-layout-validation.
 ///
 /// # Errors
 ///
@@ -535,6 +545,8 @@ pub fn frobenius_upper<T: Scalar>(values: &[T]) -> Result<T, ArithmeticFailure> 
 /// TODO ´todo:code:preserve-quantity-and-uncertainty-descriptors-during´: preserve quantity and uncertainty descriptors during precision widening independently of measure conversion under rule:vision:precision-conversions and rule:vision:uncertainty-unit-algebra.
 ///
 /// TODO ´todo:code:preserve-logical-entry-mappings-during-widening´: preserve logical entry mappings during widening at the owner without introducing scalar shape dependencies under dec:nrz:shape-descriptor-ownership.
+///
+/// TODO ´todo:code:publish-widened-owner-representations-with-distinct´: publish widened owner representations with distinct typed storage identities under rule:nrz:descriptor-lifetime-and-mutation.
 impl From<Interval<f32>> for Interval<f64> {
     fn from(value: Interval<f32>) -> Self {
         Self {
@@ -549,6 +561,8 @@ impl From<Interval<f32>> for Interval<f64> {
 /// TODO ´todo:code:carry-narrowing-error-as-computational-uncertainty´: carry narrowing error as computational uncertainty without changing the value or uncertainty kind under rule:vision:precision-conversions and rule:vision:uncertainty-unit-algebra.
 ///
 /// TODO ´todo:code:attach-narrowing-bounds-to-their-original´: attach narrowing bounds to their original entry or norm targets at the owner under def:nrz:numerical-error-shapes.
+///
+/// TODO ´todo:code:invalidate-owner-evidence-caches-when-narrowing´: invalidate owner evidence caches when narrowing creates a new representation under rule:nrz:computation-cache-validity.
 impl TryFrom<Interval<f64>> for Interval<f32> {
     type Error = ArithmeticFailure;
     fn try_from(value: Interval<f64>) -> Result<Self, Self::Error> {
@@ -734,6 +748,8 @@ mod tests {
     ///
     /// TODO ´todo:code:test-owner-integration-preserves-target-identities´: test owner integration preserves target identities while recording narrowing error separately under dec:nrz:shape-descriptor-ownership.
     ///
+    /// TODO ´todo:code:test-owner-precision-changes-invalidate-bound´: test owner precision changes invalidate bound views without reinterpreting arenas under rule:nrz:descriptor-lifetime-and-mutation.
+    ///
     /// ´test:unit:precision-conversions-enclose´
     #[test]
     fn precision_conversions_enclose() {
@@ -777,6 +793,8 @@ mod tests {
     /// TODO ´todo:code:test-typed-reductions-reject-incompatible-summands´: test typed reductions reject incompatible summands and preserve product or squared uncertainty dimensions under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
     ///
     /// TODO ´todo:code:test-checked-contraction-maps-alongside-scalar´: test checked contraction maps alongside scalar reduction enclosures at the matrix boundary under rule:nrz:shape-composition.
+    ///
+    /// TODO ´todo:code:test-gathered-arena-reductions-replay-with´: test gathered arena reductions replay with declared input ordering under conv:nrz:batch-order-and-replay.
     ///
     /// ´test:unit:reductions-enclose´
     #[test]

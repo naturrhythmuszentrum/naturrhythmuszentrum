@@ -23,6 +23,8 @@ pub enum Error {
 }
 
 /// An opaque identifier, compared by exact spelling.
+///
+/// TODO ´todo:code:document-client-name-resolution-into-declared´: document client name resolution into declared computation slots under def:nrz:plan-binding.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Symbol(String);
 
@@ -144,6 +146,8 @@ impl Node {
 }
 
 /// A bounded immutable source tree; algebraic equality is supplied separately by `NormalForm`.
+///
+/// TODO ´todo:code:document-client-retention-of-original-operations´: document client retention of original operations across repeated evaluations under rule:nrz:plan-validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Expr {
     /// Original operation.
@@ -229,6 +233,8 @@ impl Expr {
     }
 
     /// Replace symbols simultaneously, preserving operations and replacement locations.
+    ///
+    /// TODO ´todo:code:require-client-rechecking-of-substituted-original´: require client rechecking of substituted original expressions before reuse under rule:nrz:plan-validation.
     ///
     /// # Errors
     /// Refuses a substituted tree exceeding the supplied budgets.

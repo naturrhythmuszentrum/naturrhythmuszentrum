@@ -10,6 +10,8 @@ use crate::{Companion, Conversion, Declaration, Descriptor, Location, Uncertaint
 /// How a checked uncertainty expression acquires its declared value relationship.
 ///
 /// TODO ´todo:code:carry-indexed-target-and-contraction-evidence´: carry indexed target and contraction evidence separately from numerical covariance validity under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:retain-cross-binding-source-dependencies-in´: retain cross binding source dependencies in reusable propagation evidence under rule:nrz:batch-source-covariance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompanionEvidence {
     /// A declared input relationship preserved by supported identity operations.
@@ -49,6 +51,8 @@ impl CompanionEvidence {
 /// The descriptor evidence associated with one original node.
 ///
 /// TODO ´todo:code:record-original-axis-contractions-and-coordinate´: record original axis contractions and coordinate maps beside each checked node under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:map-checked-expression-locations-to-client´: map checked expression locations to client operation and slot identities under def:nrz:plan-binding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeEvidence {
     /// Original tree location or expanded declaration location.
@@ -64,6 +68,8 @@ pub struct NodeEvidence {
 /// A validated original expression and an optional algebraic view of its coherent coordinates.
 ///
 /// TODO ´todo:code:own-checked-logical-shapes-and-indexed´: own checked logical shapes and indexed companion evidence before coordinate normalization under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:associate-reusable-checks-with-immutable-declaration´: associate reusable checks with immutable declaration and operation snapshots under rule:nrz:plan-validation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CheckedExpression {
     /// Original source operations, including those that a normal form would erase.
@@ -86,6 +92,8 @@ impl CheckedExpression {
     /// Value and reference names carried by established or explicitly propagated evidence.
     ///
     /// TODO ´todo:code:expose-companion-entry-targets-and-versions´: expose companion entry targets and versions without collapsing them to equal descriptors under def:nrz:companion-shape.
+    ///
+    /// TODO ´todo:code:expose-declaration-relationships-for-explicit-instantiation´: expose declaration relationships for explicit instantiation against bound slot identities under def:nrz:plan-binding.
     #[must_use]
     pub const fn companion(&self) -> Option<&Companion> {
         match &self.companion {
@@ -97,6 +105,8 @@ impl CheckedExpression {
     /// Distinguish preserved input identity from an explicitly declared propagation.
     ///
     /// TODO ´todo:code:expose-matrix-propagation-obligations-separately-from´: expose matrix propagation obligations separately from established descriptor and dependency evidence under rule:nrz:shape-data-time-evidence.
+    ///
+    /// TODO ´todo:code:expose-reusable-source-dependencies-without-implying´: expose reusable source dependencies without implying point independent uncertainty under rule:nrz:batch-source-covariance.
     #[must_use]
     pub const fn companion_evidence(&self) -> Option<&CompanionEvidence> {
         self.companion.as_ref()
@@ -125,6 +135,8 @@ impl CheckedExpression {
     }
 
     /// The declarations used by this check, retained independently of later context changes.
+    ///
+    /// TODO ´todo:code:expose-declaration-snapshot-identity-alongside-the´: expose declaration snapshot identity alongside the retained evidence inventory under rule:nrz:computation-cache-validity.
     #[must_use]
     pub const fn declarations(&self) -> &BTreeMap<Symbol, Declaration> {
         &self.declarations
@@ -133,6 +145,8 @@ impl CheckedExpression {
     /// Conversion to an explicit requested output descriptor, if one was checked.
     ///
     /// TODO ´todo:code:expose-paired-covariance-conversion-maps-instead´: expose paired covariance conversion maps instead of one scalar output conversion under def:nrz:covariance-shape.
+    ///
+    /// TODO ´todo:code:associate-exposed-conversion-evidence-with-its´: associate exposed conversion evidence with its checked binding schema version under rule:nrz:binding-validation.
     #[must_use]
     pub const fn output_conversion(&self) -> Option<Conversion> {
         self.output

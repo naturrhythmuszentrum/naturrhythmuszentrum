@@ -55,6 +55,8 @@ struct Problem {
 /// TODO ´todo:code:declare-parameter-quantity-physical-count-or´: declare parameter quantity, physical count or metadata roles explicitly under rule:vision:counts-and-metadata and req:vision:unit-data-migration.
 ///
 /// TODO ´todo:code:declare-parameter-axes-and-shared-source´: declare parameter axes and shared source identities in the future versioned shape schema under def:nrz:companion-shape and rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:declare-varying-input-axes-with-explicit´: declare varying input axes with explicit point coordinates during schema migration under def:nrz:batch-axis.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Parameter {
@@ -79,6 +81,8 @@ struct Parameter {
 /// One stated mathematical result.
 ///
 /// TODO ´todo:code:declare-observable-shapes-and-sensitivity-target´: declare observable shapes and sensitivity target maps during the future schema migration under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:declare-aggregate-point-membership-and-missing´: declare aggregate point membership and missing input policy during schema migration under rule:nrz:batch-outcomes.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Observable {
@@ -105,6 +109,8 @@ struct Observable {
 }
 
 /// One change to the base parameters and its expected outcome.
+///
+/// TODO ´todo:code:distinguish-admitted-binding-variations-from-changes´: distinguish admitted binding variations from changes requiring another plan under rule:nrz:batch-variation.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Variant {
@@ -148,6 +154,8 @@ struct Stress {
 /// TODO ´todo:code:carry-versioned-quantity-and-uncertainty-declarations´: carry versioned quantity and uncertainty declarations through entry serialization under req:vision:unit-data-migration and def:vision:intrinsic-uncertainty-companions.
 ///
 /// TODO ´todo:code:carry-versioned-operator-and-companion-declarations´: carry versioned operator and companion declarations without reinterpreting legacy problem data under dec:nrz:shape-model-implementation-boundary.
+///
+/// TODO ´todo:code:serialize-ordered-binding-families-with-shared´: serialize ordered binding families with shared constants during versioned schema migration under def:nrz:computation-batch.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
@@ -426,6 +434,8 @@ fn valid_slug(slug: &str) -> bool {
 /// TODO ´todo:code:assemble-declared-symbols-and-check-observable´: assemble declared symbols and check observable formulas, uncertainty expressions and reference cycles under req:vision:expression-and-symbol-contract.
 ///
 /// TODO ´todo:code:validate-declared-matrix-axes-and-indexed´: validate declared matrix axes and indexed relationships only in the implementing schema migration under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:validate-future-binding-tables-against-declared´: validate future binding tables against declared plan slot contracts under rule:nrz:binding-validation.
 fn validate_entry(entry: &Entry, location: &Location, label: &str) -> Result<(), Error> {
     let path = &location.path;
     if entry.parameters.is_empty() || entry.observables.is_empty() {
@@ -640,6 +650,8 @@ fn check_unit(path: &str, value: &Value) -> Result<(), Error> {
 /// TODO ´todo:code:derive-uncertainty-dimensions-and-kinds-for´: derive uncertainty dimensions and kinds for absolute, relative and covariance expressions instead of copying the value descriptor under rule:vision:uncertainty-unit-algebra.
 ///
 /// TODO ´todo:code:validate-companion-extents-and-paired-references´: validate companion extents and paired references separately from statistical validity in the future schema under def:nrz:covariance-shape and rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:reject-conflicting-shared-source-declarations-across´: reject conflicting shared source declarations across future binding rows under rule:nrz:batch-source-covariance.
 fn check_uncertainty(path: &str, value: &Value) -> Result<(), Error> {
     let object = value
         .as_object()

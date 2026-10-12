@@ -16,6 +16,8 @@ impl Context {
     ///
     /// TODO ´todo:code:dispatch-future-shaped-checks-without-treating´: dispatch future shaped checks without treating scalar traversal as matrix multiplication evidence under rule:nrz:shape-data-time-evidence.
     ///
+    /// TODO ´todo:code:provide-reusable-original-expression-evidence-for´: provide reusable original expression evidence for every declared plan alternative under rule:nrz:plan-validation.
+    ///
     /// # Errors
     /// Reports unknown names, cycles, metadata operands, physical refusals and limits.
     pub fn check(&self, expression: &Expr) -> Result<CheckedExpression, Diagnostic> {
@@ -47,6 +49,8 @@ impl Context {
     /// Check an original expression against an explicit output descriptor.
     ///
     /// TODO ´todo:code:compare-declared-output-axes-and-companion´: compare declared output axes and companion extents before exposing converted matrix results under rule:nrz:shape-data-time-evidence.
+    ///
+    /// TODO ´todo:code:recheck-bound-output-conversions-when-declaration´: recheck bound output conversions when declaration snapshots differ between bindings under rule:nrz:binding-validation.
     ///
     /// # Errors
     /// Reports expression failures or a dimension, kind, role or measure mismatch.
@@ -81,6 +85,8 @@ impl Context {
     ///
     /// TODO ´todo:code:check-ordered-equation-axes-and-typed´: check ordered equation axes and typed entry correspondence on both sides under rule:nrz:shape-entry-contract.
     ///
+    /// TODO ´todo:code:retain-equation-side-evidence-when-clients´: retain equation side evidence when clients assign checked expressions to plan nodes under rule:nrz:plan-validation.
+    ///
     /// # Errors
     /// Reports either original expression's failure or incompatible side descriptors.
     pub fn check_equation(
@@ -107,6 +113,8 @@ impl Context {
     ///
     /// TODO ´todo:code:validate-block-extents-partitions-and-quotient´: validate block extents partitions and quotient axes beyond individually checked scalar entries under def:nrz:matrix-shape and rule:nrz:shape-entry-contract.
     ///
+    /// TODO ´todo:code:reuse-block-checks-only-for-matching´: reuse block checks only for matching declaration snapshots and slot schemas under rule:nrz:binding-validation.
+    ///
     /// # Errors
     /// Returns the first invalid entry with its index prepended to the original path.
     pub fn check_block(
@@ -131,6 +139,8 @@ impl Context {
     ///
     /// TODO ´todo:code:include-unused-shape-declarations-and-stale´: include unused shape declarations and stale indexed companion references in context validation under rule:nrz:shape-data-time-evidence.
     ///
+    /// TODO ´todo:code:check-declarations-for-every-permitted-alternative´: check declarations for every permitted alternative before client binding selection under rule:nrz:plan-validation.
+    ///
     /// # Errors
     /// Reports the first failing declaration in deterministic symbol order.
     pub fn check_all(&self) -> Result<BTreeMap<Symbol, CheckedExpression>, Diagnostic> {
@@ -149,6 +159,8 @@ impl Context {
 /// A checked subtree, with coordinates in coherent measure.
 ///
 /// TODO ´todo:code:retain-original-entry-identities-and-logical´: retain original entry identities and logical maps for shaped intermediate values under def:nrz:companion-shape.
+///
+/// TODO ´todo:code:separate-reusable-subtree-contracts-from-concrete´: separate reusable subtree contracts from concrete binding value assignments under def:nrz:plan-binding.
 struct Value {
     /// Physical interpretation of the original subtree.
     descriptor: Descriptor,
@@ -169,6 +181,8 @@ struct Value {
 /// Dependency and contributor evidence collected from original expression operands.
 ///
 /// TODO ´todo:code:track-indexed-dependencies-and-paired-uncertainty´: track indexed dependencies and paired uncertainty contributors before zero or cancellation rewrites under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:retain-declaration-snapshot-keys-for-dependencies´: retain declaration snapshot keys for dependencies used by reusable checks under rule:nrz:computation-cache-validity.
 #[derive(Default)]
 struct Trace {
     /// All declarations reached by this subtree, including resolved derived dependencies.
@@ -183,6 +197,8 @@ impl Trace {
     /// Combine independently checked operands without discarding cancelled contributions.
     ///
     /// TODO ´todo:code:merge-contributor-entry-maps-without-erasing´: merge contributor entry maps without erasing shared source dependence under def:nrz:companion-shape and rule:nrz:shape-sensitivity-propagation.
+    ///
+    /// TODO ´todo:code:reject-merging-contributors-from-inconsistent-shared´: reject merging contributors from inconsistent shared source declaration snapshots under rule:nrz:batch-source-covariance.
     fn merge(&mut self, other: Self) {
         self.dependencies.extend(other.dependencies);
         self.contributors.extend(other.contributors);
@@ -193,6 +209,8 @@ impl Trace {
 /// Value dependencies that may supply uncertainty contributors to an explicit propagation.
 ///
 /// TODO ´todo:code:restrict-covariance-contributors-to-the-declared´: restrict covariance contributors to the declared paired target closures and contraction axes under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:instantiate-dependency-closures-against-explicit-binding´: instantiate dependency closures against explicit binding point and slot identities under def:nrz:plan-binding.
 struct PropagationScope {
     /// The primary value and, for covariance, the second value's dependency closures.
     values: BTreeSet<Symbol>,
@@ -541,6 +559,8 @@ impl State<'_> {
     /// Check physical compatibility before establishing or propagating a relationship.
     ///
     /// TODO ´todo:code:check-shaped-observable-targets-and-retain´: check shaped observable targets and retain the operating point for declared sensitivities under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
+    ///
+    /// TODO ´todo:code:separate-checked-observable-contracts-from-their´: separate checked observable contracts from their concrete point instantiations under rule:nrz:binding-validation.
     fn observable_body(
         &mut self,
         expression: &Expr,
@@ -587,6 +607,8 @@ impl State<'_> {
     /// Bind an explicitly declared propagation only to contributors inside its value closures.
     ///
     /// TODO ´todo:code:validate-indexed-covariance-contractions-while-leaving´: validate indexed covariance contractions while leaving derivative correctness and numerical assurance separate under rule:nrz:shape-data-time-evidence.
+    ///
+    /// TODO ´todo:code:preserve-common-source-keys-when-instantiated´: preserve common source keys when instantiated contributors cross binding points under rule:nrz:batch-source-covariance.
     fn propagate(
         &self,
         expression: &Expr,
@@ -644,6 +666,8 @@ impl State<'_> {
     /// Check the companion's descriptors at its own expression source.
     ///
     /// TODO ´todo:code:resolve-companion-entry-axes-and-relative´: resolve companion entry axes and relative references before accepting relationship evidence under def:nrz:companion-shape and rule:nrz:correlation-and-relative-shapes.
+    ///
+    /// TODO ´todo:code:reject-relationship-instantiation-against-stale-bound´: reject relationship instantiation against stale bound target versions under rule:nrz:binding-validation.
     fn companion(
         &mut self,
         source: &Expr,
