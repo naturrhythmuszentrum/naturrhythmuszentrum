@@ -18,7 +18,6 @@ partitions = [
   { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"CONTRIBUTING.md" / %s"templates/CONTRIBUTING.md.j2" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"README.md" / %s"templates/README.md.j2" / %s"rust-toolchain.toml" )' },
   { name = "documents", owner = "NRZ", pattern = '[ %s"templates/" ] %s"docs" [ "/" *VCHAR ]' },
   { name = "data", owner = "NRZ", pattern = '%s"data" [ "/" *VCHAR ]' },
-  { name = "problems", owner = "NRZ", pattern = '[ %s"templates/" ] %s"problems" [ "/" *VCHAR ]' },
   { name = "docgen", owner = "DOCGEN", pattern = '[ %s"templates/" ] %s"tools/docgen" [ "/" *VCHAR ]' },
   { name = "scalar", owner = "SCALAR", pattern = '[ %s"templates/" ] %s"crates/scalar" [ "/" *VCHAR ]' },
   { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"crates/matrix" [ "/" *VCHAR ]' },

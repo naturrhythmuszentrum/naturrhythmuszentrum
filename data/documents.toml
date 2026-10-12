@@ -15,15 +15,15 @@ output = "CONTRIBUTING.md"
 requires = []
 
 [[document]]
-output = "docs/architecture.md"
+output = "docs/design/architecture.md"
 requires = []
 
 [[document]]
-output = "docs/exemplars.md"
+output = "docs/reference/exemplars.md"
 requires = []
 
 [[document]]
-output = "docs/plan.md"
+output = "docs/plan/plan.md"
 requires = []
 
 [[document]]
@@ -31,7 +31,7 @@ output = "tools/docgen/README.md"
 requires = ["census", "project"]
 
 [[document]]
-output = "problems/README.md"
+output = "docs/reference/problems.md"
 requires = ["problems"]
 
 [[document]]
@@ -43,7 +43,7 @@ output = "crates/matrix/README.md"
 requires = []
 
 [[document]]
-output = "docs/feasibility.md"
+output = "docs/records/feasibility.md"
 requires = []
 
 [[document]]
@@ -55,11 +55,11 @@ output = "crates/units/README.md"
 requires = []
 
 [[document]]
-output = "docs/shapes.md"
+output = "docs/design/shapes.md"
 requires = []
 
 [[document]]
-output = "docs/computation.md"
+output = "docs/design/computation.md"
 requires = []
 
 [[document]]
@@ -67,5 +67,5 @@ output = "prototypes/descriptors/README.md"
 requires = []
 
 [[document]]
-output = "docs/units-design.md"
+output = "docs/design/units-design.md"
 requires = []
