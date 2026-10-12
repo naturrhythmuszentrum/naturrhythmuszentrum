@@ -423,3 +423,7 @@ Deterministic collection flattens sums and products, collects equal terms and ba
 **Rule (Algebra domain boundary)** · `rule:vision:algebra-domain-boundary`
 
 Normal-form equality is formal equality on common defined domains, not equality of definedness sets or authorization for numerical rewriting. The original operations retain those obligations. Distributive polynomial normalization, explicit side-condition objects, noncommutative matrix-value algebra, arbitrary precision, differentiation, solving and numerical evaluation are excluded.
+
+**Convention (Algebra text syntax)** · `conv:vision:algebra-text-syntax`
+
+The bounded data-time grammar accepts ASCII identifiers, exact integer/decimal/scientific literals, explicit arithmetic, parentheses, rational literal powers and named applications. It preserves source operations and byte locations. Functions have no built-in physical meaning in the core. Implicit multiplication, unit suffixes, variable exponents, embedded equations, indexing and binders are unsupported; legacy problem strings require the declared migration rather than permissive guessing (`req:vision:unit-data-migration`).
