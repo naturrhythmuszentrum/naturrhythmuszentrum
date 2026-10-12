@@ -8,6 +8,8 @@ use core::ops::{Add, Div, Mul, Neg, Sub};
 
 /// Operations required by the sealed binary scalar contract.
 /// Only binary32 and binary64 are admitted (dec:vision:precision-selection).
+///
+/// TODO ´todo:code:keep-the-binary-scalar-contract-dimension´: keep the binary scalar contract dimension-neutral beneath quantity and discrete-count wrappers under dec:vision:storage-and-scalar-wrapping.
 pub trait Scalar:
     private::Sealed
     + Copy
@@ -186,6 +188,8 @@ pub enum ArithmeticFailure {
 }
 
 /// A closed interval of finite binary values.
+///
+/// TODO ´todo:code:wrap-intervals-with-value-dimensions-measures´: wrap intervals with value dimensions, measures and kinds and intrinsic measurement and computational companions under dec:vision:storage-and-scalar-wrapping and def:vision:intrinsic-uncertainty-companions.
 #[derive(Debug, Clone, Copy)]
 pub struct Interval<T: Scalar> {
     /// Lower endpoint.
@@ -195,6 +199,8 @@ pub struct Interval<T: Scalar> {
 }
 
 /// Conservatively step both ends unless exactness is established.
+///
+/// TODO ´todo:code:retain-primitive-rounding-bounds-as-computational´: retain primitive rounding bounds as computational uncertainty with independently derived descriptors at the quantity boundary under rule:vision:uncertainty-unit-algebra.
 fn rounded<T: Scalar>(nearest: T, exact: bool) -> Result<Interval<T>, ArithmeticFailure> {
     if !nearest.is_finite() {
         return Err(ArithmeticFailure::Overflow);
@@ -281,6 +287,8 @@ fn sqrt_value<T: Scalar>(a: T) -> Result<Interval<T>, ArithmeticFailure> {
 impl<T: Scalar> Interval<T> {
     /// Make an exactly represented point.
     ///
+    /// TODO ´todo:code:distinguish-singleton-enclosure-construction-from-affine´: distinguish singleton enclosure construction from affine physical points and exact discrete counts under rule:vision:semantic-kinds-and-roles and def:vision:counts.
+    ///
     /// # Errors
     ///
     /// A non-finite input returns `ArithmeticFailure::NonFiniteEndpoint`.
@@ -296,6 +304,8 @@ impl<T: Scalar> Interval<T> {
 
     /// Make a checked finite enclosure.
     ///
+    /// TODO ´todo:code:classify-imported-enclosures-as-carried-input´: classify imported enclosures as carried input evidence with explicit value and uncertainty descriptors under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
+    ///
     /// # Errors
     ///
     /// Non-finite or inverted endpoints return an `ArithmeticFailure`.
@@ -310,19 +320,27 @@ impl<T: Scalar> Interval<T> {
     }
 
     /// Lower endpoint.
+    ///
+    /// TODO ´todo:code:preserve-the-lower-endpoint-quantity-descriptor´: preserve the lower endpoint quantity descriptor through typed access under dec:vision:storage-and-scalar-wrapping.
     pub const fn lo(self) -> T {
         self.lo
     }
     /// Upper endpoint.
+    ///
+    /// TODO ´todo:code:preserve-the-upper-endpoint-quantity-descriptor´: preserve the upper endpoint quantity descriptor through typed access under dec:vision:storage-and-scalar-wrapping.
     pub const fn hi(self) -> T {
         self.hi
     }
     /// Whether a point is enclosed.
+    ///
+    /// TODO ´todo:code:check-containment-only-after-compatible-dimensions´: check containment only after compatible dimensions, measures, kinds and affine roles are established under req:vision:algebraic-unit-checks.
     pub fn contains(self, value: T) -> bool {
         self.lo <= value && value <= self.hi
     }
 
     /// Interval addition.
+    ///
+    /// TODO ´todo:code:gate-quantity-addition-by-compatible-kinds´: gate quantity addition by compatible kinds and affine roles while propagating both uncertainty sources under rule:vision:measure-conversions and rule:vision:uncertainty-unit-algebra.
     ///
     /// # Errors
     ///
@@ -336,6 +354,8 @@ impl<T: Scalar> Interval<T> {
 
     /// Interval subtraction.
     ///
+    /// TODO ´todo:code:derive-difference-roles-for-quantity-subtraction´: derive difference roles for quantity subtraction and its uncertainty companion under rule:vision:measure-conversions and rule:vision:uncertainty-unit-algebra.
+    ///
     /// # Errors
     ///
     /// Overflow that needs an infinite endpoint returns `ArithmeticFailure::Overflow`.
@@ -347,6 +367,8 @@ impl<T: Scalar> Interval<T> {
     }
 
     /// Interval multiplication.
+    ///
+    /// TODO ´todo:code:derive-product-dimensions-and-uncertainty-kinds´: derive product dimensions and uncertainty kinds at the quantity layer under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
     ///
     /// # Errors
     ///
@@ -372,6 +394,8 @@ impl<T: Scalar> Interval<T> {
     }
 
     /// Interval division, refusing a divisor that contains zero.
+    ///
+    /// TODO ´todo:code:derive-quotient-dimensions-and-explicit-count´: derive quotient dimensions and explicit count-to-ratio outcomes without erasing uncertainty kinds under rule:vision:semantic-kinds-and-roles and rule:vision:uncertainty-unit-algebra.
     ///
     /// # Errors
     ///
@@ -401,6 +425,8 @@ impl<T: Scalar> Interval<T> {
 
     /// Real square root of a nonnegative interval.
     ///
+    /// TODO ´todo:code:admit-quantity-square-roots-only-when´: admit quantity square roots only when result dimensions and uncertainty roles are supported under req:vision:powers-and-factor-dimensions and rule:vision:uncertainty-unit-algebra.
+    ///
     /// # Errors
     ///
     /// A negative lower endpoint or overflow returns an `ArithmeticFailure`.
@@ -412,6 +438,8 @@ impl<T: Scalar> Interval<T> {
     }
 
     /// Square with the zero crossing handled directly.
+    ///
+    /// TODO ´todo:code:check-squared-quantity-dimensions-and-keep´: check squared quantity dimensions and keep variance kinds distinct from squared values under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
     ///
     /// # Errors
     ///
@@ -432,6 +460,8 @@ impl<T: Scalar> Interval<T> {
 
 /// Enclose the exact dot product of two equally sized plain slices.
 ///
+/// TODO ´todo:code:check-typed-dot-products-for-equal´: check typed dot products for equal summand dimensions and propagate intrinsic companions around this numerical primitive under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
+///
 /// # Errors
 ///
 /// A length mismatch, non-finite input or overflow returns an `ArithmeticFailure`.
@@ -448,6 +478,8 @@ pub fn dot<T: Scalar>(left: &[T], right: &[T]) -> Result<Interval<T>, Arithmetic
 
 /// Enclose the exact sum of squares of a plain slice.
 ///
+/// TODO ´todo:code:derive-squared-dimensions-for-homogeneous-reductions´: derive squared dimensions for homogeneous reductions and their computational bounds under def:vision:dimensions and rule:vision:uncertainty-unit-algebra.
+///
 /// # Errors
 ///
 /// A non-finite input or overflow returns an `ArithmeticFailure`.
@@ -460,6 +492,8 @@ pub fn sum_squares<T: Scalar>(values: &[T]) -> Result<Interval<T>, ArithmeticFai
 }
 
 /// Bound a Frobenius norm by scaling with an exact power of two.
+///
+/// TODO ´todo:code:assign-norm-bounds-their-block-or´: assign norm bounds their block or normalized-coordinate dimension while keeping numeric scaling separate from measures under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
 ///
 /// # Errors
 ///
@@ -486,6 +520,7 @@ pub fn frobenius_upper<T: Scalar>(values: &[T]) -> Result<T, ArithmeticFailure> 
     Ok(total.sqrt()?.checked_mul(Interval::point(scale)?)?.hi())
 }
 
+/// TODO ´todo:code:preserve-quantity-and-uncertainty-descriptors-during´: preserve quantity and uncertainty descriptors during precision widening independently of measure conversion under rule:vision:precision-conversions and rule:vision:uncertainty-unit-algebra.
 impl From<Interval<f32>> for Interval<f64> {
     fn from(value: Interval<f32>) -> Self {
         Self {
@@ -495,6 +530,7 @@ impl From<Interval<f32>> for Interval<f64> {
     }
 }
 
+/// TODO ´todo:code:carry-narrowing-error-as-computational-uncertainty´: carry narrowing error as computational uncertainty without changing the value or uncertainty kind under rule:vision:precision-conversions and rule:vision:uncertainty-unit-algebra.
 impl TryFrom<Interval<f64>> for Interval<f32> {
     type Error = ArithmeticFailure;
     fn try_from(value: Interval<f64>) -> Result<Self, Self::Error> {
@@ -530,10 +566,15 @@ impl TryFrom<Interval<f64>> for Interval<f32> {
 
 #[cfg(test)]
 /// Unit evidence for scalar enclosures.
+///
+/// TODO ´todo:code:add-typed-acceptance-and-rejection-cases´: add typed acceptance and rejection cases for measures, counts, affine roles and independently kinded uncertainty under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 mod tests {
     use super::{ArithmeticFailure, Interval, dot, frobenius_upper, sum_squares};
 
     /// Exact additions remain tight for both formats.
+    ///
+    /// TODO ´todo:code:test-compatible-quantity-addition-and-exact´: test compatible quantity addition and exact count arithmetic separately from ratio and affine-point rejection under rule:vision:semantic-kinds-and-roles.
+    ///
     /// ´test:unit:exact-small-cases´
     #[test]
     fn exact_small_cases() {
@@ -550,6 +591,9 @@ mod tests {
     }
 
     /// Cancellation retains the lost unit.
+    ///
+    /// TODO ´todo:code:test-cancellation-with-carried-measurement-and´: test cancellation with carried measurement and computational uncertainty descriptors under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:cancellation-enclosed´
     #[test]
     fn cancellation_enclosed() {
@@ -572,6 +616,9 @@ mod tests {
     }
 
     /// The FMA residual exposes an inexact product.
+    ///
+    /// TODO ´todo:code:check-product-rounding-evidence-has-the´: check product rounding evidence has the product dimension and an uncertainty kind under rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:product-rounding-enclosed´
     #[test]
     fn product_rounding_enclosed() {
@@ -584,6 +631,9 @@ mod tests {
     }
 
     /// Subnormal results and the normal boundary use outward steps.
+    ///
+    /// TODO ´todo:code:exercise-unit-conversion-near-subnormal-boundaries´: exercise unit conversion near subnormal boundaries with outward uncertainty propagation under rule:vision:measure-conversions.
+    ///
     /// ´test:unit:subnormal-boundaries-enclosed´
     #[test]
     fn subnormal_boundaries_enclosed() {
@@ -600,6 +650,9 @@ mod tests {
     }
 
     /// Overflow refuses a finite enclosure.
+    ///
+    /// TODO ´todo:code:verify-quantity-and-measure-conversion-overflow´: verify quantity and measure-conversion overflow refuses without dropping descriptors or uncertainty evidence under rule:vision:measure-conversions.
+    ///
     /// ´test:unit:overflow-refuses´
     #[test]
     fn overflow_refuses() {
@@ -612,6 +665,9 @@ mod tests {
     }
 
     /// Invalid endpoints refuse construction.
+    ///
+    /// TODO ´todo:code:reject-invalid-quantity-roles-while-allowing´: reject invalid quantity roles while allowing non-integer count standard uncertainty with its own kind under def:vision:counts and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:invalid-input-refuses´
     #[test]
     fn invalid_input_refuses() {
@@ -634,6 +690,9 @@ mod tests {
     }
 
     /// A zero-containing divisor refuses division.
+    ///
+    /// TODO ´todo:code:verify-dimensioned-quotient-refusals-retain-the´: verify dimensioned quotient refusals retain the declared denominator and uncertainty contracts under req:vision:algebraic-unit-checks.
+    ///
     /// ´test:unit:zero-divisor-refuses´
     #[test]
     fn zero_divisor_refuses() {
@@ -652,6 +711,9 @@ mod tests {
     }
 
     /// Widening is exact and narrowing contains the source.
+    ///
+    /// TODO ´todo:code:test-precision-and-measure-conversions-independently´: test precision and measure conversions independently with affine difference radii and unchanged semantic kinds under rule:vision:measure-conversions and rule:vision:precision-conversions.
+    ///
     /// ´test:unit:precision-conversions-enclose´
     #[test]
     fn precision_conversions_enclose() {
@@ -676,6 +738,9 @@ mod tests {
     }
 
     /// Scaling keeps a norm finite when direct squares overflow.
+    ///
+    /// TODO ´todo:code:test-norm-dimensions-and-restored-block´: test norm dimensions and restored block-bound measures after normalized scaling under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:scaled-norm-encloses´
     #[test]
     fn scaled_norm_encloses() {
@@ -686,6 +751,9 @@ mod tests {
     }
 
     /// Plain-slice reductions enclose their exact value and reject unequal lengths.
+    ///
+    /// TODO ´todo:code:test-typed-reductions-reject-incompatible-summands´: test typed reductions reject incompatible summands and preserve product or squared uncertainty dimensions under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:reductions-enclose´
     #[test]
     fn reductions_enclose() {

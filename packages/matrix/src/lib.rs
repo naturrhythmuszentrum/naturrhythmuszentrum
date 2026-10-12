@@ -17,23 +17,37 @@ use nrz_scalar::{ArithmeticFailure, Interval, dot, frobenius_upper, sum_squares}
 mod backend;
 
 /// A square center system with deterministic Frobenius input radii.
+///
+/// TODO ´todo:code:own-checked-block-dimensions-measures-and´: own checked block dimensions, measures and kinds with intrinsic input and computational uncertainties under rule:vision:heterogeneous-assembly and def:vision:intrinsic-uncertainty-companions.
 #[derive(Debug, Clone)]
 pub struct DenseSystem {
     /// Matrix order.
+    ///
+    /// TODO ´todo:code:retain-matrix-order-as-structural-metadata´: retain matrix order as structural metadata rather than a physical count under rule:vision:counts-and-metadata.
     n: usize,
     /// Matrix center in row-major order.
+    ///
+    /// TODO ´todo:code:attach-equation-over-variable-quotient-descriptors´: attach equation-over-variable quotient descriptors to matrix centers before backend storage under rule:vision:heterogeneous-assembly.
     a: Vec<f64>,
     /// Matrix perturbation radius.
+    ///
+    /// TODO ´todo:code:carry-matrix-input-bounds-as-intrinsic´: carry matrix input bounds as intrinsic uncertainty with the operator block quotient dimension and its own kind under rule:vision:uncertainty-unit-algebra.
     a_radius: f64,
     /// Right-hand side center.
+    ///
+    /// TODO ´todo:code:declare-right-hand-side-dimensions-canonical´: declare right-hand-side dimensions, canonical measures and affine difference roles under rule:vision:heterogeneous-assembly and rule:vision:measure-conversions.
     b: Vec<f64>,
     /// Right-hand side perturbation radius.
+    ///
+    /// TODO ´todo:code:carry-right-hand-side-bounds-with´: carry right-hand-side bounds with their own difference measure and deterministic uncertainty kind under rule:vision:uncertainty-unit-algebra.
     b_radius: f64,
 }
 
 impl DenseSystem {
     /// Validate a represented center and two declared perturbation bounds.
     /// This is an import boundary under rule:vision:imports-and-exactness.
+    ///
+    /// TODO ´todo:code:validate-block-quotients-measure-conversions-kinds´: validate block quotients, measure conversions, kinds and uncertainty descriptors before numerical import under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
     ///
     /// # Errors
     ///
@@ -71,11 +85,15 @@ impl DenseSystem {
         self.n
     }
     /// Represented row-major matrix center.
+    ///
+    /// TODO ´todo:code:expose-matrix-centers-through-an-explicit´: expose matrix centers through an explicit raw or quantity-aware boundary that retains owner evidence under dec:vision:storage-and-scalar-wrapping.
     #[must_use]
     pub fn matrix(&self) -> &[f64] {
         &self.a
     }
     /// Represented right-hand side center.
+    ///
+    /// TODO ´todo:code:expose-right-hand-side-centers-with´: expose right-hand-side centers with an explicit relation to their quantity and uncertainty descriptors under dec:vision:storage-and-scalar-wrapping.
     #[must_use]
     pub fn right_hand_side(&self) -> &[f64] {
         &self.b
@@ -83,44 +101,70 @@ impl DenseSystem {
 }
 
 /// Numerical evidence accompanying a successful solve.
+///
+/// TODO ´todo:code:make-report-bounds-views-of-intrinsic´: make report bounds views of intrinsic matrix and solution companions with independently derived descriptors under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
 #[derive(Debug, Clone, Copy)]
 pub struct Report {
     /// Upper bound on the Frobenius norm of identity minus approximate inverse times matrix.
+    ///
+    /// TODO ´todo:code:type-inverse-defect-bounds-as-dimensionless´: type inverse-defect bounds as dimensionless uncertainty quantities rather than counts under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
     pub q: f64,
     /// Upper bound on the inverse norm under the Neumann argument.
+    ///
+    /// TODO ´todo:code:type-inverse-norm-bounds-with-reciprocal´: type inverse-norm bounds with reciprocal operator dimensions or the declared normalized map under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
     pub g: f64,
     /// Upper bound on the residual norm.
+    ///
+    /// TODO ´todo:code:type-residual-bounds-in-the-equation´: type residual bounds in the equation difference measure with a computational uncertainty kind under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
     pub rho: f64,
     /// Upper bound on the candidate norm.
+    ///
+    /// TODO ´todo:code:type-candidate-norm-bounds-in-the´: type candidate-norm bounds in the solution difference measure or declared normalized coordinates under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
     pub xnorm: f64,
     /// Declared matrix input radius.
+    ///
+    /// TODO ´todo:code:reference-the-matrix-companion-bound-without´: reference the matrix companion bound without losing its quotient dimension, measure or uncertainty kind under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
     pub a_radius: f64,
     /// Declared right-hand-side input radius.
+    ///
+    /// TODO ´todo:code:reference-the-right-hand-side-companion´: reference the right-hand-side companion bound with its independent difference descriptor under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
     pub b_radius: f64,
     /// Requested relative radius.
+    ///
+    /// TODO ´todo:code:retain-relative-budgets-as-dimensionless-ratios´: retain relative budgets as dimensionless ratios tied to declared compatible scales under dec:vision:accuracy-policy and rule:vision:uncertainty-unit-algebra.
     pub relative_budget: f64,
     /// Matrix order.
     pub n: usize,
 }
 
 /// A candidate with an independently certified Euclidean error radius.
+///
+/// TODO ´todo:code:return-solution-values-and-all-supported´: return solution values and all supported measurement and computational uncertainty contents together under def:vision:intrinsic-uncertainty-companions.
 #[derive(Debug, Clone)]
 pub struct Outcome {
     /// Candidate solution.
+    ///
+    /// TODO ´todo:code:restore-solution-quotient-dimensions-kinds-measures´: restore solution quotient dimensions, kinds, measures and affine origins from checked coordinates under rule:vision:heterogeneous-assembly and rule:vision:measure-conversions.
     pub candidate: Vec<f64>,
     /// Absolute Euclidean error radius.
+    ///
+    /// TODO ´todo:code:store-the-certified-solution-radius-with´: store the certified solution radius with its own difference measure, derived dimension and uncertainty kind under rule:vision:uncertainty-unit-algebra.
     pub radius: f64,
     /// Certificate diagnostics.
     pub report: Report,
 }
 
 /// A refusal to claim a requested certified solve.
+///
+/// TODO ´todo:code:report-dynamic-dimension-measure-and-kind´: report dynamic dimension, measure and kind failures separately from shape and arithmetic failures under req:vision:algebraic-unit-checks.
 #[derive(Debug, thiserror::Error)]
 pub enum NumericalFailure {
     /// The approximate-inverse conditions do not establish a certificate.
     #[error("the approximate inverse cannot certify this system")]
     CannotCertify,
     /// A valid radius exceeds the requested relative budget.
+    ///
+    /// TODO ´todo:code:retain-distinct-certified-radius-and-relative´: retain distinct certified-radius and relative-ratio descriptors in budget failures under dec:vision:accuracy-policy and rule:vision:uncertainty-unit-algebra.
     #[error("certified radius {radius} exceeds relative budget {budget}")]
     BudgetExceeded {
         /// Certified absolute radius.
@@ -140,11 +184,15 @@ pub enum NumericalFailure {
 }
 
 /// Largest magnitude in an enclosing interval.
+///
+/// TODO ´todo:code:preserve-the-interval-bound-dimension-and´: preserve the interval-bound dimension and uncertainty kind when deriving a magnitude under rule:vision:uncertainty-unit-algebra.
 const fn magnitude(bound: Interval<f64>) -> f64 {
     bound.lo().abs().max(bound.hi().abs())
 }
 
 /// Upper bound on the Frobenius norm of identity minus approximate inverse times matrix.
+///
+/// TODO ´todo:code:check-reciprocal-operator-products-and-typed´: check reciprocal operator products and typed identity blocks before computing dimensionless defect bounds under req:vision:algebraic-unit-checks and rule:vision:heterogeneous-assembly.
 fn inverse_defect(system: &DenseSystem, z: &[f64]) -> Result<f64, ArithmeticFailure> {
     let mut entries = Vec::with_capacity(system.a.len());
     for row in 0..system.n {
@@ -161,6 +209,8 @@ fn inverse_defect(system: &DenseSystem, z: &[f64]) -> Result<f64, ArithmeticFail
 }
 
 /// Upper bound on the residual norm of the represented center system.
+///
+/// TODO ´todo:code:check-equation-compatible-residual-terms-and´: check equation-compatible residual terms and derive their computational uncertainty descriptors under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 fn residual(system: &DenseSystem, x: &[f64]) -> Result<f64, ArithmeticFailure> {
     let mut entries = Vec::with_capacity(system.n);
     for row in 0..system.n {
@@ -173,6 +223,8 @@ fn residual(system: &DenseSystem, x: &[f64]) -> Result<f64, ArithmeticFailure> {
 }
 
 /// Compute the radii after a backend candidate and inverse are available.
+///
+/// TODO ´todo:code:propagate-carried-input-and-computational-companions´: propagate carried input and computational companions through the solve bound with algebraically checked dimensions and kinds under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
 fn certify_candidate(
     system: &DenseSystem,
     relative_budget: f64,
@@ -233,6 +285,8 @@ fn certify_candidate(
 /// Solve a dense system and certify its candidate through plain-slice scalar arithmetic.
 /// Refusal does not establish singularity (rule:vision:conditioning-and-refusal).
 ///
+/// TODO ´todo:code:gate-solves-on-checked-quantity-descriptors´: gate solves on checked quantity descriptors and ratio budgets and return intrinsic uncertainty contents under req:vision:algebraic-unit-checks and def:vision:intrinsic-uncertainty-companions.
+///
 /// # Errors
 ///
 /// An invalid budget, failed scalar enclosure, uncertifiable inverse or exceeded budget returns a `NumericalFailure`.
@@ -249,10 +303,15 @@ pub fn certified_solve(
 
 #[cfg(test)]
 /// Unit evidence for certificate refusal and containment.
+///
+/// TODO ´todo:code:test-static-and-dynamic-block-quotients´: test static and dynamic block quotients, normalized bounds and intrinsic uncertainty modes under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
 mod tests {
     use super::{DenseSystem, NumericalFailure, certified_solve, certify_candidate};
 
     /// A small exact diagonal system admits a certified all-ones solution.
+    ///
+    /// TODO ´todo:code:certify-a-dimensioned-system-with-intrinsic´: certify a dimensioned system with intrinsic input and computational companions and correctly typed solution bounds under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:small-exact-system-certifies´
     #[test]
     fn small_exact_system_certifies() {
@@ -265,6 +324,9 @@ mod tests {
     }
 
     /// A singular center cannot establish an approximate inverse.
+    ///
+    /// TODO ´todo:code:preserve-unit-descriptors-and-carried-uncertainty´: preserve unit descriptors and carried uncertainty when a dimensioned singular system refuses certification under def:vision:intrinsic-uncertainty-companions.
+    ///
     /// ´test:unit:singular-system-refuses´
     #[test]
     fn singular_system_refuses() {
@@ -277,6 +339,9 @@ mod tests {
     }
 
     /// A deliberately inadequate approximate inverse makes q reach one.
+    ///
+    /// TODO ´todo:code:test-dimensionless-defect-bound-kinds-and´: test dimensionless defect-bound kinds and reject wrongly dimensioned inverse or identity blocks under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:inverse-defect-refuses´
     #[test]
     fn inverse_defect_refuses() {
@@ -289,6 +354,9 @@ mod tests {
     }
 
     /// A valid certificate refuses an unreasonably small budget.
+    ///
+    /// TODO ´todo:code:test-budget-refusal-across-equivalent-measures´: test budget refusal across equivalent measures with absolute difference bounds and relative ratios kept distinct under dec:vision:accuracy-policy and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:small-budget-refuses´
     #[test]
     fn small_budget_refuses() {
@@ -301,6 +369,9 @@ mod tests {
     }
 
     /// Input validation rejects incompatible shapes and non-finite values.
+    ///
+    /// TODO ´todo:code:reject-incompatible-block-dimensions-affine-roles´: reject incompatible block dimensions, affine roles and uncertainty descriptors before backend calls under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:invalid-system-refuses´
     #[test]
     fn invalid_system_refuses() {

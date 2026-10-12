@@ -93,6 +93,8 @@ pub(crate) fn owners(root: &Path) -> Result<BTreeSet<String>, Error> {
 }
 
 /// Validate all envelope fields before the caller decodes a payload.
+///
+/// TODO ´todo:code:admit-unit-schema-versions-only-through´: admit unit-schema versions only through the declared migration and compatibility policy under req:vision:unit-data-migration.
 pub(crate) fn validate(
     value: &Value,
     path: &str,
@@ -283,6 +285,9 @@ mod tests {
     }
 
     /// Accept major one with newer minor and patch versions.
+    ///
+    /// TODO ´todo:code:test-explicit-compatibility-for-migrated-unit´: test explicit compatibility for migrated unit-data versions without accepting unchecked legacy formulas under req:vision:unit-data-migration.
+    ///
     /// ´test:unit:accepts-supported-major-and-newer-minor´
     #[test]
     fn accepts_supported_major_and_newer_minor() {

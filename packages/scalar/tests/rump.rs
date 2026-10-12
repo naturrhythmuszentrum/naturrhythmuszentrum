@@ -5,6 +5,8 @@ use nrz_scalar::{ArithmeticFailure, Interval, Scalar};
 use serde_json::Value;
 
 /// Raise an interval to a small nonnegative integer power.
+///
+/// TODO ´todo:test:check-powered-quantity-descriptors-while-treating´: check powered quantity descriptors while treating the exponent as metadata under req:vision:powers-and-factor-dimensions and rule:vision:counts-and-metadata.
 fn power<T: Scalar>(base: Interval<T>, exponent: usize) -> Result<Interval<T>, ArithmeticFailure> {
     let mut product = Interval::point(T::ONE)?;
     for _ in 0..exponent {
@@ -14,6 +16,8 @@ fn power<T: Scalar>(base: Interval<T>, exponent: usize) -> Result<Interval<T>, A
 }
 
 /// Evaluate the fixture expression in its displayed order.
+///
+/// TODO ´todo:test:evaluate-a-quantity-carrying-polynomial-with´: evaluate a quantity-carrying polynomial with compatible coefficient dimensions and intrinsic computational uncertainty under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 fn evaluate<T: Scalar>(
     a: T,
     b: T,
@@ -47,6 +51,8 @@ fn evaluate<T: Scalar>(
 }
 
 /// Read one fixture field as its string value.
+///
+/// TODO ´todo:test:read-fixture-value-roles-and-measure´: read fixture value roles and measure declarations without inferring counts from integer syntax under req:vision:unit-data-migration and rule:vision:counts-and-metadata.
 fn field<'a>(entry: &'a Value, group: &str, name: &str) -> &'a str {
     entry[group]
         .as_array()
@@ -58,6 +64,9 @@ fn field<'a>(entry: &'a Value, group: &str, name: &str) -> &'a str {
 }
 
 /// Both supported formats must refuse or contain the exact rational value.
+///
+/// TODO ´todo:test:extend-the-rump-oracle-with-dimensionless´: extend the Rump oracle with dimensionless quantity and computational-uncertainty kinds while keeping precision selections metadata under rule:vision:uncertainty-unit-algebra and rule:vision:counts-and-metadata.
+///
 /// ´test:integration:rump-polynomial-enclosure´
 #[test]
 fn rump_polynomial_enclosure() {

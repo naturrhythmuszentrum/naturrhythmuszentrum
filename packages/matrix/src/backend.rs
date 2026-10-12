@@ -6,6 +6,8 @@ use faer::{Mat, prelude::*};
 use crate::DenseSystem;
 
 /// Solve the right-hand side and all identity columns with one partially pivoted LU factorization.
+///
+/// TODO ´todo:code:keep-physical-right-hand-side-and´: keep physical right-hand-side and identity-column descriptors distinct when batching candidates and inverses through normalized views under rule:vision:heterogeneous-assembly and req:vision:powers-and-factor-dimensions.
 pub(super) fn candidate_and_inverse(system: &DenseSystem) -> (Vec<f64>, Vec<f64>) {
     let n = system.n;
     let matrix = Mat::<f64>::from_fn(n, n, |row, col| system.a[row * n + col]);

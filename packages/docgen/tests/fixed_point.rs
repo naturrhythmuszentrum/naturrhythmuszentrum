@@ -60,6 +60,8 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Write one minimal valid problem-stage input under its declared kind.
+///
+/// TODO ´todo:test:seed-explicit-quantity-and-metadata-roles´: seed explicit quantity and metadata roles with checkable observable expressions for fixed-point fixtures under req:vision:unit-data-migration.
 fn write_problem(root: &Path, slug: &str, kind: &str) -> Result<(), std::io::Error> {
     let (directory, filename) = if kind == "fixture" {
         (format!("problems/fixtures/{slug}"), "fixture.toml")
@@ -109,6 +111,9 @@ fn collect(
 }
 
 /// Rendering is idempotent, drift classes are distinct, and check is read-only.
+///
+/// TODO ´todo:test:verify-migrated-unit-and-uncertainty-data´: verify migrated unit and uncertainty data reach a fixed point while invalid expressions fail validation under req:vision:unit-data-migration.
+///
 /// ´test:integration:binary-fixed-point-and-exit-classes´
 #[test]
 fn binary_fixed_point_and_exit_classes() -> Result<(), Box<dyn std::error::Error>> {
@@ -181,6 +186,9 @@ fn orders_problem_dataset_entries() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// A changed input value makes check report the derived dataset as changed.
+///
+/// TODO ´todo:test:detect-drift-from-changed-measures-kinds´: detect drift from changed measures, kinds and observable expressions as well as numeric values under req:vision:unit-data-migration.
+///
 /// ´test:integration:detects-changed-problem-value´
 #[test]
 fn detects_changed_problem_value() -> Result<(), Box<dyn std::error::Error>> {

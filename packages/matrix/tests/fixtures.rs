@@ -55,6 +55,8 @@ impl Rational {
 }
 
 /// Round the fixture rational to binary64 using integer long division.
+///
+/// TODO ´todo:test:retain-rational-import-representation-radii-as´: retain rational-import representation radii as computational uncertainty with their own descriptors under rule:vision:uncertainty-unit-algebra.
 fn nearest(value: Rational) -> (f64, f64) {
     if value.numerator == 0 {
         return (0.0, 0.0);
@@ -105,6 +107,8 @@ fn nearest(value: Rational) -> (f64, f64) {
 }
 
 /// Import exact fixture entries with zero or half-ulp representation radii.
+///
+/// TODO ´todo:test:construct-quantity-carrying-fixtures-with-declared´: construct quantity-carrying fixtures with declared leaf measures, block quotients and intrinsic input and computational companions under rule:vision:heterogeneous-assembly and def:vision:intrinsic-uncertainty-companions.
 fn system(entries: &[Rational], n: usize) -> DenseSystem {
     let mut a = Vec::with_capacity(entries.len());
     let mut a_errors = Vec::with_capacity(entries.len());
@@ -129,6 +133,8 @@ fn system(entries: &[Rational], n: usize) -> DenseSystem {
 }
 
 /// Hilbert entries are exact unit fractions.
+///
+/// TODO ´todo:test:declare-hilbert-entries-as-numerical-ratio´: declare Hilbert entries as numerical ratio quantities and order as structural metadata in typed fixtures under rule:vision:semantic-kinds-and-roles and rule:vision:counts-and-metadata.
 fn hilbert(n: usize) -> DenseSystem {
     let entries = (0..n)
         .flat_map(|row| {
@@ -141,6 +147,8 @@ fn hilbert(n: usize) -> DenseSystem {
 }
 
 /// A Kahan upper triangle has rational powers of s.
+///
+/// TODO ´todo:test:check-kahan-coefficient-and-angular-kinds´: check Kahan coefficient and angular kinds separately from order metadata in quantity-carrying cases under rule:vision:semantic-kinds-and-roles and rule:vision:counts-and-metadata.
 fn kahan(n: usize, c: Rational, s: Rational) -> DenseSystem {
     let mut entries = Vec::with_capacity(n * n);
     let mut scale = Rational::new(1, 1);
@@ -159,6 +167,8 @@ fn kahan(n: usize, c: Rational, s: Rational) -> DenseSystem {
 }
 
 /// Wilkinson's partial-pivoting growth matrix has only integer entries.
+///
+/// TODO ´todo:test:keep-integer-valued-wilkinson-entries-distinct´: keep integer-valued Wilkinson entries distinct from physical counts in typed fixture cases under def:vision:counts and rule:vision:semantic-kinds-and-roles.
 fn wilkinson(n: usize) -> DenseSystem {
     let entries = (0..n)
         .flat_map(|row| {
@@ -178,6 +188,8 @@ fn wilkinson(n: usize) -> DenseSystem {
 }
 
 /// Read a fixture parameter, applying a variant override if present.
+///
+/// TODO ´todo:test:decode-fixture-parameter-dimensions-measures-and´: decode fixture parameter dimensions, measures and metadata roles before typed construction under req:vision:unit-data-migration and rule:vision:counts-and-metadata.
 fn parameter(entry: &Value, variant: &Value, name: &str) -> Rational {
     let override_value = variant["overrides"][name].as_str();
     let original = entry["parameters"]
@@ -199,6 +211,8 @@ fn parameter(entry: &Value, variant: &Value, name: &str) -> Rational {
 }
 
 /// Construct the system named by a fixture variant.
+///
+/// TODO ´todo:test:validate-variant-selectors-as-metadata-and´: validate variant selectors as metadata and preserve quantity descriptors through fixture dispatch under rule:vision:counts-and-metadata and req:vision:algebraic-unit-checks.
 fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
     let name = variant["name"].as_str().expect("variant name");
     if name.starts_with("order") {
@@ -217,6 +231,9 @@ fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
 }
 
 /// Every success encloses the all-ones solution and every variant meets its expectation.
+///
+/// TODO ´todo:test:verify-adversarial-outcomes-with-independently-typed´: verify adversarial outcomes with independently typed radii, residuals, inverse bounds and ratio budgets after measure conversion under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+///
 /// ´test:integration:adversarial-matrix-fixtures´
 #[test]
 fn adversarial_matrix_fixtures() {

@@ -51,18 +51,26 @@ struct Problem {
 }
 
 /// One named input quantity.
+///
+/// TODO ´todo:code:declare-parameter-quantity-physical-count-or´: declare parameter quantity, physical count or metadata roles explicitly under rule:vision:counts-and-metadata and req:vision:unit-data-migration.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Parameter {
     /// Unique parameter name.
+    ///
+    /// TODO ´todo:code:bind-parameter-symbols-to-declared-descriptors´: bind parameter symbols to declared descriptors under req:vision:expression-and-symbol-contract.
     name: String,
     /// Human-readable meaning.
     description: String,
     /// Exact input value syntax.
     value: String,
     /// Unit declaration validated after typed decoding.
+    ///
+    /// TODO ´todo:code:decode-parameter-dimensions-measure-scales-affine´: decode parameter dimensions, measure scales, affine origins and semantic kinds under def:vision:measures and rule:vision:semantic-kinds-and-roles.
     unit: Value,
     /// Uncertainty declaration validated after typed decoding.
+    ///
+    /// TODO ´todo:code:declare-input-uncertainty-expressions-with-their´: declare input uncertainty expressions with their own dimensions, measures, kinds and assurance under rule:vision:uncertainty-unit-algebra.
     uncertainty: Value,
 }
 
@@ -75,8 +83,12 @@ struct Observable {
     /// Human-readable meaning.
     description: String,
     /// Unit declaration validated after typed decoding.
+    ///
+    /// TODO ´todo:code:compare-observable-descriptors-with-algebraically-derived´: compare observable descriptors with algebraically derived dimensions, measures and kinds under req:vision:algebraic-unit-checks.
     unit: Value,
     /// Symbolic expression for the observable.
+    ///
+    /// TODO ´todo:code:migrate-closed-forms-to-the-generic´: migrate closed forms to the generic expression and declared symbol contract without treating legacy strings as checked under req:vision:expression-and-symbol-contract.
     closed_form: String,
     /// Expected value string.
     value: String,
@@ -97,6 +109,8 @@ struct Variant {
     /// Human-readable change.
     description: String,
     /// Replacement parameter value strings.
+    ///
+    /// TODO ´todo:code:check-variant-replacements-against-count-domains´: check variant replacements against count domains, metadata categories and quantity declarations under req:vision:unit-data-migration.
     #[serde(default)]
     overrides: BTreeMap<String, String>,
     /// Expected mathematical or numerical behavior.
@@ -126,6 +140,8 @@ struct Stress {
 }
 
 /// The strict payload shared by input files and dataset entries.
+///
+/// TODO ´todo:code:carry-versioned-quantity-and-uncertainty-declarations´: carry versioned quantity and uncertainty declarations through entry serialization under req:vision:unit-data-migration and def:vision:intrinsic-uncertainty-companions.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 struct Entry {
@@ -153,6 +169,8 @@ struct DatasetPayload {
 }
 
 /// Derive the dataset from all validated entry files in catalogue order.
+///
+/// TODO ´todo:code:derive-migrated-unit-datasets-only-after´: derive migrated unit datasets only after expression and symbol validation under req:vision:unit-data-migration.
 pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>, Value), Error> {
     let locations = layout(root)?;
     let mut sources = Vec::new();
@@ -198,6 +216,8 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
 }
 
 /// Validate a committed dataset before a template receives its entries.
+///
+/// TODO ´todo:code:revalidate-committed-quantity-and-uncertainty-expressions´: revalidate committed quantity and uncertainty expressions before rendering under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 pub(crate) fn validate_dataset(value: &Value, owners: &BTreeSet<String>) -> Result<(), Error> {
     envelope::validate(value, DATASET, DATASET_NAMESPACE, owners)?;
     let object = value
@@ -396,6 +416,8 @@ fn valid_slug(slug: &str) -> bool {
 }
 
 /// Apply rules four through nine after strict payload decoding.
+///
+/// TODO ´todo:code:assemble-declared-symbols-and-check-observable´: assemble declared symbols and check observable formulas, uncertainty expressions and reference cycles under req:vision:expression-and-symbol-contract.
 fn validate_entry(entry: &Entry, location: &Location, label: &str) -> Result<(), Error> {
     let path = &location.path;
     if entry.parameters.is_empty() || entry.observables.is_empty() {
@@ -482,6 +504,8 @@ fn validate_entry(entry: &Entry, location: &Location, label: &str) -> Result<(),
 }
 
 /// Check the declared exact or rounded precision of every observable.
+///
+/// TODO ´todo:code:validate-count-exactness-separately-from-continuous´: validate count exactness separately from continuous uncertainty precision under def:vision:counts and rule:vision:uncertainty-unit-algebra.
 fn check_exactness(path: &str, observables: &[Observable]) -> Result<(), Error> {
     for observable in observables {
         let count = match observable.value_kind.as_str() {
@@ -515,6 +539,8 @@ fn check_exactness(path: &str, observables: &[Observable]) -> Result<(), Error> 
 }
 
 /// Validate one optional nested numeric field before unit or uncertainty shape.
+///
+/// TODO ´todo:code:interpret-scale-factors-affine-offsets-and´: interpret scale factors, affine offsets and uncertainty values according to their declared roles under rule:vision:measure-conversions and rule:vision:uncertainty-unit-algebra.
 fn nested_value(path: &str, value: &Value, key: &str) -> Result<(), Error> {
     if let Some(entry) = value.as_object().and_then(|object| object.get(key)) {
         let text = entry
@@ -526,6 +552,8 @@ fn nested_value(path: &str, value: &Value, key: &str) -> Result<(), Error> {
 }
 
 /// Recognize the specified grammar for exact decimal, fraction, and exponent strings.
+///
+/// TODO ´todo:code:apply-value-domain-checks-after-syntax´: apply value-domain checks after syntax for counts, metadata and continuous uncertainty under rule:vision:counts-and-metadata and rule:vision:uncertainty-unit-algebra.
 fn check_value(path: &str, value: &str) -> Result<(), Error> {
     if !valid_value(value) {
         return Err(invalid(
@@ -573,6 +601,8 @@ fn valid_value(value: &str) -> bool {
 }
 
 /// Require the finite set of unit keys and their declared value types.
+///
+/// TODO ´todo:code:validate-dimension-algebra-measure-scales-affine´: validate dimension algebra, measure scales, affine roles and semantic kinds beyond table shape under req:vision:algebraic-unit-checks and rule:vision:measure-conversions.
 fn check_unit(path: &str, value: &Value) -> Result<(), Error> {
     let object = value
         .as_object()
@@ -598,6 +628,8 @@ fn check_unit(path: &str, value: &Value) -> Result<(), Error> {
 }
 
 /// Validate exactly the key set associated with each uncertainty kind.
+///
+/// TODO ´todo:code:derive-uncertainty-dimensions-and-kinds-for´: derive uncertainty dimensions and kinds for absolute, relative and covariance expressions instead of copying the value descriptor under rule:vision:uncertainty-unit-algebra.
 fn check_uncertainty(path: &str, value: &Value) -> Result<(), Error> {
     let object = value
         .as_object()
@@ -635,6 +667,8 @@ fn invalid(path: &str, rule: &str, detail: &str) -> Error {
 }
 
 /// Boundary tests for the ordered problem-stage rules.
+///
+/// TODO ´todo:code:exercise-algebraic-acceptance-and-rejection-for´: exercise algebraic acceptance and rejection for formulas, symbols, affine roles and count versus ratio versus metadata under req:vision:algebraic-unit-checks.
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -647,6 +681,8 @@ mod tests {
     use crate::error::Error;
 
     /// Build a complete minimal entry for direct rule tests.
+    ///
+    /// TODO ´todo:code:supply-declared-measures-kinds-uncertainty-descriptors´: supply declared measures, kinds, uncertainty descriptors and bound symbols in rule fixtures under req:vision:unit-data-migration.
     fn sample() -> Value {
         json!({
             "problem": {
@@ -687,6 +723,8 @@ mod tests {
     }
 
     /// Write one minimal valid entry under its inferred location.
+    ///
+    /// TODO ´todo:code:write-migrated-problem-and-fixture-declarations´: write migrated problem and fixture declarations for data-time unit cases under req:vision:unit-data-migration.
     fn write_entry(root: &Path, kind: &str, slug: &str) -> Result<(), std::io::Error> {
         let (directory, filename) = if kind == "fixture" {
             (format!("problems/fixtures/{slug}"), "fixture.toml")
@@ -706,6 +744,9 @@ mod tests {
     }
 
     /// Decode one valid problem and one valid fixture into the ordered dataset.
+    ///
+    /// TODO ´todo:code:verify-valid-derived-units-and-intrinsic´: verify valid derived units and intrinsic uncertainty declarations survive dataset derivation under req:vision:algebraic-unit-checks.
+    ///
     /// ´test:unit:decodes-valid-problem-and-fixture´
     #[test]
     fn decodes_valid_problem_and_fixture() -> Result<(), Box<dyn std::error::Error>> {
@@ -810,6 +851,9 @@ mod tests {
     }
 
     /// Reject a value string outside the exact grammar.
+    ///
+    /// TODO ´todo:code:reject-fractional-physical-counts-while-admitting´: reject fractional physical counts while admitting continuous ratios and count standard uncertainty under def:vision:counts and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:values-refuse-invalid-number´
     #[test]
     fn values_refuse_invalid_number() -> Result<(), Box<dyn std::error::Error>> {
@@ -819,6 +863,9 @@ mod tests {
     }
 
     /// Reject a unit key outside the seven base exponents.
+    ///
+    /// TODO ´todo:code:reject-invalid-measure-scales-origins-affine´: reject invalid measure scales, origins, affine roles and mismatched dimensions under rule:vision:measure-conversions and req:vision:algebraic-unit-checks.
+    ///
     /// ´test:unit:units-refuse-unknown-key´
     #[test]
     fn units_refuse_unknown_key() -> Result<(), Box<dyn std::error::Error>> {
@@ -828,6 +875,9 @@ mod tests {
     }
 
     /// Reject an enclosure that omits its source.
+    ///
+    /// TODO ´todo:code:reject-uncertainty-descriptor-mismatches-and-missing´: reject uncertainty descriptor mismatches and missing correlations without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:uncertainty-refuses-incomplete-shape´
     #[test]
     fn uncertainty_refuses_incomplete_shape() -> Result<(), Box<dyn std::error::Error>> {
@@ -837,6 +887,9 @@ mod tests {
     }
 
     /// Reject a decimal with fewer significant digits than declared.
+    ///
+    /// TODO ´todo:code:test-discrete-count-exactness-independently-of´: test discrete count exactness independently of rounded uncertainty values under def:vision:counts and rule:vision:uncertainty-unit-algebra.
+    ///
     /// ´test:unit:exactness-refuses-wrong-precision´
     #[test]
     fn exactness_refuses_wrong_precision() -> Result<(), Box<dyn std::error::Error>> {
