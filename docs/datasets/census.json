@@ -11,7 +11,8 @@
     "Cargo.toml",
     "packages/docgen/Cargo.toml",
     "packages/scalar/Cargo.toml",
-    "packages/matrix/Cargo.toml"
+    "packages/matrix/Cargo.toml",
+    "packages/algebra/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -34,6 +35,12 @@
       "has_readme_template": true,
       "name": "nrz-matrix",
       "path": "packages/matrix"
+    },
+    {
+      "description": "Exact symbolic expressions and deterministic collection normal forms",
+      "has_readme_template": true,
+      "name": "nrz-algebra",
+      "path": "packages/algebra"
     }
   ]
 }

@@ -35,5 +35,6 @@ Inputs, the document manifest, and datasets identify themselves with `namespace`
 |`nrz-docgen`|`packages/docgen`|Deterministic documentation datasets, rendering, and fixed-point checks|
 |`nrz-scalar`|`packages/scalar`|Validated scalar arithmetic prototype for Naturrhythmuszentrum|
 |`nrz-matrix`|`packages/matrix`|Safe dense solve candidates with independent numerical certificates|
+|`nrz-algebra`|`packages/algebra`|Exact symbolic expressions and deterministic collection normal forms|
 
 Naturrhythmuszentrum has 9 planned bites.

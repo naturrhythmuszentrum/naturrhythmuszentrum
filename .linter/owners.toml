@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 # Declares the repository owner over the root files, the declared surface and the documents; a package owner joins with its partition as the package lands.
 namespace = "org.naturrhythmuszentrum.linter.owners"
 version = [1, 0, 0]
@@ -7,6 +8,7 @@ owners = [
   "DOCGEN",
   "SCALAR",
   "MATRIX",
+  "ALGEBRA",
 ]
 
 partitions = [
@@ -17,6 +19,7 @@ partitions = [
   { name = "docgen", owner = "DOCGEN", pattern = '%s"packages/docgen" [ "/" *VCHAR ]' },
   { name = "scalar", owner = "SCALAR", pattern = '%s"packages/scalar" [ "/" *VCHAR ]' },
   { name = "matrix", owner = "MATRIX", pattern = '%s"packages/matrix" [ "/" *VCHAR ]' },
+  { name = "algebra", owner = "ALGEBRA", pattern = '%s"packages/algebra" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

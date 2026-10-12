@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 # Declares empty allowance lists for every activation, so each check measures the whole share it governs.
 namespace = "org.naturrhythmuszentrum.linter.lists"
 version = [1, 0, 0]
@@ -72,4 +73,22 @@ allowances = []
 allowances = []
 
 [MATRIX."owners.reach-conform"]
+allowances = []
+
+[ALGEBRA."labels.mints-well-formed"]
+allowances = []
+
+[ALGEBRA."labels.mints-kind-conform"]
+allowances = []
+
+[ALGEBRA."labels.mints-unique"]
+allowances = []
+
+[ALGEBRA."labels.heads-conform"]
+allowances = []
+
+[ALGEBRA."labels.citations-local-resolve"]
+allowances = []
+
+[ALGEBRA."owners.reach-conform"]
 allowances = []

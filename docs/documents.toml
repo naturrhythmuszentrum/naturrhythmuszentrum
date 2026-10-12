@@ -55,3 +55,8 @@ requires = []
 template = "docs/feasibility.md.j2"
 output = "docs/feasibility.md"
 requires = []
+
+[[document]]
+template = "packages/algebra/README.md.j2"
+output = "packages/algebra/README.md"
+requires = []

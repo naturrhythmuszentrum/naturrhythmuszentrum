@@ -224,7 +224,7 @@ Dimensionless does not mean unrestricted: trigonometric functions consume declar
 
 **Requirement (Expression and symbol contract)** · `req:vision:expression-and-symbol-contract`
 
-A generic symbolic-algebra core supplies expressions, symbols, normalization, and integer and rational exponents, with no physics in that core. Its own scope and interface are settled separately; the units layer supplies dimension, measure, semantic-kind, and affine-role checking over that contract. Units design depends on an agreed expression contract and prototypes its use without prescribing the core’s storage, parser API, or algorithms. The contract must distinguish exact numeric constants, symbols, supported operations, and exponents, identify unsupported constructs, and make normalized equivalent dimension expressions comparable (`def:vision:dimensions`), (`req:vision:powers-and-factor-dimensions`).
+A generic symbolic-algebra core supplies expressions, symbols, normalization, and integer and rational exponents, with no physics in that core. The nrz-algebra package supplies immutable original operation trees and separate non-expanding collection normal forms; the units layer supplies dimension, measure, semantic-kind, and affine-role checking over that contract. Units design maps its static prototypes onto this data-time expression contract without changing the physics-free boundary. The contract must distinguish exact numeric constants, symbols, supported operations, and exponents, identify unsupported constructs, and make normalized equivalent dimension expressions comparable (`def:vision:dimensions`), (`req:vision:powers-and-factor-dimensions`).
 
 Each quantity symbol, named dimensional constant, uncertainty symbol, and referenced observable needs an explicit declaration or checked derivation binding its dimension, measure, kind, and point/difference role. Metadata has separate declared uses (`rule:vision:counts-and-metadata`). A bare numeric coefficient is dimensionless; it cannot hide metres or seconds merely because a specialized example omitted them. Function meanings and symbol dependencies must be explicit, with unknown names and cycles in derived-observable definitions rejected. Coupled physical equations remain explicit systems rather than cyclic observable definitions (`dec:vision:physical-and-computational-graphs`). The units layer validates the original typed operations before algebraic rewrites can erase an invalid addition or affine operation, and preserves their contracts through normalization. Diagnostics identify the expression location and expected and derived descriptors. Dimensional consistency does not authorize numerically unsafe rewriting or establish an error bound (`req:vision:algebraic-unit-checks`).
 
@@ -285,6 +285,7 @@ The starting repository is a virtual nightly Cargo workspace with no members, a 
 
 |Directory and crate|Sole responsibility|Engine dependencies|
 |-------------------|-------------------|-------------------|
+|`packages/algebra`, `nrz-algebra`|Physics-free exact symbolic scalar expressions and collection normal forms|None of the other engine packages|
 |`packages/scalar`, `nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|
 |`packages/accuracy`, `nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|
 |`packages/units`, `nrz-units`|Dimensions, measures, counts and semantic kinds, typed scalar quantities, and algebraic unit checks|`nrz-scalar`, `nrz-accuracy`|
@@ -297,7 +298,7 @@ Exemplars: (`ex:exemplars:faer`), (`ex:exemplars:herbie`), (`ex:exemplars:estate
 
 **Rule (Layer enforcement)** · `rule:vision:layer-enforcement`
 
-Dependencies flow downward through the declared package graph; scalar and accuracy primitives receive their dimensional and measure meaning from typed quantity owners rather than depending back on units (`dec:vision:storage-and-scalar-wrapping`). The generic algebra contract is physics-free; units layers interpret its expressions, while its implementation boundary and any future admitted dependency edges are settled with that contract (`req:vision:expression-and-symbol-contract`). A metadata-based architecture check compares normal, build, development, and feature-dependent edges against the permitted graph because a forbidden dependency remains a coupling even when hidden in tests. Cross-layer integration tests live at an existing upper layer. The facade reexports supported concepts and adds no competing numerical implementation. Exemplars: none.
+Dependencies flow downward through the declared package graph; scalar and accuracy primitives receive their dimensional and measure meaning from typed quantity owners rather than depending back on units (`dec:vision:storage-and-scalar-wrapping`). The physics-free nrz-algebra package depends on no engine package. The data-time units client depends only on nrz-algebra; numerical units wrappers may later add the declared scalar and accuracy edges. Scalar primitives remain independent of algebra and units. The expression boundary is specified by (`req:vision:expression-and-symbol-contract`). A metadata-based architecture check compares normal, build, development, and feature-dependent edges against the permitted graph because a forbidden dependency remains a coupling even when hidden in tests. Cross-layer integration tests live at an existing upper layer. The facade reexports supported concepts and adds no competing numerical implementation. Exemplars: none.
 
 **Rule (Backend boundaries)** · `rule:vision:backend-boundaries`
 
@@ -411,3 +412,15 @@ Accuracy testing and representative measurements accompany every numerical bite 
 **Rule (Completion boundaries)** · `rule:vision:completion-boundaries`
 
 Each bite declares its supported domain, assurance level, error behavior, and outstanding exclusions in generated documentation because completion must be reviewable without assuming future work. A bite that cannot establish its intended guarantee either narrows its explicitly supported domain or remains incomplete. The engine’s growth is therefore measured by verified capabilities and usable physical problems, rather than by the number of backend operations exposed.
+
+**Definition (Algebra expression trees)** · `def:vision:algebra-expression-trees`
+
+Original immutable trees retain exact constants, opaque symbols, ordered operations, rational exponents and named applications. Normal forms are separate values. Clients validate original operations before requesting normalization, and substitution requires rechecking the resulting original tree. Exact coefficients use reduced bounded rationals with checked arithmetic; no floating value enters the algebra.
+
+**Decision (Algebra normal form)** · `dec:vision:algebra-normal-form`
+
+Deterministic collection flattens sums and products, collects equal terms and bases, reduces exact coefficients and composes integer outer powers. A sum factors out its leading rational coefficient, and additive collection visits scaled sum terms, so rational content respects both additive and multiplicative regrouping. Fractional outer powers retain their complete bases, and symbolic factors do not distribute across sums. This controls expression growth while giving a precise, reproducible equality relation.
+
+**Rule (Algebra domain boundary)** · `rule:vision:algebra-domain-boundary`
+
+Normal-form equality is formal equality on common defined domains, not equality of definedness sets or authorization for numerical rewriting. The original operations retain those obligations. Distributive polynomial normalization, explicit side-condition objects, noncommutative matrix-value algebra, arbitrary precision, differentiation, solving and numerical evaluation are excluded.

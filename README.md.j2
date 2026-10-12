@@ -17,6 +17,7 @@ The baseline is a virtual nightly Cargo workspace. The packages below are the ta
 
 |Directory|Crate|Responsibility|Engine dependencies|Architecture|
 |---------|-----|--------------|-------------------|------------|
+|`packages/algebra`|`nrz-algebra`|Exact symbolic scalar expressions and collection normal forms|None of the other engine packages|(`tab:vision:package-structure`)|
 |`packages/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
 |`packages/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
 |`packages/units`|`nrz-units`|Dimensions, measures, counts and kinds, typed quantities, conversions and algebraic checks|`nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|

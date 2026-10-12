@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 # Workspace of the Naturrhythmuszentrum engine: a matrix-based physics calculation engine whose
 # quantities carry their SI units in the type system. Packages live under packages/ and join the
 # member list as they land. The lint posture below is the workspace's; no package relaxes it, and
@@ -7,7 +8,7 @@
 
 [workspace]
 resolver = "3"
-members = ["packages/docgen", "packages/scalar", "packages/matrix"]
+members = ["packages/docgen", "packages/scalar", "packages/matrix", "packages/algebra"]
 
 [workspace.package]
 version = "0.1.0"
@@ -25,6 +26,7 @@ toml = "1"
 clap = { version = "4", features = ["derive"] }
 thiserror = "2"
 nrz-scalar = { path = "packages/scalar" }
+nrz-algebra = { path = "packages/algebra" }
 faer = { version = "0.24.4", default-features = false, features = ["std", "linalg"] }
 tempfile = "3"
 

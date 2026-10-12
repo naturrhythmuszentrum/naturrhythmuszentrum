@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: CC0-1.0
 # Activates the label checks for the repository owner.
 namespace = "org.naturrhythmuszentrum.linter.policies"
 version = [1, 0, 0]
@@ -27,4 +28,10 @@ policies = [
   { owner = "MATRIX", policy = "labels.heads-conform" },
   { owner = "MATRIX", policy = "labels.citations-local-resolve" },
   { owner = "MATRIX", policy = "owners.reach-conform" },
+  { owner = "ALGEBRA", policy = "labels.mints-well-formed" },
+  { owner = "ALGEBRA", policy = "labels.mints-kind-conform" },
+  { owner = "ALGEBRA", policy = "labels.mints-unique" },
+  { owner = "ALGEBRA", policy = "labels.heads-conform" },
+  { owner = "ALGEBRA", policy = "labels.citations-local-resolve" },
+  { owner = "ALGEBRA", policy = "owners.reach-conform" },
 ]
