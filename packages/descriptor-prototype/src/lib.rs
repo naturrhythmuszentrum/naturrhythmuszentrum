@@ -19,3 +19,5 @@ pub use execution::{Bound, Candidate, NormalizedView, OutputContract, Published,
 pub use fixture::{Fixture, ResistorQuantities, resistor_fixture};
 pub use maps::{CoordinateMap, Difference, PhysicalView, Point, difference_view, point_view};
 pub use plan::{Binding, Checked, Coverage, Inputs, Layout, Maps, Plan, Slot, Unchecked};
+
+pub mod static_probe;
