@@ -6,6 +6,7 @@ owners = [
   "NRZ",
   "DOCGEN",
   "SCALAR",
+  "MATRIX",
 ]
 
 partitions = [
@@ -15,6 +16,7 @@ partitions = [
   { name = "problems", owner = "NRZ", pattern = '%s"problems" [ "/" *VCHAR ]' },
   { name = "docgen", owner = "DOCGEN", pattern = '%s"packages/docgen" [ "/" *VCHAR ]' },
   { name = "scalar", owner = "SCALAR", pattern = '%s"packages/scalar" [ "/" *VCHAR ]' },
+  { name = "matrix", owner = "MATRIX", pattern = '%s"packages/matrix" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

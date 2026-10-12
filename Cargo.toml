@@ -7,7 +7,7 @@
 
 [workspace]
 resolver = "3"
-members = ["packages/docgen", "packages/scalar"]
+members = ["packages/docgen", "packages/scalar", "packages/matrix"]
 
 [workspace.package]
 version = "0.1.0"
@@ -25,6 +25,7 @@ toml = "1"
 clap = { version = "4", features = ["derive"] }
 thiserror = "2"
 nrz-scalar = { path = "packages/scalar" }
+faer = { version = "0.24.4", default-features = false, features = ["std", "linalg"] }
 tempfile = "3"
 
 [workspace.lints.rust]

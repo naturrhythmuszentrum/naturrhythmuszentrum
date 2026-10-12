@@ -1,0 +1,263 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Exact-rational fixture construction and adversarial solve expectations.
+
+use std::cmp::Ordering;
+
+use nrz_matrix::{DenseSystem, certified_solve};
+use nrz_scalar::{Interval, frobenius_upper};
+use serde_json::Value;
+
+/// A reduced rational used only to construct fixture inputs.
+#[derive(Clone, Copy)]
+struct Rational {
+    numerator: i128,
+    denominator: i128,
+}
+
+impl Rational {
+    /// Reduce a rational with positive denominator.
+    const fn new(numerator: i128, denominator: i128) -> Self {
+        let mut a = numerator.abs();
+        let mut b = denominator;
+        while b != 0 {
+            let next = a % b;
+            a = b;
+            b = next;
+        }
+        Self {
+            numerator: numerator / a,
+            denominator: denominator / a,
+        }
+    }
+    /// Exact rational addition.
+    const fn add(self, rhs: Self) -> Self {
+        let mut a = self.denominator;
+        let mut b = rhs.denominator;
+        while b != 0 {
+            let next = a % b;
+            a = b;
+            b = next;
+        }
+        let left = rhs.denominator / a;
+        let right = self.denominator / a;
+        Self::new(
+            self.numerator * left + rhs.numerator * right,
+            self.denominator * left,
+        )
+    }
+    /// Exact rational multiplication.
+    const fn mul(self, rhs: Self) -> Self {
+        Self::new(
+            self.numerator * rhs.numerator,
+            self.denominator * rhs.denominator,
+        )
+    }
+}
+
+/// Round the fixture rational to binary64 using integer long division.
+fn nearest(value: Rational) -> (f64, f64) {
+    if value.numerator == 0 {
+        return (0.0, 0.0);
+    }
+    let mut scaled_num = value.numerator.abs();
+    let mut scaled_den = value.denominator;
+    let mut exponent = 0_i32;
+    while scaled_num < scaled_den {
+        scaled_num *= 2;
+        exponent -= 1;
+    }
+    while scaled_num >= scaled_den * 2 {
+        scaled_den *= 2;
+        exponent += 1;
+    }
+    let mut remainder = scaled_num - scaled_den;
+    let mut mantissa = 1_u64 << 52;
+    for bit in (0..52).rev() {
+        remainder *= 2;
+        if remainder >= scaled_den {
+            remainder -= scaled_den;
+            mantissa |= 1_u64 << bit;
+        }
+    }
+    let exact = remainder == 0;
+    let twice = remainder * 2;
+    if twice > scaled_den || (twice == scaled_den && mantissa & 1 != 0) {
+        mantissa += 1;
+    }
+    if mantissa == 1_u64 << 53 {
+        mantissa >>= 1;
+        exponent += 1;
+    }
+    let biased = u64::try_from(exponent + 1023).expect("normal fixture value");
+    let bits = (biased << 52) | (mantissa - (1_u64 << 52));
+    let positive = f64::from_bits(bits);
+    let center = if value.numerator < 0 {
+        -positive
+    } else {
+        positive
+    };
+    let radius = if exact {
+        0.0
+    } else {
+        ((center.next_up() - center).max(center - center.next_down())) / 2.0
+    };
+    (center, radius)
+}
+
+/// Import exact fixture entries with zero or half-ulp representation radii.
+fn system(entries: &[Rational], n: usize) -> DenseSystem {
+    let mut a = Vec::with_capacity(entries.len());
+    let mut a_errors = Vec::with_capacity(entries.len());
+    let mut b = Vec::with_capacity(n);
+    let mut b_errors = Vec::with_capacity(n);
+    for row in 0..n {
+        let mut exact_sum = Rational::new(0, 1);
+        for col in 0..n {
+            let entry = entries[row * n + col];
+            exact_sum = exact_sum.add(entry);
+            let (center, radius) = nearest(entry);
+            a.push(center);
+            a_errors.push(radius);
+        }
+        let (center, radius) = nearest(exact_sum);
+        b.push(center);
+        b_errors.push(radius);
+    }
+    let a_radius = frobenius_upper(&a_errors).expect("finite matrix import");
+    let b_radius = frobenius_upper(&b_errors).expect("finite RHS import");
+    DenseSystem::new(n, a, a_radius, b, b_radius).expect("fixture shape")
+}
+
+/// Hilbert entries are exact unit fractions.
+fn hilbert(n: usize) -> DenseSystem {
+    let entries = (0..n)
+        .flat_map(|row| {
+            (0..n).map(move |col| {
+                Rational::new(1, i128::try_from(row + col + 1).expect("small order"))
+            })
+        })
+        .collect::<Vec<_>>();
+    system(&entries, n)
+}
+
+/// A Kahan upper triangle has rational powers of s.
+fn kahan(n: usize, c: Rational, s: Rational) -> DenseSystem {
+    let mut entries = Vec::with_capacity(n * n);
+    let mut scale = Rational::new(1, 1);
+    for row in 0..n {
+        for col in 0..n {
+            let entry = match col.cmp(&row) {
+                Ordering::Less => Rational::new(0, 1),
+                Ordering::Equal => scale,
+                Ordering::Greater => scale.mul(Rational::new(-c.numerator, c.denominator)),
+            };
+            entries.push(entry);
+        }
+        scale = scale.mul(s);
+    }
+    system(&entries, n)
+}
+
+/// Wilkinson's partial-pivoting growth matrix has only integer entries.
+fn wilkinson(n: usize) -> DenseSystem {
+    let entries = (0..n)
+        .flat_map(|row| {
+            (0..n).map(move |col| {
+                let value = if col + 1 == n || col == row {
+                    1
+                } else if row > col {
+                    -1
+                } else {
+                    0
+                };
+                Rational::new(value, 1)
+            })
+        })
+        .collect::<Vec<_>>();
+    system(&entries, n)
+}
+
+/// Read a fixture parameter, applying a variant override if present.
+fn parameter(entry: &Value, variant: &Value, name: &str) -> Rational {
+    let override_value = variant["overrides"][name].as_str();
+    let original = entry["parameters"]
+        .as_array()
+        .expect("parameters")
+        .iter()
+        .find(|value| value["name"].as_str() == Some(name))
+        .and_then(|value| value["value"].as_str())
+        .expect("parameter");
+    let text = override_value.unwrap_or(original);
+    if let Some((a, b)) = text.split_once('/') {
+        Rational::new(
+            a.parse().expect("numerator"),
+            b.parse().expect("denominator"),
+        )
+    } else {
+        Rational::new(text.parse().expect("integer"), 1)
+    }
+}
+
+/// Construct the system named by a fixture variant.
+fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
+    let name = variant["name"].as_str().expect("variant name");
+    if name.starts_with("order") {
+        hilbert(usize::try_from(parameter(entry, variant, "n").numerator).expect("order"))
+    } else if name.starts_with("kahan") {
+        kahan(
+            usize::try_from(parameter(entry, variant, "n_kahan").numerator).expect("order"),
+            parameter(entry, variant, "c"),
+            parameter(entry, variant, "s"),
+        )
+    } else {
+        wilkinson(
+            usize::try_from(parameter(entry, variant, "n_wilkinson").numerator).expect("order"),
+        )
+    }
+}
+
+/// Every success encloses the all-ones solution and every variant meets its expectation.
+/// ´test:integration:adversarial-matrix-fixtures´
+#[test]
+fn adversarial_matrix_fixtures() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../docs/datasets/problems.json");
+    let data: Value =
+        serde_json::from_str(&std::fs::read_to_string(path).expect("dataset")).expect("JSON");
+    for entry in data["entries"].as_array().expect("entries") {
+        let slug = entry["problem"]["slug"].as_str().expect("slug");
+        if slug != "hilbert-matrices" && slug != "kahan-and-wilkinson-matrices" {
+            continue;
+        }
+        for variant in entry["variants"].as_array().expect("variants") {
+            let name = variant["name"].as_str().expect("name");
+            if !name.ends_with("-success") && !name.ends_with("-refusal") {
+                continue;
+            }
+            let input = variant_system(entry, variant);
+            let budget_rational = parameter(entry, variant, "relative_budget");
+            let budget = nearest(budget_rational).0;
+            let result = certified_solve(&input, budget);
+            if let Ok(outcome) = &result {
+                let errors = outcome
+                    .candidate
+                    .iter()
+                    .map(|&value| {
+                        let bound = Interval::point(value)
+                            .expect("candidate")
+                            .checked_sub(Interval::point(1.0).expect("one"))
+                            .expect("difference");
+                        bound.lo().abs().max(bound.hi().abs())
+                    })
+                    .collect::<Vec<_>>();
+                let distance = frobenius_upper(&errors).expect("distance");
+                assert!(distance <= outcome.radius, "false success for {name}");
+            }
+            if name.ends_with("-success") {
+                assert!(result.is_ok(), "expected success for {name}: {result:?}");
+            } else {
+                assert!(result.is_err(), "expected refusal for {name}");
+            }
+        }
+    }
+}

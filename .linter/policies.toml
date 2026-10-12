@@ -21,4 +21,10 @@ policies = [
   { owner = "SCALAR", policy = "labels.heads-conform" },
   { owner = "SCALAR", policy = "labels.citations-local-resolve" },
   { owner = "SCALAR", policy = "owners.reach-conform" },
+  { owner = "MATRIX", policy = "labels.mints-well-formed" },
+  { owner = "MATRIX", policy = "labels.mints-kind-conform" },
+  { owner = "MATRIX", policy = "labels.mints-unique" },
+  { owner = "MATRIX", policy = "labels.heads-conform" },
+  { owner = "MATRIX", policy = "labels.citations-local-resolve" },
+  { owner = "MATRIX", policy = "owners.reach-conform" },
 ]

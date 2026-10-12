@@ -10,7 +10,8 @@
   "sources": [
     "Cargo.toml",
     "packages/docgen/Cargo.toml",
-    "packages/scalar/Cargo.toml"
+    "packages/scalar/Cargo.toml",
+    "packages/matrix/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -27,6 +28,12 @@
       "has_readme_template": true,
       "name": "nrz-scalar",
       "path": "packages/scalar"
+    },
+    {
+      "description": "Safe dense solve candidates with independent numerical certificates",
+      "has_readme_template": true,
+      "name": "nrz-matrix",
+      "path": "packages/matrix"
     }
   ]
 }

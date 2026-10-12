@@ -55,3 +55,21 @@ allowances = []
 
 [SCALAR."owners.reach-conform"]
 allowances = []
+
+[MATRIX."labels.mints-well-formed"]
+allowances = []
+
+[MATRIX."labels.mints-kind-conform"]
+allowances = []
+
+[MATRIX."labels.mints-unique"]
+allowances = []
+
+[MATRIX."labels.heads-conform"]
+allowances = []
+
+[MATRIX."labels.citations-local-resolve"]
+allowances = []
+
+[MATRIX."owners.reach-conform"]
+allowances = []

@@ -45,3 +45,8 @@ requires = ["problems"]
 template = "packages/scalar/README.md.j2"
 output = "packages/scalar/README.md"
 requires = []
+
+[[document]]
+template = "packages/matrix/README.md.j2"
+output = "packages/matrix/README.md"
+requires = []
