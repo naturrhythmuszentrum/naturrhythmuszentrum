@@ -5,7 +5,9 @@
 
 ## Scope · `sec:nrz:feasibility-scope`
 
-This bite prototypes finite enclosures in `nrz-scalar` for binary32 and binary64 and a binary64 dense solve in `nrz-matrix`. Its types and functions are provisional until the units and matrix bites settle their interfaces. The purpose is to test the arithmetic, backend and certificate assumptions before broader APIs are fixed (`step:nrz:bite-numerical-feasibility`), (`cav:vision:backend-capability-uncertainty`).
+This bite prototypes finite enclosures in `nrz-scalar` for binary32 and binary64 and a binary64 dense solve in `nrz-matrix`. Its types and functions are provisional until the units and matrix bites settle dimension, measure, count, semantic-kind and affine-role contracts around the numerical substrate (`def:vision:dimensions`), (`def:vision:measures`), (`def:vision:counts`), (`rule:vision:semantic-kinds-and-roles`). The purpose is to test the arithmetic, backend and certificate assumptions before broader APIs are fixed (`step:nrz:bite-numerical-feasibility`), (`cav:vision:backend-capability-uncertainty`).
+
+The measured prototypes use bare numeric intervals, radii and report bounds. Their results establish numerical behavior under the stated assumptions, not algebraic checks of dimensions, measures, kinds or uncertainty descriptors (`req:vision:algebraic-unit-checks`). The units and matrix contracts require input/measurement and computational uncertainties to be intrinsic contents, each with its own derived descriptor, including relative ratios, covariance and affine differences (`def:vision:intrinsic-uncertainty-companions`), (`rule:vision:uncertainty-unit-algebra`). Matrix orders and precision selections remain structural metadata (`rule:vision:counts-and-metadata`); numerical powers-of-two scaling is distinct from changing a measure (`rule:vision:equilibration`), (`rule:vision:measure-conversions`). These later obligations do not alter the measured facts below.
 
 ## Arithmetic · `sec:nrz:feasibility-arithmetic`
 
