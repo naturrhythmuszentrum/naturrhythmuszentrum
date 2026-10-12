@@ -13,7 +13,7 @@ keywords = ["units", "descriptors", "prototype"]
 categories = ["mathematics", "science"]
 
 [dependencies]
-nrz-units = { path = "../units" }
+nrz-units = { path = "../../crates/units" }
 nrz-algebra.workspace = true
 
 [lints]

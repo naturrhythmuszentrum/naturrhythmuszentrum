@@ -355,15 +355,15 @@ The starting repository is a virtual nightly Cargo workspace with no members, a 
 
 |Directory and crate|Sole responsibility|Engine dependencies|
 |-------------------|-------------------|-------------------|
-|`packages/algebra`, `nrz-algebra`|Physics-free exact symbolic scalar expressions and collection normal forms|None of the other engine packages|
-|`packages/scalar`, `nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|
-|`packages/accuracy`, `nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|
-|`packages/units`, `nrz-units`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence; numerical integration follows|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|
-|`packages/matrix`, `nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked block views, faer adapters, and operation-specific certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|
-|`packages/physics`, `nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|
-|`packages/engine`, `nrz`|Curated application-facing exports and entry points|The public interfaces of the engine packages above|
-|`packages/docgen`, `nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|No runtime engine dependency|
-|`packages/descriptor-prototype`, `nrz-descriptor-prototype`|Decision-only schema, handle, binding and static-comparison experiments; no engine API|`nrz-units`, `nrz-algebra`; no engine package may depend on this prototype|
+|`crates/algebra`, `nrz-algebra`|Physics-free exact symbolic scalar expressions and collection normal forms|None of the other engine packages|
+|`crates/scalar`, `nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|
+|`crates/accuracy`, `nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|
+|`crates/units`, `nrz-units`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence; numerical integration follows|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|
+|`crates/matrix`, `nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked block views, faer adapters, and operation-specific certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|
+|`crates/physics`, `nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|
+|`crates/engine`, `nrz`|Curated application-facing exports and entry points|The public interfaces of the engine packages above|
+|`tools/docgen`, `nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|No runtime engine dependency|
+|`prototypes/descriptors`, `nrz-descriptor-prototype`|Decision-only schema, handle, binding and static-comparison experiments; no engine API|`nrz-units`, `nrz-algebra`; no engine package may depend on this prototype|
 
 Exemplars: (`ex:exemplars:faer`), (`ex:exemplars:herbie`), (`ex:exemplars:estate-tools-and-templated-documentation`).
 
@@ -387,7 +387,7 @@ The computational representation is (`def:nrz:computation-plan`), with immutable
 
 **Rule (Tests, examples, and worked problems)** · `rule:vision:verification-locations`
 
-Package-local tests exercise the package contract; integration tests live under that package’s `tests/` directory when they cross its public interface. Units exercise dimensions, measures, counts, semantic kinds and affine roles through CAS acceptance/refusal tests. Compile-failure and compile-success twins exercise category, precision, validation state, physical/normalized views and fixed roles; the optional exponent probe separately checks its static dimension guarantee because rejection is an observable feature (`req:vision:algebraic-unit-checks`). Generator tests validate declared data expressions and their symbol dependencies; assembly tests reject incompatible dynamic blocks before backend calls. Cross-route cases check agreement of static and data-time dimension normalization, while conversion cases check point and difference bounds (`req:vision:expression-and-symbol-contract`), (`rule:vision:measure-conversions`). Matrix fixtures live under `packages/matrix/tests/fixtures/`, while executable examples and benchmarks live in the relevant package’s `examples/` and `benches/` directories. Cross-layer worked problems live under `data/problems/`, each with an identified physical model, inputs, expected observables, and generated explanatory documentation, so validation connects numerical results to a stated problem. Exemplars: (`prob:exemplars:spring-mass-truss`), (`prob:exemplars:resistor-network`).
+Package-local tests exercise the package contract; integration tests live under that package’s `tests/` directory when they cross its public interface. Units exercise dimensions, measures, counts, semantic kinds and affine roles through CAS acceptance/refusal tests. Compile-failure and compile-success twins exercise category, precision, validation state, physical/normalized views and fixed roles; the optional exponent probe separately checks its static dimension guarantee because rejection is an observable feature (`req:vision:algebraic-unit-checks`). Generator tests validate declared data expressions and their symbol dependencies; assembly tests reject incompatible dynamic blocks before backend calls. Cross-route cases check agreement of static and data-time dimension normalization, while conversion cases check point and difference bounds (`req:vision:expression-and-symbol-contract`), (`rule:vision:measure-conversions`). Matrix fixtures live under `crates/matrix/tests/fixtures/`, while executable examples and benchmarks live in the relevant package’s `examples/` and `benches/` directories. Cross-layer worked problems live under `data/problems/`, each with an identified physical model, inputs, expected observables, and generated explanatory documentation, so validation connects numerical results to a stated problem. Exemplars: (`prob:exemplars:spring-mass-truss`), (`prob:exemplars:resistor-network`).
 
 **Rule (Independent numerical evidence)** · `rule:vision:independent-numerical-evidence`
 
@@ -473,7 +473,7 @@ Documentation generation remains first because every later architectural decisio
 
 |Sequence|Relationship to the original plan|Architectural work and completion evidence|
 |--------|---------------------------------|------------------------------------------|
-|1. Documentation generator|Original bite 1|Establish `packages/docgen`, `nrz-docgen`, envelope handling, deterministic datasets, mirrored sources under `templates/`, ownership integration, and fixed-point checks; import this architecture as a committed render.|
+|1. Documentation generator|Original bite 1|Establish `tools/docgen`, `nrz-docgen`, envelope handling, deterministic datasets, mirrored sources under `templates/`, ownership integration, and fixed-point checks; import this architecture as a committed render.|
 |2. Numerical feasibility|Added prerequisite|Validate scalar and arithmetic contracts, safe faer integration, representative lint compatibility, and baseline residual/inverse-norm certification; record measured limitations before committing to broad APIs.|
 |3. Units design|Original bite 2|Decide descriptor representation and typed evidence boundaries; compare the integral static probe and assess rejected alternatives; name the separately owned next data migration (`req:vision:units-design-criteria`).|
 |4. Units and numerical foundations|Original bite 3 with necessary foundations|Implement scalar and companion foundations, descriptor integration, discrete counts and numerical conversions; integrate the separately designed migration; verify typed-boundary acceptance/rejection and CAS consistency through the agreed expression contract (`req:vision:algebraic-unit-checks`), (`req:vision:unit-data-migration`).|

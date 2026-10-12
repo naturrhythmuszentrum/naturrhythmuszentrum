@@ -9,12 +9,12 @@
   "license": "CC0-1.0",
   "sources": [
     "Cargo.toml",
-    "packages/docgen/Cargo.toml",
-    "packages/scalar/Cargo.toml",
-    "packages/matrix/Cargo.toml",
-    "packages/algebra/Cargo.toml",
-    "packages/units/Cargo.toml",
-    "packages/descriptor-prototype/Cargo.toml"
+    "tools/docgen/Cargo.toml",
+    "crates/scalar/Cargo.toml",
+    "crates/matrix/Cargo.toml",
+    "crates/algebra/Cargo.toml",
+    "crates/units/Cargo.toml",
+    "prototypes/descriptors/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -24,37 +24,37 @@
       "description": "Deterministic documentation datasets, rendering, and fixed-point checks",
       "has_readme_template": true,
       "name": "nrz-docgen",
-      "path": "packages/docgen"
+      "path": "tools/docgen"
     },
     {
       "description": "Validated scalar arithmetic prototype for Naturrhythmuszentrum",
       "has_readme_template": true,
       "name": "nrz-scalar",
-      "path": "packages/scalar"
+      "path": "crates/scalar"
     },
     {
       "description": "Safe dense solve candidates with independent numerical certificates",
       "has_readme_template": true,
       "name": "nrz-matrix",
-      "path": "packages/matrix"
+      "path": "crates/matrix"
     },
     {
       "description": "Exact symbolic expressions and deterministic collection normal forms",
       "has_readme_template": true,
       "name": "nrz-algebra",
-      "path": "packages/algebra"
+      "path": "crates/algebra"
     },
     {
       "description": "Data-time quantity descriptors and checks over original symbolic expressions",
       "has_readme_template": true,
       "name": "nrz-units",
-      "path": "packages/units"
+      "path": "crates/units"
     },
     {
       "description": "Descriptor schema interning and checked computation boundary prototypes",
       "has_readme_template": true,
       "name": "nrz-descriptor-prototype",
-      "path": "packages/descriptor-prototype"
+      "path": "prototypes/descriptors"
     }
   ]
 }

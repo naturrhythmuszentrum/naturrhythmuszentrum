@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: CC0-1.0
 # Workspace of the Naturrhythmuszentrum engine: a matrix-based physics calculation engine whose
 # quantities carry checked unit descriptors across typed computation boundaries. Packages join the
-# member list under packages/ as they land. The workspace lint posture holds for every package;
+# member list under crates/, tools/ and prototypes/ as they land. The workspace lint posture holds for every package;
 # any necessary lint exception uses expect on the smallest item with its reason.
 # Code is licensed AGPL-3.0-only, named here and inherited by every package; data and documentation
 # (inputs, datasets, templates and their renders) are CC0-1.0, stated in LICENSE-DOCS at the root.
 
 [workspace]
 resolver = "3"
-members = ["packages/docgen", "packages/scalar", "packages/matrix", "packages/algebra", "packages/units", "packages/descriptor-prototype"]
+members = ["tools/docgen", "crates/scalar", "crates/matrix", "crates/algebra", "crates/units", "prototypes/descriptors"]
 
 [workspace.package]
 version = "0.1.0"
@@ -25,8 +25,8 @@ serde_json = "1"
 toml = "1"
 clap = { version = "4", features = ["derive"] }
 thiserror = "2"
-nrz-scalar = { path = "packages/scalar" }
-nrz-algebra = { path = "packages/algebra" }
+nrz-scalar = { path = "crates/scalar" }
+nrz-algebra = { path = "crates/algebra" }
 faer = { version = "0.24.4", default-features = false, features = ["std", "linalg"] }
 tempfile = "3"
 

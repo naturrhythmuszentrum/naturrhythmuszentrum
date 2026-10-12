@@ -19,12 +19,12 @@ partitions = [
   { name = "documents", owner = "NRZ", pattern = '[ %s"templates/" ] %s"docs" [ "/" *VCHAR ]' },
   { name = "data", owner = "NRZ", pattern = '%s"data" [ "/" *VCHAR ]' },
   { name = "problems", owner = "NRZ", pattern = '[ %s"templates/" ] %s"problems" [ "/" *VCHAR ]' },
-  { name = "docgen", owner = "DOCGEN", pattern = '[ %s"templates/" ] %s"packages/docgen" [ "/" *VCHAR ]' },
-  { name = "scalar", owner = "SCALAR", pattern = '[ %s"templates/" ] %s"packages/scalar" [ "/" *VCHAR ]' },
-  { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"packages/matrix" [ "/" *VCHAR ]' },
-  { name = "algebra", owner = "ALGEBRA", pattern = '[ %s"templates/" ] %s"packages/algebra" [ "/" *VCHAR ]' },
-  { name = "units", owner = "UNITS", pattern = '[ %s"templates/" ] %s"packages/units" [ "/" *VCHAR ]' },
-  { name = "descriptors", owner = "DESCRIPTORS", pattern = '[ %s"templates/" ] %s"packages/descriptor-prototype" [ "/" *VCHAR ]' },
+  { name = "docgen", owner = "DOCGEN", pattern = '[ %s"templates/" ] %s"tools/docgen" [ "/" *VCHAR ]' },
+  { name = "scalar", owner = "SCALAR", pattern = '[ %s"templates/" ] %s"crates/scalar" [ "/" *VCHAR ]' },
+  { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"crates/matrix" [ "/" *VCHAR ]' },
+  { name = "algebra", owner = "ALGEBRA", pattern = '[ %s"templates/" ] %s"crates/algebra" [ "/" *VCHAR ]' },
+  { name = "units", owner = "UNITS", pattern = '[ %s"templates/" ] %s"crates/units" [ "/" *VCHAR ]' },
+  { name = "descriptors", owner = "DESCRIPTORS", pattern = '[ %s"templates/" ] %s"prototypes/descriptors" [ "/" *VCHAR ]' },
 ]
 
 may_cite = []

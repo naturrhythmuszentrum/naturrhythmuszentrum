@@ -27,7 +27,7 @@ output = "docs/plan.md"
 requires = []
 
 [[document]]
-output = "packages/docgen/README.md"
+output = "tools/docgen/README.md"
 requires = ["census", "project"]
 
 [[document]]
@@ -35,11 +35,11 @@ output = "problems/README.md"
 requires = ["problems"]
 
 [[document]]
-output = "packages/scalar/README.md"
+output = "crates/scalar/README.md"
 requires = []
 
 [[document]]
-output = "packages/matrix/README.md"
+output = "crates/matrix/README.md"
 requires = []
 
 [[document]]
@@ -47,11 +47,11 @@ output = "docs/feasibility.md"
 requires = []
 
 [[document]]
-output = "packages/algebra/README.md"
+output = "crates/algebra/README.md"
 requires = []
 
 [[document]]
-output = "packages/units/README.md"
+output = "crates/units/README.md"
 requires = []
 
 [[document]]
@@ -63,7 +63,7 @@ output = "docs/computation.md"
 requires = []
 
 [[document]]
-output = "packages/descriptor-prototype/README.md"
+output = "prototypes/descriptors/README.md"
 requires = []
 
 [[document]]

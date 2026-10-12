@@ -18,15 +18,15 @@ The computation contract connects storage and graph evaluation through (`spec:nr
 
 |Directory|Crate|Responsibility|Engine dependencies|Architecture|
 |---------|-----|--------------|-------------------|------------|
-|`packages/algebra`|`nrz-algebra`|Exact symbolic scalar expressions and collection normal forms|None of the other engine packages|(`tab:vision:package-structure`)|
-|`packages/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
-|`packages/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
-|`packages/units`|`nrz-units`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
-|`packages/matrix`|`nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked views, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
-|`packages/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
-|`packages/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|
-|`packages/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|No runtime engine dependency|(`tab:vision:package-structure`)|
-|`packages/descriptor-prototype`|`nrz-descriptor-prototype`|Decision-only schema, checked binding and static-comparison experiments|`nrz-units`, `nrz-algebra`; no production dependents|(`dec:nrz:descriptor-prototype-promotion`)|
+|`crates/algebra`|`nrz-algebra`|Exact symbolic scalar expressions and collection normal forms|None of the other engine packages|(`tab:vision:package-structure`)|
+|`crates/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
+|`crates/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
+|`crates/units`|`nrz-units`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
+|`crates/matrix`|`nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked views, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
+|`crates/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
+|`crates/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|
+|`tools/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|No runtime engine dependency|(`tab:vision:package-structure`)|
+|`prototypes/descriptors`|`nrz-descriptor-prototype`|Decision-only schema, checked binding and static-comparison experiments|`nrz-units`, `nrz-algebra`; no production dependents|(`dec:nrz:descriptor-prototype-promotion`)|
 
 Only the matrix package integrates faer, and only the physics package integrates petgraph. Engine interfaces check and preserve dimensions, measures, kinds, normalization maps, and intrinsic uncertainty companions across those boundaries (`rule:vision:backend-boundaries`), (`rule:vision:heterogeneous-assembly`), (`def:vision:intrinsic-uncertainty-companions`).
 

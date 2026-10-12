@@ -2,7 +2,7 @@
 
 # Descriptor units and the typed computation boundary · `spec:nrz:descriptor-units-boundary`
 
-This decision connects original-expression checking, logical matrix shapes and descriptor storage (`req:vision:expression-and-symbol-contract`), (`spec:nrz:matrix-shapes`), (`spec:nrz:descriptor-heap-computation`). The decision prototype is `packages/descriptor-prototype`, crate `nrz-descriptor-prototype`; it is an independently built workspace member with no production dependents. Its two dependencies are `nrz-units` and `nrz-algebra`.
+This decision connects original-expression checking, logical matrix shapes and descriptor storage (`req:vision:expression-and-symbol-contract`), (`spec:nrz:matrix-shapes`), (`spec:nrz:descriptor-heap-computation`). The decision prototype is `prototypes/descriptors`, crate `nrz-descriptor-prototype`; it is an independently built workspace member with no production dependents. Its two dependencies are `nrz-units` and `nrz-algebra`.
 
 ## Representation · `sec:nrz:descriptor-unit-representation`
 
