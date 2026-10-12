@@ -17,6 +17,8 @@ pub struct Evidence {
 }
 
 /// An observable's declared contract and its original expression.
+///
+/// TODO ´todo:code:attach-declared-output-shapes-and-indexed´: attach declared output shapes and indexed dependencies to future matrix observables under rule:nrz:shape-data-time-evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Observable {
     /// Expected dimension, kind, role and output coordinate measure.
@@ -28,19 +30,31 @@ pub struct Observable {
 }
 
 /// Named value relationships for an independent uncertainty companion.
+///
+/// TODO ´todo:code:bind-uncertainty-targets-to-ordered-value´: bind uncertainty targets to ordered value entries and versions rather than scalar names alone under def:nrz:companion-shape.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Companion {
     /// Absolute, relative, variance or covariance interpretation.
+    ///
+    /// TODO ´todo:code:distinguish-marginal-arrays-from-full-covariance´: distinguish marginal arrays from full covariance and joint coverage interpretations under def:nrz:companion-shape and rule:nrz:expanded-uncertainty-shapes.
     pub mode: UncertaintyMode,
     /// Primary value declaration.
+    ///
+    /// TODO ´todo:code:retain-the-primary-target-entry-map´: retain the primary target entry map through views and structural expansion under conv:nrz:shape-entry-order and rule:nrz:structured-companion-coordinates.
     pub value: Symbol,
     /// Second value declaration, required exactly for covariance.
+    ///
+    /// TODO ´todo:code:retain-the-second-covariance-axis-and´: retain the second covariance axis and cross block target identities under def:nrz:covariance-shape.
     pub other: Option<Symbol>,
     /// Compatible nonzero reference, required exactly for relative modes.
+    ///
+    /// TODO ´todo:code:identify-per-component-nonzero-references-and´: identify per component nonzero references and paired relative covariance scales under rule:nrz:correlation-and-relative-shapes.
     pub reference: Option<Symbol>,
 }
 
 /// A symbol's data-time meaning.
+///
+/// TODO ´todo:code:extend-declared-quantities-with-ordered-shapes´: extend declared quantities with ordered shapes while keeping extents separate from physical counts under def:nrz:matrix-shape.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Declaration {
     /// A numerical input with an explicit nonzero assumption if required.
@@ -62,6 +76,8 @@ pub enum Declaration {
         evidence: Evidence,
     },
     /// An uncertainty input explicitly bound to its value and optional reference names.
+    ///
+    /// TODO ´todo:code:validate-imported-companion-extents-and-indexed´: validate imported companion extents and indexed value relationships before numerical access under def:nrz:companion-shape and rule:nrz:shape-data-time-evidence.
     UncertaintyInput {
         /// Independent physical descriptor of the uncertainty coordinates.
         descriptor: Descriptor,
@@ -73,6 +89,8 @@ pub enum Declaration {
     /// A derived value whose original expression must satisfy its declared descriptor.
     Derived(Observable),
     /// An independently typed uncertainty expression with explicit value relationships.
+    ///
+    /// TODO ´todo:code:declare-output-covariance-maps-and-contributors´: declare output covariance maps and contributors without asserting a validated Jacobian under rule:nrz:shape-data-time-evidence.
     Uncertainty {
         /// Expected descriptor, expression and evidence of the uncertainty itself.
         observable: Observable,
@@ -113,6 +131,8 @@ impl Declaration {
 }
 
 /// A fixed ordered function signature; measures specify its argument and return coordinates.
+///
+/// TODO ´todo:code:declare-shaped-arguments-results-and-dependency´: declare shaped arguments results and dependency maps for matrix valued applications under rule:nrz:shape-data-time-evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FunctionSignature {
     /// Expected ordered descriptors, including affine roles.
@@ -122,6 +142,8 @@ pub struct FunctionSignature {
 }
 
 /// A reusable declaration environment; checks own snapshots of all evidence they use.
+///
+/// TODO ´todo:code:retain-shape-and-value-identity-snapshots´: retain shape and value identity snapshots independently of later declarations or batch reuse under dec:nrz:shape-descriptor-ownership.
 #[derive(Clone, Debug)]
 pub struct Context {
     /// Explicit physical operation rules.
@@ -147,6 +169,8 @@ impl Context {
     }
 
     /// Add a declaration atomically; forward references are checked during resolution.
+    ///
+    /// TODO ´todo:code:validate-shape-declarations-and-companion-target´: validate shape declarations and companion target maps atomically at the context boundary under rule:nrz:shape-data-time-evidence.
     ///
     /// # Errors
     /// Refuses duplicate names, inconsistent kinds and invalid exact count imports.
@@ -189,6 +213,8 @@ impl Context {
     }
 
     /// Add an uninterpreted function's physical signature atomically.
+    ///
+    /// TODO ´todo:code:validate-function-contraction-and-output-axes´: validate function contraction and output axes alongside the declared scalar signatures under rule:nrz:shape-data-time-evidence.
     ///
     /// # Errors
     /// Refuses inconsistent descriptors and duplicate or builtin function names.

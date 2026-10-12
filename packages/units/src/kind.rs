@@ -90,6 +90,8 @@ impl CountDomain {
 }
 
 /// The relationship of an uncertainty expression to its values, not an assurance proof.
+///
+/// TODO ´todo:code:declare-correlation-and-expanded-modes-with´: declare correlation and expanded modes with their separate reference and coverage contracts under rule:nrz:correlation-and-relative-shapes and rule:nrz:expanded-uncertainty-shapes.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum UncertaintyMode {
     /// An absolute deterministic difference bound.
@@ -107,6 +109,8 @@ pub enum UncertaintyMode {
 }
 
 /// Semantic meaning, kept even when dimension vectors cancel.
+///
+/// TODO ´todo:code:retain-paired-target-kinds-during-covariance´: retain paired target kinds during covariance contractions without equating dual roles to automatic scalar reciprocals under def:nrz:covariance-shape and rule:nrz:shape-transpose-and-duality.
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Kind {
     /// A continuous dimensionless ratio.

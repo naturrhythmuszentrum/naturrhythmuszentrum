@@ -14,6 +14,8 @@ use crate::{
 impl Context {
     /// Check every original operation before exposing a coordinate normal form.
     ///
+    /// TODO ´todo:code:dispatch-future-shaped-checks-without-treating´: dispatch future shaped checks without treating scalar traversal as matrix multiplication evidence under rule:nrz:shape-data-time-evidence.
+    ///
     /// # Errors
     /// Reports unknown names, cycles, metadata operands, physical refusals and limits.
     pub fn check(&self, expression: &Expr) -> Result<CheckedExpression, Diagnostic> {
@@ -43,6 +45,8 @@ impl Context {
     }
 
     /// Check an original expression against an explicit output descriptor.
+    ///
+    /// TODO ´todo:code:compare-declared-output-axes-and-companion´: compare declared output axes and companion extents before exposing converted matrix results under rule:nrz:shape-data-time-evidence.
     ///
     /// # Errors
     /// Reports expression failures or a dimension, kind, role or measure mismatch.
@@ -75,6 +79,8 @@ impl Context {
 
     /// Check both sides of an equation for physical compatibility, without solving it.
     ///
+    /// TODO ´todo:code:check-ordered-equation-axes-and-typed´: check ordered equation axes and typed entry correspondence on both sides under rule:nrz:shape-entry-contract.
+    ///
     /// # Errors
     /// Reports either original expression's failure or incompatible side descriptors.
     pub fn check_equation(
@@ -99,6 +105,8 @@ impl Context {
     ///
     /// This is descriptor validation, not commutative rewriting of matrix operations.
     ///
+    /// TODO ´todo:code:validate-block-extents-partitions-and-quotient´: validate block extents partitions and quotient axes beyond individually checked scalar entries under def:nrz:matrix-shape and rule:nrz:shape-entry-contract.
+    ///
     /// # Errors
     /// Returns the first invalid entry with its index prepended to the original path.
     pub fn check_block(
@@ -121,6 +129,8 @@ impl Context {
 
     /// Validate all numerical declarations, including unused observables and cycles.
     ///
+    /// TODO ´todo:code:include-unused-shape-declarations-and-stale´: include unused shape declarations and stale indexed companion references in context validation under rule:nrz:shape-data-time-evidence.
+    ///
     /// # Errors
     /// Reports the first failing declaration in deterministic symbol order.
     pub fn check_all(&self) -> Result<BTreeMap<Symbol, CheckedExpression>, Diagnostic> {
@@ -137,6 +147,8 @@ impl Context {
 }
 
 /// A checked subtree, with coordinates in coherent measure.
+///
+/// TODO ´todo:code:retain-original-entry-identities-and-logical´: retain original entry identities and logical maps for shaped intermediate values under def:nrz:companion-shape.
 struct Value {
     /// Physical interpretation of the original subtree.
     descriptor: Descriptor,
@@ -155,6 +167,8 @@ struct Value {
 }
 
 /// Dependency and contributor evidence collected from original expression operands.
+///
+/// TODO ´todo:code:track-indexed-dependencies-and-paired-uncertainty´: track indexed dependencies and paired uncertainty contributors before zero or cancellation rewrites under rule:nrz:shape-data-time-evidence.
 #[derive(Default)]
 struct Trace {
     /// All declarations reached by this subtree, including resolved derived dependencies.
@@ -167,6 +181,8 @@ struct Trace {
 
 impl Trace {
     /// Combine independently checked operands without discarding cancelled contributions.
+    ///
+    /// TODO ´todo:code:merge-contributor-entry-maps-without-erasing´: merge contributor entry maps without erasing shared source dependence under def:nrz:companion-shape and rule:nrz:shape-sensitivity-propagation.
     fn merge(&mut self, other: Self) {
         self.dependencies.extend(other.dependencies);
         self.contributors.extend(other.contributors);
@@ -175,6 +191,8 @@ impl Trace {
 }
 
 /// Value dependencies that may supply uncertainty contributors to an explicit propagation.
+///
+/// TODO ´todo:code:restrict-covariance-contributors-to-the-declared´: restrict covariance contributors to the declared paired target closures and contraction axes under rule:nrz:shape-data-time-evidence.
 struct PropagationScope {
     /// The primary value and, for covariance, the second value's dependency closures.
     values: BTreeSet<Symbol>,
@@ -253,6 +271,8 @@ impl State<'_> {
     }
 
     /// Apply an exact coordinate map without normalizing original operations.
+    ///
+    /// TODO ´todo:code:apply-axis-conversions-to-values-and´: apply axis conversions to values and both covariance indices while excluding affine uncertainty offsets under def:nrz:covariance-shape.
     fn convert(
         &self,
         source: &Expr,
@@ -519,6 +539,8 @@ impl State<'_> {
     }
 
     /// Check physical compatibility before establishing or propagating a relationship.
+    ///
+    /// TODO ´todo:code:check-shaped-observable-targets-and-retain´: check shaped observable targets and retain the operating point for declared sensitivities under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
     fn observable_body(
         &mut self,
         expression: &Expr,
@@ -563,6 +585,8 @@ impl State<'_> {
     }
 
     /// Bind an explicitly declared propagation only to contributors inside its value closures.
+    ///
+    /// TODO ´todo:code:validate-indexed-covariance-contractions-while-leaving´: validate indexed covariance contractions while leaving derivative correctness and numerical assurance separate under rule:nrz:shape-data-time-evidence.
     fn propagate(
         &self,
         expression: &Expr,
@@ -618,6 +642,8 @@ impl State<'_> {
     }
 
     /// Check the companion's descriptors at its own expression source.
+    ///
+    /// TODO ´todo:code:resolve-companion-entry-axes-and-relative´: resolve companion entry axes and relative references before accepting relationship evidence under def:nrz:companion-shape and rule:nrz:correlation-and-relative-shapes.
     fn companion(
         &mut self,
         source: &Expr,
@@ -715,6 +741,8 @@ impl State<'_> {
     }
 
     /// Distinguish a ratio coefficient from a named value or explicitly declared reference.
+    ///
+    /// TODO ´todo:code:match-relative-references-to-individual-target´: match relative references to individual target entries rather than shape equality under rule:nrz:correlation-and-relative-shapes.
     fn relative_requested(&self, left: &Value, right: &Value) -> bool {
         let Kind::Uncertainty(UncertaintyMode::Radius | UncertaintyMode::Standard, value, None) =
             left.descriptor.kind()
@@ -810,6 +838,8 @@ impl State<'_> {
     }
 
     /// Preserve identities only through explicitly supported uncertainty operations.
+    ///
+    /// TODO ´todo:code:preserve-covariance-pair-identities-through-admitted´: preserve covariance pair identities through admitted contractions and reject unrelated equal shapes under rule:nrz:shape-sensitivity-propagation.
     fn binary_companion(
         operation: BinaryOp,
         left: &Value,
@@ -849,6 +879,8 @@ impl State<'_> {
     }
 
     /// Check a power and preserve identity only through identity powers or variance transitions.
+    ///
+    /// TODO ´todo:code:gate-matrix-powers-by-endomorphism-and´: gate matrix powers by endomorphism and scalar scale contracts outside the scalar walker under rule:nrz:shape-powers-and-functions.
     fn power(&self, source: &Expr, base: Value, exponent: Rational) -> Result<Value, Diagnostic> {
         let descriptor = self
             .context
@@ -888,6 +920,8 @@ impl State<'_> {
     }
 
     /// Check special relationships or a fixed function signature after all argument visits.
+    ///
+    /// TODO ´todo:code:require-declared-shape-and-dependency-signatures´: require declared shape and dependency signatures for matrix valued functions under rule:nrz:shape-data-time-evidence.
     fn call(
         &self,
         source: &Expr,

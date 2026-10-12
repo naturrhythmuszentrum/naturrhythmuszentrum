@@ -91,6 +91,8 @@ impl Measure {
 
     /// Construct a role-aware exact conversion; dimension and kind checks belong to `Descriptor`.
     ///
+    /// TODO ´todo:code:derive-difference-scale-maps-for-both´: derive difference scale maps for both uncertainty axes without translating covariance under def:nrz:covariance-shape.
+    ///
     /// # Errors
     /// Refuses offset-bearing differences and exact arithmetic overflow.
     pub fn conversion_to(&self, target: &Self, role: Role) -> Result<Conversion, UnitError> {
@@ -112,6 +114,8 @@ impl Measure {
 }
 
 /// An exact coordinate map; it does not change the quantity's role or kind.
+///
+/// TODO ´todo:code:compose-coordinate-conversions-with-explicit-operator´: compose coordinate conversions with explicit operator and companion maps at shape owners under def:nrz:shape-normalization.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Conversion {
     /// Multiplicative coordinate factor.
@@ -122,6 +126,8 @@ pub struct Conversion {
 
 impl Conversion {
     /// Apply the map to an exact coordinate for conversion oracles and exact imports.
+    ///
+    /// TODO ´todo:code:apply-scalar-coordinate-maps-through-entrywise´: apply scalar coordinate maps through entrywise or paired tensor transformations at owners under def:nrz:covariance-shape and rule:nrz:shape-sensitivity-propagation.
     ///
     /// # Errors
     /// Refuses exact arithmetic overflow; no floating conversion bound is implied.

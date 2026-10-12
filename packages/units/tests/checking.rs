@@ -77,6 +77,8 @@ fn refusal(context: &Context, source: &str, expected: &Failure) -> TestResult {
 
 /// Original invalid operations cannot disappear through cancellation or multiplication by zero.
 ///
+/// TODO ´todo:test:test-typed-matrix-zeros-and-cancelled´: test typed matrix zeros and cancelled contractions retain original axis checks under rule:nrz:shape-entry-contract and rule:nrz:shape-data-time-evidence.
+///
 /// ´test:integration:original-operations-before-normalization´
 #[test]
 fn original_operations_before_normalization() -> TestResult {
@@ -146,6 +148,8 @@ fn original_operations_before_normalization() -> TestResult {
 
 /// Coordinate conversions retain exact affine and multiplicative evidence.
 ///
+/// TODO ´todo:test:test-operator-normalization-and-paired-covariance´: test operator normalization and paired covariance conversions preserve coordinate meaning under def:nrz:shape-normalization and def:nrz:covariance-shape.
+///
 /// ´test:integration:coordinate-evidence´
 #[test]
 fn coordinate_evidence() -> TestResult {
@@ -212,6 +216,8 @@ fn coordinate_evidence() -> TestResult {
 
 /// Derived eigenvalues and homogeneous blocks check declared physical relations.
 ///
+/// TODO ´todo:test:test-rectangular-block-extents-and-ordered´: test rectangular block extents and ordered equation axes alongside scalar descriptor checks under def:nrz:matrix-shape and rule:nrz:shape-entry-contract.
+///
 /// ´test:integration:observables-equations-and-blocks´
 #[test]
 fn observables_equations_and_blocks() -> TestResult {
@@ -271,6 +277,8 @@ fn observables_equations_and_blocks() -> TestResult {
 }
 
 /// Function signatures distinguish angles, ratios and unrelated dimensionless kinds.
+///
+/// TODO ´todo:test:test-matrix-function-signatures-reject-wrong´: test matrix function signatures reject wrong axes and unsupported contraction semantics under rule:nrz:shape-data-time-evidence.
 ///
 /// ´test:integration:function-signatures´
 #[test]
@@ -421,6 +429,8 @@ fn counts_and_metadata() -> TestResult {
 }
 
 /// Uncertainty expressions validate their own declarations and their reference conditions.
+///
+/// TODO ´todo:test:test-marginal-arrays-and-full-covariance´: test marginal arrays and full covariance derive independent shapes and paired kinds under def:nrz:companion-shape and def:nrz:covariance-shape.
 ///
 /// ´test:integration:uncertainty-expressions´
 #[test]

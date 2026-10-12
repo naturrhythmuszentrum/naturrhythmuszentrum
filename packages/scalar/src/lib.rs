@@ -10,6 +10,8 @@ use core::ops::{Add, Div, Mul, Neg, Sub};
 /// Only binary32 and binary64 are admitted (dec:vision:precision-selection).
 ///
 /// TODO ´todo:code:keep-the-binary-scalar-contract-dimension´: keep the binary scalar contract dimension-neutral beneath quantity and discrete-count wrappers under dec:vision:storage-and-scalar-wrapping.
+///
+/// TODO ´todo:code:keep-logical-shapes-at-the-caller´: keep logical shapes at the caller while precision changes preserve descriptor meaning under dec:nrz:shape-descriptor-ownership.
 pub trait Scalar:
     private::Sealed
     + Copy
@@ -190,6 +192,8 @@ pub enum ArithmeticFailure {
 /// A closed interval of finite binary values.
 ///
 /// TODO ´todo:code:wrap-intervals-with-value-dimensions-measures´: wrap intervals with value dimensions, measures and kinds and intrinsic measurement and computational companions under dec:vision:storage-and-scalar-wrapping and def:vision:intrinsic-uncertainty-companions.
+///
+/// TODO ´todo:code:bind-scalar-enclosures-to-named-entry´: bind scalar enclosures to named entry or norm targets at the quantity owner under def:nrz:numerical-error-shapes.
 #[derive(Debug, Clone, Copy)]
 pub struct Interval<T: Scalar> {
     /// Lower endpoint.
@@ -462,6 +466,8 @@ impl<T: Scalar> Interval<T> {
 ///
 /// TODO ´todo:code:check-typed-dot-products-for-equal´: check typed dot products for equal summand dimensions and propagate intrinsic companions around this numerical primitive under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 ///
+/// TODO ´todo:code:require-callers-to-validate-contraction-axes´: require callers to validate contraction axes before reducing plain scalar slices under rule:nrz:shape-composition.
+///
 /// # Errors
 ///
 /// A length mismatch, non-finite input or overflow returns an `ArithmeticFailure`.
@@ -480,6 +486,8 @@ pub fn dot<T: Scalar>(left: &[T], right: &[T]) -> Result<Interval<T>, Arithmetic
 ///
 /// TODO ´todo:code:derive-squared-dimensions-for-homogeneous-reductions´: derive squared dimensions for homogeneous reductions and their computational bounds under def:vision:dimensions and rule:vision:uncertainty-unit-algebra.
 ///
+/// TODO ´todo:code:require-callers-to-supply-compatible-coordinates´: require callers to supply compatible coordinates and structural multiplicities before squaring entries under rule:nrz:shape-norms-and-conditioning and rule:nrz:structured-companion-coordinates.
+///
 /// # Errors
 ///
 /// A non-finite input or overflow returns an `ArithmeticFailure`.
@@ -494,6 +502,8 @@ pub fn sum_squares<T: Scalar>(values: &[T]) -> Result<Interval<T>, ArithmeticFai
 /// Bound a Frobenius norm by scaling with an exact power of two.
 ///
 /// TODO ´todo:code:assign-norm-bounds-their-block-or´: assign norm bounds their block or normalized-coordinate dimension while keeping numeric scaling separate from measures under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:code:distinguish-numerical-power-scaling-from-physical´: distinguish numerical power scaling from physical normalization and packed entry weights at callers under def:nrz:shape-normalization and rule:nrz:structured-companion-coordinates.
 ///
 /// # Errors
 ///
@@ -520,7 +530,11 @@ pub fn frobenius_upper<T: Scalar>(values: &[T]) -> Result<T, ArithmeticFailure> 
     Ok(total.sqrt()?.checked_mul(Interval::point(scale)?)?.hi())
 }
 
+/// Widen a binary32 enclosure exactly to binary64.
+///
 /// TODO ´todo:code:preserve-quantity-and-uncertainty-descriptors-during´: preserve quantity and uncertainty descriptors during precision widening independently of measure conversion under rule:vision:precision-conversions and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:code:preserve-logical-entry-mappings-during-widening´: preserve logical entry mappings during widening at the owner without introducing scalar shape dependencies under dec:nrz:shape-descriptor-ownership.
 impl From<Interval<f32>> for Interval<f64> {
     fn from(value: Interval<f32>) -> Self {
         Self {
@@ -530,7 +544,11 @@ impl From<Interval<f32>> for Interval<f64> {
     }
 }
 
+/// Narrow a binary64 enclosure with outward binary32 endpoints.
+///
 /// TODO ´todo:code:carry-narrowing-error-as-computational-uncertainty´: carry narrowing error as computational uncertainty without changing the value or uncertainty kind under rule:vision:precision-conversions and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:code:attach-narrowing-bounds-to-their-original´: attach narrowing bounds to their original entry or norm targets at the owner under def:nrz:numerical-error-shapes.
 impl TryFrom<Interval<f64>> for Interval<f32> {
     type Error = ArithmeticFailure;
     fn try_from(value: Interval<f64>) -> Result<Self, Self::Error> {
@@ -714,6 +732,8 @@ mod tests {
     ///
     /// TODO ´todo:code:test-precision-and-measure-conversions-independently´: test precision and measure conversions independently with affine difference radii and unchanged semantic kinds under rule:vision:measure-conversions and rule:vision:precision-conversions.
     ///
+    /// TODO ´todo:code:test-owner-integration-preserves-target-identities´: test owner integration preserves target identities while recording narrowing error separately under dec:nrz:shape-descriptor-ownership.
+    ///
     /// ´test:unit:precision-conversions-enclose´
     #[test]
     fn precision_conversions_enclose() {
@@ -741,6 +761,8 @@ mod tests {
     ///
     /// TODO ´todo:code:test-norm-dimensions-and-restored-block´: test norm dimensions and restored block-bound measures after normalized scaling under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
     ///
+    /// TODO ´todo:code:test-normalized-mixed-quantities-and-weighted´: test normalized mixed quantities and weighted symmetric entries at the owning layer under rule:nrz:shape-norms-and-conditioning and rule:nrz:structured-companion-coordinates.
+    ///
     /// ´test:unit:scaled-norm-encloses´
     #[test]
     fn scaled_norm_encloses() {
@@ -753,6 +775,8 @@ mod tests {
     /// Plain-slice reductions enclose their exact value and reject unequal lengths.
     ///
     /// TODO ´todo:code:test-typed-reductions-reject-incompatible-summands´: test typed reductions reject incompatible summands and preserve product or squared uncertainty dimensions under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:test-checked-contraction-maps-alongside-scalar´: test checked contraction maps alongside scalar reduction enclosures at the matrix boundary under rule:nrz:shape-composition.
     ///
     /// ´test:unit:reductions-enclose´
     #[test]

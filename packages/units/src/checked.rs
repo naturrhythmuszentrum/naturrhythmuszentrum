@@ -8,11 +8,17 @@ use nrz_algebra::{Error, Expr, Limits, NormalForm, Symbol};
 use crate::{Companion, Conversion, Declaration, Descriptor, Location, UncertaintyMode};
 
 /// How a checked uncertainty expression acquires its declared value relationship.
+///
+/// TODO ´todo:code:carry-indexed-target-and-contraction-evidence´: carry indexed target and contraction evidence separately from numerical covariance validity under rule:nrz:shape-data-time-evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CompanionEvidence {
     /// A declared input relationship preserved by supported identity operations.
+    ///
+    /// TODO ´todo:code:retain-established-entry-identities-through-supported´: retain established entry identities through supported view and permutation maps under conv:nrz:shape-entry-order and def:nrz:companion-shape.
     Established(Companion),
     /// A kind-checked body whose uncertainty contributors belong to the value closures.
+    ///
+    /// TODO ´todo:code:retain-paired-contributor-maps-across-covariance´: retain paired contributor maps across covariance contractions without inferring independence under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
     Propagated {
         /// The declared target relationship, available to later uncertainty operations.
         companion: Companion,
@@ -31,6 +37,8 @@ impl CompanionEvidence {
     }
 
     /// Preserve the evidence source while changing a supported uncertainty mode or reference.
+    ///
+    /// TODO ´todo:code:transform-uncertainty-reference-maps-and-paired´: transform uncertainty reference maps and paired axes together with each supported mode under rule:nrz:correlation-and-relative-shapes.
     pub(super) fn transform(&mut self, mode: UncertaintyMode, reference: Option<Symbol>) {
         let (Self::Established(companion) | Self::Propagated { companion, .. }) = self;
         companion.mode = mode;
@@ -39,6 +47,8 @@ impl CompanionEvidence {
 }
 
 /// The descriptor evidence associated with one original node.
+///
+/// TODO ´todo:code:record-original-axis-contractions-and-coordinate´: record original axis contractions and coordinate maps beside each checked node under rule:nrz:shape-data-time-evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NodeEvidence {
     /// Original tree location or expanded declaration location.
@@ -52,6 +62,8 @@ pub struct NodeEvidence {
 }
 
 /// A validated original expression and an optional algebraic view of its coherent coordinates.
+///
+/// TODO ´todo:code:own-checked-logical-shapes-and-indexed´: own checked logical shapes and indexed companion evidence before coordinate normalization under rule:nrz:shape-data-time-evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CheckedExpression {
     /// Original source operations, including those that a normal form would erase.
@@ -72,6 +84,8 @@ pub struct CheckedExpression {
 
 impl CheckedExpression {
     /// Value and reference names carried by established or explicitly propagated evidence.
+    ///
+    /// TODO ´todo:code:expose-companion-entry-targets-and-versions´: expose companion entry targets and versions without collapsing them to equal descriptors under def:nrz:companion-shape.
     #[must_use]
     pub const fn companion(&self) -> Option<&Companion> {
         match &self.companion {
@@ -81,6 +95,8 @@ impl CheckedExpression {
     }
 
     /// Distinguish preserved input identity from an explicitly declared propagation.
+    ///
+    /// TODO ´todo:code:expose-matrix-propagation-obligations-separately-from´: expose matrix propagation obligations separately from established descriptor and dependency evidence under rule:nrz:shape-data-time-evidence.
     #[must_use]
     pub const fn companion_evidence(&self) -> Option<&CompanionEvidence> {
         self.companion.as_ref()
@@ -93,12 +109,16 @@ impl CheckedExpression {
     }
 
     /// Root's physical descriptor, never discarded when coordinates normalize to zero.
+    ///
+    /// TODO ´todo:code:expose-ordered-axis-descriptors-alongside-the´: expose ordered axis descriptors alongside the scalar root descriptor for shaped results under def:nrz:matrix-shape.
     #[must_use]
     pub const fn descriptor(&self) -> &Descriptor {
         &self.descriptor
     }
 
     /// Postorder evidence for original nodes and expanded declarations.
+    ///
+    /// TODO ´todo:code:expose-original-contraction-paths-and-typed´: expose original contraction paths and typed zero evidence with indexed nodes under rule:nrz:shape-data-time-evidence.
     #[must_use]
     pub fn nodes(&self) -> &[NodeEvidence] {
         &self.nodes
@@ -111,6 +131,8 @@ impl CheckedExpression {
     }
 
     /// Conversion to an explicit requested output descriptor, if one was checked.
+    ///
+    /// TODO ´todo:code:expose-paired-covariance-conversion-maps-instead´: expose paired covariance conversion maps instead of one scalar output conversion under def:nrz:covariance-shape.
     #[must_use]
     pub const fn output_conversion(&self) -> Option<Conversion> {
         self.output

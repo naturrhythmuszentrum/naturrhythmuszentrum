@@ -109,6 +109,8 @@ fn nearest(value: Rational) -> (f64, f64) {
 /// Import exact fixture entries with zero or half-ulp representation radii.
 ///
 /// TODO ´todo:test:construct-quantity-carrying-fixtures-with-declared´: construct quantity-carrying fixtures with declared leaf measures, block quotients and intrinsic input and computational companions under rule:vision:heterogeneous-assembly and def:vision:intrinsic-uncertainty-companions.
+///
+/// TODO ´todo:test:import-fixture-entries-with-logical-axes´: import fixture entries with logical axes and shaped representation bounds under def:nrz:matrix-shape and def:nrz:numerical-error-shapes.
 fn system(entries: &[Rational], n: usize) -> DenseSystem {
     let mut a = Vec::with_capacity(entries.len());
     let mut a_errors = Vec::with_capacity(entries.len());
@@ -135,6 +137,8 @@ fn system(entries: &[Rational], n: usize) -> DenseSystem {
 /// Hilbert entries are exact unit fractions.
 ///
 /// TODO ´todo:test:declare-hilbert-entries-as-numerical-ratio´: declare Hilbert entries as numerical ratio quantities and order as structural metadata in typed fixtures under rule:vision:semantic-kinds-and-roles and rule:vision:counts-and-metadata.
+///
+/// TODO ´todo:test:declare-hilbert-symmetry-with-explicit-center´: declare Hilbert symmetry with explicit center and perturbation scope under def:nrz:shape-structure.
 fn hilbert(n: usize) -> DenseSystem {
     let entries = (0..n)
         .flat_map(|row| {
@@ -149,6 +153,8 @@ fn hilbert(n: usize) -> DenseSystem {
 /// A Kahan upper triangle has rational powers of s.
 ///
 /// TODO ´todo:test:check-kahan-coefficient-and-angular-kinds´: check Kahan coefficient and angular kinds separately from order metadata in quantity-carrying cases under rule:vision:semantic-kinds-and-roles and rule:vision:counts-and-metadata.
+///
+/// TODO ´todo:test:declare-kahan-triangular-zeros-with-checked´: declare Kahan triangular zeros with checked entry descriptors and uncertainty scope under rule:nrz:shape-entry-contract and def:nrz:shape-structure.
 fn kahan(n: usize, c: Rational, s: Rational) -> DenseSystem {
     let mut entries = Vec::with_capacity(n * n);
     let mut scale = Rational::new(1, 1);
@@ -169,6 +175,8 @@ fn kahan(n: usize, c: Rational, s: Rational) -> DenseSystem {
 /// Wilkinson's partial-pivoting growth matrix has only integer entries.
 ///
 /// TODO ´todo:test:keep-integer-valued-wilkinson-entries-distinct´: keep integer-valued Wilkinson entries distinct from physical counts in typed fixture cases under def:vision:counts and rule:vision:semantic-kinds-and-roles.
+///
+/// TODO ´todo:test:retain-wilkinson-structural-zeros-without-inferring´: retain Wilkinson structural zeros without inferring absent uncertainty from stored centers under def:nrz:shape-structure.
 fn wilkinson(n: usize) -> DenseSystem {
     let entries = (0..n)
         .flat_map(|row| {
@@ -213,6 +221,8 @@ fn parameter(entry: &Value, variant: &Value, name: &str) -> Rational {
 /// Construct the system named by a fixture variant.
 ///
 /// TODO ´todo:test:validate-variant-selectors-as-metadata-and´: validate variant selectors as metadata and preserve quantity descriptors through fixture dispatch under rule:vision:counts-and-metadata and req:vision:algebraic-unit-checks.
+///
+/// TODO ´todo:test:dispatch-fixture-variants-with-declared-axes´: dispatch fixture variants with declared axes and independently shaped companions under def:nrz:matrix-shape and def:nrz:companion-shape.
 fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
     let name = variant["name"].as_str().expect("variant name");
     if name.starts_with("order") {
@@ -233,6 +243,8 @@ fn variant_system(entry: &Value, variant: &Value) -> DenseSystem {
 /// Every success encloses the all-ones solution and every variant meets its expectation.
 ///
 /// TODO ´todo:test:verify-adversarial-outcomes-with-independently-typed´: verify adversarial outcomes with independently typed radii, residuals, inverse bounds and ratio budgets after measure conversion under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:test:test-descriptor-preserving-fixture-solves-and´: test descriptor preserving fixture solves and packed structure norms against independent enclosures under rule:nrz:structured-companion-coordinates and rule:nrz:shape-certified-solve.
 ///
 /// ´test:integration:adversarial-matrix-fixtures´
 #[test]

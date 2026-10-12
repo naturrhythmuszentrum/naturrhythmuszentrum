@@ -89,6 +89,8 @@ impl Registry {
     /// Count results require domain proofs outside this registry. Count/count division
     /// remains the explicit `count_ratio` operation and cannot be registered here.
     ///
+    /// TODO ´todo:code:register-explicit-sensitivity-and-covariance-pairing´: register explicit sensitivity and covariance pairing relations without inferring semantic coercions from dimensions under rule:nrz:shape-sensitivity-propagation.
+    ///
     /// # Errors
     /// Refuses additive rules, duplicate keys, count results or inconsistent dimensions.
     pub fn register_binary(
@@ -133,6 +135,8 @@ impl Registry {
 
     /// Register a power relation without inferring semantic identity from its dimension.
     ///
+    /// TODO ´todo:code:keep-scalar-exponent-admission-distinct-from´: keep scalar exponent admission distinct from matrix branch and composition evidence under rule:nrz:shape-powers-and-functions.
+    ///
     /// # Errors
     /// Refuses duplicate rules, count rules and incompatible dimensions or policies.
     pub fn register_power(
@@ -169,6 +173,8 @@ impl Registry {
     ///
     /// Ratio factors preserve existing uncertainty kinds. Relative conversion is an
     /// explicit operation; standard-uncertainty products need original identity evidence.
+    ///
+    /// TODO ´todo:code:check-each-contracted-entry-kind-before´: check each contracted entry kind before admitting a shaped operator product under rule:nrz:shape-composition.
     ///
     /// # Errors
     /// Refuses invalid affine roles, kinds, count closure or dimension arithmetic.
@@ -271,6 +277,8 @@ impl Registry {
     ///
     /// The expression client additionally establishes value and reference identities.
     ///
+    /// TODO ´todo:code:validate-indexed-nonzero-references-and-preserve´: validate indexed nonzero references and preserve paired relative covariance interpretation under rule:nrz:correlation-and-relative-shapes.
+    ///
     /// # Errors
     /// Refuses non-absolute uncertainties, incompatible references and missing nonzero evidence.
     pub fn relative(
@@ -298,6 +306,8 @@ impl Registry {
     }
 
     /// Check an exact power under the selected exponent policy and semantic rules.
+    ///
+    /// TODO ´todo:code:require-factor-and-eigenvalue-kind-contracts´: require factor and eigenvalue kind contracts beyond scalar dimensional powers under rule:nrz:shape-factorizations and rule:nrz:shape-eigenproblems.
     ///
     /// # Errors
     /// Refuses points, counts, unsupported kind rules and unadmitted dimensions.

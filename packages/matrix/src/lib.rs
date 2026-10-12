@@ -19,27 +19,39 @@ mod backend;
 /// A square center system with deterministic Frobenius input radii.
 ///
 /// TODO ´todo:code:own-checked-block-dimensions-measures-and´: own checked block dimensions, measures and kinds with intrinsic input and computational uncertainties under rule:vision:heterogeneous-assembly and def:vision:intrinsic-uncertainty-companions.
+///
+/// TODO ´todo:code:own-ordered-domain-and-codomain-shapes´: own ordered domain and codomain shapes with structural scope and separate companion extents under def:nrz:matrix-shape and def:nrz:companion-shape.
 #[derive(Debug, Clone)]
 pub struct DenseSystem {
     /// Matrix order.
     ///
     /// TODO ´todo:code:retain-matrix-order-as-structural-metadata´: retain matrix order as structural metadata rather than a physical count under rule:vision:counts-and-metadata.
+    ///
+    /// TODO ´todo:code:replace-the-single-order-assumption-with´: replace the single order assumption with checked operator and right hand side extents under rule:nrz:shape-solves-and-inverses.
     n: usize,
     /// Matrix center in row-major order.
     ///
     /// TODO ´todo:code:attach-equation-over-variable-quotient-descriptors´: attach equation-over-variable quotient descriptors to matrix centers before backend storage under rule:vision:heterogeneous-assembly.
+    ///
+    /// TODO ´todo:code:map-operator-storage-positions-to-logical´: map operator storage positions to logical entries independently of row order under conv:nrz:shape-entry-order.
     a: Vec<f64>,
     /// Matrix perturbation radius.
     ///
     /// TODO ´todo:code:carry-matrix-input-bounds-as-intrinsic´: carry matrix input bounds as intrinsic uncertainty with the operator block quotient dimension and its own kind under rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:bind-the-operator-radius-to-its´: bind the operator radius to its declared normalized Frobenius norm under def:nrz:numerical-error-shapes.
     a_radius: f64,
     /// Right-hand side center.
     ///
     /// TODO ´todo:code:declare-right-hand-side-dimensions-canonical´: declare right-hand-side dimensions, canonical measures and affine difference roles under rule:vision:heterogeneous-assembly and rule:vision:measure-conversions.
+    ///
+    /// TODO ´todo:code:retain-the-equation-and-column-axes´: retain the equation and column axes for multiple right hand sides under rule:nrz:shape-solves-and-inverses.
     b: Vec<f64>,
     /// Right-hand side perturbation radius.
     ///
     /// TODO ´todo:code:carry-right-hand-side-bounds-with´: carry right-hand-side bounds with their own difference measure and deterministic uncertainty kind under rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:bind-the-right-side-radius-to´: bind the right side radius to its full matrix target and coordinate norm under rule:nrz:shape-certified-solve.
     b_radius: f64,
 }
 
@@ -48,6 +60,8 @@ impl DenseSystem {
     /// This is an import boundary under rule:vision:imports-and-exactness.
     ///
     /// TODO ´todo:code:validate-block-quotients-measure-conversions-kinds´: validate block quotients, measure conversions, kinds and uncertainty descriptors before numerical import under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:validate-ordered-axes-and-structural-families´: validate ordered axes and structural families before admitting centers or companion shapes under rule:nrz:shape-entry-contract and def:nrz:shape-structure.
     ///
     /// # Errors
     ///
@@ -80,6 +94,8 @@ impl DenseSystem {
     }
 
     /// Matrix order.
+    ///
+    /// TODO ´todo:code:expose-logical-extents-without-implying-compatible´: expose logical extents without implying compatible physical axes from equal orders under def:nrz:matrix-shape.
     #[must_use]
     pub const fn order(&self) -> usize {
         self.n
@@ -87,6 +103,8 @@ impl DenseSystem {
     /// Represented row-major matrix center.
     ///
     /// TODO ´todo:code:expose-matrix-centers-through-an-explicit´: expose matrix centers through an explicit raw or quantity-aware boundary that retains owner evidence under dec:vision:storage-and-scalar-wrapping.
+    ///
+    /// TODO ´todo:code:associate-borrowed-operator-centers-with-logical´: associate borrowed operator centers with logical entry maps and their owner under dec:nrz:shape-descriptor-ownership.
     #[must_use]
     pub fn matrix(&self) -> &[f64] {
         &self.a
@@ -94,6 +112,8 @@ impl DenseSystem {
     /// Represented right-hand side center.
     ///
     /// TODO ´todo:code:expose-right-hand-side-centers-with´: expose right-hand-side centers with an explicit relation to their quantity and uncertainty descriptors under dec:vision:storage-and-scalar-wrapping.
+    ///
+    /// TODO ´todo:code:associate-borrowed-equation-centers-with-column´: associate borrowed equation centers with column identities and shared uncertainty sources under def:nrz:companion-shape.
     #[must_use]
     pub fn right_hand_side(&self) -> &[f64] {
         &self.b
@@ -103,60 +123,88 @@ impl DenseSystem {
 /// Numerical evidence accompanying a successful solve.
 ///
 /// TODO ´todo:code:make-report-bounds-views-of-intrinsic´: make report bounds views of intrinsic matrix and solution companions with independently derived descriptors under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:code:retain-named-coordinate-maps-and-target´: retain named coordinate maps and target shapes for each reported bound under rule:nrz:shape-certified-solve.
 #[derive(Debug, Clone, Copy)]
 pub struct Report {
     /// Upper bound on the Frobenius norm of identity minus approximate inverse times matrix.
     ///
     /// TODO ´todo:code:type-inverse-defect-bounds-as-dimensionless´: type inverse-defect bounds as dimensionless uncertainty quantities rather than counts under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:identify-the-defect-identity-axis-and´: identify the defect identity axis and normalized operator norm under rule:nrz:shape-certified-solve.
     pub q: f64,
     /// Upper bound on the inverse norm under the Neumann argument.
     ///
     /// TODO ´todo:code:type-inverse-norm-bounds-with-reciprocal´: type inverse-norm bounds with reciprocal operator dimensions or the declared normalized map under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:identify-inverse-domain-and-codomain-metrics´: identify inverse domain and codomain metrics when exposing the validated inverse norm under rule:nrz:shape-norms-and-conditioning.
     pub g: f64,
     /// Upper bound on the residual norm.
     ///
     /// TODO ´todo:code:type-residual-bounds-in-the-equation´: type residual bounds in the equation difference measure with a computational uncertainty kind under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:identify-residual-equation-and-column-axes´: identify residual equation and column axes in the recorded Frobenius bound under rule:nrz:shape-certified-solve.
     pub rho: f64,
     /// Upper bound on the candidate norm.
     ///
     /// TODO ´todo:code:type-candidate-norm-bounds-in-the´: type candidate-norm bounds in the solution difference measure or declared normalized coordinates under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:identify-candidate-variable-and-column-axes´: identify candidate variable and column axes in the recorded Frobenius bound under rule:nrz:shape-certified-solve.
     pub xnorm: f64,
     /// Declared matrix input radius.
     ///
     /// TODO ´todo:code:reference-the-matrix-companion-bound-without´: reference the matrix companion bound without losing its quotient dimension, measure or uncertainty kind under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:retain-operator-perturbation-scope-across-every´: retain operator perturbation scope across every right hand side in this report under def:nrz:numerical-error-shapes.
     pub a_radius: f64,
     /// Declared right-hand-side input radius.
     ///
     /// TODO ´todo:code:reference-the-right-hand-side-companion´: reference the right-hand-side companion bound with its independent difference descriptor under def:vision:intrinsic-uncertainty-companions and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:retain-equation-perturbation-targets-and-coordinate´: retain equation perturbation targets and coordinate maps in this report under def:nrz:numerical-error-shapes.
     pub b_radius: f64,
     /// Requested relative radius.
     ///
     /// TODO ´todo:code:retain-relative-budgets-as-dimensionless-ratios´: retain relative budgets as dimensionless ratios tied to declared compatible scales under dec:vision:accuracy-policy and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:name-the-solution-norm-and-reference´: name the solution norm and reference scales used by the relative budget under rule:nrz:shape-norms-and-conditioning.
     pub relative_budget: f64,
     /// Matrix order.
+    ///
+    /// TODO ´todo:code:report-operator-and-solution-extents-separately´: report operator and solution extents separately when several right hand sides are admitted under rule:nrz:shape-solves-and-inverses.
     pub n: usize,
 }
 
 /// A candidate with an independently certified Euclidean error radius.
 ///
 /// TODO ´todo:code:return-solution-values-and-all-supported´: return solution values and all supported measurement and computational uncertainty contents together under def:vision:intrinsic-uncertainty-companions.
+///
+/// TODO ´todo:code:own-solution-shape-and-independently-shaped´: own solution shape and independently shaped statistical and computational companions under def:nrz:companion-shape.
 #[derive(Debug, Clone)]
 pub struct Outcome {
     /// Candidate solution.
     ///
     /// TODO ´todo:code:restore-solution-quotient-dimensions-kinds-measures´: restore solution quotient dimensions, kinds, measures and affine origins from checked coordinates under rule:vision:heterogeneous-assembly and rule:vision:measure-conversions.
+    ///
+    /// TODO ´todo:code:restore-candidate-entry-identities-and-variable´: restore candidate entry identities and variable axes through the declared normalization map under def:nrz:shape-normalization.
     pub candidate: Vec<f64>,
     /// Absolute Euclidean error radius.
     ///
     /// TODO ´todo:code:store-the-certified-solution-radius-with´: store the certified solution radius with its own difference measure, derived dimension and uncertainty kind under rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:distinguish-the-scalar-normwise-enclosure-from´: distinguish the scalar normwise enclosure from componentwise arrays and full covariance under def:nrz:numerical-error-shapes.
     pub radius: f64,
     /// Certificate diagnostics.
+    ///
+    /// TODO ´todo:code:link-certificate-diagnostics-to-the-exact´: link certificate diagnostics to the exact solution version and companion targets under dec:nrz:shape-descriptor-ownership.
     pub report: Report,
 }
 
 /// A refusal to claim a requested certified solve.
 ///
 /// TODO ´todo:code:report-dynamic-dimension-measure-and-kind´: report dynamic dimension, measure and kind failures separately from shape and arithmetic failures under req:vision:algebraic-unit-checks.
+///
+/// TODO ´todo:code:distinguish-axis-incompatibility-from-unsupported-structure´: distinguish axis incompatibility from unsupported structure and unavailable shape guarantees under req:nrz:shape-implementation-evidence.
 #[derive(Debug, thiserror::Error)]
 pub enum NumericalFailure {
     /// The approximate-inverse conditions do not establish a certificate.
@@ -165,6 +213,8 @@ pub enum NumericalFailure {
     /// A valid radius exceeds the requested relative budget.
     ///
     /// TODO ´todo:code:retain-distinct-certified-radius-and-relative´: retain distinct certified-radius and relative-ratio descriptors in budget failures under dec:vision:accuracy-policy and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:retain-the-failed-norm-interpretation-and´: retain the failed norm interpretation and restoration map with the exceeded budget under rule:nrz:shape-norms-and-conditioning.
     #[error("certified radius {radius} exceeds relative budget {budget}")]
     BudgetExceeded {
         /// Certified absolute radius.
@@ -176,6 +226,8 @@ pub enum NumericalFailure {
     #[error("scalar enclosure failed: {0}")]
     Arithmetic(#[from] ArithmeticFailure),
     /// The input dimensions do not describe a nonempty square system.
+    ///
+    /// TODO ´todo:code:diagnose-operator-axes-and-companion-extents´: diagnose operator axes and companion extents beyond the current nonempty square check under def:nrz:matrix-shape and def:nrz:companion-shape.
     #[error("matrix and right-hand-side shapes do not match a nonempty square system")]
     ShapeMismatch,
     /// An entry, radius, or budget is invalid or non-finite.
@@ -193,6 +245,8 @@ const fn magnitude(bound: Interval<f64>) -> f64 {
 /// Upper bound on the Frobenius norm of identity minus approximate inverse times matrix.
 ///
 /// TODO ´todo:code:check-reciprocal-operator-products-and-typed´: check reciprocal operator products and typed identity blocks before computing dimensionless defect bounds under req:vision:algebraic-unit-checks and rule:vision:heterogeneous-assembly.
+///
+/// TODO ´todo:code:check-inverse-witness-axes-and-typed´: check inverse witness axes and typed identity columns in common normalized coordinates under rule:nrz:shape-certified-solve.
 fn inverse_defect(system: &DenseSystem, z: &[f64]) -> Result<f64, ArithmeticFailure> {
     let mut entries = Vec::with_capacity(system.a.len());
     for row in 0..system.n {
@@ -211,6 +265,8 @@ fn inverse_defect(system: &DenseSystem, z: &[f64]) -> Result<f64, ArithmeticFail
 /// Upper bound on the residual norm of the represented center system.
 ///
 /// TODO ´todo:code:check-equation-compatible-residual-terms-and´: check equation-compatible residual terms and derive their computational uncertainty descriptors under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:code:contract-operator-and-candidate-axes-before´: contract operator and candidate axes before bounding every right hand side residual under rule:nrz:shape-composition and rule:nrz:shape-certified-solve.
 fn residual(system: &DenseSystem, x: &[f64]) -> Result<f64, ArithmeticFailure> {
     let mut entries = Vec::with_capacity(system.n);
     for row in 0..system.n {
@@ -225,6 +281,8 @@ fn residual(system: &DenseSystem, x: &[f64]) -> Result<f64, ArithmeticFailure> {
 /// Compute the radii after a backend candidate and inverse are available.
 ///
 /// TODO ´todo:code:propagate-carried-input-and-computational-companions´: propagate carried input and computational companions through the solve bound with algebraically checked dimensions and kinds under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
+///
+/// TODO ´todo:code:certify-a-common-operator-perturbation-across´: certify a common operator perturbation across all solution columns in recorded coordinates under rule:nrz:shape-certified-solve.
 fn certify_candidate(
     system: &DenseSystem,
     relative_budget: f64,
@@ -287,6 +345,8 @@ fn certify_candidate(
 ///
 /// TODO ´todo:code:gate-solves-on-checked-quantity-descriptors´: gate solves on checked quantity descriptors and ratio budgets and return intrinsic uncertainty contents under req:vision:algebraic-unit-checks and def:vision:intrinsic-uncertainty-companions.
 ///
+/// TODO ´todo:code:admit-checked-solve-shapes-and-restore´: admit checked solve shapes and restore all supported output companion maps under rule:nrz:shape-solves-and-inverses and def:nrz:companion-shape.
+///
 /// # Errors
 ///
 /// An invalid budget, failed scalar enclosure, uncertifiable inverse or exceeded budget returns a `NumericalFailure`.
@@ -312,6 +372,8 @@ mod tests {
     ///
     /// TODO ´todo:code:certify-a-dimensioned-system-with-intrinsic´: certify a dimensioned system with intrinsic input and computational companions and correctly typed solution bounds under def:vision:certified-solve-contract and rule:vision:uncertainty-unit-algebra.
     ///
+    /// TODO ´todo:code:add-exact-mixed-axis-solves-with´: add exact mixed axis solves with several right hand sides and restored bounds under rule:nrz:shape-certified-solve.
+    ///
     /// ´test:unit:small-exact-system-certifies´
     #[test]
     fn small_exact_system_certifies() {
@@ -326,6 +388,8 @@ mod tests {
     /// A singular center cannot establish an approximate inverse.
     ///
     /// TODO ´todo:code:preserve-unit-descriptors-and-carried-uncertainty´: preserve unit descriptors and carried uncertainty when a dimensioned singular system refuses certification under def:vision:intrinsic-uncertainty-companions.
+    ///
+    /// TODO ´todo:code:test-shape-valid-singular-systems-separately´: test shape valid singular systems separately from physical axis incompatibility under rule:nrz:shape-solves-and-inverses.
     ///
     /// ´test:unit:singular-system-refuses´
     #[test]
@@ -342,6 +406,8 @@ mod tests {
     ///
     /// TODO ´todo:code:test-dimensionless-defect-bound-kinds-and´: test dimensionless defect-bound kinds and reject wrongly dimensioned inverse or identity blocks under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
     ///
+    /// TODO ´todo:code:test-inverse-witnesses-with-mismatched-axes´: test inverse witnesses with mismatched axes and correctly typed identity zeros under rule:nrz:shape-certified-solve.
+    ///
     /// ´test:unit:inverse-defect-refuses´
     #[test]
     fn inverse_defect_refuses() {
@@ -357,6 +423,8 @@ mod tests {
     ///
     /// TODO ´todo:code:test-budget-refusal-across-equivalent-measures´: test budget refusal across equivalent measures with absolute difference bounds and relative ratios kept distinct under dec:vision:accuracy-policy and rule:vision:uncertainty-unit-algebra.
     ///
+    /// TODO ´todo:code:test-budget-refusal-under-declared-scale´: test budget refusal under declared scale changes and per entry restoration under rule:nrz:shape-norms-and-conditioning.
+    ///
     /// ´test:unit:small-budget-refuses´
     #[test]
     fn small_budget_refuses() {
@@ -371,6 +439,8 @@ mod tests {
     /// Input validation rejects incompatible shapes and non-finite values.
     ///
     /// TODO ´todo:code:reject-incompatible-block-dimensions-affine-roles´: reject incompatible block dimensions, affine roles and uncertainty descriptors before backend calls under rule:vision:heterogeneous-assembly and rule:vision:uncertainty-unit-algebra.
+    ///
+    /// TODO ´todo:code:test-malformed-companion-extents-and-forbidden´: test malformed companion extents and forbidden structural assumptions at system import under req:nrz:shape-implementation-evidence.
     ///
     /// ´test:unit:invalid-system-refuses´
     #[test]

@@ -68,6 +68,8 @@ fn length() -> Result<Descriptor, Box<dyn std::error::Error>> {
 
 /// Ratio coefficients scale absolute, variance and relative forms without changing modes.
 ///
+/// TODO ´todo:test:test-per-entry-reference-scales-survive´: test per entry reference scales survive views and paired covariance conversion under rule:nrz:correlation-and-relative-shapes.
+///
 /// ´test:integration:ratio-uncertainty-scaling-and-references´
 #[test]
 fn ratio_uncertainty_scaling_and_references() -> TestResult {
@@ -133,6 +135,8 @@ fn ratio_uncertainty_scaling_and_references() -> TestResult {
 }
 
 /// Variance and relative companions must describe the values and divisors actually used.
+///
+/// TODO ´todo:test:test-equal-shape-values-retain-distinct´: test equal shape values retain distinct identities and shared source relationships under def:nrz:companion-shape and dec:nrz:shape-descriptor-ownership.
 ///
 /// ´test:integration:uncertainty-value-and-reference-identities´
 #[test]
@@ -225,6 +229,8 @@ fn uncertainty_value_and_reference_identities() -> TestResult {
 
 /// Relative inputs and constants cannot bypass a named, checked nonzero reference.
 ///
+/// TODO ´todo:test:test-zero-component-references-and-unavailable´: test zero component references and unavailable zero variance correlations refuse implicit defaults under rule:nrz:correlation-and-relative-shapes.
+///
 /// ´test:integration:relative-declaration-refusals´
 #[test]
 fn relative_declaration_refusals() -> TestResult {
@@ -279,6 +285,8 @@ fn relative_declaration_refusals() -> TestResult {
 }
 
 /// Equation paths identify the failing side independently of nested operand paths.
+///
+/// TODO ´todo:test:test-block-and-covariance-index-paths´: test block and covariance index paths identify the failing contraction side under rule:nrz:shape-data-time-evidence.
 ///
 /// ´test:integration:equation-side-diagnostics´
 #[test]
@@ -379,6 +387,8 @@ fn registered_count_composition() -> TestResult {
 }
 
 /// Declaration diagnostics use the inner source and include value/reference descriptors.
+///
+/// TODO ´todo:test:test-shaped-declaration-snapshots-preserve-provenance´: test shaped declaration snapshots preserve provenance without asserting statistical validity under rule:nrz:shape-data-time-evidence.
 ///
 /// ´test:integration:declaration-source-and-descriptor-evidence´
 #[test]
@@ -545,6 +555,8 @@ fn observable_companion(
 
 /// Derived propagation records contributing companions and can feed relative and variance forms.
 ///
+/// TODO ´todo:test:test-indexed-sensitivity-contractions-retain-source´: test indexed sensitivity contractions retain source closures across multiple outputs under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
+///
 /// ´test:integration:derived-uncertainty-propagation´
 #[test]
 fn derived_uncertainty_propagation() -> TestResult {
@@ -598,6 +610,8 @@ fn derived_uncertainty_propagation() -> TestResult {
 
 /// Unrelated and unbound uncertainty operands remain refusals even when multiplied by zero.
 ///
+/// TODO ´todo:test:test-rejected-matrix-propagations-expose-missing´: test rejected matrix propagations expose missing paired contributors and stale target maps under rule:nrz:shape-data-time-evidence.
+///
 /// ´test:integration:propagation-closure-refusals´
 #[test]
 fn propagation_closure_refusals() -> TestResult {
@@ -631,6 +645,8 @@ fn propagation_closure_refusals() -> TestResult {
 }
 
 /// Registered rules cannot create uncertainty terms without contributing companions.
+///
+/// TODO ´todo:test:test-registered-covariance-products-cannot-erase´: test registered covariance products cannot erase indexed contributor requirements under rule:nrz:shape-data-time-evidence.
 ///
 /// ´test:integration:registered-uncertainty-terms-require-contributors´
 #[test]
@@ -700,6 +716,8 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
 
 /// Covariance propagation admits contributors from either value and records the declared pair.
 ///
+/// TODO ´todo:test:test-the-mixed-voltage-current-covariance´: test the mixed voltage current covariance and structured duplication maps exactly under ex:nrz:resistor-shape-covariance and rule:nrz:structured-companion-coordinates.
+///
 /// ´test:integration:covariance-propagation´
 #[test]
 fn covariance_propagation() -> TestResult {
@@ -746,6 +764,8 @@ fn covariance_propagation() -> TestResult {
 }
 
 /// Ratio quantities require propagation, while literal and typed constant scaling preserve identity.
+///
+/// TODO ´todo:test:test-matching-axis-descriptors-cannot-substitute´: test matching axis descriptors cannot substitute for relative target identity under def:nrz:companion-shape and rule:nrz:correlation-and-relative-shapes.
 ///
 /// ´test:integration:ratio-quantity-identity-boundary´
 #[test]

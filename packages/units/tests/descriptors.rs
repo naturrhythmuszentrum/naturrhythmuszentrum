@@ -67,6 +67,8 @@ fn dimension_laws() -> TestResult {
 
 /// Affine conversions apply offsets only to points and preserve exact round trips.
 ///
+/// TODO ´todo:test:test-shaped-point-origins-never-translate´: test shaped point origins never translate difference or covariance companions under def:nrz:shape-normalization and def:nrz:covariance-shape.
+///
 /// ´test:integration:affine-measures´
 #[test]
 fn affine_measures() -> TestResult {
@@ -197,6 +199,8 @@ fn fahrenheit_conversion(celsius: &Descriptor) -> TestResult {
 
 /// Semantic rules preserve kinds even when all dimension exponents agree.
 ///
+/// TODO ´todo:test:test-dual-pairing-and-sensitivity-products´: test dual pairing and sensitivity products require explicit semantic relationships under rule:nrz:shape-transpose-and-duality and rule:nrz:shape-sensitivity-propagation.
+///
 /// ´test:integration:declared-kind-rules´
 #[test]
 fn declared_kind_rules() -> TestResult {
@@ -322,6 +326,8 @@ fn count_domains() -> TestResult {
 
 /// Uncertainty companions have independent dimensions, measures and semantic kinds.
 ///
+/// TODO ´todo:test:test-vector-and-matrix-covariance-extents´: test vector and matrix covariance extents with mixed product dimensions under def:nrz:covariance-shape.
+///
 /// ´test:integration:uncertainty-descriptors´
 #[test]
 fn uncertainty_descriptors() -> TestResult {
@@ -400,6 +406,8 @@ fn uncertainty_descriptors() -> TestResult {
 }
 
 /// Check squared and product scales independently of uncertainty identity tests.
+///
+/// TODO ´todo:test:test-cross-covariance-measure-products-on´: test cross covariance measure products on both logical axes under def:nrz:covariance-shape.
 fn uncertainty_measures(length: &Descriptor, time: &Descriptor) -> TestResult {
     let centimetres = Descriptor::new(
         length.kind().clone(),
@@ -432,6 +440,8 @@ fn uncertainty_measures(length: &Descriptor, time: &Descriptor) -> TestResult {
 }
 
 /// Ratio coefficients preserve uncertainty kinds and relative construction checks a reference.
+///
+/// TODO ´todo:test:test-correlation-kinds-and-indexed-relative´: test correlation kinds and indexed relative references remain distinct from normalized covariance under rule:nrz:correlation-and-relative-shapes.
 ///
 /// ´test:integration:ratio-uncertainty-descriptor-rules´
 #[test]

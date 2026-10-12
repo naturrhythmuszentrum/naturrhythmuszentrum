@@ -15,6 +15,8 @@ pub enum Role {
 }
 
 /// A validated data-time quantity descriptor, independent of numerical storage.
+///
+/// TODO ´todo:code:reuse-scalar-descriptors-on-ordered-matrix´: reuse scalar descriptors on ordered matrix axes without inferring value identity from equality under def:nrz:matrix-shape and dec:nrz:shape-descriptor-ownership.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Descriptor {
     /// Cached dimension derived from the kind declaration.
@@ -121,6 +123,8 @@ impl Descriptor {
 
     /// Check dimension and kind compatibility independently of role or measure.
     ///
+    /// TODO ´todo:code:validate-axis-coordinate-meaning-beside-scalar´: validate axis coordinate meaning beside scalar kind compatibility at shape assembly under rule:nrz:shape-composition.
+    ///
     /// # Errors
     /// Refuses unequal dimensions or incompatible semantic kinds.
     pub fn compatible_kind(&self, other: &Self) -> Result<(), UnitError> {
@@ -134,6 +138,8 @@ impl Descriptor {
     }
 
     /// Convert coordinates only after checking dimensions, kinds and affine roles.
+    ///
+    /// TODO ´todo:code:compose-scalar-conversions-into-declared-axis´: compose scalar conversions into declared axis maps and paired covariance conversions under def:nrz:shape-normalization and def:nrz:covariance-shape.
     ///
     /// # Errors
     /// Refuses incompatible descriptors and exact conversion overflow.
@@ -161,6 +167,8 @@ impl Descriptor {
 ///
 /// Relative modes additionally require a compatible difference reference and a declared
 /// nonzero condition. The condition is an input assumption, not a numerical proof.
+///
+/// TODO ´todo:code:derive-each-indexed-companion-descriptor-independently´: derive each indexed companion descriptor independently of its target extent and representation under def:nrz:companion-shape and def:nrz:covariance-shape.
 ///
 /// # Errors
 /// Refuses malformed relationships, incompatible relative references and exact overflow.

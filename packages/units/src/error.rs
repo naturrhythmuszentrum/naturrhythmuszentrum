@@ -4,6 +4,8 @@
 use nrz_algebra::{ArithmeticError, Symbol};
 
 /// A mechanical descriptor check failed.
+///
+/// TODO ´todo:code:represent-unsupported-shape-kinds-and-pairing´: represent unsupported shape kinds and pairing relations distinctly from scalar dimension mismatch under rule:nrz:shape-entry-contract and rule:nrz:shape-transpose-and-duality.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum UnitError {
     /// Recursive kind relationships exceeded the supported structural depth.
