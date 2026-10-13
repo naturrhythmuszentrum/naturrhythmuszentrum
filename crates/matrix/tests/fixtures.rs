@@ -197,27 +197,56 @@ fn wilkinson(n: usize) -> DenseSystem {
     system(&entries, n)
 }
 
-/// Read a fixture parameter, applying a variant override if present.
-///
-/// TODO ´todo:test:decode-fixture-parameter-dimensions-measures-and´: decode fixture parameter dimensions, measures and metadata roles before typed construction under req:vision:unit-data-migration and rule:vision:counts-and-metadata.
+/// Admit a metadata order or coherent ratio before applying a numerical fixture recipe.
 fn parameter(entry: &Value, variant: &Value, name: &str) -> Rational {
-    let override_value = variant["overrides"][name].as_str();
     let original = entry["parameters"]
         .as_array()
         .expect("parameters")
         .iter()
         .find(|value| value["name"].as_str() == Some(name))
-        .and_then(|value| value["value"].as_str())
-        .expect("parameter");
-    let text = override_value.unwrap_or(original);
-    if let Some((a, b)) = text.split_once('/') {
+        .expect("parameter declaration");
+    let text = variant["overrides"][name]
+        .as_str()
+        .unwrap_or_else(|| original["value"].as_str().expect("parameter value"));
+    let value = if let Some((a, b)) = text.split_once('/') {
         Rational::new(
             a.parse().expect("numerator"),
             b.parse().expect("denominator"),
         )
     } else {
         Rational::new(text.parse().expect("integer"), 1)
+    };
+    assert_eq!(original["uncertainty"]["kind"], "none");
+    if matches!(name, "n" | "n_kahan" | "n_wilkinson") {
+        assert_eq!(original["role"], "metadata");
+        assert!(original.get("descriptor").is_none());
+        assert_eq!(original["metadata"]["kind"], "integer_range");
+        assert_eq!(value.denominator, 1);
+        let minimum = original["metadata"]["minimum"].as_i64().expect("minimum");
+        assert!(value.numerator >= i128::from(minimum));
+        if let Some(maximum) = original["metadata"]["maximum"].as_i64() {
+            assert!(value.numerator <= i128::from(maximum));
+        }
+    } else {
+        assert_eq!(original["role"], "quantity");
+        let descriptor = &original["descriptor"];
+        assert_eq!(
+            descriptor["dimensions"],
+            serde_json::json!(["0", "0", "0", "0", "0", "0", "0"])
+        );
+        assert_eq!(descriptor["affine_role"], "difference");
+        assert_eq!(descriptor["measure"]["scale"], "1");
+        assert_eq!(descriptor["measure"]["offset"], "0");
+        let kind = entry["kinds"]
+            .as_array()
+            .expect("kinds")
+            .iter()
+            .find(|kind| kind["name"] == descriptor["kind"])
+            .expect("declared kind");
+        assert_eq!(kind["type"], "ratio");
+        assert_eq!(kind["dimensions"], descriptor["dimensions"]);
     }
+    value
 }
 
 /// Construct the system named by a fixture variant.

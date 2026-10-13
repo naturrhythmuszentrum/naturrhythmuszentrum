@@ -1,245 +1,382 @@
 # SPDX-License-Identifier: CC0-1.0
 namespace = "org.naturrhythmuszentrum.problems.problem"
-version = [1, 0, 0]
+version = [2, 0, 0]
 owner = "NRZ"
 license = "CC0-1.0"
 sources = []
 labels = ["prob:exemplars:pendulum-gravity-estimate"]
+exponent_policy = "rational"
+equations = []
 
 [problem]
 slug = "pendulum-gravity-estimate"
 title = "Gravitational acceleration from pendulum periods"
 register = "prob:exemplars:pendulum-gravity-estimate"
 kind = "problem"
-model = """
-The small-angle simple-pendulum model gives g_i=4*pi^2*L_i/T_i^2. The measurement equations are L_i=l_i+ruler_offset and T_i=t_i*(1+stopwatch_rate). Each measured l_i and t_i has its own independent standard uncertainty. The common ruler offset and stopwatch rate are shared random inputs, independent of one another and of the six independent readings. First-order propagation retains their induced cross-covariances.
-Uncertainty mode zero uses the standard-uncertainty records. Mode one instead uses the corresponding records ending in _enclosed. Each pair describes alternative declarations of the same measurement or instrument source and is never composed as two inputs. The enclosure records impose additional deterministic assumptions; their half-widths are not confidence limits inferred from the standard uncertainties and supply no variances.
-"""
-instance = """
-Three nominally identical pendulums each have measured length 621/625 m and period 2 s. They have different independent length-reading uncertainties and identical independent timing uncertainties. Their shared ruler offset and stopwatch rate have nominal value zero. The exact defined standard acceleration 9.80665 m/s^2 is supplied only for comparison.
-"""
+model = "The small-angle simple-pendulum model gives g_i=4*pi^2*L_i/T_i^2. The measurement equations are L_i=l_i+ruler_offset and T_i=t_i*(1+stopwatch_rate). Each measured l_i and t_i has its own independent standard uncertainty. The common ruler offset and stopwatch rate are shared random inputs, independent of one another and of the six independent readings. First-order propagation retains their induced cross-covariances.\nUncertainty mode zero uses the standard-uncertainty records. Mode one instead uses the corresponding records ending in _enclosed. Each pair describes alternative declarations of the same measurement or instrument source and is never composed as two inputs. The enclosure records impose additional deterministic assumptions; their half-widths are not confidence limits inferred from the standard uncertainties and supply no variances.\n"
+instance = "Three nominally identical pendulums each have measured length 621/625 m and period 2 s. They have different independent length-reading uncertainties and identical independent timing uncertainties. Their shared ruler offset and stopwatch rate have nominal value zero. The exact defined standard acceleration 9.80665 m/s^2 is supplied only for comparison.\n"
+
+[[kinds]]
+name = "length"
+type = "named"
+dimensions = ["1", "0", "0", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "standard_length"
+type = "uncertainty"
+dimensions = ["1", "0", "0", "0", "0", "0", "0"]
+mode = "standard"
+value_kind = "length"
+
+[[kinds]]
+name = "duration"
+type = "named"
+dimensions = ["0", "0", "1", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "standard_duration"
+type = "uncertainty"
+dimensions = ["0", "0", "1", "0", "0", "0", "0"]
+mode = "standard"
+value_kind = "duration"
+
+[[kinds]]
+name = "ratio"
+type = "ratio"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "standard_ratio"
+type = "uncertainty"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+mode = "standard"
+value_kind = "ratio"
+
+[[kinds]]
+name = "radius_length"
+type = "uncertainty"
+dimensions = ["1", "0", "0", "0", "0", "0", "0"]
+mode = "radius"
+value_kind = "length"
+
+[[kinds]]
+name = "radius_duration"
+type = "uncertainty"
+dimensions = ["0", "0", "1", "0", "0", "0", "0"]
+mode = "radius"
+value_kind = "duration"
+
+[[kinds]]
+name = "radius_ratio"
+type = "uncertainty"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+mode = "radius"
+value_kind = "ratio"
+
+[[kinds]]
+name = "acceleration"
+type = "named"
+dimensions = ["1", "0", "-2", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "angle"
+type = "angle"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "standard_acceleration"
+type = "uncertainty"
+dimensions = ["1", "0", "-2", "0", "0", "0", "0"]
+mode = "standard"
+value_kind = "acceleration"
+
+[[kinds]]
+name = "uncertainty_comparison"
+type = "named"
+dimensions = ["1", "0", "-2", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "duration_squared"
+type = "named"
+dimensions = ["0", "0", "2", "0", "0", "0", "0"]
+
+[[kind_rules]]
+operation = "power"
+base = "duration"
+exponent = "2"
+result = "duration_squared"
+reason = "Square the measured pendulum period."
+
+[[kind_rules]]
+operation = "divide"
+left = "length"
+right = "duration_squared"
+result = "acceleration"
+reason = "Pendulum length over squared period gives acceleration."
 
 [[parameters]]
 name = "uncertainty_mode"
 description = "zero selects probabilistic propagation and one the deterministic enclosure variant"
 value = "0"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "metadata"
+metadata = { kind = "category", values = ["0", "1"] }
 
 [[parameters]]
 name = "l1"
 description = "first measured pendulum length"
 value = "621/625"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "standard", sigma = "0.0016", source = "reading-l1" }
+uncertainty = { kind = "components", components = [{ name = "sigma_l1", class = "measurement", mode = "standard", target = "l1", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "standard_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "reading-l1", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "0.0016" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "l2"
 description = "second measured pendulum length"
 value = "621/625"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "standard", sigma = "0.001", source = "reading-l2" }
+uncertainty = { kind = "components", components = [{ name = "sigma_l2", class = "measurement", mode = "standard", target = "l2", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "standard_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "reading-l2", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "0.001" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "l3"
 description = "third measured pendulum length"
 value = "621/625"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "standard", sigma = "0.0008", source = "reading-l3" }
+uncertainty = { kind = "components", components = [{ name = "sigma_l3", class = "measurement", mode = "standard", target = "l3", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "standard_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "reading-l3", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "0.0008" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "t1"
 description = "first measured period"
 value = "2"
-unit = { display = "s", s = 1 }
-uncertainty = { kind = "standard", sigma = "1/2484", source = "timing-t1" }
+uncertainty = { kind = "components", components = [{ name = "sigma_t1", class = "measurement", mode = "standard", target = "t1", descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "standard_duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }, source = "timing-t1", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "1/2484" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "t2"
 description = "second measured period"
 value = "2"
-unit = { display = "s", s = 1 }
-uncertainty = { kind = "standard", sigma = "1/2484", source = "timing-t2" }
+uncertainty = { kind = "components", components = [{ name = "sigma_t2", class = "measurement", mode = "standard", target = "t2", descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "standard_duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }, source = "timing-t2", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "1/2484" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "t3"
 description = "third measured period"
 value = "2"
-unit = { display = "s", s = 1 }
-uncertainty = { kind = "standard", sigma = "1/2484", source = "timing-t3" }
+uncertainty = { kind = "components", components = [{ name = "sigma_t3", class = "measurement", mode = "standard", target = "t3", descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "standard_duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }, source = "timing-t3", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "1/2484" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "ruler_offset"
 description = "shared additive length calibration error"
 value = "0"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "standard", sigma = "9/12500", source = "ruler" }
+uncertainty = { kind = "components", components = [{ name = "sigma_ruler_offset", class = "measurement", mode = "standard", target = "ruler_offset", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "standard_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "ruler", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "9/12500" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "stopwatch_rate"
 description = "shared relative period calibration error"
 value = "0"
-unit = { display = "1" }
-uncertainty = { kind = "standard", sigma = "1/2070", source = "stopwatch" }
+uncertainty = { kind = "components", components = [{ name = "sigma_stopwatch_rate", class = "measurement", mode = "standard", target = "stopwatch_rate", descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "standard_ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }, source = "stopwatch", assurance = "Probabilistic standard uncertainty; not a deterministic enclosure", magnitude = { sigma = "1/2070" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "l1_enclosed"
 description = "alternative deterministic declaration of the first length"
 value = "621/625"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "enclosure", half_width = "0.0016", source = "reading-l1" }
+uncertainty = { kind = "components", components = [{ name = "radius_l1_enclosed", class = "measurement", mode = "radius", target = "l1_enclosed", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "radius_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "reading-l1", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "0.0016" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "l2_enclosed"
 description = "alternative deterministic declaration of the second length"
 value = "621/625"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "enclosure", half_width = "0.001", source = "reading-l2" }
+uncertainty = { kind = "components", components = [{ name = "radius_l2_enclosed", class = "measurement", mode = "radius", target = "l2_enclosed", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "radius_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "reading-l2", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "0.001" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "l3_enclosed"
 description = "alternative deterministic declaration of the third length"
 value = "621/625"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "enclosure", half_width = "0.0008", source = "reading-l3" }
+uncertainty = { kind = "components", components = [{ name = "radius_l3_enclosed", class = "measurement", mode = "radius", target = "l3_enclosed", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "radius_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "reading-l3", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "0.0008" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "t1_enclosed"
 description = "alternative deterministic declaration of the first period"
 value = "2"
-unit = { display = "s", s = 1 }
-uncertainty = { kind = "enclosure", half_width = "1/2484", source = "timing-t1" }
+uncertainty = { kind = "components", components = [{ name = "radius_t1_enclosed", class = "measurement", mode = "radius", target = "t1_enclosed", descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "radius_duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }, source = "timing-t1", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "1/2484" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "t2_enclosed"
 description = "alternative deterministic declaration of the second period"
 value = "2"
-unit = { display = "s", s = 1 }
-uncertainty = { kind = "enclosure", half_width = "1/2484", source = "timing-t2" }
+uncertainty = { kind = "components", components = [{ name = "radius_t2_enclosed", class = "measurement", mode = "radius", target = "t2_enclosed", descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "radius_duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }, source = "timing-t2", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "1/2484" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "t3_enclosed"
 description = "alternative deterministic declaration of the third period"
 value = "2"
-unit = { display = "s", s = 1 }
-uncertainty = { kind = "enclosure", half_width = "1/2484", source = "timing-t3" }
+uncertainty = { kind = "components", components = [{ name = "radius_t3_enclosed", class = "measurement", mode = "radius", target = "t3_enclosed", descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "radius_duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }, source = "timing-t3", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "1/2484" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "ruler_offset_enclosed"
 description = "alternative deterministic declaration of the shared ruler offset"
 value = "0"
-unit = { display = "m", m = 1 }
-uncertainty = { kind = "enclosure", half_width = "9/12500", source = "ruler" }
+uncertainty = { kind = "components", components = [{ name = "radius_ruler_offset_enclosed", class = "measurement", mode = "radius", target = "ruler_offset_enclosed", descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "radius_length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }, source = "ruler", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "9/12500" } }] }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "0", "0", "0", "0", "0"], kind = "length", measure = { display = "m", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "stopwatch_rate_enclosed"
 description = "alternative deterministic declaration of the shared stopwatch rate"
 value = "0"
-unit = { display = "1" }
-uncertainty = { kind = "enclosure", half_width = "1/2070", source = "stopwatch" }
+uncertainty = { kind = "components", components = [{ name = "radius_stopwatch_rate_enclosed", class = "measurement", mode = "radius", target = "stopwatch_rate_enclosed", descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "radius_ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }, source = "stopwatch", assurance = "Separately assumed deterministic enclosure for the alternative enclosed input", magnitude = { half_width = "1/2070" } }] }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "standard_gravity"
 description = "exact defined standard acceleration used for comparison"
 value = "9.80665"
-unit = { display = "m/s^2", m = 1, s = -2 }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
+
+[[symbols]]
+name = "radian"
+description = "One radian as the explicit angle convention"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "angle", measure = { display = "rad", scale = "1", offset = "0" }, affine_role = "difference" }
+source = "Explicit radian convention for angle-valued inverse trigonometric functions"
+assurance = "Exact coordinate convention, independent of every reference answer"
+kind = "constant"
+value = "1"
+
+[[symbols]]
+name = "pi"
+description = "Declared helper pi"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+source = "Machin identity; explicit radian convention, independent of reference answers"
+assurance = "Algebraic descriptor consistency only; no numerical certification"
+kind = "derived"
+expression = { kind = "algebra", text = "(16*atan(1/5)-4*atan(1/239))/radian" }
 
 [[observables]]
 name = "g1"
 description = "first nominal gravity estimate"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "4*pi^2*l1/t1^2"
 value = "9.80643893292"
 value_kind = "decimal-12"
-derivation = """
-At zero nominal calibration offsets, g1=4*pi^2*(621/625)/4=(621/625)*pi^2. Using pi=16*atan(1/5)-4*atan(1/239), with alternating-series remainder bounds, gives pi^2=9.869604401089358... and g1=9.806438932922386... m/s^2.
-"""
+derivation = "At zero nominal calibration offsets, g1=4*pi^2*(621/625)/4=(621/625)*pi^2. Using pi=16*atan(1/5)-4*atan(1/239), with alternating-series remainder bounds, gives pi^2=9.869604401089358... and g1=9.806438932922386... m/s^2.\n"
 second_route = "none"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "4*pi^2*l1/t1^2" }
 
 [[observables]]
 name = "g2"
 description = "second nominal gravity estimate"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "4*pi^2*l2/t2^2"
 value = "9.80643893292"
 value_kind = "decimal-12"
-derivation = """
-The second nominal length and period equal the first, so g2=(621/625)*pi^2 m/s^2. Its independent reading uncertainty differs, but that does not change its central value.
-"""
+derivation = "The second nominal length and period equal the first, so g2=(621/625)*pi^2 m/s^2. Its independent reading uncertainty differs, but that does not change its central value.\n"
 second_route = "none"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "4*pi^2*l2/t2^2" }
 
 [[observables]]
 name = "g3"
 description = "third nominal gravity estimate"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "4*pi^2*l3/t3^2"
 value = "9.80643893292"
 value_kind = "decimal-12"
-derivation = """
-The third nominal length and period give g3=(621/625)*pi^2 m/s^2.
-"""
+derivation = "The third nominal length and period give g3=(621/625)*pi^2 m/s^2.\n"
 second_route = "none"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "4*pi^2*l3/t3^2" }
 
 [[observables]]
 name = "mean_gravity"
 description = "unweighted mean of the three nominal estimates"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "(g1+g2+g3)/3"
 value = "9.80643893292"
 value_kind = "decimal-12"
-derivation = """
-All three central estimates equal (621/625)*pi^2, so their unweighted mean has the same value. It differs from the exact comparison acceleration by approximately -0.000211067077614 m/s^2.
-"""
+derivation = "All three central estimates equal (621/625)*pi^2, so their unweighted mean has the same value. It differs from the exact comparison acceleration by approximately -0.000211067077614 m/s^2.\n"
 second_route = "none"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "(g1+g2+g3)/3" }
 
 [[observables]]
 name = "mean_standard_uncertainty_correlated"
 description = "probabilistic-only first-order standard uncertainty retaining shared sources"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "7*pi^2/5000"
 value = "0.0138174461615"
 value_kind = "decimal-12"
-derivation = """
-At the nominal inputs, each length derivative is pi^2, each period derivative is -(621/625)*pi^2 per second, the shared ruler derivative is pi^2, and the shared rate derivative is -2*(621/625)*pi^2. Use w=pi^2/25000 m/s^2 as a common propagated scale. The independent length contributions are 40*w,25*w,20*w; the three independent timing contributions have magnitude 10*w each. The shared ruler contribution is 18*w to every estimate, and the shared stopwatch contribution is -24*w to every estimate.
-Consequently Cov(g_i,g_j)=900*w^2 for i!=j, and the diagonal entries are 2600*w^2,1625*w^2,1400*w^2. Equivalently, the full covariance matrix is w^2*[[2600,900,900],[900,1625,900],[900,900,1400]]. The variance of the mean is (2600+1625+1400+6*900)*w^2/9=1225*w^2. Its standard uncertainty is 35*w=7*pi^2/5000=0.0138174461615251... m/s^2. The covariance formula is a linear probabilistic estimate, not a deterministic certificate.
-"""
+derivation = "At the nominal inputs, each length derivative is pi^2, each period derivative is -(621/625)*pi^2 per second, the shared ruler derivative is pi^2, and the shared rate derivative is -2*(621/625)*pi^2. Use w=pi^2/25000 m/s^2 as a common propagated scale. The independent length contributions are 40*w,25*w,20*w; the three independent timing contributions have magnitude 10*w each. The shared ruler contribution is 18*w to every estimate, and the shared stopwatch contribution is -24*w to every estimate.\nConsequently Cov(g_i,g_j)=900*w^2 for i!=j, and the diagonal entries are 2600*w^2,1625*w^2,1400*w^2. Equivalently, the full covariance matrix is w^2*[[2600,900,900],[900,1625,900],[900,900,1400]]. The variance of the mean is (2600+1625+1400+6*900)*w^2/9=1225*w^2. Its standard uncertainty is 35*w=7*pi^2/5000=0.0138174461615251... m/s^2. The covariance formula is a linear probabilistic estimate, not a deterministic certificate.\n"
 second_route = "Group contributions by independent source before forming output covariances. The six individual contributions give mean variance (40^2+25^2+20^2+3*10^2)*w^2/9=325*w^2. The two shared contributions give (18^2+24^2)*w^2=900*w^2. Their sum is again 1225*w^2."
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "standard_acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+companion = { class = "measurement", mode = "standard", target = "mean_gravity", source = "observables.mean_standard_uncertainty_correlated.derivation", assurance = "Unverified first-order probabilistic comparison; not a deterministic bound" }
+expression = { kind = "unsupported", text = "7*pi^2/5000", code = "omitted-propagation-scale-and-contributors", reason = "The specialized coefficient omits the acceleration scale w and executable sensitivity/source contributions. A check requires dimensioned propagation and all bound length, timing, shared ruler and stopwatch contributors; the nominal mean expression does not bind the calibration contributions.", dependencies = ["pi", "mean_gravity", "sigma_l1", "sigma_l2", "sigma_l3", "sigma_t1", "sigma_t2", "sigma_t3", "sigma_ruler_offset", "sigma_stopwatch_rate"], scope = ["expression"] }
 
 [[observables]]
 name = "mean_standard_uncertainty_independence_assumed"
 description = "incorrect comparison obtained by dropping cross-covariances while retaining marginal variances"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "pi^2/1000"
 value = "0.00986960440109"
 value_kind = "decimal-12"
-derivation = """
-Treating the three estimates as independent drops the six off-diagonal covariance terms. The resulting mean variance is (2600+1625+1400)*w^2/9=625*w^2, so its standard uncertainty is 25*w=pi^2/1000. This is a comparison calculation that contradicts the declared shared sources.
-"""
+derivation = "Treating the three estimates as independent drops the six off-diagonal covariance terms. The resulting mean variance is (2600+1625+1400)*w^2/9=625*w^2, so its standard uncertainty is 25*w=pi^2/1000. This is a comparison calculation that contradicts the declared shared sources.\n"
 second_route = "none"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "standard_acceleration", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+companion = { class = "measurement", mode = "standard", target = "mean_gravity", source = "observables.mean_standard_uncertainty_independence_assumed.derivation", assurance = "Unverified first-order probabilistic comparison; not a deterministic bound" }
+expression = { kind = "unsupported", text = "pi^2/1000", code = "omitted-propagation-scale-and-contributors", reason = "The specialized coefficient omits the acceleration scale w and executable sensitivity/source contributions. A check requires dimensioned propagation and all bound length, timing, shared ruler and stopwatch contributors; the nominal mean expression does not bind the calibration contributions. This preserved comparison also assumes independence contrary to the declared shared sources.", dependencies = ["pi", "mean_gravity", "sigma_l1", "sigma_l2", "sigma_l3", "sigma_t1", "sigma_t2", "sigma_t3", "sigma_ruler_offset", "sigma_stopwatch_rate"], scope = ["expression"] }
 
 [[observables]]
 name = "standard_uncertainty_difference"
 description = "correlated standard uncertainty minus the independence-assumed comparison"
-unit = { display = "m/s^2", m = 1, s = -2 }
 closed_form = "pi^2/2500"
 value = "0.00394784176044"
 value_kind = "decimal-12"
-derivation = """
-The difference is (35-25)*w=10*pi^2/25000=pi^2/2500=0.00394784176043574... m/s^2.
-"""
+derivation = "The difference is (35-25)*w=10*pi^2/25000=pi^2/2500=0.00394784176043574... m/s^2.\n"
 second_route = "none"
+descriptor = { dimensions = ["1", "0", "-2", "0", "0", "0", "0"], kind = "uncertainty_comparison", measure = { display = "m/s^2", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "pi^2/2500", code = "omitted-propagation-scale-and-contributors", reason = "The specialized coefficient omits the acceleration scale w and executable sensitivity/source contributions. A check requires dimensioned propagation and all bound length, timing, shared ruler and stopwatch contributors; the nominal mean expression does not bind the calibration contributions. The result is a comparison quantity, not a newly established standard uncertainty.", dependencies = ["pi", "mean_gravity", "sigma_l1", "sigma_l2", "sigma_l3", "sigma_t1", "sigma_t2", "sigma_t3", "sigma_ruler_offset", "sigma_stopwatch_rate"], scope = ["expression"] }
 
 [[variants]]
 name = "deterministic-instrument-and-reading-enclosures"
 description = "replace the probabilistic declarations by separately assumed deterministic bounds on every relevant input"
 overrides = { uncertainty_mode = "1" }
-expected = """
-Use the eight _enclosed records in the same measurement equations. All lengths and periods stay positive throughout their enclosures. Each gravity estimate increases with its length and the shared ruler offset, and decreases with its measured period and the shared stopwatch rate. Therefore simultaneous endpoint choices attain the exact extrema of the unweighted mean.
-The average independent length half-width is (0.0016+0.001+0.0008)/3=17/15000 m. Adding the shared ruler half-width gives 139/75000 m. Thus the upper and lower mean length numerators are 74659/75000 m and 74381/75000 m. The measured period endpoints are 4967/2484 s and 4969/2484 s, and the shared rate factors are 2069/2070 and 2071/2070.
-The exact mean enclosure is [g_lower,g_upper], where g_lower=4*pi^2*(74381/75000)*(2484/4969)^2*(2070/2071)^2 and g_upper=4*pi^2*(74659/75000)*(2484/4967)^2*(2070/2069)^2, both in m/s^2. A radius about the nominal mean g0=(621/625)*pi^2 is max(g0-g_lower,g_upper-g0). These nonlinear endpoint expressions include interaction effects and provide a worst-case bound under the declared enclosure assumptions.
-The half-widths are independent deterministic declarations, even where their magnitudes equal the standard uncertainties in the other mode. An enclosure supplies no variance. Conversely, the standard uncertainties alone do not provide this deterministic bound.
-"""
+expected = "Use the eight _enclosed records in the same measurement equations. All lengths and periods stay positive throughout their enclosures. Each gravity estimate increases with its length and the shared ruler offset, and decreases with its measured period and the shared stopwatch rate. Therefore simultaneous endpoint choices attain the exact extrema of the unweighted mean.\nThe average independent length half-width is (0.0016+0.001+0.0008)/3=17/15000 m. Adding the shared ruler half-width gives 139/75000 m. Thus the upper and lower mean length numerators are 74659/75000 m and 74381/75000 m. The measured period endpoints are 4967/2484 s and 4969/2484 s, and the shared rate factors are 2069/2070 and 2071/2070.\nThe exact mean enclosure is [g_lower,g_upper], where g_lower=4*pi^2*(74381/75000)*(2484/4969)^2*(2070/2071)^2 and g_upper=4*pi^2*(74659/75000)*(2484/4967)^2*(2070/2069)^2, both in m/s^2. A radius about the nominal mean g0=(621/625)*pi^2 is max(g0-g_lower,g_upper-g0). These nonlinear endpoint expressions include interaction effects and provide a worst-case bound under the declared enclosure assumptions.\nThe half-widths are independent deterministic declarations, even where their magnitudes equal the standard uncertainties in the other mode. An enclosure supplies no variance. Conversely, the standard uncertainties alone do not provide this deterministic bound.\n"
 
 [errors]
 bounded = ["deterministic input envelope in the explicitly enclosed variant", "representation arithmetic and verification contributions when separately validated"]

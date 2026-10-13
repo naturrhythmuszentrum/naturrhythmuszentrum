@@ -24,7 +24,7 @@
 
 Inputs, the document manifest, and datasets identify themselves with `namespace`, `version`, `owner`, `license`, `sources`, and `labels`, in that order. Readers parse the complete syntax, validate the envelope, and then decode and validate the typed payload.
 
-Problem and fixture schema v2 is specified in `docs/design/problem-data-schema.md`. Its strict records declare quantities, counts, metadata, independent uncertainties and executable expressions; `nrz-units` checks original operations over `nrz-algebra`. `render` reconstructs the context and compares regenerated evidence with committed validation records. Unsupported records retain named limitations and cannot become substitute inputs. During the adjacent-commit transition only, v1 receives unchecked shape validation and mixed-major trees fail; the complete migration removes v1 acceptance. A units check establishes declared consistency, not numerical accuracy, model validity or statistical assurance.
+Problem and fixture schema v2 is specified in `docs/design/problem-data-schema.md`. Its strict records declare quantities, counts, metadata, independent uncertainties and executable expressions; `nrz-units` checks original operations over `nrz-algebra`. `render` reconstructs the context and compares regenerated evidence with committed validation records. Unsupported records retain named limitations and cannot become substitute inputs. Problem and fixture inputs and committed problem datasets require v2.0; v1 is refused with the migration diagnostic, and unknown minors require an explicit compatibility decision. A units check establishes declared consistency, not numerical accuracy, model validity or statistical assurance.
 
 ## Fixed point · `sec:docgen:fixed-point`
 

@@ -1,12 +1,18 @@
 {# SPDX-License-Identifier: CC0-1.0 -#}
-{# requires problems v1 -#}
+{# requires problems v2 -#}
 <!-- SPDX-License-Identifier: CC0-1.0 -->
 
 # Reference problems and fixtures · `guide:nrz:problem-catalogue`
 
-The files under `data/problems/` state each exemplar of the register as data: its model, its inputs with units and declared uncertainty, its expected observables with their derivations, the error classes it bounds, estimates or excludes, and the claims it stresses (`conv:exemplars:problem-entry-shape`). This catalogue is rendered from them.
+The files under `data/problems/` declare each exemplar's model, roles, descriptors, input uncertainties, executable observables and preserved reference answers (`conv:exemplars:problem-entry-shape`), (`spec:nrz:problem-data-schema`). The units checker establishes declared algebraic consistency; expected numbers, physical models, statistical assurance and documentary derivations require their independent evidence. Every historical `closed_form` remains provenance. Variant checking admits replacement values under unchanged contracts; it does not execute another topology's documentary expectation.
 
-|Entry|Kind|File|Parameters|Observables|Variants|Claims|Bites|
-|-----|----|----|----------|-----------|--------|------|-----|
-{% for entry in problems.entries %}|{{ entry.problem.title }} (`{{ entry.problem.register }}`)|{{ entry.problem.kind }}|`{{ problems.sources[loop.index0] }}`|{{ entry.parameters | length }}|{{ entry.observables | length }}|{{ entry.variants | length }}|{% for label in entry.stress.claims %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|{% for label in entry.stress.bites %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|
-{% endfor -%}
+The checked and unsupported columns count observable expressions in each entry. Unsupported values are never installed as substitute numerical inputs. Descriptor and relationship limitations are stated separately, including the unadmitted relative period uncertainty.
+
+|Entry|Kind|File|Parameters|Observables|Checked|Unsupported|Variants|Claims|Bites|
+|-----|----|----|----------|-----------|-------|-----------|--------|------|-----|
+{% for entry in problems.entries %}|{{ entry.problem.title }} (`{{ entry.problem.register }}`)|{{ entry.problem.kind }}|`{{ problems.sources[loop.index0] }}`|{{ entry.parameters | length }}|{{ entry.observables | length }}|{{ entry.validation.checked_observables }}|{{ entry.validation.unsupported_observables }}|{{ entry.variants | length }}|{% for label in entry.stress.claims %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|{% for label in entry.stress.bites %}{% if not loop.first %}, {% endif %}(`{{ label }}`){% endfor %}|
+{% endfor %}
+Explicit limitations follow from the source records. Shape axes, shared source identities and batch axes remain later-version obligations (`def:nrz:companion-shape`), (`def:nrz:batch-axis`).
+
+{% for entry in problems.entries %}{% for record in entry.validation.records %}{% if record.expression_status == "unsupported" %}- {{ entry.problem.title }}, `{{ record.name }}` (`{{ record.unsupported.code }}`; scope: {{ record.unsupported.scope | join(", ") }}): {{ record.unsupported.reason }}
+{% endif %}{% endfor %}{% endfor -%}

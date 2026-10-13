@@ -1,0 +1,55 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.{kind}"
+version = [2, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:{slug}"]
+exponent_policy = "rational"
+kinds = [{ name = "ratio", type = "ratio", dimensions = ["0", "0", "0", "0", "0", "0", "0"] }, { name = "standard_ratio", type = "uncertainty", dimensions = ["0", "0", "0", "0", "0", "0", "0"], mode = "standard", value_kind = "ratio" }]
+kind_rules = []
+
+[problem]
+slug = "{slug}"
+title = "Sample"
+register = "prob:exemplars:{slug}"
+kind = "{kind}"
+model = "Model"
+instance = "Instance"
+
+[[parameters]]
+name = "p"
+description = "Input"
+value = "1"
+role = "quantity"
+nonzero = false
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+uncertainty = { kind = "components", components = [{ name = "sigma_p", class = "measurement", mode = "standard", target = "p", descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "standard_ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }, source = "instrument", assurance = "Declared standard uncertainty", magnitude = { sigma = "1/10" } }] }
+
+[[parameters]]
+name = "selector"
+description = "Scenario"
+value = "0"
+role = "metadata"
+metadata = { kind = "category", values = ["0", "1"] }
+uncertainty = { kind = "none" }
+
+[[observables]]
+name = "answer"
+description = "Output"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "p" }
+closed_form = "p"
+value = "1"
+value_kind = "exact"
+derivation = "Direct"
+second_route = "none"
+
+[errors]
+bounded = []
+estimated = []
+excluded = []
+
+[stress]
+claims = []
+bites = ["step:nrz:bite-exemplar-register"]

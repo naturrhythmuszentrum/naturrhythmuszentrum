@@ -20,6 +20,28 @@ use kinds::Kinds;
 use record::Record;
 
 /// Validate one source payload and attach deterministically regenerated evidence.
+///
+/// TODO ´todo:code:declare-parameter-axes-and-shared-source´: declare parameter axes and shared source identities in the future versioned shape schema under def:nrz:companion-shape and rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:declare-varying-input-axes-with-explicit´: declare varying input axes with explicit point coordinates during schema migration under def:nrz:batch-axis.
+///
+/// TODO ´todo:code:declare-observable-shapes-and-sensitivity-target´: declare observable shapes and sensitivity target maps during the future schema migration under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:declare-aggregate-point-membership-and-missing´: declare aggregate point membership and missing input policy during schema migration under rule:nrz:batch-outcomes.
+///
+/// TODO ´todo:code:distinguish-admitted-binding-variations-from-changes´: distinguish admitted binding variations from changes requiring another plan under rule:nrz:batch-variation.
+///
+/// TODO ´todo:code:carry-versioned-operator-and-companion-declarations´: carry versioned operator and companion declarations without reinterpreting legacy problem data under dec:nrz:shape-model-implementation-boundary.
+///
+/// TODO ´todo:code:serialize-ordered-binding-families-with-shared´: serialize ordered binding families with shared constants during versioned schema migration under def:nrz:computation-batch.
+///
+/// TODO ´todo:code:validate-declared-matrix-axes-and-indexed´: validate declared matrix axes and indexed relationships only in the implementing schema migration under rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:validate-future-binding-tables-against-declared´: validate future binding tables against declared plan slot contracts under rule:nrz:binding-validation.
+///
+/// TODO ´todo:code:validate-companion-extents-and-paired-references´: validate companion extents and paired references separately from statistical validity in the future schema under def:nrz:covariance-shape and rule:nrz:shape-data-time-evidence.
+///
+/// TODO ´todo:code:reject-conflicting-shared-source-declarations-across´: reject conflicting shared source declarations across future binding rows under rule:nrz:batch-source-covariance.
 pub(crate) fn validate(
     value: &Value,
     path: &str,

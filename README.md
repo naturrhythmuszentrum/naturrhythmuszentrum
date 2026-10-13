@@ -10,7 +10,7 @@ Accuracy governs acceptance before speed; dimensions, measures, kinds and affine
 
 ## Workspace · `sec:nrz:overview-workspace`
 
-The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The generic algebra package supplies exact original expressions and collection forms; the units client checks declared physical operations before normalization. Descriptor representation and typed checked access are selected by (`spec:nrz:descriptor-units-boundary`); production numerical integration and the separately owned next problem-data migration remain obligations under (`dec:nrz:algebra-and-data-time-units-boundary`).
+The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The generic algebra package supplies exact original expressions and collection forms; the units client checks declared physical operations before normalization. Descriptor representation and typed checked access are selected by (`spec:nrz:descriptor-units-boundary`); problem schema v2 and docgen now apply that authority to reference declarations (`spec:nrz:problem-data-schema`); production numerical integration remains under (`dec:nrz:algebra-and-data-time-units-boundary`).
 
 The computation contract connects storage and graph evaluation through (`spec:nrz:descriptor-heap-computation`); its implementation responsibilities remain in the existing bites (`dec:nrz:computation-model-implementation-boundary`).
 
@@ -25,7 +25,7 @@ The computation contract connects storage and graph evaluation through (`spec:nr
 |`crates/matrix`|`nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked views, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
 |`crates/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
 |`crates/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|
-|`tools/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|No runtime engine dependency|(`tab:vision:package-structure`)|
+|`tools/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|Tooling dependencies on `nrz-units` and `nrz-algebra`|(`tab:vision:package-structure`)|
 |`prototypes/descriptors`|`nrz-descriptor-prototype`|Decision-only schema, checked binding and static-comparison experiments|`nrz-units`, `nrz-algebra`; no production dependents|(`dec:nrz:descriptor-prototype-promotion`)|
 
 Only the matrix package integrates faer, and only the physics package integrates petgraph. Engine interfaces check and preserve dimensions, measures, kinds, normalization maps, and intrinsic uncertainty companions across those boundaries (`rule:vision:backend-boundaries`), (`rule:vision:heterogeneous-assembly`), (`def:vision:intrinsic-uncertainty-companions`).
@@ -52,6 +52,7 @@ The commands derive datasets, render documents, and verify the committed generat
 |Matrix shapes, uncertainties and numerical errors|(`spec:nrz:matrix-shapes`)|Defines ordered physical axes, admissible operations, independently shaped uncertainty and numerical-error companions, and their implementation evidence.|
 |Descriptor heaps, computation plans and batches|(`spec:nrz:descriptor-heap-computation`)|Defines safe scalar storage and versioned references, plan/binding checks, per-point evidence, shared-source covariance and deterministic replay.|
 |Descriptor units and the typed computation boundary|(`spec:nrz:descriptor-units-boundary`)|Selects exact descriptor authority and typed checked access, with an executable resistor and static-exponent comparison.|
+|Versioned problem data|(`spec:nrz:problem-data-schema`)|Defines roles, descriptors, executable formulas, unsupported evidence and the generator validation contract.|
 |Exemplars to design against|(`reg:exemplars:reference-register`)|Records the systems, problems, and adversarial fixtures that inform and test those decisions.|
 |The engine's plan|(`plan:nrz:engine-plan`)|Orders implementation bites and states their deliverables, verification, exclusions, import procedure, and gate.|
 |Naturrhythmuszentrum|(`guide:nrz:overview`)|Provides the workspace and documentation entry point.|
@@ -65,7 +66,7 @@ The plan gives the dependencies and completion evidence for these bites (`plan:n
 - Bite 1b, exemplar register: seed the seven reference problems and bind adversarial fixtures to feasibility tests (`step:nrz:bite-exemplar-register`).
 - Bite 2, numerical feasibility: establish safe backend and validated-arithmetic feasibility before broad APIs (`step:nrz:bite-numerical-feasibility`).
 - Bite 3, units design: decide descriptor representation and typed checked computation through prototypes and an integral static comparison (`step:nrz:bite-units-design`), (`req:vision:expression-and-symbol-contract`).
-- Bite 4, units and numerical foundations: integrate numerical quantities, intrinsic uncertainties, conversion bounds and the data-time checker with scalar and accuracy foundations and the planned data migration (`step:nrz:bite-units-and-foundations`), (`req:vision:unit-data-migration`).
+- Bite 4, units and numerical foundations: integrate numerical quantities, intrinsic uncertainties, conversion bounds and the data-time checker with scalar and accuracy foundations and the implemented data validation boundary (`step:nrz:bite-units-and-foundations`), (`req:vision:unit-data-migration`).
 - Bite 5, certified matrix core: establish supported matrix storage, arithmetic, and square solve guarantees (`step:nrz:bite-certified-matrix-core`).
 - Bite 6, initial physics core: assemble and evaluate supported physical problems with explicit error coverage (`step:nrz:bite-physics-core`).
 - Bite 7, advanced matrix domains: admit further operations through their own domain checks and certificates (`step:nrz:bite-advanced-matrix-domains`).

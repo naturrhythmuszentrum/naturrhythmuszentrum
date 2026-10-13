@@ -93,7 +93,6 @@ pub(crate) fn owners(root: &Path) -> Result<BTreeSet<String>, Error> {
 }
 
 /// Validate all envelope fields before the caller decodes a payload.
-///
 pub(crate) fn validate(
     value: &Value,
     path: &str,
@@ -133,8 +132,7 @@ pub(crate) fn validate(
             | "org.naturrhythmuszentrum.docs.dataset.problems"
     );
     let supported = if problem_schema {
-        // Transitional v1 acceptance performs unchecked shape validation only.
-        (numbers[0] == 1) || (numbers[0] == 2 && numbers[1] == 0)
+        numbers[0] == 2 && numbers[1] == 0
     } else {
         numbers[0] == 1
     };
@@ -328,18 +326,18 @@ mod tests {
         );
     }
 
-    /// Admit only the named v2 minor while retaining the adjacent legacy shape route.
+    /// Admit only the named v2 minor and reject legacy data with a migration diagnostic.
     /// ´test:unit:checks-problem-schema-version-policy´
     #[test]
     fn checks_problem_schema_version_policy() {
         let namespace = "org.naturrhythmuszentrum.problems.problem";
         let mut value = fixture();
         value["namespace"] = json!(namespace);
-        for version in [[1, 0, 0], [2, 0, 0], [2, 0, 8]] {
+        for version in [[2, 0, 0], [2, 0, 8]] {
             value["version"] = json!(version);
             assert!(validate(&value, "problem.toml", namespace, &owners()).is_ok());
         }
-        for version in [[2, 1, 0], [3, 0, 0]] {
+        for version in [[1, 0, 0], [2, 1, 0], [3, 0, 0]] {
             value["version"] = json!(version);
             let error = validate(&value, "problem.toml", namespace, &owners())
                 .expect_err("unsupported schema")

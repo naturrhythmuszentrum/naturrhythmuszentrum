@@ -1,107 +1,107 @@
 # SPDX-License-Identifier: CC0-1.0
 namespace = "org.naturrhythmuszentrum.problems.fixture"
-version = [1, 0, 0]
+version = [2, 0, 0]
 owner = "NRZ"
 license = "CC0-1.0"
 sources = []
 labels = ["cex:exemplars:rump-polynomial"]
+exponent_policy = "rational"
+kind_rules = []
+symbols = []
+equations = []
 
 [problem]
 slug = "rump-polynomial"
 title = "Rump's polynomial"
 register = "cex:exemplars:rump-polynomial"
 kind = "fixture"
-model = """
-The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.
-The measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility bite records the resulting floating-point outputs. No such output is asserted here.
-"""
-instance = """
-Evaluate at a=77617 and b=33096. The exact polynomial part equals -2, while a/(2*b)=77617/66192, leaving a negative exact result. The precision selector is the significand bit count: 24 for binary32 and 53 for binary64.
-"""
+model = "The dimensionless expression is 333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b). Its polynomial coefficients are exact rationals: 333.75=1335/4 and 5.5=11/2. The quotient requires b!=0.\nThe measurement convention for naive evaluation is binary32 or binary64, round to nearest even, no fused multiply-add, no extended intermediates and no algebraic rewriting. Each power is formed by repeated multiplication from the base, starting with the first power. Products and sums are evaluated left to right within their precedence level, respecting the displayed parentheses; every elementary operation rounds to the selected format. The feasibility bite records the resulting floating-point outputs. No such output is asserted here.\n"
+instance = "Evaluate at a=77617 and b=33096. The exact polynomial part equals -2, while a/(2*b)=77617/66192, leaving a negative exact result. The precision selector is the significand bit count: 24 for binary32 and 53 for binary64.\n"
+
+[[kinds]]
+name = "ratio"
+type = "ratio"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
 
 [[parameters]]
 name = "a"
 description = "first exact coordinate"
 value = "77617"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "b"
 description = "second exact coordinate"
 value = "33096"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "precision_bits"
 description = "significand precision for the naive-evaluation experiment"
 value = "53"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "metadata"
+metadata = { kind = "category", values = ["24", "53"] }
 
 [[parameters]]
 name = "relative_budget"
 description = "requested relative radius for a budgeted validated scalar result"
 value = "1/1000000"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[observables]]
 name = "polynomial_part"
 description = "exact expression excluding the final quotient"
-unit = { display = "1" }
 closed_form = "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8"
 value = "-2"
 value_kind = "exact"
-derivation = """
-Set t=b^2 and u=a^2. Direct integer squaring gives t=1095345216 and u=6024398689. Since (11/2)*t=6024398688, the exact relation is u=(11/2)*t+1.
-The polynomial part is P=(1335/4)*t^3+11*u^2*t-u*t^3-121*u*t^2-2*u+(11/2)*t^4. Substituting u=(11/2)*t+1 gives 11*u^2*t=(1331/4)*t^3+121*t^2+11*t, -u*t^3=-(11/2)*t^4-t^3, -121*u*t^2=-(1331/2)*t^3-121*t^2, and -2*u=-11*t-2. Fourth-, second- and first-degree terms cancel pairwise. The cubic coefficient is (1335+1331-4-2662)/4=0. Therefore P=-2 exactly.
-"""
+derivation = "Set t=b^2 and u=a^2. Direct integer squaring gives t=1095345216 and u=6024398689. Since (11/2)*t=6024398688, the exact relation is u=(11/2)*t+1.\nThe polynomial part is P=(1335/4)*t^3+11*u^2*t-u*t^3-121*u*t^2-2*u+(11/2)*t^4. Substituting u=(11/2)*t+1 gives 11*u^2*t=(1331/4)*t^3+121*t^2+11*t, -u*t^3=-(11/2)*t^4-t^3, -121*u*t^2=-(1331/2)*t^3-121*t^2, and -2*u=-11*t-2. Fourth-, second- and first-degree terms cancel pairwise. The cubic coefficient is (1335+1331-4-2662)/4=0. Therefore P=-2 exactly.\n"
 second_route = "Polynomial division gives the independently checkable identity P+2=(u-(11/2)*t-1)*(11*t*u-t^3-(121/2)*t^2+11*t-2). Expanding verifies this identity without numerical cancellation. The first factor is zero at the stated integer squares, again giving P=-2."
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8" }
 
 [[observables]]
 name = "quotient_term"
 description = "exact final quotient"
-unit = { display = "1" }
 closed_form = "a/(2*b)"
 value = "77617/66192"
 value_kind = "exact"
-derivation = """
-The denominator is 2*33096=66192, so the quotient is exactly 77617/66192.
-"""
+derivation = "The denominator is 2*33096=66192, so the quotient is exactly 77617/66192.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "a/(2*b)" }
 
 [[observables]]
 name = "exact_value"
 description = "exact value of the complete expression"
-unit = { display = "1" }
 closed_form = "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b)"
 value = "-54767/66192"
 value_kind = "exact"
-derivation = """
-The complete value is -2+77617/66192=(-132384+77617)/66192=-54767/66192. The denominator is positive and the numerator negative, so the exact sign is negative.
-Rump's 1988 account in Algorithms for verified inclusions: theory and practice, and Loh and Walster's 2002 note Rump's example revisited, are the published accounts named by the dispatch. They report illustrative naive evaluations at common precisions with the wrong sign and magnitude near one; the latter account explains dependence on the arithmetic and expression form. This is an attributed literature claim, not a numerical prediction for the evaluation convention fixed in this file.
-"""
+derivation = "The complete value is -2+77617/66192=(-132384+77617)/66192=-54767/66192. The denominator is positive and the numerator negative, so the exact sign is negative.\nRump's 1988 account in Algorithms for verified inclusions: theory and practice, and Loh and Walster's 2002 note Rump's example revisited, are the published accounts named by the dispatch. They report illustrative naive evaluations at common precisions with the wrong sign and magnitude near one; the latter account explains dependence on the arithmetic and expression form. This is an attributed literature claim, not a numerical prediction for the evaluation convention fixed in this file.\n"
 second_route = "Combining the quotient with the polynomial-division remainder directly over denominator 2*b gives (a-4*b)/(2*b)=(77617-132384)/66192=-54767/66192."
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "333.75*b^6+a^2*(11*a^2*b^2-b^6-121*b^4-2)+5.5*b^8+a/(2*b)" }
 
 [[variants]]
 name = "binary32-naive-and-validated"
 description = "measure naive binary32 and require honest validated behaviour"
 overrides = { precision_bits = "24" }
-expected = """
-The mathematical target remains -54767/66192. The feasibility bite measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.
-A validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.
-"""
+expected = "The mathematical target remains -54767/66192. The feasibility bite measures the naive result under the explicitly stated evaluation convention; no particular floating-point output is prescribed.\nA validated path carries input, representation, arithmetic and verification contributions, including conversion accounting for any finite-precision imports. It either produces an enclosure containing -54767/66192 or refuses the requested guarantee. If an enclosure is too wide for the relative budget 1e-6, it may be retained as diagnostic evidence but must not be reported as budget success. Any claimed budget success requires a validated radius within that budget. A confident enclosure excluding the exact negative value is a defect.\n"
 
 [[variants]]
 name = "binary64-naive-and-validated"
 description = "measure naive binary64 under the same operation-order convention"
 overrides = { precision_bits = "53" }
-expected = """
-The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.
-The accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility bite records the measured naive output and the validated path's evidence separately.
-"""
+expected = "The exact target and validation requirements are unchanged. Increasing the ordinary precision is not itself a proof of correctness. Cancellation can make an unvalidated central value misleading even when the elementary inputs are exactly representable.\nThe accepted behaviours are a validated enclosure containing -54767/66192 with honest budget status, or a numerical refusal. A non-finite intermediate, unsupported arithmetic guarantee or bound exceeding the requested budget is handled as a failure of the requested guarantee. The feasibility bite records the measured naive output and the validated path's evidence separately.\n"
 
 [errors]
 bounded = ["arithmetic and verification contributions when the validated path returns an enclosure", "representation contributions under the declared import policy"]

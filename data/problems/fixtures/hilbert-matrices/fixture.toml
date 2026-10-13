@@ -1,315 +1,289 @@
 # SPDX-License-Identifier: CC0-1.0
 namespace = "org.naturrhythmuszentrum.problems.fixture"
-version = [1, 0, 0]
+version = [2, 0, 0]
 owner = "NRZ"
 license = "CC0-1.0"
 sources = []
 labels = ["ex:exemplars:hilbert-matrices"]
+exponent_policy = "rational"
+kind_rules = []
+symbols = []
+equations = []
 
 [problem]
 slug = "hilbert-matrices"
 title = "Hilbert matrices"
 register = "ex:exemplars:hilbert-matrices"
 kind = "fixture"
-model = """
-The dimensionless Hilbert matrix is H_n[i,j]=1/(i+j-1), with indices starting at one. It is symmetric positive definite. The exact right-hand side is b_i=sum from j=1 to n of 1/(i+j-1), so the exact solution is the all-ones vector. The six entry observables and six inverse-entry observables below specify the upper triangles at order three; symmetry specifies their lower triangles.
-Certification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting and no recovery. Exactly representable matrix and right-hand-side entries import without a representation radius; entries binary64 cannot represent receive a half-ulp enclosure. A validated bound q on norm_2(I-Z*A), for an approximate inverse Z, gives g=norm_2(Z)/(1-q) if q<1. With residual bound rho, input bounds rA and rB, and candidate norm bound xnorm, the certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA) if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget; otherwise the requested guarantee is refused. Conditioning estimates below predict outcomes and do not replace these checks.
-"""
-instance = """
-The base order is three: H_3=[[1,1/2,1/3],[1/2,1/3,1/4],[1/3,1/4,1/5]], b=[11/6,13/12,47/60]^T, and x=[1,1,1]^T. The exact inverse is [[9,-36,30],[-36,192,-180],[30,-180,180]].
-"""
+model = "The dimensionless Hilbert matrix is H_n[i,j]=1/(i+j-1), with indices starting at one. It is symmetric positive definite. The exact right-hand side is b_i=sum from j=1 to n of 1/(i+j-1), so the exact solution is the all-ones vector. The six entry observables and six inverse-entry observables below specify the upper triangles at order three; symmetry specifies their lower triangles.\nCertification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting and no recovery. Exactly representable matrix and right-hand-side entries import without a representation radius; entries binary64 cannot represent receive a half-ulp enclosure. A validated bound q on norm_2(I-Z*A), for an approximate inverse Z, gives g=norm_2(Z)/(1-q) if q<1. With residual bound rho, input bounds rA and rB, and candidate norm bound xnorm, the certified radius is R=g*(rho+rB+rA*xnorm)/(1-g*rA) if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget; otherwise the requested guarantee is refused. Conditioning estimates below predict outcomes and do not replace these checks.\n"
+instance = "The base order is three: H_3=[[1,1/2,1/3],[1/2,1/3,1/4],[1/3,1/4,1/5]], b=[11/6,13/12,47/60]^T, and x=[1,1,1]^T. The exact inverse is [[9,-36,30],[-36,192,-180],[30,-180,180]].\n"
+
+[[kinds]]
+name = "ratio"
+type = "ratio"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
 
 [[parameters]]
 name = "n"
 description = "matrix order"
 value = "3"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "metadata"
+metadata = { kind = "integer_range", minimum = 1 }
 
 [[parameters]]
 name = "relative_budget"
 description = "relative two-norm certificate radius budget"
 value = "1/1000000"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[observables]]
 name = "h3_11"
 description = "order-three entry in row 1 column 1"
-unit = { display = "1" }
 closed_form = "1/(1+1-1)"
 value = "1"
 value_kind = "exact"
-derivation = """
-The defining denominator is 1+1-1=1.
-"""
+derivation = "The defining denominator is 1+1-1=1.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1/(1+1-1)" }
 
 [[observables]]
 name = "h3_12"
 description = "order-three entries in positions 12 and 21"
-unit = { display = "1" }
 closed_form = "1/(1+2-1)"
 value = "1/2"
 value_kind = "exact"
-derivation = """
-The defining denominator is 2; symmetry gives the transposed entry.
-"""
+derivation = "The defining denominator is 2; symmetry gives the transposed entry.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1/(1+2-1)" }
 
 [[observables]]
 name = "h3_13"
 description = "order-three entries in positions 13 and 31"
-unit = { display = "1" }
 closed_form = "1/(1+3-1)"
 value = "1/3"
 value_kind = "exact"
-derivation = """
-The defining denominator is 3.
-"""
+derivation = "The defining denominator is 3.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1/(1+3-1)" }
 
 [[observables]]
 name = "h3_22"
 description = "order-three entry in row 2 column 2"
-unit = { display = "1" }
 closed_form = "1/(2+2-1)"
 value = "1/3"
 value_kind = "exact"
-derivation = """
-The defining denominator is 3.
-"""
+derivation = "The defining denominator is 3.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1/(2+2-1)" }
 
 [[observables]]
 name = "h3_23"
 description = "order-three entries in positions 23 and 32"
-unit = { display = "1" }
 closed_form = "1/(2+3-1)"
 value = "1/4"
 value_kind = "exact"
-derivation = """
-The defining denominator is 4.
-"""
+derivation = "The defining denominator is 4.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1/(2+3-1)" }
 
 [[observables]]
 name = "h3_33"
 description = "order-three entry in row 3 column 3"
-unit = { display = "1" }
 closed_form = "1/(3+3-1)"
 value = "1/5"
 value_kind = "exact"
-derivation = """
-The defining denominator is 5.
-"""
+derivation = "The defining denominator is 5.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1/(3+3-1)" }
 
 [[observables]]
 name = "inverse3_11"
 description = "order-three inverse entry in row 1 column 1"
-unit = { display = "1" }
 closed_form = "60*15/100"
 value = "9"
 value_kind = "exact"
-derivation = """
-Set C=60*H_3=[[60,30,20],[30,20,15],[20,15,12]]. Its adjugate is [[15,-60,50],[-60,320,-300],[50,-300,300]], and its determinant is 60*15+30*(-60)+20*50=100. Therefore H_3^(-1)=60*adj(C)/100, giving the stated entry.
-For general order, H_n^(-1)[i,j]=(-1)^(i+j)*(i+j-1)*binom(n+i-1,n-j)*binom(n+j-1,n-i)*binom(i+j-2,i-1)^2. This follows by interpolating R(z)=sum_j x_j/(z+j-1) with R(i)=delta(i,k). With D(z)=product_j(z+j-1), the numerator for column k is D(k)*product over l!=k of (z-l)/(k-l); residues at z=1-j give the displayed integer formula.
-"""
+derivation = "Set C=60*H_3=[[60,30,20],[30,20,15],[20,15,12]]. Its adjugate is [[15,-60,50],[-60,320,-300],[50,-300,300]], and its determinant is 60*15+30*(-60)+20*50=100. Therefore H_3^(-1)=60*adj(C)/100, giving the stated entry.\nFor general order, H_n^(-1)[i,j]=(-1)^(i+j)*(i+j-1)*binom(n+i-1,n-j)*binom(n+j-1,n-i)*binom(i+j-2,i-1)^2. This follows by interpolating R(z)=sum_j x_j/(z+j-1) with R(i)=delta(i,k). With D(z)=product_j(z+j-1), the numerator for column k is D(k)*product over l!=k of (z-l)/(k-l); residues at z=1-j give the displayed integer formula.\n"
 second_route = "Multiplication of H_3 by the proposed first inverse column [9,-36,30]^T gives [9-18+10,9/2-12+15/2,3-9+6]^T=[1,0,0]^T. Multiplying the other displayed columns likewise gives the remaining identity columns."
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "60*15/100" }
 
 [[observables]]
 name = "inverse3_12"
 description = "order-three inverse entries in positions 12 and 21"
-unit = { display = "1" }
 closed_form = "60*(-60)/100"
 value = "-36"
 value_kind = "exact"
-derivation = """
-The signed cofactor in the adjugate is -(30*12-15*20)=-60. Multiplication by 60/100 gives -36.
-"""
+derivation = "The signed cofactor in the adjugate is -(30*12-15*20)=-60. Multiplication by 60/100 gives -36.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "60*(-60)/100" }
 
 [[observables]]
 name = "inverse3_13"
 description = "order-three inverse entries in positions 13 and 31"
-unit = { display = "1" }
 closed_form = "60*50/100"
 value = "30"
 value_kind = "exact"
-derivation = """
-The corresponding cofactor is 30*15-20*20=50. Multiplication by 60/100 gives 30.
-"""
+derivation = "The corresponding cofactor is 30*15-20*20=50. Multiplication by 60/100 gives 30.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "60*50/100" }
 
 [[observables]]
 name = "inverse3_22"
 description = "order-three inverse entry in row 2 column 2"
-unit = { display = "1" }
 closed_form = "60*320/100"
 value = "192"
 value_kind = "exact"
-derivation = """
-The cofactor is 60*12-20*20=320. Multiplication by 60/100 gives 192.
-"""
+derivation = "The cofactor is 60*12-20*20=320. Multiplication by 60/100 gives 192.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "60*320/100" }
 
 [[observables]]
 name = "inverse3_23"
 description = "order-three inverse entries in positions 23 and 32"
-unit = { display = "1" }
 closed_form = "60*(-300)/100"
 value = "-180"
 value_kind = "exact"
-derivation = """
-The signed cofactor is -(60*15-30*20)=-300. Multiplication by 60/100 gives -180.
-"""
+derivation = "The signed cofactor is -(60*15-30*20)=-300. Multiplication by 60/100 gives -180.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "60*(-300)/100" }
 
 [[observables]]
 name = "inverse3_33"
 description = "order-three inverse entry in row 3 column 3"
-unit = { display = "1" }
 closed_form = "60*300/100"
 value = "180"
 value_kind = "exact"
-derivation = """
-The cofactor is 60*20-30*30=300. Multiplication by 60/100 gives 180.
-"""
+derivation = "The cofactor is 60*20-30*30=300. Multiplication by 60/100 gives 180.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "60*300/100" }
 
 [[observables]]
 name = "solution_component"
 description = "every component of the exact solution for the prescribed row-sum right-hand side"
-unit = { display = "1" }
 closed_form = "1"
 value = "1"
 value_kind = "exact"
-derivation = """
-By construction, (H_n*ones)_i=sum_j H_n[i,j]=b_i. At order three these row sums are 11/6,13/12,47/60. Invertibility makes this solution unique.
-"""
+derivation = "By construction, (H_n*ones)_i=sum_j H_n[i,j]=b_i. At order three these row sums are 11/6,13/12,47/60. Invertibility makes this solution unique.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1" }
 
 [[observables]]
 name = "condition_order3"
 description = "tabulated two-norm condition number at order three"
-unit = { display = "1" }
 closed_form = "lambda_max(H_3)/lambda_min(H_3)"
 value = "524.1"
 value_kind = "decimal-4"
-derivation = """
-This is a literature value supplied by the dispatch, following standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility bite. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.
-"""
+derivation = "This is a literature value supplied by the dispatch, following standard Hilbert-matrix tables such as those in Higham's Accuracy and Stability of Numerical Algorithms. It is not derived here and is to be confirmed by the feasibility bite. Positive definiteness makes the eigenvalue ratio equal to the spectral condition number.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "lambda_max(H_3)/lambda_min(H_3)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_3 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
 
 [[observables]]
 name = "condition_order4"
 description = "tabulated two-norm condition number at order four"
-unit = { display = "1" }
 closed_form = "lambda_max(H_4)/lambda_min(H_4)"
 value = "1.551e4"
 value_kind = "decimal-4"
-derivation = """
-This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.
-"""
+derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "lambda_max(H_4)/lambda_min(H_4)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_4 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
 
 [[observables]]
 name = "condition_order5"
 description = "tabulated two-norm condition number at order five"
-unit = { display = "1" }
 closed_form = "lambda_max(H_5)/lambda_min(H_5)"
 value = "4.766e5"
 value_kind = "decimal-4"
-derivation = """
-This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.
-"""
+derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "lambda_max(H_5)/lambda_min(H_5)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_5 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
 
 [[observables]]
 name = "condition_order6"
 description = "tabulated two-norm condition number at order six"
-unit = { display = "1" }
 closed_form = "lambda_max(H_6)/lambda_min(H_6)"
 value = "1.495e7"
 value_kind = "decimal-4"
-derivation = """
-This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.
-"""
+derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "lambda_max(H_6)/lambda_min(H_6)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_6 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
 
 [[observables]]
 name = "condition_order7"
 description = "tabulated two-norm condition number at order seven"
-unit = { display = "1" }
 closed_form = "lambda_max(H_7)/lambda_min(H_7)"
 value = "4.754e8"
 value_kind = "decimal-4"
-derivation = """
-This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.
-"""
+derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "lambda_max(H_7)/lambda_min(H_7)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_7 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
 
 [[observables]]
 name = "condition_order8"
 description = "tabulated two-norm condition number at order eight"
-unit = { display = "1" }
 closed_form = "lambda_max(H_8)/lambda_min(H_8)"
 value = "1.526e10"
 value_kind = "decimal-4"
-derivation = """
-This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.
-"""
+derivation = "This is a literature value supplied by the dispatch from the standard Hilbert-matrix condition-number tabulation associated with Higham's Accuracy and Stability of Numerical Algorithms, to be confirmed by the feasibility bite.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "lambda_max(H_8)/lambda_min(H_8)", code = "matrix-spectral-declarations", reason = "Requires a shaped Hilbert matrix declaration and minimum/maximum eigenvalue operations; the scalar checker cannot bind H_8 or certify its spectral condition expression.", dependencies = ["n"], scope = ["expression"] }
 
 [[variants]]
 name = "order3-success"
 description = "first certification expectation"
 overrides = { n = "3" }
-expected = """
-The exact solution is three ones. Success under the stated procedure and relative budget 1e-6 is expected. The order-of-magnitude estimate kappa*u is about 5.8e-14 for u=2^(-53), leaving substantial margin for representation, residual and verification contributions. The actual validated radius remains the acceptance test.
-"""
+expected = "The exact solution is three ones. Success under the stated procedure and relative budget 1e-6 is expected. The order-of-magnitude estimate kappa*u is about 5.8e-14 for u=2^(-53), leaving substantial margin for representation, residual and verification contributions. The actual validated radius remains the acceptance test.\n"
 
 [[variants]]
 name = "order4-success"
 description = "certification expectation at order four"
 overrides = { n = "4" }
-expected = """
-The exact solution is four ones. Success is expected under the stated procedure. The estimate kappa*u is about 1.7e-12, well below the relative budget 1e-6.
-"""
+expected = "The exact solution is four ones. Success is expected under the stated procedure. The estimate kappa*u is about 1.7e-12, well below the relative budget 1e-6.\n"
 
 [[variants]]
 name = "order5-success"
 description = "certification expectation at order five"
 overrides = { n = "5" }
-expected = """
-The exact solution is five ones. Success is expected under the stated procedure. The estimate kappa*u is about 5.3e-11. It is an estimate of scale, not a substitute for validated inverse and residual bounds.
-"""
+expected = "The exact solution is five ones. Success is expected under the stated procedure. The estimate kappa*u is about 5.3e-11. It is an estimate of scale, not a substitute for validated inverse and residual bounds.\n"
 
 [[variants]]
 name = "order6-success"
 description = "certification expectation at order six"
 overrides = { n = "6" }
-expected = """
-The exact solution is six ones. Success is expected under the stated procedure. The estimate kappa*u is about 1.7e-9, below the relative budget 1e-6 with room for moderate certificate factors.
-"""
+expected = "The exact solution is six ones. Success is expected under the stated procedure. The estimate kappa*u is about 1.7e-9, below the relative budget 1e-6 with room for moderate certificate factors.\n"
 
 [[variants]]
 name = "order7-success"
 description = "last expected success among the supplied orders"
 overrides = { n = "7" }
-expected = """
-The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility bite must confirm or correct this expectation from its recorded certificate.
-"""
+expected = "The exact solution is seven ones. Success is expected, with a narrower margin: kappa*u is about 5.3e-8 against a relative budget of 1e-6. Frobenius enclosure factors and the actual verification arithmetic matter at this order. The feasibility bite must confirm or correct this expectation from its recorded certificate.\n"
 
 [[variants]]
 name = "order8-refusal"
 description = "first expected refusal among the supplied orders"
 overrides = { n = "8" }
-expected = """
-The exact solution is eight ones. Refusal of the relative budget 1e-6 is expected without refinement or higher precision. The estimate kappa*u is about 1.7e-6 before further certificate factors, so conversion accounting and residual amplification are expected to exhaust the budget.
-This prediction does not assert a universal condition-number cutoff. The recorded reason must be q>=1, g*rA>=1, or a validated radius exceeding the budget. Failure to certify proves neither singularity nor inaccuracy of the candidate.
-"""
+expected = "The exact solution is eight ones. Refusal of the relative budget 1e-6 is expected without refinement or higher precision. The estimate kappa*u is about 1.7e-6 before further certificate factors, so conversion accounting and residual amplification are expected to exhaust the budget.\nThis prediction does not assert a universal condition-number cutoff. The recorded reason must be q>=1, g*rA>=1, or a validated radius exceeding the budget. Failure to certify proves neither singularity nor inaccuracy of the candidate.\n"
 
 [errors]
 bounded = ["representation input perturbations under the prescribed import policy", "arithmetic and verification contributions when a certificate succeeds"]

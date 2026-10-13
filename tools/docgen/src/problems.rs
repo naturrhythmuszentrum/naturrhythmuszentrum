@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 
 use crate::envelope;
@@ -32,148 +32,6 @@ struct Location {
     kind: &'static str,
 }
 
-/// Metadata and mathematical declaration for one entry.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Problem {
-    /// Directory-matching slug.
-    slug: String,
-    /// Human-readable title.
-    title: String,
-    /// Minted register label.
-    register: String,
-    /// Problem or fixture kind.
-    kind: String,
-    /// Mathematical model and its assumptions.
-    model: String,
-    /// Concrete reference instance.
-    instance: String,
-}
-
-/// One named input quantity.
-///
-/// TODO ´todo:code:declare-parameter-quantity-physical-count-or´: declare parameter quantity, physical count or metadata roles explicitly under rule:vision:counts-and-metadata and req:vision:unit-data-migration.
-///
-/// TODO ´todo:code:declare-parameter-axes-and-shared-source´: declare parameter axes and shared source identities in the future versioned shape schema under def:nrz:companion-shape and rule:nrz:shape-data-time-evidence.
-///
-/// TODO ´todo:code:declare-varying-input-axes-with-explicit´: declare varying input axes with explicit point coordinates during schema migration under def:nrz:batch-axis.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Parameter {
-    /// Unique parameter name.
-    ///
-    /// TODO ´todo:code:bind-parameter-symbols-to-declared-descriptors´: bind parameter symbols to declared descriptors under req:vision:expression-and-symbol-contract.
-    name: String,
-    /// Human-readable meaning.
-    description: String,
-    /// Exact input value syntax.
-    value: String,
-    /// Unit declaration validated after typed decoding.
-    ///
-    /// TODO ´todo:code:decode-parameter-dimensions-measure-scales-affine´: decode parameter dimensions, measure scales, affine origins and semantic kinds under def:vision:measures and rule:vision:semantic-kinds-and-roles.
-    unit: Value,
-    /// Uncertainty declaration validated after typed decoding.
-    ///
-    /// TODO ´todo:code:declare-input-uncertainty-expressions-with-their´: declare input uncertainty expressions with their own dimensions, measures, kinds and assurance under rule:vision:uncertainty-unit-algebra.
-    uncertainty: Value,
-}
-
-/// One stated mathematical result.
-///
-/// TODO ´todo:code:declare-observable-shapes-and-sensitivity-target´: declare observable shapes and sensitivity target maps during the future schema migration under rule:nrz:shape-sensitivity-propagation and rule:nrz:shape-data-time-evidence.
-///
-/// TODO ´todo:code:declare-aggregate-point-membership-and-missing´: declare aggregate point membership and missing input policy during schema migration under rule:nrz:batch-outcomes.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Observable {
-    /// Unique observable name.
-    name: String,
-    /// Human-readable meaning.
-    description: String,
-    /// Unit declaration validated after typed decoding.
-    ///
-    /// TODO ´todo:code:compare-observable-descriptors-with-algebraically-derived´: compare observable descriptors with algebraically derived dimensions, measures and kinds under req:vision:algebraic-unit-checks.
-    unit: Value,
-    /// Symbolic expression for the observable.
-    ///
-    /// TODO ´todo:code:migrate-closed-forms-to-the-generic´: migrate closed forms to the generic expression and declared symbol contract without treating legacy strings as checked under req:vision:expression-and-symbol-contract.
-    closed_form: String,
-    /// Expected value string.
-    value: String,
-    /// Exact or rounded precision category.
-    value_kind: String,
-    /// Primary derivation.
-    derivation: String,
-    /// Independent check where supplied.
-    second_route: String,
-}
-
-/// One change to the base parameters and its expected outcome.
-///
-/// TODO ´todo:code:distinguish-admitted-binding-variations-from-changes´: distinguish admitted binding variations from changes requiring another plan under rule:nrz:batch-variation.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Variant {
-    /// Variant identifier.
-    name: String,
-    /// Human-readable change.
-    description: String,
-    /// Replacement parameter value strings.
-    ///
-    /// TODO ´todo:code:check-variant-replacements-against-count-domains´: check variant replacements against count domains, metadata categories and quantity declarations under req:vision:unit-data-migration.
-    #[serde(default)]
-    overrides: BTreeMap<String, String>,
-    /// Expected mathematical or numerical behavior.
-    expected: String,
-}
-
-/// Error classes declared by an entry.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Errors {
-    /// Bounded error classes.
-    bounded: Vec<String>,
-    /// Estimated error classes.
-    estimated: Vec<String>,
-    /// Excluded error classes.
-    excluded: Vec<String>,
-}
-
-/// Labels whose claims and implementation bites the entry stresses.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Stress {
-    /// Claim labels exercised by the entry.
-    claims: Vec<String>,
-    /// Implementation-bite labels exercised by the entry.
-    bites: Vec<String>,
-}
-
-/// The strict payload shared by input files and dataset entries.
-///
-/// TODO ´todo:code:carry-versioned-quantity-and-uncertainty-declarations´: carry versioned quantity and uncertainty declarations through entry serialization under req:vision:unit-data-migration and def:vision:intrinsic-uncertainty-companions.
-///
-/// TODO ´todo:code:carry-versioned-operator-and-companion-declarations´: carry versioned operator and companion declarations without reinterpreting legacy problem data under dec:nrz:shape-model-implementation-boundary.
-///
-/// TODO ´todo:code:serialize-ordered-binding-families-with-shared´: serialize ordered binding families with shared constants during versioned schema migration under def:nrz:computation-batch.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(deny_unknown_fields)]
-struct Entry {
-    /// Core mathematical declaration.
-    problem: Problem,
-    /// Input quantities in source order.
-    parameters: Vec<Parameter>,
-    /// Expected results in source order.
-    observables: Vec<Observable>,
-    /// Optional variants in source order.
-    #[serde(default)]
-    variants: Vec<Variant>,
-    /// Bounded, estimated, and excluded errors.
-    errors: Errors,
-    /// Cited claims and bites.
-    stress: Stress,
-}
-
 /// The dataset's only payload key.
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -183,13 +41,10 @@ struct DatasetPayload {
 }
 
 /// Derive the dataset from all validated entry files in catalogue order.
-///
-/// TODO ´todo:code:derive-migrated-unit-datasets-only-after´: derive migrated unit datasets only after expression and symbol validation under req:vision:unit-data-migration.
 pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>, Value), Error> {
     let locations = layout(root)?;
     let mut sources = Vec::new();
     let mut entries = Vec::new();
-    let mut tree_major = None;
     for location in &locations {
         let value = envelope::read_toml(root, &location.path)?;
         let namespace = if location.kind == "problem" {
@@ -197,15 +52,7 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
         } else {
             FIXTURE_NAMESPACE
         };
-        let major = envelope::validate(&value, &location.path, namespace, owners)?;
-        if tree_major.is_some_and(|previous| previous != major) {
-            return Err(invalid(
-                &location.path,
-                "version",
-                "mixed-major problem trees are forbidden",
-            ));
-        }
-        tree_major = Some(major);
+        envelope::validate(&value, &location.path, namespace, owners)?;
         let object = value
             .as_object()
             .ok_or_else(|| invalid(&location.path, "envelope", "entry must be an object"))?;
@@ -219,23 +66,13 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
             });
         }
         let payload = envelope::payload(&value, &location.path)?;
-        let entry = if major == 2 {
-            crate::problem_schema::validate(
-                &payload,
-                &location.path,
-                &location.slug,
-                location.kind,
-                &labels[0],
-            )?
-        } else {
-            // Legacy shape validation only: no checked evidence is produced.
-            let entry: Entry = serde_json::from_value(payload).map_err(|problem| {
-                invalid(&location.path, "typed payload", &problem.to_string())
-            })?;
-            validate_entry(&entry, location, &labels[0])?;
-            serde_json::to_value(entry)
-                .map_err(|problem| invalid(&location.path, "typed payload", &problem.to_string()))?
-        };
+        let entry = crate::problem_schema::validate(
+            &payload,
+            &location.path,
+            &location.slug,
+            location.kind,
+            &labels[0],
+        )?;
         entries.push(entry);
         sources.push(location.path.clone());
     }
@@ -247,7 +84,7 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
         &sources,
         &[],
         &payload,
-        [tree_major.unwrap_or(1), 0, 0],
+        [2, 0, 0],
     )?;
     let value = serde_json::from_slice(&bytes).map_err(|problem| Error::JsonSyntax {
         path: DATASET.to_owned(),
@@ -257,10 +94,8 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
 }
 
 /// Validate a committed dataset before a template receives its entries.
-///
-/// TODO ´todo:code:revalidate-committed-quantity-and-uncertainty-expressions´: revalidate committed quantity and uncertainty expressions before rendering under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 pub(crate) fn validate_dataset(value: &Value, owners: &BTreeSet<String>) -> Result<(), Error> {
-    let major = envelope::validate(value, DATASET, DATASET_NAMESPACE, owners)?;
+    envelope::validate(value, DATASET, DATASET_NAMESPACE, owners)?;
     let object = value
         .as_object()
         .ok_or_else(|| invalid(DATASET, "envelope", "dataset must be an object"))?;
@@ -294,19 +129,12 @@ pub(crate) fn validate_dataset(value: &Value, owners: &BTreeSet<String>) -> Resu
             ));
         }
         previous = Some(order);
-        if major == 2 {
-            crate::problem_schema::revalidate(
-                entry,
-                &format!("{DATASET}:{}", location.path),
-                &location.slug,
-                location.kind,
-            )?;
-        } else {
-            // This adjacent-commit compatibility route makes no algebraic claim.
-            let entry: Entry = serde_json::from_value(entry.clone())
-                .map_err(|problem| invalid(DATASET, "typed payload", &problem.to_string()))?;
-            validate_entry(&entry, &location, &entry.problem.register)?;
-        }
+        crate::problem_schema::revalidate(
+            entry,
+            &format!("{DATASET}:{}", location.path),
+            &location.slug,
+            location.kind,
+        )?;
     }
     Ok(())
 }
@@ -469,257 +297,6 @@ fn valid_slug(slug: &str) -> bool {
     !hyphen
 }
 
-/// Apply rules four through nine after strict payload decoding.
-///
-/// TODO ´todo:code:assemble-declared-symbols-and-check-observable´: assemble declared symbols and check observable formulas, uncertainty expressions and reference cycles under req:vision:expression-and-symbol-contract.
-///
-/// TODO ´todo:code:validate-declared-matrix-axes-and-indexed´: validate declared matrix axes and indexed relationships only in the implementing schema migration under rule:nrz:shape-data-time-evidence.
-///
-/// TODO ´todo:code:validate-future-binding-tables-against-declared´: validate future binding tables against declared plan slot contracts under rule:nrz:binding-validation.
-fn validate_entry(entry: &Entry, location: &Location, label: &str) -> Result<(), Error> {
-    let path = &location.path;
-    if entry.parameters.is_empty() || entry.observables.is_empty() {
-        return Err(invalid(
-            path,
-            "typed payload",
-            "parameters and observables must be non-empty",
-        ));
-    }
-    if entry.problem.slug != location.slug
-        || entry.problem.kind != location.kind
-        || entry.problem.register != label
-    {
-        return Err(invalid(
-            path,
-            "identity",
-            "slug, kind, or register differs from its location or envelope",
-        ));
-    }
-    let mut names = BTreeSet::new();
-    for parameter in &entry.parameters {
-        if !names.insert(parameter.name.as_str()) {
-            return Err(invalid(path, "identity", "duplicate parameter name"));
-        }
-    }
-    let mut observable_names = BTreeSet::new();
-    for observable in &entry.observables {
-        if !observable_names.insert(observable.name.as_str()) {
-            return Err(invalid(path, "identity", "duplicate observable name"));
-        }
-    }
-    for variant in &entry.variants {
-        if variant
-            .overrides
-            .keys()
-            .any(|name| !names.contains(name.as_str()))
-        {
-            return Err(invalid(
-                path,
-                "identity",
-                "override names an absent parameter",
-            ));
-        }
-    }
-    for parameter in &entry.parameters {
-        check_value(path, &parameter.value)?;
-        nested_value(path, &parameter.unit, "offset")?;
-        nested_value(path, &parameter.uncertainty, "half_width")?;
-        nested_value(path, &parameter.uncertainty, "sigma")?;
-    }
-    for observable in &entry.observables {
-        check_value(path, &observable.value)?;
-        nested_value(path, &observable.unit, "offset")?;
-    }
-    for variant in &entry.variants {
-        for value in variant.overrides.values() {
-            check_value(path, value)?;
-        }
-    }
-    for parameter in &entry.parameters {
-        check_unit(path, &parameter.unit)?;
-    }
-    for observable in &entry.observables {
-        check_unit(path, &observable.unit)?;
-    }
-    for parameter in &entry.parameters {
-        check_uncertainty(path, &parameter.uncertainty)?;
-    }
-    check_exactness(path, &entry.observables)?;
-    if !envelope::valid_label(&entry.problem.register) {
-        return Err(invalid(path, "labels", "malformed register label"));
-    }
-    for claim in &entry.stress.claims {
-        if !envelope::valid_label(claim) {
-            return Err(invalid(path, "labels", "malformed claim label"));
-        }
-    }
-    for bite in &entry.stress.bites {
-        if !envelope::valid_label(bite) || !bite.starts_with("step:nrz:") {
-            return Err(invalid(path, "labels", "bite must be a step:nrz: label"));
-        }
-    }
-    Ok(())
-}
-
-/// Check the declared exact or rounded precision of every observable.
-///
-/// TODO ´todo:code:validate-count-exactness-separately-from-continuous´: validate count exactness separately from continuous uncertainty precision under def:vision:counts and rule:vision:uncertainty-unit-algebra.
-fn check_exactness(path: &str, observables: &[Observable]) -> Result<(), Error> {
-    for observable in observables {
-        let count = match observable.value_kind.as_str() {
-            "exact" => {
-                if observable.value.contains('e') || observable.value.contains('E') {
-                    return Err(invalid(
-                        path,
-                        "exactness",
-                        "exact value uses scientific notation",
-                    ));
-                }
-                None
-            }
-            "decimal-12" => Some(12),
-            "decimal-4" => Some(4),
-            _ => return Err(invalid(path, "exactness", "unknown value_kind")),
-        };
-        if let Some(expected) = count {
-            let mantissa = observable.value.split(&['e', 'E'][..]).next().unwrap_or("");
-            let digits = mantissa
-                .bytes()
-                .filter(u8::is_ascii_digit)
-                .skip_while(|byte| *byte == b'0')
-                .count();
-            if digits != expected {
-                return Err(invalid(path, "exactness", "wrong significant-digit count"));
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Validate one optional nested numeric field before unit or uncertainty shape.
-///
-/// TODO ´todo:code:interpret-scale-factors-affine-offsets-and´: interpret scale factors, affine offsets and uncertainty values according to their declared roles under rule:vision:measure-conversions and rule:vision:uncertainty-unit-algebra.
-fn nested_value(path: &str, value: &Value, key: &str) -> Result<(), Error> {
-    if let Some(entry) = value.as_object().and_then(|object| object.get(key)) {
-        let text = entry
-            .as_str()
-            .ok_or_else(|| invalid(path, "values", &format!("{key} must be a value string")))?;
-        check_value(path, text)?;
-    }
-    Ok(())
-}
-
-/// Recognize the specified grammar for exact decimal, fraction, and exponent strings.
-///
-/// TODO ´todo:code:apply-value-domain-checks-after-syntax´: apply value-domain checks after syntax for counts, metadata and continuous uncertainty under rule:vision:counts-and-metadata and rule:vision:uncertainty-unit-algebra.
-fn check_value(path: &str, value: &str) -> Result<(), Error> {
-    if !valid_value(value) {
-        return Err(invalid(
-            path,
-            "values",
-            &format!("invalid value string {value}"),
-        ));
-    }
-    Ok(())
-}
-
-/// Match unsigned decimal components without leading-sign or whitespace allowances.
-fn decimal(text: &str) -> bool {
-    let mut parts = text.split('.');
-    let first = parts.next().unwrap_or("");
-    let second = parts.next();
-    !first.is_empty()
-        && first.bytes().all(|byte| byte.is_ascii_digit())
-        && second.is_none_or(|digits| {
-            !digits.is_empty() && digits.bytes().all(|byte| byte.is_ascii_digit())
-        })
-        && parts.next().is_none()
-}
-
-/// Match the value grammar without a regular-expression dependency.
-fn valid_value(value: &str) -> bool {
-    let body = value.strip_prefix('-').unwrap_or(value);
-    if let Some((numerator, denominator)) = body.split_once('/') {
-        return !numerator.is_empty()
-            && !denominator.is_empty()
-            && numerator.bytes().all(|byte| byte.is_ascii_digit())
-            && denominator.bytes().all(|byte| byte.is_ascii_digit());
-    }
-    if let Some(index) = body.find(&['e', 'E'][..]) {
-        let (mantissa, exponent) = body.split_at(index);
-        let exponent = exponent[1..]
-            .strip_prefix('-')
-            .or_else(|| exponent[1..].strip_prefix('+'))
-            .unwrap_or_else(|| &exponent[1..]);
-        return decimal(mantissa)
-            && !exponent.is_empty()
-            && exponent.bytes().all(|byte| byte.is_ascii_digit());
-    }
-    decimal(body)
-}
-
-/// Require the finite set of unit keys and their declared value types.
-///
-/// TODO ´todo:code:validate-dimension-algebra-measure-scales-affine´: validate dimension algebra, measure scales, affine roles and semantic kinds beyond table shape under req:vision:algebraic-unit-checks and rule:vision:measure-conversions.
-fn check_unit(path: &str, value: &Value) -> Result<(), Error> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| invalid(path, "units", "unit must be an inline table"))?;
-    if !object.get("display").is_some_and(Value::is_string) {
-        return Err(invalid(path, "units", "display must be a string"));
-    }
-    for (key, value) in object {
-        let valid = match key.as_str() {
-            "display" | "offset" => value.is_string(),
-            "m" | "kg" | "s" | "A" | "K" | "mol" | "cd" => value.as_i64().is_some(),
-            _ => false,
-        };
-        if !valid {
-            return Err(invalid(
-                path,
-                "units",
-                &format!("invalid unit key or type {key}"),
-            ));
-        }
-    }
-    Ok(())
-}
-
-/// Validate exactly the key set associated with each uncertainty kind.
-///
-/// TODO ´todo:code:derive-uncertainty-dimensions-and-kinds-for´: derive uncertainty dimensions and kinds for absolute, relative and covariance expressions instead of copying the value descriptor under rule:vision:uncertainty-unit-algebra.
-///
-/// TODO ´todo:code:validate-companion-extents-and-paired-references´: validate companion extents and paired references separately from statistical validity in the future schema under def:nrz:covariance-shape and rule:nrz:shape-data-time-evidence.
-///
-/// TODO ´todo:code:reject-conflicting-shared-source-declarations-across´: reject conflicting shared source declarations across future binding rows under rule:nrz:batch-source-covariance.
-fn check_uncertainty(path: &str, value: &Value) -> Result<(), Error> {
-    let object = value
-        .as_object()
-        .ok_or_else(|| invalid(path, "uncertainty", "uncertainty must be an inline table"))?;
-    let kind = object
-        .get("kind")
-        .and_then(Value::as_str)
-        .ok_or_else(|| invalid(path, "uncertainty", "kind must be a string"))?;
-    let keys: BTreeSet<&str> = object.keys().map(String::as_str).collect();
-    let expected = match kind {
-        "none" => BTreeSet::from(["kind"]),
-        "enclosure" => BTreeSet::from(["kind", "half_width", "source"]),
-        "standard" => BTreeSet::from(["kind", "sigma", "source"]),
-        _ => return Err(invalid(path, "uncertainty", "unknown kind")),
-    };
-    if keys != expected {
-        return Err(invalid(
-            path,
-            "uncertainty",
-            "keys differ from kind's required shape",
-        ));
-    }
-    if kind != "none" && !object.get("source").is_some_and(Value::is_string) {
-        return Err(invalid(path, "uncertainty", "source must be a string"));
-    }
-    Ok(())
-}
-
 /// Construct a path-bearing problem-stage error with its rule name.
 fn invalid(path: &str, rule: &str, detail: &str) -> Error {
     Error::Payload {
@@ -730,7 +307,6 @@ fn invalid(path: &str, rule: &str, detail: &str) -> Error {
 
 /// Boundary tests for the ordered problem-stage rules.
 ///
-/// TODO ´todo:code:exercise-algebraic-acceptance-and-rejection-for´: exercise algebraic acceptance and rejection for formulas, symbols, affine roles and count versus ratio versus metadata under req:vision:algebraic-unit-checks.
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -739,25 +315,43 @@ mod tests {
 
     use serde_json::{Value, json};
 
-    use super::{Entry, Location, derive, layout, validate_entry};
+    use super::{derive, layout};
     use crate::error::Error;
 
     /// Build a complete minimal entry for direct rule tests.
-    ///
-    /// TODO ´todo:code:supply-declared-measures-kinds-uncertainty-descriptors´: supply declared measures, kinds, uncertainty descriptors and bound symbols in rule fixtures under req:vision:unit-data-migration.
     fn sample() -> Value {
         json!({
             "problem": {
                 "slug": "alpha", "title": "Alpha", "register": "prob:exemplars:alpha",
                 "kind": "problem", "model": "Model", "instance": "Instance"
             },
+            "exponent_policy": "rational",
+            "kinds": [{
+                "name": "length",
+                "type": "named",
+                "dimensions": ["1", "0", "0", "0", "0", "0", "0"]
+            }],
+            "kind_rules": [],
             "parameters": [{
-                "name": "p", "description": "Input", "value": "1/2",
-                "unit": {"display": "m", "m": 1}, "uncertainty": {"kind": "none"}
+                "name": "p", "description": "Input", "value": "1/2", "role": "quantity", "nonzero": false,
+                "descriptor": {
+                    "dimensions": ["1", "0", "0", "0", "0", "0", "0"],
+                    "kind": "length",
+                    "measure": {"display": "m", "scale": "1", "offset": "0"},
+                    "affine_role": "difference"
+                }, "uncertainty": {"kind": "none"}
             }],
             "observables": [{
-                "name": "answer", "description": "Output", "unit": {"display": "m", "m": 1},
-                "closed_form": "p", "value": "0.500000000000", "value_kind": "decimal-12",
+                "name": "answer", "description": "Output", "descriptor": {
+                    "dimensions": ["1", "0", "0", "0", "0", "0", "0"],
+                    "kind": "length",
+                    "measure": {"display": "m", "scale": "1", "offset": "0"},
+                    "affine_role": "difference"
+                },
+                "expression": {
+                    "kind": "algebra",
+                    "text": "p"
+                }, "closed_form": "p", "value": "0.500000000000", "value_kind": "decimal-12",
                 "derivation": "Direct", "second_route": "none"
             }],
             "variants": [{
@@ -772,21 +366,21 @@ mod tests {
         })
     }
 
-    /// Decode and validate a modified sample, returning its rule error.
-    fn invalid_sample(value: Value) -> Result<(), Box<dyn std::error::Error>> {
-        let entry: Entry = serde_json::from_value(value)?;
-        let location = Location {
-            path: "data/problems/alpha/problem.toml".to_owned(),
-            slug: "alpha".to_owned(),
-            kind: "problem",
-        };
-        assert!(validate_entry(&entry, &location, "prob:exemplars:alpha").is_err());
-        Ok(())
+    /// Assert that a located modified source sample is refused.
+    fn invalid_sample(value: &Value) {
+        assert!(
+            crate::problem_schema::validate(
+                value,
+                "data/problems/alpha/problem.toml",
+                "alpha",
+                "problem",
+                "prob:exemplars:alpha",
+            )
+            .is_err()
+        );
     }
 
     /// Write one minimal valid entry under its inferred location.
-    ///
-    /// TODO ´todo:code:write-migrated-problem-and-fixture-declarations´: write migrated problem and fixture declarations for data-time unit cases under req:vision:unit-data-migration.
     fn write_entry(root: &Path, kind: &str, slug: &str) -> Result<(), std::io::Error> {
         let (directory, filename) = if kind == "fixture" {
             (format!("data/problems/fixtures/{slug}"), "fixture.toml")
@@ -794,9 +388,13 @@ mod tests {
             (format!("data/problems/{slug}"), "problem.toml")
         };
         fs::create_dir_all(root.join(&directory))?;
-        let source = format!(
-            "# SPDX-License-Identifier: CC0-1.0\nnamespace = \"org.naturrhythmuszentrum.problems.{kind}\"\nversion = [1, 0, 0]\nowner = \"NRZ\"\nlicense = \"CC0-1.0\"\nsources = []\nlabels = [\"prob:exemplars:{slug}\"]\n[problem]\nslug = \"{slug}\"\ntitle = \"Sample\"\nregister = \"prob:exemplars:{slug}\"\nkind = \"{kind}\"\nmodel = \"Model\"\ninstance = \"Instance\"\n[[parameters]]\nname = \"p\"\ndescription = \"Input\"\nvalue = \"1\"\nunit = {{ display = \"1\" }}\nuncertainty = {{ kind = \"none\" }}\n[[observables]]\nname = \"answer\"\ndescription = \"Output\"\nunit = {{ display = \"1\" }}\nclosed_form = \"p\"\nvalue = \"1\"\nvalue_kind = \"exact\"\nderivation = \"Direct\"\nsecond_route = \"none\"\n[errors]\nbounded = []\nestimated = []\nexcluded = []\n[stress]\nclaims = []\nbites = [\"step:nrz:bite-exemplar-register\"]\n"
-        );
+        #[expect(
+            clippy::literal_string_with_formatting_args,
+            reason = "the fixture template uses brace placeholders filled by str::replace, not a format string"
+        )]
+        let source = include_str!("../tests/support/problem.toml")
+            .replace("{kind}", kind)
+            .replace("{slug}", slug);
         fs::write(root.join(directory).join(filename), source)
     }
 
@@ -806,8 +404,6 @@ mod tests {
     }
 
     /// Decode one valid problem and one valid fixture into the ordered dataset.
-    ///
-    /// TODO ´todo:code:verify-valid-derived-units-and-intrinsic´: verify valid derived units and intrinsic uncertainty declarations survive dataset derivation under req:vision:algebraic-unit-checks.
     ///
     /// ´test:unit:decodes-valid-problem-and-fixture´
     #[test]
@@ -906,67 +502,73 @@ mod tests {
     /// Catch a register that differs from the envelope label.
     /// ´test:unit:identity-refuses-register-mismatch´
     #[test]
-    fn identity_refuses_register_mismatch() -> Result<(), Box<dyn std::error::Error>> {
+    fn identity_refuses_register_mismatch() {
         let mut value = sample();
         value["problem"]["register"] = json!("prob:exemplars:other");
-        invalid_sample(value)
+        invalid_sample(&value);
     }
 
     /// Reject a value string outside the exact grammar.
     ///
-    /// TODO ´todo:code:reject-fractional-physical-counts-while-admitting´: reject fractional physical counts while admitting continuous ratios and count standard uncertainty under def:vision:counts and rule:vision:uncertainty-unit-algebra.
-    ///
     /// ´test:unit:values-refuse-invalid-number´
     #[test]
-    fn values_refuse_invalid_number() -> Result<(), Box<dyn std::error::Error>> {
+    fn values_refuse_invalid_number() {
         let mut value = sample();
-        value["parameters"][0]["value"] = json!("+1");
-        invalid_sample(value)
+        value["parameters"][0]["value"] = json!("1+2");
+        invalid_sample(&value);
     }
 
-    /// Reject a unit key outside the seven base exponents.
-    ///
-    /// TODO ´todo:code:reject-invalid-measure-scales-origins-affine´: reject invalid measure scales, origins, affine roles and mismatched dimensions under rule:vision:measure-conversions and req:vision:algebraic-unit-checks.
+    /// Reject an undeclared descriptor field.
     ///
     /// ´test:unit:units-refuse-unknown-key´
     #[test]
-    fn units_refuse_unknown_key() -> Result<(), Box<dyn std::error::Error>> {
+    fn units_refuse_unknown_key() {
         let mut value = sample();
-        value["parameters"][0]["unit"]["gram"] = json!(1);
-        invalid_sample(value)
+        value["parameters"][0]["descriptor"]["gram"] = json!(1);
+        invalid_sample(&value);
     }
 
     /// Reject an enclosure that omits its source.
     ///
-    /// TODO ´todo:code:reject-uncertainty-descriptor-mismatches-and-missing´: reject uncertainty descriptor mismatches and missing correlations without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra.
+    /// TODO ´todo:code:reject-missing-correlations-under-the-future´: reject missing correlations under the future shared-source contract without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra.
     ///
     /// ´test:unit:uncertainty-refuses-incomplete-shape´
     #[test]
-    fn uncertainty_refuses_incomplete_shape() -> Result<(), Box<dyn std::error::Error>> {
+    fn uncertainty_refuses_incomplete_shape() {
         let mut value = sample();
-        value["parameters"][0]["uncertainty"] = json!({"kind": "enclosure", "half_width": "1/10"});
-        invalid_sample(value)
+        value["kinds"].as_array_mut().expect("kinds").push(json!({
+            "name": "radius_length", "type": "uncertainty", "mode": "radius",
+            "value_kind": "length", "dimensions": ["1", "0", "0", "0", "0", "0", "0"],
+        }));
+        let mut descriptor = value["parameters"][0]["descriptor"].clone();
+        descriptor["kind"] = json!("radius_length");
+        value["parameters"][0]["uncertainty"] = json!({
+            "kind": "components", "components": [{
+                "name": "radius_p", "class": "measurement", "mode": "radius", "target": "p",
+                "descriptor": descriptor, "assurance": "Assumed deterministic bound",
+                "magnitude": {"half_width": "1/10"},
+            }],
+        });
+        invalid_sample(&value);
     }
 
     /// Reject a decimal with fewer significant digits than declared.
     ///
-    /// TODO ´todo:code:test-discrete-count-exactness-independently-of´: test discrete count exactness independently of rounded uncertainty values under def:vision:counts and rule:vision:uncertainty-unit-algebra.
-    ///
     /// ´test:unit:exactness-refuses-wrong-precision´
     #[test]
-    fn exactness_refuses_wrong_precision() -> Result<(), Box<dyn std::error::Error>> {
+    fn exactness_refuses_wrong_precision() {
         let mut value = sample();
         value["observables"][0]["value"] = json!("0.5");
-        invalid_sample(value)
+        invalid_sample(&value);
     }
 
     /// Reject a bite label outside the step and NRZ area.
     /// ´test:unit:labels-refuse-wrong-bite-kind´
     #[test]
-    fn labels_refuse_wrong_bite_kind() -> Result<(), Box<dyn std::error::Error>> {
+    fn labels_refuse_wrong_bite_kind() {
         let mut value = sample();
         value["stress"]["bites"][0] = json!("rule:vision:example");
-        invalid_sample(value)
+        invalid_sample(&value);
     }
 
     /// Report an invalid envelope before attempting to decode an invalid payload.
@@ -980,7 +582,7 @@ mod tests {
         fs::write(
             &path,
             source
-                .replace("version = [1, 0, 0]", "version = [3, 0, 0]")
+                .replace("version = [2, 0, 0]", "version = [3, 0, 0]")
                 .replace("title = \"Sample\"", "bad_field = \"Value\""),
         )?;
         assert!(matches!(

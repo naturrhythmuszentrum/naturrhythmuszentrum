@@ -50,17 +50,35 @@ fn evaluate<T: Scalar>(
         .checked_add(quotient)
 }
 
-/// Read one fixture field as its string value.
-///
-/// TODO ´todo:test:read-fixture-value-roles-and-measure´: read fixture value roles and measure declarations without inferring counts from integer syntax under req:vision:unit-data-migration and rule:vision:counts-and-metadata.
+/// Read a declared coherent ratio coordinate before numerical fixture evaluation.
 fn field<'a>(entry: &'a Value, group: &str, name: &str) -> &'a str {
-    entry[group]
+    let value = entry[group]
         .as_array()
         .expect("fixture array")
         .iter()
         .find(|value| value["name"].as_str() == Some(name))
-        .and_then(|value| value["value"].as_str())
-        .expect("fixture value")
+        .expect("fixture declaration");
+    if group == "parameters" {
+        assert_eq!(value["role"], "quantity");
+        assert_eq!(value["uncertainty"]["kind"], "none");
+    }
+    let descriptor = &value["descriptor"];
+    assert_eq!(
+        descriptor["dimensions"],
+        serde_json::json!(["0", "0", "0", "0", "0", "0", "0"])
+    );
+    assert_eq!(descriptor["affine_role"], "difference");
+    assert_eq!(descriptor["measure"]["scale"], "1");
+    assert_eq!(descriptor["measure"]["offset"], "0");
+    let kind = entry["kinds"]
+        .as_array()
+        .expect("declared kinds")
+        .iter()
+        .find(|kind| kind["name"] == descriptor["kind"])
+        .expect("declared ratio kind");
+    assert_eq!(kind["type"], "ratio");
+    assert_eq!(kind["dimensions"], descriptor["dimensions"]);
+    value["value"].as_str().expect("fixture value")
 }
 
 /// Both supported formats must refuse or contain the exact rational value.

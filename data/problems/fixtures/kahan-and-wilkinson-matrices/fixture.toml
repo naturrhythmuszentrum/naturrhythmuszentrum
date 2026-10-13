@@ -1,284 +1,273 @@
 # SPDX-License-Identifier: CC0-1.0
 namespace = "org.naturrhythmuszentrum.problems.fixture"
-version = [1, 0, 0]
+version = [2, 0, 0]
 owner = "NRZ"
 license = "CC0-1.0"
 sources = []
 labels = ["ex:exemplars:kahan-and-wilkinson-matrices"]
+exponent_policy = "rational"
+kind_rules = []
+symbols = []
+equations = []
 
 [problem]
 slug = "kahan-and-wilkinson-matrices"
 title = "Kahan and Wilkinson matrices"
 register = "ex:exemplars:kahan-and-wilkinson-matrices"
 kind = "fixture"
-model = """
-The Kahan matrix is K_n=D*U, where D=diag(1,s,...,s^(n-1)), U has unit diagonal, entries -c above the diagonal and zero entries below it, and c^2+s^2=1. The fixed angle has c=3/5 and s=4/5. Every column has Euclidean norm one, while an unpivoted QR factorisation has Q=I and R=K_n.
-The Wilkinson construction here is the Gaussian-elimination partial-pivoting growth matrix: diagonal entries are one, entries below the diagonal are minus one, the last column is all ones, and remaining entries are zero. Equal-magnitude pivot candidates are resolved by choosing the smallest row index, so elimination makes no row swaps. This is the growth construction, rather than the symmetric tridiagonal eigenvalue example, because the fixture stresses elimination growth and factorisation choices.
-For both matrices the exact right-hand side is the matrix times the all-ones vector. Certification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, exact import for binary64-representable entries and half-ulp enclosures only for inexact imports, and no recovery. With q>=norm_2(I-Z*A), use g=norm_2(Z)/(1-q) only if q<1. With validated rho,rA,rB,xnorm, use R=g*(rho+rB+rA*xnorm)/(1-g*rA) only if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget. All outcome predictions remain expectations to be confirmed or corrected by the feasibility bite.
-"""
-instance = """
-At order three, K=[[1,-3/5,-3/5],[0,4/5,-12/25],[0,0,16/25]], with right-hand side [-1/5,8/25,16/25]^T. Its inverse is [[1,3/4,3/2],[0,5/4,15/16],[0,0,25/16]].
-At order three, W=[[1,0,1],[-1,1,1],[-1,-1,1]], with right-hand side [2,1,-1]^T. For general order, the Wilkinson right-hand side is b_i=3-i for i<n and b_n=2-n.
-"""
+model = "The Kahan matrix is K_n=D*U, where D=diag(1,s,...,s^(n-1)), U has unit diagonal, entries -c above the diagonal and zero entries below it, and c^2+s^2=1. The fixed angle has c=3/5 and s=4/5. Every column has Euclidean norm one, while an unpivoted QR factorisation has Q=I and R=K_n.\nThe Wilkinson construction here is the Gaussian-elimination partial-pivoting growth matrix: diagonal entries are one, entries below the diagonal are minus one, the last column is all ones, and remaining entries are zero. Equal-magnitude pivot candidates are resolved by choosing the smallest row index, so elimination makes no row swaps. This is the growth construction, rather than the symmetric tridiagonal eigenvalue example, because the fixture stresses elimination growth and factorisation choices.\nFor both matrices the exact right-hand side is the matrix times the all-ones vector. Certification uses binary64, round to nearest even, no fused multiply-add, LU with partial pivoting, exact import for binary64-representable entries and half-ulp enclosures only for inexact imports, and no recovery. With q>=norm_2(I-Z*A), use g=norm_2(Z)/(1-q) only if q<1. With validated rho,rA,rB,xnorm, use R=g*(rho+rB+rA*xnorm)/(1-g*rA) only if g*rA<1. Success requires R/norm_2(xhat)<=relative_budget. All outcome predictions remain expectations to be confirmed or corrected by the feasibility bite.\n"
+instance = "At order three, K=[[1,-3/5,-3/5],[0,4/5,-12/25],[0,0,16/25]], with right-hand side [-1/5,8/25,16/25]^T. Its inverse is [[1,3/4,3/2],[0,5/4,15/16],[0,0,25/16]].\nAt order three, W=[[1,0,1],[-1,1,1],[-1,-1,1]], with right-hand side [2,1,-1]^T. For general order, the Wilkinson right-hand side is b_i=3-i for i<n and b_n=2-n.\n"
+
+[[kinds]]
+name = "ratio"
+type = "ratio"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "angle"
+type = "angle"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
 
 [[parameters]]
 name = "n_kahan"
 description = "Kahan matrix order"
 value = "3"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "metadata"
+metadata = { kind = "integer_range", minimum = 1 }
 
 [[parameters]]
 name = "n_wilkinson"
 description = "Wilkinson matrix order"
 value = "3"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "metadata"
+metadata = { kind = "integer_range", minimum = 1 }
 
 [[parameters]]
 name = "c"
 description = "cosine of the Kahan angle"
 value = "3/5"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "s"
 description = "sine of the Kahan angle"
 value = "4/5"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "rank_threshold"
 description = "absolute singular-value threshold used to compare rank diagnostics"
 value = "1/2"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[parameters]]
 name = "relative_budget"
 description = "relative two-norm solve-certificate budget"
 value = "1/1000000"
-unit = { display = "1" }
 uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
 
 [[observables]]
 name = "kahan_angle"
 description = "angle determined by the rational sine and cosine"
-unit = { display = "rad" }
 closed_form = "atan(4/3)"
 value = "0.927295218002"
 value_kind = "decimal-12"
-derivation = """
-The angle lies in the first quadrant and has tangent s/c=4/3. The identity atan(4/3)=2*atan(1/2), evaluated by the alternating arctangent series through j=22, gives the displayed twelve-digit value with a remainder below 2e-16.
-"""
+derivation = "The angle lies in the first quadrant and has tangent s/c=4/3. The identity atan(4/3)=2*atan(1/2), evaluated by the alternating arctangent series through j=22, gives the displayed twelve-digit value with a remainder below 2e-16.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "angle", measure = { display = "rad", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "atan(4/3)" }
 
 [[observables]]
 name = "kahan_11"
 description = "first Kahan diagonal entry"
-unit = { display = "1" }
 closed_form = "1"
 value = "1"
 value_kind = "exact"
-derivation = """
-The first row scale is s^0=1 and the diagonal of U is one.
-"""
+derivation = "The first row scale is s^0=1 and the diagonal of U is one.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1" }
 
 [[observables]]
 name = "kahan_12_and_13"
 description = "the two strictly upper entries in the first row"
-unit = { display = "1" }
 closed_form = "-c"
 value = "-3/5"
 value_kind = "exact"
-derivation = """
-Both first-row upper entries are the row scale one times -c.
-"""
+derivation = "Both first-row upper entries are the row scale one times -c.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "-c" }
 
 [[observables]]
 name = "kahan_22"
 description = "second Kahan diagonal entry"
-unit = { display = "1" }
 closed_form = "s"
 value = "4/5"
 value_kind = "exact"
-derivation = """
-The second row scale is s=4/5.
-"""
+derivation = "The second row scale is s=4/5.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "s" }
 
 [[observables]]
 name = "kahan_23"
 description = "third entry in the second Kahan row"
-unit = { display = "1" }
 closed_form = "-s*c"
 value = "-12/25"
 value_kind = "exact"
-derivation = """
-Multiplication gives -(4/5)*(3/5)=-12/25.
-"""
+derivation = "Multiplication gives -(4/5)*(3/5)=-12/25.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "-s*c" }
 
 [[observables]]
 name = "kahan_trailing_diagonal"
 description = "last diagonal entry and last unpivoted QR diagonal at order three"
-unit = { display = "1" }
 closed_form = "s^2"
 value = "16/25"
 value_kind = "exact"
-derivation = """
-The third row scale is s^2=16/25. Since K is already upper triangular with positive diagonal, unpivoted QR can take Q=I and R=K.
-"""
+derivation = "The third row scale is s^2=16/25. Since K is already upper triangular with positive diagonal, unpivoted QR can take Q=I and R=K.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "s^2" }
 
 [[observables]]
 name = "kahan_lower_entry"
 description = "each of the entries 21,31,32"
-unit = { display = "1" }
 closed_form = "0"
 value = "0"
 value_kind = "exact"
-derivation = """
-U is upper triangular, and left diagonal scaling preserves its zero lower triangle.
-"""
+derivation = "U is upper triangular, and left diagonal scaling preserves its zero lower triangle.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "0" }
 
 [[observables]]
 name = "kahan_column_norm_squared"
 description = "squared Euclidean norm of every Kahan column"
-unit = { display = "1" }
 closed_form = "c^2*sum(s^(2*i),i=0..j-2)+s^(2*(j-1))"
 value = "1"
 value_kind = "exact"
-derivation = """
-Because 1-s^2=c^2, the geometric sum is 1-s^(2*(j-1)); adding the final diagonal square gives one. The first column has norm one directly.
-"""
+derivation = "Because 1-s^2=c^2, the geometric sum is 1-s^(2*(j-1)); adding the final diagonal square gives one. The first column has norm one directly.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "c^2*sum(s^(2*i),i=0..j-2)+s^(2*(j-1))", code = "indexed-sum-and-symbolic-exponents", reason = "Requires indexed column and summation binders, declared i and j ranges, and symbolic exponent support; the bounded scalar grammar admits none of these.", dependencies = ["c", "s", "n_kahan"], scope = ["expression"] }
 
 [[observables]]
 name = "kahan_smallest_singular_value_squared_upper_bound"
 description = "exact upper bound on the square of the smallest singular value at order three"
-unit = { display = "1" }
 closed_form = "256/(24^2+15^2+25^2)"
 value = "128/713"
 value_kind = "exact"
-derivation = """
-For v=[24,15,25]^T, exact multiplication gives K*v=[0,0,16]^T. The Rayleigh quotient for K^T*K is 16^2/(24^2+15^2+25^2)=256/1426=128/713. The smallest eigenvalue cannot exceed this quotient. Thus sigma_min(K)<=sqrt(128/713)<1/2, while every unpivoted QR diagonal is at least 16/25>1/2. A diagonal-only rank diagnostic at the stated threshold misses the small singular value.
-For general n, U^(-1)[i,j]=c*(1+c)^(j-i-1) for i<j, with unit diagonal. The last inverse column therefore gives sigma_min(K_n)<=s^(n-1)/sqrt(1+c^2*sum((1+c)^(2*j),j=0..n-2)). Keeping just its first entry gives the simpler bound sigma_min(K_n)<=16/(3*2^n). This exposes the growing separation from the trailing QR diagonal s^(n-1). Every finite matrix remains exactly nonsingular.
-"""
+derivation = "For v=[24,15,25]^T, exact multiplication gives K*v=[0,0,16]^T. The Rayleigh quotient for K^T*K is 16^2/(24^2+15^2+25^2)=256/1426=128/713. The smallest eigenvalue cannot exceed this quotient. Thus sigma_min(K)<=sqrt(128/713)<1/2, while every unpivoted QR diagonal is at least 16/25>1/2. A diagonal-only rank diagnostic at the stated threshold misses the small singular value.\nFor general n, U^(-1)[i,j]=c*(1+c)^(j-i-1) for i<j, with unit diagonal. The last inverse column therefore gives sigma_min(K_n)<=s^(n-1)/sqrt(1+c^2*sum((1+c)^(2*j),j=0..n-2)). Keeping just its first entry gives the simpler bound sigma_min(K_n)<=16/(3*2^n). This exposes the growing separation from the trailing QR diagonal s^(n-1). Every finite matrix remains exactly nonsingular.\n"
 second_route = "The last inverse column is [3/2,15/16,25/16]^T, with squared norm 713/128. Since norm_2(K^(-1)) is at least that column norm, sigma_min(K)^2<=128/713 independently reproduces the bound."
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "256/(24^2+15^2+25^2)" }
 
 [[observables]]
 name = "wilkinson_diagonal"
 description = "every diagonal entry of the growth matrix"
-unit = { display = "1" }
 closed_form = "1"
 value = "1"
 value_kind = "exact"
-derivation = """
-This is the defining diagonal of the specified Wilkinson construction.
-"""
+derivation = "This is the defining diagonal of the specified Wilkinson construction.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1" }
 
 [[observables]]
 name = "wilkinson_lower"
 description = "every entry strictly below the diagonal"
-unit = { display = "1" }
 closed_form = "-1"
 value = "-1"
 value_kind = "exact"
-derivation = """
-All strictly lower entries are minus one by construction.
-"""
+derivation = "All strictly lower entries are minus one by construction.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "-1" }
 
 [[observables]]
 name = "wilkinson_last_column"
 description = "every entry in the last column"
-unit = { display = "1" }
 closed_form = "1"
 value = "1"
 value_kind = "exact"
-derivation = """
-The last column consists of ones, including its diagonal entry.
-"""
+derivation = "The last column consists of ones, including its diagonal entry.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1" }
 
 [[observables]]
 name = "wilkinson_other_upper"
 description = "strictly upper entries outside the last column"
-unit = { display = "1" }
 closed_form = "0"
 value = "0"
 value_kind = "exact"
-derivation = """
-These are the remaining entries in the defining construction; at order three this is entry 12.
-"""
+derivation = "These are the remaining entries in the defining construction; at order three this is entry 12.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "0" }
 
 [[observables]]
 name = "wilkinson_growth_factor"
 description = "element growth factor under the specified partial-pivoting tie rule"
-unit = { display = "1" }
 closed_form = "2^(n_wilkinson-1)"
 value = "4"
 value_kind = "exact"
-derivation = """
-Each pivot before the last is one and every lower multiplier is minus one. Updating the last column doubles its active entries at each elimination stage. The final pivot is 2^(n-1), while the largest original entry magnitude is one. Thus the growth factor is 2^(n-1), equal to four at order three.
-"""
+derivation = "Each pivot before the last is one and every lower multiplier is minus one. Updating the last column doubles its active entries at each elimination stage. The final pivot is 2^(n-1), while the largest original entry magnitude is one. Thus the growth factor is 2^(n-1), equal to four at order three.\n"
 second_route = "At order three the successive upper rows are [1,0,1], [0,1,2] and [0,0,4], displaying the same maximum entry four."
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "2^(n_wilkinson-1)", code = "metadata-dependent-exponent", reason = "Requires a declared family instantiation from structural order to a literal exponent; metadata cannot be a quantity operand and the algebra grammar requires a literal rational exponent.", dependencies = ["n_wilkinson"], scope = ["expression"] }
 
 [[observables]]
 name = "solution_component"
 description = "every component of either prescribed exact solution"
-unit = { display = "1" }
 closed_form = "1"
 value = "1"
 value_kind = "exact"
-derivation = """
-For Kahan, row i sums to s^(i-1)*(1-c*(n-i)), giving the stated order-three right-hand side. For Wilkinson, a row i<n sums to 1-(i-1)+1=3-i, and the final row sums to 1-(n-1)=2-n. Thus both exact right-hand sides have the all-ones solution.
-"""
+derivation = "For Kahan, row i sums to s^(i-1)*(1-c*(n-i)), giving the stated order-three right-hand side. For Wilkinson, a row i<n sums to 1-(i-1)+1=3-i, and the final row sums to 1-(n-1)=2-n. Thus both exact right-hand sides have the all-ones solution.\n"
 second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "ratio", measure = { display = "1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "1" }
 
 [[variants]]
 name = "kahan-order3-success"
 description = "well-conditioned solve despite the rank-diagnostic example"
 overrides = { n_kahan = "3", rank_threshold = "1/2" }
-expected = """
-The exact solution is [1,1,1]. Under the stated binary64 certificate procedure, success at relative budget 1e-6 is expected. The Frobenius norm squared of K is 3, and that of its displayed inverse is 1113/128. Therefore kappa_2(K)<=sqrt(3339/128)<6, so kappa*u is below 7e-16. The rank threshold is a separate diagnostic choice and is not the solve budget.
-"""
+expected = "The exact solution is [1,1,1]. Under the stated binary64 certificate procedure, success at relative budget 1e-6 is expected. The Frobenius norm squared of K is 3, and that of its displayed inverse is 1113/128. Therefore kappa_2(K)<=sqrt(3339/128)<6, so kappa*u is below 7e-16. The rank threshold is a separate diagnostic choice and is not the solve budget.\n"
 
 [[variants]]
 name = "kahan-order40-refusal"
 description = "large separation between triangular diagonals and the smallest singular value"
 overrides = { n_kahan = "40", rank_threshold = "1e-8" }
-expected = """
-The exact solution remains forty ones. The trailing QR diagonal is (4/5)^39, greater than 1e-4, whereas sigma_min is at most 16/(3*2^40), less than 5e-12. A diagonal-only QR diagnostic therefore fails to report a singular value below the threshold 1e-8.
-Since norm_2(K)>=1, the singular-value bound gives kappa_2(K)>=3*2^40/16=206158430208. The resulting conditioning estimate kappa*u is at least about 2.3e-5. Refusal of the relative solve budget 1e-6 is expected under the prescribed half-ulp import policy and absence of recovery. This remains an expectation subject to the actual inverse and residual certificate, not a declaration of exact rank deficiency.
-"""
+expected = "The exact solution remains forty ones. The trailing QR diagonal is (4/5)^39, greater than 1e-4, whereas sigma_min is at most 16/(3*2^40), less than 5e-12. A diagonal-only QR diagnostic therefore fails to report a singular value below the threshold 1e-8.\nSince norm_2(K)>=1, the singular-value bound gives kappa_2(K)>=3*2^40/16=206158430208. The resulting conditioning estimate kappa*u is at least about 2.3e-5. Refusal of the relative solve budget 1e-6 is expected under the prescribed half-ulp import policy and absence of recovery. This remains an expectation subject to the actual inverse and residual certificate, not a declaration of exact rank deficiency.\n"
 
 [[variants]]
 name = "wilkinson-order54-success"
 description = "large growth with an exactly representable all-ones candidate"
 overrides = { n_wilkinson = "54" }
-expected = """
-The exact growth factor is 2^53=9007199254740992. Nevertheless, the all-ones candidate is exactly recovered by the specified elimination: the transformed right-hand side is 1+2^(i-1) for i<n and 2^(n-1) in the last row. At n=54 these integers are representable in binary64, and back substitution gives every component exactly one.
-The inverse has last row entries 2^(-j) for j<n and 2^(-(n-1)) for j=n. For i<n, its row has zeros before column i, entry 1/2 in column i, entries -2^(i-j-1) for i<j<n, and entry -2^(i-n) in the last column. Every absolute row sum and column sum is one. Thus norm_2(W^(-1))<=1 and norm_2(W)<=n, giving kappa_2(W)<=54 and a conditioning estimate kappa*u below 6e-15.
-Success under the stated certificate and relative budget 1e-6 is expected. The inverse entries are dyadic, and the independent residual of the exact candidate is zero. Conversion and verification bounds still have to be recorded. The large elimination growth alone is not grounds for refusal.
-"""
+expected = "The exact growth factor is 2^53=9007199254740992. Nevertheless, the all-ones candidate is exactly recovered by the specified elimination: the transformed right-hand side is 1+2^(i-1) for i<n and 2^(n-1) in the last row. At n=54 these integers are representable in binary64, and back substitution gives every component exactly one.\nThe inverse has last row entries 2^(-j) for j<n and 2^(-(n-1)) for j=n. For i<n, its row has zeros before column i, entry 1/2 in column i, entries -2^(i-j-1) for i<j<n, and entry -2^(i-n) in the last column. Every absolute row sum and column sum is one. Thus norm_2(W^(-1))<=1 and norm_2(W)<=n, giving kappa_2(W)<=54 and a conditioning estimate kappa*u below 6e-15.\nSuccess under the stated certificate and relative budget 1e-6 is expected. The inverse entries are dyadic, and the independent residual of the exact candidate is zero. Conversion and verification bounds still have to be recorded. The large elimination growth alone is not grounds for refusal.\n"
 
 [[variants]]
 name = "wilkinson-order55-refusal"
 description = "the transformed right-hand side loses a unit in binary64"
 overrides = { n_wilkinson = "55" }
-expected = """
-The exact solution is fifty-five ones and the exact growth factor is 2^54=18014398509481984. At elimination stage 53, the transformed entry in row 54 becomes 2^53+1, which rounds to 2^53 under ties-to-even. The last-row entry at that stage is 2^53-1; adding the rounded row-54 entry produces 2^54-1, which rounds to 2^54. Back substitution therefore gives xhat_54=0 and every other component one.
-The exact represented-center residual is b-W*xhat=W*e_54, with entries 1 and -1 in rows 54 and 55 and zeros elsewhere. Its norm is sqrt(2), and the actual candidate error has norm one. Any honest enclosing radius is therefore at least one, far above the relative budget 1e-6 for a candidate norm sqrt(54). Refusal is required for this candidate even though kappa_2(W)<=55 and kappa*u is only about 6e-15. This distinguishes a poor candidate caused by growth and rounding from ill-conditioning of the underlying problem.
-"""
+expected = "The exact solution is fifty-five ones and the exact growth factor is 2^54=18014398509481984. At elimination stage 53, the transformed entry in row 54 becomes 2^53+1, which rounds to 2^53 under ties-to-even. The last-row entry at that stage is 2^53-1; adding the rounded row-54 entry produces 2^54-1, which rounds to 2^54. Back substitution therefore gives xhat_54=0 and every other component one.\nThe exact represented-center residual is b-W*xhat=W*e_54, with entries 1 and -1 in rows 54 and 55 and zeros elsewhere. Its norm is sqrt(2), and the actual candidate error has norm one. Any honest enclosing radius is therefore at least one, far above the relative budget 1e-6 for a candidate norm sqrt(54). Refusal is required for this candidate even though kappa_2(W)<=55 and kappa*u is only about 6e-15. This distinguishes a poor candidate caused by growth and rounding from ill-conditioning of the underlying problem.\n"
 
 [errors]
 bounded = ["exact elimination growth for the stated tie rule", "singular-value and conditioning bounds derived from exact matrices", "representation arithmetic and verification contributions in successful certificates"]

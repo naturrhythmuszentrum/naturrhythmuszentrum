@@ -2,7 +2,7 @@
 
 # Versioned problem data · `spec:nrz:problem-data-schema`
 
-This specification implements the contract of (`req:vision:unit-data-migration`). The schema and generator migration is owned by NRZ and the units/docgen maintainers. Numerical quantities, conservative conversions, intrinsic numerical companions and matrix contracts remain foundations work. This document is introduced before the generator and input switch: until that atomic switch, v1 inputs still receive shape validation only.
+This specification implements the contract of (`req:vision:unit-data-migration`). The schema and generator migration is owned by NRZ and the units/docgen maintainers. Numerical quantities, conservative conversions, intrinsic numerical companions and matrix contracts remain foundations work. All ten source inputs now use this version, and v1 input and dataset envelopes are refused with the migration diagnostic.
 
 ## Source records · `sec:nrz:problem-data-records`
 
@@ -67,7 +67,7 @@ render must reconstruct and recheck the committed v2 declarations before using t
 
 Variants validate every replacement even if a parameter is unused by the base formulas: exact quantity syntax and any explicit nonzero assumption; integral count membership; permitted metadata category/range. A rejected replacement reports variants.<name>.overrides.<parameter>. A category selecting a different topology or uncertainty scenario does not cause docgen to execute or certify its documentary expected text. The schema declares the observable expressions as base-instance formulas; variant checking proves replacement admission and unchanged declaration contracts, not that the base formula is the new topology's solver. Batch/plan admission notices therefore remain.
 
-After the switch-over, v1 inputs and v1 committed problem datasets are refused. The diagnostic names req:vision:unit-data-migration, the new schema document and the need to supply v2 declarations or an explicit unsupported marker. It never reports a legacy formula as checked. The implementation sequence uses a temporary v1 route in the second commit, explicitly labeled legacy shape validation, to keep the existing files accepted until the atomic third-commit migration. That route is removed in the final commit; there is no long-term legacy compatibility promise.
+After the switch-over, v1 inputs and v1 committed problem datasets are refused. The diagnostic names req:vision:unit-data-migration, the new schema document and the need to supply v2 declarations or an explicit unsupported marker. It never reports a legacy formula as checked. The adjacent implementation commits first introduced an explicitly unchecked v1 shape route, then removed it with the atomic ten-input migration. No legacy route remains.
 
 Current surface limits remain explicit: rational scales only; no shaped matrix/spectral declarations, binders, symbolic exponents or metadata arithmetic; conservative count-domain closure; explicit ordered semantic rules; no arbitrary affine weighted-sum constructor; relative references need a named nonzero difference; a derived declaration supplies no nonzero evidence; companion identity cannot be inferred from equal dimensions; a relative uncertainty cannot be rebound from G to period merely because both relative dimensions are zero. No units/algebra API or behavior addition is proposed.
 
