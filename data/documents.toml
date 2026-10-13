@@ -69,3 +69,7 @@ requires = []
 [[document]]
 output = "docs/design/units-design.md"
 requires = []
+
+[[document]]
+output = "docs/design/problem-data-schema.md"
+requires = []
