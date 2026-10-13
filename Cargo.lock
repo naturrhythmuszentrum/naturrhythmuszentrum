@@ -606,6 +606,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "minijinja",
+ "nrz-algebra",
+ "nrz-units",
  "serde",
  "serde_json",
  "tempfile",

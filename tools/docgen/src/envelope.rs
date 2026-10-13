@@ -94,7 +94,6 @@ pub(crate) fn owners(root: &Path) -> Result<BTreeSet<String>, Error> {
 
 /// Validate all envelope fields before the caller decodes a payload.
 ///
-/// TODO ´todo:code:admit-unit-schema-versions-only-through´: admit unit-schema versions only through the declared migration and compatibility policy under req:vision:unit-data-migration.
 pub(crate) fn validate(
     value: &Value,
     path: &str,
@@ -127,10 +126,24 @@ pub(crate) fn validate(
     if numbers.len() != 3 {
         return Err(invalid(path, "version must contain exactly three integers"));
     }
-    if numbers[0] != 1 {
+    let problem_schema = matches!(
+        namespace,
+        "org.naturrhythmuszentrum.problems.problem"
+            | "org.naturrhythmuszentrum.problems.fixture"
+            | "org.naturrhythmuszentrum.docs.dataset.problems"
+    );
+    let supported = if problem_schema {
+        // Transitional v1 acceptance performs unchecked shape validation only.
+        (numbers[0] == 1) || (numbers[0] == 2 && numbers[1] == 0)
+    } else {
+        numbers[0] == 1
+    };
+    if !supported {
         return Err(invalid(
             path,
-            &format!("found version {version:?}; supported major is 1"),
+            &format!(
+                "found version {version:?}; supported versions are major 1 for documentation and 2.0 for problem declarations; migrate under req:vision:unit-data-migration and docs/design/problem-data-schema.md"
+            ),
         ));
     }
     let owner = object
@@ -197,6 +210,19 @@ pub(crate) fn encode(
     labels: &[String],
     payload: &BTreeMap<String, Value>,
 ) -> Result<Vec<u8>, Error> {
+    encode_version(path, namespace, owner, sources, labels, payload, [1, 0, 0])
+}
+
+/// Encode an explicitly admitted schema version with the same deterministic ordering.
+pub(crate) fn encode_version(
+    path: &str,
+    namespace: &str,
+    owner: &str,
+    sources: &[String],
+    labels: &[String],
+    payload: &BTreeMap<String, Value>,
+    version: [u32; 3],
+) -> Result<Vec<u8>, Error> {
     if let Some(key) = payload.keys().find(|key| KEYS.contains(&key.as_str())) {
         return Err(Error::Payload {
             path: path.to_owned(),
@@ -205,7 +231,7 @@ pub(crate) fn encode(
     }
     let record = Dataset {
         namespace,
-        version: [1, 0, 0],
+        version,
         owner,
         license: "CC0-1.0",
         sources,
@@ -286,7 +312,6 @@ mod tests {
 
     /// Accept major one with newer minor and patch versions.
     ///
-    /// TODO ´todo:code:test-explicit-compatibility-for-migrated-unit´: test explicit compatibility for migrated unit-data versions without accepting unchecked legacy formulas under req:vision:unit-data-migration.
     ///
     /// ´test:unit:accepts-supported-major-and-newer-minor´
     #[test]
@@ -301,6 +326,26 @@ mod tests {
             validate(&value, "fixture.toml", "org.example.input", &owners()).ok(),
             Some(1)
         );
+    }
+
+    /// Admit only the named v2 minor while retaining the adjacent legacy shape route.
+    /// ´test:unit:checks-problem-schema-version-policy´
+    #[test]
+    fn checks_problem_schema_version_policy() {
+        let namespace = "org.naturrhythmuszentrum.problems.problem";
+        let mut value = fixture();
+        value["namespace"] = json!(namespace);
+        for version in [[1, 0, 0], [2, 0, 0], [2, 0, 8]] {
+            value["version"] = json!(version);
+            assert!(validate(&value, "problem.toml", namespace, &owners()).is_ok());
+        }
+        for version in [[2, 1, 0], [3, 0, 0]] {
+            value["version"] = json!(version);
+            let error = validate(&value, "problem.toml", namespace, &owners())
+                .expect_err("unsupported schema")
+                .to_string();
+            assert!(error.contains("unit-data-migration"));
+        }
     }
 
     /// Reject missing fields, namespace and version errors, owners, and labels.

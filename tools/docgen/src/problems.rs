@@ -179,7 +179,7 @@ struct Entry {
 #[serde(deny_unknown_fields)]
 struct DatasetPayload {
     /// Ordered problem and fixture payloads.
-    entries: Vec<Entry>,
+    entries: Vec<Value>,
 }
 
 /// Derive the dataset from all validated entry files in catalogue order.
@@ -189,6 +189,7 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
     let locations = layout(root)?;
     let mut sources = Vec::new();
     let mut entries = Vec::new();
+    let mut tree_major = None;
     for location in &locations {
         let value = envelope::read_toml(root, &location.path)?;
         let namespace = if location.kind == "problem" {
@@ -196,7 +197,15 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
         } else {
             FIXTURE_NAMESPACE
         };
-        envelope::validate(&value, &location.path, namespace, owners)?;
+        let major = envelope::validate(&value, &location.path, namespace, owners)?;
+        if tree_major.is_some_and(|previous| previous != major) {
+            return Err(invalid(
+                &location.path,
+                "version",
+                "mixed-major problem trees are forbidden",
+            ));
+        }
+        tree_major = Some(major);
         let object = value
             .as_object()
             .ok_or_else(|| invalid(&location.path, "envelope", "entry must be an object"))?;
@@ -210,18 +219,36 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
             });
         }
         let payload = envelope::payload(&value, &location.path)?;
-        let entry: Entry = serde_json::from_value(payload)
-            .map_err(|problem| invalid(&location.path, "typed payload", &problem.to_string()))?;
-        validate_entry(&entry, location, &labels[0])?;
-        entries.push(
-            serde_json::to_value(entry).map_err(|problem| {
+        let entry = if major == 2 {
+            crate::problem_schema::validate(
+                &payload,
+                &location.path,
+                &location.slug,
+                location.kind,
+                &labels[0],
+            )?
+        } else {
+            // Legacy shape validation only: no checked evidence is produced.
+            let entry: Entry = serde_json::from_value(payload).map_err(|problem| {
                 invalid(&location.path, "typed payload", &problem.to_string())
-            })?,
-        );
+            })?;
+            validate_entry(&entry, location, &labels[0])?;
+            serde_json::to_value(entry)
+                .map_err(|problem| invalid(&location.path, "typed payload", &problem.to_string()))?
+        };
+        entries.push(entry);
         sources.push(location.path.clone());
     }
     let payload = BTreeMap::from([("entries".to_owned(), Value::Array(entries))]);
-    let bytes = envelope::encode(DATASET, DATASET_NAMESPACE, "NRZ", &sources, &[], &payload)?;
+    let bytes = envelope::encode_version(
+        DATASET,
+        DATASET_NAMESPACE,
+        "NRZ",
+        &sources,
+        &[],
+        &payload,
+        [tree_major.unwrap_or(1), 0, 0],
+    )?;
     let value = serde_json::from_slice(&bytes).map_err(|problem| Error::JsonSyntax {
         path: DATASET.to_owned(),
         detail: problem.to_string(),
@@ -233,7 +260,7 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
 ///
 /// TODO ´todo:code:revalidate-committed-quantity-and-uncertainty-expressions´: revalidate committed quantity and uncertainty expressions before rendering under req:vision:algebraic-unit-checks and rule:vision:uncertainty-unit-algebra.
 pub(crate) fn validate_dataset(value: &Value, owners: &BTreeSet<String>) -> Result<(), Error> {
-    envelope::validate(value, DATASET, DATASET_NAMESPACE, owners)?;
+    let major = envelope::validate(value, DATASET, DATASET_NAMESPACE, owners)?;
     let object = value
         .as_object()
         .ok_or_else(|| invalid(DATASET, "envelope", "dataset must be an object"))?;
@@ -267,7 +294,19 @@ pub(crate) fn validate_dataset(value: &Value, owners: &BTreeSet<String>) -> Resu
             ));
         }
         previous = Some(order);
-        validate_entry(entry, &location, &entry.problem.register)?;
+        if major == 2 {
+            crate::problem_schema::revalidate(
+                entry,
+                &format!("{DATASET}:{}", location.path),
+                &location.slug,
+                location.kind,
+            )?;
+        } else {
+            // This adjacent-commit compatibility route makes no algebraic claim.
+            let entry: Entry = serde_json::from_value(entry.clone())
+                .map_err(|problem| invalid(DATASET, "typed payload", &problem.to_string()))?;
+            validate_entry(&entry, &location, &entry.problem.register)?;
+        }
     }
     Ok(())
 }
@@ -941,7 +980,7 @@ mod tests {
         fs::write(
             &path,
             source
-                .replace("version = [1, 0, 0]", "version = [2, 0, 0]")
+                .replace("version = [1, 0, 0]", "version = [3, 0, 0]")
                 .replace("title = \"Sample\"", "bad_field = \"Value\""),
         )?;
         assert!(matches!(

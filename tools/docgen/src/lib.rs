@@ -42,6 +42,12 @@ mod project;
 )]
 mod render;
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod problem_schema;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
