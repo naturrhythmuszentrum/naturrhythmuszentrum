@@ -62,6 +62,8 @@ pub enum Primitive {
     Substitute,
     /// Assemble an ordered matrix from a derivative premise for every cell.
     Jacobian,
+    /// Rational square-free multiplicity layers with independently checked Bezout evidence.
+    SquareFree,
 }
 
 /// Immutable public metadata for one compiled schema.
@@ -111,6 +113,7 @@ impl Primitive {
             Self::DerivativeTransport => ("diff.transport", 1),
             Self::Substitute => ("eq.substitute", 1),
             Self::Jacobian => ("diff.jacobian", 2),
+            Self::SquareFree => ("poly.square-free", 8),
         };
         RuleSpec {
             primitive: self,
@@ -121,8 +124,8 @@ impl Primitive {
     }
 }
 
-/// Every admitted primitive, in lexical key order; no square-free checker is installed yet.
-pub const PRIMITIVES: [Primitive; 29] = [
+/// Every admitted primitive, in lexical key order.
+pub const PRIMITIVES: [Primitive; 30] = [
     Primitive::DifferentiateAdd,
     Primitive::DifferentiateConstant,
     Primitive::DifferentiatePower,
@@ -152,4 +155,5 @@ pub const PRIMITIVES: [Primitive; 29] = [
     Primitive::Exact,
     Primitive::Jets,
     Primitive::RationalIdentity,
+    Primitive::SquareFree,
 ];

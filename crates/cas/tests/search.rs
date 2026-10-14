@@ -139,6 +139,7 @@ fn equality(primitive: Primitive, left: &Handle, right: &Handle) -> ProofStep {
         premises: Vec::new(),
         path: Vec::new(),
         substitutions: Vec::new(),
+        certificate: None,
     }
 }
 

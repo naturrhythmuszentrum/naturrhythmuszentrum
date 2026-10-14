@@ -154,6 +154,7 @@ pub(crate) fn append(
             premises,
         );
         proposal.path.clone_from(&value.path);
+        proposal.certificate.clone_from(&value.certificate);
         proposal
             .substitutions
             .try_reserve_exact(value.substitutions.len())

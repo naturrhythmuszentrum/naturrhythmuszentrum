@@ -164,6 +164,14 @@ impl Cas {
                     fault: None,
                 })
             }
+            Operation::SquareFree(variable) => {
+                let result =
+                    self.square_free_result(context, first, variable, policy, generation, checker)?;
+                Ok(Execution {
+                    result: Some(result),
+                    fault: None,
+                })
+            }
             _ => Ok(Execution {
                 result: None,
                 fault: None,
@@ -206,6 +214,46 @@ impl Cas {
         let result = SearchResult {
             witness,
             cost: policy.costs.weight(crate::rule::Primitive::Jets)?,
+            peak: before.max(after),
+            expansion_credits: growth,
+            primitive_steps: 1,
+            trace,
+            policy: policy.costs.clone(),
+            statistics: SearchStatistics::default(),
+            replay_usage: checker.usage(),
+            response: None,
+        };
+        self.state = candidate.state;
+        Ok(result)
+    }
+
+    /// Polynomial evidence and its displayed factors are published as one checked transaction.
+    fn square_free_result(
+        &mut self,
+        context: LogicalId,
+        input: LogicalId,
+        variable: &str,
+        policy: &SearchPolicy,
+        generation: &mut Budget,
+        checker: &mut Budget,
+    ) -> Result<SearchResult, Fault> {
+        let mut candidate = self.fork(generation)?;
+        let plan =
+            crate::square_free::produce(&mut candidate, context, input, variable, generation)?;
+        let proposal = plan.steps.last().ok_or_else(invalid)?;
+        let output = candidate.checked(&proposal.right)?;
+        let before = candidate.state.expression(input)?.unfolded;
+        let after = candidate.state.expression(output)?.unfolded;
+        let growth = after.saturating_sub(before);
+        generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
+        let witness = plan.verify(&mut candidate, context, checker)?;
+        if !policy.allow_conditional && !witness.is_discharged() {
+            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+        }
+        let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+        let result = SearchResult {
+            witness,
+            cost: policy.costs.weight(crate::rule::Primitive::SquareFree)?,
             peak: before.max(after),
             expansion_credits: growth,
             primitive_steps: 1,
@@ -341,6 +389,23 @@ fn outcome(
                     request: record,
                     consistency: ContextConsistency::Unknown,
                     blocker: Some(fault),
+                    usage,
+                }
+            }
+            FaultKind::Invalid(
+                code @ (InvalidCode::PolynomialFragment
+                | InvalidCode::CoefficientField
+                | InvalidCode::ZeroPolynomial),
+            ) => {
+                let reason = match code {
+                    InvalidCode::CoefficientField => UnsupportedReason::CoefficientField,
+                    InvalidCode::ZeroPolynomial => UnsupportedReason::ZeroPolynomialMultiplicity,
+                    _ => UnsupportedReason::PolynomialFragment,
+                };
+                Outcome::Unsupported {
+                    request: record,
+                    reason,
+                    consistency: ContextConsistency::Unknown,
                     usage,
                 }
             }

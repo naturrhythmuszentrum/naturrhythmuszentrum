@@ -35,8 +35,15 @@ fn measure_input(cas: &Cas, steps: &[ProofStep], budget: &mut Budget) -> Result<
                 AT,
             )?;
         }
+        let certificate_bytes = match &step.certificate {
+            Some(value) => value.payload(budget)?,
+            None => 0,
+        };
         let mut out = crate::encoding::Encoder::new(budget, AT);
         crate::wire::encode_relation(&step.relation, &mut out)?;
+        if let Some(value) = &step.certificate {
+            value.encode(&mut out)?;
+        }
         out.count(step.premises.len())?;
         for index in &step.premises {
             crate::wire::index(*index, &mut out)?;
@@ -58,6 +65,7 @@ fn measure_input(cas: &Cas, steps: &[ProofStep], budget: &mut Budget) -> Result<
         total = total
             .checked_add(size(out.finish().len(), AT)?)
             .and_then(|n| n.checked_add(512))
+            .and_then(|n| n.checked_add(certificate_bytes))
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
     }
     let peak = total
@@ -102,6 +110,7 @@ fn preflight(
         }
         if (step.primitive != Primitive::Congruence && !step.path.is_empty())
             || (step.primitive != Primitive::Substitute && !step.substitutions.is_empty())
+            || (step.primitive == Primitive::SquareFree) != step.certificate.is_some()
         {
             return Err(mismatch());
         }
@@ -196,7 +205,9 @@ fn compile_step(
     budget: &mut Budget,
 ) -> Result<CheckedStep, Fault> {
     budget.work(1, AT)?;
-    if matches!(step.relation, Relation::SquareFree { .. }) {
+    if matches!(step.relation, Relation::SquareFree { .. })
+        && step.primitive != Primitive::SquareFree
+    {
         return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
     }
     let mut conditions = Conditions::default();
@@ -230,6 +241,8 @@ fn compile_step(
     conditions.endpoint(&cas.state, context, right, budget)?;
     if step.primitive == Primitive::Substitute {
         substitute(cas, context, step, earlier, &mut conditions, budget)?;
+    } else if step.primitive == Primitive::SquareFree {
+        crate::square_free_check::check(cas, context, step, budget)?;
     } else if step.relation == Relation::EqualOnDomain {
         crate::rule_check::equality(cas, step, earlier, context, budget)?;
     } else {
@@ -254,6 +267,7 @@ fn compile_step(
         premises: Vec::new(),
         path: step.path.clone(),
         substitutions,
+        certificate: step.certificate.clone(),
         conditions,
         depth,
         cost,

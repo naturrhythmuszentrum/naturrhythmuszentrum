@@ -108,7 +108,7 @@ impl<'a> Encoder<'a> {
     }
 
     /// Encode an exact number using the same canonical magnitude representation.
-    fn number(&mut self, value: &crate::number::Rational) -> Result<(), Fault> {
+    pub(crate) fn number(&mut self, value: &crate::number::Rational) -> Result<(), Fault> {
         let bytes = value.structural_bytes(self.budget)?;
         self.raw(&bytes)
     }

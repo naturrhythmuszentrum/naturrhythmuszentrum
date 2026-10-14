@@ -158,7 +158,7 @@ impl<'a, 'b> Reader<'a, 'b> {
     }
 
     /// Read and verify reduced canonical magnitudes before constructing a rational.
-    fn rational(&mut self) -> Result<Rational, Fault> {
+    pub(crate) fn rational(&mut self) -> Result<Rational, Fault> {
         let start = self.position;
         let negative = self.boolean()?;
         let numerator = self.magnitude()?;

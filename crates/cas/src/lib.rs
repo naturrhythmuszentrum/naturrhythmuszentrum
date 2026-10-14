@@ -5,7 +5,7 @@
 //! Its coverage receipts never establish a mathematical identity or physical validity.
 //! A closed primitive kernel checks supplied identities and derivative premises.
 //! Bounded identity search, scalar derivatives and ordered Jacobians produce replayed results.
-//! Square-free polynomial certificates remain a later capability.
+//! Rational square-free multiplicity certificates are generated and independently replayed.
 
 #![expect(
     clippy::multiple_crate_versions,
@@ -167,3 +167,27 @@ pub use cost::CostPolicy;
 
 pub use frozen::FrozenCertificate;
 pub use search::{SearchPolicy, SearchResult, SearchStatistics};
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod euclidean;
+mod multiplicity;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod square_free;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod square_free_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod univariate;
+
+pub use multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};

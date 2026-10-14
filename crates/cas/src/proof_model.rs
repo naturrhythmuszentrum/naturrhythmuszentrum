@@ -18,11 +18,11 @@ pub enum Relation {
         /// Declaration key, not its display name.
         variable: String,
     },
-    /// Reserved square-free product relation; no primitive checker is installed yet.
+    /// Exact square-free multiplicity product, with independently certified factors.
     SquareFree {
         /// Declared polynomial variable.
         variable: String,
-        /// Exact coefficient field required by a future certificate.
+        /// Exact rational coefficient field required by the certificate.
         field: crate::model::Field,
     },
     /// Jacobian of a column of scalar outputs, with ordered independent variables.
@@ -73,6 +73,8 @@ pub struct ProofStep {
     pub path: Vec<u32>,
     /// Simultaneous replacements; empty except for the substitution schema.
     pub substitutions: Vec<Substitution>,
+    /// Exact multiplicity evidence; present only for the square-free primitive.
+    pub certificate: Option<crate::multiplicity::SquareFreeCertificate>,
 }
 
 impl fmt::Debug for Relation {
@@ -119,6 +121,7 @@ impl fmt::Debug for ProofStep {
             .field("premises", &self.premises.len())
             .field("path_depth", &self.path.len())
             .field("substitutions", &self.substitutions.len())
+            .field("certificate", &self.certificate)
             .finish_non_exhaustive()
     }
 }
@@ -142,6 +145,8 @@ pub(crate) struct CheckedStep {
     pub(crate) path: Vec<u32>,
     /// Checked simultaneous replacement identities.
     pub(crate) substitutions: Vec<(String, LogicalId)>,
+    /// Reconstructed multiplicity evidence owned by this application.
+    pub(crate) certificate: Option<crate::multiplicity::SquareFreeCertificate>,
     /// Independently reconstructed residuals and hypothesis keys.
     pub(crate) conditions: Conditions,
     /// Checked proof depth.

@@ -30,6 +30,12 @@ pub struct Request {
 pub enum UnsupportedReason {
     /// The requested executable coefficient/calculus field is not admitted.
     Field,
+    /// The expression is outside the univariate polynomial grammar.
+    PolynomialFragment,
+    /// A symbolic coefficient is outside the exact rational field.
+    CoefficientField,
+    /// The zero polynomial has undefined multiplicities.
+    ZeroPolynomialMultiplicity,
 }
 
 /// No context admission or coverage receipt establishes a model of its hypotheses.

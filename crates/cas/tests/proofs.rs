@@ -151,6 +151,7 @@ fn equality(primitive: Primitive, left: &Handle, right: &Handle) -> ProofStep {
         premises: Vec::new(),
         path: Vec::new(),
         substitutions: Vec::new(),
+        certificate: None,
     }
 }
 
@@ -166,6 +167,7 @@ fn derivative(primitive: Primitive, left: &Handle, right: &Handle, premises: &[u
         premises: premises.to_vec(),
         path: Vec::new(),
         substitutions: Vec::new(),
+        certificate: None,
     }
 }
 
@@ -1263,8 +1265,8 @@ fn unknown_function_derivative_refusal() -> TestResult {
     Ok(())
 }
 
-/// The reserved square-free relation has no accepting placeholder before its certificate checker
-/// exists.
+/// Reflexivity remains unregistered as a checker for square-free judgments: a complete
+/// multiplicity certificate is required by the dedicated schema.
 /// ´test:integration:square-free-checker-remains-unregistered´
 #[test]
 fn square_free_checker_remains_unregistered() -> TestResult {
@@ -1279,7 +1281,7 @@ fn square_free_checker_remains_unregistered() -> TestResult {
         .cas
         .check_proof(&fixture.context, &[step], &mut budget()?)
         .err()
-        .ok_or("accepted a placeholder square-free checker")?;
+        .ok_or("accepted square-free judgment by reflexivity")?;
     assert_eq!(
         fault.kind,
         FaultKind::Invalid(InvalidCode::UnsupportedFragment)

@@ -345,6 +345,9 @@ fn encode_step(
         out.name(key)?;
         index(terms.index(*term)?, out)?;
     }
+    if let Some(value) = &step.certificate {
+        value.encode(out)?;
+    }
     Ok(())
 }
 

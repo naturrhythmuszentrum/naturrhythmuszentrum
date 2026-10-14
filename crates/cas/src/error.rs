@@ -66,6 +66,12 @@ pub enum InvalidCode {
     UnsupportedVersion,
     /// A valid mathematical representation is outside this executable checker.
     UnsupportedFragment,
+    /// The input does not denote the admitted univariate polynomial fragment.
+    PolynomialFragment,
+    /// The coefficient field is not exactly rational.
+    CoefficientField,
+    /// The zero polynomial has no finite square-free multiplicity decomposition.
+    ZeroPolynomial,
     /// A required domain condition was refuted, so no equality is admitted.
     RefutedDomain,
 }

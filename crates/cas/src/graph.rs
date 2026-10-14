@@ -1093,10 +1093,18 @@ impl Cas {
         ] {
             storage_check(&self.limits, budget, kind, count, at)?;
         }
+        let certificate_bytes = match &vertex {
+            Vertex::Application(value) => match &value.certificate {
+                Some(certificate) => certificate.payload(budget)?,
+                None => 0,
+            },
+            _ => 0,
+        };
         let added = size(key.len(), at)?
             .checked_mul(3)
             .and_then(|n| n.checked_add(256))
             .and_then(|n| size(edges.len(), at).ok()?.checked_mul(32)?.checked_add(n))
+            .and_then(|n| n.checked_add(certificate_bytes))
             .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, at))?;
         let payload = state
             .payload

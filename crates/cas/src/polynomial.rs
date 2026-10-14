@@ -686,3 +686,99 @@ fn materialize_term(
     }
     product.ok_or_else(fragment)
 }
+
+/// Reconstruct a univariate Q coefficient view, refusing other variables and named constants.
+pub(crate) fn univariate(
+    state: &State,
+    root: LogicalId,
+    variable: &str,
+    budget: &mut Budget,
+) -> Result<Vec<Rational>, Fault> {
+    let value = convert(state, root, budget)?;
+    let retained = value
+        .numerator
+        .bytes(budget)?
+        .checked_add(value.denominator.bytes(budget)?)
+        .and_then(|n| n.checked_mul(8))
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+    let previous = budget.reserve_temporary(retained, AT)?;
+    let result = univariate_coefficients(&value, variable, budget);
+    budget.restore_limits(previous);
+    result
+}
+
+/// Retained sparse maps and a pending dense vector have separate bounded scratch space.
+fn univariate_coefficients(
+    value: &Fraction,
+    variable: &str,
+    budget: &mut Budget,
+) -> Result<Vec<Rational>, Fault> {
+    if !value.denominator.is_scalar() {
+        return Err(Fault::invalid(InvalidCode::PolynomialFragment, AT));
+    }
+    let divisor = value
+        .denominator
+        .terms
+        .values()
+        .next()
+        .ok_or_else(fragment)?;
+    let mut degree = 0_u64;
+    for monomial in value.numerator.terms.keys() {
+        for (atom, exponent) in monomial {
+            budget.work(budget.limits().name_bytes, AT)?;
+            match atom {
+                Atom::Free(key) if key == variable => degree = degree.max(*exponent),
+                Atom::Free(_) => return Err(Fault::invalid(InvalidCode::PolynomialFragment, AT)),
+                Atom::Constant(_) => return Err(Fault::invalid(InvalidCode::CoefficientField, AT)),
+            }
+        }
+    }
+    if value.numerator.terms.is_empty() {
+        return Ok(Vec::new());
+    }
+    let count = degree
+        .checked_add(1)
+        .ok_or_else(|| Fault::capacity(BudgetKind::PolynomialDegree, AT))?;
+    let length =
+        usize::try_from(count).map_err(|_| Fault::capacity(BudgetKind::PolynomialDegree, AT))?;
+    let mut coefficients = crate::univariate::zero_coefficients(length, budget)?;
+    for (monomial, coefficient) in &value.numerator.terms {
+        let exponent = monomial.first().map_or(0, |(_, exponent)| *exponent);
+        let position = usize::try_from(exponent).map_err(|_| fragment())?;
+        *coefficients.get_mut(position).ok_or_else(fragment)? = coefficient.div(divisor, budget)?;
+    }
+    Ok(coefficients)
+}
+
+/// Materialize a canonical univariate coefficient vector using the source term's context.
+pub(crate) fn materialize_univariate(
+    cas: &mut Cas,
+    model: LogicalId,
+    variable: &str,
+    coefficients: &[Rational],
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    crate::univariate::validate(coefficients, budget)?;
+    let source = cas.state.expression(model)?;
+    let context = source.context;
+    let sort = source.sort.clone();
+    let mut value = Polynomial {
+        terms: BTreeMap::new(),
+    };
+    for (position, coefficient) in coefficients.iter().enumerate() {
+        let monomial = if position == 0 {
+            Vec::new()
+        } else {
+            vec![(Atom::Free(variable.into()), size(position, AT)?)]
+        };
+        value.accumulate(monomial, coefficient, budget)?;
+    }
+    let retained = value
+        .bytes(budget)?
+        .checked_mul(8)
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+    let previous = budget.reserve_temporary(retained, AT)?;
+    let result = materialize(cas, context, &sort, &value, budget);
+    budget.restore_limits(previous);
+    result
+}

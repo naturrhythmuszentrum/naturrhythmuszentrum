@@ -254,6 +254,11 @@ fn proof_step(
         premises,
         path,
         substitutions,
+        certificate: if primitive == Primitive::SquareFree {
+            Some(crate::multiplicity::SquareFreeCertificate::decode(reader)?)
+        } else {
+            None
+        },
     })
 }
 

@@ -35,6 +35,9 @@ pub(crate) fn encode_application(value: &CheckedStep, out: &mut Encoder<'_>) -> 
         out.name(key)?;
         encode_id(*id, out)?;
     }
+    if let Some(certificate) = &value.certificate {
+        certificate.encode(out)?;
+    }
     for conditions in [&value.conditions.requirements, &value.conditions.residuals] {
         out.count(conditions.len())?;
         for condition in conditions {
@@ -59,11 +62,16 @@ pub(crate) fn pending_bytes(
     premises: usize,
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
+    let retained = match &step.certificate {
+        Some(value) => value.payload(budget)?,
+        None => 0,
+    };
     let mut out = Encoder::new(budget, AT);
     encode_application(step, &mut out)?;
     let bytes = size(out.finish().len(), AT)?
         .checked_mul(3)
         .and_then(|n| n.checked_add(256))
+        .and_then(|n| n.checked_add(retained))
         .and_then(|n| n.checked_add(size(premises, AT).ok()?.checked_mul(32)?))
         .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
     budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;

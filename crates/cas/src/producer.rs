@@ -28,8 +28,17 @@ impl Plan {
             .checked_add(1)
             .ok_or_else(|| Fault::capacity(BudgetKind::ProofNodes, AT))?;
         budget.check(BudgetKind::ProofNodes, count, AT)?;
+        let mut retained = 0_u64;
+        for proposal in self.steps.iter().chain(std::iter::once(&step)) {
+            if let Some(value) = &proposal.certificate {
+                retained = retained
+                    .checked_add(value.payload(budget)?)
+                    .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+            }
+        }
         let bytes = count
             .checked_mul(1024)
+            .and_then(|n| n.checked_add(retained))
             .and_then(|n| n.checked_add(size(step.premises.len(), AT).ok()?.checked_mul(8)?))
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
@@ -69,7 +78,11 @@ impl Plan {
         let mut result = Self::default();
         let mut positions = BTreeMap::new();
         for index in reached {
-            let mut step = self.get(index)?.clone();
+            let source = self.get(index)?;
+            if let Some(value) = &source.certificate {
+                let _bytes = value.payload(budget)?;
+            }
+            let mut step = source.clone();
             for premise in &mut step.premises {
                 *premise = *positions
                     .get(premise)
@@ -135,6 +148,7 @@ pub(crate) fn step(
         premises,
         path: Vec::new(),
         substitutions: Vec::new(),
+        certificate: None,
     }
 }
 
