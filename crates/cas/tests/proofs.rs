@@ -1,0 +1,1289 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Independent identities, supplied derivative premises, import attacks and resource boundaries.
+
+use nrz_cas::{
+    AssumptionDraft, AtomicSort, Budget, BudgetKind, Cas, Claim, Declaration, Draft, Environment,
+    ExpressionDraft, FaultKind, Field, Guard, GuardKind, Handle, InvalidCode, Limits, Operator,
+    PredicateKind, Primitive, ProofStep, Rational, Reference, Relation, Sort, Substitution,
+};
+
+/// Fallible setup keeps fixture failures distinct from asserted laws.
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+/// Separate calls get separate generous work ledgers; structural ceilings remain unchanged.
+fn budget() -> TestResult<Budget> {
+    Ok(Budget::new(Limits {
+        work: 100_000_000,
+        replay_work: 100_000_000,
+        ..Limits::default()
+    })?)
+}
+
+/// The ambient real scalar type.
+const fn real() -> Sort {
+    Sort::Value(AtomicSort::Scalar(Field::Real))
+}
+
+/// One checked handle extraction, without indexing or panicking on setup failures.
+fn at(handles: &[Handle], index: usize) -> TestResult<Handle> {
+    handles
+        .get(index)
+        .cloned()
+        .ok_or_else(|| "missing fixture handle".into())
+}
+
+/// Shared small symbolic universe used only by this new test suite.
+struct Fixture {
+    /// Independent graph store.
+    cas: Cas,
+    /// Full context for every proof in the fixture.
+    context: Handle,
+    /// Original declaration header, used when explicitly adding hypotheses.
+    environment: Environment,
+    /// First free coordinate.
+    x: Handle,
+    /// Independent second coordinate.
+    y: Handle,
+    /// Exact zero.
+    zero: Handle,
+    /// Exact one.
+    one: Handle,
+    /// Exact two.
+    two: Handle,
+}
+
+impl Fixture {
+    /// Admit declarations and five leaf terms as one transaction.
+    fn new() -> TestResult<Self> {
+        let environment = Environment {
+            declarations: ["x", "y"]
+                .into_iter()
+                .map(|key| Declaration {
+                    key: key.into(),
+                    display_name: key.into(),
+                    sort: real(),
+                })
+                .collect(),
+            ..Environment::default()
+        };
+        let mut cas = Cas::new(Limits::default())?;
+        let mut drafts = vec![Draft::Context {
+            environment: environment.clone(),
+            assumptions: Vec::new(),
+        }];
+        for operator in [
+            Operator::Free("x".into()),
+            Operator::Free("y".into()),
+            Operator::Rational(Rational::zero()),
+            Operator::Rational(Rational::one()),
+            Operator::Rational(Rational::from_ratio(2, 1, &mut budget()?)?),
+        ] {
+            drafts.push(Draft::Expression(ExpressionDraft {
+                operator,
+                sort: real(),
+                context: Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }));
+        }
+        let handles = cas.admit(&drafts, &mut budget()?)?;
+        Ok(Self {
+            cas,
+            context: at(&handles, 0)?,
+            environment,
+            x: at(&handles, 1)?,
+            y: at(&handles, 2)?,
+            zero: at(&handles, 3)?,
+            one: at(&handles, 4)?,
+            two: at(&handles, 5)?,
+        })
+    }
+
+    /// Build exact ordered scalar syntax without normalization.
+    fn term(&mut self, operator: Operator, operands: &[Handle]) -> TestResult<Handle> {
+        let handles = self.cas.admit(
+            &[Draft::Expression(ExpressionDraft {
+                operator,
+                sort: real(),
+                context: Reference::Existing(self.context.clone()),
+                scope: Vec::new(),
+                binding: None,
+                operands: operands.iter().cloned().map(Reference::Existing).collect(),
+            })],
+            &mut budget()?,
+        )?;
+        at(&handles, 0)
+    }
+
+    /// Add one explicitly named hypothesis while preserving the semantic header.
+    fn assume(&mut self, key: &str, kind: PredicateKind, term: &Handle) -> TestResult {
+        let handles = self.cas.admit(
+            &[
+                Draft::Condition {
+                    kind,
+                    context: Reference::Existing(self.context.clone()),
+                    scope: Vec::new(),
+                    arguments: vec![Reference::Existing(term.clone())],
+                },
+                Draft::Context {
+                    environment: self.environment.clone(),
+                    assumptions: vec![AssumptionDraft {
+                        key: key.into(),
+                        condition: Reference::Local(0),
+                    }],
+                },
+            ],
+            &mut budget()?,
+        )?;
+        self.context = at(&handles, 1)?;
+        Ok(())
+    }
+}
+
+/// A primitive equality application with no implicit premise or substitution.
+fn equality(primitive: Primitive, left: &Handle, right: &Handle) -> ProofStep {
+    ProofStep {
+        primitive,
+        relation: Relation::EqualOnDomain,
+        left: left.clone(),
+        right: right.clone(),
+        premises: Vec::new(),
+        path: Vec::new(),
+        substitutions: Vec::new(),
+    }
+}
+
+/// A derivative application with explicit ordered premise references.
+fn derivative(primitive: Primitive, left: &Handle, right: &Handle, premises: &[u32]) -> ProofStep {
+    ProofStep {
+        primitive,
+        relation: Relation::Derivative {
+            variable: "x".into(),
+        },
+        left: left.clone(),
+        right: right.clone(),
+        premises: premises.to_vec(),
+        path: Vec::new(),
+        substitutions: Vec::new(),
+    }
+}
+
+/// A cancellation fixture whose independently known domain is exactly x nonzero.
+fn cancellation() -> TestResult<(Fixture, Handle, ProofStep)> {
+    let mut fixture = Fixture::new()?;
+    let quotient = fixture.term(Operator::Div, &[fixture.x.clone(), fixture.x.clone()])?;
+    let step = equality(Primitive::Cancel, &quotient, &fixture.one);
+    Ok((fixture, quotient, step))
+}
+
+/// Cancellation retains its guard and publishes both application and proof graph vertices.
+/// ´test:integration:conditional-cancellation´
+#[test]
+fn conditional_cancellation() -> TestResult {
+    let (mut fixture, _, step) = cancellation()?;
+    let before = fixture.cas.counts();
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[step],
+        &mut Budget::new(Limits::default())?,
+    )?;
+    assert!(!witness.is_discharged());
+    assert_eq!(
+        witness.claim().residuals,
+        vec![Guard {
+            kind: GuardKind::NonZero,
+            term: fixture.x
+        }],
+    );
+    let no_hypotheses: &[String] = &[];
+    assert_eq!(witness.hypotheses(), no_hypotheses);
+    assert!(fixture.cas.counts().vertices >= before.vertices + 3);
+    assert_eq!(
+        witness.proof().logical_id().kind,
+        nrz_cas::VertexKind::Proof
+    );
+    Ok(())
+}
+
+/// Hypotheses discharge guards relative to their exact context and keep provenance visible.
+/// ´test:integration:assumed-cancellation´
+#[test]
+fn assumed_cancellation() -> TestResult {
+    let (mut fixture, _, step) = cancellation()?;
+    fixture.assume("positive-x", PredicateKind::Positive, &fixture.x.clone())?;
+    let witness = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut budget()?)?;
+    assert!(witness.is_discharged());
+    assert_eq!(witness.hypotheses(), &["positive-x".to_owned()]);
+    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
+    let (mut fresh, quotient, _) = cancellation()?;
+    fresh.assume("positive-x", PredicateKind::Positive, &fresh.x.clone())?;
+    let expected = Claim {
+        context: fresh.context.clone(),
+        relation: Relation::EqualOnDomain,
+        left: quotient,
+        right: fresh.one.clone(),
+        residuals: Vec::new(),
+    };
+    let replayed = fresh.cas.replay(&bytes, &expected, &mut budget()?)?;
+    assert_eq!(fresh.cas.export_witness(&replayed, &mut budget()?)?, bytes);
+    assert_eq!(replayed.hypotheses(), witness.hypotheses());
+    Ok(())
+}
+
+/// A false equality cannot publish any candidate record or consume a logical serial.
+/// ´test:integration:false-proof-rollback´
+#[test]
+fn false_proof_rollback() -> TestResult {
+    let (mut fixture, quotient, _) = cancellation()?;
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let bad = equality(Primitive::Cancel, &quotient, &fixture.zero);
+    let fault = fixture
+        .cas
+        .check_proof(&fixture.context, &[bad], &mut budget()?)
+        .err()
+        .ok_or("accepted false cancellation")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// A zero product cannot erase the undefined quotient that appears in its original operand.
+/// ´test:integration:proof-retains-partial-operands´
+#[test]
+fn proof_retains_partial_operands() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let bad = fixture.term(Operator::Div, &[fixture.one.clone(), fixture.zero.clone()])?;
+    let product = fixture.term(Operator::Mul, &[bad, fixture.zero.clone()])?;
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let fault = fixture
+        .cas
+        .check_proof(
+            &fixture.context,
+            &[equality(Primitive::MulZero, &product, &fixture.zero)],
+            &mut budget()?,
+        )
+        .err()
+        .ok_or("accepted an undefined original operand")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::RefutedDomain));
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Exact rational arithmetic is recomputed, and an altered result is refused.
+/// ´test:integration:exact-proof-arithmetic´
+#[test]
+fn exact_proof_arithmetic() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let sum = fixture.term(Operator::Add, &[fixture.one.clone(), fixture.two.clone()])?;
+    let three = fixture.term(
+        Operator::Rational(Rational::from_ratio(3, 1, &mut budget()?)?),
+        &[],
+    )?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[equality(Primitive::Exact, &sum, &three)],
+        &mut budget()?,
+    )?;
+    assert!(witness.is_discharged());
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[equality(Primitive::Exact, &sum, &fixture.two)],
+                &mut budget()?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// The finite-jet identity uses exact coefficients and independently retains the quotient guard.
+/// ´test:integration:finite-jet-difference-quotient´
+#[test]
+fn finite_jet_difference_quotient() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let sum = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.y.clone()])?;
+    let square = fixture.term(Operator::IntegerPower(2), &[sum])?;
+    let x_square = fixture.term(Operator::IntegerPower(2), &[fixture.x.clone()])?;
+    let difference = fixture.term(Operator::Sub, &[square, x_square])?;
+    let quotient = fixture.term(Operator::Div, &[difference, fixture.y.clone()])?;
+    let twice_x = fixture.term(Operator::Mul, &[fixture.two.clone(), fixture.x.clone()])?;
+    let target = fixture.term(Operator::Add, &[twice_x, fixture.y.clone()])?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[equality(Primitive::RationalIdentity, &quotient, &target)],
+        &mut budget()?,
+    )?;
+    assert_eq!(
+        witness.claim().residuals,
+        vec![Guard {
+            kind: GuardKind::NonZero,
+            term: fixture.y.clone()
+        }],
+    );
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[equality(Primitive::Jets, &quotient, &target)],
+                &mut budget()?
+            )
+            .is_err()
+    );
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[equality(Primitive::Jets, &fixture.x, &fixture.y)],
+                &mut budget()?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// Supplied product-rule premises derive 2x, while differentiation never becomes equality.
+/// ´test:integration:checked-derivative-premises´
+#[test]
+fn checked_derivative_premises() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let square = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.x.clone()])?;
+    let first = fixture.term(Operator::Mul, &[fixture.one.clone(), fixture.x.clone()])?;
+    let second = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.one.clone()])?;
+    let sum = fixture.term(Operator::Add, &[first, second])?;
+    let target = fixture.term(Operator::Mul, &[fixture.two.clone(), fixture.x.clone()])?;
+    let steps = vec![
+        derivative(
+            Primitive::DifferentiateVariable,
+            &fixture.x,
+            &fixture.one,
+            &[],
+        ),
+        derivative(Primitive::DifferentiateProduct, &square, &sum, &[0, 0]),
+        equality(Primitive::Jets, &sum, &target),
+        derivative(Primitive::DerivativeTransport, &square, &target, &[1, 2]),
+    ];
+    let witness = fixture
+        .cas
+        .check_proof(&fixture.context, &steps, &mut budget()?)?;
+    assert!(witness.is_discharged());
+    assert_eq!(
+        witness.claim().relation,
+        Relation::Derivative {
+            variable: "x".into()
+        }
+    );
+    let mut bad = equality(Primitive::Symmetry, &fixture.one, &fixture.x);
+    bad.premises = vec![0];
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[steps.first().ok_or("missing derivative")?.clone(), bad],
+                &mut budget()?,
+            )
+            .is_err()
+    );
+    let mut missing = steps.get(1).ok_or("missing product")?.clone();
+    missing.premises = vec![0];
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[steps.first().ok_or("missing variable")?.clone(), missing],
+                &mut budget()?,
+            )
+            .is_err()
+    );
+    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
+    let mut fresh = Cas::new(Limits::default())?;
+    let inspected = fresh.inspect(&bytes, &mut budget()?)?;
+    assert_eq!(fresh.export_witness(&inspected, &mut budget()?)?, bytes);
+    Ok(())
+}
+
+/// Strict zero-power differentiation retains nonzero, while the one-power case adds no guard.
+/// ´test:integration:derivative-power-domain-cases´
+#[test]
+fn derivative_power_domain_cases() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let power_zero = fixture.term(Operator::IntegerPower(0), &[fixture.x.clone()])?;
+    let power_one = fixture.term(Operator::IntegerPower(1), &[fixture.x.clone()])?;
+    let variable = derivative(
+        Primitive::DifferentiateVariable,
+        &fixture.x,
+        &fixture.one,
+        &[],
+    );
+    let zero_steps = [
+        variable.clone(),
+        derivative(
+            Primitive::DifferentiatePower,
+            &power_zero,
+            &fixture.zero,
+            &[0],
+        ),
+    ];
+    let zero = fixture
+        .cas
+        .check_proof(&fixture.context, &zero_steps, &mut budget()?)?;
+    assert_eq!(
+        zero.claim().residuals,
+        vec![Guard {
+            kind: GuardKind::NonZero,
+            term: fixture.x.clone()
+        }],
+    );
+    let one_steps = [
+        variable,
+        derivative(
+            Primitive::DifferentiatePower,
+            &power_one,
+            &fixture.one,
+            &[0],
+        ),
+    ];
+    let one = fixture
+        .cas
+        .check_proof(&fixture.context, &one_steps, &mut budget()?)?;
+    assert!(one.is_discharged());
+    Ok(())
+}
+
+/// Simultaneous equality instantiation transports every old guard before discharging it.
+/// ´test:integration:substituted-proof-guards´
+#[test]
+fn substituted_proof_guards() -> TestResult {
+    let (mut fixture, _, first) = cancellation()?;
+    let two_over_two = fixture.term(Operator::Div, &[fixture.two.clone(), fixture.two.clone()])?;
+    let mut second = equality(Primitive::Substitute, &two_over_two, &fixture.one);
+    second.premises = vec![0];
+    second.substitutions = vec![Substitution {
+        key: "x".into(),
+        replacement: fixture.two.clone(),
+    }];
+    let witness =
+        fixture
+            .cas
+            .check_proof(&fixture.context, &[first.clone(), second], &mut budget()?)?;
+    assert!(witness.is_discharged());
+    let zero_over_zero =
+        fixture.term(Operator::Div, &[fixture.zero.clone(), fixture.zero.clone()])?;
+    let mut bad = equality(Primitive::Substitute, &zero_over_zero, &fixture.one);
+    bad.premises = vec![0];
+    bad.substitutions = vec![Substitution {
+        key: "x".into(),
+        replacement: fixture.zero.clone(),
+    }];
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let fault = fixture
+        .cas
+        .check_proof(&fixture.context, &[first, bad], &mut budget()?)
+        .err()
+        .ok_or("accepted zero substitution")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::RefutedDomain));
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Independently assembled format-one bytes for x/x = 1 with residual x nonzero.
+const CANCELLATION_WIRE_HEX: &str = concat!(
+    "4e525a4341533031010000000900000065712e63616e63656c010000000100020000000100000078",
+    "01000000780001010100000079010000007900010100000000030000000101000000780001010000",
+    "00000000000000080001010000000000020000000000000000000000000001000000010100000001",
+    "00010100000000000000000000000100000002000000010000000100000000000000000100000000",
+    "00000000010000000200000000000000000000000000000000000000",
+);
+
+/// Decode this fixed test vector without using the production witness codec.
+fn canonical_fixture() -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    for pair in CANCELLATION_WIRE_HEX.as_bytes().as_chunks::<2>().0 {
+        bytes.push(u8::from_str_radix(std::str::from_utf8(pair)?, 16)?);
+    }
+    Ok(bytes)
+}
+
+/// A canonical witness replays in a fresh store, and a different intended claim is rejected.
+/// ´test:integration:expected-claim-replay´
+#[test]
+fn expected_claim_replay() -> TestResult {
+    let (mut producer, _, step) = cancellation()?;
+    let witness = producer
+        .cas
+        .check_proof(&producer.context, &[step], &mut budget()?)?;
+    let bytes = producer.cas.export_witness(&witness, &mut budget()?)?;
+    assert_eq!(bytes, canonical_fixture()?);
+    let (mut receiver, quotient, _) = cancellation()?;
+    let expected = Claim {
+        context: receiver.context.clone(),
+        relation: Relation::EqualOnDomain,
+        left: quotient,
+        right: receiver.one.clone(),
+        residuals: vec![Guard {
+            kind: GuardKind::NonZero,
+            term: receiver.x.clone(),
+        }],
+    };
+    let replayed = receiver.cas.replay(&bytes, &expected, &mut budget()?)?;
+    assert_eq!(
+        receiver.cas.export_witness(&replayed, &mut budget()?)?,
+        bytes
+    );
+    let before = receiver.cas.canonical_snapshot(&mut budget()?)?;
+    let mut wrong = expected.clone();
+    wrong.right = receiver.zero.clone();
+    let fault = receiver
+        .cas
+        .replay(&bytes, &wrong, &mut budget()?)
+        .err()
+        .ok_or("accepted wrong endpoint")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::EndpointMismatch)
+    );
+    wrong = expected;
+    wrong.residuals.clear();
+    assert!(receiver.cas.replay(&bytes, &wrong, &mut budget()?).is_err());
+    assert_eq!(receiver.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Every truncation and trailing suffix refuses without publishing its decoded prefix.
+/// ´test:integration:canonical-wire-refusals´
+#[test]
+fn canonical_wire_refusals() -> TestResult {
+    let (mut fixture, _, step) = cancellation()?;
+    let witness = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut budget()?)?;
+    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
+    let mut receiver = Cas::new(Limits::default())?;
+    let before = receiver.canonical_snapshot(&mut budget()?)?;
+    for length in 0..bytes.len() {
+        assert!(
+            receiver
+                .inspect(bytes.get(..length).ok_or("bad test slice")?, &mut budget()?,)
+                .is_err()
+        );
+        assert_eq!(receiver.counts().vertices, 0);
+    }
+    let mut extended = bytes.clone();
+    extended.push(0);
+    assert!(receiver.inspect(&extended, &mut budget()?).is_err());
+    let mut version = bytes.clone();
+    let version_position = 16_usize
+        .checked_add(Primitive::Cancel.specification().key.len())
+        .ok_or("position overflow")?;
+    *version.get_mut(version_position).ok_or("missing version")? = 2;
+    let fault = receiver
+        .inspect(&version, &mut budget()?)
+        .err()
+        .ok_or("accepted unknown rule version")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedVersion)
+    );
+    assert_eq!(receiver.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Explicit forward premises, unused proof nodes and wrong-store inputs all refuse.
+/// ´test:integration:proof-reference-refusals´
+#[test]
+fn proof_reference_refusals() -> TestResult {
+    let (mut fixture, _, step) = cancellation()?;
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let mut recursive = step.clone();
+    recursive.premises = vec![0];
+    assert!(
+        fixture
+            .cas
+            .check_proof(&fixture.context, &[recursive], &mut budget()?)
+            .is_err()
+    );
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[step.clone(), step.clone()],
+                &mut budget()?,
+            )
+            .is_err()
+    );
+    let foreign = Fixture::new()?;
+    let mut bad = step;
+    bad.right = foreign.one;
+    assert!(
+        fixture
+            .cas
+            .check_proof(&fixture.context, &[bad], &mut budget()?)
+            .is_err()
+    );
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Shortcut admission requires a positive strict improvement and preserves the older proof.
+/// ´test:integration:derived-shortcut-improvement´
+#[test]
+fn derived_shortcut_improvement() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let sum = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.x.clone()])?;
+    let product = fixture.term(Operator::Mul, &[fixture.two.clone(), fixture.x.clone()])?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[equality(Primitive::Jets, &sum, &product)],
+        &mut budget()?,
+    )?;
+    let handle = fixture
+        .cas
+        .register_derived(&witness, witness.claim(), 1, &mut budget()?)?;
+    assert_eq!(handle.logical_id().kind, nrz_cas::VertexKind::Application);
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    assert!(
+        fixture
+            .cas
+            .register_derived(&witness, witness.claim(), 1, &mut budget()?)
+            .is_err()
+    );
+    assert!(
+        fixture
+            .cas
+            .register_derived(&witness, witness.claim(), 0, &mut budget()?)
+            .is_err()
+    );
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Witness bytes are reproducible, and exact byte/proof/replay ceilings refuse before publication.
+/// ´test:integration:proof-resource-boundaries´
+#[test]
+fn proof_resource_boundaries() -> TestResult {
+    let (mut a, _, first) = cancellation()?;
+    let (mut b, _, second) = cancellation()?;
+    let x = a.cas.check_proof(&a.context, &[first], &mut budget()?)?;
+    let y = b
+        .cas
+        .check_proof(&b.context, std::slice::from_ref(&second), &mut budget()?)?;
+    let bytes = a.cas.export_witness(&x, &mut budget()?)?;
+    assert_eq!(bytes, b.cas.export_witness(&y, &mut budget()?)?);
+    let length = u64::try_from(bytes.len())?;
+    let mut exact = Budget::new(Limits {
+        witness_bytes: length,
+        ..Limits::default()
+    })?;
+    assert_eq!(a.cas.export_witness(&x, &mut exact)?, bytes);
+    let mut short = Budget::new(Limits {
+        witness_bytes: length.checked_sub(1).ok_or("empty witness")?,
+        ..Limits::default()
+    })?;
+    assert!(a.cas.export_witness(&x, &mut short).is_err());
+    let before = b.cas.canonical_snapshot(&mut budget()?)?;
+    let mut no_proofs = Budget::new(Limits {
+        proof_nodes: 0,
+        work: 100_000_000,
+        ..Limits::default()
+    })?;
+    assert!(
+        b.cas
+            .check_proof(&b.context, &[second], &mut no_proofs)
+            .is_err()
+    );
+    let mut no_replay = Budget::new(Limits {
+        replay_work: 0,
+        work: 100_000_000,
+        ..Limits::default()
+    })?;
+    let fault = b
+        .cas
+        .inspect(&bytes, &mut no_replay)
+        .err()
+        .ok_or("unmetered replay")?;
+    assert!(matches!(
+        fault.kind,
+        FaultKind::Exhausted {
+            budget: BudgetKind::ReplayWork,
+            ..
+        }
+    ));
+    assert_eq!(b.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// Field schemas preserve operand order except at the one explicitly checked law.
+/// ´test:integration:closed-field-schemas´
+#[test]
+fn closed_field_schemas() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let xy = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.y.clone()])?;
+    let yx = fixture.term(Operator::Add, &[fixture.y.clone(), fixture.x.clone()])?;
+    let product = fixture.term(Operator::Mul, &[fixture.x.clone(), xy.clone()])?;
+    let xx = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.x.clone()])?;
+    let times_y = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.y.clone()])?;
+    let distributed = fixture.term(Operator::Add, &[xx, times_y])?;
+    let x_zero = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.zero.clone()])?;
+    let x_one = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.one.clone()])?;
+    let negative = fixture.term(Operator::Neg, &[fixture.x.clone()])?;
+    let opposite = fixture.term(Operator::Add, &[fixture.x.clone(), negative])?;
+    for step in [
+        equality(Primitive::AddCommute, &xy, &yx),
+        equality(Primitive::Distribute, &product, &distributed),
+        equality(Primitive::AddZero, &x_zero, &fixture.x),
+        equality(Primitive::MulOne, &x_one, &fixture.x),
+        equality(Primitive::AddInverse, &opposite, &fixture.zero),
+    ] {
+        let witness = fixture
+            .cas
+            .check_proof(&fixture.context, &[step], &mut budget()?)?;
+        assert!(witness.is_discharged());
+    }
+    Ok(())
+}
+
+/// Congruence changes one ordered operand, and transitivity requires the exact middle term.
+/// ´test:integration:proof-composition-paths´
+#[test]
+fn proof_composition_paths() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let xy = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.y.clone()])?;
+    let yx = fixture.term(Operator::Add, &[fixture.y.clone(), fixture.x.clone()])?;
+    let left = fixture.term(Operator::Mul, &[fixture.two.clone(), xy.clone()])?;
+    let right = fixture.term(Operator::Mul, &[fixture.two.clone(), yx.clone()])?;
+    let first = equality(Primitive::AddCommute, &xy, &yx);
+    let mut second = equality(Primitive::Congruence, &left, &right);
+    second.path = vec![1];
+    second.premises = vec![0];
+    let mut reverse = equality(Primitive::Symmetry, &right, &left);
+    reverse.premises = vec![1];
+    let mut final_step = equality(Primitive::Transitivity, &left, &left);
+    final_step.premises = vec![1, 2];
+    let steps = [first, second, reverse, final_step];
+    assert!(
+        fixture
+            .cas
+            .check_proof(&fixture.context, &steps, &mut budget()?)?
+            .is_discharged()
+    );
+    let mut bad = steps.to_vec();
+    bad.get_mut(1).ok_or("missing congruence")?.path = vec![0];
+    assert!(
+        fixture
+            .cas
+            .check_proof(&fixture.context, &bad, &mut budget()?)
+            .is_err()
+    );
+    Ok(())
+}
+
+/// Rational subexpression guards discharge after exact evaluation, including nominal sums.
+/// ´test:integration:rational-condition-closure´
+#[test]
+fn rational_condition_closure() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let one_plus_zero =
+        fixture.term(Operator::Add, &[fixture.one.clone(), fixture.zero.clone()])?;
+    let ratio = fixture.term(Operator::Div, &[one_plus_zero.clone(), one_plus_zero])?;
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[equality(Primitive::Cancel, &ratio, &fixture.one)],
+                &mut budget()?
+            )?
+            .is_discharged()
+    );
+    let difference = fixture.term(Operator::Sub, &[fixture.two.clone(), fixture.two.clone()])?;
+    let false_ratio = fixture.term(Operator::Div, &[difference.clone(), difference])?;
+    let fault = fixture
+        .cas
+        .check_proof(
+            &fixture.context,
+            &[equality(Primitive::Cancel, &false_ratio, &fixture.one)],
+            &mut budget()?,
+        )
+        .err()
+        .ok_or("accepted a rational zero denominator")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::RefutedDomain));
+    Ok(())
+}
+
+/// A variable ceiling covers the union of a polynomial's monomials, and degree is finite.
+/// ´test:integration:coefficient-view-limits´
+#[test]
+fn coefficient_view_limits() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let sum = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.y.clone()])?;
+    let step = equality(Primitive::Jets, &sum, &sum);
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let mut one_variable = Budget::new(Limits {
+        polynomial_variables: 1,
+        work: 100_000_000,
+        ..Limits::default()
+    })?;
+    let fault = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut one_variable)
+        .err()
+        .ok_or("ignored distinct-variable ceiling")?;
+    assert!(matches!(
+        fault.kind,
+        FaultKind::Exhausted {
+            budget: BudgetKind::PolynomialVariables,
+            ..
+        },
+    ));
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    let square = fixture.term(Operator::IntegerPower(2), &[fixture.x.clone()])?;
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let mut degree_one = Budget::new(Limits {
+        polynomial_degree: 1,
+        work: 100_000_000,
+        ..Limits::default()
+    })?;
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[equality(Primitive::Jets, &square, &square)],
+                &mut degree_one
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// The expected-claim boundary rejects a caller's mismatched branch interpretation.
+/// ´test:integration:expected-context-mismatch´
+#[test]
+fn expected_context_mismatch() -> TestResult {
+    let (mut fixture, quotient, step) = cancellation()?;
+    let witness = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut budget()?)?;
+    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
+    let mut environment = fixture.environment.clone();
+    environment.branch = nrz_cas::Branch::Declared("different-powers".into());
+    let handles = fixture.cas.admit(
+        &[
+            Draft::Context {
+                environment,
+                assumptions: Vec::new(),
+            },
+            Draft::Expression(ExpressionDraft {
+                operator: Operator::Free("x".into()),
+                sort: real(),
+                context: Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }),
+        ],
+        &mut budget()?,
+    )?;
+    let wrong = Claim {
+        context: fixture.context.clone(),
+        relation: Relation::EqualOnDomain,
+        left: quotient,
+        right: fixture.one.clone(),
+        residuals: vec![Guard {
+            kind: GuardKind::NonZero,
+            term: at(&handles, 1)?,
+        }],
+    };
+    let fault = fixture
+        .cas
+        .replay(&bytes, &wrong, &mut budget()?)
+        .err()
+        .ok_or("reinterpreted an expected guard")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Context));
+    Ok(())
+}
+
+/// Quotient premises reconstruct the full quotient rule and reduce its power guard to y nonzero.
+/// ´test:integration:checked-quotient-derivative´
+#[test]
+fn checked_quotient_derivative() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let quotient = fixture.term(Operator::Div, &[fixture.x.clone(), fixture.y.clone()])?;
+    let left_product = fixture.term(Operator::Mul, &[fixture.one.clone(), fixture.y.clone()])?;
+    let right_product = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.zero.clone()])?;
+    let numerator = fixture.term(Operator::Sub, &[left_product, right_product])?;
+    let denominator = fixture.term(Operator::IntegerPower(2), &[fixture.y.clone()])?;
+    let derivative_value = fixture.term(Operator::Div, &[numerator, denominator])?;
+    let simplified = fixture.term(Operator::Div, &[fixture.one.clone(), fixture.y.clone()])?;
+    let steps = [
+        derivative(
+            Primitive::DifferentiateVariable,
+            &fixture.x,
+            &fixture.one,
+            &[],
+        ),
+        derivative(
+            Primitive::DifferentiateVariable,
+            &fixture.y,
+            &fixture.zero,
+            &[],
+        ),
+        derivative(
+            Primitive::DifferentiateQuotient,
+            &quotient,
+            &derivative_value,
+            &[0, 1],
+        ),
+        equality(Primitive::RationalIdentity, &derivative_value, &simplified),
+        derivative(
+            Primitive::DerivativeTransport,
+            &quotient,
+            &simplified,
+            &[2, 3],
+        ),
+    ];
+    let witness = fixture
+        .cas
+        .check_proof(&fixture.context, &steps, &mut budget()?)?;
+    assert_eq!(
+        witness.claim().residuals,
+        vec![Guard {
+            kind: GuardKind::NonZero,
+            term: fixture.y.clone()
+        }],
+    );
+    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
+    let mut fresh = Cas::new(Limits::default())?;
+    assert!(!fresh.inspect(&bytes, &mut budget()?)?.is_discharged());
+    Ok(())
+}
+
+/// A supplied Jacobian proves each ordered cell and refuses an altered variable order.
+/// ´test:integration:checked-jacobian-assembly´
+#[test]
+fn checked_jacobian_assembly() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let matrix = |rows, columns, operands: Vec<Reference>| {
+        Draft::Expression(ExpressionDraft {
+            operator: Operator::Matrix { rows, columns },
+            sort: Sort::Value(AtomicSort::Matrix {
+                field: Field::Real,
+                rows: nrz_cas::Extent::Literal(rows),
+                columns: nrz_cas::Extent::Literal(columns),
+            }),
+            context: Reference::Existing(fixture.context.clone()),
+            scope: Vec::new(),
+            binding: None,
+            operands,
+        })
+    };
+    let handles = fixture.cas.admit(
+        &[
+            matrix(1, 1, vec![Reference::Existing(fixture.x.clone())]),
+            matrix(
+                1,
+                2,
+                vec![
+                    Reference::Existing(fixture.one.clone()),
+                    Reference::Existing(fixture.zero.clone()),
+                ],
+            ),
+        ],
+        &mut budget()?,
+    )?;
+    let first = derivative(
+        Primitive::DifferentiateVariable,
+        &fixture.x,
+        &fixture.one,
+        &[],
+    );
+    let mut second = derivative(
+        Primitive::DifferentiateVariable,
+        &fixture.x,
+        &fixture.zero,
+        &[],
+    );
+    second.relation = Relation::Derivative {
+        variable: "y".into(),
+    };
+    let mut assembly = equality(Primitive::Jacobian, &at(&handles, 0)?, &at(&handles, 1)?);
+    assembly.relation = Relation::Jacobian {
+        variables: vec!["x".into(), "y".into()],
+    };
+    assembly.premises = vec![0, 1];
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[first.clone(), second.clone(), assembly.clone()],
+        &mut budget()?,
+    )?;
+    assert!(witness.is_discharged());
+    assembly.relation = Relation::Jacobian {
+        variables: vec!["y".into(), "x".into()],
+    };
+    assert!(
+        fixture
+            .cas
+            .check_proof(&fixture.context, &[first, second, assembly], &mut budget()?,)
+            .is_err()
+    );
+    Ok(())
+}
+
+/// Changes to a guard, coefficient, reduced magnitude or forward reference cannot become proof.
+/// ´test:integration:witness-payload-tampering´
+#[test]
+fn witness_payload_tampering() -> TestResult {
+    let original = canonical_fixture()?;
+    let mut receiver = Cas::new(Limits::default())?;
+    for (position, byte) in [(146, 0), (114, 2), (172, 1), (155, 255)] {
+        let mut changed = original.clone();
+        *changed
+            .get_mut(position)
+            .ok_or("bad independent wire offset")? = byte;
+        assert!(receiver.inspect(&changed, &mut budget()?).is_err());
+        assert_eq!(receiver.counts().vertices, 0);
+    }
+    let mut unreduced = original;
+    *unreduced.get_mut(114).ok_or("missing numerator")? = 2;
+    *unreduced.get_mut(119).ok_or("missing denominator")? = 2;
+    let fault = receiver
+        .inspect(&unreduced, &mut budget()?)
+        .err()
+        .ok_or("normalized noncanonical wire")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Encoding));
+    assert_eq!(receiver.counts().vertices, 0);
+    Ok(())
+}
+
+/// Permanent name ceilings and a lowered expression-depth limit also constrain proof APIs.
+/// ´test:integration:proof-permanent-limits´
+#[test]
+fn proof_permanent_limits() -> TestResult {
+    let mut small = Cas::new(Limits {
+        name_bytes: 3,
+        ..Limits::default()
+    })?;
+    let mut ledger = budget()?;
+    let fault = small
+        .inspect(&canonical_fixture()?, &mut ledger)
+        .err()
+        .ok_or("ignored store name limit")?;
+    assert!(matches!(
+        fault.kind,
+        FaultKind::Exhausted {
+            budget: BudgetKind::NameBytes,
+            ..
+        }
+    ));
+    assert_eq!(small.counts().vertices, 0);
+    assert_eq!(ledger.limits().name_bytes, Limits::default().name_bytes);
+    let mut fixture = Fixture::new()?;
+    let negative = fixture.term(Operator::Neg, &[fixture.x.clone()])?;
+    let mut shallow = Budget::new(Limits {
+        depth: 1,
+        work: 100_000_000,
+        ..Limits::default()
+    })?;
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let fault = fixture
+        .cas
+        .check_proof(
+            &fixture.context,
+            &[equality(Primitive::Reflexivity, &negative, &negative)],
+            &mut shallow,
+        )
+        .err()
+        .ok_or("ignored expression depth during proof")?;
+    assert!(matches!(
+        fault.kind,
+        FaultKind::Exhausted {
+            budget: BudgetKind::Depth,
+            ..
+        }
+    ));
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// The scalar commutativity checker cannot be reused for ordered matrix multiplication.
+/// ´test:integration:matrix-proof-boundary´
+#[test]
+fn matrix_proof_boundary() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let sort = Sort::Value(AtomicSort::Matrix {
+        field: Field::Real,
+        rows: nrz_cas::Extent::Literal(1),
+        columns: nrz_cas::Extent::Literal(1),
+    });
+    let matrix = |operator, operands| {
+        Draft::Expression(ExpressionDraft {
+            operator,
+            sort: sort.clone(),
+            context: Reference::Existing(fixture.context.clone()),
+            scope: Vec::new(),
+            binding: None,
+            operands,
+        })
+    };
+    let handles = fixture.cas.admit(
+        &[
+            matrix(
+                Operator::Matrix {
+                    rows: 1,
+                    columns: 1,
+                },
+                vec![Reference::Existing(fixture.x.clone())],
+            ),
+            matrix(
+                Operator::Matrix {
+                    rows: 1,
+                    columns: 1,
+                },
+                vec![Reference::Existing(fixture.y.clone())],
+            ),
+            matrix(
+                Operator::MatrixMultiply,
+                vec![Reference::Local(0), Reference::Local(1)],
+            ),
+            matrix(
+                Operator::MatrixMultiply,
+                vec![Reference::Local(1), Reference::Local(0)],
+            ),
+        ],
+        &mut budget()?,
+    )?;
+    let fault = fixture
+        .cas
+        .check_proof(
+            &fixture.context,
+            &[equality(
+                Primitive::MulCommute,
+                &at(&handles, 2)?,
+                &at(&handles, 3)?,
+            )],
+            &mut budget()?,
+        )
+        .err()
+        .ok_or("used scalar commutativity on matrices")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    Ok(())
+}
+
+/// A valid unknown function call stays outside the admitted derivative schemas even with a child
+/// proof.
+/// ´test:integration:unknown-function-derivative-refusal´
+#[test]
+fn unknown_function_derivative_refusal() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let mut environment = fixture.environment.clone();
+    environment.declarations.push(Declaration {
+        key: "f".into(),
+        display_name: "f".into(),
+        sort: Sort::Function {
+            inputs: vec![AtomicSort::Scalar(Field::Real)],
+            output: AtomicSort::Scalar(Field::Real),
+        },
+    });
+    let handles = fixture.cas.admit(
+        &[
+            Draft::Context {
+                environment,
+                assumptions: Vec::new(),
+            },
+            Draft::Expression(ExpressionDraft {
+                operator: Operator::Free("x".into()),
+                sort: real(),
+                context: Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }),
+            Draft::Expression(ExpressionDraft {
+                operator: Operator::Rational(Rational::one()),
+                sort: real(),
+                context: Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }),
+            Draft::Expression(ExpressionDraft {
+                operator: Operator::Rational(Rational::zero()),
+                sort: real(),
+                context: Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }),
+            Draft::Expression(ExpressionDraft {
+                operator: Operator::Call("f".into()),
+                sort: real(),
+                context: Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: vec![Reference::Local(1)],
+            }),
+        ],
+        &mut budget()?,
+    )?;
+    let steps = [
+        derivative(
+            Primitive::DifferentiateVariable,
+            &at(&handles, 1)?,
+            &at(&handles, 2)?,
+            &[],
+        ),
+        derivative(
+            Primitive::DifferentiateConstant,
+            &at(&handles, 4)?,
+            &at(&handles, 3)?,
+            &[0],
+        ),
+    ];
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let fault = fixture
+        .cas
+        .check_proof(&at(&handles, 0)?, &steps, &mut budget()?)
+        .err()
+        .ok_or("manufactured an unknown-function derivative")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}
+
+/// The reserved square-free relation has no accepting placeholder before its certificate checker
+/// exists.
+/// ´test:integration:square-free-checker-remains-unregistered´
+#[test]
+fn square_free_checker_remains_unregistered() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let mut step = equality(Primitive::Reflexivity, &fixture.x, &fixture.x);
+    step.relation = Relation::SquareFree {
+        variable: "x".into(),
+        field: Field::Rational,
+    };
+    let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+    let fault = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut budget()?)
+        .err()
+        .ok_or("accepted a placeholder square-free checker")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+    Ok(())
+}

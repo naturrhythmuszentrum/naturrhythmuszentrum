@@ -299,6 +299,17 @@ pub(crate) enum Vertex {
     Binder(Binding),
     /// A task whose algorithm may not be admitted yet.
     Request(RequestRecord),
+    /// A kernel-checked instantiated primitive.
+    Application(crate::proof_model::CheckedStep),
+    /// A sealed proof root pointing to its authoritative application.
+    Proof(LogicalId),
+    /// A strictly cheaper reusable route backed by an older complete proof.
+    Shortcut {
+        /// Existing checked proof, never a forward dependency.
+        proof: LogicalId,
+        /// Positive logical-v1 cost after strict improvement checking.
+        cost: u64,
+    },
 }
 
 /// Typed graph edge roles; only internal validated admission can create edges.
@@ -326,6 +337,18 @@ pub(crate) enum Edge {
     Provenance,
     /// Ordered operation input root.
     Input(u32),
+    /// Checked conclusion input.
+    ConclusionLeft,
+    /// Checked conclusion output.
+    ConclusionRight,
+    /// Ordered prerequisite proof.
+    Premise(u32),
+    /// Required typed domain condition.
+    Obligation(u32),
+    /// The checked application underlying a proof.
+    Justifies,
+    /// An older proof expanded by a derived shortcut.
+    DependsOn,
 }
 
 /// Append-only storage plus derived lookup maps; the graph owns every weight.
@@ -353,7 +376,7 @@ pub(crate) struct State {
 
 impl State {
     /// Start an empty graph without allocating the requested maximum capacities.
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             graph: DiGraph::new(),
             indices: BTreeMap::new(),
@@ -454,6 +477,30 @@ impl Cas {
             token: Arc::new(StoreToken),
             limits,
             state: State::new(),
+        })
+    }
+
+    /// Copy a private transaction candidate after charging its full retained storage.
+    pub(crate) fn fork(&self, budget: &mut Budget) -> Result<Self, Fault> {
+        let at = Location::new("proof transaction");
+        for (kind, needed) in [
+            (
+                BudgetKind::StagedVertices,
+                size(self.state.graph.node_count(), at)?,
+            ),
+            (
+                BudgetKind::StagedEdges,
+                size(self.state.graph.edge_count(), at)?,
+            ),
+            (BudgetKind::StagedPayloadBytes, self.state.payload),
+        ] {
+            storage_check(&self.limits, budget, kind, needed, at)?;
+        }
+        budget.work(self.state.payload, at)?;
+        Ok(Self {
+            token: Arc::clone(&self.token),
+            limits: self.limits.clone(),
+            state: self.state.clone(),
         })
     }
 
@@ -952,7 +999,7 @@ impl Cas {
     }
 
     /// Publish only into a private state after every size/index/endpoint check.
-    fn insert(
+    pub(crate) fn insert(
         &self,
         state: &mut State,
         vertex: Vertex,
@@ -1085,10 +1132,22 @@ pub(crate) fn vertex_key(
         Vertex::Occurrence(_) => VertexKind::Occurrence,
         Vertex::Binder(_) => VertexKind::Binder,
         Vertex::Request(_) => VertexKind::Request,
+        Vertex::Application(_) | Vertex::Shortcut { .. } => VertexKind::Application,
+        Vertex::Proof(_) => VertexKind::Proof,
     };
     let mut out = Encoder::new(budget, Location::new("structural key"));
     out.byte(kind.tag())?;
     match vertex {
+        Vertex::Application(application) => {
+            out.byte(0)?;
+            crate::proof_storage::encode_application(application, &mut out)?;
+        }
+        Vertex::Proof(application) => encode_id(*application, &mut out)?,
+        Vertex::Shortcut { proof, cost } => {
+            out.byte(1)?;
+            encode_id(*proof, &mut out)?;
+            out.unsigned(*cost)?;
+        }
         Vertex::Source(source) => {
             out.name(&source.key)?;
             out.count(source.text.len())?;

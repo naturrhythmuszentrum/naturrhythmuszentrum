@@ -42,6 +42,16 @@ impl<'a> Encoder<'a> {
         }
     }
 
+    /// Start a portable proof export bounded before every allocation.
+    pub(crate) const fn witness(budget: &'a mut Budget, at: Location) -> Self {
+        Self {
+            bytes: Vec::new(),
+            budget,
+            at,
+            limit: BudgetKind::WitnessBytes,
+        }
+    }
+
     /// Append already encoded bytes after checking length and work.
     pub(crate) fn raw(&mut self, bytes: &[u8]) -> Result<(), Fault> {
         let next = self

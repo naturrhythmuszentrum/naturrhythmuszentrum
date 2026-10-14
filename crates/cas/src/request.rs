@@ -39,7 +39,8 @@ pub enum ContextConsistency {
     Unknown,
 }
 
-/// Construction-stage outcomes; no successful proof type is exposed before its checker exists.
+/// Request outcomes while automatic producers remain pending; supplied proofs use
+/// `Cas::check_proof`.
 #[derive(Clone, Debug)]
 pub enum Outcome {
     /// A valid first-class request whose derivation algorithm remains pending.
@@ -81,8 +82,8 @@ pub enum Outcome {
 impl Cas {
     /// Retain a validated task with an honest unresolved/unsupported outcome.
     ///
-    /// Mathematical producers and successful witness outcomes are added only with
-    /// their checked proof capability. This stage never claims an identity.
+    /// Automatic producers are added separately from supplied-proof checking.
+    /// This request path currently reports pending work without claiming an identity.
     pub fn run(&mut self, request: &Request) -> Outcome {
         let resolved = match self.limits.resolve(&request.limits) {
             Ok(value) => value,

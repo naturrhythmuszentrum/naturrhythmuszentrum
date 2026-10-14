@@ -56,6 +56,18 @@ pub enum InvalidCode {
     Receipt,
     /// An imported representation is not canonical.
     Encoding,
+    /// A primitive schema or an ordered premise does not match.
+    Rule,
+    /// Replay proved a different theorem than the caller requested.
+    EndpointMismatch,
+    /// Declared residuals or hypotheses differ from checked conditions.
+    ConditionMismatch,
+    /// The wire format or exact primitive semantic version is unknown.
+    UnsupportedVersion,
+    /// A valid mathematical representation is outside this executable checker.
+    UnsupportedFragment,
+    /// A required domain condition was refuted, so no equality is admitted.
+    RefutedDomain,
 }
 
 /// Classification of a resource refusal.

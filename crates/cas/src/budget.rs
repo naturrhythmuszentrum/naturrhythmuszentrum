@@ -465,6 +465,32 @@ impl Budget {
         previous
     }
 
+    /// Reserve retained temporary maps while nested arithmetic accounts for its own scratch.
+    pub(crate) fn reserve_temporary(&mut self, bytes: u64, at: Location) -> Result<Limits, Fault> {
+        self.check(BudgetKind::StagedPayloadBytes, bytes, at)?;
+        let previous = self.limits.clone();
+        self.limits.staged_payload_bytes = self
+            .limits
+            .staged_payload_bytes
+            .checked_sub(bytes)
+            .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
+        Ok(previous)
+    }
+
+    /// Reserve an independent replay ceiling inside the remaining aggregate work ledger.
+    pub(crate) fn restrict_replay(&mut self) -> Result<Limits, Fault> {
+        let previous = self.limits.clone();
+        let ceiling = self
+            .usage
+            .work
+            .checked_add(self.limits.replay_work)
+            .ok_or_else(|| {
+                Fault::capacity(BudgetKind::ReplayWork, Location::new("replay allowance"))
+            })?;
+        self.limits.work = self.limits.work.min(ceiling);
+        Ok(previous)
+    }
+
     /// Restore the caller policy while retaining every consumed work unit.
     pub(crate) const fn restore_limits(&mut self, limits: Limits) {
         self.limits = limits;

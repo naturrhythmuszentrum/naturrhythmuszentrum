@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Exact, resource-bounded mathematical graph construction.
+//! Exact mathematical graph construction and bounded conditional proof replay.
 //!
 //! The construction layer preserves distinct original occurrences and checked scopes.
 //! Its coverage receipts never establish a mathematical identity or physical validity.
-//! Algebraic algorithms and portable proof checking are admitted in later capability steps.
+//! A closed primitive kernel checks supplied identities and derivative premises.
+//! Automatic search and algebraic producers are admitted in later capability steps.
 
 #![expect(
     clippy::multiple_crate_versions,
@@ -19,7 +20,17 @@ mod budget;
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
 )]
+mod conditions;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
 mod context;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod derivative_check;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
@@ -32,6 +43,48 @@ mod error;
 )]
 mod graph;
 mod model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod polynomial;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod proof;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod proof_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod proof_storage;
+mod rule;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod rule_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod wire;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod wire_import;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod wire_read;
+
 mod number;
 #[expect(
     clippy::redundant_pub_crate,
@@ -64,3 +117,7 @@ pub use substitution::Substitution;
 pub use traversal::{
     CompleteWalk, SourceLocation, TraversalReceipt, Visit, WalkEvent, WalkFailure,
 };
+
+pub use conditions::{ConditionStatus, GuardKind};
+pub use proof_model::{Claim, Guard, ProofStep, Relation, VerifiedWitness};
+pub use rule::{PRIMITIVES, Primitive, RuleSpec};

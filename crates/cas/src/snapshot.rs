@@ -24,6 +24,12 @@ const fn role(edge: Edge) -> (u8, u32) {
         Edge::Body(position) => (8, position),
         Edge::Provenance => (9, 0),
         Edge::Input(position) => (10, position),
+        Edge::ConclusionLeft => (11, 0),
+        Edge::ConclusionRight => (12, 0),
+        Edge::Premise(position) => (13, position),
+        Edge::Obligation(position) => (14, position),
+        Edge::Justifies => (15, 0),
+        Edge::DependsOn => (16, 0),
     }
 }
 
