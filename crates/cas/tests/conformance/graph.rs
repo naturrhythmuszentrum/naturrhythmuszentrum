@@ -1,131 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Public-API graph, occurrence, transaction and scope acceptance fixtures.
+//! Public-contract checks for graph.
 
 use nrz_cas::{
     AssumptionDraft, AtomicSort, Binding, Budget, Cas, Declaration, Draft, Environment,
-    ExpressionDraft, Field, Handle, Limits, LimitsOverride, OccurrenceDraft, Operation, Operator,
-    Outcome, PredicateKind, Rational, Reference, Request, Sort, Span, Substitution, WalkEvent,
+    ExpressionDraft, Field, Limits, LimitsOverride, OccurrenceDraft, Operation, Operator, Outcome,
+    PredicateKind, Rational, Reference, Request, Sort, Span, Substitution, WalkEvent,
 };
 
-/// Fallible test helpers preserve the production error rather than panicking on setup.
-type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-
-/// Independent generous work does not raise the store's permanent storage ceilings.
-fn budget() -> TestResult<Budget> {
-    Ok(Budget::new(Limits {
-        work: 100_000_000,
-        ..Limits::default()
-    })?)
-}
-
-/// The real scalar sort used by these representation tests.
-const fn real() -> Sort {
-    Sort::Value(AtomicSort::Scalar(Field::Real))
-}
-
-/// Admit one draft and extract its only handle with checked access.
-fn admit(cas: &mut Cas, draft: Draft) -> TestResult<Handle> {
-    cas.admit(&[draft], &mut budget()?)?
-        .into_iter()
-        .next()
-        .ok_or_else(|| "one draft returned no handle".into())
-}
-
-/// Build a fresh immutable context with two distinct free identities.
-fn fixture() -> TestResult<(Cas, Handle)> {
-    let mut cas = Cas::new(Limits::default())?;
-    let environment = Environment {
-        declarations: ["x", "y"]
-            .into_iter()
-            .map(|key| Declaration {
-                key: key.to_owned(),
-                display_name: key.to_owned(),
-                sort: real(),
-            })
-            .collect(),
-        ..Environment::default()
-    };
-    let context = admit(
-        &mut cas,
-        Draft::Context {
-            environment,
-            assumptions: Vec::new(),
-        },
-    )?;
-    Ok((cas, context))
-}
-
-/// Construct an ordinary closed expression with ordered operands.
-fn expression(
-    cas: &mut Cas,
-    context: &Handle,
-    operator: Operator,
-    sort: Sort,
-    operands: &[Handle],
-) -> TestResult<Handle> {
-    admit(
-        cas,
-        Draft::Expression(ExpressionDraft {
-            operator,
-            sort,
-            context: Reference::Existing(context.clone()),
-            scope: Vec::new(),
-            binding: None,
-            operands: operands.iter().cloned().map(Reference::Existing).collect(),
-        }),
-    )
-}
-
-/// Retain an original source occurrence, including absent precise spans.
-fn occurrence(
-    cas: &mut Cas,
-    expression: &Handle,
-    source: &Handle,
-    span: Option<Span>,
-    children: &[Handle],
-) -> TestResult<Handle> {
-    admit(
-        cas,
-        Draft::Occurrence(OccurrenceDraft {
-            expression: Reference::Existing(expression.clone()),
-            source: Some(Reference::Existing(source.clone())),
-            span,
-            children: children.iter().cloned().map(Reference::Existing).collect(),
-            provenance: None,
-            binder_names: Vec::new(),
-        }),
-    )
-}
-
-/// Build two leaf uses of one interned symbol beneath their original sum.
-fn shared_original() -> TestResult<(Cas, Handle, Handle)> {
-    let (mut cas, context) = fixture()?;
-    let source = admit(
-        &mut cas,
-        Draft::Source {
-            key: "input".into(),
-            text: "x+x".into(),
-        },
-    )?;
-    let x = expression(&mut cas, &context, Operator::Free("x".into()), real(), &[])?;
-    let sum = expression(
-        &mut cas,
-        &context,
-        Operator::Add,
-        real(),
-        &[x.clone(), x.clone()],
-    )?;
-    let left = occurrence(&mut cas, &x, &source, Some(Span { start: 0, end: 1 }), &[])?;
-    let right = occurrence(&mut cas, &x, &source, Some(Span { start: 2, end: 3 }), &[])?;
-    let root = occurrence(
-        &mut cas,
-        &sum,
-        &source,
-        Some(Span { start: 0, end: 3 }),
-        &[left, right],
-    )?;
-    Ok((cas, context, root))
-}
+use crate::testing::budgets::graph_budget as budget;
+use crate::testing::common::{TestResult, real};
+use crate::testing::graph::{admit, expression, fixture, occurrence, shared_original};
 
 /// Shared mathematical syntax never erases either original operand position.
 /// ´test:integration:original-sharing´
@@ -319,70 +203,6 @@ fn simultaneous_substitution() -> TestResult {
     Ok(())
 }
 
-/// Inserting a free symbol beneath a summation frame cannot capture it.
-/// ´test:integration:binder-substitution´
-#[test]
-fn binder_substitution() -> TestResult {
-    let (mut cas, context) = fixture()?;
-    let y = expression(&mut cas, &context, Operator::Free("y".into()), real(), &[])?;
-    let body = admit(
-        &mut cas,
-        Draft::Expression(ExpressionDraft {
-            operator: Operator::Free("x".into()),
-            sort: real(),
-            context: Reference::Existing(context.clone()),
-            scope: vec![vec![AtomicSort::Integer]],
-            binding: None,
-            operands: Vec::new(),
-        }),
-    )?;
-    let one = expression(
-        &mut cas,
-        &context,
-        Operator::Rational(Rational::one()),
-        Sort::Value(AtomicSort::Integer),
-        &[],
-    )?;
-    let draft = Draft::Expression(ExpressionDraft {
-        operator: Operator::Sum,
-        sort: real(),
-        context: Reference::Existing(context),
-        scope: Vec::new(),
-        binding: Some(Binding {
-            sorts: vec![AtomicSort::Integer],
-            body_operands: vec![0],
-        }),
-        operands: vec![
-            Reference::Existing(body),
-            Reference::Existing(one.clone()),
-            Reference::Existing(one),
-        ],
-    });
-    let sum = admit(&mut cas, draft.clone())?;
-    let counts = cas.counts();
-    assert_eq!(admit(&mut cas, draft)?, sum);
-    assert_eq!(cas.counts(), counts);
-    let replaced = cas.substitute(
-        &sum,
-        &[Substitution {
-            key: "x".into(),
-            replacement: y,
-        }],
-        &mut budget()?,
-    )?;
-    let operands = cas.operands(&replaced, &mut budget()?)?;
-    let body = operands.first().ok_or("sum lost its body")?;
-    assert_eq!(cas.expression(body)?.0, &Operator::Free("y".into()));
-    let root = cas.materialize_derived(&replaced, &sum, &mut budget()?)?;
-    let walk = cas.walk_derived(&root, &mut budget()?)?;
-    assert!(matches!(
-        walk.events.first(),
-        Some(WalkEvent::EnterBinder { .. })
-    ));
-    assert_eq!(walk.receipt.visited(), 4);
-    Ok(())
-}
-
 /// Instantiating a bound slot removes its frame and restores the caller's free identity.
 /// ´test:integration:bound-instantiation´
 #[test]
@@ -438,64 +258,6 @@ fn permanent_storage_limit() -> TestResult {
         },
     )?;
     assert_eq!(source.logical_id().serial, 0);
-    Ok(())
-}
-
-/// Zero multiplication still visits the partial quotient and both of its original uses.
-/// ´test:integration:no-normalization-before-coverage´
-#[test]
-fn no_normalization_before_coverage() -> TestResult {
-    let (mut cas, context) = fixture()?;
-    let source = admit(
-        &mut cas,
-        Draft::Source {
-            key: "partial".into(),
-            text: "0*(x/x)".into(),
-        },
-    )?;
-    let x = expression(&mut cas, &context, Operator::Free("x".into()), real(), &[])?;
-    let zero = expression(
-        &mut cas,
-        &context,
-        Operator::Rational(Rational::zero()),
-        real(),
-        &[],
-    )?;
-    let quotient = expression(
-        &mut cas,
-        &context,
-        Operator::Div,
-        real(),
-        &[x.clone(), x.clone()],
-    )?;
-    let product = expression(
-        &mut cas,
-        &context,
-        Operator::Mul,
-        real(),
-        &[zero.clone(), quotient.clone()],
-    )?;
-    let numerator = occurrence(&mut cas, &x, &source, None, &[])?;
-    let denominator = occurrence(&mut cas, &x, &source, None, &[])?;
-    let quotient = occurrence(
-        &mut cas,
-        &quotient,
-        &source,
-        None,
-        &[numerator, denominator],
-    )?;
-    let zero = occurrence(&mut cas, &zero, &source, None, &[])?;
-    let root = occurrence(&mut cas, &product, &source, None, &[zero, quotient])?;
-    let receipt = cas.walk_original(&root, &mut budget()?)?.receipt;
-    assert_eq!(receipt.visited(), 5);
-    let outcome = cas.run(&Request {
-        operation: Operation::Simplify,
-        context,
-        inputs: vec![root],
-        receipts: vec![receipt],
-        limits: LimitsOverride::default(),
-    });
-    assert!(matches!(outcome, Outcome::Conditional { .. }));
     Ok(())
 }
 

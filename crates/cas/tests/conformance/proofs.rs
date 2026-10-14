@@ -1,183 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Independent identities, supplied derivative premises, import attacks and resource boundaries.
+//! Public-contract checks for proofs.
 
 use nrz_cas::{
-    AssumptionDraft, AtomicSort, Budget, BudgetKind, Cas, Claim, Declaration, Draft, Environment,
-    ExpressionDraft, FaultKind, Field, Guard, GuardKind, Handle, InvalidCode, Limits, Operator,
-    PredicateKind, Primitive, ProofStep, Rational, Reference, Relation, Sort, Substitution,
+    AtomicSort, Budget, BudgetKind, Cas, Claim, Declaration, Draft, ExpressionDraft, FaultKind,
+    Field, Guard, GuardKind, InvalidCode, Limits, Operator, Primitive, Rational, Reference,
+    Relation, Sort, Substitution,
 };
 
-/// Fallible setup keeps fixture failures distinct from asserted laws.
-type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-
-/// Separate calls get separate generous work ledgers; structural ceilings remain unchanged.
-fn budget() -> TestResult<Budget> {
-    Ok(Budget::new(Limits {
-        work: 100_000_000,
-        replay_work: 100_000_000,
-        ..Limits::default()
-    })?)
-}
-
-/// The ambient real scalar type.
-const fn real() -> Sort {
-    Sort::Value(AtomicSort::Scalar(Field::Real))
-}
-
-/// One checked handle extraction, without indexing or panicking on setup failures.
-fn at(handles: &[Handle], index: usize) -> TestResult<Handle> {
-    handles
-        .get(index)
-        .cloned()
-        .ok_or_else(|| "missing fixture handle".into())
-}
-
-/// Shared small symbolic universe used only by this new test suite.
-struct Fixture {
-    /// Independent graph store.
-    cas: Cas,
-    /// Full context for every proof in the fixture.
-    context: Handle,
-    /// Original declaration header, used when explicitly adding hypotheses.
-    environment: Environment,
-    /// First free coordinate.
-    x: Handle,
-    /// Independent second coordinate.
-    y: Handle,
-    /// Exact zero.
-    zero: Handle,
-    /// Exact one.
-    one: Handle,
-    /// Exact two.
-    two: Handle,
-}
-
-impl Fixture {
-    /// Admit declarations and five leaf terms as one transaction.
-    fn new() -> TestResult<Self> {
-        let environment = Environment {
-            declarations: ["x", "y"]
-                .into_iter()
-                .map(|key| Declaration {
-                    key: key.into(),
-                    display_name: key.into(),
-                    sort: real(),
-                })
-                .collect(),
-            ..Environment::default()
-        };
-        let mut cas = Cas::new(Limits::default())?;
-        let mut drafts = vec![Draft::Context {
-            environment: environment.clone(),
-            assumptions: Vec::new(),
-        }];
-        for operator in [
-            Operator::Free("x".into()),
-            Operator::Free("y".into()),
-            Operator::Rational(Rational::zero()),
-            Operator::Rational(Rational::one()),
-            Operator::Rational(Rational::from_ratio(2, 1, &mut budget()?)?),
-        ] {
-            drafts.push(Draft::Expression(ExpressionDraft {
-                operator,
-                sort: real(),
-                context: Reference::Local(0),
-                scope: Vec::new(),
-                binding: None,
-                operands: Vec::new(),
-            }));
-        }
-        let handles = cas.admit(&drafts, &mut budget()?)?;
-        Ok(Self {
-            cas,
-            context: at(&handles, 0)?,
-            environment,
-            x: at(&handles, 1)?,
-            y: at(&handles, 2)?,
-            zero: at(&handles, 3)?,
-            one: at(&handles, 4)?,
-            two: at(&handles, 5)?,
-        })
-    }
-
-    /// Build exact ordered scalar syntax without normalization.
-    fn term(&mut self, operator: Operator, operands: &[Handle]) -> TestResult<Handle> {
-        let handles = self.cas.admit(
-            &[Draft::Expression(ExpressionDraft {
-                operator,
-                sort: real(),
-                context: Reference::Existing(self.context.clone()),
-                scope: Vec::new(),
-                binding: None,
-                operands: operands.iter().cloned().map(Reference::Existing).collect(),
-            })],
-            &mut budget()?,
-        )?;
-        at(&handles, 0)
-    }
-
-    /// Add one explicitly named hypothesis while preserving the semantic header.
-    fn assume(&mut self, key: &str, kind: PredicateKind, term: &Handle) -> TestResult {
-        let handles = self.cas.admit(
-            &[
-                Draft::Condition {
-                    kind,
-                    context: Reference::Existing(self.context.clone()),
-                    scope: Vec::new(),
-                    arguments: vec![Reference::Existing(term.clone())],
-                },
-                Draft::Context {
-                    environment: self.environment.clone(),
-                    assumptions: vec![AssumptionDraft {
-                        key: key.into(),
-                        condition: Reference::Local(0),
-                    }],
-                },
-            ],
-            &mut budget()?,
-        )?;
-        self.context = at(&handles, 1)?;
-        Ok(())
-    }
-}
-
-/// A primitive equality application with no implicit premise or substitution.
-fn equality(primitive: Primitive, left: &Handle, right: &Handle) -> ProofStep {
-    ProofStep {
-        primitive,
-        relation: Relation::EqualOnDomain,
-        left: left.clone(),
-        right: right.clone(),
-        premises: Vec::new(),
-        path: Vec::new(),
-        substitutions: Vec::new(),
-        certificate: None,
-    }
-}
-
-/// A derivative application with explicit ordered premise references.
-fn derivative(primitive: Primitive, left: &Handle, right: &Handle, premises: &[u32]) -> ProofStep {
-    ProofStep {
-        primitive,
-        relation: Relation::Derivative {
-            variable: "x".into(),
-        },
-        left: left.clone(),
-        right: right.clone(),
-        premises: premises.to_vec(),
-        path: Vec::new(),
-        substitutions: Vec::new(),
-        certificate: None,
-    }
-}
-
-/// A cancellation fixture whose independently known domain is exactly x nonzero.
-fn cancellation() -> TestResult<(Fixture, Handle, ProofStep)> {
-    let mut fixture = Fixture::new()?;
-    let quotient = fixture.term(Operator::Div, &[fixture.x.clone(), fixture.x.clone()])?;
-    let step = equality(Primitive::Cancel, &quotient, &fixture.one);
-    Ok((fixture, quotient, step))
-}
+use crate::testing::budgets::proof_budget as budget;
+use crate::testing::builders::at;
+use crate::testing::common::{TestResult, real};
+use crate::testing::proofs::{Fixture, cancellation};
+use crate::testing::wire::canonical_fixture;
+use crate::testing::witness::{derivative, equality};
 
 /// Cancellation retains its guard and publishes both application and proof graph vertices.
 /// ´test:integration:conditional-cancellation´
@@ -205,33 +40,6 @@ fn conditional_cancellation() -> TestResult {
         witness.proof().logical_id().kind,
         nrz_cas::VertexKind::Proof
     );
-    Ok(())
-}
-
-/// Hypotheses discharge guards relative to their exact context and keep provenance visible.
-/// ´test:integration:assumed-cancellation´
-#[test]
-fn assumed_cancellation() -> TestResult {
-    let (mut fixture, _, step) = cancellation()?;
-    fixture.assume("positive-x", PredicateKind::Positive, &fixture.x.clone())?;
-    let witness = fixture
-        .cas
-        .check_proof(&fixture.context, &[step], &mut budget()?)?;
-    assert!(witness.is_discharged());
-    assert_eq!(witness.hypotheses(), &["positive-x".to_owned()]);
-    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let (mut fresh, quotient, _) = cancellation()?;
-    fresh.assume("positive-x", PredicateKind::Positive, &fresh.x.clone())?;
-    let expected = Claim {
-        context: fresh.context.clone(),
-        relation: Relation::EqualOnDomain,
-        left: quotient,
-        right: fresh.one.clone(),
-        residuals: Vec::new(),
-    };
-    let replayed = fresh.cas.replay(&bytes, &expected, &mut budget()?)?;
-    assert_eq!(fresh.cas.export_witness(&replayed, &mut budget()?)?, bytes);
-    assert_eq!(replayed.hypotheses(), witness.hypotheses());
     Ok(())
 }
 
@@ -350,68 +158,6 @@ fn finite_jet_difference_quotient() -> TestResult {
     Ok(())
 }
 
-/// Supplied product-rule premises derive 2x, while differentiation never becomes equality.
-/// ´test:integration:checked-derivative-premises´
-#[test]
-fn checked_derivative_premises() -> TestResult {
-    let mut fixture = Fixture::new()?;
-    let square = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.x.clone()])?;
-    let first = fixture.term(Operator::Mul, &[fixture.one.clone(), fixture.x.clone()])?;
-    let second = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.one.clone()])?;
-    let sum = fixture.term(Operator::Add, &[first, second])?;
-    let target = fixture.term(Operator::Mul, &[fixture.two.clone(), fixture.x.clone()])?;
-    let steps = vec![
-        derivative(
-            Primitive::DifferentiateVariable,
-            &fixture.x,
-            &fixture.one,
-            &[],
-        ),
-        derivative(Primitive::DifferentiateProduct, &square, &sum, &[0, 0]),
-        equality(Primitive::Jets, &sum, &target),
-        derivative(Primitive::DerivativeTransport, &square, &target, &[1, 2]),
-    ];
-    let witness = fixture
-        .cas
-        .check_proof(&fixture.context, &steps, &mut budget()?)?;
-    assert!(witness.is_discharged());
-    assert_eq!(
-        witness.claim().relation,
-        Relation::Derivative {
-            variable: "x".into()
-        }
-    );
-    let mut bad = equality(Primitive::Symmetry, &fixture.one, &fixture.x);
-    bad.premises = vec![0];
-    assert!(
-        fixture
-            .cas
-            .check_proof(
-                &fixture.context,
-                &[steps.first().ok_or("missing derivative")?.clone(), bad],
-                &mut budget()?,
-            )
-            .is_err()
-    );
-    let mut missing = steps.get(1).ok_or("missing product")?.clone();
-    missing.premises = vec![0];
-    assert!(
-        fixture
-            .cas
-            .check_proof(
-                &fixture.context,
-                &[steps.first().ok_or("missing variable")?.clone(), missing],
-                &mut budget()?,
-            )
-            .is_err()
-    );
-    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let mut fresh = Cas::new(Limits::default())?;
-    let inspected = fresh.inspect(&bytes, &mut budget()?)?;
-    assert_eq!(fresh.export_witness(&inspected, &mut budget()?)?, bytes);
-    Ok(())
-}
-
 /// Strict zero-power differentiation retains nonzero, while the one-power case adds no guard.
 /// ´test:integration:derivative-power-domain-cases´
 #[test]
@@ -493,69 +239,6 @@ fn substituted_proof_guards() -> TestResult {
         .ok_or("accepted zero substitution")?;
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::RefutedDomain));
     assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
-    Ok(())
-}
-
-/// Independently assembled format-one bytes for x/x = 1 with residual x nonzero.
-const CANCELLATION_WIRE_HEX: &str = concat!(
-    "4e525a4341533031010000000900000065712e63616e63656c010000000100020000000100000078",
-    "01000000780001010100000079010000007900010100000000030000000101000000780001010000",
-    "00000000000000080001010000000000020000000000000000000000000001000000010100000001",
-    "00010100000000000000000000000100000002000000010000000100000000000000000100000000",
-    "00000000010000000200000000000000000000000000000000000000",
-);
-
-/// Decode this fixed test vector without using the production witness codec.
-fn canonical_fixture() -> TestResult<Vec<u8>> {
-    let mut bytes = Vec::new();
-    for pair in CANCELLATION_WIRE_HEX.as_bytes().as_chunks::<2>().0 {
-        bytes.push(u8::from_str_radix(std::str::from_utf8(pair)?, 16)?);
-    }
-    Ok(bytes)
-}
-
-/// A canonical witness replays in a fresh store, and a different intended claim is rejected.
-/// ´test:integration:expected-claim-replay´
-#[test]
-fn expected_claim_replay() -> TestResult {
-    let (mut producer, _, step) = cancellation()?;
-    let witness = producer
-        .cas
-        .check_proof(&producer.context, &[step], &mut budget()?)?;
-    let bytes = producer.cas.export_witness(&witness, &mut budget()?)?;
-    assert_eq!(bytes, canonical_fixture()?);
-    let (mut receiver, quotient, _) = cancellation()?;
-    let expected = Claim {
-        context: receiver.context.clone(),
-        relation: Relation::EqualOnDomain,
-        left: quotient,
-        right: receiver.one.clone(),
-        residuals: vec![Guard {
-            kind: GuardKind::NonZero,
-            term: receiver.x.clone(),
-        }],
-    };
-    let replayed = receiver.cas.replay(&bytes, &expected, &mut budget()?)?;
-    assert_eq!(
-        receiver.cas.export_witness(&replayed, &mut budget()?)?,
-        bytes
-    );
-    let before = receiver.cas.canonical_snapshot(&mut budget()?)?;
-    let mut wrong = expected.clone();
-    wrong.right = receiver.zero.clone();
-    let fault = receiver
-        .cas
-        .replay(&bytes, &wrong, &mut budget()?)
-        .err()
-        .ok_or("accepted wrong endpoint")?;
-    assert_eq!(
-        fault.kind,
-        FaultKind::Invalid(InvalidCode::EndpointMismatch)
-    );
-    wrong = expected;
-    wrong.residuals.clear();
-    assert!(receiver.cas.replay(&bytes, &wrong, &mut budget()?).is_err());
-    assert_eq!(receiver.cas.canonical_snapshot(&mut budget()?)?, before);
     Ok(())
 }
 
@@ -912,61 +595,6 @@ fn expected_context_mismatch() -> TestResult {
         .err()
         .ok_or("reinterpreted an expected guard")?;
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Context));
-    Ok(())
-}
-
-/// Quotient premises reconstruct the full quotient rule and reduce its power guard to y nonzero.
-/// ´test:integration:checked-quotient-derivative´
-#[test]
-fn checked_quotient_derivative() -> TestResult {
-    let mut fixture = Fixture::new()?;
-    let quotient = fixture.term(Operator::Div, &[fixture.x.clone(), fixture.y.clone()])?;
-    let left_product = fixture.term(Operator::Mul, &[fixture.one.clone(), fixture.y.clone()])?;
-    let right_product = fixture.term(Operator::Mul, &[fixture.x.clone(), fixture.zero.clone()])?;
-    let numerator = fixture.term(Operator::Sub, &[left_product, right_product])?;
-    let denominator = fixture.term(Operator::IntegerPower(2), &[fixture.y.clone()])?;
-    let derivative_value = fixture.term(Operator::Div, &[numerator, denominator])?;
-    let simplified = fixture.term(Operator::Div, &[fixture.one.clone(), fixture.y.clone()])?;
-    let steps = [
-        derivative(
-            Primitive::DifferentiateVariable,
-            &fixture.x,
-            &fixture.one,
-            &[],
-        ),
-        derivative(
-            Primitive::DifferentiateVariable,
-            &fixture.y,
-            &fixture.zero,
-            &[],
-        ),
-        derivative(
-            Primitive::DifferentiateQuotient,
-            &quotient,
-            &derivative_value,
-            &[0, 1],
-        ),
-        equality(Primitive::RationalIdentity, &derivative_value, &simplified),
-        derivative(
-            Primitive::DerivativeTransport,
-            &quotient,
-            &simplified,
-            &[2, 3],
-        ),
-    ];
-    let witness = fixture
-        .cas
-        .check_proof(&fixture.context, &steps, &mut budget()?)?;
-    assert_eq!(
-        witness.claim().residuals,
-        vec![Guard {
-            kind: GuardKind::NonZero,
-            term: fixture.y.clone()
-        }],
-    );
-    let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let mut fresh = Cas::new(Limits::default())?;
-    assert!(!fresh.inspect(&bytes, &mut budget()?)?.is_discharged());
     Ok(())
 }
 

@@ -1,105 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Typed representations remain available before their algorithms are executable.
+//! Public-contract checks for representation.
 
 use nrz_cas::{
-    Approach, AtomicSort, Binding, Branch, Budget, Cas, Constant, Declaration, Draft, Environment,
-    ExpressionDraft, Extent, Field, Handle, Limits, MatrixOperation, Operator, PredicateKind,
-    Rational, Reference, RootSelection, ScalarOperation, Scope, Sort, SpectralKind,
+    Approach, AtomicSort, Binding, Branch, Constant, Extent, Field, MatrixOperation, Operator,
+    PredicateKind, Rational, RootSelection, ScalarOperation, Sort, SpectralKind,
 };
 
-/// Setups return their original failure to the test runner.
-type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
-
-/// A local constructor with the complete semantic context kept explicit.
-struct Fixture {
-    /// Store with default permanent ceilings.
-    cas: Cas,
-    /// Immutable declaration context.
-    context: Handle,
-}
-
-/// The real scalar result sort.
-const fn real() -> Sort {
-    Sort::Value(AtomicSort::Scalar(Field::Real))
-}
-
-impl Fixture {
-    /// Declare one scalar and one unary function without assigning numerical behavior.
-    fn new() -> TestResult<Self> {
-        let mut cas = Cas::new(Limits::default())?;
-        let environment = Environment {
-            declarations: vec![
-                Declaration {
-                    key: "x".into(),
-                    display_name: "x".into(),
-                    sort: real(),
-                },
-                Declaration {
-                    key: "f".into(),
-                    display_name: "f".into(),
-                    sort: Sort::Function {
-                        inputs: vec![AtomicSort::Scalar(Field::Real)],
-                        output: AtomicSort::Scalar(Field::Real),
-                    },
-                },
-            ],
-            ..Environment::default()
-        };
-        let context = Self::admit(
-            &mut cas,
-            Draft::Context {
-                environment,
-                assumptions: Vec::new(),
-            },
-        )?;
-        Ok(Self { cas, context })
-    }
-
-    /// Admit one fully checked draft.
-    fn admit(cas: &mut Cas, draft: Draft) -> TestResult<Handle> {
-        let mut budget = Budget::new(Limits {
-            work: 100_000_000,
-            ..Limits::default()
-        })?;
-        cas.admit(&[draft], &mut budget)?
-            .into_iter()
-            .next()
-            .ok_or_else(|| "one draft returned no handle".into())
-    }
-
-    /// Construct a scoped or ordinary expression without a parser.
-    fn node(
-        &mut self,
-        operator: Operator,
-        sort: Sort,
-        scope: Scope,
-        binding: Option<Binding>,
-        operands: &[Handle],
-    ) -> TestResult<Handle> {
-        Self::admit(
-            &mut self.cas,
-            Draft::Expression(ExpressionDraft {
-                operator,
-                sort,
-                context: Reference::Existing(self.context.clone()),
-                scope,
-                binding,
-                operands: operands.iter().cloned().map(Reference::Existing).collect(),
-            }),
-        )
-    }
-
-    /// Construct a real scalar constant in a specified scope.
-    fn one(&mut self, scope: Scope) -> TestResult<Handle> {
-        self.node(
-            Operator::Rational(Rational::one()),
-            real(),
-            scope,
-            None,
-            &[],
-        )
-    }
-}
+use crate::testing::common::{TestResult, real};
+use crate::testing::representation::Fixture;
 
 /// Arithmetic, declared calls, derivatives and selected algebraic roots retain their exact tags.
 /// ´test:integration:scalar-vocabulary´
