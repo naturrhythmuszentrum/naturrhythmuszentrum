@@ -89,3 +89,7 @@ requires = []
 [[document]]
 output = "docs/design/cas-piecewise.md"
 requires = []
+
+[[document]]
+output = "docs/design/cas-piecewise-design.md"
+requires = []
