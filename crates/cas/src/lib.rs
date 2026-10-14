@@ -191,3 +191,11 @@ mod square_free_check;
 mod univariate;
 
 pub use multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};
+
+#[cfg(test)]
+use crate as test_api;
+
+#[cfg(test)]
+mod testing;
+#[cfg(test)]
+mod tests;

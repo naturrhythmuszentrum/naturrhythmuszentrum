@@ -282,98 +282,25 @@ mod tests {
     use super::{Frontier, Metrics};
     use crate::{Budget, Fault, Limits, LogicalId, VertexKind};
 
-    /// Small independently chosen resource tuple.
-    fn metrics(cost: u64, credits: u64, support: u64) -> Metrics {
-        Metrics {
-            cost,
-            credits,
-            peak: 8,
-            depth: 2,
-            bytes: 10,
-            support: BTreeSet::from([LogicalId {
-                kind: VertexKind::Proof,
-                serial: support,
-            }]),
-            encoding: vec![1],
-        }
-    }
-
-    /// The default epoch is exactly four cost visits followed by one progress visit.
-    /// ´test:unit:queue-quota-order´
-    #[test]
-    fn queue_quota_order() -> Result<(), Fault> {
-        let mut frontier = Frontier::default();
-        let mut budget = Budget::new(Limits::default())?;
-        for id in 0_u8..6 {
-            frontier.insert(
-                usize::from(id),
-                vec![id],
-                [u64::from(6 - id), 0, 0, 0],
-                metrics(u64::from(id), 0, 0),
-                &mut budget,
-            )?;
-        }
-        for expected in [0, 1, 2, 3, 5, 4] {
-            assert_eq!(frontier.pop(&mut budget)?, Some(expected));
-        }
-        assert_eq!(
-            frontier.visits,
-            vec![false, false, false, false, true, false]
-        );
-        assert_eq!(frontier.pop(&mut budget)?, None);
-        Ok(())
-    }
-
-    /// Resumed equal-priority cursors go behind earlier pending visits.
-    /// ´test:unit:queue-resumption-order´
-    #[test]
-    fn queue_resumption_order() -> Result<(), Fault> {
-        let mut frontier = Frontier::default();
-        let mut budget = Budget::new(Limits::default())?;
-        frontier.insert(0, vec![0], [0; 4], metrics(1, 0, 0), &mut budget)?;
-        frontier.insert(1, vec![0], [0; 4], metrics(1, 0, 1), &mut budget)?;
-        assert_eq!(frontier.pop(&mut budget)?, Some(0));
-        frontier.resume(0, &mut budget)?;
-        assert_eq!(frontier.pop(&mut budget)?, Some(1));
-        assert_eq!(frontier.pop(&mut budget)?, Some(0));
-        Ok(())
-    }
-
-    /// Neither expansion tradeoffs nor distinct dependency support can be discarded as cheaper.
-    /// ´test:unit:resource-dominance-laws´
-    #[test]
-    fn resource_dominance_laws() {
-        let cheap_expanded = metrics(1, 4, 0);
-        let dear_compact = metrics(2, 1, 0);
-        assert!(!cheap_expanded.dominates(&dear_compact));
-        assert!(!dear_compact.dominates(&cheap_expanded));
-        assert!(!metrics(1, 1, 0).dominates(&metrics(2, 2, 1)));
-        assert!(metrics(1, 1, 0).dominates(&metrics(2, 2, 0)));
-    }
-
-    /// Different theorem classes remain separate, while worse labels lose both queue entries.
-    /// ´test:unit:queue-condition-classes´
-    #[test]
-    fn queue_condition_classes() -> Result<(), Fault> {
-        let mut frontier = Frontier::default();
-        let mut budget = Budget::new(Limits::default())?;
-        assert!(frontier.insert(0, vec![0], [0; 4], metrics(3, 2, 0), &mut budget)?);
-        assert!(frontier.insert(1, vec![1], [0; 4], metrics(1, 0, 0), &mut budget)?);
-        assert!(frontier.insert(2, vec![0], [0; 4], metrics(2, 1, 0), &mut budget)?);
-        assert_eq!(frontier.dominated, 1);
-        assert_eq!(frontier.pop(&mut budget)?, Some(1));
-        assert_eq!(frontier.pop(&mut budget)?, Some(2));
-        assert_eq!(frontier.pop(&mut budget)?, None);
-        Ok(())
-    }
-
     /// If one scheduling view has no eligible entry, its slot is donated to the other view.
     /// ´test:unit:queue-empty-donation´
     #[test]
     fn queue_empty_donation() -> Result<(), Fault> {
         let mut frontier = Frontier::default();
         let mut budget = Budget::new(Limits::default())?;
-        frontier.insert(0, vec![0], [0; 4], metrics(1, 0, 0), &mut budget)?;
+        let metrics = Metrics {
+            cost: 1,
+            credits: 0,
+            peak: 8,
+            depth: 2,
+            bytes: 10,
+            support: BTreeSet::from([LogicalId {
+                kind: VertexKind::Proof,
+                serial: 0,
+            }]),
+            encoding: vec![1],
+        };
+        frontier.insert(0, vec![0], [0; 4], metrics, &mut budget)?;
         frontier.cost.clear();
         assert_eq!(frontier.pop(&mut budget)?, Some(0));
         assert_eq!(frontier.visits, vec![true]);

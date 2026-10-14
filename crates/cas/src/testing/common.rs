@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Small shared result, budget and scalar helpers.
 //!
-//! Compiled only in the public test target.
+//! Compiled in both the library test binary and the public test target.
 
 use crate::test_api::{AtomicSort, Budget, Fault, Field, Limits, Sort};
 

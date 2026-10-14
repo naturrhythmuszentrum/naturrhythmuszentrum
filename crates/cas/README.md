@@ -74,8 +74,14 @@ The lane intentionally has no Rust toolchain. The server gate runs `cargo fmt --
 
 ## Testing · `sec:cas:testing`
 
+Place each test in the outermost layer that can express its assertions. A unit test stays inline under `#[cfg(test)] mod tests` only when it needs a value private to that module. It builds its own setup and never imports the harness. A crate test needs crate-internal access and lives in `src/tests/`, with one file per concern and a `#[cfg(test)] mod tests;` declaration in `src/lib.rs`. An item visible as `pub(crate)` is not module-private. Public tests live under `tests/`.
+
 Public tests use only the crate's public API. `tests/conformance/` checks documented laws, refusals, boundaries, resource limits and determinism. `tests/integration/` exercises complete client computations and proof lifecycles across capabilities, such as constructing a graph, obtaining coverage, searching or differentiating, exporting a witness and replaying it in a fresh store. Classify a test by its principal question or worked flow; setup calls and replay helpers alone do not determine its kind.
 
 Both directories are modules of the single `tests/public.rs` target, with one file per concern. `cargo test -p nrz-cas` includes them without feature flags; `cargo test -p nrz-cas --test public conformance::` and `cargo test -p nrz-cas --test public integration::` select the two public kinds. Both kinds retain the inventory area `integration`, with one existing acute-accent label as each test's final documentation line and a hyphenated function-name slug.
 
 The shared public harness lives in `src/testing/`, included through the private `src/testing/public.rs` entrypoint by source path. Its `test_api` alias refers to the ordinary public library, and it includes no crate-only fixture. Each harness file documents which test binaries compile it. Helpers are absent from ordinary library builds and rustdoc, and the access route adds no feature or dependency. The default, graph, proof and derivation budget profiles remain distinct; test-specific refusal limits stay explicit. Shared setup preserves admission batches, original occurrences, independent oracles and fresh-ledger boundaries. The square-free fixture accepts only a discharged `Verified` result.
+
+The library test binary privately includes `src/testing/mod.rs`, which composes shared public basics and crate-only frontier and frozen-search fixtures. `src/testing/common.rs` is compiled in both binaries. Crate-only fixture files are never reachable from the public entrypoint.
+
+The linter derives each inventory area from the test's location: inline unit tests carry `test:unit`, crate tests under `src/tests/` carry `test:crate`, and public conformance and integration tests carry `test:integration`. Every label is the final documentation line and keeps its acute-accent delimiters.
