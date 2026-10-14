@@ -18,3 +18,7 @@ pub use crate::boundary_model::{
     BoundaryCertificate, BoundaryPartition, CaseDerivative, NonexistenceReason, PointDerivative,
     PointNonexistence, TraceValue,
 };
+
+pub use crate::distribution_model::{
+    DistributionCertificate, DistributionStatement, RegularCertificate, RegularityKind,
+};

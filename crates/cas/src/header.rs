@@ -195,7 +195,16 @@ pub(crate) fn expression_space(
     operands: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<Option<LogicalId>, Fault> {
-    if !space_sort(sort) {
+    if !(space_sort(sort)
+        || crate::distribution_syntax::scalar_action(operator)
+        || explicit.is_some() && crate::distribution_syntax::action_arithmetic(operator))
+    {
+        if operands
+            .iter()
+            .any(|id| state.expression(*id).is_ok_and(|v| v.space.is_some()))
+        {
+            return Err(Fault::invalid(InvalidCode::Sort, AT));
+        }
         return if explicit.is_none() {
             Ok(None)
         } else {
@@ -225,6 +234,7 @@ pub(crate) fn expression_space(
             return Err(Fault::invalid(InvalidCode::Sort, AT));
         }
     }
+    crate::distribution_syntax::space(state, operator, sort, space, operands, budget)?;
     Ok(Some(space))
 }
 

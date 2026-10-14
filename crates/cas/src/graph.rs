@@ -146,7 +146,7 @@ pub struct AssumptionDraft {
 /// Untrusted ordered expression syntax.
 #[derive(Clone, Debug)]
 pub struct ExpressionDraft {
-    /// Explicit typed space link; scalar values require absence.
+    /// Explicit typed space link; ordinary pointwise scalar values require absence.
     pub space: Option<Reference>,
     /// Operator and complete mathematical payload.
     pub operator: Operator,
@@ -388,6 +388,8 @@ pub(crate) enum Vertex {
         cost: u64,
         /// Complete pinned table stored in the same graph.
         policy: LogicalId,
+        /// Complete older snapshot used for the strict-improvement comparison.
+        baseline: Vec<u8>,
     },
     /// A strictly cheaper reusable route backed by an older complete proof.
     Shortcut {
@@ -1113,7 +1115,7 @@ impl Cas {
             operator: draft.operator.clone(),
             sort: draft.sort.clone(),
             header,
-            layer: if draft.sort == Sort::Distribution {
+            layer: if space.is_some() && draft.sort != Sort::Test {
                 Layer::Distribution
             } else if draft.sort == Sort::Value(crate::model::AtomicSort::Boolean) {
                 Layer::Logic
@@ -1416,11 +1418,14 @@ pub(crate) fn vertex_key(
             proof,
             cost,
             policy,
+            baseline,
         } => {
             out.byte(2)?;
             encode_id(*proof, &mut out)?;
             encode_id(*policy, &mut out)?;
             out.unsigned(*cost)?;
+            out.count(baseline.len())?;
+            out.raw(baseline)?;
         }
         Vertex::Shortcut { proof, cost } => {
             out.byte(1)?;

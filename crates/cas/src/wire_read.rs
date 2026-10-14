@@ -374,6 +374,25 @@ impl<'a, 'b> Reader<'a, 'b> {
     /// Decode represented calculus, matrix and predicate operator payloads separately.
     fn extended_operator(&mut self, tag: u8) -> Result<Operator, Fault> {
         match tag {
+            30 => Ok(Operator::RegularEmbed),
+            31 => Ok(Operator::DistributionZero),
+            32 => Ok(Operator::Delta {
+                order: self.small()?,
+            }),
+            33 => Ok(Operator::DistributionAdd),
+            34 => Ok(Operator::DistributionScale),
+            35 => Ok(Operator::DistributionDerivative {
+                order: self.small()?,
+            }),
+            36 => Ok(Operator::SmoothMultiply),
+            37 => Ok(Operator::Pair),
+            38 => Ok(Operator::PairNearSupport),
+            39 => Ok(Operator::TestDerivative {
+                order: self.small()?,
+            }),
+            40 => Ok(Operator::TestMultiply),
+            41 => Ok(Operator::TestApply),
+            42 => Ok(Operator::RegularAction),
             28 => Ok(Operator::Cases),
             29 => Ok(Operator::NamedCase(Box::new(crate::named_case::decode(
                 self,

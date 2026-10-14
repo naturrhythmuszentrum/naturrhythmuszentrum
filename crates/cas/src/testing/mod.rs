@@ -28,3 +28,8 @@ pub(crate) mod native;
     reason = "shared crate boundary evidence fixtures"
 )]
 pub(crate) mod boundary_native;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared internal distribution evidence"
+)]
+pub(crate) mod distribution_native;

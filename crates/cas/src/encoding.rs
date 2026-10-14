@@ -309,6 +309,19 @@ const fn operator_tag(value: &Operator) -> u8 {
         Operator::Entrywise(_) => 27,
         Operator::Cases => 28,
         Operator::NamedCase(_) => 29,
+        Operator::RegularEmbed => 30,
+        Operator::DistributionZero => 31,
+        Operator::Delta { .. } => 32,
+        Operator::DistributionAdd => 33,
+        Operator::DistributionScale => 34,
+        Operator::DistributionDerivative { .. } => 35,
+        Operator::SmoothMultiply => 36,
+        Operator::Pair => 37,
+        Operator::PairNearSupport => 38,
+        Operator::TestDerivative { .. } => 39,
+        Operator::TestMultiply => 40,
+        Operator::TestApply => 41,
+        Operator::RegularAction => 42,
     }
 }
 
@@ -317,6 +330,9 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
     out.byte(operator_tag(value))?;
     match value {
         Operator::NamedCase(value) => crate::named_case::encode(value, out),
+        Operator::Delta { order }
+        | Operator::DistributionDerivative { order }
+        | Operator::TestDerivative { order } => out.unsigned(u64::from(*order)),
         Operator::Rational(number) => out.number(number),
         Operator::Free(name) | Operator::Call(name) | Operator::Derivative(name) => out.name(name),
         Operator::Bound { depth, slot } => {
@@ -378,7 +394,17 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
         | Operator::Transpose
         | Operator::MatrixMultiply
         | Operator::IntegerEmbed
-        | Operator::Cases => Ok(()),
+        | Operator::Cases
+        | Operator::RegularEmbed
+        | Operator::DistributionZero
+        | Operator::DistributionAdd
+        | Operator::DistributionScale
+        | Operator::SmoothMultiply
+        | Operator::Pair
+        | Operator::PairNearSupport
+        | Operator::TestMultiply
+        | Operator::TestApply
+        | Operator::RegularAction => Ok(()),
     }
 }
 

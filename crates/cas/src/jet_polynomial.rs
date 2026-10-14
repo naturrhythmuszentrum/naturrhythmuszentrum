@@ -86,7 +86,7 @@ pub(crate) fn measure(count: usize, budget: &mut Budget) -> Result<(), Fault> {
 }
 
 /// Sum falling-factorial coefficients times nonnegative powers, including the constant at zero.
-fn trace(
+pub(crate) fn trace(
     coefficients: &[Rational],
     point: &Rational,
     order: usize,

@@ -232,6 +232,41 @@ pub enum RootSelection {
 /// Mathematical syntax tags; all operands remain explicitly ordered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// A regular distribution; local integrability still requires checked evidence.
+    RegularEmbed,
+    /// Zero in the explicitly linked distribution space.
+    DistributionZero,
+    /// Delta at the sole scalar location operand.
+    Delta {
+        /// Nonnegative derivative order.
+        order: u32,
+    },
+    /// Addition of two distributions in exactly the same space.
+    DistributionAdd,
+    /// A rational scalar operand followed by a distribution.
+    DistributionScale,
+    /// Formal iterated distribution derivative.
+    DistributionDerivative {
+        /// Positive derivative order.
+        order: u32,
+    },
+    /// Smooth scalar operand followed by a distribution.
+    SmoothMultiply,
+    /// Action on an ordinary declared compact smooth test.
+    Pair,
+    /// Cutoff-independent action on a separately certified supported germ.
+    PairNearSupport,
+    /// Test derivative, which preserves smoothness and compact support.
+    TestDerivative {
+        /// Positive derivative order.
+        order: u32,
+    },
+    /// Smooth scalar operand followed by a test.
+    TestMultiply,
+    /// Test operand followed by an interior scalar location.
+    TestApply,
+    /// Defining integral action of a regular representative on a test.
+    RegularAction,
     /// Transparent canonical case definition retained as one operand.
     NamedCase(Box<crate::boundary_model::NamedCase>),
     /// Native cases use typed domain and arm links, not scalar operands.

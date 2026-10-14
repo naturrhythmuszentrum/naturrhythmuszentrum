@@ -527,3 +527,42 @@ fn rank(
         expression.depth,
     ])
 }
+
+/// Native result dominance retains full proof/source support without a scalar claim projection.
+pub(crate) fn typed_metrics(
+    cas: &Cas,
+    result: &SearchResult,
+    request: &crate::request_model::Request,
+    budget: &mut Budget,
+) -> Result<Metrics, Fault> {
+    let mut support: BTreeSet<_> = request
+        .inputs
+        .iter()
+        .map(|input| input.root.logical_id())
+        .collect();
+    let mut pending = vec![result.witness.proof().logical_id()];
+    let mut reached = BTreeSet::new();
+    let mut depth = 0;
+    while let Some(id) = pending.pop() {
+        if !reached.insert(id) {
+            continue;
+        }
+        let value = crate::proof_view::application(cas, id, budget)?;
+        support.insert(id);
+        support.insert(value.judgment.context.logical_id());
+        for object in crate::statement::objects(&value.judgment.statement) {
+            support.insert(object.logical_id());
+        }
+        pending.extend(value.premises);
+        depth = depth.max(value.depth);
+    }
+    Ok(Metrics {
+        cost: result.cost,
+        peak: result.peak,
+        credits: result.expansion_credits,
+        depth,
+        bytes: size(result.witness.bytes.len(), AT)?,
+        support,
+        encoding: result.witness.bytes.clone(),
+    })
+}

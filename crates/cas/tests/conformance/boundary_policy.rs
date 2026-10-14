@@ -5,8 +5,8 @@ use crate::testing::common::TestResult;
 use nrz_cas::proof::PRIMITIVES;
 use nrz_cas::request::CostPolicy;
 
-/// All forty existing weights plus exactly three semantic-version-one boundary checkers.
-const EXPECTED: [(&str, u64); 43] = [
+/// All fifty-two active weights, including the nine semantic-version-one distribution checkers.
+const EXPECTED: [(&str, u64); 52] = [
     ("case.congruence", 4),
     ("case.domain", 2),
     ("case.eliminate", 4),
@@ -27,6 +27,15 @@ const EXPECTED: [(&str, u64); 43] = [
     ("diff.sub", 2),
     ("diff.transport", 1),
     ("diff.variable", 2),
+    ("dist.ae", 4),
+    ("dist.delta-multiply", 8),
+    ("dist.delta-pair", 4),
+    ("dist.derivative", 2),
+    ("dist.jump", 8),
+    ("dist.linear", 2),
+    ("dist.regular", 8),
+    ("dist.smooth", 8),
+    ("dist.support-action", 8),
     ("eq.add-associate", 2),
     ("eq.add-commute", 2),
     ("eq.add-inverse", 2),
@@ -52,12 +61,12 @@ const EXPECTED: [(&str, u64); 43] = [
     ("region.decide", 4),
 ];
 
-/// Logical version four has no distribution or reserved future primitive placeholders.
-/// ´test:integration:boundary-policy-four-complete-manifest´
+/// Logical version five includes exactly the executable distribution schemas and no recipe keys.
+/// ´test:integration:distribution-policy-five-complete-manifest´
 #[test]
-fn boundary_policy_four_complete_manifest() -> TestResult {
+fn distribution_policy_five_complete_manifest() -> TestResult {
     let policy = CostPolicy::default();
-    assert_eq!(policy.version, 4);
+    assert_eq!(policy.version, 5);
     assert_eq!(PRIMITIVES.len(), EXPECTED.len());
     let actual: Vec<_> = PRIMITIVES
         .iter()
@@ -80,7 +89,7 @@ fn boundary_policy_four_complete_manifest() -> TestResult {
     let one = fixture.one.clone();
     let request = fixture.request(nrz_cas::request::Task::Simplify, std::slice::from_ref(&one))?;
     let mut search = nrz_cas::request::SearchPolicy::default();
-    search.costs.version = 3;
+    search.costs.version = 4;
     assert!(matches!(
         fixture.cas.run_with_policy(&request, &search),
         nrz_cas::request::Outcome::Invalid { .. }

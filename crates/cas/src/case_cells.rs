@@ -230,6 +230,43 @@ impl Analysis {
         Err(invalid())
     }
 
+    /// Interpret every open cell for the finite polynomial regularity checker.
+    pub(crate) fn polynomial_cells(
+        &self,
+        cas: &mut Cas,
+        expression: LogicalId,
+        within: LogicalId,
+        coordinate: &str,
+        budget: &mut Budget,
+    ) -> Result<Vec<Option<Vec<crate::number::Rational>>>, Fault> {
+        let count = self.cells.membership.first().ok_or_else(invalid)?.len();
+        let mut result = Vec::new();
+        result
+            .try_reserve_exact(count.div_ceil(2))
+            .map_err(|_| Fault::allocation(Location::new("regular polynomial cells")))?;
+        for cell in (0..count).step_by(2) {
+            if !self.contains(within, cell)? {
+                result.push(None);
+                continue;
+            }
+            let values = self.specialize(cas, within, cell, budget)?;
+            let value = match values.get(&expression).ok_or_else(invalid)? {
+                Value::Defined(value) => *value,
+                Value::Conflict => return Err(conflict()),
+                Value::Undefined => {
+                    return Err(Fault::invalid(
+                        InvalidCode::PendingPremise,
+                        Location::new("regular open cell"),
+                    ));
+                }
+            };
+            result.push(Some(crate::polynomial::univariate(
+                &cas.state, value, coordinate, budget,
+            )?));
+        }
+        Ok(result)
+    }
+
     /// Expose exact endpoint definedness to the domain schema.
     pub(crate) fn domain(&self, expression: LogicalId) -> Result<LogicalId, Fault> {
         self.domains.get(&expression).copied().ok_or_else(invalid)

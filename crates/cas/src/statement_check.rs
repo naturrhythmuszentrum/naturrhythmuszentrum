@@ -45,6 +45,9 @@ fn endpoints(
 pub(crate) fn validate(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<(), Fault> {
     budget.work(1, Location::new("statement object roles"))?;
     match statement {
+        Statement::Distribution(value) => {
+            crate::distribution_syntax::statement(cas, value, budget)?;
+        }
         Statement::Equality {
             left,
             right,

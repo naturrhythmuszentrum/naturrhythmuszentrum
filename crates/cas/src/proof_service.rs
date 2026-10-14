@@ -59,6 +59,18 @@ impl Cas {
         cost: u64,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
+        if matches!(
+            expected.statement,
+            crate::proof_model::Statement::Distribution(_)
+        ) {
+            return self.register_typed_derived(
+                witness,
+                expected,
+                &CostPolicy::default(),
+                cost,
+                budget,
+            );
+        }
         let witness = scalar_witness(self, witness, budget)?;
         let expected = crate::proof_view::scalar_claim(self, expected)?;
         self.register_scalar_derived(&witness, &expected, cost, budget)
@@ -76,6 +88,12 @@ impl Cas {
         cost: u64,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
+        if matches!(
+            expected.statement,
+            crate::proof_model::Statement::Distribution(_)
+        ) {
+            return self.register_typed_derived(witness, expected, policy, cost, budget);
+        }
         let witness = scalar_witness(self, witness, budget)?;
         let expected = crate::proof_view::scalar_claim(self, expected)?;
         self.register_scalar_derived_with_policy(&witness, &expected, policy, cost, budget)
@@ -92,6 +110,14 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<crate::frozen::FrozenCertificate, Fault> {
         crate::proof_view::validate_judgment(self, judgment, budget)?;
+        if matches!(
+            judgment.statement,
+            crate::proof_model::Statement::Distribution(_)
+        ) {
+            return self.proof_limits(budget, |cas, budget| {
+                cas.certify_typed_frozen_cost(judgment, policy, budget)
+            });
+        }
         let claim = crate::proof_view::scalar_claim(self, judgment)?;
         self.certify_scalar_frozen_cost(&claim, policy, budget)
     }

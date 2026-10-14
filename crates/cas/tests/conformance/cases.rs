@@ -9,13 +9,13 @@ use nrz_cas::syntax::{Operator, PredicateKind};
 use nrz_cas::{FaultKind, InvalidCode};
 
 /// The active manifest preserves the five native case schemas and refuses logical policy two.
-/// ´test:integration:case-policy-four-preserves-native-manifest´
+/// ´test:integration:case-policy-five-preserves-native-manifest´
 #[test]
-fn case_policy_four_preserves_native_manifest() -> TestResult {
+fn case_policy_five_preserves_native_manifest() -> TestResult {
     let mut policy = nrz_cas::request::SearchPolicy::default();
     assert_eq!(policy.costs.key, "logical");
-    assert_eq!(policy.costs.version, 4);
-    assert_eq!(nrz_cas::proof::PRIMITIVES.len(), 43);
+    assert_eq!(policy.costs.version, 5);
+    assert_eq!(nrz_cas::proof::PRIMITIVES.len(), 52);
     let cases: Vec<_> = nrz_cas::proof::PRIMITIVES
         .iter()
         .zip(&policy.costs.weights)

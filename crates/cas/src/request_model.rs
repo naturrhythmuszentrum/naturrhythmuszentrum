@@ -48,6 +48,25 @@ pub enum UnsupportedReason {
     ZeroPolynomialMultiplicity,
 }
 
+/// A mathematical refusal returned before constructing an ill-sorted operation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RefusalReason {
+    /// Distributions have no general point values.
+    DistributionPointValue,
+    /// The requested product has no admitted distribution meaning.
+    DistributionProductUndefined,
+    /// An action's exact test and distribution spaces differ.
+    TestSpaceMismatch,
+    /// A required definedness premise is false.
+    RefutedDomain,
+    /// The requested domain is empty.
+    EmptyDomain,
+    /// Applicable associations conflict.
+    OverlapConflict,
+    /// A finite cover has a witnessed hole.
+    CoverageHole,
+}
+
 /// No context admission or coverage receipt establishes a model of its hypotheses.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ContextConsistency {
@@ -140,6 +159,8 @@ pub enum Outcome {
     },
     /// A witnessed domain contradiction prevents the requested theorem.
     Refused {
+        /// Named mathematical operation or domain refusal.
+        reason: RefusalReason,
         /// Retained request whose domain was refuted.
         request: Handle,
         /// Structured mathematical refusal.
@@ -407,6 +428,9 @@ fn validate_task(
             return Err(Fault::invalid(InvalidCode::Context, at));
         }
     }
+    if let Task::ApplyAt { point, .. } = task {
+        state.expression(point.logical_id())?;
+    }
     if let Task::Merge { proposed_value, .. } = task {
         state.expression(proposed_value.logical_id())?;
     }
@@ -440,7 +464,9 @@ fn validate_task(
         Task::Boundary { point, .. } => {
             state.boundary(point.logical_id())?;
         }
-        Task::Pair { space, .. } | Task::SmoothMultiply { space } => {
+        Task::Pair { space, .. }
+        | Task::SmoothMultiply { space }
+        | Task::EmbedRegular { space } => {
             state.space(space.logical_id())?;
         }
         Task::Pullback {
@@ -460,9 +486,14 @@ fn validate_task(
 fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> Result<(), Fault> {
     let at = Location::new("native request inputs");
     let expected = match task {
-        Task::Equal { .. } => Some(2),
+        Task::Equal { .. }
+        | Task::Pair { .. }
+        | Task::SmoothMultiply { .. }
+        | Task::Product { .. } => Some(2),
         Task::Eliminate { .. } => Some(0),
-        Task::ElaborateCases
+        Task::EmbedRegular { .. }
+        | Task::ApplyAt { .. }
+        | Task::ElaborateCases
         | Task::Select { .. }
         | Task::Merge { .. }
         | Task::Coverage { .. }

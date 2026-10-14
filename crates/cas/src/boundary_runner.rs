@@ -101,7 +101,9 @@ impl Runner<'_> {
                 match &mut payload {
                     ResultPayload::DerivativeMap(value) => value.facts = facts,
                     ResultPayload::Boundary(value) => value.facts = facts,
-                    ResultPayload::Facts(values) => *values = facts,
+                    ResultPayload::Facts(values)
+                    | ResultPayload::Distribution(values)
+                    | ResultPayload::PairingScalar(values) => *values = facts,
                 }
                 (payload, fault)
             }

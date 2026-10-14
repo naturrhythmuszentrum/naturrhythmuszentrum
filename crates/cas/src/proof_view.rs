@@ -117,8 +117,12 @@ pub(crate) fn scalar_parts(
     if cas.checked(domain)? != frame.admissible {
         return Err(Fault::invalid(InvalidCode::Context, AT));
     }
-    cas.state.expression(cas.checked(left)?)?;
-    cas.state.expression(cas.checked(right)?)?;
+    for endpoint in [left, right] {
+        let value = cas.state.expression(cas.checked(endpoint)?)?;
+        if value.space.is_some() || crate::header::space_sort(&value.sort) {
+            return Err(invalid());
+        }
+    }
     Ok((relation, left.clone(), right.clone()))
 }
 
@@ -365,6 +369,7 @@ pub(crate) fn measure(
 ) -> Result<(), Fault> {
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
+    crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
     crate::boundary_measure::statement(&value.conclusion, budget)?;
     crate::boundary_measure::certificate(cas, &value.certificate, budget)?;
     let objects = match &value.conclusion {
@@ -431,7 +436,9 @@ pub(crate) fn validate_judgment(
 ) -> Result<(), Fault> {
     crate::statement_check::validate(cas, &value.statement, budget)?;
     let context = cas.state.context(cas.checked(&value.context)?)?;
-    if value.layer != crate::statement::layer(&value.statement) || value.space.is_some() {
+    if value.layer != crate::statement::layer(&value.statement)
+        || value.space != crate::statement::space(&value.statement)
+    {
         return Err(Fault::invalid(InvalidCode::Sort, AT));
     }
     for object in crate::statement::objects(&value.statement) {

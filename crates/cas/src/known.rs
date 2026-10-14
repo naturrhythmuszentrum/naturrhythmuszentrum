@@ -54,6 +54,7 @@ pub(crate) fn snapshot(
                 proof,
                 cost,
                 policy: identity,
+                ..
             } => {
                 let Vertex::Policy(previous) = cas.state.node(*identity)? else {
                     return Err(invalid());
@@ -65,6 +66,9 @@ pub(crate) fn snapshot(
             }
             _ => continue,
         };
+        if native_proof(cas, proof)? {
+            continue;
+        }
         let value = crate::proof_storage::application(cas, proof)?;
         if value.context != context || value.relation != Relation::EqualOnDomain {
             continue;
@@ -178,4 +182,24 @@ pub(crate) fn append(
 /// Stored proof inconsistencies remain explicit errors.
 const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::Reference, AT)
+}
+
+/// Keep every native typed proof out of the scalar projection, including stored shortcuts.
+pub(crate) fn native_proof(cas: &Cas, proof: LogicalId) -> Result<bool, Fault> {
+    let Vertex::Proof(application) = cas.state.node(proof)? else {
+        return Err(invalid());
+    };
+    Ok(
+        matches!(cas.state.node(*application)?, Vertex::ScopedApplication(value) if value.scalar.is_none()),
+    )
+}
+
+/// Snapshot native equalities independently of scalar matcher records.
+pub(crate) fn typed_snapshot(
+    cas: &Cas,
+    context: LogicalId,
+    policy: &CostPolicy,
+    budget: &mut Budget,
+) -> Result<Vec<crate::distribution_known::Known>, Fault> {
+    crate::distribution_known::snapshot(cas, context, policy, budget)
 }

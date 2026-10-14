@@ -74,7 +74,9 @@ pub(crate) fn facts(result: &SearchResult) -> TestResult<&[VerifiedWitness]> {
     match result.payload.as_deref().ok_or("missing typed result")? {
         ResultPayload::DerivativeMap(value) => Ok(value.facts()),
         ResultPayload::Boundary(value) => Ok(value.facts()),
-        ResultPayload::Facts(values) => Ok(values),
+        ResultPayload::Facts(values)
+        | ResultPayload::Distribution(values)
+        | ResultPayload::PairingScalar(values) => Ok(values),
     }
 }
 

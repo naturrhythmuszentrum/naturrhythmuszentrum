@@ -137,17 +137,24 @@ pub(crate) fn snapshot(
                 (value, policy.weight(value.primitive)?)
             }
             Vertex::Shortcut { proof, cost } if default => {
+                if crate::known::native_proof(cas, *proof)? {
+                    continue;
+                }
                 (crate::proof_storage::application(cas, *proof)?, *cost)
             }
             Vertex::PolicyShortcut {
                 proof,
                 cost,
                 policy: identity,
+                ..
             } => {
                 let Vertex::Policy(pinned) = cas.state.node(*identity)? else {
                     return Err(invalid());
                 };
                 if *pinned != *policy {
+                    continue;
+                }
+                if crate::known::native_proof(cas, *proof)? {
                     continue;
                 }
                 (crate::proof_storage::application(cas, *proof)?, *cost)
@@ -292,4 +299,76 @@ pub(crate) fn dijkstra(
 /// A malformed stored relation cannot become a cost certificate.
 const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::Reference, AT)
+}
+
+/// Pin native equalities with the same complete finite-graph cost contract.
+pub(crate) fn typed_snapshot(
+    cas: &Cas,
+    judgment: &crate::proof_model::Judgment,
+    policy: &CostPolicy,
+    budget: &mut Budget,
+) -> Result<(Vec<Arc>, Vec<u8>), Fault> {
+    crate::proof_view::validate_judgment(cas, judgment, budget)?;
+    let known = crate::known::typed_snapshot(cas, judgment.context.logical_id(), policy, budget)?;
+    let mut arcs = Vec::new();
+    let mut records = Vec::new();
+    for value in known {
+        if !crate::distribution_known::same_class(cas, &value.judgment, judgment, budget)? {
+            continue;
+        }
+        let bytes = value.encoding;
+        arcs.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+        records.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+        arcs.push(Arc {
+            left: value.left,
+            right: value.right,
+            cost: value.cost,
+        });
+        records.push((bytes, value.cost));
+    }
+    records.sort();
+    let key = crate::wire_build::judgment_key(cas, judgment, budget)?;
+    let mut out = Encoder::output(budget, AT);
+    out.raw(b"NRZDCOST")?;
+    policy.encode(&mut out)?;
+    out.count(key.len())?;
+    out.raw(&key)?;
+    out.count(records.len())?;
+    for (bytes, cost) in records {
+        out.count(bytes.len())?;
+        out.raw(&bytes)?;
+        out.unsigned(cost)?;
+    }
+    Ok((arcs, out.finish()))
+}
+
+impl Cas {
+    /// Certify an exact native distribution equality without constructing a scalar claim.
+    pub(crate) fn certify_typed_frozen_cost(
+        &mut self,
+        judgment: &crate::proof_model::Judgment,
+        policy: &CostPolicy,
+        budget: &mut Budget,
+    ) -> Result<FrozenCertificate, Fault> {
+        let crate::proof_model::Statement::Distribution(value) = &judgment.statement else {
+            return Err(invalid());
+        };
+        let crate::distribution_model::DistributionStatement::Equality { left, right, .. } =
+            value.as_ref()
+        else {
+            return Err(invalid());
+        };
+        let mut candidate = self.fork(budget)?;
+        candidate.pin_policy(policy, budget)?;
+        let (arcs, manifest) = typed_snapshot(&candidate, judgment, policy, budget)?;
+        let (shortest_cost, settled) =
+            dijkstra(&arcs, left.logical_id(), right.logical_id(), budget)?;
+        self.state = candidate.state;
+        Ok(FrozenCertificate {
+            manifest,
+            policy: policy.clone(),
+            shortest_cost,
+            settled,
+        })
+    }
 }

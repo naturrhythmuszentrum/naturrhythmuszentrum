@@ -101,6 +101,42 @@ impl Cas {
         }
     }
 
+    /// Native typed routes share request coverage while keeping their statements out of scalar search.
+    fn native_execution(
+        &mut self,
+        request: &Request,
+        inputs: &[LogicalId],
+        policy: &SearchPolicy,
+        generation: &mut Budget,
+        checker: &mut Budget,
+    ) -> Result<Option<Execution>, Fault> {
+        let context = self.checked(&request.context)?;
+        if crate::distribution_search::handles(self, &request.task, inputs)? {
+            self.check_nonempty_request(context, generation)?;
+            return crate::distribution_search::execute(
+                self, request, inputs, policy, generation, checker,
+            )
+            .map(Some);
+        }
+        if crate::boundary_runner::handles(self, &request.task, inputs, generation)? {
+            self.check_nonempty_request(context, generation)?;
+            return crate::boundary_runner::execute(
+                self, request, inputs, policy, generation, checker,
+            )
+            .map(Some);
+        }
+        if crate::case_service::handles(self, &request.task, inputs, generation)? {
+            self.check_nonempty_request(context, generation)?;
+            let result =
+                crate::case_service::execute(self, request, inputs, policy, generation, checker)?;
+            return Ok(Some(Execution {
+                result: Some(result),
+                fault: None,
+            }));
+        }
+        Ok(None)
+    }
+
     /// Resolve occurrence roots to immutable syntax before choosing an admitted producer.
     fn execute_inner(
         &mut self,
@@ -118,20 +154,10 @@ impl Cas {
             generation.work(1, AT)?;
             inputs.push(self.state.occurrence(self.checked(&root.root)?)?.expression);
         }
-        if crate::boundary_runner::handles(self, &request.task, &inputs, generation)? {
-            self.check_nonempty_request(context, generation)?;
-            return crate::boundary_runner::execute(
-                self, request, &inputs, policy, generation, checker,
-            );
-        }
-        if crate::case_service::handles(self, &request.task, &inputs, generation)? {
-            self.check_nonempty_request(context, generation)?;
-            let result =
-                crate::case_service::execute(self, request, &inputs, policy, generation, checker)?;
-            return Ok(Execution {
-                result: Some(result),
-                fault: None,
-            });
+        if let Some(result) =
+            self.native_execution(request, &inputs, policy, generation, checker)?
+        {
+            return Ok(result);
         }
         let Some(operation) = request.task.scalar() else {
             return Ok(Execution {
@@ -457,11 +483,15 @@ fn outcome(
     if let Some(fault) = execution.fault {
         return match fault.kind {
             FaultKind::Invalid(
-                InvalidCode::RefutedDomain
+                InvalidCode::DistributionPointValue
+                | InvalidCode::DistributionProductUndefined
+                | InvalidCode::TestSpaceMismatch
+                | InvalidCode::RefutedDomain
                 | InvalidCode::EmptyDomain
                 | InvalidCode::OverlapConflict
                 | InvalidCode::CoverageHole,
             ) => Outcome::Refused {
+                reason: crate::distribution_search::refusal(fault),
                 request: record,
                 fault,
                 usage,

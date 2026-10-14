@@ -194,6 +194,10 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::Distribution(value) => {
+            out.byte(8)?;
+            crate::distribution_wire::certificate(value, out, write)
+        }
         Certificate::Boundary(value) => {
             out.byte(7)?;
             crate::boundary_wire::certificate(value, out, write)
@@ -278,6 +282,10 @@ pub(crate) fn encode(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Statement::Distribution(value) => {
+            out.byte(22)?;
+            return crate::distribution_wire::statement(value, out, write);
+        }
         Statement::Equality {
             left,
             right,
@@ -488,6 +496,7 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::Distribution(value) => crate::distribution_wire::objects(value),
         Statement::BoundaryPartition(_)
         | Statement::CaseDerivative(_)
         | Statement::DerivativeAt(_)
@@ -704,6 +713,7 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
 /// Mathematical layer implied by a typed statement.
 pub(crate) const fn layer(value: &Statement) -> Layer {
     match value {
+        Statement::Distribution(_) => Layer::Distribution,
         Statement::BoundaryPartition(_)
         | Statement::PredicateFact { .. }
         | Statement::Subset { .. }
@@ -713,5 +723,13 @@ pub(crate) const fn layer(value: &Statement) -> Layer {
         | Statement::Constructor { .. }
         | Statement::Incidence { .. } => Layer::Logic,
         _ => Layer::Pointwise,
+    }
+}
+
+/// Exact space is derived from the typed statement, including scalar-valued actions.
+pub(crate) fn space(value: &Statement) -> Option<Handle> {
+    match value {
+        Statement::Distribution(value) => Some(value.space().clone()),
+        _ => None,
     }
 }

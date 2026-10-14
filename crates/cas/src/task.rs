@@ -11,6 +11,23 @@ use crate::proof_model::DomainContract;
 /// The intended mathematical operation; availability never follows merely from representation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Task {
+    /// Explicitly certify and construct a regular distribution.
+    EmbedRegular {
+        /// Exact distribution space.
+        space: Handle,
+    },
+    /// Request a point value before constructing any application syntax.
+    ApplyAt {
+        /// Declared coordinate.
+        coordinate: String,
+        /// Scalar point expression.
+        point: Handle,
+    },
+    /// Request a product before admitting potentially ill-sorted multiplication syntax.
+    Product {
+        /// Intended result category.
+        requested_sort: crate::model::Sort,
+    },
     /// Bounded exact simplification on the current context domain.
     Simplify,
     /// Equality with an explicit domain and definedness contract.
@@ -191,12 +208,14 @@ impl Task {
                 .iter()
                 .chain(std::iter::once(proposed_value))
                 .collect(),
-            Self::Boundary { point, .. } => vec![point],
+            Self::ApplyAt { point, .. } | Self::Boundary { point, .. } => vec![point],
             Self::Pair {
                 space,
                 action_mode: ActionMode::NearSupport { neighborhood },
             } => vec![space, neighborhood],
-            Self::Pair { space, .. } | Self::SmoothMultiply { space } => vec![space],
+            Self::EmbedRegular { space }
+            | Self::Pair { space, .. }
+            | Self::SmoothMultiply { space } => vec![space],
             Self::Pullback {
                 source_space,
                 target_space,
@@ -209,38 +228,26 @@ impl Task {
 
 /// Encode all explicit task semantics, including represented but unavailable operations.
 pub(crate) fn encode(value: &Task, out: &mut Encoder<'_>) -> Result<(), Fault> {
-    let tag = match value {
-        Task::Simplify => 0,
-        Task::Equal { .. } => 1,
-        Task::Expand => 2,
-        Task::Differentiate { .. } => 3,
-        Task::Jacobian(_) => 4,
-        Task::SquareFree(_) => 5,
-        Task::Integrate => 6,
-        Task::Sum => 7,
-        Task::Limit => 8,
-        Task::Series => 9,
-        Task::Solve => 10,
-        Task::Spectral => 11,
-        Task::ElaborateCases => 12,
-        Task::Select { .. } => 13,
-        Task::Eliminate { .. } => 14,
-        Task::Merge { .. } => 15,
-        Task::Coverage { .. } => 16,
-        Task::Boundary { .. } => 17,
-        Task::Pair { .. } => 18,
-        Task::SmoothMultiply { .. } => 19,
-        Task::Pullback { .. } => 20,
-    };
-    out.byte(tag)?;
+    encode_with(value, out, crate::statement::handle)
+}
+
+/// Encode intent with caller-selected local or portable reference identities.
+pub(crate) fn encode_with(
+    value: &Task,
+    out: &mut Encoder<'_>,
+    mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
+) -> Result<(), Fault> {
+    out.byte(tag(value))?;
     let references = value.references();
     out.count(references.len())?;
     for reference in references {
-        crate::graph::encode_id(reference.logical_id(), out)?;
+        write(reference, out)?;
     }
     match value {
+        Task::ApplyAt { coordinate, .. } => out.name(coordinate)?,
+        Task::Product { requested_sort } => crate::encoding::sort(requested_sort, out)?,
         Task::Eliminate { conclusion, .. } => {
-            crate::statement::encode(conclusion, out, crate::statement::handle)?;
+            crate::statement::encode(conclusion, out, &mut write)?;
         }
         Task::Equal {
             domain_contract, ..
@@ -297,4 +304,34 @@ pub(crate) fn encode(value: &Task, out: &mut Encoder<'_>) -> Result<(), Fault> {
         _ => {}
     }
     Ok(())
+}
+
+/// Stable task tags are independent of Rust enum layout.
+const fn tag(value: &Task) -> u8 {
+    match value {
+        Task::Simplify => 0,
+        Task::Equal { .. } => 1,
+        Task::Expand => 2,
+        Task::Differentiate { .. } => 3,
+        Task::Jacobian(_) => 4,
+        Task::SquareFree(_) => 5,
+        Task::Integrate => 6,
+        Task::Sum => 7,
+        Task::Limit => 8,
+        Task::Series => 9,
+        Task::Solve => 10,
+        Task::Spectral => 11,
+        Task::ElaborateCases => 12,
+        Task::Select { .. } => 13,
+        Task::Eliminate { .. } => 14,
+        Task::Merge { .. } => 15,
+        Task::Coverage { .. } => 16,
+        Task::Boundary { .. } => 17,
+        Task::Pair { .. } => 18,
+        Task::SmoothMultiply { .. } => 19,
+        Task::Pullback { .. } => 20,
+        Task::EmbedRegular { .. } => 21,
+        Task::ApplyAt { .. } => 22,
+        Task::Product { .. } => 23,
+    }
 }

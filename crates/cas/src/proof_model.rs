@@ -36,6 +36,8 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// Native distribution facts and scalar actions in their exact space.
+    Distribution(Box<crate::distribution_model::DistributionStatement>),
     /// Complete finite selector partition, without assuming analytic regularity.
     BoundaryPartition(Box<crate::boundary_model::BoundaryPartition>),
     /// Explicit positive-order classical case derivative.
@@ -238,6 +240,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// Finite regularity, exceptional-set or supported-action evidence.
+    Distribution(Box<crate::distribution_model::DistributionCertificate>),
     /// Closed finite-boundary, jet and derivative modes.
     Boundary(Box<crate::boundary_model::BoundaryCertificate>),
     /// This primitive has no auxiliary payload.

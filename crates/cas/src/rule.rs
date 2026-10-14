@@ -4,6 +4,24 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// Checked `dist.regular` schema.
+    DistRegular,
+    /// Checked `dist.ae` schema.
+    DistAe,
+    /// Checked `dist.linear` schema.
+    DistLinear,
+    /// Checked `dist.derivative` schema.
+    DistDerivative,
+    /// Checked `dist.delta-pair` schema.
+    DistDeltaPair,
+    /// Checked `dist.smooth` schema.
+    DistSmooth,
+    /// Checked `dist.delta-multiply` schema.
+    DistDeltaMultiply,
+    /// Checked `dist.support-action` schema.
+    DistSupportAction,
+    /// Checked `dist.jump` schema.
+    DistJump,
     /// Complete finite partitions and exact oriented polynomial jets.
     JetPolynomial,
     /// Transport a checked derivative through local case equality.
@@ -95,6 +113,8 @@ pub enum Primitive {
 /// Typed conclusion family selected by an executable checker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConclusionKind {
+    /// Native distribution membership, equality, derivative or scalar action.
+    Distribution,
     /// Exact partition, jet, trace, jump or point derivative fact.
     Boundary,
     /// Typed case construction, domain, agreement, ownership or elimination.
@@ -118,6 +138,8 @@ pub enum ConclusionKind {
 /// Premise shape is explicit independently of certificate representation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PremiseShape {
+    /// Ordered analytic and distribution facts consumed by the closed schema.
+    DistributionEvidence,
     /// Exactly the ordered premises consumed by the closed boundary mode.
     BoundaryEvidence,
     /// Typed case premises consumed according to the closed certificate mode.
@@ -133,6 +155,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// Closed regularity, exceptional-set and support modes.
+    Distribution,
     /// Closed finite boundary-calculus modes.
     Boundary,
     /// Complete typed association, restriction and exact-cell evidence.
@@ -177,7 +201,16 @@ impl Primitive {
     pub(crate) const fn native(self) -> bool {
         matches!(
             self,
-            Self::JetPolynomial
+            Self::DistRegular
+                | Self::DistAe
+                | Self::DistLinear
+                | Self::DistDerivative
+                | Self::DistDeltaPair
+                | Self::DistSmooth
+                | Self::DistDeltaMultiply
+                | Self::DistSupportAction
+                | Self::DistJump
+                | Self::JetPolynomial
                 | Self::CaseInterior
                 | Self::CaseBoundary
                 | Self::ContextHypothesis
@@ -197,6 +230,15 @@ impl Primitive {
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::DistRegular => ("dist.regular", 8),
+            Self::DistAe => ("dist.ae", 4),
+            Self::DistLinear => ("dist.linear", 2),
+            Self::DistDerivative => ("dist.derivative", 2),
+            Self::DistDeltaPair => ("dist.delta-pair", 4),
+            Self::DistSmooth => ("dist.smooth", 8),
+            Self::DistDeltaMultiply => ("dist.delta-multiply", 8),
+            Self::DistSupportAction => ("dist.support-action", 8),
+            Self::DistJump => ("dist.jump", 8),
             Self::JetPolynomial => ("jet.polynomial", 4),
             Self::CaseInterior => ("diff.case-interior", 2),
             Self::CaseBoundary => ("diff.case-boundary", 4),
@@ -256,6 +298,15 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
+            Self::DistRegular
+            | Self::DistAe
+            | Self::DistLinear
+            | Self::DistDerivative
+            | Self::DistDeltaPair
+            | Self::DistSmooth
+            | Self::DistDeltaMultiply
+            | Self::DistSupportAction
+            | Self::DistJump => ConclusionKind::Distribution,
             Self::JetPolynomial | Self::CaseBoundary => ConclusionKind::Boundary,
             Self::CaseOrdered
             | Self::CaseDomain
@@ -284,6 +335,15 @@ impl Primitive {
     /// Fixed and dependent ordered-premise arities remain visible in the registry.
     const fn premise_shape(self) -> PremiseShape {
         match self {
+            Self::DistRegular
+            | Self::DistAe
+            | Self::DistLinear
+            | Self::DistDerivative
+            | Self::DistDeltaPair
+            | Self::DistSmooth
+            | Self::DistDeltaMultiply
+            | Self::DistSupportAction
+            | Self::DistJump => PremiseShape::DistributionEvidence,
             Self::JetPolynomial | Self::CaseInterior | Self::CaseBoundary => {
                 PremiseShape::BoundaryEvidence
             }
@@ -313,6 +373,15 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::DistRegular
+            | Self::DistAe
+            | Self::DistLinear
+            | Self::DistDerivative
+            | Self::DistDeltaPair
+            | Self::DistSmooth
+            | Self::DistDeltaMultiply
+            | Self::DistSupportAction
+            | Self::DistJump => CertificateSchema::Distribution,
             Self::JetPolynomial | Self::CaseInterior | Self::CaseBoundary => {
                 CertificateSchema::Boundary
             }
@@ -332,7 +401,7 @@ impl Primitive {
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 43] = [
+pub const PRIMITIVES: [Primitive; 52] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -353,6 +422,15 @@ pub const PRIMITIVES: [Primitive; 43] = [
     Primitive::DifferentiateSub,
     Primitive::DerivativeTransport,
     Primitive::DifferentiateVariable,
+    Primitive::DistAe,
+    Primitive::DistDeltaMultiply,
+    Primitive::DistDeltaPair,
+    Primitive::DistDerivative,
+    Primitive::DistJump,
+    Primitive::DistLinear,
+    Primitive::DistRegular,
+    Primitive::DistSmooth,
+    Primitive::DistSupportAction,
     Primitive::AddAssociate,
     Primitive::AddCommute,
     Primitive::AddInverse,

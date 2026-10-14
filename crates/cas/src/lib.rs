@@ -478,3 +478,132 @@ mod boundary_replay;
     reason = "partition memo helpers are shared only within the kernel"
 )]
 mod region_cache;
+
+mod distribution_model;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_syntax;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_wire;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_decode;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_regular;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_check;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_linear;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_derivative;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_action;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_support;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_multiply;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_jump;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_ae;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_terms;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_producer;
+
+mod distribution_pair_producer;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "private distribution preflight entry"
+)]
+mod distribution_preflight;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_search;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution implementation is shared only within the crate"
+)]
+mod distribution_refusal;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution limits are shared only within the crate"
+)]
+mod distribution_measure;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "native equality snapshots stay private"
+)]
+mod distribution_known;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "derived distribution recipes remain private"
+)]
+mod distribution_recipes;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution scheduling remains private"
+)]
+mod distribution_schedule;

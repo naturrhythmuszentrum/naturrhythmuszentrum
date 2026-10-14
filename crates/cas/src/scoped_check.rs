@@ -107,6 +107,15 @@ pub(crate) fn check_application(
     crate::proof_view::measure(cas, draft, budget)?;
     let mut scalar_view = None;
     let mut conditions = match draft.rule {
+        Primitive::DistRegular
+        | Primitive::DistAe
+        | Primitive::DistLinear
+        | Primitive::DistDerivative
+        | Primitive::DistDeltaPair
+        | Primitive::DistSmooth
+        | Primitive::DistDeltaMultiply
+        | Primitive::DistSupportAction
+        | Primitive::DistJump => crate::distribution_check::check(cas, draft, premises, budget)?,
         Primitive::JetPolynomial | Primitive::CaseInterior | Primitive::CaseBoundary => {
             crate::boundary_check::check(cas, draft, premises, budget)?
         }
@@ -165,7 +174,7 @@ pub(crate) fn check_application(
     let judgment = Judgment {
         context: draft.context.clone(),
         layer,
-        space: None,
+        space: crate::statement::space(&draft.conclusion),
         statement: draft.conclusion.clone(),
         residuals: conditions.residuals.clone(),
     };

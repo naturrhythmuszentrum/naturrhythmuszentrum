@@ -4,7 +4,7 @@
 pub use crate::cost::CostPolicy;
 pub use crate::frozen::FrozenCertificate;
 pub use crate::request_model::{
-    ContextConsistency, CoveredInput, Outcome, Request, UnsupportedReason,
+    ContextConsistency, CoveredInput, Outcome, RefusalReason, Request, UnsupportedReason,
 };
 pub use crate::search::{SearchPolicy, SearchResult, SearchStatistics};
 pub use crate::task::{ActionMode, BoundaryFact, Task};

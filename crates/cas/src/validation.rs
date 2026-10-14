@@ -602,6 +602,21 @@ fn operator_sorts(
     let same = children.iter().all(|child| child.sort == *result);
     let first = children.first().copied();
     let valid = match operator {
+        Operator::RegularEmbed
+        | Operator::DistributionZero
+        | Operator::Delta { .. }
+        | Operator::DistributionAdd
+        | Operator::DistributionScale
+        | Operator::DistributionDerivative { .. }
+        | Operator::SmoothMultiply
+        | Operator::Pair
+        | Operator::PairNearSupport
+        | Operator::TestDerivative { .. }
+        | Operator::TestMultiply
+        | Operator::TestApply
+        | Operator::RegularAction => {
+            crate::distribution_syntax::sorts(operator, result, children, budget)?
+        }
         Operator::Cases => false,
         Operator::NamedCase(value) => {
             children.len() == 1 && same && named_case_sort(value, result, scope, environment)
@@ -616,25 +631,13 @@ fn operator_sorts(
                     Sort::Value(AtomicSort::Scalar(Field::Real | Field::Complex))
                 )
         }
-        Operator::Neg => children.len() == 1 && same && numeric(result),
-        Operator::Add | Operator::Sub | Operator::Mul => {
-            children.len() == 2 && same && numeric(result)
-        }
-        Operator::Div => {
-            children.len() == 2 && same && matches!(result, Sort::Value(AtomicSort::Scalar(_)),)
-        }
-        Operator::IntegerPower(exponent) => {
-            children.len() == 1
-                && same
-                && numeric(result)
-                && (*exponent >= 0 || matches!(result, Sort::Value(AtomicSort::Scalar(_))))
-        }
-        Operator::GeneralPower(_) => {
-            children.len() == 2
-                && first.is_some_and(|child| child.sort == *result)
-                && matches!(result, Sort::Value(AtomicSort::Scalar(_)))
-                && children.get(1).is_some_and(|child| numeric(&child.sort))
-        }
+        Operator::Neg
+        | Operator::Add
+        | Operator::Sub
+        | Operator::Mul
+        | Operator::Div
+        | Operator::IntegerPower(_)
+        | Operator::GeneralPower(_) => arithmetic_sorts(operator, result, children),
         Operator::Call(key) => call_sorts(key, result, environment, children),
         Operator::Derivative(key) => {
             children.len() == 1
@@ -680,6 +683,33 @@ fn operator_sorts(
         | Operator::Entrywise(_) => matrix_sorts(operator, result, children, budget)?,
     };
     if valid { Ok(()) } else { Err(sort_error()) }
+}
+
+/// Arithmetic retains its existing pointwise sort restrictions for every operand.
+fn arithmetic_sorts(operator: &Operator, result: &Sort, children: &[&Expression]) -> bool {
+    let same = children.iter().all(|child| child.sort == *result);
+    match operator {
+        Operator::Neg => children.len() == 1 && same && numeric(result),
+        Operator::Add | Operator::Sub | Operator::Mul => {
+            children.len() == 2 && same && numeric(result)
+        }
+        Operator::Div => {
+            children.len() == 2 && same && matches!(result, Sort::Value(AtomicSort::Scalar(_)))
+        }
+        Operator::IntegerPower(exponent) => {
+            children.len() == 1
+                && same
+                && numeric(result)
+                && (*exponent >= 0 || matches!(result, Sort::Value(AtomicSort::Scalar(_))))
+        }
+        Operator::GeneralPower(_) => {
+            children.len() == 2
+                && children.first().is_some_and(|child| child.sort == *result)
+                && matches!(result, Sort::Value(AtomicSort::Scalar(_)))
+                && children.get(1).is_some_and(|child| numeric(&child.sort))
+        }
+        _ => false,
+    }
 }
 
 /// Named scalar wrappers retain their declared axis and family-specific parameter shape.

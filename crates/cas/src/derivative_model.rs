@@ -7,6 +7,10 @@ use crate::proof_model::{Statement, VerifiedWitness};
 /// Typed collections never infer mathematical nonexistence from missing work.
 #[derive(Clone, Debug)]
 pub enum ResultPayload {
+    /// A replayed distribution result whose witness retains its exact space.
+    Distribution(Vec<VerifiedWitness>),
+    /// A scalar action whose witness retains its distributional layer and space.
+    PairingScalar(Vec<VerifiedWitness>),
     /// Replayed prefix before enough geometry was established to construct a map.
     Facts(Vec<VerifiedWitness>),
     /// Whole-domain derivative facts and their exact completeness evidence.
@@ -121,7 +125,9 @@ impl ResultPayload {
         match self {
             Self::DerivativeMap(value) => &value.facts,
             Self::Boundary(value) => &value.facts,
-            Self::Facts(values) => values,
+            Self::Facts(values) | Self::Distribution(values) | Self::PairingScalar(values) => {
+                values
+            }
         }
     }
 
@@ -154,6 +160,8 @@ impl ResultPayload {
             Self::DerivativeMap(_) => 0,
             Self::Boundary(_) => 1,
             Self::Facts(_) => 2,
+            Self::Distribution(_) => 3,
+            Self::PairingScalar(_) => 4,
         })?;
         self.metadata(out)?;
         out.count(self.facts().len())?;
@@ -215,7 +223,7 @@ impl ResultPayload {
                 crate::graph::encode_id(value.function.logical_id(), out)?;
                 crate::graph::encode_id(value.boundary.logical_id(), out)?;
             }
-            Self::Facts(_) => {}
+            Self::Facts(_) | Self::Distribution(_) | Self::PairingScalar(_) => {}
         }
         Ok(())
     }

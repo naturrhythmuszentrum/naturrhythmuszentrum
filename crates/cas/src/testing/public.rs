@@ -87,3 +87,10 @@ pub(crate) mod witness;
 )]
 #[path = "boundary.rs"]
 pub(crate) mod boundary;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public distribution fixtures"
+)]
+#[path = "distributions.rs"]
+pub(crate) mod distributions;

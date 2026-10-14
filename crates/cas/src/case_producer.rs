@@ -43,6 +43,18 @@ impl<'a> Plan<'a> {
         }
     }
 
+    /// Account for an older native transition whose expansion remains attached to its proof.
+    pub(crate) fn account_native(&mut self, cost: u64, budget: &mut Budget) -> Result<(), Fault> {
+        if cost == 0 {
+            return Err(invalid());
+        }
+        self.steps = self.steps.checked_add(1).ok_or_else(invalid)?;
+        budget.check(BudgetKind::Transitions, self.steps, AT)?;
+        self.cost = self.cost.checked_add(cost).ok_or_else(invalid)?;
+        self.attempt(budget)?;
+        self.visit()
+    }
+
     /// Account for every scalar branch application in the expanded native route.
     pub(crate) fn account_scalar(
         &mut self,

@@ -274,6 +274,24 @@ const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::Reference, AT)
 }
 
+impl Frontier {
+    /// Queue producer intents before result dominance; remaining producer work is part of the key.
+    pub(crate) fn producer(
+        &mut self,
+        id: usize,
+        mut key: Vec<u8>,
+        metrics: Metrics,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        key.extend_from_slice(&size(id, AT)?.to_le_bytes());
+        let rank = [0, metrics.peak, metrics.depth, size(id, AT)?];
+        if !self.insert(id, key, rank, metrics, budget)? {
+            return Err(invalid());
+        }
+        Ok(())
+    }
+}
+
 /// Scheduling tests use independent numbered labels, without the rewrite implementation.
 #[cfg(test)]
 mod tests {
@@ -283,6 +301,31 @@ mod tests {
     use crate::limits::{Budget, Limits};
     use crate::syntax::VertexKind;
     use crate::{Fault, LogicalId};
+
+    /// Producer identity keeps both pending routes in both queues before completed-result dominance.
+    /// ´test:unit:distribution-producer-intents-enter-both-queues´
+    #[test]
+    fn distribution_producer_intents_enter_both_queues() -> Result<(), Fault> {
+        let mut frontier = Frontier::default();
+        let mut budget = Budget::new(Limits::default())?;
+        let metrics = Metrics {
+            cost: 1,
+            credits: 0,
+            peak: 1,
+            depth: 1,
+            bytes: 1,
+            support: BTreeSet::new(),
+            encoding: vec![0],
+        };
+        frontier.producer(0, vec![1], metrics.clone(), &mut budget)?;
+        frontier.producer(1, vec![1], metrics, &mut budget)?;
+        assert_eq!(frontier.cost.len(), 2);
+        assert_eq!(frontier.progress.len(), 2);
+        assert_eq!(frontier.pop(&mut budget)?, Some(0));
+        assert_eq!(frontier.pop(&mut budget)?, Some(1));
+        assert_eq!(frontier.dominated, 0);
+        Ok(())
+    }
 
     /// If one scheduling view has no eligible entry, its slot is donated to the other view.
     /// ´test:unit:queue-empty-donation´

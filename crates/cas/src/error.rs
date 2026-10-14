@@ -28,6 +28,12 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// Distribution point evaluation is outside the mathematical contract.
+    DistributionPointValue,
+    /// No admitted general distribution product or discontinuous multiplier exists.
+    DistributionProductUndefined,
+    /// The test or action uses a different exact distribution space.
+    TestSpaceMismatch,
     /// The exact requested cover cannot be decided in the supported fragment.
     UnknownTotality,
     /// A valid operation still requires an explicit supported premise.
