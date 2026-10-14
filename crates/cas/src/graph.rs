@@ -33,6 +33,8 @@ pub enum VertexKind {
     Application,
     /// A checked acyclic proof record, admitted only by the proof module.
     Proof,
+    /// A complete immutable versioned logical-cost policy.
+    Policy,
 }
 
 impl VertexKind {
@@ -48,6 +50,7 @@ impl VertexKind {
             Self::Request => 6,
             Self::Application => 7,
             Self::Proof => 8,
+            Self::Policy => 9,
         }
     }
 }
@@ -299,10 +302,21 @@ pub(crate) enum Vertex {
     Binder(Binding),
     /// A task whose algorithm may not be admitted yet.
     Request(RequestRecord),
+    /// Immutable positive weights for the complete primitive registry.
+    Policy(crate::cost::CostPolicy),
     /// A kernel-checked instantiated primitive.
     Application(crate::proof_model::CheckedStep),
     /// A sealed proof root pointing to its authoritative application.
     Proof(LogicalId),
+    /// A replayed strict improvement under one immutable policy identity.
+    PolicyShortcut {
+        /// Older checked mathematical proof.
+        proof: LogicalId,
+        /// Positive improved weight.
+        cost: u64,
+        /// Complete pinned table stored in the same graph.
+        policy: LogicalId,
+    },
     /// A strictly cheaper reusable route backed by an older complete proof.
     Shortcut {
         /// Existing checked proof, never a forward dependency.
@@ -349,6 +363,8 @@ pub(crate) enum Edge {
     Justifies,
     /// An older proof expanded by a derived shortcut.
     DependsOn,
+    /// Immutable logical-cost policy for an admitted shortcut.
+    CostPolicy,
 }
 
 /// Append-only storage plus derived lookup maps; the graph owns every weight.
@@ -645,6 +661,48 @@ impl Cas {
         handles.extend(resolved.iter().map(|id| self.handle(*id)));
         self.state = staged;
         Ok(handles)
+    }
+
+    /// Append generated closed syntax inside a private producer transaction.
+    /// The outer producer owns rollback and must discard this candidate on any failure.
+    pub(crate) fn generated(
+        &mut self,
+        context: LogicalId,
+        operator: Operator,
+        sort: Sort,
+        operands: &[LogicalId],
+        budget: &mut Budget,
+    ) -> Result<LogicalId, Fault> {
+        let at = Location::new("generated syntax");
+        let mut locals = vec![context];
+        locals
+            .try_reserve(operands.len())
+            .map_err(|_| Fault::allocation(at))?;
+        locals.extend_from_slice(operands);
+        let mut references = Vec::new();
+        references
+            .try_reserve_exact(operands.len())
+            .map_err(|_| Fault::allocation(at))?;
+        for position in 0..operands.len() {
+            let index = position
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, at))?;
+            references.push(Reference::Local(position_u32(index)?));
+        }
+        let draft = ExpressionDraft {
+            operator,
+            sort,
+            context: Reference::Local(0),
+            scope: Vec::new(),
+            binding: None,
+            operands: references,
+        };
+        let pending =
+            crate::validation::draft_payload(&[Draft::Expression(draft.clone())], budget)?;
+        let mut staged = std::mem::replace(&mut self.state, State::new());
+        let result = self.admit_expression(&mut staged, &draft, &locals, pending, budget);
+        self.state = staged;
+        result
     }
 
     /// Resolve one existing or strictly earlier batch reference.
@@ -1124,25 +1182,26 @@ pub(crate) fn vertex_key(
     state: &State,
     budget: &mut Budget,
 ) -> Result<(VertexKind, Vec<u8>), Fault> {
-    let kind = match vertex {
-        Vertex::Source(_) => VertexKind::Source,
-        Vertex::Context(_) => VertexKind::Context,
-        Vertex::Condition(_) => VertexKind::Condition,
-        Vertex::Expression(_) => VertexKind::Expression,
-        Vertex::Occurrence(_) => VertexKind::Occurrence,
-        Vertex::Binder(_) => VertexKind::Binder,
-        Vertex::Request(_) => VertexKind::Request,
-        Vertex::Application(_) | Vertex::Shortcut { .. } => VertexKind::Application,
-        Vertex::Proof(_) => VertexKind::Proof,
-    };
+    let kind = vertex_kind(vertex);
     let mut out = Encoder::new(budget, Location::new("structural key"));
     out.byte(kind.tag())?;
     match vertex {
+        Vertex::Policy(policy) => policy.encode(&mut out)?,
         Vertex::Application(application) => {
             out.byte(0)?;
             crate::proof_storage::encode_application(application, &mut out)?;
         }
         Vertex::Proof(application) => encode_id(*application, &mut out)?,
+        Vertex::PolicyShortcut {
+            proof,
+            cost,
+            policy,
+        } => {
+            out.byte(2)?;
+            encode_id(*proof, &mut out)?;
+            encode_id(*policy, &mut out)?;
+            out.unsigned(*cost)?;
+        }
         Vertex::Shortcut { proof, cost } => {
             out.byte(1)?;
             encode_id(*proof, &mut out)?;
@@ -1214,4 +1273,22 @@ pub(crate) fn vertex_key(
         }
     }
     Ok((kind, out.finish()))
+}
+
+/// Classify a graph-owned record without exposing physical indices.
+const fn vertex_kind(vertex: &Vertex) -> VertexKind {
+    match vertex {
+        Vertex::Source(_) => VertexKind::Source,
+        Vertex::Context(_) => VertexKind::Context,
+        Vertex::Condition(_) => VertexKind::Condition,
+        Vertex::Expression(_) => VertexKind::Expression,
+        Vertex::Occurrence(_) => VertexKind::Occurrence,
+        Vertex::Binder(_) => VertexKind::Binder,
+        Vertex::Request(_) => VertexKind::Request,
+        Vertex::Application(_) | Vertex::Shortcut { .. } | Vertex::PolicyShortcut { .. } => {
+            VertexKind::Application
+        }
+        Vertex::Proof(_) => VertexKind::Proof,
+        Vertex::Policy(_) => VertexKind::Policy,
+    }
 }

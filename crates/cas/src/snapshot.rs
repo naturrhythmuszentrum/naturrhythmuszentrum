@@ -30,6 +30,7 @@ const fn role(edge: Edge) -> (u8, u32) {
         Edge::Obligation(position) => (14, position),
         Edge::Justifies => (15, 0),
         Edge::DependsOn => (16, 0),
+        Edge::CostPolicy => (17, 0),
     }
 }
 

@@ -57,7 +57,7 @@ pub struct Claim {
 }
 
 /// One untrusted application; every referenced premise must precede it.
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct ProofStep {
     /// Compiled schema, never an arbitrary assertion callback.
     pub primitive: Primitive,

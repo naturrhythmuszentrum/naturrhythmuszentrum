@@ -9,7 +9,7 @@ use crate::graph::{Cas, Draft, ExpressionDraft, Handle, LogicalId, Reference, si
 use crate::model::{Operator, Scope};
 
 /// A declared free key and the exact expression inserted for it.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Substitution {
     /// Declared free-variable identity, never a binder display name.
     pub key: String,

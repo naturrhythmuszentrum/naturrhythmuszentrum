@@ -239,7 +239,7 @@ fn draft_refusals() -> TestResult {
     Ok(())
 }
 
-/// Coverage is required before requests, and construction alone cannot certify an identity.
+/// Coverage is required before a request can start independently checked simplification.
 /// ´test:integration:request-coverage´
 #[test]
 fn request_coverage() -> TestResult {
@@ -263,7 +263,7 @@ fn request_coverage() -> TestResult {
     };
     assert!(matches!(cas.run(&request), Outcome::Invalid { .. }));
     request.receipts.push(receipt);
-    assert!(matches!(cas.run(&request), Outcome::Unresolved { .. }));
+    assert!(matches!(cas.run(&request), Outcome::Verified { .. }));
     Ok(())
 }
 
@@ -495,7 +495,7 @@ fn no_normalization_before_coverage() -> TestResult {
         receipts: vec![receipt],
         limits: LimitsOverride::default(),
     });
-    assert!(matches!(outcome, Outcome::Unresolved { .. }));
+    assert!(matches!(outcome, Outcome::Conditional { .. }));
     Ok(())
 }
 

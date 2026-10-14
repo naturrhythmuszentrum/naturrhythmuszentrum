@@ -453,7 +453,7 @@ impl Cas {
     }
 
     /// Seal only after complete canonical encoding and checked graph publication.
-    fn finish_proof(
+    pub(crate) fn finish_proof(
         &mut self,
         compiled: &Compiled,
         bytes: Vec<u8>,

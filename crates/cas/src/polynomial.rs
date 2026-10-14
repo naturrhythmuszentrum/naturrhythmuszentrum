@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
-use crate::graph::{LogicalId, State, size};
-use crate::model::{Constant, Operator};
+use crate::graph::{Cas, LogicalId, State, size};
+use crate::model::{Constant, Operator, Sort};
 use crate::number::Rational;
 
 /// Stable formal indeterminates; named constants are never approximated.
@@ -442,4 +442,247 @@ pub(crate) fn equal(
     first.prepay(budget)?;
     second.prepay(budget)?;
     Ok(first.terms == second.terms)
+}
+
+/// Generate a coefficient expression; the caller still owes an independent equality proof.
+pub(crate) fn normalize(
+    cas: &mut Cas,
+    root: LogicalId,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    normalize_mode(cas, root, false, budget)
+}
+
+/// Keep composite denominator syntax when differentiation would otherwise invent extra guards.
+pub(crate) fn normalize_derivative(
+    cas: &mut Cas,
+    root: LogicalId,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    normalize_mode(cas, root, true, budget)
+}
+
+/// A mathematical producer may choose a conservative canonicalization fragment.
+fn normalize_mode(
+    cas: &mut Cas,
+    root: LogicalId,
+    preserve_denominator: bool,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    let previous = budget.reserve_temporary(cas.counts().payload_bytes, AT)?;
+    let converted = convert(&cas.state, root, budget);
+    budget.restore_limits(previous);
+    let value = converted?;
+    if preserve_denominator
+        && value.denominator.terms.len() > 1
+        && !value.numerator.terms.is_empty()
+    {
+        return Ok(root);
+    }
+    if value.denominator.terms.is_empty() {
+        return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
+    }
+    let numerator_bytes = value.numerator.bytes(budget)?;
+    let bytes = numerator_bytes
+        .checked_add(value.denominator.bytes(budget)?)
+        .and_then(|n| n.checked_mul(8))
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+    let previous = budget.reserve_temporary(bytes, AT)?;
+    let result = materialize_fraction(cas, root, value, budget);
+    budget.restore_limits(previous);
+    result
+}
+
+/// Retained maps reserve scratch space while materialization grows the private graph.
+fn materialize_fraction(
+    cas: &mut Cas,
+    root: LogicalId,
+    mut value: Fraction,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    cancel_monomial(&mut value, budget)?;
+    let scale = value
+        .denominator
+        .terms
+        .values()
+        .next_back()
+        .ok_or_else(fragment)?
+        .clone();
+    for polynomial in [&mut value.numerator, &mut value.denominator] {
+        polynomial.prepay(budget)?;
+        for coefficient in polynomial.terms.values_mut() {
+            *coefficient = coefficient.div(&scale, budget)?;
+        }
+    }
+    let expression = cas.state.expression(root)?;
+    let context = expression.context;
+    let sort = expression.sort.clone();
+    let numerator = materialize(cas, context, &sort, &value.numerator, budget)?;
+    if value.denominator.is_scalar() || value.numerator.terms.is_empty() {
+        return Ok(numerator);
+    }
+    let denominator = materialize(cas, context, &sort, &value.denominator, budget)?;
+    cas.generated(
+        context,
+        Operator::Div,
+        sort,
+        &[numerator, denominator],
+        budget,
+    )
+}
+
+/// Remove only a monomial common to every numerator and denominator term.
+fn cancel_monomial(value: &mut Fraction, budget: &mut Budget) -> Result<(), Fault> {
+    value.numerator.prepay(budget)?;
+    value.denominator.prepay(budget)?;
+    let mut common = value
+        .numerator
+        .terms
+        .keys()
+        .next()
+        .cloned()
+        .unwrap_or_default();
+    for term in value
+        .numerator
+        .terms
+        .keys()
+        .chain(value.denominator.terms.keys())
+    {
+        for (atom, exponent) in &mut common {
+            budget.work(
+                size(term.len(), AT)?
+                    .checked_mul(budget.limits().name_bytes)
+                    .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
+                AT,
+            )?;
+            *exponent = (*exponent).min(
+                term.iter()
+                    .find_map(|(key, power)| (key == &*atom).then_some(*power))
+                    .unwrap_or(0),
+            );
+        }
+    }
+    common.retain(|(_, exponent)| *exponent != 0);
+    for polynomial in [&mut value.numerator, &mut value.denominator] {
+        let mut reduced = Polynomial {
+            terms: BTreeMap::new(),
+        };
+        for (term, coefficient) in &polynomial.terms {
+            let mut monomial = Vec::new();
+            monomial
+                .try_reserve_exact(term.len())
+                .map_err(|_| Fault::allocation(AT))?;
+            for (atom, exponent) in term {
+                budget.work(
+                    size(common.len(), AT)?
+                        .checked_mul(budget.limits().name_bytes)
+                        .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
+                    AT,
+                )?;
+                let divisor = common
+                    .iter()
+                    .find_map(|(key, power)| (key == atom).then_some(*power))
+                    .unwrap_or(0);
+                let exponent = exponent.checked_sub(divisor).ok_or_else(fragment)?;
+                if exponent != 0 {
+                    monomial.push((atom.clone(), exponent));
+                }
+            }
+            reduced.accumulate(monomial, coefficient, budget)?;
+        }
+        *polynomial = reduced;
+    }
+    Ok(())
+}
+
+/// Materialize a finite ordered sum, omitting empty powers and unit coefficients.
+fn materialize(
+    cas: &mut Cas,
+    context: LogicalId,
+    sort: &Sort,
+    value: &Polynomial,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    value.prepay(budget)?;
+    let mut sum = None;
+    for (monomial, coefficient) in &value.terms {
+        let term = materialize_term(cas, context, sort, monomial, coefficient, budget)?;
+        sum = Some(if let Some(previous) = sum {
+            cas.generated(
+                context,
+                Operator::Add,
+                sort.clone(),
+                &[previous, term],
+                budget,
+            )?
+        } else {
+            term
+        });
+    }
+    sum.map_or_else(
+        || {
+            cas.generated(
+                context,
+                Operator::Rational(Rational::zero()),
+                sort.clone(),
+                &[],
+                budget,
+            )
+        },
+        Ok,
+    )
+}
+
+/// Produce one monomial without imposing a zero-power domain restriction.
+fn materialize_term(
+    cas: &mut Cas,
+    context: LogicalId,
+    sort: &Sort,
+    monomial: &[(Atom, u64)],
+    coefficient: &Rational,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    let mut product = if monomial.is_empty() || *coefficient != Rational::one() {
+        Some(cas.generated(
+            context,
+            Operator::Rational(coefficient.clone()),
+            sort.clone(),
+            &[],
+            budget,
+        )?)
+    } else {
+        None
+    };
+    for (atom, exponent) in monomial {
+        let operator = match atom {
+            Atom::Free(key) => Operator::Free(key.clone()),
+            Atom::Constant(0) => Operator::Constant(Constant::Pi),
+            Atom::Constant(_) => Operator::Constant(Constant::E),
+        };
+        let mut factor = cas.generated(context, operator, sort.clone(), &[], budget)?;
+        if *exponent != 1 {
+            let exponent = i64::try_from(*exponent).map_err(|_| fragment())?;
+            factor = cas.generated(
+                context,
+                Operator::IntegerPower(exponent),
+                sort.clone(),
+                &[factor],
+                budget,
+            )?;
+        }
+        let combined = product.map_or_else(
+            || Ok(factor),
+            |previous| {
+                cas.generated(
+                    context,
+                    Operator::Mul,
+                    sort.clone(),
+                    &[previous, factor],
+                    budget,
+                )
+            },
+        )?;
+        product = Some(combined);
+    }
+    product.ok_or_else(fragment)
 }

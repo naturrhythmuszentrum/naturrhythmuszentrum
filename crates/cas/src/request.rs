@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Typed requests and honest outcomes for the construction-only capability stage.
+//! Typed requests, coverage validation and explicit bounded execution outcomes.
 
 use std::collections::BTreeSet;
 
@@ -39,16 +39,35 @@ pub enum ContextConsistency {
     Unknown,
 }
 
-/// Request outcomes while automatic producers remain pending; supplied proofs use
-/// `Cas::check_proof`.
+/// Checked results and honest deferred, invalid or exhausted outcomes.
 #[derive(Clone, Debug)]
 pub enum Outcome {
+    /// A replayed mathematical result with no residual domain obligations.
+    Verified {
+        /// Retained graph-owned request.
+        request: Handle,
+        /// Checked witness and heuristic accounting.
+        result: crate::search::SearchResult,
+        /// Generation work, separate from the result's checker usage.
+        usage: BudgetUsage,
+    },
+    /// A replayed result on an explicitly restricted domain.
+    Conditional {
+        /// Retained graph-owned request.
+        request: Handle,
+        /// Checked witness retaining every unresolved guard.
+        result: crate::search::SearchResult,
+        /// Generation work.
+        usage: BudgetUsage,
+    },
     /// A valid first-class request whose derivation algorithm remains pending.
     Unresolved {
         /// Graph-owned request record.
         request: Handle,
         /// Explicit absence of a general consistency proof.
         consistency: ContextConsistency,
+        /// A precise pending-fragment or refuted-domain blocker when available.
+        blocker: Option<Fault>,
         /// Actual consumed work.
         usage: BudgetUsage,
     },
@@ -70,8 +89,12 @@ pub enum Outcome {
         /// Work consumed before refusal.
         usage: BudgetUsage,
     },
-    /// A resource limit, without an unverified best result.
+    /// A resource limit, optionally retaining an already replayed best result.
     Exhausted {
+        /// Only a previously checked result may survive later exhaustion.
+        best: Option<crate::search::SearchResult>,
+        /// Independent checker work consumed before refusal.
+        replay_usage: BudgetUsage,
         /// Exact limit/range failure.
         fault: Fault,
         /// Work consumed before refusal.
@@ -80,39 +103,13 @@ pub enum Outcome {
 }
 
 impl Cas {
-    /// Retain a validated task with an honest unresolved/unsupported outcome.
-    ///
-    /// Automatic producers are added separately from supplied-proof checking.
-    /// This request path currently reports pending work without claiming an identity.
+    /// Execute a bounded mathematical request under the default positive-cost policy.
     pub fn run(&mut self, request: &Request) -> Outcome {
-        let resolved = match self.limits.resolve(&request.limits) {
-            Ok(value) => value,
-            Err(fault) => return failure(fault, BudgetUsage::default()),
-        };
-        let mut budget = match Budget::new(resolved.clone()) {
-            Ok(value) => value,
-            Err(fault) => return failure(fault, BudgetUsage::default()),
-        };
-        let prepared = self.prepare_request(request, resolved, &mut budget);
-        let usage = budget.usage();
-        match prepared {
-            Ok((record, true)) => Outcome::Unsupported {
-                request: record,
-                reason: UnsupportedReason::Field,
-                consistency: ContextConsistency::Unknown,
-                usage,
-            },
-            Ok((record, false)) => Outcome::Unresolved {
-                request: record,
-                consistency: ContextConsistency::Unknown,
-                usage,
-            },
-            Err(fault) => failure(fault, usage),
-        }
+        self.run_with_policy(request, &crate::search::SearchPolicy::default())
     }
 
     /// Check receipts before admitting an operation request record.
-    fn prepare_request(
+    pub(crate) fn prepare_request(
         &mut self,
         request: &Request,
         limits: Limits,
@@ -170,10 +167,19 @@ impl Cas {
 }
 
 /// Classify a typed failure without trusting a searcher's success flag.
-const fn failure(fault: Fault, usage: BudgetUsage) -> Outcome {
+pub(crate) const fn failure(fault: Fault, usage: BudgetUsage) -> Outcome {
     match fault.kind {
         FaultKind::Invalid(_) => Outcome::Invalid { fault, usage },
-        FaultKind::Exhausted { .. } => Outcome::Exhausted { fault, usage },
+        FaultKind::Exhausted { .. } => Outcome::Exhausted {
+            fault,
+            usage,
+            best: None,
+            replay_usage: BudgetUsage {
+                work: 0,
+                arithmetic_steps: 0,
+                condition_steps: 0,
+            },
+        },
     }
 }
 

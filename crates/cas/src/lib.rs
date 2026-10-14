@@ -4,7 +4,8 @@
 //! The construction layer preserves distinct original occurrences and checked scopes.
 //! Its coverage receipts never establish a mathematical identity or physical validity.
 //! A closed primitive kernel checks supplied identities and derivative premises.
-//! Automatic search and algebraic producers are admitted in later capability steps.
+//! Bounded identity search, scalar derivatives and ordered Jacobians produce replayed results.
+//! Square-free polynomial certificates remain a later capability.
 
 #![expect(
     clippy::multiple_crate_versions,
@@ -100,6 +101,46 @@ mod traversal;
 )]
 mod validation;
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod calculus;
+mod cost;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod frontier;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod producer;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod rewrite;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod frozen;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod known;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod search;
+mod service;
+mod shortcut;
+
 pub use budget::{Budget, BudgetKind, BudgetUsage, Limits, LimitsOverride};
 pub use error::{Exhaustion, Fault, FaultKind, InvalidCode, Location};
 pub use graph::{
@@ -121,3 +162,8 @@ pub use traversal::{
 pub use conditions::{ConditionStatus, GuardKind};
 pub use proof_model::{Claim, Guard, ProofStep, Relation, VerifiedWitness};
 pub use rule::{PRIMITIVES, Primitive, RuleSpec};
+
+pub use cost::CostPolicy;
+
+pub use frozen::FrozenCertificate;
+pub use search::{SearchPolicy, SearchResult, SearchStatistics};
