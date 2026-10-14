@@ -122,6 +122,7 @@ impl Runner<'_> {
             Task::Boundary {
                 point,
                 requested_facts,
+                ..
             } if requested_facts == &[BoundaryFact::Ownership] => self.ownership(&input, point),
             Task::Equal {
                 domain,

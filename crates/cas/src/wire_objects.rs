@@ -116,6 +116,7 @@ fn header(
 fn syntax(
     cas: &mut Cas,
     tag: u8,
+    space: Option<&Handle>,
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<Handle, Fault> {
@@ -162,6 +163,7 @@ fn syntax(
                 return Err(invalid());
             }
             Draft::Expression(ExpressionDraft {
+                space: space.cloned().map(Reference::Existing),
                 operator,
                 sort,
                 header,
@@ -328,7 +330,7 @@ pub(crate) fn decode(
             )?
         }
         8 => context(cas, reader, records)?,
-        _ => syntax(cas, tag, reader, records)?,
+        _ => syntax(cas, tag, space, reader, records)?,
     };
     if tag == 1 && reader.budget.usage().region_nodes == previous.region_nodes {
         reader

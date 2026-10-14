@@ -107,6 +107,9 @@ pub(crate) fn check_application(
     crate::proof_view::measure(cas, draft, budget)?;
     let mut scalar_view = None;
     let mut conditions = match draft.rule {
+        Primitive::JetPolynomial | Primitive::CaseInterior | Primitive::CaseBoundary => {
+            crate::boundary_check::check(cas, draft, premises, budget)?
+        }
         Primitive::CaseOrdered
         | Primitive::CaseDomain
         | Primitive::CaseSelect

@@ -185,20 +185,56 @@ pub(crate) fn embeds(
     }
 }
 
-/// Resolve a declared test/distribution variable's exact earlier space.
+/// Check an explicit expression space and any exact declaration binding.
 pub(crate) fn expression_space(
     state: &State,
     header: LogicalId,
     operator: &Operator,
     sort: &Sort,
+    explicit: Option<LogicalId>,
+    operands: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<Option<LogicalId>, Fault> {
     if !space_sort(sort) {
-        return Ok(None);
+        return if explicit.is_none() {
+            Ok(None)
+        } else {
+            Err(Fault::invalid(InvalidCode::Sort, AT))
+        };
     }
-    let Operator::Free(key) = operator else {
-        return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+    let declared = if let Operator::Free(key) = operator {
+        declaration_space(state, header, key, budget)?
+    } else {
+        None
     };
+    let space = explicit
+        .or(declared)
+        .ok_or_else(|| Fault::invalid(InvalidCode::Sort, AT))?;
+    let value = state.space(space)?;
+    if declared.is_some_and(|expected| expected != space)
+        || !embeds(state, value.header, header, budget)?
+    {
+        return Err(Fault::invalid(InvalidCode::Sort, AT));
+    }
+    for operand in operands {
+        if state
+            .expression(*operand)?
+            .space
+            .is_some_and(|actual| actual != space)
+        {
+            return Err(Fault::invalid(InvalidCode::Sort, AT));
+        }
+    }
+    Ok(Some(space))
+}
+
+/// Resolve the exact declaration binding without inferring a space from display spelling.
+fn declaration_space(
+    state: &State,
+    header: LogicalId,
+    key: &str,
+    budget: &mut Budget,
+) -> Result<Option<LogicalId>, Fault> {
     let mut current = header;
     let mut depth = 0_u64;
     loop {

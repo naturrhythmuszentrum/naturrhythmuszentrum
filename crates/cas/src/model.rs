@@ -232,6 +232,8 @@ pub enum RootSelection {
 /// Mathematical syntax tags; all operands remain explicitly ordered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// Transparent canonical case definition retained as one operand.
+    NamedCase(Box<crate::boundary_model::NamedCase>),
     /// Native cases use typed domain and arm links, not scalar operands.
     Cases,
     /// An exact reduced rational.

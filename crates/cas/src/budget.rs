@@ -645,6 +645,8 @@ pub struct Budget {
     limits: Limits,
     /// Monotone measured consumption.
     usage: BudgetUsage,
+    /// Independently reconstructed exact partitions shared by this ledger only.
+    pub(crate) region_partitions: crate::region_cache::Cache,
 }
 
 impl Budget {
@@ -657,6 +659,7 @@ impl Budget {
         Ok(Self {
             limits,
             usage: BudgetUsage::default(),
+            region_partitions: crate::region_cache::Cache::default(),
         })
     }
 
@@ -716,6 +719,14 @@ impl Budget {
     /// Returns exhaustion if the measured size exceeds the named ceiling.
     pub const fn check(&self, kind: BudgetKind, needed: u64, at: Location) -> Result<(), Fault> {
         let limit = self.limits.get(kind);
+        let needed = if matches!(kind, BudgetKind::StagedPayloadBytes) {
+            match needed.checked_add(self.region_partitions.bytes) {
+                Some(total) => total,
+                None => return Err(Fault::capacity(kind, at)),
+            }
+        } else {
+            needed
+        };
         if needed > limit {
             return Err(Fault::exhausted(kind, limit, needed, at));
         }

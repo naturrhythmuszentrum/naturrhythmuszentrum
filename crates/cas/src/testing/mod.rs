@@ -22,3 +22,9 @@ pub(crate) mod frontier;
 pub(crate) mod frozen;
 #[expect(clippy::redundant_pub_crate, reason = "shared crate case fixtures")]
 pub(crate) mod native;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared crate boundary evidence fixtures"
+)]
+pub(crate) mod boundary_native;

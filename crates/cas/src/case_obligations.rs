@@ -14,7 +14,7 @@ pub(crate) fn empty(cas: &Cas, region: LogicalId, budget: &mut Budget) -> Result
     if matches!(cas.state.region(region)?.expression, RegionExpr::Empty) {
         return Ok(true);
     }
-    let cells = crate::region::partition(&cas.state, &[region], budget)?;
+    let cells = crate::region_cache::partition(cas, &[region], budget)?;
     Ok(cells
         .membership
         .first()
@@ -123,7 +123,7 @@ pub(crate) fn require(
         }
     }
     let truth = case_syntax::guarded(cas, region, predicate, budget)?;
-    match crate::region::partition(&cas.state, &[region, truth], budget) {
+    match crate::region_cache::partition(cas, &[region, truth], budget) {
         Ok(cells) => {
             let reached = cells.membership.first().ok_or_else(invalid)?;
             let holds = cells.membership.get(1).ok_or_else(invalid)?;

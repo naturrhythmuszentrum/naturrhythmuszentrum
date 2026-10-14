@@ -54,6 +54,7 @@ pub(crate) fn expression_draft(
     operands: &[Handle],
 ) -> Draft {
     Draft::Expression(ExpressionDraft {
+        space: None,
         operator,
         sort,
         header,

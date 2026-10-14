@@ -4,6 +4,12 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// Complete finite partitions and exact oriented polynomial jets.
+    JetPolynomial,
+    /// Transport a checked derivative through local case equality.
+    CaseInterior,
+    /// Compare actual point ownership and two incident finite jets.
+    CaseBoundary,
     /// Reconstruct ordered source clauses and their reached regions.
     CaseOrdered,
     /// Reconstruct a compatible case's exact defined domain.
@@ -89,6 +95,8 @@ pub enum Primitive {
 /// Typed conclusion family selected by an executable checker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConclusionKind {
+    /// Exact partition, jet, trace, jump or point derivative fact.
+    Boundary,
     /// Typed case construction, domain, agreement, ownership or elimination.
     Case,
     /// Scalar equality on an explicit domain.
@@ -110,6 +118,8 @@ pub enum ConclusionKind {
 /// Premise shape is explicit independently of certificate representation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PremiseShape {
+    /// Exactly the ordered premises consumed by the closed boundary mode.
+    BoundaryEvidence,
     /// Typed case premises consumed according to the closed certificate mode.
     CaseEvidence,
     /// Exactly this many ordered earlier applications.
@@ -123,6 +133,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// Closed finite boundary-calculus modes.
+    Boundary,
     /// Complete typed association, restriction and exact-cell evidence.
     Cases,
     /// No auxiliary payload.
@@ -165,7 +177,10 @@ impl Primitive {
     pub(crate) const fn native(self) -> bool {
         matches!(
             self,
-            Self::ContextHypothesis
+            Self::JetPolynomial
+                | Self::CaseInterior
+                | Self::CaseBoundary
+                | Self::ContextHypothesis
                 | Self::ContextWeaken
                 | Self::ContextClose
                 | Self::RegionDecide
@@ -182,6 +197,9 @@ impl Primitive {
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::JetPolynomial => ("jet.polynomial", 4),
+            Self::CaseInterior => ("diff.case-interior", 2),
+            Self::CaseBoundary => ("diff.case-boundary", 4),
             Self::CaseOrdered => ("case.ordered", 4),
             Self::CaseDomain => ("case.domain", 2),
             Self::CaseSelect => ("case.select", 2),
@@ -238,6 +256,7 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
+            Self::JetPolynomial | Self::CaseBoundary => ConclusionKind::Boundary,
             Self::CaseOrdered
             | Self::CaseDomain
             | Self::CaseSelect
@@ -256,7 +275,8 @@ impl Primitive {
             | Self::DifferentiateProduct
             | Self::DifferentiateQuotient
             | Self::DifferentiatePower
-            | Self::DerivativeTransport => ConclusionKind::Derivative,
+            | Self::DerivativeTransport
+            | Self::CaseInterior => ConclusionKind::Derivative,
             _ => ConclusionKind::Equality,
         }
     }
@@ -264,6 +284,9 @@ impl Primitive {
     /// Fixed and dependent ordered-premise arities remain visible in the registry.
     const fn premise_shape(self) -> PremiseShape {
         match self {
+            Self::JetPolynomial | Self::CaseInterior | Self::CaseBoundary => {
+                PremiseShape::BoundaryEvidence
+            }
             Self::CaseOrdered
             | Self::CaseDomain
             | Self::CaseSelect
@@ -290,6 +313,9 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::JetPolynomial | Self::CaseInterior | Self::CaseBoundary => {
+                CertificateSchema::Boundary
+            }
             Self::CaseOrdered
             | Self::CaseDomain
             | Self::CaseSelect
@@ -306,7 +332,7 @@ impl Primitive {
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 40] = [
+pub const PRIMITIVES: [Primitive; 43] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -316,6 +342,8 @@ pub const PRIMITIVES: [Primitive; 40] = [
     Primitive::ContextHypothesis,
     Primitive::ContextWeaken,
     Primitive::DifferentiateAdd,
+    Primitive::CaseBoundary,
+    Primitive::CaseInterior,
     Primitive::DifferentiateConstant,
     Primitive::DifferentiatePower,
     Primitive::Jacobian,
@@ -342,6 +370,7 @@ pub const PRIMITIVES: [Primitive; 40] = [
     Primitive::Symmetry,
     Primitive::Transitivity,
     Primitive::Exact,
+    Primitive::JetPolynomial,
     Primitive::Jets,
     Primitive::RationalIdentity,
     Primitive::SquareFree,

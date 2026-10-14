@@ -43,6 +43,56 @@ impl<'a> Plan<'a> {
         }
     }
 
+    /// Account for every scalar branch application in the expanded native route.
+    pub(crate) fn account_scalar(
+        &mut self,
+        plan: &crate::producer::Plan,
+        cas: &Cas,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        for step in &plan.steps {
+            self.steps = self.steps.checked_add(1).ok_or_else(invalid)?;
+            budget.check(BudgetKind::Transitions, self.steps, AT)?;
+            self.cost = self
+                .cost
+                .checked_add(self.policy.costs.weight(step.primitive)?)
+                .ok_or_else(invalid)?;
+            self.attempt(budget)?;
+            self.visit()?;
+            let before = cas.state.expression(step.left.logical_id())?.unfolded;
+            let after = cas.state.expression(step.right.logical_id())?.unfolded;
+            self.expansion(before, after, budget)?;
+        }
+        Ok(())
+    }
+
+    /// Finish from an already sealed and freshly replayed fact after later work stops.
+    pub(crate) fn finish_retained(
+        self,
+        witness: VerifiedWitness,
+        trace: Vec<Handle>,
+        usage: crate::budget::BudgetUsage,
+    ) -> SearchResult {
+        SearchResult {
+            payload: None,
+            witness,
+            cost: self.cost,
+            peak: self.peak.max(1),
+            expansion_credits: self.credits,
+            primitive_steps: self.steps,
+            trace,
+            policy: self.policy.costs.clone(),
+            statistics: SearchStatistics {
+                transitions: self.steps,
+                matches: self.matches,
+                visits: self.visits,
+                dominated: 0,
+            },
+            replay_usage: usage,
+            response: None,
+        }
+    }
+
     /// Rank a pending refinement using the actual policy and already recorded route cost.
     pub(crate) fn refinement_cost(&self) -> Result<u64, Fault> {
         self.cost
@@ -156,6 +206,7 @@ impl<'a> Plan<'a> {
             .max()
             .unwrap_or(1);
         Ok(SearchResult {
+            payload: None,
             witness,
             cost: self.cost,
             peak: peak.max(self.peak),
@@ -230,7 +281,11 @@ fn proposal(
 }
 
 /// Compare both canonical bytes and the exact expected theorem in a fresh store.
-fn replay(cas: &Cas, witness: &VerifiedWitness, checker: &mut Budget) -> Result<(), Fault> {
+pub(crate) fn replay(
+    cas: &Cas,
+    witness: &VerifiedWitness,
+    checker: &mut Budget,
+) -> Result<(), Fault> {
     let expected = crate::wire_build::judgment_key(cas, witness.judgment(), checker)?;
     let bytes = cas.export_witness(witness, checker)?;
     let mut receiver = Cas::new(checker.limits().clone())?;

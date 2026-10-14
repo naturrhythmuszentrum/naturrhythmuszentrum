@@ -375,6 +375,9 @@ impl<'a, 'b> Reader<'a, 'b> {
     fn extended_operator(&mut self, tag: u8) -> Result<Operator, Fault> {
         match tag {
             28 => Ok(Operator::Cases),
+            29 => Ok(Operator::NamedCase(Box::new(crate::named_case::decode(
+                self,
+            )?))),
             10 => Ok(Operator::GeneralPower(self.branch()?)),
             11 => Ok(Operator::Call(self.name()?)),
             12 => Ok(Operator::Derivative(self.name()?)),

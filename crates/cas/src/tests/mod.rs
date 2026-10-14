@@ -7,3 +7,7 @@ mod snapshot;
 
 mod cases;
 mod conditions;
+
+mod boundary;
+
+mod region_cache;

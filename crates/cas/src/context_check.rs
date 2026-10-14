@@ -107,6 +107,7 @@ pub(crate) fn hypothesis(
 /// The explicitly stated pointwise domain, if the proposition has one.
 pub(crate) const fn domain(statement: &Statement) -> Option<&Handle> {
     match statement {
+        Statement::CaseDerivative(value) => Some(&value.domain),
         Statement::Equality { domain, .. }
         | Statement::DerivativeOn { domain, .. }
         | Statement::Jacobian { domain, .. }
@@ -125,6 +126,7 @@ pub(crate) const fn domain(statement: &Statement) -> Option<&Handle> {
 pub(crate) fn restricted(statement: &Statement, region: &Handle) -> Statement {
     let mut result = statement.clone();
     match &mut result {
+        Statement::CaseDerivative(value) => value.domain.clone_from(region),
         Statement::Equality { domain, .. }
         | Statement::DerivativeOn { domain, .. }
         | Statement::Jacobian { domain, .. }
@@ -231,6 +233,7 @@ pub(crate) fn weaken(
     if !matches!(
         &source.judgment.statement,
         Statement::Equality { .. }
+            | Statement::CaseDerivative(_)
             | Statement::DerivativeOn { .. }
             | Statement::Jacobian { .. }
             | Statement::SquareFree { .. }

@@ -194,6 +194,10 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::Boundary(value) => {
+            out.byte(7)?;
+            crate::boundary_wire::certificate(value, out, write)
+        }
         Certificate::None => out.byte(0),
         Certificate::Region(value) => {
             out.byte(1)?;
@@ -249,7 +253,7 @@ pub(crate) fn certificate(
 }
 
 /// Encode exact case partitions without copying caller-owned rational components.
-fn case_cells(
+pub(crate) fn case_cells(
     value: &crate::region::RegionCertificate,
     out: &mut Encoder<'_>,
 ) -> Result<(), Fault> {
@@ -476,7 +480,7 @@ fn encode_boundary(
             out.unsigned(u64::from(*order))?;
             write(value, out)?;
         }
-        _ => return Err(Fault::invalid(InvalidCode::Rule, AT)),
+        _ => return crate::boundary_wire::statement(value, out, write),
     }
     Ok(())
 }
@@ -484,6 +488,11 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::BoundaryPartition(_)
+        | Statement::CaseDerivative(_)
+        | Statement::DerivativeAt(_)
+        | Statement::DerivativeDoesNotExist(_)
+        | Statement::TraceValue(_) => crate::boundary_wire::objects(value),
         Statement::Equality { .. }
         | Statement::DerivativeOn { .. }
         | Statement::Jacobian { .. }
@@ -644,6 +653,14 @@ fn boundary_objects(value: &Statement) -> Vec<&Handle> {
 /// Reconstruct semantic roles from positions in a validated statement's object sequence.
 pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
     match (value, position) {
+        (
+            Statement::BoundaryPartition(_)
+            | Statement::CaseDerivative(_)
+            | Statement::DerivativeAt(_)
+            | Statement::DerivativeDoesNotExist(_)
+            | Statement::TraceValue(_),
+            _,
+        ) => crate::boundary_wire::edge(value, position),
         (Statement::Subset { .. } | Statement::Disjoint { .. }, _) => {
             Edge::ComparedRegion(position)
         }
@@ -687,7 +704,8 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
 /// Mathematical layer implied by a typed statement.
 pub(crate) const fn layer(value: &Statement) -> Layer {
     match value {
-        Statement::PredicateFact { .. }
+        Statement::BoundaryPartition(_)
+        | Statement::PredicateFact { .. }
         | Statement::Subset { .. }
         | Statement::Disjoint { .. }
         | Statement::Cover { .. }

@@ -8,3 +8,5 @@ pub use crate::request_model::{
 };
 pub use crate::search::{SearchPolicy, SearchResult, SearchStatistics};
 pub use crate::task::{ActionMode, BoundaryFact, Task};
+
+pub use crate::derivative_model::{BoundaryFacts, DerivativeMap, PendingCell, ResultPayload};

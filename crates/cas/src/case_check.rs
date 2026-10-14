@@ -129,7 +129,7 @@ fn domain(
         budget,
     )?;
     let actual = analysis.domain(function)?;
-    let comparison = crate::region::partition(&cas.state, &[actual, claimed], budget)?;
+    let comparison = crate::region_cache::partition(cas, &[actual, claimed], budget)?;
     if comparison.membership.first() != comparison.membership.get(1) {
         return Err(invalid());
     }
@@ -207,7 +207,10 @@ fn refinement_cover(
     let Some(domain) = after.domain else {
         return Ok(());
     };
-    if before.domain.is_some() || before.operands.is_empty() {
+    if before.domain.is_some()
+        || before.operands.is_empty()
+        || matches!(before.operator, crate::model::Operator::NamedCase(_))
+    {
         return Ok(());
     }
     let mut native = false;
@@ -259,7 +262,7 @@ pub(crate) fn subset(
     if subset == superset {
         return Ok(());
     }
-    let cells = crate::region::partition(&cas.state, &[subset, superset], budget)?;
+    let cells = crate::region_cache::partition(cas, &[subset, superset], budget)?;
     let left = cells.membership.first().ok_or_else(invalid)?;
     let right = cells.membership.get(1).ok_or_else(invalid)?;
     if left.iter().zip(right).all(|(left, right)| !left || *right) {

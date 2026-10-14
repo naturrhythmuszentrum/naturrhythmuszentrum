@@ -83,6 +83,7 @@ fn expression(
         }));
     }
     Ok(Draft::Expression(ExpressionDraft {
+        space: v.space.map(&mut *resolve).transpose()?,
         header,
         scope,
         operator: operator.ok_or_else(invalid)?,

@@ -104,6 +104,7 @@ fn draft_refusals() -> TestResult {
     let before = cas.canonical_snapshot(&mut budget()?)?;
     for reference in [Reference::Existing(foreign), Reference::Local(1)] {
         let draft = Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Free("x".into()),
             sort: real(),
             header: reference,
@@ -239,6 +240,7 @@ fn bound_instantiation() -> TestResult {
     let bound = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Bound { depth: 0, slot: 0 },
             sort: real(),
             header: Reference::Existing(syntax_header),
@@ -452,6 +454,7 @@ fn outer_frame_lifting() -> TestResult {
     let replacement = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Bound { depth: 0, slot: 0 },
             sort: real(),
             header: Reference::Existing(syntax_header.clone()),
@@ -465,6 +468,7 @@ fn outer_frame_lifting() -> TestResult {
     let body = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Free("x".into()),
             sort: real(),
             header: Reference::Existing(syntax_header.clone()),
@@ -476,6 +480,7 @@ fn outer_frame_lifting() -> TestResult {
     let endpoint = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Rational(Rational::one()),
             sort: Sort::Value(AtomicSort::Integer),
             header: Reference::Existing(syntax_header.clone()),
@@ -487,6 +492,7 @@ fn outer_frame_lifting() -> TestResult {
     let sum = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Sum,
             sort: real(),
             header: Reference::Existing(syntax_header),

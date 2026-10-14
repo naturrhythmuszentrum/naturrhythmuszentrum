@@ -148,7 +148,7 @@ fn ownership(
         }
         Ownership::Absent => {
             let cells =
-                crate::region::partition(&cas.state, &[singleton, cas.checked(&domain)?], budget)?;
+                crate::region_cache::partition(cas, &[singleton, cas.checked(&domain)?], budget)?;
             let point = cells.membership.first().ok_or_else(invalid)?;
             let defined = cells.membership.get(1).ok_or_else(invalid)?;
             if point
@@ -217,6 +217,7 @@ pub(crate) fn singleton(
         _ => return Err(invalid()),
     };
     let coordinate = Draft::Expression(ExpressionDraft {
+        space: None,
         header: Reference::Existing(cas.handle(boundary.header)),
         scope: boundary.scope.clone(),
         sort,

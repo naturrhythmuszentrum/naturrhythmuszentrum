@@ -58,8 +58,28 @@ pub enum ContextConsistency {
 /// Checked results and honest deferred, invalid or exhausted outcomes.
 #[derive(Clone, Debug)]
 pub enum Outcome {
+    /// A replayed statement proves the requested point derivative does not exist.
+    Nonexistent {
+        /// Retained exact request.
+        request: Handle,
+        /// Sealed mathematical evidence.
+        result: crate::search::SearchResult,
+        /// Generation usage.
+        usage: BudgetUsage,
+    },
+    /// A derivative exists on some cells and has checked obstructions on others.
+    Partial {
+        /// Retained whole-domain request.
+        request: Handle,
+        /// Sealed derivative map.
+        result: crate::search::SearchResult,
+        /// Generation usage.
+        usage: BudgetUsage,
+    },
     /// Opaque region evidence cannot decide whether the requested whole domain is covered.
     UnknownTotality {
+        /// Independently replayed partial facts.
+        partial: Option<Box<crate::search::SearchResult>>,
         /// Retained request with its original coverage evidence.
         request: Handle,
         /// Exact unresolved region or definedness blocker.
@@ -69,6 +89,8 @@ pub enum Outcome {
     },
     /// A valid case operation lacks a supported mathematical premise.
     PendingPremise {
+        /// Independently replayed partial facts.
+        partial: Option<Box<crate::search::SearchResult>>,
         /// Retained request with its supplied evidence.
         request: Handle,
         /// Exact pending fragment or hypothesis.
@@ -398,7 +420,11 @@ fn validate_task(
     match task {
         Task::Equal { domain, .. } | Task::Differentiate { domain, .. } => {
             state.region(domain.logical_id())?;
-            if task.scalar().is_some() && domain.logical_id() != context.admissible {
+            if task.scalar().is_some()
+                && domain.logical_id() != context.admissible
+                && !matches!(task, Task::Differentiate { layer: crate::domain_model::Layer::Pointwise, .. }
+                    if matches!(state.region(domain.logical_id())?.ambient, crate::domain_model::AmbientDomain::Real(_)))
+            {
                 return Err(Fault::invalid(InvalidCode::Context, at));
             }
         }
@@ -440,7 +466,8 @@ fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> R
         | Task::Select { .. }
         | Task::Merge { .. }
         | Task::Coverage { .. }
-        | Task::Boundary { .. } => Some(1),
+        | Task::Boundary { .. }
+        | Task::Differentiate { .. } => Some(1),
         _ => None,
     };
     if expected.is_some_and(|count| inputs.len() != count) {

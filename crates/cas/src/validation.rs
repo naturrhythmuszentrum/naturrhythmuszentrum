@@ -196,6 +196,10 @@ fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
             }
         }
         Draft::Expression(value) => {
+            out.byte(u8::from(value.space.is_some()))?;
+            if let Some(space) = &value.space {
+                reference(space, out)?;
+            }
             encoding::operator(&value.operator, out)?;
             encoding::sort(&value.sort, out)?;
             reference(&value.header, out)?;
@@ -599,6 +603,9 @@ fn operator_sorts(
     let first = children.first().copied();
     let valid = match operator {
         Operator::Cases => false,
+        Operator::NamedCase(value) => {
+            children.len() == 1 && same && named_case_sort(value, result, scope, environment)
+        }
         Operator::Rational(_) | Operator::Free(_) | Operator::Bound { .. } => {
             leaf_sort(operator, result, scope, environment, budget)? && children.is_empty()
         }
@@ -673,6 +680,22 @@ fn operator_sorts(
         | Operator::Entrywise(_) => matrix_sorts(operator, result, children, budget)?,
     };
     if valid { Ok(()) } else { Err(sort_error()) }
+}
+
+/// Named scalar wrappers retain their declared axis and family-specific parameter shape.
+fn named_case_sort(
+    value: &crate::boundary_model::NamedCase,
+    result: &Sort,
+    scope: &Scope,
+    environment: &Environment,
+) -> bool {
+    scope.is_empty()
+        && *result == Sort::Value(AtomicSort::Scalar(Field::Real))
+        && (value.parameter.is_some() == (value.name == crate::boundary_model::CaseName::Step))
+        && environment
+            .declarations
+            .iter()
+            .any(|item| item.key == value.coordinate && item.sort == *result)
 }
 
 /// Check the value carried by an operand-free literal or variable.

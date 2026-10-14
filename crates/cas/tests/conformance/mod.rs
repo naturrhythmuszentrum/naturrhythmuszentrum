@@ -12,3 +12,8 @@ mod case_refinement;
 mod case_substitution;
 mod cases;
 mod domain;
+
+mod boundary;
+
+mod boundary_policy;
+mod boundary_spaces;

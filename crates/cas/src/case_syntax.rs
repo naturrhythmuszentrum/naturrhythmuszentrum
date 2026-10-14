@@ -108,6 +108,7 @@ pub(crate) fn guard_expression(
         return Ok(id);
     };
     let draft = crate::graph::ExpressionDraft {
+        space: None,
         header: Reference::Existing(cas.handle(value.header)),
         scope: value.scope.clone(),
         sort: Sort::Value(AtomicSort::Boolean),
@@ -175,6 +176,7 @@ pub(crate) fn domains(
     let mut result = Domains::new();
     for id in order {
         budget.condition(1, AT)?;
+        crate::named_case::check(cas, *id, budget)?;
         let value = cas.state.expression(*id)?.clone();
         let domain = if let Some(domain) = value.domain {
             case_domain(cas, domain, &value.arms, within, &result, budget)?
@@ -232,7 +234,8 @@ fn scalar_domain(
     let denominator_slot = match value.operator {
         Operator::Div => value.operands.get(1).copied(),
         Operator::IntegerPower(power) if power <= 0 => value.operands.first().copied(),
-        Operator::Rational(_)
+        Operator::NamedCase(_)
+        | Operator::Rational(_)
         | Operator::Free(_)
         | Operator::Bound { .. }
         | Operator::Constant(_)

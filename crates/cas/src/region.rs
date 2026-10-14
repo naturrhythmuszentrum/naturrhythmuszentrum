@@ -11,7 +11,7 @@ use crate::graph::{LogicalId, State, Vertex, size};
 use crate::model::{Operator, PredicateKind};
 use crate::number::Rational;
 
-/// Untrusted finite-cell evidence, independently reconstructed on every replay.
+/// Untrusted finite-cell evidence compared with an independently reconstructed exact partition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegionCertificate {
     /// Strictly increasing exact rational cuts.
@@ -834,7 +834,11 @@ pub(crate) fn open_interval(
     root: LogicalId,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let certificate = partition(state, &[root], budget)?;
+    check_open(&partition(state, &[root], budget)?)
+}
+
+/// Require one nonempty run of cells with open exterior endpoints.
+pub(crate) fn check_open(certificate: &RegionCertificate) -> Result<(), Fault> {
     let membership = certificate.membership.first().ok_or_else(unknown)?;
     let first = membership
         .iter()

@@ -146,7 +146,7 @@ fn advanced_statement(
             order: reader.small()?,
             value: object(reader, records)?,
         },
-        _ => return Err(invalid()),
+        _ => return crate::boundary_decode::statement(tag, reader, records),
     })
 }
 
@@ -176,7 +176,9 @@ pub(crate) fn substitutions(
 }
 
 /// Bound exact interval cells before any certificate vector is reserved.
-fn region(reader: &mut Reader<'_, '_>) -> Result<crate::region::RegionCertificate, Fault> {
+pub(crate) fn region(
+    reader: &mut Reader<'_, '_>,
+) -> Result<crate::region::RegionCertificate, Fault> {
     let count = reader.count(BudgetKind::RegionCells, 9, 128)?;
     let cells = count
         .checked_mul(2)
@@ -244,6 +246,9 @@ pub(crate) fn certificate(
             crate::multiplicity::SquareFreeCertificate::decode(reader)?,
         )),
         6 => Certificate::Cases(Box::new(case_certificate(reader, records)?)),
+        7 => Certificate::Boundary(Box::new(crate::boundary_decode::certificate(
+            reader, records,
+        )?)),
         _ => return Err(invalid()),
     })
 }

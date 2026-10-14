@@ -146,6 +146,7 @@ impl Scheduler<'_, '_> {
             })
             .collect::<Result<_, _>>()?;
         let draft = Draft::Expression(ExpressionDraft {
+            space: None,
             header: Reference::Existing(self.cas.handle(value.header)),
             scope: value.scope,
             sort: value.sort,
@@ -494,6 +495,7 @@ fn binary(
 ) -> Result<LogicalId, Fault> {
     let value = cas.state.expression(id)?;
     let draft = Draft::Expression(ExpressionDraft {
+        space: None,
         header: Reference::Existing(cas.handle(value.header)),
         scope: value.scope.clone(),
         sort: value.sort.clone(),

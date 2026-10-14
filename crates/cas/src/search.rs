@@ -48,6 +48,8 @@ pub struct SearchStatistics {
 /// A checked candidate and its explicitly heuristic path accounting.
 #[derive(Clone)]
 pub struct SearchResult {
+    /// Sealed typed calculus facts, including incomplete derivative maps.
+    pub payload: Option<Box<crate::derivative_model::ResultPayload>>,
     /// Kernel-checked mathematical witness; no optimality is implied.
     pub witness: crate::proof_model::VerifiedWitness,
     /// Positive logical transition sum under the pinned policy.
@@ -394,6 +396,7 @@ impl Search {
         let mut statistics = self.statistics;
         statistics.dominated = self.frontier.dominated;
         Ok(Some(SearchResult {
+            payload: None,
             witness: crate::proof_view::native_witness(cas, label.witness, checker)?,
             cost: label.metrics.cost,
             peak: label.metrics.peak,

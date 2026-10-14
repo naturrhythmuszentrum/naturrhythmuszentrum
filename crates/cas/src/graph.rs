@@ -146,6 +146,8 @@ pub struct AssumptionDraft {
 /// Untrusted ordered expression syntax.
 #[derive(Clone, Debug)]
 pub struct ExpressionDraft {
+    /// Explicit typed space link; scalar values require absence.
+    pub space: Option<Reference>,
     /// Operator and complete mathematical payload.
     pub operator: Operator,
     /// Claimed mathematical result sort, checked against operands.
@@ -879,6 +881,7 @@ impl Cas {
             references.push(Reference::Local(position_u32(index)?));
         }
         let draft = ExpressionDraft {
+            space: None,
             operator,
             sort,
             header: Reference::Local(0),
@@ -1092,8 +1095,20 @@ impl Cas {
         let operands = self.resolve_all(&draft.operands, locals, budget)?;
         let (depth, unfolded) =
             crate::validation::expression(state, draft, header, &operands, budget)?;
-        let space =
-            crate::header::expression_space(state, header, &draft.operator, &draft.sort, budget)?;
+        let explicit = draft
+            .space
+            .as_ref()
+            .map(|value| self.resolve(value, locals))
+            .transpose()?;
+        let space = crate::header::expression_space(
+            state,
+            header,
+            &draft.operator,
+            &draft.sort,
+            explicit,
+            &operands,
+            budget,
+        )?;
         let expression = Vertex::Expression(Expression {
             operator: draft.operator.clone(),
             sort: draft.sort.clone(),

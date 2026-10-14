@@ -124,7 +124,7 @@ pub(crate) fn evidence(
 ) -> Result<RegionCertificate, Fault> {
     let mut roots = roots(cas, statement)?;
     if let Statement::PredicateFact { region, predicate } = statement {
-        let empty = crate::region::partition(&cas.state, &roots, budget)?;
+        let empty = crate::region_cache::partition(cas, &roots, budget)?;
         if empty
             .membership
             .first()
@@ -147,7 +147,7 @@ pub(crate) fn evidence(
         )?),
         _ => None,
     };
-    crate::region::partition_at(&cas.state, &roots, boundary.as_ref(), budget)
+    crate::region_cache::partition_at(cas, &roots, boundary.as_ref(), budget)
 }
 
 /// Bound untrusted rows and exact numbers before comparison or copying.
@@ -298,7 +298,7 @@ fn incidence(
     if region.ambient != location.ambient || region.scope != location.scope {
         return Err(invalid());
     }
-    crate::region::open_interval(&cas.state, cas.checked(neighborhood)?, budget)?;
+    crate::region_cache::open_interval(cas, cas.checked(neighborhood)?, budget)?;
     let point = crate::region::boundary_point(&cas.state, boundary_id, budget)?;
     let position = value
         .cuts

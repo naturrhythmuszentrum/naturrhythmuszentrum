@@ -38,6 +38,7 @@ fn physical_index_independence() -> TestResult {
                 assumptions: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 operator: Operator::Rational(Rational::one()),
                 sort: real(),
                 header: Reference::Local(1),

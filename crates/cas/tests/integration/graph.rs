@@ -21,6 +21,7 @@ fn binder_substitution() -> TestResult {
     let body = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Free("x".into()),
             sort: real(),
             header: Reference::Existing(syntax_header.clone()),
@@ -37,6 +38,7 @@ fn binder_substitution() -> TestResult {
         &[],
     )?;
     let draft = Draft::Expression(ExpressionDraft {
+        space: None,
         operator: Operator::Sum,
         sort: real(),
         header: Reference::Existing(syntax_header),

@@ -38,6 +38,7 @@ fn guarded_tuple_identity() -> TestResult {
                 assumptions: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 header: Reference::Local(0),
                 scope: Vec::new(),
                 sort: real(),

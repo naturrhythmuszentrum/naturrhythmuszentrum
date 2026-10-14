@@ -75,7 +75,7 @@ pub(crate) fn analyze(
         }
     }
     let regions = case_syntax::canonical(cas, &roots, budget)?;
-    let cells = crate::region::partition(&cas.state, &regions, budget)?;
+    let cells = crate::region_cache::partition(cas, &regions, budget)?;
     Ok(Analysis {
         regions,
         cells,
@@ -202,6 +202,34 @@ impl Analysis {
         Ok(selected.unwrap_or(Value::Undefined))
     }
 
+    /// Propose one cell-local scalar germ; a separate equality proof checks the whole region.
+    pub(crate) fn germ(
+        &self,
+        cas: &mut Cas,
+        expression: LogicalId,
+        within: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<LogicalId, Fault> {
+        let count = self.cells.membership.first().ok_or_else(invalid)?.len();
+        for cell in 0..count {
+            if self.contains(within, cell)? {
+                return match self
+                    .specialize(cas, within, cell, budget)?
+                    .get(&expression)
+                    .ok_or_else(invalid)?
+                {
+                    Value::Defined(value) => Ok(*value),
+                    Value::Conflict => Err(conflict()),
+                    Value::Undefined => Err(Fault::invalid(
+                        InvalidCode::PendingPremise,
+                        Location::new("undefined boundary germ"),
+                    )),
+                };
+            }
+        }
+        Err(invalid())
+    }
+
     /// Expose exact endpoint definedness to the domain schema.
     pub(crate) fn domain(&self, expression: LogicalId) -> Result<LogicalId, Fault> {
         self.domains.get(&expression).copied().ok_or_else(invalid)
@@ -250,6 +278,10 @@ fn scalar_value(
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
     let value = cas.state.expression(id)?;
+    if matches!(value.operator, Operator::NamedCase(_)) {
+        let child = value.operands.first().ok_or_else(invalid)?;
+        return values.get(child).copied().ok_or_else(invalid);
+    }
     if value.operands.is_empty() {
         return Ok(Value::Defined(id));
     }
@@ -265,6 +297,7 @@ fn scalar_value(
         }
     }
     let draft = Draft::Expression(ExpressionDraft {
+        space: None,
         header: Reference::Existing(cas.handle(value.header)),
         scope: value.scope.clone(),
         sort: value.sort.clone(),
@@ -332,6 +365,7 @@ fn at_point(
         .sort
         .clone();
     let draft = Draft::Expression(ExpressionDraft {
+        space: None,
         header: Reference::Existing(cas.handle(value.header)),
         scope: value.scope.clone(),
         sort,

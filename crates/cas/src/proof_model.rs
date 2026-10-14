@@ -36,6 +36,16 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// Complete finite selector partition, without assuming analytic regularity.
+    BoundaryPartition(Box<crate::boundary_model::BoundaryPartition>),
+    /// Explicit positive-order classical case derivative.
+    CaseDerivative(Box<crate::boundary_model::CaseDerivative>),
+    /// Classical derivative value at an owned point.
+    DerivativeAt(Box<crate::boundary_model::PointDerivative>),
+    /// Independently witnessed finite obstruction to a point derivative.
+    DerivativeDoesNotExist(Box<crate::boundary_model::PointNonexistence>),
+    /// Typed projection from a checked oriented jet.
+    TraceValue(Box<crate::boundary_model::TraceValue>),
     /// Classical equality with explicit domain and definedness strength.
     Equality {
         /// Left value expression.
@@ -167,7 +177,7 @@ pub enum Statement {
         /// Region retaining all strict input requirements.
         domain: Handle,
     },
-    /// A represented side jet; its producer belongs to the following lane.
+    /// A checked finite polynomial side jet.
     Jet {
         /// Function with the stated trace.
         function: Handle,
@@ -228,6 +238,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// Closed finite-boundary, jet and derivative modes.
+    Boundary(Box<crate::boundary_model::BoundaryCertificate>),
     /// This primitive has no auxiliary payload.
     None,
     /// Exact interval-cell certificate, never a trusted truth flag.

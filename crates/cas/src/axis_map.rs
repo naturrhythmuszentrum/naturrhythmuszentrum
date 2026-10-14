@@ -270,6 +270,7 @@ impl Mapping {
         let mut result = operator.clone();
         match &mut result {
             Operator::Free(key) | Operator::Derivative(key) => *key = self.key(key),
+            Operator::NamedCase(value) => value.coordinate = self.key(&value.coordinate),
             Operator::AlgebraicRoot { variable, .. } => *variable = self.key(variable),
             Operator::Comprehension { rows, columns } => {
                 *rows = self.extent(rows);

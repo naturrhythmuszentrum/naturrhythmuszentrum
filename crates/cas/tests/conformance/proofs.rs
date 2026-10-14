@@ -735,6 +735,7 @@ fn expected_context_mismatch() -> TestResult {
                 assumptions: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 operator: Operator::Free("x".into()),
                 sort: real(),
                 header: Reference::Local(0),
@@ -779,6 +780,7 @@ fn checked_jacobian_assembly() -> TestResult {
     let syntax_header = fixture.cas.context_header(&fixture.context)?;
     let matrix = |rows, columns, operands: Vec<Reference>| {
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator: Operator::Matrix { rows, columns },
             sort: Sort::Value(AtomicSort::Matrix {
                 field: Field::Real,
@@ -957,6 +959,7 @@ fn matrix_proof_boundary() -> TestResult {
     });
     let matrix = |operator, operands| {
         Draft::Expression(ExpressionDraft {
+            space: None,
             operator,
             sort: sort.clone(),
             header: Reference::Existing(syntax_header.clone()),
@@ -1044,6 +1047,7 @@ fn unknown_function_derivative_refusal() -> TestResult {
                 assumptions: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 operator: Operator::Free("x".into()),
                 sort: real(),
                 header: Reference::Local(0),
@@ -1052,6 +1056,7 @@ fn unknown_function_derivative_refusal() -> TestResult {
                 operands: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 operator: Operator::Rational(Rational::one()),
                 sort: real(),
                 header: Reference::Local(0),
@@ -1060,6 +1065,7 @@ fn unknown_function_derivative_refusal() -> TestResult {
                 operands: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 operator: Operator::Rational(Rational::zero()),
                 sort: real(),
                 header: Reference::Local(0),
@@ -1068,6 +1074,7 @@ fn unknown_function_derivative_refusal() -> TestResult {
                 operands: Vec::new(),
             }),
             Draft::Expression(ExpressionDraft {
+                space: None,
                 operator: Operator::Call("f".into()),
                 sort: real(),
                 header: Reference::Local(0),

@@ -96,6 +96,7 @@ pub(crate) fn term(
     admit(
         cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             header: Reference::Existing(header.clone()),
             scope: Vec::new(),
             sort: real(),
@@ -211,6 +212,7 @@ fn scoped_inputs(
     let bound = admit(
         &mut f.cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             header: Reference::Existing(f.header.clone()),
             scope: scope.clone(),
             sort: real(),

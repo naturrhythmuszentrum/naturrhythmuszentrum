@@ -244,6 +244,14 @@ impl Cas {
         let Vertex::Expression(value) = self.state.node(id)? else {
             return Ok(None);
         };
+        if let (Operator::NamedCase(name), Mode::Free { replacements, .. }) =
+            (&value.operator, mode)
+            && let Some(replacement) = replacements.get(&name.coordinate)
+            && self.state.expression(*replacement)?.operator
+                != Operator::Free(name.coordinate.clone())
+        {
+            return Err(invalid());
+        }
         if let Operator::Rational(number) = &value.operator {
             number.check(budget, AT)?;
         }
@@ -337,6 +345,8 @@ impl Cas {
                         header_id,
                         &Operator::Free(substitution.key.clone()),
                         &declared.sort,
+                        None,
+                        &[],
                         budget,
                     )?
                 || result.insert(substitution.key.clone(), id).is_some()

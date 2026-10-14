@@ -365,7 +365,23 @@ pub(crate) fn measure(
 ) -> Result<(), Fault> {
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
+    crate::boundary_measure::statement(&value.conclusion, budget)?;
+    crate::boundary_measure::certificate(cas, &value.certificate, budget)?;
     let objects = match &value.conclusion {
+        Statement::BoundaryPartition(value) => {
+            budget.check(
+                BudgetKind::BoundaryNodes,
+                size(value.boundaries.len(), AT)?,
+                AT,
+            )?;
+            budget.check(BudgetKind::RegionCells, size(value.cells.len(), AT)?, AT)?;
+            value
+                .boundaries
+                .len()
+                .checked_add(value.cells.len())
+                .and_then(|count| count.checked_add(2))
+                .ok_or_else(invalid)?
+        }
         Statement::Cover { members, .. } => {
             budget.check(BudgetKind::RegionNodes, size(members.len(), AT)?, AT)?;
             members.len().checked_add(1).ok_or_else(invalid)?

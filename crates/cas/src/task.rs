@@ -77,6 +77,8 @@ pub enum Task {
     },
     /// Request function-indexed facts at one boundary.
     Boundary {
+        /// Exact real coordinate for all requested facts.
+        coordinate: String,
         /// Boundary object with no built-in ownership claim.
         point: Handle,
         /// Independently requested fact classes.
@@ -111,11 +113,20 @@ pub enum BoundaryFact {
     /// Actual point ownership.
     Ownership,
     /// One-sided finite jets.
-    Jets,
+    Jets {
+        /// Largest included derivative order, starting at zero.
+        order: u32,
+    },
     /// Classical point derivative.
-    Derivative,
+    Derivative {
+        /// Positive iterated classical derivative order.
+        order: u32,
+    },
     /// Right-minus-left jump.
-    Jump,
+    Jump {
+        /// Trace derivative order; zero is the function jump.
+        order: u32,
+    },
 }
 
 /// A near-support germ is distinct from a compactly supported test.
@@ -258,16 +269,25 @@ pub(crate) fn encode(value: &Task, out: &mut Encoder<'_>) -> Result<(), Fault> {
             map_kind: value, ..
         } => out.name(value)?,
         Task::Boundary {
-            requested_facts, ..
+            coordinate,
+            requested_facts,
+            ..
         } => {
+            out.name(coordinate)?;
             out.count(requested_facts.len())?;
             for fact in requested_facts {
                 out.byte(match fact {
                     BoundaryFact::Ownership => 0,
-                    BoundaryFact::Jets => 1,
-                    BoundaryFact::Derivative => 2,
-                    BoundaryFact::Jump => 3,
+                    BoundaryFact::Jets { .. } => 1,
+                    BoundaryFact::Derivative { .. } => 2,
+                    BoundaryFact::Jump { .. } => 3,
                 })?;
+                if let BoundaryFact::Jets { order }
+                | BoundaryFact::Derivative { order }
+                | BoundaryFact::Jump { order } = fact
+                {
+                    out.unsigned(u64::from(*order))?;
+                }
             }
         }
         Task::Pair { action_mode, .. } => out.byte(u8::from(matches!(

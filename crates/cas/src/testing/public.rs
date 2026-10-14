@@ -80,3 +80,10 @@ pub(crate) mod wire;
 )]
 #[path = "witness.rs"]
 pub(crate) mod witness;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared boundary syntax fixtures"
+)]
+#[path = "boundary.rs"]
+pub(crate) mod boundary;

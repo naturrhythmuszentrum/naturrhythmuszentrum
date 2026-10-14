@@ -182,7 +182,7 @@ fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
                 return Err(invalid());
             }
         }
-        _ => return Err(invalid()),
+        _ => crate::boundary_roles::validate(cas, statement)?,
     }
     Ok(())
 }

@@ -13,3 +13,8 @@ pub use crate::proof_model::{
     Ownership, Statement, VerifiedWitness,
 };
 pub use crate::region::RegionCertificate;
+
+pub use crate::boundary_model::{
+    BoundaryCertificate, BoundaryPartition, CaseDerivative, NonexistenceReason, PointDerivative,
+    PointNonexistence, TraceValue,
+};

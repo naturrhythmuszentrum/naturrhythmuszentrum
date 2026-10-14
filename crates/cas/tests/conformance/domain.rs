@@ -837,6 +837,7 @@ fn header_space_acyclicity() -> TestResult {
     let test = admit(
         &mut fixture.cas,
         Draft::Expression(ExpressionDraft {
+            space: None,
             header: Reference::Existing(extended.clone()),
             scope: Vec::new(),
             sort: Sort::Test,

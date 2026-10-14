@@ -308,6 +308,7 @@ const fn operator_tag(value: &Operator) -> u8 {
         Operator::IntegerEmbed => 26,
         Operator::Entrywise(_) => 27,
         Operator::Cases => 28,
+        Operator::NamedCase(_) => 29,
     }
 }
 
@@ -315,6 +316,7 @@ const fn operator_tag(value: &Operator) -> u8 {
 pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fault> {
     out.byte(operator_tag(value))?;
     match value {
+        Operator::NamedCase(value) => crate::named_case::encode(value, out),
         Operator::Rational(number) => out.number(number),
         Operator::Free(name) | Operator::Call(name) | Operator::Derivative(name) => out.name(name),
         Operator::Bound { depth, slot } => {

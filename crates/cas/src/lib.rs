@@ -229,6 +229,10 @@ mod known;
         unreachable_pub"
 )]
 mod search;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
 mod service;
 mod shortcut;
 
@@ -385,3 +389,92 @@ mod proof_service;
     reason = "typed role validation is shared only within the private kernel"
 )]
 mod statement_check;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_decode;
+mod boundary_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_partition;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_producer;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_regions;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_roles;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_runner;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_wire;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod case_calculus;
+mod derivative_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod jet_polynomial;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod named_case;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod case_point;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_derivative;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "boundary implementation is shared only within the crate"
+)]
+mod boundary_map;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "private boundary preflight checks"
+)]
+mod boundary_measure;
+
+mod boundary_replay;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "partition memo helpers are shared only within the kernel"
+)]
+mod region_cache;

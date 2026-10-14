@@ -14,11 +14,11 @@ use crate::search::{Search, SearchPolicy, SearchResult, SearchStatistics};
 const AT: Location = Location::new("request execution");
 
 /// A fully checked prefix and an optional reason that further generation stopped.
-struct Execution {
+pub(crate) struct Execution {
     /// Only a kernel-checked candidate is retained.
-    result: Option<SearchResult>,
+    pub(crate) result: Option<SearchResult>,
     /// A failed search/generation stage does not certify absence of another route.
-    fault: Option<Fault>,
+    pub(crate) fault: Option<Fault>,
 }
 
 impl Cas {
@@ -118,6 +118,12 @@ impl Cas {
             generation.work(1, AT)?;
             inputs.push(self.state.occurrence(self.checked(&root.root)?)?.expression);
         }
+        if crate::boundary_runner::handles(self, &request.task, &inputs, generation)? {
+            self.check_nonempty_request(context, generation)?;
+            return crate::boundary_runner::execute(
+                self, request, &inputs, policy, generation, checker,
+            );
+        }
         if crate::case_service::handles(self, &request.task, &inputs, generation)? {
             self.check_nonempty_request(context, generation)?;
             let result =
@@ -196,7 +202,7 @@ impl Cas {
         generation: &mut Budget,
     ) -> Result<(), Fault> {
         let admissible = self.state.context(context)?.admissible;
-        match crate::region::partition(&self.state, &[admissible], generation) {
+        match crate::region_cache::partition(self, &[admissible], generation) {
             Ok(cells) => {
                 if cells
                     .membership
@@ -249,6 +255,7 @@ impl Cas {
         let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
         let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
         let result = SearchResult {
+            payload: None,
             witness,
             cost: policy.costs.weight(crate::rule::Primitive::Jets)?,
             peak: before.max(after),
@@ -290,6 +297,7 @@ impl Cas {
         let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
         let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
         let result = SearchResult {
+            payload: None,
             witness,
             cost: policy.costs.weight(crate::rule::Primitive::SquareFree)?,
             peak: before.max(after),
@@ -352,6 +360,7 @@ impl Cas {
         let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
         let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
         let result = SearchResult {
+            payload: None,
             witness,
             cost,
             peak,
@@ -376,7 +385,7 @@ fn envelope(
     budget: &mut Budget,
 ) -> Result<Vec<u8>, Fault> {
     let mut out = Encoder::output(budget, AT);
-    out.raw(b"NRZRUN02")?;
+    out.raw(b"NRZRUN03")?;
     result.policy.encode(&mut out)?;
     for kind in crate::budget::ALL_KINDS {
         out.unsigned(limits.get(kind))?;
@@ -431,6 +440,10 @@ fn envelope(
     }
     out.count(result.witness.bytes.len())?;
     out.raw(&result.witness.bytes)?;
+    out.byte(u8::from(result.payload.is_some()))?;
+    if let Some(payload) = &result.payload {
+        payload.encode(&mut out)?;
+    }
     Ok(out.finish())
 }
 
@@ -460,11 +473,13 @@ fn outcome(
                 best: execution.result,
             },
             FaultKind::Invalid(InvalidCode::UnknownTotality) => Outcome::UnknownTotality {
+                partial: execution.result.map(Box::new),
                 request: record,
                 blocker: fault,
                 usage,
             },
             FaultKind::Invalid(InvalidCode::PendingPremise) => Outcome::PendingPremise {
+                partial: execution.result.map(Box::new),
                 request: record,
                 blocker: fault,
                 usage,
@@ -495,12 +510,49 @@ fn outcome(
             FaultKind::Invalid(_) => Outcome::Invalid { fault, usage },
         };
     }
-    match execution.result {
-        Some(result) if result.witness.is_discharged() => Outcome::Proved {
-            request: record,
-            result,
-            usage,
-        },
+    completed_outcome(record, execution.result, usage)
+}
+
+/// Completion classification uses every retained component, including partial maps.
+fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: BudgetUsage) -> Outcome {
+    match result {
+        Some(result)
+            if result
+                .payload
+                .as_ref()
+                .is_some_and(|value| value.partial() && value.discharged()) =>
+        {
+            Outcome::Partial {
+                request: record,
+                result,
+                usage,
+            }
+        }
+        Some(result)
+            if result
+                .payload
+                .as_ref()
+                .is_some_and(|value| value.nonexistence() && value.discharged()) =>
+        {
+            Outcome::Nonexistent {
+                request: record,
+                result,
+                usage,
+            }
+        }
+        Some(result)
+            if result.witness.is_discharged()
+                && result
+                    .payload
+                    .as_ref()
+                    .is_none_or(|value| value.discharged()) =>
+        {
+            Outcome::Proved {
+                request: record,
+                result,
+                usage,
+            }
+        }
         Some(result) => Outcome::Conditional {
             request: record,
             result,

@@ -8,3 +8,5 @@ pub use crate::model::{
     SpectralKind,
 };
 pub use crate::substitution::Substitution;
+
+pub use crate::boundary_model::{CaseName, NamedCase};

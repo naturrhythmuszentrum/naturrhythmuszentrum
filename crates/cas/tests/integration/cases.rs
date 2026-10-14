@@ -177,6 +177,7 @@ fn original_ownership_expected_replay() -> TestResult {
     let point = f.boundary(&f.zero.clone())?;
     let request = f.request(
         Task::Boundary {
+            coordinate: "x".into(),
             point,
             requested_facts: vec![BoundaryFact::Ownership],
         },
