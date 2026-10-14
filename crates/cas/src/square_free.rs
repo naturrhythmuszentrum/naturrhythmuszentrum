@@ -8,8 +8,9 @@ use crate::model::{AtomicSort, Field, Operator, Sort};
 use crate::multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};
 use crate::number::Rational;
 use crate::producer::{Plan, step, term};
-use crate::proof_model::{Relation, VerifiedWitness};
+use crate::proof_model::VerifiedWitness;
 use crate::rule::Primitive;
+use crate::scalar_model::Relation;
 use crate::univariate::Polynomial;
 
 /// Polynomial production location.

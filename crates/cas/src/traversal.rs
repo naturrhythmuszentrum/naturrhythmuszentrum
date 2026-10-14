@@ -350,6 +350,11 @@ impl Cas {
     ) -> Result<Handle, Fault> {
         let at = Location::new("generated occurrences");
         let root = self.checked(expression)?;
+        if matches!(self.state.node(root)?, Vertex::SourceForm(_))
+            || matches!(self.state.node(root)?, Vertex::Expression(value) if value.domain.is_some())
+        {
+            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
+        }
         let provenance_id = self.checked(provenance)?;
         if !matches!(
             self.state.node(provenance_id)?,

@@ -8,7 +8,7 @@ use crate::graph::{Cas, LogicalId, size};
 use crate::model::{Field, Operator};
 use crate::multiplicity::SquareFreeCertificate;
 use crate::number::Rational;
-use crate::proof_model::{ProofStep, Relation};
+use crate::scalar_model::{ProofStep, Relation};
 use crate::univariate::Polynomial;
 
 /// Multiplicity checker location.

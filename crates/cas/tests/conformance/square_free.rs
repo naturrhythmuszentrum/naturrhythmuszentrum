@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public-contract checks for square-free.
 
-use nrz_cas::{
-    AtomicSort, Budget, BudgetKind, Cas, Constant, Declaration, Draft, Environment, FaultKind,
-    Field, Limits, LimitsOverride, Operator, Outcome, Primitive, Rational, Relation, Sort,
-    UnsupportedReason,
+use nrz_cas::limits::{Budget, BudgetKind, Limits, LimitsOverride};
+use nrz_cas::proof::{Primitive, Statement};
+use nrz_cas::request::{Outcome, UnsupportedReason};
+use nrz_cas::syntax::{
+    AtomicSort, Constant, Declaration, Draft, Environment, Field, Operator, Sort,
 };
+use nrz_cas::{Cas, FaultKind, Rational, Reference};
 
 use crate::testing::budgets::derivation_budget as budget;
 use crate::testing::common::TestResult;
@@ -21,8 +23,14 @@ fn square_free_constants_and_zero() -> TestResult {
         let result = fixture.decompose(&input)?;
         let certificate = fixture.cas.square_free_certificate(&result.witness)?;
         assert_eq!(certificate.scalar, Rational::parse(text, &mut budget()?)?);
-        assert_eq!(certificate.layers, [] as [nrz_cas::SquareFreeLayer; 0]);
-        assert_eq!(certificate.rounds, [] as [nrz_cas::GcdCertificate; 0]);
+        assert_eq!(
+            certificate.layers,
+            [] as [nrz_cas::proof::SquareFreeLayer; 0]
+        );
+        assert_eq!(
+            certificate.rounds,
+            [] as [nrz_cas::proof::GcdCertificate; 0]
+        );
     }
     let mut fixture = Fixture::new(Field::Real)?;
     let zero = fixture.number("0")?;
@@ -218,20 +226,31 @@ fn square_free_claim_tampering() -> TestResult {
     for mutation in 0..4 {
         let mut step = proposal(&result, certificate.clone());
         match mutation {
-            0 => step.right = different.clone(),
+            0 => {
+                let Statement::SquareFree { output, .. } = &mut step.conclusion else {
+                    return Err("expected square-free statement".into());
+                };
+                *output = different.clone();
+            }
             1 => {
-                step.relation = Relation::SquareFree {
+                step.conclusion = Statement::SquareFree {
+                    input: crate::testing::witness::left(result.witness.judgment())?.clone(),
+                    output: crate::testing::witness::right(result.witness.judgment())?.clone(),
+                    domain: fixture.cas.admissible_region(&fixture.context)?,
                     variable: "y".into(),
                     field: Field::Rational,
                 }
             }
             2 => {
-                step.relation = Relation::SquareFree {
+                step.conclusion = Statement::SquareFree {
+                    input: crate::testing::witness::left(result.witness.judgment())?.clone(),
+                    output: crate::testing::witness::right(result.witness.judgment())?.clone(),
+                    domain: fixture.cas.admissible_region(&fixture.context)?,
                     variable: "x".into(),
                     field: Field::Real,
                 }
             }
-            _ => step.primitive = Primitive::Reflexivity,
+            _ => step.rule = Primitive::Reflexivity,
         }
         let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
         assert!(
@@ -304,7 +323,7 @@ fn square_free_portable_boundaries() -> TestResult {
     let bytes = outputs.first().ok_or("missing export")?;
     assert_eq!(Some(bytes), outputs.get(1));
     let length = u64::try_from(bytes.len())?;
-    let mut receiver = Cas::new(Limits::default())?;
+    let mut receiver = Cas::new(budget()?.limits().clone())?;
     let mut exact = Budget::new(Limits {
         witness_bytes: length,
         work: 2_000_000_000,
@@ -359,8 +378,8 @@ fn square_free_unknown_function_refusal() -> TestResult {
     let mut fixture = Fixture::new(Field::Real)?;
     let scalar = AtomicSort::Scalar(Field::Real);
     let handles = fixture.cas.admit(
-        &[Draft::Context {
-            environment: Environment {
+        &[
+            Draft::Header(nrz_cas::domain::HeaderDraft::Core(Environment {
                 declarations: vec![
                     Declaration {
                         key: "x".into(),
@@ -377,12 +396,22 @@ fn square_free_unknown_function_refusal() -> TestResult {
                     },
                 ],
                 ..Environment::default()
-            },
-            assumptions: Vec::new(),
-        }],
+            })),
+            Draft::Region(nrz_cas::domain::RegionDraft {
+                header: Reference::Local(0),
+                scope: Vec::new(),
+                ambient: nrz_cas::domain::AmbientDomain::Assignments,
+                expression: nrz_cas::domain::RegionExpr::Ambient,
+            }),
+            Draft::Context(nrz_cas::domain::ContextDraft::Root {
+                header: Reference::Local(0),
+                admissible: Reference::Local(1),
+                assumptions: Vec::new(),
+            }),
+        ],
         &mut budget()?,
     )?;
-    fixture.context = handles.first().cloned().ok_or("function context")?;
+    fixture.context = handles.get(2).cloned().ok_or("function context")?;
     let coordinate = fixture.term(Operator::Free("x".into()), &[])?;
     let input = fixture.term(Operator::Call("f".into()), &[coordinate])?;
     let request = fixture.request(&input)?;
@@ -405,7 +434,7 @@ fn square_free_sparse_term_boundary() -> TestResult {
     let input = fixture.term(Operator::IntegerPower(3), &[coordinate])?;
     let mut request = fixture.request(&input)?;
     request.limits.polynomial_terms = Some(1);
-    let Outcome::Verified { result, .. } = fixture.cas.run(&request) else {
+    let Outcome::Proved { result, .. } = fixture.cas.run(&request) else {
         return Err("dense padding spent the nonzero term allowance".into());
     };
     let certificate = fixture.cas.square_free_certificate(&result.witness)?;

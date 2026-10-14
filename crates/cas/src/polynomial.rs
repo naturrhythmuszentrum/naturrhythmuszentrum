@@ -394,6 +394,12 @@ fn convert_node(
             };
             Fraction::polynomial(Polynomial::atom(Atom::Constant(tag), budget)?, budget)
         }
+        Operator::IntegerEmbed => {
+            let value = child(0)?;
+            value.numerator.prepay(budget)?;
+            value.denominator.prepay(budget)?;
+            Ok(value.clone())
+        }
         Operator::Neg => {
             let value = child(0)?;
             value.denominator.prepay(budget)?;
@@ -515,7 +521,7 @@ fn materialize_fraction(
         }
     }
     let expression = cas.state.expression(root)?;
-    let context = expression.context;
+    let context = expression.header;
     let sort = expression.sort.clone();
     let numerator = materialize(cas, context, &sort, &value.numerator, budget)?;
     if value.denominator.is_scalar() || value.numerator.terms.is_empty() {
@@ -760,7 +766,7 @@ pub(crate) fn materialize_univariate(
 ) -> Result<LogicalId, Fault> {
     crate::univariate::validate(coefficients, budget)?;
     let source = cas.state.expression(model)?;
-    let context = source.context;
+    let context = source.header;
     let sort = source.sort.clone();
     let mut value = Polynomial {
         terms: BTreeMap::new(),

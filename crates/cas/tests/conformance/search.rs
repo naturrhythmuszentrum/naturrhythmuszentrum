@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public-contract checks for search.
 
-use nrz_cas::{
-    AtomicSort, Budget, BudgetKind, Claim, CostPolicy, Declaration, Draft, Environment, Fault,
-    FaultKind, Field, InvalidCode, Limits, Operation, Operator, Outcome, Primitive, Rational,
-    Relation, SearchPolicy, Sort,
-};
+use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::proof::{Judgment, Primitive, Statement};
+use nrz_cas::request::{CostPolicy, Outcome, SearchPolicy, Task};
+use nrz_cas::syntax::{AtomicSort, Declaration, Draft, Environment, Field, Operator, Sort};
+use nrz_cas::{Fault, FaultKind, InvalidCode, Rational, Reference};
 
 use crate::testing::budgets::derivation_budget as budget;
 use crate::testing::builders::at;
@@ -39,18 +39,37 @@ fn generated_calculus_laws() -> TestResult {
         (added, added_derivative),
         (product, other),
     ] {
-        let request = fixture.request(Operation::Differentiate("x".into()), &[input])?;
+        let request = fixture.request(
+            Task::Differentiate {
+                coordinate: "x".into(),
+                order: 1,
+                layer: nrz_cas::domain::Layer::Pointwise,
+                domain: fixture.domain.clone(),
+            },
+            &[input],
+        )?;
         let result = completed(fixture.cas.run(&request))?;
-        equal(&mut fixture, &result.witness.claim().right, &expected)?;
+        equal(
+            &mut fixture,
+            crate::testing::witness::right(result.witness.judgment())?,
+            &expected,
+        )?;
         replay(&fixture, &result)?;
     }
     let reciprocal_square = fixture.term(Operator::Div, &[one, denominator])?;
-    let request = fixture.request(Operation::Differentiate("x".into()), &[reciprocal_square])?;
+    let request = fixture.request(
+        Task::Differentiate {
+            coordinate: "x".into(),
+            order: 1,
+            layer: nrz_cas::domain::Layer::Pointwise,
+            domain: fixture.domain.clone(),
+        },
+        &[reciprocal_square],
+    )?;
     let result = completed(fixture.cas.run(&request))?;
-    assert!(
-        matches!(fixture.cas.expression(&result.witness.claim().right)?.0,
-        Operator::Rational(value) if value.is_zero())
-    );
+    assert!(matches!(
+            fixture.cas.expression(crate::testing::witness::right(result.witness.judgment())?)?.0,
+        Operator::Rational(value) if value.is_zero()));
     Ok(())
 }
 
@@ -65,19 +84,29 @@ fn generated_power_domains() -> TestResult {
             Operator::IntegerPower(exponent),
             std::slice::from_ref(&variable),
         )?;
-        let request = fixture.request(Operation::Differentiate("x".into()), &[power])?;
+        let request = fixture.request(
+            Task::Differentiate {
+                coordinate: "x".into(),
+                order: 1,
+                layer: nrz_cas::domain::Layer::Pointwise,
+                domain: fixture.domain.clone(),
+            },
+            &[power],
+        )?;
         let result = completed(fixture.cas.run(&request))?;
-        assert_eq!(result.witness.claim().residuals.is_empty(), exponent == 1);
+        assert_eq!(
+            result.witness.judgment().residuals.is_empty(),
+            exponent == 1
+        );
         if exponent != 1 {
             assert_eq!(
-                result
-                    .witness
-                    .claim()
-                    .residuals
-                    .first()
-                    .ok_or("missing strict guard")?
-                    .term,
-                variable,
+                result.witness.judgment().residuals,
+                vec![crate::testing::witness::guarded(
+                    &mut fixture.cas,
+                    &fixture.context,
+                    nrz_cas::proof::GuardKind::NonZero,
+                    &variable
+                )?],
             );
         }
         replay(&fixture, &result)?;
@@ -94,15 +123,23 @@ fn generated_zero_domain() -> TestResult {
     let zero = fixture.number("0")?;
     let invalid = fixture.term(Operator::Div, &[variable, zero.clone()])?;
     let input = fixture.term(Operator::Mul, &[zero, invalid])?;
-    for operation in [Operation::Simplify, Operation::Differentiate("x".into())] {
+    for operation in [
+        Task::Simplify,
+        Task::Differentiate {
+            coordinate: "x".into(),
+            order: 1,
+            layer: nrz_cas::domain::Layer::Pointwise,
+            domain: fixture.domain.clone(),
+        },
+    ] {
         let request = fixture.request(operation, std::slice::from_ref(&input))?;
         assert!(matches!(
             fixture.cas.run(&request),
-            Outcome::Unresolved {
-                blocker: Some(Fault {
+            Outcome::Refused {
+                fault: Fault {
                     kind: FaultKind::Invalid(InvalidCode::RefutedDomain),
                     ..
-                }),
+                },
                 ..
             }
         ));
@@ -118,13 +155,14 @@ fn generated_jacobian_order() -> TestResult {
     let variable = fixture.variable("x")?;
     let other = fixture.variable("y")?;
     let request = fixture.request(
-        Operation::Jacobian(vec!["y".into(), "x".into()]),
+        Task::Jacobian(vec!["y".into(), "x".into()]),
         &[variable.clone(), other],
     )?;
     let result = completed(fixture.cas.run(&request))?;
-    let cells = fixture
-        .cas
-        .operands(&result.witness.claim().right, &mut budget()?)?;
+    let cells = fixture.cas.operands(
+        crate::testing::witness::right(result.witness.judgment())?,
+        &mut budget()?,
+    )?;
     for (cell, expected) in cells.iter().zip([0, 1, 1, 0]) {
         let (operator, _) = fixture.cas.expression(cell)?;
         assert_eq!(
@@ -133,10 +171,7 @@ fn generated_jacobian_order() -> TestResult {
         );
     }
     replay(&fixture, &result)?;
-    let repeated = fixture.request(
-        Operation::Jacobian(vec!["x".into(), "x".into()]),
-        &[variable],
-    )?;
+    let repeated = fixture.request(Task::Jacobian(vec!["x".into(), "x".into()]), &[variable])?;
     let before = fixture.cas.counts();
     assert!(matches!(
         fixture.cas.run(&repeated),
@@ -156,26 +191,34 @@ fn frozen_cost_snapshots() -> TestResult {
     let sum = fixture.term(Operator::Add, &[variable.clone(), zero])?;
     let proof = fixture.cas.check_proof(
         &fixture.context,
-        &[equality(Primitive::Jets, &sum, &variable)],
+        &[equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::Jets,
+            &sum,
+            &variable,
+        )],
         &mut budget()?,
     )?;
-    let first =
-        fixture
-            .cas
-            .certify_frozen_cost(proof.claim(), &CostPolicy::default(), &mut budget()?)?;
+    let first = fixture.cas.certify_frozen_cost(
+        proof.judgment(),
+        &CostPolicy::default(),
+        &mut budget()?,
+    )?;
     assert_eq!(first.shortest_cost(), Some(4));
     assert_eq!(first.settled(), 2);
     fixture.cas.register_derived_with_policy(
         &proof,
-        proof.claim(),
+        proof.judgment(),
         &CostPolicy::default(),
         1,
         &mut budget()?,
     )?;
-    let second =
-        fixture
-            .cas
-            .certify_frozen_cost(proof.claim(), &CostPolicy::default(), &mut budget()?)?;
+    let second = fixture.cas.certify_frozen_cost(
+        proof.judgment(),
+        &CostPolicy::default(),
+        &mut budget()?,
+    )?;
     assert_eq!(second.shortest_cost(), Some(1));
     assert_ne!(first.manifest(), second.manifest());
     assert_eq!(first.shortest_cost(), Some(4));
@@ -184,7 +227,7 @@ fn frozen_cost_snapshots() -> TestResult {
             .cas
             .register_derived_with_policy(
                 &proof,
-                proof.claim(),
+                proof.judgment(),
                 &CostPolicy::default(),
                 1,
                 &mut budget()?
@@ -198,7 +241,7 @@ fn frozen_cost_snapshots() -> TestResult {
     assert!(
         fixture
             .cas
-            .certify_frozen_cost(proof.claim(), &CostPolicy::default(), &mut tiny,)
+            .certify_frozen_cost(proof.judgment(), &CostPolicy::default(), &mut tiny,)
             .is_err()
     );
     Ok(())
@@ -214,12 +257,18 @@ fn versioned_cost_policies() -> TestResult {
     let sum = fixture.term(Operator::Add, &[variable.clone(), zero])?;
     let proof = fixture.cas.check_proof(
         &fixture.context,
-        &[equality(Primitive::Jets, &sum, &variable)],
+        &[equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::Jets,
+            &sum,
+            &variable,
+        )],
         &mut budget()?,
     )?;
     fixture
         .cas
-        .register_derived(&proof, proof.claim(), 1, &mut budget()?)?;
+        .register_derived(&proof, proof.judgment(), 1, &mut budget()?)?;
     let mut policy = CostPolicy {
         key: "fixture".into(),
         version: 1,
@@ -228,15 +277,19 @@ fn versioned_cost_policies() -> TestResult {
     policy.weights.fill(7);
     let certificate = fixture
         .cas
-        .certify_frozen_cost(proof.claim(), &policy, &mut budget()?)?;
+        .certify_frozen_cost(proof.judgment(), &policy, &mut budget()?)?;
     assert_eq!(certificate.shortest_cost(), Some(7));
-    fixture
-        .cas
-        .register_derived_with_policy(&proof, proof.claim(), &policy, 2, &mut budget()?)?;
+    fixture.cas.register_derived_with_policy(
+        &proof,
+        proof.judgment(),
+        &policy,
+        2,
+        &mut budget()?,
+    )?;
     assert_eq!(
         fixture
             .cas
-            .certify_frozen_cost(proof.claim(), &policy, &mut budget()?)?
+            .certify_frozen_cost(proof.judgment(), &policy, &mut budget()?)?
             .shortest_cost(),
         Some(2),
     );
@@ -245,7 +298,7 @@ fn versioned_cost_policies() -> TestResult {
     assert!(
         fixture
             .cas
-            .certify_frozen_cost(proof.claim(), &policy, &mut budget()?)
+            .certify_frozen_cost(proof.judgment(), &policy, &mut budget()?)
             .is_err()
     );
     assert_eq!(fixture.cas.counts(), old);
@@ -253,7 +306,7 @@ fn versioned_cost_policies() -> TestResult {
     assert_eq!(
         fixture
             .cas
-            .certify_frozen_cost(proof.claim(), &policy, &mut budget()?)?
+            .certify_frozen_cost(proof.judgment(), &policy, &mut budget()?)?
             .shortest_cost(),
         Some(7),
     );
@@ -266,7 +319,7 @@ fn versioned_cost_policies() -> TestResult {
 fn cost_policy_refusals() -> TestResult {
     let mut fixture = Fixture::new(&["x"])?;
     let variable = fixture.variable("x")?;
-    let request = fixture.request(Operation::Simplify, &[variable])?;
+    let request = fixture.request(Task::Simplify, &[variable])?;
     for case in 0..4 {
         let mut costs = CostPolicy {
             key: "invalid-fixture".into(),
@@ -307,7 +360,13 @@ fn search_resource_refusals() -> TestResult {
         let variable = fixture.variable("x")?;
         let one = fixture.number("1")?;
         let quotient = fixture.term(Operator::Div, &[variable.clone(), variable])?;
-        let mut request = fixture.request(Operation::Equal, &[quotient, one])?;
+        let mut request = fixture.request(
+            Task::Equal {
+                domain: fixture.domain.clone(),
+                domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+            },
+            &[quotient, one],
+        )?;
         if no_replay {
             request.limits.replay_work = Some(0);
         } else {
@@ -328,7 +387,15 @@ fn search_resource_refusals() -> TestResult {
 fn generated_output_boundary() -> TestResult {
     let mut fixture = Fixture::new(&["x"])?;
     let variable = fixture.variable("x")?;
-    let mut request = fixture.request(Operation::Differentiate("x".into()), &[variable])?;
+    let mut request = fixture.request(
+        Task::Differentiate {
+            coordinate: "x".into(),
+            order: 1,
+            layer: nrz_cas::domain::Layer::Pointwise,
+            domain: fixture.domain.clone(),
+        },
+        &[variable],
+    )?;
     request.limits.output_bytes = Some(0);
     let result = completed(fixture.cas.run(&request))?;
     assert!(result.response.is_none());
@@ -350,7 +417,13 @@ fn search_requires_discharged_domain() -> TestResult {
     let variable = fixture.variable("x")?;
     let one = fixture.number("1")?;
     let quotient = fixture.term(Operator::Div, &[variable.clone(), variable])?;
-    let request = fixture.request(Operation::Equal, &[quotient, one])?;
+    let request = fixture.request(
+        Task::Equal {
+            domain: fixture.domain.clone(),
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
+        &[quotient, one],
+    )?;
     let outcome = fixture.cas.run_with_policy(
         &request,
         &SearchPolicy {
@@ -370,7 +443,15 @@ fn generated_request_determinism() -> TestResult {
         let mut fixture = Fixture::new(&["x"])?;
         let variable = fixture.variable("x")?;
         let cubic = fixture.term(Operator::IntegerPower(3), &[variable])?;
-        let request = fixture.request(Operation::Differentiate("x".into()), &[cubic])?;
+        let request = fixture.request(
+            Task::Differentiate {
+                coordinate: "x".into(),
+                order: 1,
+                layer: nrz_cas::domain::Layer::Pointwise,
+                domain: fixture.domain.clone(),
+            },
+            &[cubic],
+        )?;
         let result = completed(fixture.cas.run(&request))?;
         let bytes = replay(&fixture, &result)?;
         Ok((bytes, result.response.ok_or("response was not exported")?))
@@ -385,8 +466,8 @@ fn generated_request_determinism() -> TestResult {
 fn generated_function_remains_pending() -> TestResult {
     let mut fixture = Fixture::new(&["x"])?;
     let handles = fixture.cas.admit(
-        &[Draft::Context {
-            environment: Environment {
+        &[
+            Draft::Header(nrz_cas::domain::HeaderDraft::Core(Environment {
                 declarations: vec![
                     Declaration {
                         key: "x".into(),
@@ -403,16 +484,32 @@ fn generated_function_remains_pending() -> TestResult {
                     },
                 ],
                 ..Environment::default()
-            },
-            assumptions: Vec::new(),
-        }],
+            })),
+            Draft::Region(nrz_cas::domain::RegionDraft {
+                header: Reference::Local(0),
+                scope: Vec::new(),
+                ambient: nrz_cas::domain::AmbientDomain::Assignments,
+                expression: nrz_cas::domain::RegionExpr::Ambient,
+            }),
+            Draft::Context(nrz_cas::domain::ContextDraft::Root {
+                header: Reference::Local(0),
+                admissible: Reference::Local(1),
+                assumptions: Vec::new(),
+            }),
+        ],
         &mut budget()?,
     )?;
-    fixture.context = at(&handles, 0)?;
+    fixture.context = at(&handles, 2)?;
+    fixture.domain = fixture.cas.admissible_region(&fixture.context)?;
     let variable = fixture.variable("x")?;
     let call = fixture.term(Operator::Call("f".into()), &[variable])?;
     let request = fixture.request(
-        Operation::Differentiate("x".into()),
+        Task::Differentiate {
+            coordinate: "x".into(),
+            order: 1,
+            layer: nrz_cas::domain::Layer::Pointwise,
+            domain: fixture.domain.clone(),
+        },
         std::slice::from_ref(&call),
     )?;
     let outcome = fixture.cas.run(&request);
@@ -439,20 +536,28 @@ fn generated_expected_claim_refusal() -> TestResult {
     let variable = fixture.variable("x")?;
     let zero = fixture.number("0")?;
     let request = fixture.request(
-        Operation::Differentiate("x".into()),
+        Task::Differentiate {
+            coordinate: "x".into(),
+            order: 1,
+            layer: nrz_cas::domain::Layer::Pointwise,
+            domain: fixture.domain.clone(),
+        },
         std::slice::from_ref(&variable),
     )?;
     let result = completed(fixture.cas.run(&request))?;
     let bytes = fixture
         .cas
         .export_witness(&result.witness, &mut budget()?)?;
-    let wrong = Claim {
+    let wrong = Judgment {
         context: fixture.context.clone(),
-        relation: Relation::Derivative {
-            variable: "x".into(),
+        layer: nrz_cas::domain::Layer::Pointwise,
+        space: None,
+        statement: Statement::DerivativeOn {
+            function: variable,
+            derivative: zero,
+            coordinate: "x".into(),
+            domain: fixture.domain.clone(),
         },
-        left: variable,
-        right: zero,
         residuals: Vec::new(),
     };
     assert!(fixture.cas.replay(&bytes, &wrong, &mut budget()?).is_err());
@@ -466,11 +571,16 @@ fn frozen_domain_refusal() -> TestResult {
     let mut fixture = Fixture::new(&["x"])?;
     let variable = fixture.variable("x")?;
     let quotient = fixture.term(Operator::Div, &[variable.clone(), variable])?;
-    let claim = Claim {
+    let claim = Judgment {
         context: fixture.context.clone(),
-        relation: Relation::EqualOnDomain,
-        left: quotient.clone(),
-        right: quotient,
+        layer: nrz_cas::domain::Layer::Pointwise,
+        space: None,
+        statement: Statement::Equality {
+            left: quotient.clone(),
+            right: quotient,
+            domain: fixture.domain.clone(),
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
         residuals: Vec::new(),
     };
     let before = fixture.cas.counts();

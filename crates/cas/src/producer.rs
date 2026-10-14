@@ -8,8 +8,8 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, size};
 use crate::model::{Operator, Sort};
 use crate::number::Rational;
-use crate::proof_model::{ProofStep, Relation, VerifiedWitness};
 use crate::rule::Primitive;
+use crate::scalar_model::{ProofStep, Relation, VerifiedWitness};
 
 /// Producer bookkeeping location.
 const AT: Location = Location::new("proof generation");
@@ -110,9 +110,8 @@ impl Plan {
         check_budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
         let checked = (|| {
-            let compiled = crate::proof::compile(cas, context, &self.steps, check_budget)?;
-            let bytes = crate::wire::encode(cas, &compiled, check_budget)?;
-            cas.finish_proof(&compiled, bytes, check_budget)
+            let compiled = crate::proof_check::compile(cas, context, &self.steps, check_budget)?;
+            cas.finish_proof(&compiled, check_budget)
         })();
         checked.map_err(replay_fault)
     }
@@ -164,7 +163,7 @@ pub(crate) fn term(
     if !source.scope.is_empty() {
         return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
     }
-    let context = source.context;
+    let context = source.header;
     let sort: Sort = source.sort.clone();
     cas.generated(context, operator, sort, operands, budget)
 }

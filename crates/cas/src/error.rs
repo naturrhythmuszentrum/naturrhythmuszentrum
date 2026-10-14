@@ -74,6 +74,8 @@ pub enum InvalidCode {
     ZeroPolynomial,
     /// A required domain condition was refuted, so no equality is admitted.
     RefutedDomain,
+    /// A requested function result has an exactly empty admissible domain.
+    EmptyDomain,
 }
 
 /// Classification of a resource refusal.

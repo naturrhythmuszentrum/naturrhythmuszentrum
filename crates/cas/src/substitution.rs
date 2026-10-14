@@ -98,23 +98,13 @@ impl Cas {
                 continue;
             }
             let value = self.state.expression(id)?;
+            if value.domain.is_some() {
+                return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
+            }
             if let Operator::Rational(number) = &value.operator {
                 number.check(budget, at)?;
             }
-            let prefix = outer_len
-                .checked_add(1)
-                .ok_or_else(|| Fault::invalid(InvalidCode::Scope, at))?;
-            let suffix = value
-                .scope
-                .get(prefix..)
-                .ok_or_else(|| Fault::invalid(InvalidCode::Scope, at))?;
-            let nested =
-                u32::try_from(suffix.len()).map_err(|_| Fault::invalid(InvalidCode::Scope, at))?;
-            let mut scope = outer.clone();
-            scope
-                .try_reserve(suffix.len())
-                .map_err(|_| Fault::allocation(at))?;
-            scope.extend_from_slice(suffix);
+            let (nested, scope) = instantiated_scope(&outer, outer_len, &value.scope, budget)?;
             if let Operator::Bound { depth, slot } = &value.operator
                 && *depth == nested
             {
@@ -156,7 +146,7 @@ impl Cas {
                 ExpressionDraft {
                     operator,
                     sort: value.sort.clone(),
-                    context: Reference::Existing(self.handle(value.context)),
+                    header: Reference::Existing(self.handle(value.header)),
                     scope,
                     binding: value.binding.clone(),
                     operands,
@@ -198,7 +188,7 @@ impl Cas {
             .get(..outer_len)
             .ok_or_else(|| Fault::invalid(InvalidCode::Scope, at))?
             .to_vec();
-        let header = &self.state.context(value.context)?.header;
+        let header = &self.state.header(value.header)?.bytes;
         let mut replacement_ids = Vec::new();
         replacement_ids
             .try_reserve_exact(replacements.len())
@@ -209,7 +199,7 @@ impl Cas {
             budget.work(size(header.len(), at)?, at)?;
             if replacement.scope != outer
                 || replacement.sort != crate::model::Sort::Value(sort.clone())
-                || self.state.context(replacement.context)?.header != *header
+                || self.state.header(replacement.header)?.bytes != *header
             {
                 return Err(Fault::invalid(InvalidCode::Scope, at));
             }
@@ -252,6 +242,9 @@ impl Cas {
                 continue;
             }
             let value = self.state.expression(id)?;
+            if value.domain.is_some() {
+                return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
+            }
             if let Operator::Rational(number) = &value.operator {
                 number.check(budget, at)?;
             }
@@ -287,7 +280,7 @@ impl Cas {
                 ExpressionDraft {
                     operator: value.operator.clone(),
                     sort: value.sort.clone(),
-                    context: Reference::Existing(self.handle(value.context)),
+                    header: Reference::Existing(self.handle(value.header)),
                     scope: value.scope.clone(),
                     binding: value.binding.clone(),
                     operands,
@@ -313,7 +306,7 @@ impl Cas {
         let at = Location::new("free substitution");
         let expression = self.state.expression(root)?;
         let initial_scope = &expression.scope;
-        let context = self.state.context(expression.context)?;
+        let context = self.state.header(expression.header)?;
         let mut replacements = BTreeMap::new();
         let count = size(substitutions.len(), at)?;
         budget.work(
@@ -326,7 +319,7 @@ impl Cas {
         for substitution in substitutions {
             let replacement = self.checked(&substitution.replacement)?;
             let value = self.state.expression(replacement)?;
-            budget.work(size(context.header.len(), at)?, at)?;
+            budget.work(size(context.bytes.len(), at)?, at)?;
             let declared = context
                 .environment
                 .declarations
@@ -335,7 +328,7 @@ impl Cas {
                 .ok_or_else(|| Fault::invalid(InvalidCode::Scope, at))?;
             if value.scope != *initial_scope
                 || value.sort != declared.sort
-                || self.state.context(value.context)?.header != context.header
+                || self.state.header(value.header)?.bytes != context.bytes
                 || replacements
                     .insert(substitution.key.clone(), replacement)
                     .is_some()
@@ -404,6 +397,9 @@ impl Cas {
                 continue;
             }
             let value = self.state.expression(id)?;
+            if value.domain.is_some() {
+                return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
+            }
             if let Operator::Rational(number) = &value.operator {
                 number.check(budget, at)?;
             }
@@ -444,7 +440,7 @@ impl Cas {
                 ExpressionDraft {
                     operator,
                     sort: value.sort.clone(),
-                    context: Reference::Existing(self.handle(value.context)),
+                    header: Reference::Existing(self.handle(value.header)),
                     scope,
                     binding: value.binding.clone(),
                     operands,
@@ -488,4 +484,28 @@ fn mapped_operands(
         );
     }
     Ok(result)
+}
+
+/// Remove one bound frame while preserving all nested scopes.
+fn instantiated_scope(
+    outer: &Scope,
+    outer_len: usize,
+    original: &Scope,
+    budget: &mut Budget,
+) -> Result<(u32, Scope), Fault> {
+    let at = Location::new("bound scope reconstruction");
+    let prefix = outer_len
+        .checked_add(1)
+        .ok_or_else(|| Fault::invalid(InvalidCode::Scope, at))?;
+    let suffix = original
+        .get(prefix..)
+        .ok_or_else(|| Fault::invalid(InvalidCode::Scope, at))?;
+    let nested = u32::try_from(suffix.len()).map_err(|_| Fault::invalid(InvalidCode::Scope, at))?;
+    budget.work(size(original.len(), at)?, at)?;
+    let mut scope = outer.clone();
+    scope
+        .try_reserve(suffix.len())
+        .map_err(|_| Fault::allocation(at))?;
+    scope.extend_from_slice(suffix);
+    Ok((nested, scope))
 }

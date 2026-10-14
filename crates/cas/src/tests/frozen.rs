@@ -2,9 +2,10 @@
 //! Synthetic frozen graph paths, work boundaries and invalid edge costs.
 
 use crate::frozen::{Arc, dijkstra};
+use crate::limits::{Budget, BudgetKind, Limits};
 use crate::testing::common::default_budget;
 use crate::testing::frozen::node;
-use crate::{Budget, BudgetKind, Fault, FaultKind, Limits};
+use crate::{Fault, FaultKind};
 
 /// Every three-vertex directed graph agrees with enumeration of all simple target paths.
 /// ´test:crate:frozen-path-enumeration´

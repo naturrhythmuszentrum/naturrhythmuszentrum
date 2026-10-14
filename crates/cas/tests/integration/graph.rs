@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete public-API client flows for graph.
 
-use nrz_cas::{
-    AtomicSort, Binding, Draft, ExpressionDraft, LimitsOverride, Operation, Operator, Outcome,
-    Rational, Reference, Request, Sort, Substitution, WalkEvent,
-};
+use nrz_cas::limits::LimitsOverride;
+use nrz_cas::request::{Outcome, Request, Task};
+use nrz_cas::source::WalkEvent;
+use nrz_cas::syntax::{AtomicSort, Binding, Draft, ExpressionDraft, Operator, Sort, Substitution};
+use nrz_cas::{Rational, Reference};
 
 use crate::testing::budgets::graph_budget as budget;
 use crate::testing::common::{TestResult, real};
@@ -15,13 +16,14 @@ use crate::testing::graph::{admit, expression, fixture, occurrence};
 #[test]
 fn binder_substitution() -> TestResult {
     let (mut cas, context) = fixture()?;
+    let syntax_header = cas.context_header(&context)?;
     let y = expression(&mut cas, &context, Operator::Free("y".into()), real(), &[])?;
     let body = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
             operator: Operator::Free("x".into()),
             sort: real(),
-            context: Reference::Existing(context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: vec![vec![AtomicSort::Integer]],
             binding: None,
             operands: Vec::new(),
@@ -37,7 +39,7 @@ fn binder_substitution() -> TestResult {
     let draft = Draft::Expression(ExpressionDraft {
         operator: Operator::Sum,
         sort: real(),
-        context: Reference::Existing(context),
+        header: Reference::Existing(syntax_header),
         scope: Vec::new(),
         binding: Some(Binding {
             sorts: vec![AtomicSort::Integer],
@@ -122,10 +124,10 @@ fn no_normalization_before_coverage() -> TestResult {
     let receipt = cas.walk_original(&root, &mut budget()?)?.receipt;
     assert_eq!(receipt.visited(), 5);
     let outcome = cas.run(&Request {
-        operation: Operation::Simplify,
+        task: Task::Simplify,
         context,
-        inputs: vec![root],
-        receipts: vec![receipt],
+        inputs: vec![nrz_cas::request::CoveredInput { root, receipt }],
+        premises: Vec::new(),
         limits: LimitsOverride::default(),
     });
     assert!(matches!(outcome, Outcome::Conditional { .. }));

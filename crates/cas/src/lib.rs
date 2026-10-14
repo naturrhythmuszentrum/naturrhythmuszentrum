@@ -9,188 +9,185 @@
 
 #![expect(
     clippy::multiple_crate_versions,
-    reason = "petgraph 0.8.3, the newest release, depends on hashbrown 0.15 while its indexmap dependency uses hashbrown 0.17, so no single-version resolution exists"
+    reason = "petgraph 0.8.3 depends on hashbrown 0.15 while indexmap \
+        uses hashbrown 0.17, so no single-version resolution exists"
 )]
 
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod budget;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod conditions;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod context;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod derivative_check;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod encoding;
 mod error;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod graph;
 mod model;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod polynomial;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
-mod proof;
+mod proof_check;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
-)]
-mod proof_model;
-#[expect(
-    clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod proof_storage;
 mod rule;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod rule_check;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod scalar_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod wire;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
-)]
-mod wire_import;
-#[expect(
-    clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod wire_read;
 
 mod number;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
-mod request;
+mod request_model;
 mod snapshot;
 mod substitution;
 mod traversal;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod validation;
 
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod calculus;
 mod cost;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod frontier;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod producer;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod rewrite;
 
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod frozen;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod known;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod search;
 mod service;
 mod shortcut;
 
-pub use budget::{Budget, BudgetKind, BudgetUsage, Limits, LimitsOverride};
 pub use error::{Exhaustion, Fault, FaultKind, InvalidCode, Location};
-pub use graph::{
-    AssumptionDraft, Cas, Draft, ExpressionDraft, GraphCounts, Handle, LogicalId, OccurrenceDraft,
-    Reference, VertexKind,
-};
-pub use model::{
-    Approach, AtomicSort, Binding, Branch, Constant, Declaration, Environment, Extent, Field,
-    MatrixOperation, Operation, Operator, PredicateKind, RootSelection, ScalarOperation, Scope,
-    Sort, Span, SpectralKind,
-};
+pub use graph::{Cas, Handle, LogicalId, Reference};
 pub use number::Rational;
-pub use request::{ContextConsistency, Outcome, Request, UnsupportedReason};
-pub use substitution::Substitution;
-pub use traversal::{
-    CompleteWalk, SourceLocation, TraversalReceipt, Visit, WalkEvent, WalkFailure,
-};
-
-pub use conditions::{ConditionStatus, GuardKind};
-pub use proof_model::{Claim, Guard, ProofStep, Relation, VerifiedWitness};
-pub use rule::{PRIMITIVES, Primitive, RuleSpec};
-
-pub use cost::CostPolicy;
-
-pub use frozen::FrozenCertificate;
-pub use search::{SearchPolicy, SearchResult, SearchStatistics};
 
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod euclidean;
 mod multiplicity;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod square_free;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod square_free_check;
 #[expect(
     clippy::redundant_pub_crate,
-    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
 )]
 mod univariate;
-
-pub use multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};
 
 #[cfg(test)]
 use crate as test_api;
@@ -199,3 +196,119 @@ use crate as test_api;
 mod testing;
 #[cfg(test)]
 mod tests;
+
+pub mod domain;
+pub mod limits;
+pub mod proof;
+pub mod request;
+pub mod source;
+pub mod syntax;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared implementation items stay crate-visible inside private modules"
+)]
+mod domain_model;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared implementation items stay crate-visible inside private modules"
+)]
+mod source_model;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared implementation items stay crate-visible inside private modules"
+)]
+mod domain_encoding;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared implementation items stay crate-visible inside private modules"
+)]
+mod domain_admission;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared implementation items stay crate-visible inside private modules"
+)]
+mod header;
+
+mod context_admission;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "typed proof records are shared only among private kernel modules"
+)]
+mod proof_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact region compilation is a private shared kernel component"
+)]
+mod region;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scoped key helpers remain private implementation"
+)]
+mod statement;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod context_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod proof_view;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod region_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod scoped_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod wire_build;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod wire_decode;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod wire_objects;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod wire_records;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared private kernel implementation"
+)]
+mod wire_statement;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "task encoding is shared privately"
+)]
+mod task;
+
+mod proof_service;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "typed role validation is shared only within the private kernel"
+)]
+mod statement_check;

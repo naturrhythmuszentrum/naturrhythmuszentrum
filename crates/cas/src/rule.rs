@@ -64,6 +64,63 @@ pub enum Primitive {
     Jacobian,
     /// Rational square-free multiplicity layers with independently checked Bezout evidence.
     SquareFree,
+    /// Use one exact qualified hypothesis in an ancestor or current frame.
+    ContextHypothesis,
+    /// Transport a theorem through an explicit restriction or semantic embedding.
+    ContextWeaken,
+    /// Close a local frame while retaining every used predicate as evidence or residual.
+    ContextClose,
+    /// Recompute a finite affine or integer truth partition.
+    RegionDecide,
+    /// Check the exact defining membership and inclusion laws of region constructors.
+    RegionConstruct,
+}
+
+/// Typed conclusion family selected by an executable checker.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConclusionKind {
+    /// Scalar equality on an explicit domain.
+    Equality,
+    /// Scalar derivative on an explicit domain.
+    Derivative,
+    /// Ordered Jacobian cells.
+    Jacobian,
+    /// Rational multiplicity decomposition.
+    SquareFree,
+    /// Exact introduced predicate or membership fact.
+    Hypothesis,
+    /// The same typed statement under checked scope transport.
+    Transport,
+    /// A constructor or independently decided set relation.
+    Region,
+}
+
+/// Premise shape is explicit independently of certificate representation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PremiseShape {
+    /// Exactly this many ordered earlier applications.
+    Exact(u32),
+    /// A fixed prefix followed by explicitly consumed discharge proofs.
+    AtLeast(u32),
+    /// One ordered derivative premise per output/coordinate cell.
+    JacobianCells,
+}
+
+/// The sole auxiliary schema admitted by one primitive.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum CertificateSchema {
+    /// No auxiliary payload.
+    None,
+    /// Ordered operand path.
+    Congruence,
+    /// Exact polynomial GCD and Bezout evidence.
+    SquareFree,
+    /// Qualified introducing frame and slot.
+    Hypothesis,
+    /// Exact local frame being closed.
+    Close,
+    /// Exact rational cuts and Boolean cell rows.
+    Region,
 }
 
 /// Immutable public metadata for one compiled schema.
@@ -75,8 +132,16 @@ pub struct RuleSpec {
     pub key: &'static str,
     /// Exact semantic version; no implicit upgrades occur during replay.
     pub version: u32,
-    /// Positive transition cost in the logical-v1 policy.
+    /// Positive transition cost in the current logical policy.
     pub weight: u64,
+    /// Typed output family; no dummy scalar endpoints stand for set facts.
+    pub conclusion: ConclusionKind,
+    /// Ordered premise contract checked by the kernel.
+    pub premises: PremiseShape,
+    /// Exact auxiliary-data schema; an absent producer cannot register a placeholder.
+    pub certificate: CertificateSchema,
+    /// Every listed primitive has an executable independent checker.
+    pub available: bool,
 }
 
 impl Primitive {
@@ -114,18 +179,84 @@ impl Primitive {
             Self::Substitute => ("eq.substitute", 1),
             Self::Jacobian => ("diff.jacobian", 2),
             Self::SquareFree => ("poly.square-free", 8),
+            Self::ContextHypothesis => ("ctx.hypothesis", 1),
+            Self::ContextWeaken => ("ctx.weaken", 1),
+            Self::ContextClose => ("ctx.close", 2),
+            Self::RegionDecide => ("region.decide", 4),
+            Self::RegionConstruct => ("region.construct", 2),
         };
         RuleSpec {
             primitive: self,
             key,
             version: 1,
             weight,
+            conclusion: self.conclusion_kind(),
+            premises: self.premise_shape(),
+            certificate: self.certificate_schema(),
+            available: true,
+        }
+    }
+
+    /// Identify the exact proposition family without inspecting untrusted payloads.
+    const fn conclusion_kind(self) -> ConclusionKind {
+        match self {
+            Self::ContextHypothesis => ConclusionKind::Hypothesis,
+            Self::ContextWeaken | Self::ContextClose => ConclusionKind::Transport,
+            Self::RegionDecide | Self::RegionConstruct => ConclusionKind::Region,
+            Self::Jacobian => ConclusionKind::Jacobian,
+            Self::SquareFree => ConclusionKind::SquareFree,
+            Self::DifferentiateConstant
+            | Self::DifferentiateVariable
+            | Self::DifferentiateNeg
+            | Self::DifferentiateAdd
+            | Self::DifferentiateSub
+            | Self::DifferentiateProduct
+            | Self::DifferentiateQuotient
+            | Self::DifferentiatePower
+            | Self::DerivativeTransport => ConclusionKind::Derivative,
+            _ => ConclusionKind::Equality,
+        }
+    }
+
+    /// Fixed and dependent ordered-premise arities remain visible in the registry.
+    const fn premise_shape(self) -> PremiseShape {
+        match self {
+            Self::ContextClose => PremiseShape::AtLeast(2),
+            Self::Jacobian => PremiseShape::JacobianCells,
+            Self::Transitivity
+            | Self::ContextWeaken
+            | Self::DifferentiateAdd
+            | Self::DifferentiateSub
+            | Self::DifferentiateProduct
+            | Self::DifferentiateQuotient
+            | Self::DerivativeTransport => PremiseShape::Exact(2),
+            Self::Symmetry
+            | Self::Congruence
+            | Self::Substitute
+            | Self::DifferentiateNeg
+            | Self::DifferentiatePower => PremiseShape::Exact(1),
+            _ => PremiseShape::Exact(0),
+        }
+    }
+
+    /// Certificate meaning is independent of a statement's wire representation.
+    const fn certificate_schema(self) -> CertificateSchema {
+        match self {
+            Self::Congruence => CertificateSchema::Congruence,
+            Self::SquareFree => CertificateSchema::SquareFree,
+            Self::ContextHypothesis => CertificateSchema::Hypothesis,
+            Self::ContextClose => CertificateSchema::Close,
+            Self::RegionDecide => CertificateSchema::Region,
+            _ => CertificateSchema::None,
         }
     }
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 30] = [
+pub const PRIMITIVES: [Primitive; 35] = [
+    Primitive::ContextClose,
+    Primitive::ContextHypothesis,
+    Primitive::ContextWeaken,
     Primitive::DifferentiateAdd,
     Primitive::DifferentiateConstant,
     Primitive::DifferentiatePower,
@@ -156,4 +287,6 @@ pub const PRIMITIVES: [Primitive; 30] = [
     Primitive::Jets,
     Primitive::RationalIdentity,
     Primitive::SquareFree,
+    Primitive::RegionConstruct,
+    Primitive::RegionDecide,
 ];

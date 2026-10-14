@@ -3,10 +3,11 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{
-    AssumptionDraft, Cas, Draft, Environment, Field, Handle, Limits, Operator, PredicateKind,
-    Primitive, ProofStep, Rational, Reference,
-};
+use crate::test_api::domain::AssumptionDraft;
+use crate::test_api::{Cas, Handle, Rational, Reference};
+
+use crate::test_api::proof::{ApplicationDraft, Primitive};
+use crate::test_api::syntax::{Draft, Environment, Field, Operator, PredicateKind};
 
 use super::budgets::proof_budget as budget;
 use super::builders::{self, at};
@@ -20,6 +21,8 @@ pub(crate) struct Fixture {
     pub(crate) cas: Cas,
     /// Full context for every proof in the fixture.
     pub(crate) context: Handle,
+    /// Exact domain used in every scalar proposal.
+    pub(crate) domain: Handle,
     /// Original declaration header, used when explicitly adding hypotheses.
     pub(crate) environment: Environment,
     /// First free coordinate.
@@ -38,11 +41,12 @@ impl Fixture {
     /// Admit declarations and five leaf terms as one transaction.
     pub(crate) fn new() -> TestResult<Self> {
         let environment = builders::environment(Field::Real, &["x", "y"]);
-        let mut cas = Cas::new(Limits::default())?;
-        let mut drafts = vec![Draft::Context {
-            environment: environment.clone(),
-            assumptions: Vec::new(),
-        }];
+        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let context =
+            builders::core_context(&mut cas, environment.clone(), Vec::new(), &mut budget()?)?;
+        let domain = cas.admissible_region(&context)?;
+        let header = cas.context_header(&context)?;
+        let mut drafts = Vec::new();
         for operator in [
             Operator::Free("x".into()),
             Operator::Free("y".into()),
@@ -53,7 +57,7 @@ impl Fixture {
             drafts.push(builders::expression_draft(
                 operator,
                 real(),
-                Reference::Local(0),
+                Reference::Existing(header.clone()),
                 Vec::new(),
                 None,
                 &[],
@@ -62,13 +66,14 @@ impl Fixture {
         let handles = cas.admit(&drafts, &mut budget()?)?;
         Ok(Self {
             cas,
-            context: at(&handles, 0)?,
+            context,
+            domain,
             environment,
-            x: at(&handles, 1)?,
-            y: at(&handles, 2)?,
-            zero: at(&handles, 3)?,
-            one: at(&handles, 4)?,
-            two: at(&handles, 5)?,
+            x: at(&handles, 0)?,
+            y: at(&handles, 1)?,
+            zero: at(&handles, 2)?,
+            one: at(&handles, 3)?,
+            two: at(&handles, 4)?,
         })
     }
 
@@ -86,33 +91,41 @@ impl Fixture {
 
     /// Add one explicitly named hypothesis while preserving the semantic header.
     pub(crate) fn assume(&mut self, key: &str, kind: PredicateKind, term: &Handle) -> TestResult {
-        let handles = self.cas.admit(
-            &[
-                Draft::Condition {
-                    kind,
-                    context: Reference::Existing(self.context.clone()),
-                    scope: Vec::new(),
-                    arguments: vec![Reference::Existing(term.clone())],
-                },
-                Draft::Context {
-                    environment: self.environment.clone(),
-                    assumptions: vec![AssumptionDraft {
-                        key: key.into(),
-                        condition: Reference::Local(0),
-                    }],
-                },
-            ],
+        let header = self.cas.context_header(&self.context)?;
+        let predicate = builders::admit(
+            &mut self.cas,
+            Draft::Condition {
+                kind,
+                header: Reference::Existing(header),
+                scope: Vec::new(),
+                arguments: vec![Reference::Existing(term.clone())],
+            },
             &mut budget()?,
         )?;
-        self.context = at(&handles, 1)?;
+        self.context = builders::core_context(
+            &mut self.cas,
+            self.environment.clone(),
+            vec![AssumptionDraft {
+                key: key.into(),
+                condition: Reference::Existing(predicate),
+            }],
+            &mut budget()?,
+        )?;
+        self.domain = self.cas.admissible_region(&self.context)?;
         Ok(())
     }
 }
 
 /// A cancellation fixture whose independently known domain is exactly x nonzero.
-pub(crate) fn cancellation() -> TestResult<(Fixture, Handle, ProofStep)> {
+pub(crate) fn cancellation() -> TestResult<(Fixture, Handle, ApplicationDraft)> {
     let mut fixture = Fixture::new()?;
     let quotient = fixture.term(Operator::Div, &[fixture.x.clone(), fixture.x.clone()])?;
-    let step = equality(Primitive::Cancel, &quotient, &fixture.one);
+    let step = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Cancel,
+        &quotient,
+        &fixture.one,
+    );
     Ok((fixture, quotient, step))
 }

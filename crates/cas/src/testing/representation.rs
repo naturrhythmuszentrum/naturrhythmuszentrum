@@ -3,9 +3,10 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{
-    AtomicSort, Binding, Cas, Declaration, Draft, Environment, Field, Handle, Limits, Operator,
-    Rational, Reference, Scope, Sort,
+use crate::test_api::{Cas, Handle, Rational, Reference};
+
+use crate::test_api::syntax::{
+    AtomicSort, Binding, Declaration, Environment, Field, Operator, Scope, Sort,
 };
 
 use super::budgets::graph_budget as budget;
@@ -24,7 +25,7 @@ pub(crate) struct Fixture {
 impl Fixture {
     /// Declare one scalar and one unary function without assigning numerical behavior.
     pub(crate) fn new() -> TestResult<Self> {
-        let mut cas = Cas::new(Limits::default())?;
+        let mut cas = Cas::new(budget()?.limits().clone())?;
         let environment = Environment {
             declarations: vec![
                 Declaration {
@@ -43,14 +44,7 @@ impl Fixture {
             ],
             ..Environment::default()
         };
-        let context = builders::admit(
-            &mut cas,
-            Draft::Context {
-                environment,
-                assumptions: Vec::new(),
-            },
-            &mut budget()?,
-        )?;
+        let context = builders::core_context(&mut cas, environment, Vec::new(), &mut budget()?)?;
         Ok(Self { cas, context })
     }
 
@@ -63,12 +57,13 @@ impl Fixture {
         binding: Option<Binding>,
         operands: &[Handle],
     ) -> TestResult<Handle> {
+        let header = self.cas.context_header(&self.context)?;
         builders::admit(
             &mut self.cas,
             builders::expression_draft(
                 operator,
                 sort,
-                Reference::Existing(self.context.clone()),
+                Reference::Existing(header),
                 scope,
                 binding,
                 operands,

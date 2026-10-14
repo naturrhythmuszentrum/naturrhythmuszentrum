@@ -7,9 +7,9 @@ use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, State, size};
 use crate::model::{AtomicSort, Field, Operator, Sort};
-use crate::proof_model::{CheckedStep, ProofStep, Relation};
 use crate::rule::Primitive;
 use crate::rule_check::{binary, literal, mismatch, premise, scalar, unary};
+use crate::scalar_model::{CheckedStep, ProofStep, Relation};
 
 /// Derivative-checking location.
 const AT: Location = Location::new("derivative schema");

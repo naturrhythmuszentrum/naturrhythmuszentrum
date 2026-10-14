@@ -31,6 +31,30 @@ const fn role(edge: Edge) -> (u8, u32) {
         Edge::Justifies => (15, 0),
         Edge::DependsOn => (16, 0),
         Edge::CostPolicy => (17, 0),
+        Edge::InHeader => (18, 0),
+        Edge::ParentHeader => (19, 0),
+        Edge::DeclarationSpace(position) => (20, position),
+        Edge::SpaceDomain => (21, 0),
+        Edge::RegionInput(position) => (22, position),
+        Edge::MembershipPredicate => (23, 0),
+        Edge::ArmRegion => (24, 0),
+        Edge::ArmValue => (25, 0),
+        Edge::BoundaryLocation => (26, 0),
+        Edge::SourceArgument(position) => (27, position),
+        Edge::CaseDomain => (28, 0),
+        Edge::CaseMember(position) => (29, position),
+        Edge::InSpace => (30, 0),
+        Edge::AdmissibleRegion => (31, 0),
+        Edge::ParentContext => (32, 0),
+        Edge::ConclusionObject(position) => (33, position),
+        Edge::IncidentRegion => (34, 0),
+        Edge::AtBoundary => (35, 0),
+        Edge::OfFunction => (36, 0),
+        Edge::SideRegion(position) => (37, position.tag()),
+        Edge::JetValue(position) => (38, position),
+        Edge::ComparedRegion(position) => (39, position),
+        Edge::CoverMember(position) => (40, position),
+        Edge::ArgumentRegion(position) => (41, position),
     }
 }
 
@@ -96,7 +120,7 @@ impl Cas {
             records.push((*id, key));
         }
         let mut out = Encoder::output(budget, at);
-        out.raw(b"NRZGRAPH01")?;
+        out.raw(b"NRZGRAPH02")?;
         out.count(records.len())?;
         for (id, key) in records {
             encode_id(id, &mut out)?;

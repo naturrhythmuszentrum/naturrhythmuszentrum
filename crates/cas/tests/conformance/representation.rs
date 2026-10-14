@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public-contract checks for representation.
 
-use nrz_cas::{
+use nrz_cas::Rational;
+use nrz_cas::syntax::{
     Approach, AtomicSort, Binding, Branch, Constant, Extent, Field, MatrixOperation, Operator,
-    PredicateKind, Rational, RootSelection, ScalarOperation, Sort, SpectralKind,
+    PredicateKind, RootSelection, ScalarOperation, Sort, SpectralKind,
 };
 
 use crate::testing::common::{TestResult, real};

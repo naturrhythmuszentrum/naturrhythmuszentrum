@@ -3,7 +3,8 @@
 
 use std::cmp::Ordering;
 
-use nrz_cas::{Budget, BudgetKind, Exhaustion, Fault, FaultKind, Limits, Location, Rational};
+use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::{Exhaustion, Fault, FaultKind, Location, Rational};
 
 use crate::testing::common::default_budget as budget;
 

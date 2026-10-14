@@ -22,6 +22,11 @@ pub(crate) struct Encoder<'a> {
 }
 
 impl<'a> Encoder<'a> {
+    /// Current bounded payload length before a reference is appended.
+    pub(crate) const fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
     /// Start an empty structural key.
     pub(crate) const fn new(budget: &'a mut Budget, at: Location) -> Self {
         Self {
@@ -62,6 +67,8 @@ impl<'a> Encoder<'a> {
         let size =
             u64::try_from(next).map_err(|_| Fault::capacity(BudgetKind::PayloadBytes, self.at))?;
         self.budget.check(self.limit, size, self.at)?;
+        self.budget
+            .check(BudgetKind::StagedPayloadBytes, size, self.at)?;
         self.budget.work(
             u64::try_from(bytes.len()).map_err(|_| Fault::capacity(BudgetKind::Work, self.at))?,
             self.at,
@@ -182,6 +189,8 @@ pub(crate) fn atomic(value: &AtomicSort, out: &mut Encoder<'_>) -> Result<(), Fa
 /// Encode a flat sort and its ordered function signature.
 pub(crate) fn sort(value: &Sort, out: &mut Encoder<'_>) -> Result<(), Fault> {
     match value {
+        Sort::Test => out.byte(3),
+        Sort::Distribution => out.byte(4),
         Sort::Value(value) => {
             out.byte(0)?;
             atomic(value, out)
@@ -298,6 +307,7 @@ const fn operator_tag(value: &Operator) -> u8 {
         Operator::MatrixMap(_) => 25,
         Operator::IntegerEmbed => 26,
         Operator::Entrywise(_) => 27,
+        Operator::Cases => 28,
     }
 }
 
@@ -365,7 +375,8 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
         | Operator::Sum
         | Operator::Transpose
         | Operator::MatrixMultiply
-        | Operator::IntegerEmbed => Ok(()),
+        | Operator::IntegerEmbed
+        | Operator::Cases => Ok(()),
     }
 }
 
@@ -420,41 +431,5 @@ fn root_selection(value: &RootSelection, out: &mut Encoder<'_>) -> Result<(), Fa
             out.byte(2)?;
             out.name(name)
         }
-    }
-}
-
-/// Encode a task vocabulary key, including its ordered variable identities.
-pub(crate) fn operation(
-    value: &crate::model::Operation,
-    out: &mut Encoder<'_>,
-) -> Result<(), Fault> {
-    use crate::model::Operation;
-
-    match value {
-        Operation::Simplify => out.byte(0),
-        Operation::Equal => out.byte(1),
-        Operation::Expand => out.byte(2),
-        Operation::Differentiate(variable) => {
-            out.byte(3)?;
-            out.name(variable)
-        }
-        Operation::Jacobian(variables) => {
-            out.byte(4)?;
-            out.count(variables.len())?;
-            for variable in variables {
-                out.name(variable)?;
-            }
-            Ok(())
-        }
-        Operation::SquareFree(variable) => {
-            out.byte(5)?;
-            out.name(variable)
-        }
-        Operation::Integrate => out.byte(6),
-        Operation::Sum => out.byte(7),
-        Operation::Series => out.byte(8),
-        Operation::Limit => out.byte(9),
-        Operation::Solve => out.byte(10),
-        Operation::Spectral => out.byte(11),
     }
 }

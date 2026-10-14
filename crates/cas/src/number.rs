@@ -156,6 +156,25 @@ impl Rational {
         )
     }
 
+    /// Compute the exact integral floor with prepaid magnitude arithmetic.
+    pub(crate) fn floor(&self, budget: &mut Budget) -> Result<Self, Fault> {
+        let at = Location::new("integer region rounding");
+        self.check(budget, at)?;
+        let mut whole = quotient(&self.numerator, &self.denominator, budget, at)?;
+        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
+        let remainder = &self.numerator % &self.denominator;
+        if self.negative && remainder.bits() != 0 {
+            let bound = whole
+                .bits()
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::IntermediateBits, at))?;
+            budget.check(BudgetKind::IntermediateBits, bound, at)?;
+            charge(whole.bits(), 1, budget, at)?;
+            whole += BigUint::from(1_u8);
+        }
+        Self::new(self.negative, &whole, &BigUint::from(1_u8), budget)
+    }
+
     /// Whether the canonical numerator is zero.
     #[must_use]
     pub fn is_zero(&self) -> bool {

@@ -1,222 +1,340 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Untrusted proof inputs and sealed checked witnesses.
+//! Typed untrusted applications and sealed scoped mathematical judgments.
 
-use std::fmt;
-
-use crate::conditions::{Conditions, GuardKind};
+use crate::domain_model::{HypothesisRef, Layer, Side};
 use crate::graph::{Handle, LogicalId};
+use crate::model::{Field, Scope};
+use crate::region::RegionCertificate;
 use crate::rule::Primitive;
 use crate::substitution::Substitution;
 
-/// Admitted mathematical relations; a derivative is never an equality edge.
-#[derive(Clone, Eq, PartialEq)]
-pub enum Relation {
-    /// Equality on the retained common defined domain.
-    EqualOnDomain,
-    /// Scalar derivative with respect to one declared real variable.
-    Derivative {
-        /// Declaration key, not its display name.
-        variable: String,
-    },
-    /// Exact square-free multiplicity product, with independently certified factors.
-    SquareFree {
-        /// Declared polynomial variable.
-        variable: String,
-        /// Exact rational coefficient field required by the certificate.
-        field: crate::model::Field,
-    },
-    /// Jacobian of a column of scalar outputs, with ordered independent variables.
-    Jacobian {
-        /// Distinct declaration keys in column order.
-        variables: Vec<String>,
-    },
+/// The definedness contract of a pointwise equality.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DomainContract {
+    /// Both endpoints are defined and equal on the stated region under explicit conditions.
+    DefinedAndEqual,
+    /// Both definedness directions and equality on the common domain are established.
+    SameDefinedDomain,
 }
 
-/// A visible condition on an exact expression, including its bound scope.
+/// Exact constructor semantics without a dummy scalar equality.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConstructorLaw {
+    /// The region's checked constructor defines its membership relation.
+    Membership,
+}
+
+/// Function-specific ownership at one shared boundary location.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Guard {
-    /// Required mathematical predicate.
-    pub kind: GuardKind,
-    /// Expression to which it applies.
-    pub term: Handle,
+pub enum Ownership {
+    /// A proved value at the location.
+    Present(Handle),
+    /// Proved exclusion from the function's defined domain.
+    Absent,
 }
 
-/// The exact theorem a caller intends to accept, including residual obligations.
-#[derive(Clone, Eq, PartialEq)]
-pub struct Claim {
-    /// Complete immutable context, including hypothesis provenance.
+/// A mathematical statement with exactly the objects needed by its proposition.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Statement {
+    /// Classical equality with explicit domain and definedness strength.
+    Equality {
+        /// Left value expression.
+        left: Handle,
+        /// Right value expression.
+        right: Handle,
+        /// Region on which the contract is asserted.
+        domain: Handle,
+        /// Required definedness strength.
+        domain_contract: DomainContract,
+    },
+    /// One predicate is defined and true throughout a region.
+    PredicateFact {
+        /// Region of validity.
+        region: Handle,
+        /// Exact condition syntax.
+        predicate: Handle,
+    },
+    /// Every point of the first region belongs to the second.
+    Subset {
+        /// Region being restricted.
+        subset: Handle,
+        /// Containing region.
+        superset: Handle,
+    },
+    /// Two regions have empty intersection.
+    Disjoint {
+        /// First region.
+        left: Handle,
+        /// Second region.
+        right: Handle,
+    },
+    /// A complete finite family covers the stated domain.
+    Cover {
+        /// Covered region.
+        domain: Handle,
+        /// Unordered cover members, including any singleton endpoints.
+        members: Vec<Handle>,
+    },
+    /// A region has no points.
+    Empty {
+        /// Empty region.
+        region: Handle,
+    },
+    /// Exact constructor membership semantics.
+    Constructor {
+        /// Constructed region.
+        region: Handle,
+        /// Closed defining law.
+        law: ConstructorLaw,
+    },
+    /// The exact domain on which a function has a value.
+    DefinedDomain {
+        /// Function expression.
+        function: Handle,
+        /// Exact defined domain within the context's admissible region.
+        domain: Handle,
+    },
+    /// Applicable arms have matching values and definedness.
+    Compatibility {
+        /// First association.
+        left: Handle,
+        /// Second association.
+        right: Handle,
+        /// Region on which compatibility is claimed.
+        region: Handle,
+    },
+    /// An original semantic form constructs the specified native case.
+    Elaboration {
+        /// Ordered source-form signature.
+        source: Handle,
+        /// Resulting native expression.
+        result: Handle,
+        /// Claimed domain.
+        domain: Handle,
+    },
+    /// One side of a location has an incident neighborhood in a region.
+    Incidence {
+        /// Incident region.
+        region: Handle,
+        /// Boundary location.
+        boundary: Handle,
+        /// Oriented side.
+        side: Side,
+        /// Proved incident neighborhood.
+        neighborhood: Handle,
+    },
+    /// The function owns a value at a boundary, or is proved absent there.
+    Ownership {
+        /// Function whose domain is being described.
+        function: Handle,
+        /// Shared boundary location.
+        boundary: Handle,
+        /// Checked presence or checked absence.
+        value: Ownership,
+    },
+    /// A classical scalar derivative on a stated region.
+    DerivativeOn {
+        /// Input function.
+        function: Handle,
+        /// Derivative expression.
+        derivative: Handle,
+        /// Exact coordinate declaration key.
+        coordinate: String,
+        /// Region of the theorem.
+        domain: Handle,
+    },
+    /// Ordered Jacobian assembly from checked scalar partials.
+    Jacobian {
+        /// Ordered input column.
+        input: Handle,
+        /// Ordered result matrix.
+        output: Handle,
+        /// Ordered distinct coordinate keys.
+        variables: Vec<String>,
+        /// Region of the theorem.
+        domain: Handle,
+    },
+    /// Certified exact rational multiplicity decomposition.
+    SquareFree {
+        /// Polynomial input.
+        input: Handle,
+        /// Displayed factor expression.
+        output: Handle,
+        /// Exact declared variable.
+        variable: String,
+        /// Coefficient field.
+        field: Field,
+        /// Region retaining all strict input requirements.
+        domain: Handle,
+    },
+    /// A represented side jet; its producer belongs to the following lane.
+    Jet {
+        /// Function with the stated trace.
+        function: Handle,
+        /// Region carrying that function germ.
+        region: Handle,
+        /// Boundary location.
+        boundary: Handle,
+        /// Oriented side.
+        side: Side,
+        /// Derivative values in order, beginning with the trace.
+        values: Vec<Handle>,
+    },
+    /// A represented jump; no missing side is treated as zero.
+    Jump {
+        /// Function whose jump is stated.
+        function: Handle,
+        /// Boundary location.
+        boundary: Handle,
+        /// Derivative order.
+        order: u32,
+        /// Right trace minus left trace.
+        value: Handle,
+    },
+}
+
+/// A predicate required throughout a region under one exact home context.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct GuardedObligation {
+    /// Context under which the predicate must hold.
+    pub home: Handle,
+    /// Explicit binder scope of the requirement.
+    pub scope: Scope,
+    /// Mathematical interpretation.
+    pub layer: Layer,
+    /// Exact mathematical space, absent for space-free statements.
+    pub space: Option<Handle>,
+    /// Region on which the predicate is required.
+    pub region: Handle,
+    /// Exact condition syntax, including its actual header.
+    pub predicate: Handle,
+}
+
+/// The complete theorem a caller intends to accept.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Judgment {
+    /// Full immutable hypothesis frame.
     pub context: Handle,
-    /// Mathematical relation and its ordered payload.
-    pub relation: Relation,
-    /// Function/input or equality's left endpoint.
-    pub left: Handle,
-    /// Output or equality's right endpoint.
-    pub right: Handle,
-    /// Exact residual set; comparison is independent of this vector's order.
-    pub residuals: Vec<Guard>,
+    /// Mathematical interpretation.
+    pub layer: Layer,
+    /// Exact mathematical space, explicitly absent where unnecessary.
+    pub space: Option<Handle>,
+    /// Typed proposition.
+    pub statement: Statement,
+    /// Canonical conjunction of still-open guarded predicates.
+    pub residuals: Vec<GuardedObligation>,
 }
 
-/// One untrusted application; every referenced premise must precede it.
-#[derive(Clone, Eq, PartialEq)]
-pub struct ProofStep {
-    /// Compiled schema, never an arbitrary assertion callback.
-    pub primitive: Primitive,
-    /// Claimed relation reconstructed by the checker.
-    pub relation: Relation,
-    /// Claimed input endpoint.
-    pub left: Handle,
-    /// Claimed output endpoint.
-    pub right: Handle,
-    /// Ordered zero-based proof indices, strictly backward.
+/// Independently checked evidence tied to a closed primitive schema.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum Certificate {
+    /// This primitive has no auxiliary payload.
+    None,
+    /// Exact interval-cell certificate, never a trusted truth flag.
+    Region(RegionCertificate),
+    /// One qualified ancestor/current hypothesis reference.
+    Hypothesis(HypothesisRef),
+    /// Exact child frame being closed.
+    Close {
+        /// Local context introducing the discharged slots.
+        frame: Handle,
+    },
+    /// One ordered operand path for scalar congruence.
+    Congruence(Vec<u32>),
+    /// Exact rational multiplicity evidence.
+    SquareFree(Box<crate::multiplicity::SquareFreeCertificate>),
+}
+
+/// One untrusted application whose local premise indices are strictly backward.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ApplicationDraft {
+    /// Compiled schema, never a user callback.
+    pub rule: Primitive,
+    /// Exact context in which this application is checked.
+    pub context: Handle,
+    /// Claimed typed statement reconstructed by the checker.
+    pub conclusion: Statement,
+    /// Ordered earlier applications in this supplied proof DAG.
     pub premises: Vec<u32>,
-    /// Congruence operand path; empty for every other schema.
-    pub path: Vec<u32>,
-    /// Simultaneous replacements; empty except for the substitution schema.
+    /// Simultaneous substitutions, admitted only by their schema.
     pub substitutions: Vec<Substitution>,
-    /// Exact multiplicity evidence; present only for the square-free primitive.
-    pub certificate: Option<crate::multiplicity::SquareFreeCertificate>,
+    /// Schema-specific untrusted evidence.
+    pub certificate: Certificate,
 }
 
-impl fmt::Debug for Relation {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::EqualOnDomain => formatter.write_str("EqualOnDomain"),
-            Self::Derivative { variable } => formatter
-                .debug_struct("Derivative")
-                .field("variable_bytes", &variable.len())
-                .finish_non_exhaustive(),
-            Self::Jacobian { variables } => formatter
-                .debug_struct("Jacobian")
-                .field("variables", &variables.len())
-                .finish_non_exhaustive(),
-            Self::SquareFree { variable, .. } => formatter
-                .debug_struct("SquareFree")
-                .field("variable_bytes", &variable.len())
-                .finish_non_exhaustive(),
-        }
-    }
+/// Conditions reconstructed by the scoped kernel, retained separately from syntax.
+#[derive(Clone, Debug, Default)]
+pub(crate) struct ScopedConditions {
+    /// Every required fact, including those already discharged.
+    pub(crate) requirements: Vec<GuardedObligation>,
+    /// Facts that remain open.
+    pub(crate) residuals: Vec<GuardedObligation>,
+    /// Qualified hypothesis identities actually used.
+    pub(crate) hypotheses: Vec<HypothesisRef>,
 }
 
-impl fmt::Debug for Claim {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Claim")
-            .field("context", &self.context)
-            .field("relation", &self.relation)
-            .field("left", &self.left)
-            .field("right", &self.right)
-            .field("residuals", &self.residuals.len())
-            .finish_non_exhaustive()
-    }
-}
-
-impl fmt::Debug for ProofStep {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("ProofStep")
-            .field("primitive", &self.primitive)
-            .field("relation", &self.relation)
-            .field("left", &self.left)
-            .field("right", &self.right)
-            .field("premises", &self.premises.len())
-            .field("path_depth", &self.path.len())
-            .field("substitutions", &self.substitutions.len())
-            .field("certificate", &self.certificate)
-            .finish_non_exhaustive()
-    }
-}
-
-/// A checked step whose mathematical payload is owned by an Application graph vertex.
+/// Authoritative graph-owned application for non-scalar typed statements.
 #[derive(Clone, Debug)]
-pub(crate) struct CheckedStep {
-    /// Primitive schema.
-    pub(crate) primitive: Primitive,
-    /// Reconstructed relation.
-    pub(crate) relation: Relation,
-    /// Full context.
-    pub(crate) context: LogicalId,
-    /// Input expression.
-    pub(crate) left: LogicalId,
-    /// Output expression.
-    pub(crate) right: LogicalId,
-    /// Earlier proof vertices, filled only during atomic publication.
+pub(crate) struct CheckedApplication {
+    /// Derived scalar matcher data for executable scalar rules, never wire authority.
+    pub(crate) scalar: Option<crate::scalar_model::CheckedStep>,
+    /// Closed registered schema.
+    pub(crate) rule: Primitive,
+    /// Complete reconstructed theorem.
+    pub(crate) judgment: Judgment,
+    /// Earlier proof graph vertices in premise order.
     pub(crate) premises: Vec<LogicalId>,
-    /// Checked ordered operand path.
-    pub(crate) path: Vec<u32>,
-    /// Checked simultaneous replacement identities.
-    pub(crate) substitutions: Vec<(String, LogicalId)>,
-    /// Reconstructed multiplicity evidence owned by this application.
-    pub(crate) certificate: Option<crate::multiplicity::SquareFreeCertificate>,
-    /// Independently reconstructed residuals and hypothesis keys.
-    pub(crate) conditions: Conditions,
-    /// Checked proof depth.
+    /// Checked simultaneous substitutions.
+    pub(crate) substitutions: Vec<Substitution>,
+    /// Independently checked auxiliary payload.
+    pub(crate) certificate: Certificate,
+    /// All requirements and qualified used hypotheses.
+    pub(crate) conditions: ScopedConditions,
+    /// Exact proof depth.
     pub(crate) depth: u64,
-    /// Positive known-route cost under logical-v1.
-    pub(crate) cost: u64,
 }
 
-/// A compiled batch before logical proof IDs are assigned.
+/// Sealed evidence minted only by checking, canonical encoding and atomic publication.
 #[derive(Clone, Debug)]
-pub(crate) struct Compiled {
-    /// Mathematically checked applications.
-    pub(crate) steps: Vec<CheckedStep>,
-    /// Earlier local indices corresponding to each step's ordered premises.
-    pub(crate) premises: Vec<Vec<u32>>,
-}
-
-/// Sealed evidence minted only after complete replay and atomic graph publication.
-#[derive(Clone)]
 pub struct VerifiedWitness {
-    /// Store-scoped proof root, inaccessible to untrusted constructors.
+    /// Store-scoped checked proof root.
     pub(crate) proof: Handle,
-    /// Exact accepted theorem.
-    pub(crate) claim: Claim,
-    /// Explicit hypotheses used to discharge required domain predicates.
-    pub(crate) hypotheses: Vec<String>,
-    /// Canonical independently reconstructible proof bytes.
+    /// Complete typed theorem.
+    pub(crate) judgment: Judgment,
+    /// Exact qualified assumption provenance.
+    pub(crate) hypotheses: Vec<HypothesisRef>,
+    /// Canonical portable bytes, with no original traversal receipt.
     pub(crate) bytes: Vec<u8>,
 }
 
-impl fmt::Debug for VerifiedWitness {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("VerifiedWitness")
-            .field("proof", &self.proof)
-            .field("residual_count", &self.claim.residuals.len())
-            .field("hypothesis_count", &self.hypotheses.len())
-            .field("bytes", &self.bytes.len())
-            .finish_non_exhaustive()
-    }
-}
-
 impl VerifiedWitness {
-    /// Borrow the exact checked theorem and all residual obligations.
+    /// Borrow the complete typed theorem, including every guarded residual.
     #[must_use]
-    pub const fn claim(&self) -> &Claim {
-        &self.claim
+    pub const fn judgment(&self) -> &Judgment {
+        &self.judgment
     }
 
-    /// Borrow the exact context hypotheses used; consistency remains unknown.
+    /// Borrow every qualified hypothesis actually used by the proof.
     #[must_use]
-    pub fn hypotheses(&self) -> &[String] {
+    pub fn hypotheses(&self) -> &[HypothesisRef] {
         &self.hypotheses
     }
 
-    /// Whether all required guards were discharged, possibly relative to Gamma.
+    /// Whether no residual remains; root assumptions still remain assumptions.
     #[must_use]
     pub const fn is_discharged(&self) -> bool {
-        self.claim.residuals.is_empty()
+        self.judgment.residuals.is_empty()
     }
 
-    /// General satisfiability of Gamma remains unknown even for a discharged theorem.
-    #[must_use]
-    pub const fn context_consistency(&self) -> crate::request::ContextConsistency {
-        crate::request::ContextConsistency::Unknown
-    }
-
-    /// Read the checked proof's store-scoped graph handle.
+    /// Read the store-scoped proof root without exposing its private constructor.
     #[must_use]
     pub const fn proof(&self) -> &Handle {
         &self.proof
+    }
+
+    /// General consistency remains unproved even for discharged results.
+    #[must_use]
+    pub const fn context_consistency(&self) -> crate::request_model::ContextConsistency {
+        crate::request_model::ContextConsistency::Unknown
     }
 }

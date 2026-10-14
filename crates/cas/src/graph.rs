@@ -8,9 +8,14 @@ use std::sync::Arc;
 use petgraph::graph::{DiGraph, NodeIndex};
 
 use crate::budget::{Budget, BudgetKind, Limits};
+use crate::domain_model::{
+    Boundary, BoundaryDraft, CaseArm, CaseArmDraft, ContextDraft, Header, HeaderDraft, Layer,
+    Region, RegionDraft, Space, SpaceDraft,
+};
 use crate::encoding::{self, Encoder};
 use crate::error::{Fault, InvalidCode, Location};
-use crate::model::{Binding, Environment, Operation, Operator, PredicateKind, Scope, Sort, Span};
+use crate::model::{Binding, Environment, Operator, PredicateKind, Scope, Sort, Span};
+use crate::source_model::{SourceForm, SourceFormDraft};
 
 /// A disjoint namespace for logical identifiers.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -35,6 +40,18 @@ pub enum VertexKind {
     Proof,
     /// A complete immutable versioned logical-cost policy.
     Policy,
+    /// Declared mathematical space.
+    Space,
+    /// Exact unproved set description.
+    Region,
+    /// Unordered region/value association.
+    CaseArm,
+    /// Shared boundary location.
+    Boundary,
+    /// Original ordered semantic form.
+    SourceForm,
+    /// Immutable acyclic semantic declarations.
+    Header,
 }
 
 impl VertexKind {
@@ -51,6 +68,12 @@ impl VertexKind {
             Self::Application => 7,
             Self::Proof => 8,
             Self::Policy => 9,
+            Self::Space => 10,
+            Self::Region => 11,
+            Self::CaseArm => 12,
+            Self::Boundary => 13,
+            Self::SourceForm => 14,
+            Self::Header => 15,
         }
     }
 }
@@ -103,7 +126,7 @@ impl PartialEq for Handle {
 impl Eq for Handle {}
 
 /// A checked existing handle or an earlier index in the current draft batch.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Reference {
     /// A live handle in the receiving store.
     Existing(Handle),
@@ -127,8 +150,8 @@ pub struct ExpressionDraft {
     pub operator: Operator,
     /// Claimed mathematical result sort, checked against operands.
     pub sort: Sort,
-    /// Context providing the semantic header.
-    pub context: Reference,
+    /// Actual immutable semantic header, independent of assumptions.
+    pub header: Reference,
     /// Explicit outer-to-inner binder frames.
     pub scope: Scope,
     /// Optional new frame for the designated body operands.
@@ -164,24 +187,33 @@ pub enum Draft {
         /// Exact source text.
         text: String,
     },
-    /// Admit a canonical context under a complete semantic header.
-    Context {
-        /// Declared field, branches and free identities.
-        environment: Environment,
-        /// Explicit mathematical hypotheses.
-        assumptions: Vec<AssumptionDraft>,
-    },
+    /// Admit an immutable semantic header.
+    Header(HeaderDraft),
+    /// Admit a root or local hypothesis frame.
+    Context(ContextDraft),
+    /// Admit an exact region without proving any relation.
+    Region(RegionDraft),
+    /// Admit a declared mathematical space.
+    Space(SpaceDraft),
+    /// Admit one region/value association.
+    CaseArm(CaseArmDraft),
+    /// Admit a boundary location without ownership facts.
+    Boundary(BoundaryDraft),
+    /// Retain an original ordered semantic signature.
+    SourceForm(SourceFormDraft),
     /// Admit a typed predicate; this supplies no proof of its truth.
     Condition {
         /// Predicate vocabulary tag.
         kind: PredicateKind,
-        /// Semantic context.
-        context: Reference,
+        /// Actual immutable semantic header.
+        header: Reference,
         /// Explicit bound frames.
         scope: Scope,
         /// Ordered predicate expressions.
         arguments: Vec<Reference>,
     },
+    /// Admit native case syntax without asserting coverage or compatibility.
+    Cases(crate::domain_model::CasesDraft),
     /// Admit shared mathematical syntax.
     Expression(ExpressionDraft),
     /// Admit a distinct original or generated occurrence.
@@ -189,13 +221,15 @@ pub enum Draft {
     /// Retain a typed task; this does not authorize execution without coverage receipts.
     Request {
         /// Requested mathematical operation.
-        operation: Operation,
+        task: crate::task::Task,
         /// Immutable mathematical context.
         context: Reference,
         /// Ordered occurrence roots.
         inputs: Vec<Reference>,
+        /// Earlier checked proof premises.
+        premises: Vec<Reference>,
         /// Fully resolved request budgets.
-        limits: Limits,
+        limits: Box<Limits>,
     },
 }
 
@@ -211,6 +245,18 @@ pub(crate) struct Source {
 /// Canonical mathematical context weight.
 #[derive(Clone, Debug)]
 pub(crate) struct Context {
+    /// Actual header object, retained independently of its legacy view.
+    pub(crate) header_id: LogicalId,
+    /// Exact admissible region.
+    pub(crate) admissible: LogicalId,
+    /// Enclosing context for a local frame.
+    pub(crate) parent: Option<LogicalId>,
+    /// Supplied local restriction; membership is an explicit binder.
+    pub(crate) restriction: Option<LogicalId>,
+    /// Local predicate slots in caller order, excluding membership slot zero.
+    pub(crate) frame: Vec<(String, LogicalId)>,
+    /// Checked number of parent-frame edges.
+    pub(crate) depth: u64,
     /// Sorted semantic declarations and policies.
     pub(crate) environment: Environment,
     /// Canonical header bytes, excluding assumptions.
@@ -226,8 +272,8 @@ pub(crate) struct Context {
 pub(crate) struct Condition {
     /// Predicate tag.
     pub(crate) kind: PredicateKind,
-    /// Context used for mathematical interpretation.
-    pub(crate) context: LogicalId,
+    /// Actual semantic header.
+    pub(crate) header: LogicalId,
     /// Explicit binder environment.
     pub(crate) scope: Scope,
     /// Ordered argument expression IDs.
@@ -241,8 +287,16 @@ pub(crate) struct Expression {
     pub(crate) operator: Operator,
     /// Checked result sort.
     pub(crate) sort: Sort,
-    /// First admitting context; sharing is by its semantic header alone.
-    pub(crate) context: LogicalId,
+    /// Actual semantic header; no first-context field exists.
+    pub(crate) header: LogicalId,
+    /// Mathematical interpretation.
+    pub(crate) layer: Layer,
+    /// Exact space for space-dependent syntax.
+    pub(crate) space: Option<LogicalId>,
+    /// Native case domain, absent for ordinary expressions.
+    pub(crate) domain: Option<LogicalId>,
+    /// Canonical unordered case associations.
+    pub(crate) arms: Vec<LogicalId>,
     /// Explicit frames.
     pub(crate) scope: Scope,
     /// New bound frame, if any.
@@ -276,18 +330,32 @@ pub(crate) struct Occurrence {
 #[derive(Clone, Debug)]
 pub(crate) struct RequestRecord {
     /// Requested mathematical relation/operation.
-    pub(crate) operation: Operation,
+    pub(crate) task: crate::task::Task,
     /// Full context, including hypotheses.
     pub(crate) context: LogicalId,
     /// Original or generated occurrence roots in caller order.
     pub(crate) inputs: Vec<LogicalId>,
     /// Resolved resource policy.
     pub(crate) limits: Limits,
+    /// Explicit earlier proof premises.
+    pub(crate) premises: Vec<LogicalId>,
 }
 
 /// One authoritative heterogeneous vertex weight.
 #[derive(Clone, Debug)]
 pub(crate) enum Vertex {
+    /// Immutable semantic declarations.
+    Header(Header),
+    /// Exact set syntax.
+    Region(Region),
+    /// Declared mathematical space.
+    Space(Space),
+    /// Region/value association.
+    CaseArm(CaseArm),
+    /// Shared location without mutable function facts.
+    Boundary(Boundary),
+    /// Original ordered semantic signature.
+    SourceForm(SourceForm),
     /// Retained source.
     Source(Source),
     /// Mathematical context.
@@ -305,7 +373,9 @@ pub(crate) enum Vertex {
     /// Immutable positive weights for the complete primitive registry.
     Policy(crate::cost::CostPolicy),
     /// A kernel-checked instantiated primitive.
-    Application(crate::proof_model::CheckedStep),
+    Application(crate::scalar_model::CheckedStep),
+    /// Checked scoped application without dummy scalar endpoints.
+    ScopedApplication(Box<crate::proof_model::CheckedApplication>),
     /// A sealed proof root pointing to its authoritative application.
     Proof(LogicalId),
     /// A replayed strict improvement under one immutable policy identity.
@@ -321,7 +391,7 @@ pub(crate) enum Vertex {
     Shortcut {
         /// Existing checked proof, never a forward dependency.
         proof: LogicalId,
-        /// Positive logical-v1 cost after strict improvement checking.
+        /// Positive the current logical policy cost after strict improvement checking.
         cost: u64,
     },
 }
@@ -365,6 +435,54 @@ pub(crate) enum Edge {
     DependsOn,
     /// Immutable logical-cost policy for an admitted shortcut.
     CostPolicy,
+    /// Typed `InHeader` relationship.
+    InHeader,
+    /// Typed `ParentHeader` relationship.
+    ParentHeader,
+    /// Typed `DeclarationSpace` relationship.
+    DeclarationSpace(u32),
+    /// Typed `SpaceDomain` relationship.
+    SpaceDomain,
+    /// Typed `RegionInput` relationship.
+    RegionInput(u32),
+    /// Typed `MembershipPredicate` relationship.
+    MembershipPredicate,
+    /// Typed `ArmRegion` relationship.
+    ArmRegion,
+    /// Typed `ArmValue` relationship.
+    ArmValue,
+    /// Typed `BoundaryLocation` relationship.
+    BoundaryLocation,
+    /// Typed `SourceArgument` relationship.
+    SourceArgument(u32),
+    /// Typed `CaseDomain` relationship.
+    CaseDomain,
+    /// Typed `CaseMember` relationship.
+    CaseMember(u32),
+    /// Typed `InSpace` relationship.
+    InSpace,
+    /// Typed `AdmissibleRegion` relationship.
+    AdmissibleRegion,
+    /// Typed `ParentContext` relationship.
+    ParentContext,
+    /// Typed `ConclusionObject` relationship.
+    ConclusionObject(u32),
+    /// Typed `IncidentRegion` relationship.
+    IncidentRegion,
+    /// Typed `AtBoundary` relationship.
+    AtBoundary,
+    /// Typed `OfFunction` relationship.
+    OfFunction,
+    /// Typed `SideRegion` relationship.
+    SideRegion(crate::domain_model::Side),
+    /// Typed `JetValue` relationship.
+    JetValue(u32),
+    /// Typed `ComparedRegion` relationship.
+    ComparedRegion(u32),
+    /// Typed `CoverMember` relationship.
+    CoverMember(u32),
+    /// Typed `ArgumentRegion` relationship.
+    ArgumentRegion(u32),
 }
 
 /// Append-only storage plus derived lookup maps; the graph owns every weight.
@@ -421,6 +539,72 @@ impl State {
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
                 Location::new("expression lookup"),
+            )),
+        }
+    }
+
+    /// Read an immutable header of the correct graph kind.
+    pub(crate) fn header(&self, id: LogicalId) -> Result<&Header, Fault> {
+        match self.node(id)? {
+            Vertex::Header(value) => Ok(value),
+            _ => Err(Fault::invalid(
+                InvalidCode::Reference,
+                Location::new("header lookup"),
+            )),
+        }
+    }
+
+    /// Read an immutable region of the correct graph kind.
+    pub(crate) fn region(&self, id: LogicalId) -> Result<&Region, Fault> {
+        match self.node(id)? {
+            Vertex::Region(value) => Ok(value),
+            _ => Err(Fault::invalid(
+                InvalidCode::Reference,
+                Location::new("region lookup"),
+            )),
+        }
+    }
+
+    /// Read an immutable space of the correct graph kind.
+    pub(crate) fn space(&self, id: LogicalId) -> Result<&Space, Fault> {
+        match self.node(id)? {
+            Vertex::Space(value) => Ok(value),
+            _ => Err(Fault::invalid(
+                InvalidCode::Reference,
+                Location::new("space lookup"),
+            )),
+        }
+    }
+
+    /// Read an immutable arm of the correct graph kind.
+    pub(crate) fn arm(&self, id: LogicalId) -> Result<&CaseArm, Fault> {
+        match self.node(id)? {
+            Vertex::CaseArm(value) => Ok(value),
+            _ => Err(Fault::invalid(
+                InvalidCode::Reference,
+                Location::new("arm lookup"),
+            )),
+        }
+    }
+
+    /// Read an immutable boundary of the correct graph kind.
+    pub(crate) fn boundary(&self, id: LogicalId) -> Result<&Boundary, Fault> {
+        match self.node(id)? {
+            Vertex::Boundary(value) => Ok(value),
+            _ => Err(Fault::invalid(
+                InvalidCode::Reference,
+                Location::new("boundary lookup"),
+            )),
+        }
+    }
+
+    /// Read an immutable source form of the correct graph kind.
+    pub(crate) fn source_form(&self, id: LogicalId) -> Result<&SourceForm, Fault> {
+        match self.node(id)? {
+            Vertex::SourceForm(value) => Ok(value),
+            _ => Err(Fault::invalid(
+                InvalidCode::Reference,
+                Location::new("source_form lookup"),
             )),
         }
     }
@@ -674,7 +858,12 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("generated syntax");
-        let mut locals = vec![context];
+        let header = match self.state.node(context)? {
+            Vertex::Context(value) => value.header_id,
+            Vertex::Header(_) => context,
+            _ => return Err(Fault::invalid(InvalidCode::Reference, at)),
+        };
+        let mut locals = vec![header];
         locals
             .try_reserve(operands.len())
             .map_err(|_| Fault::allocation(at))?;
@@ -692,7 +881,7 @@ impl Cas {
         let draft = ExpressionDraft {
             operator,
             sort,
-            context: Reference::Local(0),
+            header: Reference::Local(0),
             scope: Vec::new(),
             binding: None,
             operands: references,
@@ -706,7 +895,11 @@ impl Cas {
     }
 
     /// Resolve one existing or strictly earlier batch reference.
-    fn resolve(&self, reference: &Reference, locals: &[LogicalId]) -> Result<LogicalId, Fault> {
+    pub(crate) fn resolve(
+        &self,
+        reference: &Reference,
+        locals: &[LogicalId],
+    ) -> Result<LogicalId, Fault> {
         match reference {
             Reference::Existing(handle) => self.checked(handle),
             Reference::Local(index) => usize::try_from(*index)
@@ -720,7 +913,7 @@ impl Cas {
     }
 
     /// Resolve an ordered finite reference list before looking up any weights.
-    fn resolve_all(
+    pub(crate) fn resolve_all(
         &self,
         references: &[Reference],
         locals: &[LogicalId],
@@ -749,20 +942,27 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         match draft {
             Draft::Source { key, text } => self.admit_source(state, key, text, pending, budget),
-            Draft::Context {
-                environment,
-                assumptions,
-            } => self.admit_context(state, environment, assumptions, locals, pending, budget),
+            Draft::Header(value) => self.admit_header(state, value, locals, pending, budget),
+            Draft::Context(value) => {
+                self.admit_context_frame(state, value, locals, pending, budget)
+            }
+            Draft::Region(value) => self.admit_region(state, value, locals, pending, budget),
+            Draft::Space(value) => self.admit_space(state, value, locals, pending, budget),
+            Draft::CaseArm(value) => self.admit_arm(state, value, locals, pending, budget),
+            Draft::Boundary(value) => self.admit_boundary(state, value, locals, pending, budget),
+            Draft::SourceForm(value) => {
+                self.admit_source_form(state, value, locals, pending, budget)
+            }
             Draft::Condition {
                 kind,
-                context,
+                header,
                 scope,
                 arguments,
             } => {
-                let context = self.resolve(context, locals)?;
+                let header = self.resolve(header, locals)?;
                 let arguments = self.resolve_all(arguments, locals, budget)?;
-                crate::validation::condition(state, kind, context, scope, &arguments, budget)?;
-                let mut edges = vec![(context, Edge::InContext)];
+                crate::validation::condition(state, kind, header, scope, &arguments, budget)?;
+                let mut edges = vec![(header, Edge::InHeader)];
                 for (position, argument) in arguments.iter().enumerate() {
                     edges.push((*argument, Edge::PredicateArgument(position_u32(position)?)));
                 }
@@ -770,7 +970,7 @@ impl Cas {
                     state,
                     Vertex::Condition(Condition {
                         kind: kind.clone(),
-                        context,
+                        header,
                         scope: scope.clone(),
                         arguments,
                     }),
@@ -779,6 +979,7 @@ impl Cas {
                     budget,
                 )
             }
+            Draft::Cases(value) => self.admit_cases(state, value, locals, pending, budget),
             Draft::Expression(expression) => {
                 self.admit_expression(state, expression, locals, pending, budget)
             }
@@ -786,25 +987,42 @@ impl Cas {
                 self.admit_occurrence(state, occurrence, locals, pending, budget)
             }
             Draft::Request {
-                operation,
+                task,
+                premises,
                 context,
                 inputs,
                 limits,
             } => {
                 let context = self.resolve(context, locals)?;
                 let inputs = self.resolve_all(inputs, locals, budget)?;
-                crate::request::validate(state, operation, context, &inputs, limits, budget)?;
+                for handle in task.references() {
+                    self.checked(handle)?;
+                }
+                let premises = self.resolve_all(premises, locals, budget)?;
+                for premise in &premises {
+                    if !matches!(state.node(*premise)?, Vertex::Proof(_)) {
+                        return Err(Fault::invalid(
+                            InvalidCode::Reference,
+                            Location::new("request admission"),
+                        ));
+                    }
+                }
+                crate::request_model::validate(state, task, context, &inputs, limits, budget)?;
                 let mut edges = vec![(context, Edge::InContext)];
+                for (position, premise) in premises.iter().enumerate() {
+                    edges.push((*premise, Edge::Premise(position_u32(position)?)));
+                }
                 for (position, input) in inputs.iter().enumerate() {
                     edges.push((*input, Edge::Input(position_u32(position)?)));
                 }
                 self.insert(
                     state,
                     Vertex::Request(RequestRecord {
-                        operation: operation.clone(),
+                        task: task.clone(),
+                        premises,
                         context,
                         inputs,
-                        limits: limits.clone(),
+                        limits: limits.as_ref().clone(),
                     }),
                     &edges,
                     pending,
@@ -860,60 +1078,6 @@ impl Cas {
         Ok(id)
     }
 
-    /// Canonicalize a context before interning it.
-    fn admit_context(
-        &self,
-        state: &mut State,
-        environment: &Environment,
-        assumptions: &[AssumptionDraft],
-        locals: &[LogicalId],
-        pending: u64,
-        budget: &mut Budget,
-    ) -> Result<LogicalId, Fault> {
-        let at = Location::new("context admission");
-        let environment = crate::validation::environment(environment, budget)?;
-        let mut encoded = Encoder::new(budget, at);
-        encoding::environment(&environment, &mut encoded)?;
-        let header = encoded.finish();
-        budget.check(BudgetKind::ConditionAtoms, size(assumptions.len(), at)?, at)?;
-        let mut declared = BTreeMap::new();
-        let comparisons = size(assumptions.len(), at)?
-            .checked_mul(size(assumptions.len(), at)?)
-            .and_then(|n| n.checked_mul(budget.limits().name_bytes))
-            .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?;
-        budget.work(comparisons, at)?;
-        for assumption in assumptions {
-            let condition = self.resolve(&assumption.condition, locals)?;
-            crate::validation::assumption(state, condition, &header, budget)?;
-            if let Some(old) = declared.insert(assumption.key.clone(), condition)
-                && old != condition
-            {
-                return Err(Fault::invalid(InvalidCode::Context, at));
-            }
-        }
-        let assumptions: Vec<_> = declared.into_iter().collect();
-        let canonical_assumptions = crate::context::canonical(state, &assumptions, budget)?;
-        let mut edges = Vec::new();
-        edges
-            .try_reserve_exact(assumptions.len())
-            .map_err(|_| Fault::allocation(at))?;
-        for (position, (_, condition)) in assumptions.iter().enumerate() {
-            edges.push((*condition, Edge::Assumption(position_u32(position)?)));
-        }
-        self.insert(
-            state,
-            Vertex::Context(Context {
-                environment,
-                header,
-                assumptions,
-                canonical_assumptions,
-            }),
-            &edges,
-            pending,
-            budget,
-        )
-    }
-
     /// Validate mathematical syntax before admitting its binder and expression.
     fn admit_expression(
         &self,
@@ -924,14 +1088,26 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("expression admission");
-        let context = self.resolve(&draft.context, locals)?;
+        let header = self.resolve(&draft.header, locals)?;
         let operands = self.resolve_all(&draft.operands, locals, budget)?;
         let (depth, unfolded) =
-            crate::validation::expression(state, draft, context, &operands, budget)?;
+            crate::validation::expression(state, draft, header, &operands, budget)?;
+        let space =
+            crate::header::expression_space(state, header, &draft.operator, &draft.sort, budget)?;
         let expression = Vertex::Expression(Expression {
             operator: draft.operator.clone(),
             sort: draft.sort.clone(),
-            context,
+            header,
+            layer: if draft.sort == Sort::Distribution {
+                Layer::Distribution
+            } else if draft.sort == Sort::Value(crate::model::AtomicSort::Boolean) {
+                Layer::Logic
+            } else {
+                Layer::Pointwise
+            },
+            space,
+            domain: None,
+            arms: Vec::new(),
             scope: draft.scope.clone(),
             binding: draft.binding.clone(),
             operands: operands.clone(),
@@ -949,7 +1125,10 @@ impl Cas {
         if let Some(id) = state.intern.get(&key) {
             return Ok(*id);
         }
-        let mut edges = vec![(context, Edge::InContext)];
+        let mut edges = vec![(header, Edge::InHeader)];
+        if let Some(space) = space {
+            edges.push((space, Edge::InSpace));
+        }
         for (position, operand) in operands.iter().enumerate() {
             edges.push((*operand, Edge::Operand(position_u32(position)?)));
         }
@@ -991,6 +1170,9 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("occurrence admission");
         let expression = self.resolve(&draft.expression, locals)?;
+        if matches!(state.node(expression)?, Vertex::Expression(value) if value.domain.is_some()) {
+            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
+        }
         let source = draft
             .source
             .as_ref()
@@ -1094,6 +1276,12 @@ impl Cas {
             storage_check(&self.limits, budget, kind, count, at)?;
         }
         let certificate_bytes = match &vertex {
+            Vertex::ScopedApplication(value) => match &value.certificate {
+                crate::proof_model::Certificate::SquareFree(certificate) => {
+                    certificate.payload(budget)?
+                }
+                _ => 0,
+            },
             Vertex::Application(value) => match &value.certificate {
                 Some(certificate) => certificate.payload(budget)?,
                 None => 0,
@@ -1179,7 +1367,7 @@ pub(crate) fn encode_id(id: LogicalId, out: &mut Encoder<'_>) -> Result<(), Faul
 }
 
 /// Convert a checked operand position to its wire/edge width.
-fn position_u32(position: usize) -> Result<u32, Fault> {
+pub(crate) fn position_u32(position: usize) -> Result<u32, Fault> {
     u32::try_from(position)
         .map_err(|_| Fault::capacity(BudgetKind::Edges, Location::new("operand position")))
 }
@@ -1187,14 +1375,26 @@ fn position_u32(position: usize) -> Result<u32, Fault> {
 /// Reconstruct a complete canonical record key from graph-owned weights.
 pub(crate) fn vertex_key(
     vertex: &Vertex,
-    state: &State,
+    _state: &State,
     budget: &mut Budget,
 ) -> Result<(VertexKind, Vec<u8>), Fault> {
     let kind = vertex_kind(vertex);
     let mut out = Encoder::new(budget, Location::new("structural key"));
     out.byte(kind.tag())?;
     match vertex {
+        Vertex::Header(_)
+        | Vertex::Region(_)
+        | Vertex::Space(_)
+        | Vertex::CaseArm(_)
+        | Vertex::Boundary(_)
+        | Vertex::SourceForm(_) => {
+            crate::domain_encoding::vertex(vertex, &mut out)?;
+        }
         Vertex::Policy(policy) => policy.encode(&mut out)?,
+        Vertex::ScopedApplication(application) => {
+            out.byte(3)?;
+            crate::statement::application(application, &mut out)?;
+        }
         Vertex::Application(application) => {
             out.byte(0)?;
             crate::proof_storage::encode_application(application, &mut out)?;
@@ -1220,13 +1420,9 @@ pub(crate) fn vertex_key(
             out.count(source.text.len())?;
             out.raw(source.text.as_bytes())?;
         }
-        Vertex::Context(context) => {
-            out.raw(&context.header)?;
-            out.count(context.assumptions.len())?;
-            out.raw(&context.canonical_assumptions)?;
-        }
+        Vertex::Context(context) => context_key(context, &mut out)?,
         Vertex::Condition(condition) => {
-            out.raw(&state.context(condition.context)?.header)?;
+            encode_id(condition.header, &mut out)?;
             encoding::predicate(&condition.kind, &mut out)?;
             encoding::scope(&condition.scope, &mut out)?;
             out.count(condition.arguments.len())?;
@@ -1234,42 +1430,15 @@ pub(crate) fn vertex_key(
                 encode_id(*argument, &mut out)?;
             }
         }
-        Vertex::Expression(expression) => {
-            out.raw(&state.context(expression.context)?.header)?;
-            encoding::operator(&expression.operator, &mut out)?;
-            encoding::sort(&expression.sort, &mut out)?;
-            encoding::scope(&expression.scope, &mut out)?;
-            encoding::binding(expression.binding.as_ref(), &mut out)?;
-            out.count(expression.operands.len())?;
-            for operand in &expression.operands {
-                encode_id(*operand, &mut out)?;
-            }
-        }
-        Vertex::Occurrence(occurrence) => {
-            encode_id(occurrence.expression, &mut out)?;
-            for optional in [occurrence.source, occurrence.provenance] {
-                out.byte(u8::from(optional.is_some()))?;
-                if let Some(id) = optional {
-                    encode_id(id, &mut out)?;
-                }
-            }
-            out.byte(u8::from(occurrence.span.is_some()))?;
-            if let Some(span) = occurrence.span {
-                out.unsigned(span.start)?;
-                out.unsigned(span.end)?;
-            }
-            out.count(occurrence.children.len())?;
-            for child in &occurrence.children {
-                encode_id(*child, &mut out)?;
-            }
-            out.count(occurrence.binder_names.len())?;
-            for name in &occurrence.binder_names {
-                out.name(name)?;
-            }
-        }
+        Vertex::Expression(expression) => expression_key(expression, &mut out)?,
+        Vertex::Occurrence(occurrence) => occurrence_key(occurrence, &mut out)?,
         Vertex::Binder(binding) => encoding::binding(Some(binding), &mut out)?,
         Vertex::Request(request) => {
-            encoding::operation(&request.operation, &mut out)?;
+            crate::task::encode(&request.task, &mut out)?;
+            out.count(request.premises.len())?;
+            for premise in &request.premises {
+                encode_id(*premise, &mut out)?;
+            }
             encode_id(request.context, &mut out)?;
             out.count(request.inputs.len())?;
             for input in &request.inputs {
@@ -1286,6 +1455,12 @@ pub(crate) fn vertex_key(
 /// Classify a graph-owned record without exposing physical indices.
 const fn vertex_kind(vertex: &Vertex) -> VertexKind {
     match vertex {
+        Vertex::Header(_) => VertexKind::Header,
+        Vertex::Region(_) => VertexKind::Region,
+        Vertex::Space(_) => VertexKind::Space,
+        Vertex::CaseArm(_) => VertexKind::CaseArm,
+        Vertex::Boundary(_) => VertexKind::Boundary,
+        Vertex::SourceForm(_) => VertexKind::SourceForm,
         Vertex::Source(_) => VertexKind::Source,
         Vertex::Context(_) => VertexKind::Context,
         Vertex::Condition(_) => VertexKind::Condition,
@@ -1293,10 +1468,86 @@ const fn vertex_kind(vertex: &Vertex) -> VertexKind {
         Vertex::Occurrence(_) => VertexKind::Occurrence,
         Vertex::Binder(_) => VertexKind::Binder,
         Vertex::Request(_) => VertexKind::Request,
-        Vertex::Application(_) | Vertex::Shortcut { .. } | Vertex::PolicyShortcut { .. } => {
-            VertexKind::Application
-        }
+        Vertex::ScopedApplication(_)
+        | Vertex::Application(_)
+        | Vertex::Shortcut { .. }
+        | Vertex::PolicyShortcut { .. } => VertexKind::Application,
         Vertex::Proof(_) => VertexKind::Proof,
         Vertex::Policy(_) => VertexKind::Policy,
     }
+}
+
+/// Encode every retained context identity field.
+fn context_key(context: &Context, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    encode_id(context.header_id, out)?;
+    encode_id(context.admissible, out)?;
+    out.byte(u8::from(context.restriction.is_some()))?;
+    if let Some(restriction) = context.restriction {
+        encode_id(restriction, out)?;
+    }
+    out.byte(u8::from(context.parent.is_some()))?;
+    if let Some(parent) = context.parent {
+        encode_id(parent, out)?;
+    }
+    out.count(context.frame.len())?;
+    for (name, predicate) in &context.frame {
+        out.name(name)?;
+        encode_id(*predicate, out)?;
+    }
+    out.raw(&context.header)?;
+    out.count(context.assumptions.len())?;
+    out.raw(&context.canonical_assumptions)?;
+    Ok(())
+}
+
+/// Encode every retained expression identity field.
+fn expression_key(expression: &Expression, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    encode_id(expression.header, out)?;
+    out.byte(expression.layer.tag())?;
+    out.byte(u8::from(expression.space.is_some()))?;
+    if let Some(space) = expression.space {
+        encode_id(space, out)?;
+    }
+    out.byte(u8::from(expression.domain.is_some()))?;
+    if let Some(domain) = expression.domain {
+        encode_id(domain, out)?;
+    }
+    out.count(expression.arms.len())?;
+    for arm in &expression.arms {
+        encode_id(*arm, out)?;
+    }
+    encoding::operator(&expression.operator, out)?;
+    encoding::sort(&expression.sort, out)?;
+    encoding::scope(&expression.scope, out)?;
+    encoding::binding(expression.binding.as_ref(), out)?;
+    out.count(expression.operands.len())?;
+    for operand in &expression.operands {
+        encode_id(*operand, out)?;
+    }
+    Ok(())
+}
+
+/// Encode every retained occurrence identity field.
+fn occurrence_key(occurrence: &Occurrence, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    encode_id(occurrence.expression, out)?;
+    for optional in [occurrence.source, occurrence.provenance] {
+        out.byte(u8::from(optional.is_some()))?;
+        if let Some(id) = optional {
+            encode_id(id, out)?;
+        }
+    }
+    out.byte(u8::from(occurrence.span.is_some()))?;
+    if let Some(span) = occurrence.span {
+        out.unsigned(span.start)?;
+        out.unsigned(span.end)?;
+    }
+    out.count(occurrence.children.len())?;
+    for child in &occurrence.children {
+        encode_id(*child, out)?;
+    }
+    out.count(occurrence.binder_names.len())?;
+    for name in &occurrence.binder_names {
+        out.name(name)?;
+    }
+    Ok(())
 }

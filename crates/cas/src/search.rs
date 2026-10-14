@@ -10,9 +10,9 @@ use crate::error::{Fault, FaultKind, InvalidCode, Location};
 use crate::frontier::{Frontier, Metrics, Rank};
 use crate::graph::{Cas, Handle, LogicalId, size};
 use crate::producer::{Plan, step};
-use crate::proof_model::{Relation, VerifiedWitness};
 use crate::rewrite::Action;
 use crate::rule::Primitive;
+use crate::scalar_model::{Relation, VerifiedWitness};
 
 /// Request policy kept separate from the mathematical proof format.
 #[derive(Clone, Debug)]
@@ -49,7 +49,7 @@ pub struct SearchStatistics {
 #[derive(Clone)]
 pub struct SearchResult {
     /// Kernel-checked mathematical witness; no optimality is implied.
-    pub witness: VerifiedWitness,
+    pub witness: crate::proof_model::VerifiedWitness,
     /// Positive logical transition sum under the pinned policy.
     pub cost: u64,
     /// Maximum unfolded expression size along this route.
@@ -378,27 +378,33 @@ impl Search {
     }
 
     /// Return only an already checked candidate; a target miss is explicitly unresolved.
-    pub(crate) fn result(mut self, checker: &Budget) -> Option<SearchResult> {
-        let id = self.best?;
-        self.labels.get(id)?;
+    pub(crate) fn result(
+        mut self,
+        cas: &Cas,
+        checker: &mut Budget,
+    ) -> Result<Option<SearchResult>, Fault> {
+        let Some(id) = self.best else {
+            return Ok(None);
+        };
+        self.labels.get(id).ok_or_else(invalid)?;
         let label = self.labels.swap_remove(id);
         if self.target.is_some_and(|goal| label.endpoint != goal) {
-            return None;
+            return Ok(None);
         }
         let mut statistics = self.statistics;
         statistics.dominated = self.frontier.dominated;
-        Some(SearchResult {
-            witness: label.witness,
+        Ok(Some(SearchResult {
+            witness: crate::proof_view::native_witness(cas, label.witness, checker)?,
             cost: label.metrics.cost,
             peak: label.metrics.peak,
             expansion_credits: label.metrics.credits,
-            primitive_steps: u64::try_from(label.plan.steps.len()).ok()?,
+            primitive_steps: u64::try_from(label.plan.steps.len()).map_err(|_| invalid())?,
             trace: label.trace,
             policy: self.policy.costs,
             statistics,
             replay_usage: checker.usage(),
             response: None,
-        })
+        }))
     }
 }
 

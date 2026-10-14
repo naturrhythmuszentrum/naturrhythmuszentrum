@@ -3,10 +3,13 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{
-    AtomicSort, Binding, Budget, Cas, Declaration, Draft, Environment, ExpressionDraft, Field,
-    Handle, Operation, Operator, Rational, Reference, Request, Scope, Sort,
+use crate::test_api::limits::Budget;
+use crate::test_api::request::{CoveredInput, Request, Task};
+use crate::test_api::syntax::{
+    AtomicSort, Binding, Declaration, Draft, Environment, ExpressionDraft, Field, Operator, Scope,
+    Sort,
 };
+use crate::test_api::{Cas, Handle, Rational, Reference};
 
 use super::budgets::{derivation_budget, derivation_request_limits};
 use super::common::TestResult;
@@ -45,7 +48,7 @@ pub(crate) fn environment(field: Field, keys: &[&str]) -> Environment {
 pub(crate) fn expression_draft(
     operator: Operator,
     sort: Sort,
-    context: Reference,
+    header: Reference,
     scope: Scope,
     binding: Option<Binding>,
     operands: &[Handle],
@@ -53,7 +56,7 @@ pub(crate) fn expression_draft(
     Draft::Expression(ExpressionDraft {
         operator,
         sort,
-        context,
+        header,
         scope,
         binding,
         operands: operands.iter().cloned().map(Reference::Existing).collect(),
@@ -69,12 +72,13 @@ pub(crate) fn expression(
     operands: &[Handle],
     budget: &mut Budget,
 ) -> TestResult<Handle> {
+    let header = cas.context_header(context)?;
     admit(
         cas,
         expression_draft(
             operator,
             sort,
-            Reference::Existing(context.clone()),
+            Reference::Existing(header),
             Vec::new(),
             None,
             operands,
@@ -106,22 +110,50 @@ pub(crate) fn number(
 pub(crate) fn request(
     cas: &mut Cas,
     context: &Handle,
-    operation: Operation,
+    task: Task,
     expressions: &[Handle],
 ) -> TestResult<Request> {
     let mut inputs = Vec::new();
-    let mut receipts = Vec::new();
     for expression in expressions {
         let root = cas.materialize_derived(expression, expression, &mut derivation_budget()?)?;
         let receipt = cas.walk_derived(&root, &mut derivation_budget()?)?.receipt;
-        inputs.push(root);
-        receipts.push(receipt);
+        inputs.push(CoveredInput { root, receipt });
     }
     Ok(Request {
-        operation,
+        task,
         context: context.clone(),
         inputs,
-        receipts,
+        premises: Vec::new(),
         limits: derivation_request_limits(),
     })
+}
+
+/// Build the header, ambient assignments region and root context as an explicit acyclic batch.
+pub(crate) fn core_context(
+    cas: &mut Cas,
+    environment: Environment,
+    assumptions: Vec<crate::test_api::domain::AssumptionDraft>,
+    budget: &mut Budget,
+) -> TestResult<Handle> {
+    use crate::test_api::domain::{
+        AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr,
+    };
+    let handles = cas.admit(
+        &[
+            Draft::Header(HeaderDraft::Core(environment)),
+            Draft::Region(RegionDraft {
+                header: Reference::Local(0),
+                scope: Vec::new(),
+                ambient: AmbientDomain::Assignments,
+                expression: RegionExpr::Ambient,
+            }),
+            Draft::Context(ContextDraft::Root {
+                header: Reference::Local(0),
+                admissible: Reference::Local(1),
+                assumptions,
+            }),
+        ],
+        budget,
+    )?;
+    at(&handles, 2)
 }

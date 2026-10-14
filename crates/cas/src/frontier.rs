@@ -280,7 +280,9 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::{Frontier, Metrics};
-    use crate::{Budget, Fault, Limits, LogicalId, VertexKind};
+    use crate::limits::{Budget, Limits};
+    use crate::syntax::VertexKind;
+    use crate::{Fault, LogicalId};
 
     /// If one scheduling view has no eligible entry, its slot is donated to the other view.
     /// ´test:unit:queue-empty-donation´

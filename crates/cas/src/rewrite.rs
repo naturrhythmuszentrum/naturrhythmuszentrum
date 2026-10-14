@@ -6,8 +6,8 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, size};
 use crate::model::Operator;
 use crate::producer::{Plan, integer, step, term};
-use crate::proof_model::Relation;
 use crate::rule::Primitive;
+use crate::scalar_model::Relation;
 
 /// A deterministic match cursor entry; no arbitrary terms or variables are synthesized.
 #[derive(Clone, Debug)]

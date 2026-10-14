@@ -6,8 +6,8 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Expression, LogicalId, State, size};
 use crate::model::{AtomicSort, Branch, Field, Operator, Sort};
 use crate::number::Rational;
-use crate::proof_model::{CheckedStep, ProofStep, Relation};
 use crate::rule::Primitive;
+use crate::scalar_model::{CheckedStep, ProofStep, Relation};
 
 /// Static schema-checking location.
 const AT: Location = Location::new("primitive schema");

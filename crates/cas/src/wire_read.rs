@@ -12,7 +12,6 @@ use crate::model::{
     SpectralKind,
 };
 use crate::number::Rational;
-use crate::proof_model::Relation;
 
 /// Decoder location, never interpolating hostile bytes into an error.
 const AT: Location = Location::new("witness decoding");
@@ -82,7 +81,7 @@ impl<'a, 'b> Reader<'a, 'b> {
     }
 
     /// Structural encodings use u64 for bounded u32 mathematical payloads.
-    fn small(&mut self) -> Result<u32, Fault> {
+    pub(crate) fn small(&mut self) -> Result<u32, Fault> {
         u32::try_from(self.unsigned()?).map_err(|_| invalid())
     }
 
@@ -135,19 +134,6 @@ impl<'a, 'b> Reader<'a, 'b> {
         Ok(result)
     }
 
-    /// Read a finite list of local references.
-    pub(crate) fn indices(&mut self, kind: BudgetKind) -> Result<Vec<u32>, Fault> {
-        let count = self.count(kind, 4, 8)?;
-        let mut result = Vec::new();
-        result
-            .try_reserve_exact(count)
-            .map_err(|_| Fault::allocation(AT))?;
-        for _ in 0..count {
-            result.push(self.index()?);
-        }
-        Ok(result)
-    }
-
     /// Refuse trailing bytes even after a valid prefix.
     pub(crate) const fn finished(&self) -> Result<(), Fault> {
         if self.position == self.bytes.len() {
@@ -192,7 +178,7 @@ impl<'a, 'b> Reader<'a, 'b> {
     }
 
     /// Decode a complete field convention.
-    fn field(&mut self) -> Result<Field, Fault> {
+    pub(crate) fn field(&mut self) -> Result<Field, Fault> {
         match self.byte()? {
             0 => Ok(Field::Rational),
             1 => Ok(Field::Real),
@@ -246,6 +232,8 @@ impl<'a, 'b> Reader<'a, 'b> {
                 output: self.atomic()?,
             }),
             2 => Ok(Sort::Set(self.atomic()?)),
+            3 => Ok(Sort::Test),
+            4 => Ok(Sort::Distribution),
             _ => Err(invalid()),
         }
     }
@@ -359,7 +347,7 @@ impl<'a, 'b> Reader<'a, 'b> {
         }
     }
 
-    /// Decode every v1 operator without relying on Rust enum layout.
+    /// Decode every represented operator without relying on Rust enum layout.
     pub(crate) fn operator(&mut self) -> Result<Operator, Fault> {
         match self.byte()? {
             0 => Ok(Operator::Rational(self.rational()?)),
@@ -386,6 +374,7 @@ impl<'a, 'b> Reader<'a, 'b> {
     /// Decode represented calculus, matrix and predicate operator payloads separately.
     fn extended_operator(&mut self, tag: u8) -> Result<Operator, Fault> {
         match tag {
+            28 => Ok(Operator::Cases),
             10 => Ok(Operator::GeneralPower(self.branch()?)),
             11 => Ok(Operator::Call(self.name()?)),
             12 => Ok(Operator::Derivative(self.name()?)),
@@ -483,31 +472,5 @@ impl<'a, 'b> Reader<'a, 'b> {
             multiplicity,
             selection,
         })
-    }
-
-    /// Decode only the relation meanings with an admitted checker in this capability.
-    pub(crate) fn relation(&mut self) -> Result<Relation, Fault> {
-        match self.byte()? {
-            0 => Ok(Relation::EqualOnDomain),
-            1 => Ok(Relation::Derivative {
-                variable: self.name()?,
-            }),
-            2 => {
-                let count = self.count(BudgetKind::PolynomialVariables, 4, 32)?;
-                let mut variables = Vec::new();
-                variables
-                    .try_reserve_exact(count)
-                    .map_err(|_| Fault::allocation(AT))?;
-                for _ in 0..count {
-                    variables.push(self.name()?);
-                }
-                Ok(Relation::Jacobian { variables })
-            }
-            3 => Ok(Relation::SquareFree {
-                variable: self.name()?,
-                field: self.field()?,
-            }),
-            _ => Err(invalid()),
-        }
     }
 }

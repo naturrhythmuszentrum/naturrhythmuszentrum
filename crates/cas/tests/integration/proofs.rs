@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete public-API client flows for proofs.
 
-use nrz_cas::{
-    Cas, Claim, FaultKind, Guard, GuardKind, InvalidCode, Limits, Operator, PredicateKind,
-    Primitive, Relation,
-};
+use nrz_cas::{Cas, FaultKind, InvalidCode};
+
+use nrz_cas::proof::{GuardKind, Judgment, Primitive, Statement};
+use nrz_cas::syntax::{Operator, PredicateKind};
 
 use crate::testing::budgets::proof_budget as budget;
 use crate::testing::common::TestResult;
@@ -16,26 +16,49 @@ use crate::testing::witness::{derivative, equality};
 /// ´test:integration:assumed-cancellation´
 #[test]
 fn assumed_cancellation() -> TestResult {
-    let (mut fixture, _, step) = cancellation()?;
+    let (mut fixture, _, mut step) = cancellation()?;
     fixture.assume("positive-x", PredicateKind::Positive, &fixture.x.clone())?;
+    step.context = fixture.context.clone();
     let witness = fixture
         .cas
         .check_proof(&fixture.context, &[step], &mut budget()?)?;
     assert!(witness.is_discharged());
-    assert_eq!(witness.hypotheses(), &["positive-x".to_owned()]);
+    assert_eq!(
+        witness.hypotheses(),
+        &[nrz_cas::domain::HypothesisRef {
+            context: fixture.context.clone(),
+            slot: 0
+        }]
+    );
+    let reference = witness
+        .hypotheses()
+        .first()
+        .ok_or("missing root hypothesis")?;
+    assert_eq!(fixture.cas.hypothesis_name(reference)?, Some("positive-x"));
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
     let (mut fresh, quotient, _) = cancellation()?;
     fresh.assume("positive-x", PredicateKind::Positive, &fresh.x.clone())?;
-    let expected = Claim {
+    let expected = Judgment {
         context: fresh.context.clone(),
-        relation: Relation::EqualOnDomain,
-        left: quotient,
-        right: fresh.one.clone(),
+        layer: nrz_cas::domain::Layer::Pointwise,
+        space: None,
+        statement: Statement::Equality {
+            left: quotient,
+            right: fresh.one.clone(),
+            domain: fresh.domain.clone(),
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
         residuals: Vec::new(),
     };
     let replayed = fresh.cas.replay(&bytes, &expected, &mut budget()?)?;
     assert_eq!(fresh.cas.export_witness(&replayed, &mut budget()?)?, bytes);
-    assert_eq!(replayed.hypotheses(), witness.hypotheses());
+    assert_eq!(
+        replayed.hypotheses(),
+        &[nrz_cas::domain::HypothesisRef {
+            context: fresh.context.clone(),
+            slot: 0
+        }]
+    );
     Ok(())
 }
 
@@ -51,26 +74,52 @@ fn checked_derivative_premises() -> TestResult {
     let target = fixture.term(Operator::Mul, &[fixture.two.clone(), fixture.x.clone()])?;
     let steps = vec![
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DifferentiateVariable,
             &fixture.x,
             &fixture.one,
             &[],
         ),
-        derivative(Primitive::DifferentiateProduct, &square, &sum, &[0, 0]),
-        equality(Primitive::Jets, &sum, &target),
-        derivative(Primitive::DerivativeTransport, &square, &target, &[1, 2]),
+        derivative(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::DifferentiateProduct,
+            &square,
+            &sum,
+            &[0, 0],
+        ),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::Jets,
+            &sum,
+            &target,
+        ),
+        derivative(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::DerivativeTransport,
+            &square,
+            &target,
+            &[1, 2],
+        ),
     ];
     let witness = fixture
         .cas
         .check_proof(&fixture.context, &steps, &mut budget()?)?;
     assert!(witness.is_discharged());
-    assert_eq!(
-        witness.claim().relation,
-        Relation::Derivative {
-            variable: "x".into()
-        }
+    assert!(
+        matches!(&witness.judgment().statement, Statement::DerivativeOn { coordinate, domain, ..
+        } if coordinate == "x" && *domain == fixture.domain)
     );
-    let mut bad = equality(Primitive::Symmetry, &fixture.one, &fixture.x);
+    let mut bad = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Symmetry,
+        &fixture.one,
+        &fixture.x,
+    );
     bad.premises = vec![0];
     assert!(
         fixture
@@ -95,7 +144,7 @@ fn checked_derivative_premises() -> TestResult {
             .is_err()
     );
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let mut fresh = Cas::new(Limits::default())?;
+    let mut fresh = Cas::new(budget()?.limits().clone())?;
     let inspected = fresh.inspect(&bytes, &mut budget()?)?;
     assert_eq!(fresh.export_witness(&inspected, &mut budget()?)?, bytes);
     Ok(())
@@ -112,15 +161,22 @@ fn expected_claim_replay() -> TestResult {
     let bytes = producer.cas.export_witness(&witness, &mut budget()?)?;
     assert_eq!(bytes, canonical_fixture()?);
     let (mut receiver, quotient, _) = cancellation()?;
-    let expected = Claim {
+    let expected = Judgment {
         context: receiver.context.clone(),
-        relation: Relation::EqualOnDomain,
-        left: quotient,
-        right: receiver.one.clone(),
-        residuals: vec![Guard {
-            kind: GuardKind::NonZero,
-            term: receiver.x.clone(),
-        }],
+        layer: nrz_cas::domain::Layer::Pointwise,
+        space: None,
+        statement: Statement::Equality {
+            left: quotient,
+            right: receiver.one.clone(),
+            domain: receiver.domain.clone(),
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
+        residuals: vec![crate::testing::witness::guarded(
+            &mut receiver.cas,
+            &receiver.context,
+            GuardKind::NonZero,
+            &(receiver.x.clone()),
+        )?],
     };
     let replayed = receiver.cas.replay(&bytes, &expected, &mut budget()?)?;
     assert_eq!(
@@ -129,7 +185,10 @@ fn expected_claim_replay() -> TestResult {
     );
     let before = receiver.cas.canonical_snapshot(&mut budget()?)?;
     let mut wrong = expected.clone();
-    wrong.right = receiver.zero.clone();
+    let Statement::Equality { right, .. } = &mut wrong.statement else {
+        return Err("expected equality".into());
+    };
+    *right = receiver.zero.clone();
     let fault = receiver
         .cas
         .replay(&bytes, &wrong, &mut budget()?)
@@ -160,25 +219,39 @@ fn checked_quotient_derivative() -> TestResult {
     let simplified = fixture.term(Operator::Div, &[fixture.one.clone(), fixture.y.clone()])?;
     let steps = [
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DifferentiateVariable,
             &fixture.x,
             &fixture.one,
             &[],
         ),
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DifferentiateVariable,
             &fixture.y,
             &fixture.zero,
             &[],
         ),
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DifferentiateQuotient,
             &quotient,
             &derivative_value,
             &[0, 1],
         ),
-        equality(Primitive::RationalIdentity, &derivative_value, &simplified),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::RationalIdentity,
+            &derivative_value,
+            &simplified,
+        ),
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DerivativeTransport,
             &quotient,
             &simplified,
@@ -189,14 +262,16 @@ fn checked_quotient_derivative() -> TestResult {
         .cas
         .check_proof(&fixture.context, &steps, &mut budget()?)?;
     assert_eq!(
-        witness.claim().residuals,
-        vec![Guard {
-            kind: GuardKind::NonZero,
-            term: fixture.y.clone()
-        }],
+        witness.judgment().residuals,
+        vec![crate::testing::witness::guarded(
+            &mut fixture.cas,
+            &fixture.context,
+            GuardKind::NonZero,
+            &(fixture.y.clone())
+        )?],
     );
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let mut fresh = Cas::new(Limits::default())?;
+    let mut fresh = Cas::new(budget()?.limits().clone())?;
     assert!(!fresh.inspect(&bytes, &mut budget()?)?.is_discharged());
     Ok(())
 }

@@ -72,6 +72,10 @@ pub enum Sort {
     },
     /// A set of values, such as a solution set.
     Set(AtomicSort),
+    /// Smooth compactly supported test value in an explicitly linked space.
+    Test,
+    /// Distribution value in an explicitly linked space.
+    Distribution,
 }
 
 /// One declared identity; its display spelling does not determine identity.
@@ -228,6 +232,8 @@ pub enum RootSelection {
 /// Mathematical syntax tags; all operands remain explicitly ordered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// Native cases use typed domain and arm links, not scalar operands.
+    Cases,
     /// An exact reduced rational.
     Rational(Rational),
     /// A free declaration key.
@@ -332,7 +338,11 @@ pub struct Span {
 
 /// A first-class task whose execution may remain unresolved.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Operation {
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scalar producer intent remains private behind the typed task facade"
+)]
+pub(crate) enum Operation {
     /// Search for a simpler expression.
     Simplify,
     /// Prove equality to the supplied target root.

@@ -3,9 +3,9 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{
-    Cas, Draft, Field, Handle, Limits, OccurrenceDraft, Operator, Reference, Sort, Span,
-};
+use crate::test_api::{Cas, Handle, Reference};
+
+use crate::test_api::syntax::{Draft, Field, OccurrenceDraft, Operator, Sort, Span};
 
 use super::budgets::graph_budget as budget;
 use super::builders;
@@ -18,15 +18,9 @@ pub(crate) fn admit(cas: &mut Cas, draft: Draft) -> TestResult<Handle> {
 
 /// Build a fresh immutable context with two distinct free identities.
 pub(crate) fn fixture() -> TestResult<(Cas, Handle)> {
-    let mut cas = Cas::new(Limits::default())?;
+    let mut cas = Cas::new(budget()?.limits().clone())?;
     let environment = builders::environment(Field::Real, &["x", "y"]);
-    let context = admit(
-        &mut cas,
-        Draft::Context {
-            environment,
-            assumptions: Vec::new(),
-        },
-    )?;
+    let context = builders::core_context(&mut cas, environment, Vec::new(), &mut budget()?)?;
     Ok((cas, context))
 }
 

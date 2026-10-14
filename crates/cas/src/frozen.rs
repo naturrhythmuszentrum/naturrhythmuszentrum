@@ -9,7 +9,7 @@ use crate::cost::CostPolicy;
 use crate::encoding::Encoder;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, Vertex, encode_id, size, vertex_key};
-use crate::proof_model::{Claim, Relation};
+use crate::scalar_model::{Claim, Relation};
 
 /// A sealed finite-snapshot cost claim, independent of mathematical witness validity.
 #[derive(Clone)]
@@ -84,7 +84,7 @@ impl Cas {
     /// # Errors
     /// Refuses non-equality relations, conflicting policy versions, invalid handles or any
     /// resource exhaustion. Failure produces no certificate and publishes no policy record.
-    pub fn certify_frozen_cost(
+    pub(crate) fn certify_scalar_frozen_cost(
         &mut self,
         claim: &Claim,
         policy: &CostPolicy,
@@ -130,6 +130,12 @@ pub(crate) fn snapshot(
         let node = cas.state.node(*id)?;
         let (application, cost) = match node {
             Vertex::Application(value) => (value, policy.weight(value.primitive)?),
+            Vertex::ScopedApplication(value) => {
+                let Some(value) = &value.scalar else {
+                    continue;
+                };
+                (value, policy.weight(value.primitive)?)
+            }
             Vertex::Shortcut { proof, cost } if default => {
                 (crate::proof_storage::application(cas, *proof)?, *cost)
             }
@@ -151,7 +157,7 @@ pub(crate) fn snapshot(
         if application.context != context || application.relation != claim.relation {
             continue;
         }
-        let mut actual = crate::proof::claim(cas, application, budget)?;
+        let mut actual = crate::proof_check::claim(cas, application, budget)?;
         actual.left = claim.left.clone();
         actual.right = claim.right.clone();
         if crate::wire::claim_key(cas, &actual, budget)? != desired {

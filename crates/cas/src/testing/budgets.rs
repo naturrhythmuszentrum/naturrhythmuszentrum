@@ -3,7 +3,7 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{Budget, Limits, LimitsOverride};
+use crate::test_api::limits::{Budget, Limits, LimitsOverride};
 
 use super::common::TestResult;
 

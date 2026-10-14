@@ -6,3 +6,5 @@ mod numbers;
 mod proofs;
 mod search;
 mod square_free;
+
+mod contexts;

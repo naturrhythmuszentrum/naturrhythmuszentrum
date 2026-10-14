@@ -3,7 +3,9 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{Constant, Handle, Operator, Primitive, Substitution};
+use crate::test_api::Handle;
+use crate::test_api::proof::Primitive;
+use crate::test_api::syntax::{Constant, Operator, Substitution};
 
 use super::budgets::derivation_budget as budget;
 use super::common::TestResult;
@@ -61,12 +63,27 @@ pub(crate) fn check_point_domain(
     point: &[Substitution],
 ) -> TestResult {
     let substituted = fixture.cas.substitute(input, point, &mut budget()?)?;
-    let mut instance = equality(Primitive::Substitute, &substituted, &substituted);
+    let mut instance = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Substitute,
+        &substituted,
+        &substituted,
+    );
     instance.premises = vec![0];
     instance.substitutions = point.to_vec();
     let proof = fixture.cas.check_proof(
         &fixture.context,
-        &[equality(Primitive::Reflexivity, input, input), instance],
+        &[
+            equality(
+                &fixture.context,
+                &fixture.domain,
+                Primitive::Reflexivity,
+                input,
+                input,
+            ),
+            instance,
+        ],
         &mut budget()?,
     )?;
     assert!(proof.is_discharged());

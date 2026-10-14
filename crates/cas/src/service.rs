@@ -7,7 +7,7 @@ use crate::encoding::Encoder;
 use crate::error::{Fault, FaultKind, InvalidCode, Location};
 use crate::graph::{Cas, Handle, LogicalId, encode_id, size};
 use crate::model::Operation;
-use crate::request::{ContextConsistency, Outcome, Request, UnsupportedReason, failure};
+use crate::request_model::{ContextConsistency, Outcome, Request, UnsupportedReason, failure};
 use crate::search::{Search, SearchPolicy, SearchResult, SearchStatistics};
 
 /// Service location for output and envelope accounting.
@@ -116,12 +116,19 @@ impl Cas {
             .map_err(|_| Fault::allocation(AT))?;
         for root in &request.inputs {
             generation.work(1, AT)?;
-            inputs.push(self.state.occurrence(self.checked(root)?)?.expression);
+            inputs.push(self.state.occurrence(self.checked(&root.root)?)?.expression);
         }
+        let Some(operation) = request.task.scalar() else {
+            return Ok(Execution {
+                result: None,
+                fault: None,
+            });
+        };
+        self.check_nonempty_request(context, generation)?;
         let first = inputs.first().copied().ok_or_else(invalid)?;
-        match &request.operation {
+        match &operation {
             Operation::Simplify | Operation::Equal => {
-                let target = if request.operation == Operation::Equal {
+                let target = if operation == Operation::Equal {
                     inputs.get(1).copied()
                 } else {
                     None
@@ -139,7 +146,7 @@ impl Cas {
                 self.state = initial.state;
                 let fault = search.explore(self, generation, checker).err();
                 Ok(Execution {
-                    result: search.result(checker),
+                    result: search.result(self, checker)?,
                     fault,
                 })
             }
@@ -151,14 +158,8 @@ impl Cas {
                 })
             }
             Operation::Differentiate(_) | Operation::Jacobian(_) => {
-                let result = self.calculus_result(
-                    context,
-                    &inputs,
-                    &request.operation,
-                    policy,
-                    generation,
-                    checker,
-                )?;
+                let result = self
+                    .calculus_result(context, &inputs, &operation, policy, generation, checker)?;
                 Ok(Execution {
                     result: Some(result),
                     fault: None,
@@ -177,6 +178,32 @@ impl Cas {
                 fault: None,
             }),
         }
+    }
+
+    /// Reject exactly proved empty function domains without claiming opaque domains are inhabited.
+    fn check_nonempty_request(
+        &self,
+        context: LogicalId,
+        generation: &mut Budget,
+    ) -> Result<(), Fault> {
+        let admissible = self.state.context(context)?.admissible;
+        match crate::region::partition(&self.state, &[admissible], generation) {
+            Ok(cells) => {
+                if cells
+                    .membership
+                    .first()
+                    .is_some_and(|row| row.iter().all(|value| !value))
+                {
+                    return Err(Fault::invalid(InvalidCode::EmptyDomain, AT));
+                }
+            }
+            Err(Fault {
+                kind: FaultKind::Invalid(InvalidCode::UnsupportedFragment),
+                ..
+            }) => {}
+            Err(fault) => return Err(fault),
+        }
+        Ok(())
     }
 
     /// Materialize the finite polynomial coefficient form and independently check that edge.
@@ -199,7 +226,7 @@ impl Cas {
             crate::producer::step(
                 &candidate,
                 crate::rule::Primitive::Jets,
-                crate::proof_model::Relation::EqualOnDomain,
+                crate::scalar_model::Relation::EqualOnDomain,
                 input,
                 output,
                 Vec::new(),
@@ -211,6 +238,7 @@ impl Cas {
             return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
         }
         let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+        let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
         let result = SearchResult {
             witness,
             cost: policy.costs.weight(crate::rule::Primitive::Jets)?,
@@ -251,6 +279,7 @@ impl Cas {
             return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
         }
         let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+        let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
         let result = SearchResult {
             witness,
             cost: policy.costs.weight(crate::rule::Primitive::SquareFree)?,
@@ -283,7 +312,7 @@ impl Cas {
             Operation::Differentiate(variable) => {
                 let input = inputs.first().copied().ok_or_else(invalid)?;
                 deriver
-                    .derive(&mut candidate, input, variable, generation)?
+                    .derive(&mut candidate, context, input, variable, generation)?
                     .1
             }
             Operation::Jacobian(variables) => {
@@ -312,6 +341,7 @@ impl Cas {
             }
         }
         let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+        let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
         let result = SearchResult {
             witness,
             cost,
@@ -337,7 +367,7 @@ fn envelope(
     budget: &mut Budget,
 ) -> Result<Vec<u8>, Fault> {
     let mut out = Encoder::output(budget, AT);
-    out.raw(b"NRZRUN01")?;
+    out.raw(b"NRZRUN02")?;
     result.policy.encode(&mut out)?;
     for kind in crate::budget::ALL_KINDS {
         out.unsigned(limits.get(kind))?;
@@ -354,9 +384,35 @@ fn envelope(
         generation_usage.work,
         generation_usage.arithmetic_steps,
         generation_usage.condition_steps,
+        generation_usage.case_arms,
+        generation_usage.region_nodes,
+        generation_usage.region_cells,
+        generation_usage.refinement_pairs,
+        generation_usage.local_contexts,
+        generation_usage.hypothesis_depth,
+        generation_usage.boundary_nodes,
+        generation_usage.jet_order,
+        generation_usage.jet_entries,
+        generation_usage.delta_order,
+        generation_usage.test_nodes,
+        generation_usage.pairing_steps,
+        generation_usage.pullback_zeros,
         result.replay_usage.work,
         result.replay_usage.arithmetic_steps,
         result.replay_usage.condition_steps,
+        result.replay_usage.case_arms,
+        result.replay_usage.region_nodes,
+        result.replay_usage.region_cells,
+        result.replay_usage.refinement_pairs,
+        result.replay_usage.local_contexts,
+        result.replay_usage.hypothesis_depth,
+        result.replay_usage.boundary_nodes,
+        result.replay_usage.jet_order,
+        result.replay_usage.jet_entries,
+        result.replay_usage.delta_order,
+        result.replay_usage.test_nodes,
+        result.replay_usage.pairing_steps,
+        result.replay_usage.pullback_zeros,
     ] {
         out.unsigned(value)?;
     }
@@ -378,20 +434,25 @@ fn outcome(
 ) -> Outcome {
     if let Some(fault) = execution.fault {
         return match fault.kind {
+            FaultKind::Invalid(InvalidCode::RefutedDomain | InvalidCode::EmptyDomain) => {
+                Outcome::Refused {
+                    request: record,
+                    fault,
+                    usage,
+                }
+            }
             FaultKind::Exhausted { .. } => Outcome::Exhausted {
                 fault,
                 usage,
                 replay_usage,
                 best: execution.result,
             },
-            FaultKind::Invalid(InvalidCode::UnsupportedFragment | InvalidCode::RefutedDomain) => {
-                Outcome::Unresolved {
-                    request: record,
-                    consistency: ContextConsistency::Unknown,
-                    blocker: Some(fault),
-                    usage,
-                }
-            }
+            FaultKind::Invalid(InvalidCode::UnsupportedFragment) => Outcome::Unresolved {
+                request: record,
+                consistency: ContextConsistency::Unknown,
+                blocker: Some(fault),
+                usage,
+            },
             FaultKind::Invalid(
                 code @ (InvalidCode::PolynomialFragment
                 | InvalidCode::CoefficientField
@@ -413,7 +474,7 @@ fn outcome(
         };
     }
     match execution.result {
-        Some(result) if result.witness.is_discharged() => Outcome::Verified {
+        Some(result) if result.witness.is_discharged() => Outcome::Proved {
             request: record,
             result,
             usage,

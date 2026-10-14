@@ -3,10 +3,13 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{Cas, Draft, Field, Handle, Limits, Operation, Operator, Request};
+use crate::test_api::{Cas, Handle};
+
+use crate::test_api::request::{Request, Task};
+use crate::test_api::syntax::{Field, Operator};
 
 use super::budgets::derivation_budget as budget;
-use super::builders::{self, at};
+use super::builders::{self};
 use super::common::{TestResult, real};
 
 /// A minimal independent request builder, with a complete generated occurrence walk.
@@ -16,22 +19,25 @@ pub(crate) struct Fixture {
     pub(crate) cas: Cas,
     /// Shared mathematical context.
     pub(crate) context: Handle,
+    /// Explicit domain of the fixture context.
+    pub(crate) domain: Handle,
 }
 
 impl Fixture {
     /// Declare only the named real coordinates.
     pub(crate) fn new(keys: &[&str]) -> TestResult<Self> {
-        let mut cas = Cas::new(Limits::default())?;
-        let handles = cas.admit(
-            &[Draft::Context {
-                environment: builders::environment(Field::Real, keys),
-                assumptions: Vec::new(),
-            }],
+        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let context = builders::core_context(
+            &mut cas,
+            builders::environment(Field::Real, keys),
+            Vec::new(),
             &mut budget()?,
         )?;
+        let domain = cas.admissible_region(&context)?;
         Ok(Self {
             cas,
-            context: at(&handles, 0)?,
+            context,
+            domain,
         })
     }
 
@@ -58,11 +64,7 @@ impl Fixture {
     }
 
     /// Each request receives all its occurrence receipts before execution.
-    pub(crate) fn request(
-        &mut self,
-        operation: Operation,
-        expressions: &[Handle],
-    ) -> TestResult<Request> {
-        builders::request(&mut self.cas, &self.context, operation, expressions)
+    pub(crate) fn request(&mut self, task: Task, expressions: &[Handle]) -> TestResult<Request> {
+        builders::request(&mut self.cas, &self.context, task, expressions)
     }
 }

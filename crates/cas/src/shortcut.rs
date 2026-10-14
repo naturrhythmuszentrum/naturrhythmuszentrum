@@ -5,7 +5,7 @@ use crate::budget::{Budget, BudgetKind};
 use crate::cost::CostPolicy;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Edge, Handle, Vertex};
-use crate::proof_model::{Claim, VerifiedWitness};
+use crate::scalar_model::{Claim, VerifiedWitness};
 
 impl Cas {
     /// Admit a replayed equality shortcut only after recomputing improvement in this policy.
@@ -16,7 +16,7 @@ impl Cas {
     /// # Errors
     /// Refuses changed claims, conflicting policy identities, nonpositive costs, a non-improving
     /// route, non-equality relations or any resource limit before publication.
-    pub fn register_derived_with_policy(
+    pub(crate) fn register_scalar_derived_with_policy(
         &mut self,
         witness: &VerifiedWitness,
         expected: &Claim,

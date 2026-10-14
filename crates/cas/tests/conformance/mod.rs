@@ -7,3 +7,5 @@ mod proofs;
 mod representation;
 mod search;
 mod square_free;
+
+mod domain;

@@ -3,7 +3,9 @@
 //!
 //! Compiled in both the library test binary and the public test target.
 
-use crate::test_api::{AtomicSort, Budget, Fault, Field, Limits, Sort};
+use crate::test_api::Fault;
+use crate::test_api::limits::{Budget, Limits};
+use crate::test_api::syntax::{AtomicSort, Field, Sort};
 
 /// Setup failures retain their original error for the test runner.
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

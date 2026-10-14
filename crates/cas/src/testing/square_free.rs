@@ -3,13 +3,14 @@
 //!
 //! Compiled only in the public test target.
 
-use crate::test_api::{
-    AtomicSort, Cas, Draft, Field, Handle, Limits, Operation, Operator, Outcome, Primitive,
-    ProofStep, Rational, Request, SearchResult, Sort, SquareFreeCertificate,
-};
+use crate::test_api::{Cas, Handle, Rational};
+
+use crate::test_api::proof::{ApplicationDraft, Certificate, Primitive, SquareFreeCertificate};
+use crate::test_api::request::{Outcome, Request, SearchResult, Task};
+use crate::test_api::syntax::{AtomicSort, Field, Operator, Sort};
 
 use super::budgets::derivation_budget as budget;
-use super::builders::{self, at};
+use super::builders::{self};
 use super::common::TestResult;
 
 /// Convert an independent integer coefficient fixture to canonical rationals.
@@ -36,15 +37,13 @@ impl Fixture {
     /// Declare coordinates without asserting any polynomial identities.
     pub(crate) fn new(field: Field) -> TestResult<Self> {
         let sort = Sort::Value(AtomicSort::Scalar(field.clone()));
-        let mut cas = Cas::new(Limits::default())?;
-        let handles = cas.admit(
-            &[Draft::Context {
-                environment: builders::environment(field, &["x", "y"]),
-                assumptions: Vec::new(),
-            }],
+        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let context = builders::core_context(
+            &mut cas,
+            builders::environment(field, &["x", "y"]),
+            Vec::new(),
             &mut budget()?,
         )?;
-        let context = at(&handles, 0)?;
         Ok(Self { cas, context, sort })
     }
 
@@ -91,7 +90,7 @@ impl Fixture {
         builders::request(
             &mut self.cas,
             &self.context,
-            Operation::SquareFree("x".into()),
+            Task::SquareFree("x".into()),
             std::slice::from_ref(expression),
         )
     }
@@ -100,22 +99,23 @@ impl Fixture {
     pub(crate) fn decompose(&mut self, input: &Handle) -> TestResult<SearchResult> {
         let request = self.request(input)?;
         match self.cas.run(&request) {
-            Outcome::Verified { result, .. } => Ok(result),
+            Outcome::Proved { result, .. } => Ok(result),
             other => Err(format!("expected square-free proof, got {other:?}").into()),
         }
     }
 }
 
 /// Copy a checked theorem's endpoints into a new untrusted proposal for adversarial replay.
-pub(crate) fn proposal(result: &SearchResult, certificate: SquareFreeCertificate) -> ProofStep {
-    ProofStep {
-        primitive: Primitive::SquareFree,
-        relation: result.witness.claim().relation.clone(),
-        left: result.witness.claim().left.clone(),
-        right: result.witness.claim().right.clone(),
+pub(crate) fn proposal(
+    result: &SearchResult,
+    certificate: SquareFreeCertificate,
+) -> ApplicationDraft {
+    ApplicationDraft {
+        rule: Primitive::SquareFree,
+        context: result.witness.judgment().context.clone(),
+        conclusion: result.witness.judgment().statement.clone(),
         premises: Vec::new(),
-        path: Vec::new(),
         substitutions: Vec::new(),
-        certificate: Some(certificate),
+        certificate: Certificate::SquareFree(Box::new(certificate)),
     }
 }

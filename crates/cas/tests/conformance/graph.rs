@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public-contract checks for graph.
 
-use nrz_cas::{
-    AssumptionDraft, AtomicSort, Binding, Budget, Cas, Declaration, Draft, Environment,
-    ExpressionDraft, Field, Limits, LimitsOverride, OccurrenceDraft, Operation, Operator, Outcome,
-    PredicateKind, Rational, Reference, Request, Sort, Span, Substitution, WalkEvent,
+use nrz_cas::domain::AssumptionDraft;
+use nrz_cas::limits::{Budget, Limits, LimitsOverride};
+use nrz_cas::request::{Outcome, Request, Task};
+use nrz_cas::source::WalkEvent;
+use nrz_cas::syntax::{
+    AtomicSort, Binding, Declaration, Draft, Environment, ExpressionDraft, Field, OccurrenceDraft,
+    Operator, PredicateKind, Sort, Span, Substitution,
 };
+use nrz_cas::{Cas, FaultKind, InvalidCode, Rational, Reference};
 
 use crate::testing::budgets::graph_budget as budget;
 use crate::testing::common::{TestResult, real};
@@ -102,7 +106,7 @@ fn draft_refusals() -> TestResult {
         let draft = Draft::Expression(ExpressionDraft {
             operator: Operator::Free("x".into()),
             sort: real(),
-            context: reference,
+            header: reference,
             scope: Vec::new(),
             binding: None,
             operands: Vec::new(),
@@ -139,15 +143,37 @@ fn request_coverage() -> TestResult {
     assert_eq!(partial.events.len(), 2);
     let receipt = cas.walk_original(&root, &mut budget()?)?.receipt;
     let mut request = Request {
-        operation: Operation::Simplify,
+        task: Task::Simplify,
         context,
-        inputs: vec![root],
-        receipts: Vec::new(),
+        inputs: Vec::new(),
+        premises: Vec::new(),
         limits: LimitsOverride::default(),
     };
     assert!(matches!(cas.run(&request), Outcome::Invalid { .. }));
-    request.receipts.push(receipt);
-    assert!(matches!(cas.run(&request), Outcome::Verified { .. }));
+    let variable = expression(
+        &mut cas,
+        &request.context,
+        Operator::Free("x".into()),
+        real(),
+        &[],
+    )?;
+    let wrong_root = cas.materialize_derived(&variable, &variable, &mut budget()?)?;
+    request.inputs.push(nrz_cas::request::CoveredInput {
+        root: wrong_root,
+        receipt: receipt.clone(),
+    });
+    assert!(matches!(
+        cas.run(&request),
+        Outcome::Invalid {
+            fault: nrz_cas::Fault {
+                kind: FaultKind::Invalid(InvalidCode::Receipt),
+                ..
+            },
+            ..
+        }
+    ));
+    request.inputs = vec![nrz_cas::request::CoveredInput { root, receipt }];
+    assert!(matches!(cas.run(&request), Outcome::Proved { .. }));
     Ok(())
 }
 
@@ -208,13 +234,14 @@ fn simultaneous_substitution() -> TestResult {
 #[test]
 fn bound_instantiation() -> TestResult {
     let (mut cas, context) = fixture()?;
+    let syntax_header = cas.context_header(&context)?;
     let x = expression(&mut cas, &context, Operator::Free("x".into()), real(), &[])?;
     let bound = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
             operator: Operator::Bound { depth: 0, slot: 0 },
             sort: real(),
-            context: Reference::Existing(context),
+            header: Reference::Existing(syntax_header),
             scope: vec![vec![AtomicSort::Scalar(Field::Real)]],
             binding: None,
             operands: Vec::new(),
@@ -266,6 +293,7 @@ fn permanent_storage_limit() -> TestResult {
 #[test]
 fn explicit_contradiction() -> TestResult {
     let (mut cas, context) = fixture()?;
+    let syntax_header = cas.context_header(&context)?;
     let x = expression(&mut cas, &context, Operator::Free("x".into()), real(), &[])?;
     let predicate = expression(
         &mut cas,
@@ -278,7 +306,7 @@ fn explicit_contradiction() -> TestResult {
         &mut cas,
         Draft::Condition {
             kind: PredicateKind::NonZero,
-            context: Reference::Existing(context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: Vec::new(),
             arguments: vec![Reference::Existing(x)],
         },
@@ -287,7 +315,7 @@ fn explicit_contradiction() -> TestResult {
         &mut cas,
         Draft::Condition {
             kind: PredicateKind::Not,
-            context: Reference::Existing(context),
+            header: Reference::Existing(syntax_header),
             scope: Vec::new(),
             arguments: vec![Reference::Existing(predicate)],
         },
@@ -305,21 +333,20 @@ fn explicit_contradiction() -> TestResult {
     };
     let before = cas.canonical_snapshot(&mut budget()?)?;
     assert!(
-        admit(
+        crate::testing::builders::core_context(
             &mut cas,
-            Draft::Context {
-                environment,
-                assumptions: vec![
-                    AssumptionDraft {
-                        key: "positive".into(),
-                        condition: Reference::Existing(positive)
-                    },
-                    AssumptionDraft {
-                        key: "negative".into(),
-                        condition: Reference::Existing(negative)
-                    },
-                ],
-            },
+            environment,
+            vec![
+                AssumptionDraft {
+                    key: "positive".into(),
+                    condition: Reference::Existing(positive)
+                },
+                AssumptionDraft {
+                    key: "negative".into(),
+                    condition: Reference::Existing(negative)
+                },
+            ],
+            &mut budget()?
         )
         .is_err()
     );
@@ -358,36 +385,34 @@ fn occurrence_parent_refusal() -> TestResult {
 /// ´test:integration:field-boundary´
 #[test]
 fn field_boundary() -> TestResult {
-    let mut cas = Cas::new(Limits::default())?;
+    let mut cas = Cas::new(budget()?.limits().clone())?;
     assert!(
-        admit(
+        crate::testing::builders::core_context(
             &mut cas,
-            Draft::Context {
-                environment: Environment {
-                    field: Field::PositiveCharacteristic(4),
-                    ..Environment::default()
-                },
-                assumptions: Vec::new(),
+            Environment {
+                field: Field::PositiveCharacteristic(4),
+                ..Environment::default()
             },
+            Vec::new(),
+            &mut budget()?
         )
         .is_err()
     );
     let field = Field::PositiveCharacteristic(5);
     let sort = Sort::Value(AtomicSort::Scalar(field.clone()));
-    let context = admit(
+    let context = crate::testing::builders::core_context(
         &mut cas,
-        Draft::Context {
-            environment: Environment {
-                field,
-                declarations: vec![Declaration {
-                    key: "x".into(),
-                    display_name: "x".into(),
-                    sort: sort.clone(),
-                }],
-                ..Environment::default()
-            },
-            assumptions: Vec::new(),
+        Environment {
+            field,
+            declarations: vec![Declaration {
+                key: "x".into(),
+                display_name: "x".into(),
+                sort: sort.clone(),
+            }],
+            ..Environment::default()
         },
+        Vec::new(),
+        &mut budget()?,
     )?;
     let x = expression(&mut cas, &context, Operator::Free("x".into()), sort, &[])?;
     let source = admit(
@@ -401,10 +426,15 @@ fn field_boundary() -> TestResult {
     let receipt = cas.walk_original(&root, &mut budget()?)?.receipt;
     assert!(matches!(
         cas.run(&Request {
-            operation: Operation::Differentiate("x".into()),
+            task: Task::Differentiate {
+                coordinate: "x".into(),
+                order: 1,
+                layer: nrz_cas::domain::Layer::Pointwise,
+                domain: cas.admissible_region(&context)?
+            },
             context,
-            inputs: vec![root],
-            receipts: vec![receipt],
+            inputs: vec![nrz_cas::request::CoveredInput { root, receipt }],
+            premises: Vec::new(),
             limits: LimitsOverride::default(),
         }),
         Outcome::Unsupported { .. },
@@ -417,13 +447,14 @@ fn field_boundary() -> TestResult {
 #[test]
 fn outer_frame_lifting() -> TestResult {
     let (mut cas, context) = fixture()?;
+    let syntax_header = cas.context_header(&context)?;
     let outer = vec![vec![AtomicSort::Scalar(Field::Real)]];
     let replacement = admit(
         &mut cas,
         Draft::Expression(ExpressionDraft {
             operator: Operator::Bound { depth: 0, slot: 0 },
             sort: real(),
-            context: Reference::Existing(context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: outer.clone(),
             binding: None,
             operands: Vec::new(),
@@ -436,7 +467,7 @@ fn outer_frame_lifting() -> TestResult {
         Draft::Expression(ExpressionDraft {
             operator: Operator::Free("x".into()),
             sort: real(),
-            context: Reference::Existing(context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: nested,
             binding: None,
             operands: Vec::new(),
@@ -447,7 +478,7 @@ fn outer_frame_lifting() -> TestResult {
         Draft::Expression(ExpressionDraft {
             operator: Operator::Rational(Rational::one()),
             sort: Sort::Value(AtomicSort::Integer),
-            context: Reference::Existing(context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: outer.clone(),
             binding: None,
             operands: Vec::new(),
@@ -458,7 +489,7 @@ fn outer_frame_lifting() -> TestResult {
         Draft::Expression(ExpressionDraft {
             operator: Operator::Sum,
             sort: real(),
-            context: Reference::Existing(context),
+            header: Reference::Existing(syntax_header),
             scope: outer,
             binding: Some(Binding {
                 sorts: vec![AtomicSort::Integer],
@@ -550,10 +581,17 @@ fn equality_target_sort() -> TestResult {
     let before = cas.canonical_snapshot(&mut budget()?)?;
     assert!(matches!(
         cas.run(&Request {
-            operation: Operation::Equal,
+            task: Task::Equal {
+                domain: cas.admissible_region(&context)?,
+                domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual
+            },
             context,
-            inputs: vec![left, right],
-            receipts,
+            inputs: vec![left, right]
+                .into_iter()
+                .zip(receipts)
+                .map(|(root, receipt)| nrz_cas::request::CoveredInput { root, receipt })
+                .collect(),
+            premises: Vec::new(),
             limits: LimitsOverride::default(),
         }),
         Outcome::Invalid { .. },

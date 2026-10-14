@@ -8,8 +8,8 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, size};
 use crate::model::{AtomicSort, Extent, Field, Operator, Sort};
 use crate::producer::{Plan, integer, step, term};
-use crate::proof_model::Relation;
 use crate::rule::Primitive;
+use crate::scalar_model::Relation;
 
 /// Automatic calculus location.
 const AT: Location = Location::new("derivative generation");
@@ -19,8 +19,8 @@ const AT: Location = Location::new("derivative generation");
 pub(crate) struct Deriver {
     /// Steps are pruned to the final requested relation before checking.
     pub(crate) plan: Plan,
-    /// Exact term and variable identities; term identity includes context.
-    memo: BTreeMap<(LogicalId, String), (LogicalId, u32)>,
+    /// Complete context, term and variable identities; syntax alone carries no assumptions.
+    memo: BTreeMap<(LogicalId, LogicalId, String), (LogicalId, u32)>,
 }
 
 impl Deriver {
@@ -28,16 +28,16 @@ impl Deriver {
     pub(crate) fn derive(
         &mut self,
         cas: &mut Cas,
+        context: LogicalId,
         root: LogicalId,
         variable: &str,
         budget: &mut Budget,
     ) -> Result<(LogicalId, u32), Fault> {
-        let context = cas.state.expression(root)?.context;
         crate::derivative_check::variable(&cas.state, context, variable, budget)?;
         let mut pending = vec![(root, false)];
         while let Some((id, expanded)) = pending.pop() {
             self.charge(variable, budget)?;
-            let key = (id, variable.to_owned());
+            let key = (context, id, variable.to_owned());
             if self.memo.contains_key(&key) {
                 continue;
             }
@@ -81,7 +81,7 @@ impl Deriver {
                 self.charge(variable, budget)?;
                 let (value, proof) = self
                     .memo
-                    .get(&(child, variable.to_owned()))
+                    .get(&(context, child, variable.to_owned()))
                     .copied()
                     .ok_or_else(pending_derivative)?;
                 derivatives.push(value);
@@ -99,7 +99,7 @@ impl Deriver {
         }
         self.charge(variable, budget)?;
         self.memo
-            .get(&(root, variable.to_owned()))
+            .get(&(context, root, variable.to_owned()))
             .copied()
             .ok_or_else(pending_derivative)
     }
@@ -189,7 +189,7 @@ impl Deriver {
             .map_err(|_| Fault::allocation(AT))?;
         for input in inputs {
             for variable in variables {
-                let (cell, proof) = self.derive(cas, *input, variable, budget)?;
+                let (cell, proof) = self.derive(cas, context, *input, variable, budget)?;
                 cells.push(cell);
                 premises.push(proof);
             }

@@ -21,7 +21,7 @@ const fn sort_error() -> Fault {
 }
 
 /// Check scope size before any copy or traversal of frames.
-fn scope_limit(scope: &Scope, budget: &mut Budget) -> Result<(), Fault> {
+pub(crate) fn scope_limit(scope: &Scope, budget: &mut Budget) -> Result<(), Fault> {
     budget.check(BudgetKind::Depth, size(scope.len(), AT)?, AT)?;
     for frame in scope {
         budget.check(BudgetKind::Edges, size(frame.len(), AT)?, AT)?;
@@ -71,6 +71,7 @@ fn atomic_sort(value: &AtomicSort, budget: &mut Budget) -> Result<(), Fault> {
 /// Validate every coefficient field in one flat mathematical sort.
 fn declared_sort(value: &Sort, budget: &mut Budget) -> Result<(), Fault> {
     match value {
+        Sort::Test | Sort::Distribution => Ok(()),
         Sort::Value(value) | Sort::Set(value) => atomic_sort(value, budget),
         Sort::Function { inputs, output } => {
             for input in inputs {
@@ -109,6 +110,7 @@ fn extent_parameters(
 /// Validate symbolic extents in each position of a flat sort.
 fn sort_extents(value: &Sort, environment: &Environment, budget: &mut Budget) -> Result<(), Fault> {
     match value {
+        Sort::Test | Sort::Distribution => Ok(()),
         Sort::Value(value) | Sort::Set(value) => extent_parameters(value, environment, budget),
         Sort::Function { inputs, output } => {
             for input in inputs {
@@ -169,25 +171,24 @@ fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
             out.count(text.len())?;
             out.raw(text.as_bytes())?;
         }
-        Draft::Context {
-            environment,
-            assumptions,
-        } => {
-            encoding::environment(environment, out)?;
-            out.count(assumptions.len())?;
-            for assumption in assumptions {
-                out.name(&assumption.key)?;
-                reference(&assumption.condition, out)?;
-            }
+        Draft::Cases(_)
+        | Draft::Header(_)
+        | Draft::Context(_)
+        | Draft::Region(_)
+        | Draft::Space(_)
+        | Draft::CaseArm(_)
+        | Draft::Boundary(_)
+        | Draft::SourceForm(_) => {
+            crate::domain_encoding::draft(draft, out)?;
         }
         Draft::Condition {
             kind,
-            context,
+            header,
             scope,
             arguments,
         } => {
             encoding::predicate(kind, out)?;
-            reference(context, out)?;
+            reference(header, out)?;
             encoding::scope(scope, out)?;
             out.count(arguments.len())?;
             for argument in arguments {
@@ -197,7 +198,7 @@ fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
         Draft::Expression(value) => {
             encoding::operator(&value.operator, out)?;
             encoding::sort(&value.sort, out)?;
-            reference(&value.context, out)?;
+            reference(&value.header, out)?;
             encoding::scope(&value.scope, out)?;
             encoding::binding(value.binding.as_ref(), out)?;
             out.count(value.operands.len())?;
@@ -227,12 +228,17 @@ fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
             }
         }
         Draft::Request {
-            operation,
+            task,
+            premises,
             context,
             inputs,
             limits,
         } => {
-            encoding::operation(operation, out)?;
+            crate::task::encode(task, out)?;
+            out.count(premises.len())?;
+            for premise in premises {
+                reference(premise, out)?;
+            }
             reference(context, out)?;
             out.count(inputs.len())?;
             for input in inputs {
@@ -278,37 +284,6 @@ pub(crate) fn environment(value: &Environment, budget: &mut Budget) -> Result<En
     Ok(canonical)
 }
 
-/// Refuse recognized false literal hypotheses without claiming general consistency.
-pub(crate) fn assumption(
-    state: &State,
-    id: LogicalId,
-    header: &[u8],
-    budget: &mut Budget,
-) -> Result<(), Fault> {
-    let Vertex::Condition(condition) = state.node(id)? else {
-        return Err(Fault::invalid(InvalidCode::Reference, AT));
-    };
-    let context = state.context(condition.context)?;
-    budget.work(size(header.len(), AT)?, AT)?;
-    if context.header != header {
-        return Err(Fault::invalid(InvalidCode::Context, AT));
-    }
-    if let Some(argument) = condition.arguments.first()
-        && let Operator::Rational(value) = &state.expression(*argument)?.operator
-    {
-        let false_literal = match condition.kind {
-            PredicateKind::NonZero => value.is_zero(),
-            PredicateKind::Positive => value.is_zero() || value.is_negative(),
-            PredicateKind::NonNegative => value.is_negative(),
-            _ => false,
-        };
-        if false_literal {
-            return Err(Fault::invalid(InvalidCode::Context, AT));
-        }
-    }
-    Ok(())
-}
-
 /// Check predicate arity/sorts and the semantic header of every argument.
 pub(crate) fn condition(
     state: &State,
@@ -319,7 +294,7 @@ pub(crate) fn condition(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     scope_limit(scope, budget)?;
-    let header = &state.context(context)?.header;
+    let header = &state.header(context)?.bytes;
     let mut values = Vec::new();
     values
         .try_reserve_exact(arguments.len())
@@ -332,7 +307,7 @@ pub(crate) fn condition(
             AT,
         )?;
         let value = state.expression(*argument)?;
-        if state.context(value.context)?.header != *header || value.scope != *scope {
+        if !crate::header::embeds(state, value.header, context, budget)? || value.scope != *scope {
             return Err(Fault::invalid(InvalidCode::Scope, AT));
         }
         values.push(&value.sort);
@@ -400,14 +375,14 @@ pub(crate) fn expression(
     scope_limit(&draft.scope, budget)?;
     declared_sort(&draft.sort, budget)?;
     binding_shape(&draft.operator, draft.binding.as_ref(), operands.len())?;
-    let environment = &state.context(context)?.environment;
+    let environment = &state.header(context)?.environment;
     sort_extents(&draft.sort, environment, budget)?;
     for frame in &draft.scope {
         for slot in frame {
             extent_parameters(slot, environment, budget)?;
         }
     }
-    let header = &state.context(context)?.header;
+    let header = &state.header(context)?.bytes;
     let mut scope_key = Encoder::new(budget, AT);
     encoding::scope(&draft.scope, &mut scope_key)?;
     encoding::binding(draft.binding.as_ref(), &mut scope_key)?;
@@ -433,7 +408,7 @@ pub(crate) fn expression(
             AT,
         )?;
         let child = state.expression(*operand)?;
-        if state.context(child.context)?.header != *header {
+        if !crate::header::embeds(state, child.header, context, budget)? {
             return Err(Fault::invalid(InvalidCode::Context, AT));
         }
         check_child_scope(&draft.scope, draft.binding.as_ref(), position, &child.scope)?;
@@ -623,6 +598,7 @@ fn operator_sorts(
     let same = children.iter().all(|child| child.sort == *result);
     let first = children.first().copied();
     let valid = match operator {
+        Operator::Cases => false,
         Operator::Rational(_) | Operator::Free(_) | Operator::Bound { .. } => {
             leaf_sort(operator, result, scope, environment, budget)? && children.is_empty()
         }

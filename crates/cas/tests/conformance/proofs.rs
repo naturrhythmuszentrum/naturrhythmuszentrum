@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public-contract checks for proofs.
 
-use nrz_cas::{
-    AtomicSort, Budget, BudgetKind, Cas, Claim, Declaration, Draft, ExpressionDraft, FaultKind,
-    Field, Guard, GuardKind, InvalidCode, Limits, Operator, Primitive, Rational, Reference,
-    Relation, Sort, Substitution,
+use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::proof::{GuardKind, Judgment, Primitive, Statement};
+use nrz_cas::syntax::{
+    AtomicSort, Declaration, Draft, ExpressionDraft, Field, Operator, Sort, Substitution,
 };
+use nrz_cas::{Cas, FaultKind, InvalidCode, Rational, Reference};
 
 use crate::testing::budgets::proof_budget as budget;
 use crate::testing::builders::at;
@@ -27,18 +28,20 @@ fn conditional_cancellation() -> TestResult {
     )?;
     assert!(!witness.is_discharged());
     assert_eq!(
-        witness.claim().residuals,
-        vec![Guard {
-            kind: GuardKind::NonZero,
-            term: fixture.x
-        }],
+        witness.judgment().residuals,
+        vec![crate::testing::witness::guarded(
+            &mut fixture.cas,
+            &fixture.context,
+            GuardKind::NonZero,
+            &(fixture.x)
+        )?],
     );
-    let no_hypotheses: &[String] = &[];
+    let no_hypotheses: &[nrz_cas::domain::HypothesisRef] = &[];
     assert_eq!(witness.hypotheses(), no_hypotheses);
     assert!(fixture.cas.counts().vertices >= before.vertices + 3);
     assert_eq!(
         witness.proof().logical_id().kind,
-        nrz_cas::VertexKind::Proof
+        nrz_cas::syntax::VertexKind::Proof
     );
     Ok(())
 }
@@ -49,7 +52,13 @@ fn conditional_cancellation() -> TestResult {
 fn false_proof_rollback() -> TestResult {
     let (mut fixture, quotient, _) = cancellation()?;
     let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
-    let bad = equality(Primitive::Cancel, &quotient, &fixture.zero);
+    let bad = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Cancel,
+        &quotient,
+        &fixture.zero,
+    );
     let fault = fixture
         .cas
         .check_proof(&fixture.context, &[bad], &mut budget()?)
@@ -72,7 +81,13 @@ fn proof_retains_partial_operands() -> TestResult {
         .cas
         .check_proof(
             &fixture.context,
-            &[equality(Primitive::MulZero, &product, &fixture.zero)],
+            &[equality(
+                &fixture.context,
+                &fixture.domain,
+                Primitive::MulZero,
+                &product,
+                &fixture.zero,
+            )],
             &mut budget()?,
         )
         .err()
@@ -94,7 +109,13 @@ fn exact_proof_arithmetic() -> TestResult {
     )?;
     let witness = fixture.cas.check_proof(
         &fixture.context,
-        &[equality(Primitive::Exact, &sum, &three)],
+        &[equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::Exact,
+            &sum,
+            &three,
+        )],
         &mut budget()?,
     )?;
     assert!(witness.is_discharged());
@@ -103,7 +124,13 @@ fn exact_proof_arithmetic() -> TestResult {
             .cas
             .check_proof(
                 &fixture.context,
-                &[equality(Primitive::Exact, &sum, &fixture.two)],
+                &[equality(
+                    &fixture.context,
+                    &fixture.domain,
+                    Primitive::Exact,
+                    &sum,
+                    &fixture.two
+                )],
                 &mut budget()?
             )
             .is_err()
@@ -125,22 +152,36 @@ fn finite_jet_difference_quotient() -> TestResult {
     let target = fixture.term(Operator::Add, &[twice_x, fixture.y.clone()])?;
     let witness = fixture.cas.check_proof(
         &fixture.context,
-        &[equality(Primitive::RationalIdentity, &quotient, &target)],
+        &[equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::RationalIdentity,
+            &quotient,
+            &target,
+        )],
         &mut budget()?,
     )?;
     assert_eq!(
-        witness.claim().residuals,
-        vec![Guard {
-            kind: GuardKind::NonZero,
-            term: fixture.y.clone()
-        }],
+        witness.judgment().residuals,
+        vec![crate::testing::witness::guarded(
+            &mut fixture.cas,
+            &fixture.context,
+            GuardKind::NonZero,
+            &(fixture.y.clone())
+        )?],
     );
     assert!(
         fixture
             .cas
             .check_proof(
                 &fixture.context,
-                &[equality(Primitive::Jets, &quotient, &target)],
+                &[equality(
+                    &fixture.context,
+                    &fixture.domain,
+                    Primitive::Jets,
+                    &quotient,
+                    &target
+                )],
                 &mut budget()?
             )
             .is_err()
@@ -150,7 +191,13 @@ fn finite_jet_difference_quotient() -> TestResult {
             .cas
             .check_proof(
                 &fixture.context,
-                &[equality(Primitive::Jets, &fixture.x, &fixture.y)],
+                &[equality(
+                    &fixture.context,
+                    &fixture.domain,
+                    Primitive::Jets,
+                    &fixture.x,
+                    &fixture.y
+                )],
                 &mut budget()?
             )
             .is_err()
@@ -166,6 +213,8 @@ fn derivative_power_domain_cases() -> TestResult {
     let power_zero = fixture.term(Operator::IntegerPower(0), &[fixture.x.clone()])?;
     let power_one = fixture.term(Operator::IntegerPower(1), &[fixture.x.clone()])?;
     let variable = derivative(
+        &fixture.context,
+        &fixture.domain,
         Primitive::DifferentiateVariable,
         &fixture.x,
         &fixture.one,
@@ -174,6 +223,8 @@ fn derivative_power_domain_cases() -> TestResult {
     let zero_steps = [
         variable.clone(),
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DifferentiatePower,
             &power_zero,
             &fixture.zero,
@@ -184,15 +235,19 @@ fn derivative_power_domain_cases() -> TestResult {
         .cas
         .check_proof(&fixture.context, &zero_steps, &mut budget()?)?;
     assert_eq!(
-        zero.claim().residuals,
-        vec![Guard {
-            kind: GuardKind::NonZero,
-            term: fixture.x.clone()
-        }],
+        zero.judgment().residuals,
+        vec![crate::testing::witness::guarded(
+            &mut fixture.cas,
+            &fixture.context,
+            GuardKind::NonZero,
+            &(fixture.x.clone())
+        )?],
     );
     let one_steps = [
         variable,
         derivative(
+            &fixture.context,
+            &fixture.domain,
             Primitive::DifferentiatePower,
             &power_one,
             &fixture.one,
@@ -212,7 +267,13 @@ fn derivative_power_domain_cases() -> TestResult {
 fn substituted_proof_guards() -> TestResult {
     let (mut fixture, _, first) = cancellation()?;
     let two_over_two = fixture.term(Operator::Div, &[fixture.two.clone(), fixture.two.clone()])?;
-    let mut second = equality(Primitive::Substitute, &two_over_two, &fixture.one);
+    let mut second = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Substitute,
+        &two_over_two,
+        &fixture.one,
+    );
     second.premises = vec![0];
     second.substitutions = vec![Substitution {
         key: "x".into(),
@@ -225,7 +286,13 @@ fn substituted_proof_guards() -> TestResult {
     assert!(witness.is_discharged());
     let zero_over_zero =
         fixture.term(Operator::Div, &[fixture.zero.clone(), fixture.zero.clone()])?;
-    let mut bad = equality(Primitive::Substitute, &zero_over_zero, &fixture.one);
+    let mut bad = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Substitute,
+        &zero_over_zero,
+        &fixture.one,
+    );
     bad.premises = vec![0];
     bad.substitutions = vec![Substitution {
         key: "x".into(),
@@ -251,7 +318,7 @@ fn canonical_wire_refusals() -> TestResult {
         .cas
         .check_proof(&fixture.context, &[step], &mut budget()?)?;
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let mut receiver = Cas::new(Limits::default())?;
+    let mut receiver = Cas::new(budget()?.limits().clone())?;
     let before = receiver.canonical_snapshot(&mut budget()?)?;
     for length in 0..bytes.len() {
         assert!(
@@ -307,7 +374,10 @@ fn proof_reference_refusals() -> TestResult {
     );
     let foreign = Fixture::new()?;
     let mut bad = step;
-    bad.right = foreign.one;
+    let Statement::Equality { right, .. } = &mut bad.conclusion else {
+        return Err("expected equality proposal".into());
+    };
+    *right = foreign.one;
     assert!(
         fixture
             .cas
@@ -327,24 +397,33 @@ fn derived_shortcut_improvement() -> TestResult {
     let product = fixture.term(Operator::Mul, &[fixture.two.clone(), fixture.x.clone()])?;
     let witness = fixture.cas.check_proof(
         &fixture.context,
-        &[equality(Primitive::Jets, &sum, &product)],
+        &[equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::Jets,
+            &sum,
+            &product,
+        )],
         &mut budget()?,
     )?;
     let handle = fixture
         .cas
-        .register_derived(&witness, witness.claim(), 1, &mut budget()?)?;
-    assert_eq!(handle.logical_id().kind, nrz_cas::VertexKind::Application);
+        .register_derived(&witness, witness.judgment(), 1, &mut budget()?)?;
+    assert_eq!(
+        handle.logical_id().kind,
+        nrz_cas::syntax::VertexKind::Application
+    );
     let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
     assert!(
         fixture
             .cas
-            .register_derived(&witness, witness.claim(), 1, &mut budget()?)
+            .register_derived(&witness, witness.judgment(), 1, &mut budget()?)
             .is_err()
     );
     assert!(
         fixture
             .cas
-            .register_derived(&witness, witness.claim(), 0, &mut budget()?)
+            .register_derived(&witness, witness.judgment(), 0, &mut budget()?)
             .is_err()
     );
     assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
@@ -422,11 +501,41 @@ fn closed_field_schemas() -> TestResult {
     let negative = fixture.term(Operator::Neg, &[fixture.x.clone()])?;
     let opposite = fixture.term(Operator::Add, &[fixture.x.clone(), negative])?;
     for step in [
-        equality(Primitive::AddCommute, &xy, &yx),
-        equality(Primitive::Distribute, &product, &distributed),
-        equality(Primitive::AddZero, &x_zero, &fixture.x),
-        equality(Primitive::MulOne, &x_one, &fixture.x),
-        equality(Primitive::AddInverse, &opposite, &fixture.zero),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::AddCommute,
+            &xy,
+            &yx,
+        ),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::Distribute,
+            &product,
+            &distributed,
+        ),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::AddZero,
+            &x_zero,
+            &fixture.x,
+        ),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::MulOne,
+            &x_one,
+            &fixture.x,
+        ),
+        equality(
+            &fixture.context,
+            &fixture.domain,
+            Primitive::AddInverse,
+            &opposite,
+            &fixture.zero,
+        ),
     ] {
         let witness = fixture
             .cas
@@ -445,13 +554,37 @@ fn proof_composition_paths() -> TestResult {
     let yx = fixture.term(Operator::Add, &[fixture.y.clone(), fixture.x.clone()])?;
     let left = fixture.term(Operator::Mul, &[fixture.two.clone(), xy.clone()])?;
     let right = fixture.term(Operator::Mul, &[fixture.two.clone(), yx.clone()])?;
-    let first = equality(Primitive::AddCommute, &xy, &yx);
-    let mut second = equality(Primitive::Congruence, &left, &right);
-    second.path = vec![1];
+    let first = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::AddCommute,
+        &xy,
+        &yx,
+    );
+    let mut second = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Congruence,
+        &left,
+        &right,
+    );
+    second.certificate = nrz_cas::proof::Certificate::Congruence(vec![1]);
     second.premises = vec![0];
-    let mut reverse = equality(Primitive::Symmetry, &right, &left);
+    let mut reverse = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Symmetry,
+        &right,
+        &left,
+    );
     reverse.premises = vec![1];
-    let mut final_step = equality(Primitive::Transitivity, &left, &left);
+    let mut final_step = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Transitivity,
+        &left,
+        &left,
+    );
     final_step.premises = vec![1, 2];
     let steps = [first, second, reverse, final_step];
     assert!(
@@ -461,7 +594,8 @@ fn proof_composition_paths() -> TestResult {
             .is_discharged()
     );
     let mut bad = steps.to_vec();
-    bad.get_mut(1).ok_or("missing congruence")?.path = vec![0];
+    bad.get_mut(1).ok_or("missing congruence")?.certificate =
+        nrz_cas::proof::Certificate::Congruence(vec![0]);
     assert!(
         fixture
             .cas
@@ -484,7 +618,13 @@ fn rational_condition_closure() -> TestResult {
             .cas
             .check_proof(
                 &fixture.context,
-                &[equality(Primitive::Cancel, &ratio, &fixture.one)],
+                &[equality(
+                    &fixture.context,
+                    &fixture.domain,
+                    Primitive::Cancel,
+                    &ratio,
+                    &fixture.one
+                )],
                 &mut budget()?
             )?
             .is_discharged()
@@ -495,7 +635,13 @@ fn rational_condition_closure() -> TestResult {
         .cas
         .check_proof(
             &fixture.context,
-            &[equality(Primitive::Cancel, &false_ratio, &fixture.one)],
+            &[equality(
+                &fixture.context,
+                &fixture.domain,
+                Primitive::Cancel,
+                &false_ratio,
+                &fixture.one,
+            )],
             &mut budget()?,
         )
         .err()
@@ -510,7 +656,13 @@ fn rational_condition_closure() -> TestResult {
 fn coefficient_view_limits() -> TestResult {
     let mut fixture = Fixture::new()?;
     let sum = fixture.term(Operator::Add, &[fixture.x.clone(), fixture.y.clone()])?;
-    let step = equality(Primitive::Jets, &sum, &sum);
+    let step = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Jets,
+        &sum,
+        &sum,
+    );
     let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
     let mut one_variable = Budget::new(Limits {
         polynomial_variables: 1,
@@ -542,7 +694,13 @@ fn coefficient_view_limits() -> TestResult {
             .cas
             .check_proof(
                 &fixture.context,
-                &[equality(Primitive::Jets, &square, &square)],
+                &[equality(
+                    &fixture.context,
+                    &fixture.domain,
+                    Primitive::Jets,
+                    &square,
+                    &square
+                )],
                 &mut degree_one
             )
             .is_err()
@@ -561,17 +719,25 @@ fn expected_context_mismatch() -> TestResult {
         .check_proof(&fixture.context, &[step], &mut budget()?)?;
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
     let mut environment = fixture.environment.clone();
-    environment.branch = nrz_cas::Branch::Declared("different-powers".into());
+    environment.branch = nrz_cas::syntax::Branch::Declared("different-powers".into());
     let handles = fixture.cas.admit(
         &[
-            Draft::Context {
-                environment,
+            Draft::Header(nrz_cas::domain::HeaderDraft::Core(environment)),
+            Draft::Region(nrz_cas::domain::RegionDraft {
+                header: Reference::Local(0),
+                scope: Vec::new(),
+                ambient: nrz_cas::domain::AmbientDomain::Assignments,
+                expression: nrz_cas::domain::RegionExpr::Ambient,
+            }),
+            Draft::Context(nrz_cas::domain::ContextDraft::Root {
+                header: Reference::Local(0),
+                admissible: Reference::Local(1),
                 assumptions: Vec::new(),
-            },
+            }),
             Draft::Expression(ExpressionDraft {
                 operator: Operator::Free("x".into()),
                 sort: real(),
-                context: Reference::Local(0),
+                header: Reference::Local(0),
                 scope: Vec::new(),
                 binding: None,
                 operands: Vec::new(),
@@ -579,15 +745,22 @@ fn expected_context_mismatch() -> TestResult {
         ],
         &mut budget()?,
     )?;
-    let wrong = Claim {
+    let wrong = Judgment {
         context: fixture.context.clone(),
-        relation: Relation::EqualOnDomain,
-        left: quotient,
-        right: fixture.one.clone(),
-        residuals: vec![Guard {
-            kind: GuardKind::NonZero,
-            term: at(&handles, 1)?,
-        }],
+        layer: nrz_cas::domain::Layer::Pointwise,
+        space: None,
+        statement: Statement::Equality {
+            left: quotient,
+            right: fixture.one.clone(),
+            domain: fixture.domain.clone(),
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
+        residuals: vec![crate::testing::witness::guarded(
+            &mut fixture.cas,
+            &fixture.context,
+            GuardKind::NonZero,
+            &(at(&handles, 3)?),
+        )?],
     };
     let fault = fixture
         .cas
@@ -603,15 +776,16 @@ fn expected_context_mismatch() -> TestResult {
 #[test]
 fn checked_jacobian_assembly() -> TestResult {
     let mut fixture = Fixture::new()?;
+    let syntax_header = fixture.cas.context_header(&fixture.context)?;
     let matrix = |rows, columns, operands: Vec<Reference>| {
         Draft::Expression(ExpressionDraft {
             operator: Operator::Matrix { rows, columns },
             sort: Sort::Value(AtomicSort::Matrix {
                 field: Field::Real,
-                rows: nrz_cas::Extent::Literal(rows),
-                columns: nrz_cas::Extent::Literal(columns),
+                rows: nrz_cas::syntax::Extent::Literal(rows),
+                columns: nrz_cas::syntax::Extent::Literal(columns),
             }),
-            context: Reference::Existing(fixture.context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: Vec::new(),
             binding: None,
             operands,
@@ -632,22 +806,38 @@ fn checked_jacobian_assembly() -> TestResult {
         &mut budget()?,
     )?;
     let first = derivative(
+        &fixture.context,
+        &fixture.domain,
         Primitive::DifferentiateVariable,
         &fixture.x,
         &fixture.one,
         &[],
     );
     let mut second = derivative(
+        &fixture.context,
+        &fixture.domain,
         Primitive::DifferentiateVariable,
         &fixture.x,
         &fixture.zero,
         &[],
     );
-    second.relation = Relation::Derivative {
-        variable: "y".into(),
+    second.conclusion = Statement::DerivativeOn {
+        function: fixture.x.clone(),
+        derivative: fixture.zero.clone(),
+        coordinate: "y".into(),
+        domain: fixture.domain.clone(),
     };
-    let mut assembly = equality(Primitive::Jacobian, &at(&handles, 0)?, &at(&handles, 1)?);
-    assembly.relation = Relation::Jacobian {
+    let mut assembly = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Jacobian,
+        &at(&handles, 0)?,
+        &at(&handles, 1)?,
+    );
+    assembly.conclusion = Statement::Jacobian {
+        input: at(&handles, 0)?,
+        output: at(&handles, 1)?,
+        domain: fixture.domain.clone(),
         variables: vec!["x".into(), "y".into()],
     };
     assembly.premises = vec![0, 1];
@@ -657,7 +847,10 @@ fn checked_jacobian_assembly() -> TestResult {
         &mut budget()?,
     )?;
     assert!(witness.is_discharged());
-    assembly.relation = Relation::Jacobian {
+    assembly.conclusion = Statement::Jacobian {
+        input: at(&handles, 0)?,
+        output: at(&handles, 1)?,
+        domain: fixture.domain.clone(),
         variables: vec!["y".into(), "x".into()],
     };
     assert!(
@@ -674,8 +867,8 @@ fn checked_jacobian_assembly() -> TestResult {
 #[test]
 fn witness_payload_tampering() -> TestResult {
     let original = canonical_fixture()?;
-    let mut receiver = Cas::new(Limits::default())?;
-    for (position, byte) in [(146, 0), (114, 2), (172, 1), (155, 255)] {
+    let mut receiver = Cas::new(budget()?.limits().clone())?;
+    for (position, byte) in [(244, 0), (209, 2), (172, 4), (301, 255)] {
         let mut changed = original.clone();
         *changed
             .get_mut(position)
@@ -684,8 +877,8 @@ fn witness_payload_tampering() -> TestResult {
         assert_eq!(receiver.counts().vertices, 0);
     }
     let mut unreduced = original;
-    *unreduced.get_mut(114).ok_or("missing numerator")? = 2;
-    *unreduced.get_mut(119).ok_or("missing denominator")? = 2;
+    *unreduced.get_mut(209).ok_or("missing numerator")? = 2;
+    *unreduced.get_mut(214).ok_or("missing denominator")? = 2;
     let fault = receiver
         .inspect(&unreduced, &mut budget()?)
         .err()
@@ -729,7 +922,13 @@ fn proof_permanent_limits() -> TestResult {
         .cas
         .check_proof(
             &fixture.context,
-            &[equality(Primitive::Reflexivity, &negative, &negative)],
+            &[equality(
+                &fixture.context,
+                &fixture.domain,
+                Primitive::Reflexivity,
+                &negative,
+                &negative,
+            )],
             &mut shallow,
         )
         .err()
@@ -750,16 +949,17 @@ fn proof_permanent_limits() -> TestResult {
 #[test]
 fn matrix_proof_boundary() -> TestResult {
     let mut fixture = Fixture::new()?;
+    let syntax_header = fixture.cas.context_header(&fixture.context)?;
     let sort = Sort::Value(AtomicSort::Matrix {
         field: Field::Real,
-        rows: nrz_cas::Extent::Literal(1),
-        columns: nrz_cas::Extent::Literal(1),
+        rows: nrz_cas::syntax::Extent::Literal(1),
+        columns: nrz_cas::syntax::Extent::Literal(1),
     });
     let matrix = |operator, operands| {
         Draft::Expression(ExpressionDraft {
             operator,
             sort: sort.clone(),
-            context: Reference::Existing(fixture.context.clone()),
+            header: Reference::Existing(syntax_header.clone()),
             scope: Vec::new(),
             binding: None,
             operands,
@@ -797,6 +997,8 @@ fn matrix_proof_boundary() -> TestResult {
         .check_proof(
             &fixture.context,
             &[equality(
+                &fixture.context,
+                &fixture.domain,
                 Primitive::MulCommute,
                 &at(&handles, 2)?,
                 &at(&handles, 3)?,
@@ -829,14 +1031,22 @@ fn unknown_function_derivative_refusal() -> TestResult {
     });
     let handles = fixture.cas.admit(
         &[
-            Draft::Context {
-                environment,
+            Draft::Header(nrz_cas::domain::HeaderDraft::Core(environment)),
+            Draft::Region(nrz_cas::domain::RegionDraft {
+                header: Reference::Local(0),
+                scope: Vec::new(),
+                ambient: nrz_cas::domain::AmbientDomain::Assignments,
+                expression: nrz_cas::domain::RegionExpr::Ambient,
+            }),
+            Draft::Context(nrz_cas::domain::ContextDraft::Root {
+                header: Reference::Local(0),
+                admissible: Reference::Local(1),
                 assumptions: Vec::new(),
-            },
+            }),
             Draft::Expression(ExpressionDraft {
                 operator: Operator::Free("x".into()),
                 sort: real(),
-                context: Reference::Local(0),
+                header: Reference::Local(0),
                 scope: Vec::new(),
                 binding: None,
                 operands: Vec::new(),
@@ -844,7 +1054,7 @@ fn unknown_function_derivative_refusal() -> TestResult {
             Draft::Expression(ExpressionDraft {
                 operator: Operator::Rational(Rational::one()),
                 sort: real(),
-                context: Reference::Local(0),
+                header: Reference::Local(0),
                 scope: Vec::new(),
                 binding: None,
                 operands: Vec::new(),
@@ -852,7 +1062,7 @@ fn unknown_function_derivative_refusal() -> TestResult {
             Draft::Expression(ExpressionDraft {
                 operator: Operator::Rational(Rational::zero()),
                 sort: real(),
-                context: Reference::Local(0),
+                header: Reference::Local(0),
                 scope: Vec::new(),
                 binding: None,
                 operands: Vec::new(),
@@ -860,32 +1070,36 @@ fn unknown_function_derivative_refusal() -> TestResult {
             Draft::Expression(ExpressionDraft {
                 operator: Operator::Call("f".into()),
                 sort: real(),
-                context: Reference::Local(0),
+                header: Reference::Local(0),
                 scope: Vec::new(),
                 binding: None,
-                operands: vec![Reference::Local(1)],
+                operands: vec![Reference::Local(3)],
             }),
         ],
         &mut budget()?,
     )?;
     let steps = [
         derivative(
-            Primitive::DifferentiateVariable,
-            &at(&handles, 1)?,
             &at(&handles, 2)?,
+            &fixture.cas.admissible_region(&at(&handles, 2)?)?,
+            Primitive::DifferentiateVariable,
+            &at(&handles, 3)?,
+            &at(&handles, 4)?,
             &[],
         ),
         derivative(
+            &at(&handles, 2)?,
+            &fixture.cas.admissible_region(&at(&handles, 2)?)?,
             Primitive::DifferentiateConstant,
-            &at(&handles, 4)?,
-            &at(&handles, 3)?,
+            &at(&handles, 6)?,
+            &at(&handles, 5)?,
             &[0],
         ),
     ];
     let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
     let fault = fixture
         .cas
-        .check_proof(&at(&handles, 0)?, &steps, &mut budget()?)
+        .check_proof(&at(&handles, 2)?, &steps, &mut budget()?)
         .err()
         .ok_or("manufactured an unknown-function derivative")?;
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
@@ -899,8 +1113,17 @@ fn unknown_function_derivative_refusal() -> TestResult {
 #[test]
 fn square_free_checker_remains_unregistered() -> TestResult {
     let mut fixture = Fixture::new()?;
-    let mut step = equality(Primitive::Reflexivity, &fixture.x, &fixture.x);
-    step.relation = Relation::SquareFree {
+    let mut step = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Reflexivity,
+        &fixture.x,
+        &fixture.x,
+    );
+    step.conclusion = Statement::SquareFree {
+        input: fixture.x.clone(),
+        output: fixture.x.clone(),
+        domain: fixture.domain.clone(),
         variable: "x".into(),
         field: Field::Rational,
     };

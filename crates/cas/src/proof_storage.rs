@@ -7,8 +7,8 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{
     Cas, Condition, Edge, Handle, LogicalId, State, Vertex, VertexKind, encode_id, size,
 };
-use crate::proof_model::{CheckedStep, Claim, Compiled, VerifiedWitness};
 use crate::rule_check::mismatch;
+use crate::scalar_model::{CheckedStep, Claim, Compiled, VerifiedWitness};
 
 /// Static location for checked proof storage.
 const AT: Location = Location::new("checked proof storage");
@@ -83,10 +83,11 @@ pub(crate) fn application(cas: &Cas, proof: LogicalId) -> Result<&CheckedStep, F
     let Vertex::Proof(id) = cas.state.node(proof)? else {
         return Err(mismatch());
     };
-    let Vertex::Application(value) = cas.state.node(*id)? else {
-        return Err(mismatch());
-    };
-    Ok(value)
+    match cas.state.node(*id)? {
+        Vertex::Application(value) => Ok(value),
+        Vertex::ScopedApplication(value) => value.scalar.as_ref().ok_or_else(mismatch),
+        _ => Err(mismatch()),
+    }
 }
 
 /// Stable checked position conversion.
@@ -151,25 +152,7 @@ impl Cas {
                 value.premises.push(id);
                 edges.push((id, Edge::Premise(position(index)?)));
             }
-            for (index, required) in value.conditions.requirements.iter().enumerate() {
-                let condition = Condition {
-                    kind: required.kind.predicate(),
-                    context: value.context,
-                    scope: staged.expression(required.term)?.scope.clone(),
-                    arguments: vec![required.term],
-                };
-                let condition = self.insert(
-                    &mut staged,
-                    Vertex::Condition(condition),
-                    &[
-                        (value.context, Edge::InContext),
-                        (required.term, Edge::PredicateArgument(0)),
-                    ],
-                    pending,
-                    budget,
-                )?;
-                edges.push((condition, Edge::Obligation(position(index)?)));
-            }
+            self.publish_conditions(&mut staged, &value, &mut edges, pending, budget)?;
             let application = self.insert(
                 &mut staged,
                 Vertex::Application(value),
@@ -197,12 +180,45 @@ impl Cas {
         Ok(self.handle(root))
     }
 
-    /// Register an older sealed proof as a strictly cheaper logical-v1 shortcut.
+    /// Retain every scalar domain predicate as an explicit application dependency.
+    fn publish_conditions(
+        &self,
+        state: &mut State,
+        value: &CheckedStep,
+        edges: &mut Vec<(LogicalId, Edge)>,
+        pending: u64,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        for (index, required) in value.conditions.requirements.iter().enumerate() {
+            let condition = Condition {
+                kind: required.kind.predicate(),
+                header: state.context(value.context)?.header_id,
+                scope: state.expression(required.term)?.scope.clone(),
+                arguments: vec![required.term],
+            };
+            let condition_header = state.context(value.context)?.header_id;
+            let condition = self.insert(
+                state,
+                Vertex::Condition(condition),
+                &[
+                    (condition_header, Edge::InHeader),
+                    (required.term, Edge::PredicateArgument(0)),
+                ],
+                pending,
+                budget,
+            )?;
+            edges.push((condition, Edge::Obligation(position(index)?)));
+        }
+        Ok(())
+    }
+
+    /// Register an older sealed proof as a strictly cheaper shortcut under the current logical
+    /// policy.
     ///
     /// # Errors
     /// Refuses a foreign proof, a different expected theorem, nonpositive/excessive cost,
     /// failure to improve the current known route, or exhaustion. Dependencies always precede it.
-    pub fn register_derived(
+    pub(crate) fn register_scalar_derived(
         &mut self,
         witness: &VerifiedWitness,
         expected: &Claim,
@@ -225,6 +241,12 @@ impl Cas {
                 budget.work(1, AT)?;
                 let (value, weight) = match cas.state.node(*id)? {
                     Vertex::Application(value) => (value, value.cost),
+                    Vertex::ScopedApplication(value) => {
+                        let Some(checked) = &value.scalar else {
+                            continue;
+                        };
+                        (checked, checked.cost)
+                    }
                     Vertex::Shortcut { proof, cost } => (application(cas, *proof)?, *cost),
                     _ => continue,
                 };

@@ -8,8 +8,8 @@ use crate::cost::CostPolicy;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, Vertex, size};
 use crate::producer::{Plan, step};
-use crate::proof_model::Relation;
 use crate::rule::Primitive;
+use crate::scalar_model::Relation;
 use crate::substitution::Substitution;
 
 /// An older proof eligible under the exact pinned policy and context.
@@ -40,7 +40,12 @@ pub(crate) fn snapshot(
     for id in cas.state.indices.keys() {
         budget.work(32, AT)?;
         let (proof, cost) = match cas.state.node(*id)? {
-            Vertex::Proof(_) => {
+            Vertex::Proof(application) => {
+                if matches!(cas.state.node(*application)?, Vertex::ScopedApplication(value) if
+                    value.scalar.is_none())
+                {
+                    continue;
+                }
                 let value = crate::proof_storage::application(cas, *id)?;
                 (*id, policy.weight(value.primitive)?)
             }

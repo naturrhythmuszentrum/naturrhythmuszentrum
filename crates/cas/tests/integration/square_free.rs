@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete public-API client flows for square-free.
 
-use nrz_cas::{
-    Cas, Field, Limits, Operator, Primitive, ProofStep, Rational, Relation, SquareFreeCertificate,
-};
+use nrz_cas::{Cas, Rational};
+
+use nrz_cas::proof::{ApplicationDraft, Primitive, SquareFreeCertificate, Statement};
+use nrz_cas::syntax::{Field, Operator};
 
 use crate::testing::budgets::derivation_budget as budget;
 use crate::testing::common::TestResult;
@@ -60,17 +61,15 @@ fn square_free_degree_five() -> TestResult {
     assert_eq!(certificate.square_free.len(), 2);
     assert_eq!(certificate.coprime.len(), 1);
     assert_eq!(result.cost, 8);
-    assert_eq!(
-        result.witness.claim().relation,
-        Relation::SquareFree {
-            variable: "x".into(),
-            field: Field::Rational
-        }
+    assert!(
+        matches!(&result.witness.judgment().statement, Statement::SquareFree { variable, field,
+        domain, .. } if variable == "x" && *field == Field::Rational && *domain ==
+        fixture.cas.admissible_region(&fixture.context)?)
     );
     let bytes = fixture
         .cas
         .export_witness(&result.witness, &mut budget()?)?;
-    let mut fresh = Cas::new(Limits::default())?;
+    let mut fresh = Cas::new(budget()?.limits().clone())?;
     let witness = fresh.inspect(&bytes, &mut budget()?)?;
     assert_eq!(fresh.export_witness(&witness, &mut budget()?)?, bytes);
     assert_eq!(fresh.square_free_certificate(&witness)?, certificate);
@@ -88,14 +87,14 @@ fn square_free_independent_certificate() -> TestResult {
     let power = fixture.term(Operator::IntegerPower(1), std::slice::from_ref(&input))?;
     let output = fixture.term(Operator::Mul, &[one, power])?;
     // (x²+1) + (-x/2)(2x) = 1, with both divisions by one exact.
-    let derivative_gcd = nrz_cas::GcdCertificate {
+    let derivative_gcd = nrz_cas::proof::GcdCertificate {
         gcd: rationals(&[1])?,
         left_quotient: rationals(&[1, 0, 1])?,
         right_quotient: rationals(&[0, 2])?,
         bezout_left: rationals(&[1])?,
         bezout_right: vec![Rational::zero(), Rational::parse("-1/2", &mut budget()?)?],
     };
-    let round = nrz_cas::GcdCertificate {
+    let round = nrz_cas::proof::GcdCertificate {
         gcd: rationals(&[1])?,
         left_quotient: rationals(&[1, 0, 1])?,
         right_quotient: rationals(&[1])?,
@@ -106,32 +105,34 @@ fn square_free_independent_certificate() -> TestResult {
         scalar: Rational::one(),
         initial_gcd: derivative_gcd.clone(),
         rounds: vec![round],
-        layers: vec![nrz_cas::SquareFreeLayer {
+        layers: vec![nrz_cas::proof::SquareFreeLayer {
             multiplicity: 1,
             coefficients: rationals(&[1, 0, 1])?,
         }],
         square_free: vec![derivative_gcd],
         coprime: Vec::new(),
     };
-    let step = ProofStep {
-        primitive: Primitive::SquareFree,
-        relation: Relation::SquareFree {
+    let step = ApplicationDraft {
+        rule: Primitive::SquareFree,
+        context: fixture.context.clone(),
+        conclusion: Statement::SquareFree {
+            input,
+            output,
             variable: "x".into(),
             field: Field::Rational,
+            domain: fixture.cas.admissible_region(&fixture.context)?,
         },
-        left: input,
-        right: output,
         premises: Vec::new(),
-        path: Vec::new(),
         substitutions: Vec::new(),
-        certificate: Some(certificate.clone()),
+        certificate: nrz_cas::proof::Certificate::SquareFree(Box::new(certificate.clone())),
     };
+
     let witness = fixture
         .cas
         .check_proof(&fixture.context, &[step], &mut budget()?)?;
     assert_eq!(fixture.cas.square_free_certificate(&witness)?, &certificate);
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
-    let mut fresh = Cas::new(Limits::default())?;
+    let mut fresh = Cas::new(budget()?.limits().clone())?;
     let replayed = fresh.inspect(&bytes, &mut budget()?)?;
     assert_eq!(fresh.square_free_certificate(&replayed)?, &certificate);
     Ok(())

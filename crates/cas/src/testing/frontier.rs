@@ -5,8 +5,9 @@
 
 use std::collections::BTreeSet;
 
+use crate::LogicalId;
 use crate::frontier::Metrics;
-use crate::{LogicalId, VertexKind};
+use crate::syntax::VertexKind;
 
 /// Small independently chosen resource tuple.
 pub(crate) fn metrics(cost: u64, credits: u64, support: u64) -> Metrics {
