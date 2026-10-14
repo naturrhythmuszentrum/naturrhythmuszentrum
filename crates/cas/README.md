@@ -1,0 +1,29 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# nrz-cas · `guide:cas:overview`
+
+`nrz-cas` constructs exact mathematical graphs with explicit sorts, contexts, binder scopes, resource budgets and original source occurrences. It is the first capability of the staged implementation specified in `docs/design/cas-design.md`, which also holds the architecture and the full accepted scope. It has no consumer yet and introduces no physical units or numerical evaluator.
+
+**Definition (Construction capability)** · `def:cas:construction`
+
+`Cas::admit` validates flat child-before-parent drafts and publishes them atomically. Handles carry a private store identity; public logical identifiers never authorize a lookup in another store. Graph-owned expression records share exact syntax, while each original operand use keeps a distinct occurrence, optional checked UTF-8 byte span and ordered child links. Sources with conflicting bytes under one key are refused. Failed admission preserves the published graph and all next identifiers.
+
+`Operator` represents scalar arithmetic, declarations and calls, derivatives, integral/sum/series/limit bodies, predicates and solution sets, matrices and comprehensions, matrix operations, spectral requests and selected algebraic roots. Admission checks arity, sort, matrix shape and explicit de Bruijn frames. Representation supplies no evaluation, identity or proof of a predicate. Context keys sort declarations and named hypotheses, flatten conjunctions and reject recognized literal falsehoods or an atom paired with its explicit negation; unrecognized consistency remains unknown.
+
+`Rational` owns canonical sign/magnitude, positive-denominator and reduction invariants over `num-bigint` 0.4 with default features disabled. Integers, fractions, decimals and decimal scientific notation parse exactly. Arithmetic cross-cancels before multiplication and uses continued fractions for comparison. The default component/intermediate limits are 4,096/8,192 bits; `(4/5)^78` fits with numerator/denominator sizes of 157/182 bits. Every big-integer operation prepays a conservative size-dependent work charge; a smaller bit budget returns `Exhausted` with `ArithmeticRange`. `petgraph` 0.8 supplies append-only graph storage. The expected big-integer runtime dependency closure is `num-integer` and `num-traits`; lock resolution belongs to the verification gate.
+
+**Rule (Occurrence coverage before requests)** · `rule:cas:coverage`
+
+`walk_original` visits every original operand in postorder, including operands beneath zero multiplication and cancellation candidates, with explicit binder-entry events. It returns a sealed `TraversalReceipt` only when the entire walk succeeds. A `WalkFailure` retains bounded partial events and the fault, with no receipt. A receipt proves coverage, not physical validity or mathematical definedness. A client must inspect the events and perform its own checks before submitting a request. `substitute` performs simultaneous capture-safe free substitution; `instantiate_bound` replaces one explicit frame. `materialize_derived` produces fresh occurrences carrying provenance and no invented source spans, which `walk_derived` covers separately.
+
+**Caveat (Current executable scope)** · `cav:cas:construction-scope`
+
+`Cas::run` validates requests and their matching coverage receipts, then retains the operation as a graph record. Valid represented tasks return `Outcome::Unresolved`; explicitly excluded executable fields return `Outcome::Unsupported`. Malformed inputs and spent limits return `Invalid` and `Exhausted`. This commit exposes no successful witness type, identity registry, accepting proof checker, portable proof import, search, automatic differentiation, Jacobian producer or polynomial factorization. Those capabilities are the remaining three commits of the accepted plan. `canonical_snapshot` is a deterministic construction diagnostic, not a mathematical witness or import format.
+
+`Limits` names every storage, depth, bit, work and future algorithm ceiling; `LimitsOverride` resolves optional request changes. A `Budget` is an explicit monotone ledger. Admission intersects active storage limits with permanent store ceilings and discards failed staged state. Conservative estimates may refuse before the nominal vertex or bit cap is reached. Allocator failure is returned where the underlying API offers fallible reservation; environmental allocator abort behavior has the limitation stated in `docs/design/cas-design.md`.
+
+**Procedure (Construction verification)** · `alg:cas:construction-verification`
+
+The integration tests cover exact literals and independent small-integer/fraction oracles, Kahan capacity and refusals, ledger boundaries, original occurrence sharing, deterministic snapshots, UTF-8 transaction rollback, foreign/forward references, scope and sort refusals, required receipts, generated provenance, simultaneous substitution, lifting under a binder, bound instantiation, permanent storage limits, partial expressions beneath zero, explicit contradictory hypotheses and every operator variant. No existing algebra or units implementation or tests supply these fixtures.
+
+The lane intentionally has no Rust toolchain. The server gate runs `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` and rustdoc with warnings denied, then the repository's required generator and host checks. For the new package alone, `cargo test -p nrz-cas` exercises its integration fixtures. Compilation, execution and formatter acceptance are pending until that gate reports them; local static inspections are recorded separately in the round report.

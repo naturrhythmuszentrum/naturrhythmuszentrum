@@ -14,7 +14,8 @@
     "crates/matrix/Cargo.toml",
     "crates/algebra/Cargo.toml",
     "crates/units/Cargo.toml",
-    "prototypes/descriptors/Cargo.toml"
+    "prototypes/descriptors/Cargo.toml",
+    "crates/cas/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -55,6 +56,12 @@
       "has_readme_template": true,
       "name": "nrz-descriptor-prototype",
       "path": "prototypes/descriptors"
+    },
+    {
+      "description": "Exact graph construction and checked symbolic derivations",
+      "has_readme_template": true,
+      "name": "nrz-cas",
+      "path": "crates/cas"
     }
   ]
 }

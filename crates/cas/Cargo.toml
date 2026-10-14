@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-cas"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Exact graph construction and checked symbolic derivations"
+readme = "README.md"
+keywords = ["symbolic", "algebra", "exact", "graph"]
+categories = ["mathematics", "science"]
+
+[dependencies]
+petgraph.workspace = true
+num-bigint.workspace = true
+
+[lints]
+workspace = true

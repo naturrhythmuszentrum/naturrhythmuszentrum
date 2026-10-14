@@ -40,5 +40,6 @@ Problem and fixture schema v2 is specified in `docs/design/problem-data-schema.m
 |`nrz-algebra`|`crates/algebra`|Exact symbolic expressions and deterministic collection normal forms|
 |`nrz-units`|`crates/units`|Data-time quantity descriptors and checks over original symbolic expressions|
 |`nrz-descriptor-prototype`|`prototypes/descriptors`|Descriptor schema interning and checked computation boundary prototypes|
+|`nrz-cas`|`crates/cas`|Exact graph construction and checked symbolic derivations|
 
 Naturrhythmuszentrum has 9 planned bites.

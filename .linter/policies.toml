@@ -46,4 +46,10 @@ policies = [
   { owner = "DESCRIPTORS", policy = "labels.heads-conform" },
   { owner = "DESCRIPTORS", policy = "labels.citations-local-resolve" },
   { owner = "DESCRIPTORS", policy = "owners.reach-conform" },
+  { owner = "CAS", policy = "labels.mints-well-formed" },
+  { owner = "CAS", policy = "labels.mints-kind-conform" },
+  { owner = "CAS", policy = "labels.mints-unique" },
+  { owner = "CAS", policy = "labels.heads-conform" },
+  { owner = "CAS", policy = "labels.citations-local-resolve" },
+  { owner = "CAS", policy = "owners.reach-conform" },
 ]

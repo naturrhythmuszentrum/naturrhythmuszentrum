@@ -128,3 +128,21 @@ allowances = []
 
 [DESCRIPTORS."owners.reach-conform"]
 allowances = []
+
+[CAS."labels.mints-well-formed"]
+allowances = []
+
+[CAS."labels.mints-kind-conform"]
+allowances = []
+
+[CAS."labels.mints-unique"]
+allowances = []
+
+[CAS."labels.heads-conform"]
+allowances = []
+
+[CAS."labels.citations-local-resolve"]
+allowances = []
+
+[CAS."owners.reach-conform"]
+allowances = []
