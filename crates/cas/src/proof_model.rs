@@ -243,6 +243,8 @@ pub enum Certificate {
     Congruence(Vec<u32>),
     /// Exact rational multiplicity evidence.
     SquareFree(Box<crate::multiplicity::SquareFreeCertificate>),
+    /// Typed native case evidence, reconstructed by the selected case schema.
+    Cases(Box<crate::case_model::CaseCertificate>),
 }
 
 /// One untrusted application whose local premise indices are strictly backward.

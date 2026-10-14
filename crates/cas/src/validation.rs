@@ -928,12 +928,12 @@ pub(crate) fn occurrence(
     value: &Occurrence,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let expression = state.expression(value.expression)?;
+    let dependencies = crate::descriptor::children(state, value.expression, budget)?;
     budget.work(size(value.children.len(), AT)?, AT)?;
-    if value.children.len() != expression.operands.len() {
+    if value.children.len() != dependencies.len() {
         return Err(sort_error());
     }
-    for (child, expected) in value.children.iter().zip(&expression.operands) {
+    for (child, (_, expected)) in value.children.iter().zip(&dependencies) {
         if state.occurrence(*child)?.expression != *expected {
             return Err(sort_error());
         }
@@ -960,16 +960,18 @@ pub(crate) fn occurrence(
         (None, Some(provenance)) if value.span.is_none() => {
             if !matches!(
                 state.node(provenance)?,
-                Vertex::Expression(_) | Vertex::Occurrence(_)
+                Vertex::Expression(_)
+                    | Vertex::Occurrence(_)
+                    | Vertex::SourceForm(_)
+                    | Vertex::Application(_)
+                    | Vertex::ScopedApplication(_)
             ) {
                 return Err(Fault::invalid(InvalidCode::Reference, AT));
             }
         }
         _ => return Err(Fault::invalid(InvalidCode::Span, AT)),
     }
-    let names = expression
-        .binding
-        .as_ref()
+    let names = crate::descriptor::binding(state, value.expression)?
         .map_or(0, |binding| binding.sorts.len());
     if !value.binder_names.is_empty() && value.binder_names.len() != names {
         return Err(Fault::invalid(InvalidCode::Scope, AT));

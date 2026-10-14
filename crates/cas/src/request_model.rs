@@ -58,6 +58,24 @@ pub enum ContextConsistency {
 /// Checked results and honest deferred, invalid or exhausted outcomes.
 #[derive(Clone, Debug)]
 pub enum Outcome {
+    /// Opaque region evidence cannot decide whether the requested whole domain is covered.
+    UnknownTotality {
+        /// Retained request with its original coverage evidence.
+        request: Handle,
+        /// Exact unresolved region or definedness blocker.
+        blocker: Fault,
+        /// Monotone generation usage.
+        usage: BudgetUsage,
+    },
+    /// A valid case operation lacks a supported mathematical premise.
+    PendingPremise {
+        /// Retained request with its supplied evidence.
+        request: Handle,
+        /// Exact pending fragment or hypothesis.
+        blocker: Fault,
+        /// Monotone generation usage.
+        usage: BudgetUsage,
+    },
     /// A replayed mathematical result with no residual domain obligations.
     Proved {
         /// Retained graph-owned request.
@@ -157,6 +175,9 @@ impl Cas {
             if input.root != input.receipt.root {
                 return Err(Fault::invalid(InvalidCode::Receipt, at));
             }
+            if matches!(request.task, Task::ElaborateCases) && !input.receipt.is_original() {
+                return Err(Fault::invalid(InvalidCode::Receipt, at));
+            }
             budget.check(BudgetKind::OriginalOccurrences, input.receipt.visited, at)?;
         }
         let mut premises = Vec::new();
@@ -249,14 +270,14 @@ pub(crate) fn validate(
     budget.work(length, at)?;
     validate_task(state, task, context, budget)?;
     for input in inputs {
-        let expression = state.expression(state.occurrence(*input)?.expression)?;
-        if !expression.scope.is_empty()
-            || !crate::header::embeds(state, expression.header, context.header_id, budget)?
-        {
+        let (header, scope) =
+            crate::descriptor::metadata(state, state.occurrence(*input)?.expression)?;
+        if !scope.is_empty() || !crate::header::embeds(state, header, context.header_id, budget)? {
             return Err(Fault::invalid(InvalidCode::Scope, at));
         }
     }
     let Some(operation) = task.scalar() else {
+        validate_native_inputs(state, task, inputs)?;
         return Ok(());
     };
     let operation = &operation;
@@ -359,18 +380,7 @@ fn validate_task(
     let at = Location::new("task validation");
     for reference in task.references() {
         budget.work(1, at)?;
-        let (header, scope) = match state.node(reference.logical_id())? {
-            crate::graph::Vertex::Region(value) => (value.header, &value.scope),
-            crate::graph::Vertex::Boundary(value) => (value.header, &value.scope),
-            crate::graph::Vertex::Expression(value) => (value.header, &value.scope),
-            crate::graph::Vertex::Space(value) => {
-                if !crate::header::embeds(state, value.header, context.header_id, budget)? {
-                    return Err(Fault::invalid(InvalidCode::Context, at));
-                }
-                continue;
-            }
-            _ => return Err(Fault::invalid(InvalidCode::Reference, at)),
-        };
+        let (header, scope) = crate::descriptor::metadata(state, reference.logical_id())?;
         if !scope.is_empty() || !crate::header::embeds(state, header, context.header_id, budget)? {
             return Err(Fault::invalid(InvalidCode::Context, at));
         }
@@ -395,7 +405,7 @@ fn validate_task(
         Task::Coverage { domain } | Task::Select { region: domain } => {
             state.region(domain.logical_id())?;
         }
-        Task::Eliminate { regions } | Task::Merge { regions, .. } => {
+        Task::Eliminate { regions, .. } | Task::Merge { regions, .. } => {
             budget.check(BudgetKind::CaseArms, size(regions.len(), at)?, at)?;
             for region in regions {
                 state.region(region.logical_id())?;
@@ -416,6 +426,33 @@ fn validate_task(
             state.space(target_space.logical_id())?;
         }
         _ => {}
+    }
+    Ok(())
+}
+
+/// Native task arity and root kinds are checked before any executable producer runs.
+fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> Result<(), Fault> {
+    let at = Location::new("native request inputs");
+    let expected = match task {
+        Task::Equal { .. } => Some(2),
+        Task::Eliminate { .. } => Some(0),
+        Task::ElaborateCases
+        | Task::Select { .. }
+        | Task::Merge { .. }
+        | Task::Coverage { .. }
+        | Task::Boundary { .. } => Some(1),
+        _ => None,
+    };
+    if expected.is_some_and(|count| inputs.len() != count) {
+        return Err(Fault::invalid(InvalidCode::Sort, at));
+    }
+    for input in inputs {
+        let root = state.occurrence(*input)?.expression;
+        if matches!(task, Task::ElaborateCases) {
+            state.source_form(root)?;
+        } else {
+            state.expression(root)?;
+        }
     }
     Ok(())
 }

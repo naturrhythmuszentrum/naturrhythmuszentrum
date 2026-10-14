@@ -5,4 +5,5 @@ mod frontier;
 mod frozen;
 mod snapshot;
 
+mod cases;
 mod conditions;

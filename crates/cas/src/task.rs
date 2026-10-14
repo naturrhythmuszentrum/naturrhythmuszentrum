@@ -60,6 +60,8 @@ pub enum Task {
     Eliminate {
         /// Exact member regions.
         regions: Vec<Handle>,
+        /// Exact parent theorem whose mechanical restrictions the premises must prove.
+        conclusion: Box<crate::proof_model::Statement>,
     },
     /// Merge branch values using an explicit proposed common value.
     Merge {
@@ -163,7 +165,14 @@ impl Task {
             | Self::Differentiate { domain, .. }
             | Self::Coverage { domain } => vec![domain],
             Self::Select { region } => vec![region],
-            Self::Eliminate { regions } => regions.iter().collect(),
+            Self::Eliminate {
+                regions,
+                conclusion,
+            } => {
+                let mut references: Vec<_> = regions.iter().collect();
+                references.extend(crate::statement::objects(conclusion));
+                references
+            }
             Self::Merge {
                 regions,
                 proposed_value,
@@ -219,6 +228,9 @@ pub(crate) fn encode(value: &Task, out: &mut Encoder<'_>) -> Result<(), Fault> {
         crate::graph::encode_id(reference.logical_id(), out)?;
     }
     match value {
+        Task::Eliminate { conclusion, .. } => {
+            crate::statement::encode(conclusion, out, crate::statement::handle)?;
+        }
         Task::Equal {
             domain_contract, ..
         } => out.byte(match domain_contract {

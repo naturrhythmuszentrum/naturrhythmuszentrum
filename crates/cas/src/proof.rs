@@ -7,6 +7,7 @@ pub use crate::rule::{
     CertificateSchema, ConclusionKind, PRIMITIVES, PremiseShape, Primitive, RuleSpec,
 };
 
+pub use crate::case_model::CaseCertificate;
 pub use crate::proof_model::{
     ApplicationDraft, Certificate, ConstructorLaw, DomainContract, GuardedObligation, Judgment,
     Ownership, Statement, VerifiedWitness,

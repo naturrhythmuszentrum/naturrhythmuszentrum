@@ -319,6 +319,12 @@ pub(crate) fn judgment_key(
     envelope(records, root, &rules, b"NRZJDG02", budget)
 }
 
+/// Build a complete portable syntax key without exposing allocation-dependent logical identifiers.
+pub(crate) fn syntax_key(cas: &Cas, id: LogicalId, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
+    let (records, root, rules) = table(cas, Entity::Object(id), budget)?;
+    envelope(records, root, &rules, b"NRZSYN02", budget)
+}
+
 /// Frame the already canonical records with their exact primitive manifest.
 fn envelope(
     records: Vec<Vec<u8>>,

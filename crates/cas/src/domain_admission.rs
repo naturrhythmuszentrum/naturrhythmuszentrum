@@ -437,8 +437,13 @@ impl Cas {
                 .ok_or_else(|| Fault::invalid(InvalidCode::Sort, at))?,
         )?;
         let sort = first.sort.clone();
-        let mut depth = 1_u64;
-        let mut unfolded = 1_u64;
+        let (domain_depth, domain_size) = crate::descriptor::measure(state, domain, budget)?;
+        let mut depth = domain_depth
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Depth, at))?;
+        let mut unfolded = domain_size
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::PeakExpressionSize, at))?;
         let mut edges = vec![(header, Edge::InHeader), (domain, Edge::CaseDomain)];
         edges
             .try_reserve(arms.len())
@@ -459,15 +464,14 @@ impl Cas {
                 &region.ambient,
                 budget,
             )?;
-            let expression = state.expression(value.value)?;
+            let (arm_depth, arm_size) = crate::descriptor::measure(state, *arm, budget)?;
             depth = depth.max(
-                expression
-                    .depth
+                arm_depth
                     .checked_add(1)
                     .ok_or_else(|| Fault::capacity(BudgetKind::Depth, at))?,
             );
             unfolded = unfolded
-                .checked_add(expression.unfolded)
+                .checked_add(arm_size)
                 .ok_or_else(|| Fault::capacity(BudgetKind::PeakExpressionSize, at))?;
             edges.push((
                 *arm,

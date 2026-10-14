@@ -51,7 +51,7 @@ pub(crate) fn roots(cas: &Cas, statement: &Statement) -> Result<Vec<LogicalId>, 
 
 /// Recompute cuts and every cell before checking the asserted set relation.
 pub(crate) fn decide(
-    cas: &Cas,
+    cas: &mut Cas,
     statement: &Statement,
     certificate: &Certificate,
     budget: &mut Budget,
@@ -60,24 +60,22 @@ pub(crate) fn decide(
         return Err(invalid());
     };
     measure(certificate, budget)?;
-    let roots = roots(cas, statement)?;
-    let boundary = match statement {
-        Statement::Incidence { boundary, .. } => Some(crate::region::boundary_point(
-            &cas.state,
-            cas.checked(boundary)?,
-            budget,
-        )?),
-        _ => None,
-    };
-    let expected = crate::region::partition_at(&cas.state, &roots, boundary.as_ref(), budget)?;
+    let expected = evidence(cas, statement, budget)?;
     if *certificate != expected {
         return Err(invalid());
     }
     let first = expected.membership.first().ok_or_else(invalid)?;
     let valid = match statement {
-        Statement::Empty { .. } | Statement::PredicateFact { .. } => {
-            first.iter().all(|value| !value)
-        }
+        Statement::Empty { .. } => first.iter().all(|value| !value),
+        Statement::PredicateFact { .. } => expected.membership.get(1).map_or_else(
+            || first.iter().all(|value| !value),
+            |truth| {
+                first
+                    .iter()
+                    .zip(truth)
+                    .all(|(reached, holds)| !reached || *holds)
+            },
+        ),
         Statement::Incidence { .. } => incidence(cas, statement, &expected, budget)?,
         Statement::Subset { .. } => {
             let second = expected.membership.get(1).ok_or_else(invalid)?;
@@ -93,25 +91,63 @@ pub(crate) fn decide(
                 .zip(second)
                 .all(|(left, right)| !(*left && *right))
         }
-        Statement::Cover { .. } => {
-            let mut valid = true;
-            for (index, member) in first.iter().enumerate() {
-                budget.condition(1, AT)?;
-                if *member
-                    && !expected
-                        .membership
-                        .iter()
-                        .skip(1)
-                        .any(|row| row.get(index) == Some(&true))
-                {
-                    valid = false;
-                }
-            }
-            valid
-        }
+        Statement::Cover { .. } => covered(&expected, budget)?,
         _ => false,
     };
     if valid { Ok(()) } else { Err(invalid()) }
+}
+
+/// Every inhabited parent cell needs at least one explicit covering member.
+fn covered(cells: &RegionCertificate, budget: &mut Budget) -> Result<bool, Fault> {
+    let parent = cells.membership.first().ok_or_else(invalid)?;
+    let mut valid = true;
+    for (index, member) in parent.iter().enumerate() {
+        budget.condition(1, AT)?;
+        if *member
+            && !cells
+                .membership
+                .iter()
+                .skip(1)
+                .any(|row| row.get(index) == Some(&true))
+        {
+            valid = false;
+        }
+    }
+    Ok(valid)
+}
+
+/// Reconstruct predicate truth only after checking whether its region is empty.
+pub(crate) fn evidence(
+    cas: &mut Cas,
+    statement: &Statement,
+    budget: &mut Budget,
+) -> Result<RegionCertificate, Fault> {
+    let mut roots = roots(cas, statement)?;
+    if let Statement::PredicateFact { region, predicate } = statement {
+        let empty = crate::region::partition(&cas.state, &roots, budget)?;
+        if empty
+            .membership
+            .first()
+            .ok_or_else(invalid)?
+            .iter()
+            .all(|value| !value)
+        {
+            return Ok(empty);
+        }
+        let region = cas.checked(region)?;
+        let predicate = cas.checked(predicate)?;
+        let truth = crate::case_syntax::guarded(cas, region, predicate, budget)?;
+        roots.push(truth);
+    }
+    let boundary = match statement {
+        Statement::Incidence { boundary, .. } => Some(crate::region::boundary_point(
+            &cas.state,
+            cas.checked(boundary)?,
+            budget,
+        )?),
+        _ => None,
+    };
+    crate::region::partition_at(&cas.state, &roots, boundary.as_ref(), budget)
 }
 
 /// Bound untrusted rows and exact numbers before comparison or copying.

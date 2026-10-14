@@ -95,6 +95,68 @@ mod wire;
 )]
 mod wire_read;
 
+mod axis_map;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact case calculations stay private"
+)]
+mod case_cells;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "closed case checkers stay private"
+)]
+mod case_check;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "cover elimination stays private"
+)]
+mod case_eliminate;
+mod case_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scoped case requirements stay private"
+)]
+mod case_obligations;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "ordered construction stays private"
+)]
+mod case_ordered;
+#[expect(clippy::redundant_pub_crate, reason = "case proposals stay private")]
+mod case_producer;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "case reach masks are private kernel support"
+)]
+mod case_reach;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "private module with crate-wide case recipes"
+)]
+mod case_recipes;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "refinement scheduling is crate-internal"
+)]
+mod case_refine;
+#[expect(clippy::redundant_pub_crate, reason = "local selection stays private")]
+mod case_select;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "native request dispatch is crate-internal"
+)]
+mod case_service;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "case syntax helpers stay private"
+)]
+mod case_syntax;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "typed helpers stay inside the private module"
+)]
+mod descriptor;
+mod descriptor_model;
 mod number;
 #[expect(
     clippy::redundant_pub_crate,
@@ -103,7 +165,18 @@ mod number;
 )]
 mod request_model;
 mod snapshot;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "typed builders stay inside the private module"
+)]
+mod source_build;
+mod source_factory;
 mod substitution;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "typed rebuilding stays inside the private module"
+)]
+mod substitution_draft;
 mod traversal;
 #[expect(
     clippy::redundant_pub_crate,

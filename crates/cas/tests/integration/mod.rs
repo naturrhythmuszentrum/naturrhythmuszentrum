@@ -7,4 +7,5 @@ mod proofs;
 mod search;
 mod square_free;
 
+mod cases;
 mod contexts;

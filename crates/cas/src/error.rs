@@ -28,6 +28,14 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// The exact requested cover cannot be decided in the supported fragment.
+    UnknownTotality,
+    /// A valid operation still requires an explicit supported premise.
+    PendingPremise,
+    /// Applicable native associations disagree on a proved nonempty region.
+    OverlapConflict,
+    /// A requested finite cover omits a proved point or interval.
+    CoverageHole,
     /// A numeric spelling does not follow the exact literal grammar.
     Literal,
     /// A rational denominator or divisor is zero.

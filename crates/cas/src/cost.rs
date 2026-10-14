@@ -35,7 +35,7 @@ impl Default for CostPolicy {
     fn default() -> Self {
         Self {
             key: "logical".into(),
-            version: 2,
+            version: 3,
             weights: PRIMITIVES
                 .iter()
                 .map(|primitive| primitive.specification().weight)
@@ -67,7 +67,9 @@ impl CostPolicy {
         {
             return Err(Fault::invalid(InvalidCode::Policy, AT));
         }
-        if self.key == "logical" && self.version == 2 && *self != Self::default() {
+        if self.key == "logical"
+            && (self.version < 3 || (self.version == 3 && *self != Self::default()))
+        {
             return Err(Fault::invalid(InvalidCode::Policy, AT));
         }
         Ok(())

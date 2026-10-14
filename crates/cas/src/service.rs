@@ -118,6 +118,15 @@ impl Cas {
             generation.work(1, AT)?;
             inputs.push(self.state.occurrence(self.checked(&root.root)?)?.expression);
         }
+        if crate::case_service::handles(self, &request.task, &inputs, generation)? {
+            self.check_nonempty_request(context, generation)?;
+            let result =
+                crate::case_service::execute(self, request, &inputs, policy, generation, checker)?;
+            return Ok(Execution {
+                result: Some(result),
+                fault: None,
+            });
+        }
         let Some(operation) = request.task.scalar() else {
             return Ok(Execution {
                 result: None,
@@ -434,18 +443,31 @@ fn outcome(
 ) -> Outcome {
     if let Some(fault) = execution.fault {
         return match fault.kind {
-            FaultKind::Invalid(InvalidCode::RefutedDomain | InvalidCode::EmptyDomain) => {
-                Outcome::Refused {
-                    request: record,
-                    fault,
-                    usage,
-                }
-            }
+            FaultKind::Invalid(
+                InvalidCode::RefutedDomain
+                | InvalidCode::EmptyDomain
+                | InvalidCode::OverlapConflict
+                | InvalidCode::CoverageHole,
+            ) => Outcome::Refused {
+                request: record,
+                fault,
+                usage,
+            },
             FaultKind::Exhausted { .. } => Outcome::Exhausted {
                 fault,
                 usage,
                 replay_usage,
                 best: execution.result,
+            },
+            FaultKind::Invalid(InvalidCode::UnknownTotality) => Outcome::UnknownTotality {
+                request: record,
+                blocker: fault,
+                usage,
+            },
+            FaultKind::Invalid(InvalidCode::PendingPremise) => Outcome::PendingPremise {
+                request: record,
+                blocker: fault,
+                usage,
             },
             FaultKind::Invalid(InvalidCode::UnsupportedFragment) => Outcome::Unresolved {
                 request: record,

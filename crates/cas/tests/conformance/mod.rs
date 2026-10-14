@@ -8,4 +8,7 @@ mod representation;
 mod search;
 mod square_free;
 
+mod case_refinement;
+mod case_substitution;
+mod cases;
 mod domain;

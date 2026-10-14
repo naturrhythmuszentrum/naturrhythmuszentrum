@@ -1170,9 +1170,6 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("occurrence admission");
         let expression = self.resolve(&draft.expression, locals)?;
-        if matches!(state.node(expression)?, Vertex::Expression(value) if value.domain.is_some()) {
-            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
-        }
         let source = draft
             .source
             .as_ref()

@@ -6,7 +6,7 @@ use std::fmt;
 use crate::budget::{Budget, BudgetKind};
 use crate::encoding::{self, Encoder};
 use crate::error::{Fault, InvalidCode, Location};
-use crate::graph::{Cas, Draft, Handle, LogicalId, OccurrenceDraft, Reference, Vertex, size};
+use crate::graph::{Cas, Handle, LogicalId, Vertex, size};
 use crate::model::{AtomicSort, Scope, Span};
 
 /// An original source identity and optional checked byte range.
@@ -23,7 +23,7 @@ pub struct SourceLocation {
 pub struct Visit {
     /// The distinct original/generated occurrence.
     pub occurrence: Handle,
-    /// Its shared mathematical expression.
+    /// Its shared typed syntax object; inspect it with `describe_syntax`.
     pub expression: Handle,
     /// Ordered root-relative operand positions.
     pub path: Vec<u32>,
@@ -179,18 +179,16 @@ impl Cas {
     ) -> Result<u64, Fault> {
         let at = Location::new("occurrence walk");
         let id = self.checked(root)?;
-        let expression = self
-            .state
-            .expression(self.state.occurrence(id)?.expression)?;
-        let workspace = expression
-            .depth
-            .checked_mul(8)
-            .and_then(|bytes| bytes.checked_add(128))
-            .and_then(|bytes| bytes.checked_mul(expression.unfolded))
+        let target = self.state.occurrence(id)?.expression;
+        let (_, scope) = crate::descriptor::metadata(&self.state, target)?;
+        let workspace = self
+            .counts()
+            .payload_bytes
+            .checked_mul(2)
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
         budget.check(BudgetKind::StagedPayloadBytes, workspace, at)?;
         budget.work(workspace, at)?;
-        if !expression.scope.is_empty() {
+        if !scope.is_empty() {
             return Err(Fault::invalid(InvalidCode::Scope, at));
         }
         let mut stack = vec![Frame {
@@ -269,8 +267,7 @@ impl Cas {
     ) -> Result<(), Fault> {
         let at = Location::new("occurrence walk");
         let occurrence = self.state.occurrence(frame.id)?;
-        let expression = self.state.expression(occurrence.expression)?;
-        if let Some(binding) = &expression.binding {
+        if let Some(binding) = crate::descriptor::binding(&self.state, occurrence.expression)? {
             let mut out = Encoder::new(budget, at);
             encoding::binding(Some(binding), &mut out)?;
             out.count(frame.path.len())?;
@@ -305,9 +302,9 @@ impl Cas {
     ) -> Result<Visit, Fault> {
         let at = Location::new("occurrence visit");
         let occurrence = self.state.occurrence(id)?;
-        let expression = self.state.expression(occurrence.expression)?;
+        let (_, scope) = crate::descriptor::metadata(&self.state, occurrence.expression)?;
         let mut out = Encoder::new(budget, at);
-        encoding::scope(&expression.scope, &mut out)?;
+        encoding::scope(scope, &mut out)?;
         out.count(path.len())?;
         for position in &path {
             out.unsigned(u64::from(*position))?;
@@ -333,7 +330,7 @@ impl Cas {
                 key: source.key.clone(),
                 span: occurrence.span,
             }),
-            scope: expression.scope.clone(),
+            scope: scope.clone(),
         })
     }
 
@@ -348,72 +345,21 @@ impl Cas {
         provenance: &Handle,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let at = Location::new("generated occurrences");
-        let root = self.checked(expression)?;
-        if matches!(self.state.node(root)?, Vertex::SourceForm(_))
-            || matches!(self.state.node(root)?, Vertex::Expression(value) if value.domain.is_some())
-        {
-            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, at));
-        }
-        let provenance_id = self.checked(provenance)?;
-        if !matches!(
-            self.state.node(provenance_id)?,
-            Vertex::Expression(_) | Vertex::Occurrence(_),
-        ) {
-            return Err(Fault::invalid(InvalidCode::Reference, at));
-        }
-        let total = self.state.expression(root)?.unfolded;
-        budget.check(BudgetKind::OriginalOccurrences, total, at)?;
-        budget.check(BudgetKind::StagedVertices, total, at)?;
-        let workspace = total
-            .checked_mul(512)
-            .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
-        budget.check(BudgetKind::StagedPayloadBytes, workspace, at)?;
-        budget.work(workspace, at)?;
-        let mut pending = vec![(root, false)];
-        let mut results = Vec::new();
-        let mut drafts = Vec::new();
-        while let Some((id, expanded)) = pending.pop() {
-            budget.work(1, at)?;
-            let value = self.state.expression(id)?;
-            if !expanded {
-                pending
-                    .try_reserve(
-                        value
-                            .operands
-                            .len()
-                            .checked_add(1)
-                            .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, at))?,
-                    )
-                    .map_err(|_| Fault::allocation(at))?;
-                pending.push((id, true));
-                pending.extend(value.operands.iter().rev().map(|operand| (*operand, false)));
-                continue;
-            }
-            let start = results
-                .len()
-                .checked_sub(value.operands.len())
-                .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))?;
-            let children = results.split_off(start);
-            let index = u32::try_from(drafts.len())
-                .map_err(|_| Fault::capacity(BudgetKind::Vertices, at))?;
-            drafts.try_reserve(1).map_err(|_| Fault::allocation(at))?;
-            drafts.push(Draft::Occurrence(OccurrenceDraft {
-                expression: Reference::Existing(self.handle(id)),
-                source: None,
-                span: None,
-                children,
-                provenance: Some(Reference::Existing(provenance.clone())),
-                binder_names: Vec::new(),
-            }));
-            results.try_reserve(1).map_err(|_| Fault::allocation(at))?;
-            results.push(Reference::Local(index));
-        }
-        let handles = self.admit(&drafts, budget)?;
-        handles
-            .last()
-            .cloned()
-            .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))
+        crate::source_build::materialize(self, expression, None, Some(provenance), budget)
+    }
+
+    /// Build every original typed use in written order, without inventing precise spans.
+    ///
+    /// # Errors
+    /// Refuses invalid source/syntax identities and exhausted construction limits.
+    /// The resulting root still requires a successful complete original walk.
+    pub fn materialize_original(
+        &mut self,
+        syntax: &Handle,
+        source: &Handle,
+        budget: &mut Budget,
+    ) -> Result<Handle, Fault> {
+        crate::source_build::materialize(self, syntax, Some(source), None, budget)
     }
 }
 

@@ -19,6 +19,15 @@ pub(crate) mod budgets;
 pub(crate) mod builders;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "shared exact-space map fixtures"
+)]
+#[path = "case_spaces.rs"]
+pub(crate) mod case_spaces;
+#[expect(clippy::redundant_pub_crate, reason = "shared public case fixtures")]
+#[path = "cases.rs"]
+pub(crate) mod cases;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "shared test helpers stay crate-visible inside the private harness"
 )]
 #[path = "common.rs"]

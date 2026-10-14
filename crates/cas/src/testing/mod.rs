@@ -20,3 +20,5 @@ pub(crate) mod frontier;
     reason = "shared test helpers stay crate-visible inside the private harness"
 )]
 pub(crate) mod frozen;
+#[expect(clippy::redundant_pub_crate, reason = "shared crate case fixtures")]
+pub(crate) mod native;

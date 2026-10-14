@@ -243,6 +243,31 @@ pub(crate) fn certificate(
         5 => Certificate::SquareFree(Box::new(
             crate::multiplicity::SquareFreeCertificate::decode(reader)?,
         )),
+        6 => Certificate::Cases(Box::new(case_certificate(reader, records)?)),
         _ => return Err(invalid()),
+    })
+}
+
+/// Decode every case vector under the corresponding semantic ceiling before allocation.
+fn case_certificate(
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<crate::case_model::CaseCertificate, Fault> {
+    let regions = objects(reader, records, BudgetKind::RegionNodes)?;
+    let arms = objects(reader, records, BudgetKind::CaseArms)?;
+    let frames = objects(reader, records, BudgetKind::LocalContexts)?;
+    let count = reader.count(BudgetKind::ProofNodes, 8, 64)?;
+    let mut cells = Vec::new();
+    cells
+        .try_reserve_exact(count)
+        .map_err(|_| Fault::allocation(AT))?;
+    for _ in 0..count {
+        cells.push(region(reader)?);
+    }
+    Ok(crate::case_model::CaseCertificate {
+        regions,
+        arms,
+        frames,
+        cells,
     })
 }

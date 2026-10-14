@@ -231,7 +231,40 @@ pub(crate) fn certificate(
             out.byte(5)?;
             value.encode(out)
         }
+        Certificate::Cases(value) => {
+            out.byte(6)?;
+            for family in [&value.regions, &value.arms, &value.frames] {
+                out.count(family.len())?;
+                for handle in family {
+                    write(handle, out)?;
+                }
+            }
+            out.count(value.cells.len())?;
+            for cells in &value.cells {
+                case_cells(cells, out)?;
+            }
+            Ok(())
+        }
     }
+}
+
+/// Encode exact case partitions without copying caller-owned rational components.
+fn case_cells(
+    value: &crate::region::RegionCertificate,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    out.count(value.cuts.len())?;
+    for cut in &value.cuts {
+        out.number(cut)?;
+    }
+    out.count(value.membership.len())?;
+    for row in &value.membership {
+        out.count(row.len())?;
+        for truth in row {
+            out.byte(u8::from(*truth))?;
+        }
+    }
+    Ok(())
 }
 
 /// Encode a typed proposition using caller-selected local or portable references.

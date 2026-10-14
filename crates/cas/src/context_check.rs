@@ -122,7 +122,7 @@ pub(crate) const fn domain(statement: &Statement) -> Option<&Handle> {
 }
 
 /// Mechanically restrict the domain without changing endpoints, coordinate or contract.
-fn restricted(statement: &Statement, region: &Handle) -> Statement {
+pub(crate) fn restricted(statement: &Statement, region: &Handle) -> Statement {
     let mut result = statement.clone();
     match &mut result {
         Statement::Equality { domain, .. }
@@ -235,6 +235,7 @@ pub(crate) fn weaken(
             | Statement::Jacobian { .. }
             | Statement::SquareFree { .. }
             | Statement::PredicateFact { .. }
+            | Statement::Compatibility { .. }
     ) {
         return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
     }

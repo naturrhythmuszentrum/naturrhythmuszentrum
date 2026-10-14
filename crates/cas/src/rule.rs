@@ -4,6 +4,16 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// Reconstruct ordered source clauses and their reached regions.
+    CaseOrdered,
+    /// Reconstruct a compatible case's exact defined domain.
+    CaseDomain,
+    /// Select a local association or certify function-specific point ownership.
+    CaseSelect,
+    /// Check local agreement or complete case/domain congruence.
+    CaseCongruence,
+    /// Join mechanically restricted closed conclusions under a checked cover.
+    CaseEliminate,
     /// Equality of an expression with itself on its defined domain.
     Reflexivity,
     /// Reverse one equality premise.
@@ -79,6 +89,8 @@ pub enum Primitive {
 /// Typed conclusion family selected by an executable checker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConclusionKind {
+    /// Typed case construction, domain, agreement, ownership or elimination.
+    Case,
     /// Scalar equality on an explicit domain.
     Equality,
     /// Scalar derivative on an explicit domain.
@@ -98,6 +110,8 @@ pub enum ConclusionKind {
 /// Premise shape is explicit independently of certificate representation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PremiseShape {
+    /// Typed case premises consumed according to the closed certificate mode.
+    CaseEvidence,
     /// Exactly this many ordered earlier applications.
     Exact(u32),
     /// A fixed prefix followed by explicitly consumed discharge proofs.
@@ -109,6 +123,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// Complete typed association, restriction and exact-cell evidence.
+    Cases,
     /// No auxiliary payload.
     None,
     /// Ordered operand path.
@@ -145,10 +161,32 @@ pub struct RuleSpec {
 }
 
 impl Primitive {
+    /// Whether this rule requires native typed checking rather than scalar projection.
+    pub(crate) const fn native(self) -> bool {
+        matches!(
+            self,
+            Self::ContextHypothesis
+                | Self::ContextWeaken
+                | Self::ContextClose
+                | Self::RegionDecide
+                | Self::RegionConstruct
+                | Self::CaseOrdered
+                | Self::CaseDomain
+                | Self::CaseSelect
+                | Self::CaseCongruence
+                | Self::CaseEliminate
+        )
+    }
+
     /// Read the pinned version-one schema metadata.
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::CaseOrdered => ("case.ordered", 4),
+            Self::CaseDomain => ("case.domain", 2),
+            Self::CaseSelect => ("case.select", 2),
+            Self::CaseCongruence => ("case.congruence", 4),
+            Self::CaseEliminate => ("case.eliminate", 4),
             Self::Reflexivity => ("eq.refl", 1),
             Self::Symmetry => ("eq.sym", 1),
             Self::Transitivity => ("eq.trans", 1),
@@ -200,6 +238,11 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
+            Self::CaseOrdered
+            | Self::CaseDomain
+            | Self::CaseSelect
+            | Self::CaseCongruence
+            | Self::CaseEliminate => ConclusionKind::Case,
             Self::ContextHypothesis => ConclusionKind::Hypothesis,
             Self::ContextWeaken | Self::ContextClose => ConclusionKind::Transport,
             Self::RegionDecide | Self::RegionConstruct => ConclusionKind::Region,
@@ -221,6 +264,11 @@ impl Primitive {
     /// Fixed and dependent ordered-premise arities remain visible in the registry.
     const fn premise_shape(self) -> PremiseShape {
         match self {
+            Self::CaseOrdered
+            | Self::CaseDomain
+            | Self::CaseSelect
+            | Self::CaseCongruence
+            | Self::CaseEliminate => PremiseShape::CaseEvidence,
             Self::ContextClose => PremiseShape::AtLeast(2),
             Self::Jacobian => PremiseShape::JacobianCells,
             Self::Transitivity
@@ -242,6 +290,11 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::CaseOrdered
+            | Self::CaseDomain
+            | Self::CaseSelect
+            | Self::CaseCongruence
+            | Self::CaseEliminate => CertificateSchema::Cases,
             Self::Congruence => CertificateSchema::Congruence,
             Self::SquareFree => CertificateSchema::SquareFree,
             Self::ContextHypothesis => CertificateSchema::Hypothesis,
@@ -253,7 +306,12 @@ impl Primitive {
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 35] = [
+pub const PRIMITIVES: [Primitive; 40] = [
+    Primitive::CaseCongruence,
+    Primitive::CaseDomain,
+    Primitive::CaseEliminate,
+    Primitive::CaseOrdered,
+    Primitive::CaseSelect,
     Primitive::ContextClose,
     Primitive::ContextHypothesis,
     Primitive::ContextWeaken,

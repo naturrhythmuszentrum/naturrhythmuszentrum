@@ -630,12 +630,12 @@ fn native_case_admission_boundary() -> TestResult {
         })?,
     )?;
     assert_eq!(*fixture.cas.expression(&cases)?.0, Operator::Cases);
-    assert!(
-        fixture
-            .cas
-            .materialize_derived(&cases, &cases, &mut budget()?)
-            .is_err()
-    );
+    let root = fixture
+        .cas
+        .materialize_derived(&cases, &cases, &mut budget()?)?;
+    let receipt = fixture.cas.walk_derived(&root, &mut budget()?)?.receipt;
+    assert!(!receipt.is_original());
+    assert!(receipt.visited() > 3);
     Ok(())
 }
 

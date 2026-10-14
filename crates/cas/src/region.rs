@@ -100,6 +100,7 @@ const fn unknown() -> Fault {
 impl Compiler<'_> {
     /// Append a bounded Boolean program record before retaining its payload.
     fn push(&mut self, formula: Formula, budget: &mut Budget) -> Result<usize, Fault> {
+        let formula = fold(formula, &self.formulas, budget)?;
         let count = size(self.formulas.len(), AT)?
             .checked_add(1)
             .ok_or_else(|| Fault::capacity(BudgetKind::ConditionAtoms, AT))?;
@@ -131,43 +132,96 @@ impl Compiler<'_> {
         pending
             .try_reserve(roots.len())
             .map_err(|_| Fault::allocation(AT))?;
-        pending.extend(
-            roots
-                .iter()
-                .rev()
-                .map(|id| (Mode::Region, *id, false, 0_u64)),
-        );
-        while let Some((mode, id, expanded, depth)) = pending.pop() {
-            budget.condition(1, AT)?;
-            budget.check(BudgetKind::Depth, depth, AT)?;
-            if self.meanings.contains_key(&(mode, id)) {
-                continue;
-            }
-            if expanded {
-                let meaning = self.meaning(mode, id, budget)?;
-                self.meanings.insert((mode, id), meaning);
-            } else {
-                let dependencies = dependencies(self.state, mode, id, budget)?;
-                let next = depth
-                    .checked_add(1)
-                    .ok_or_else(|| Fault::capacity(BudgetKind::Depth, AT))?;
-                let reserve = dependencies
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| Fault::capacity(BudgetKind::ConditionAtoms, AT))?;
-                pending
-                    .try_reserve(reserve)
-                    .map_err(|_| Fault::allocation(AT))?;
-                pending.push((mode, id, true, depth));
-                pending.extend(
-                    dependencies
-                        .into_iter()
-                        .rev()
-                        .map(|(kind, child)| (kind, child, false, next)),
-                );
+        pending.extend(roots.iter().rev().map(|id| (Mode::Region, *id, 0_u64)));
+        let mut failed = std::collections::BTreeSet::new();
+        while let Some(current) = pending.pop() {
+            self.compile_one(current, &mut pending, &mut failed, budget)?;
+        }
+        if roots
+            .iter()
+            .any(|id| !self.meanings.contains_key(&(Mode::Region, *id)))
+        {
+            return Err(unknown());
+        }
+        Ok(())
+    }
+
+    /// Resume one dependency, retaining unknown siblings until an empty base can decide it.
+    fn compile_one(
+        &mut self,
+        (mode, id, depth): (Mode, LogicalId, u64),
+        pending: &mut Vec<(Mode, LogicalId, u64)>,
+        failed: &mut std::collections::BTreeSet<(Mode, LogicalId)>,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        budget.condition(1, AT)?;
+        budget.check(BudgetKind::Depth, depth, AT)?;
+        let live = self
+            .meanings
+            .len()
+            .saturating_add(failed.len())
+            .saturating_add(pending.len());
+        budget.check(BudgetKind::ConditionAtoms, size(live, AT)?, AT)?;
+        budget.check(
+            BudgetKind::StagedPayloadBytes,
+            size(live, AT)?.saturating_mul(128),
+            AT,
+        )?;
+        if self.meanings.contains_key(&(mode, id)) {
+            return Ok(());
+        }
+        if let Some(meaning) = self.absent(mode, id)? {
+            self.meanings.insert((mode, id), meaning);
+            return Ok(());
+        }
+        let dependencies = dependencies(self.state, mode, id, budget)?;
+        if let Some((kind, child)) = dependencies
+            .into_iter()
+            .find(|key| !self.meanings.contains_key(key) && !failed.contains(key))
+        {
+            let next = depth
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Depth, AT))?;
+            pending.try_reserve(2).map_err(|_| Fault::allocation(AT))?;
+            pending.push((mode, id, depth));
+            pending.push((kind, child, next));
+        } else {
+            match self.meaning(mode, id, budget) {
+                Ok(meaning) => {
+                    self.meanings.insert((mode, id), meaning);
+                }
+                Err(fault) if crate::case_obligations::unknown(&fault) => {
+                    failed.insert((mode, id));
+                }
+                Err(fault) => return Err(fault),
             }
         }
         Ok(())
+    }
+
+    /// A proved empty base can decide membership without evaluating an unreachable predicate.
+    fn absent(&self, mode: Mode, id: LogicalId) -> Result<Option<Meaning>, Fault> {
+        if mode != Mode::Region {
+            return Ok(None);
+        }
+        let candidates = match &self.state.region(id)?.expression {
+            RegionExpr::GuardTrue { base, .. }
+            | RegionExpr::GuardFalse { base, .. }
+            | RegionExpr::Difference { base, .. } => std::slice::from_ref(base),
+            RegionExpr::Meet(members) => members.as_slice(),
+            _ => return Ok(None),
+        };
+        for child in candidates {
+            if let Some(value) = self.meanings.get(&(Mode::Region, *child))
+                && matches!(
+                    self.formulas.get(value.truth),
+                    Some(Formula::Constant(false))
+                )
+            {
+                return Ok(Some(*value));
+            }
+        }
+        Ok(None)
     }
 
     /// Reconstruct one region, predicate or strict definedness formula.
@@ -258,34 +312,55 @@ impl Compiler<'_> {
                 self.get(Mode::Defined, *argument)?.truth
             });
         }
-        let truth = match kind {
-            PredicateKind::Defined => self.push(Formula::And(defined), budget)?,
+        if kind == PredicateKind::Defined {
+            return Ok(Meaning {
+                truth: self.push(Formula::And(defined), budget)?,
+                defined: 0,
+            });
+        }
+        if defined
+            .iter()
+            .any(|index| matches!(self.formulas.get(*index), Some(Formula::Constant(false))))
+        {
+            let absent = self.push(Formula::Constant(false), budget)?;
+            return Ok(Meaning {
+                truth: absent,
+                defined: absent,
+            });
+        }
+        let truth = self.predicate_truth(&kind, &arguments, budget)?;
+        Ok(Meaning {
+            truth,
+            defined: self.push(Formula::And(defined), budget)?,
+        })
+    }
+
+    /// Compile supported truth independently of its already collected strict requirements.
+    fn predicate_truth(
+        &mut self,
+        kind: &PredicateKind,
+        arguments: &[LogicalId],
+        budget: &mut Budget,
+    ) -> Result<usize, Fault> {
+        match kind {
             PredicateKind::And | PredicateKind::Or => {
-                let inputs: Vec<_> = arguments
+                let inputs = arguments
                     .iter()
                     .map(|id| self.get(Mode::Predicate, *id).map(|value| value.truth))
                     .collect::<Result<_, _>>()?;
-                let formula = if kind == PredicateKind::And {
+                let formula = if *kind == PredicateKind::And {
                     Formula::And(inputs)
                 } else {
                     Formula::Or(inputs)
                 };
-                let truth = self.push(formula, budget)?;
-                return Ok(Meaning {
-                    truth,
-                    defined: self.push(Formula::And(defined), budget)?,
-                });
+                self.push(formula, budget)
             }
             PredicateKind::Not => {
                 let child = arguments.first().copied().ok_or_else(unknown)?;
-                let truth = self.push(
+                self.push(
                     Formula::Not(self.get(Mode::Predicate, child)?.truth),
                     budget,
-                )?;
-                return Ok(Meaning {
-                    truth,
-                    defined: self.push(Formula::And(defined), budget)?,
-                });
+                )
             }
             PredicateKind::IntegerRange => {
                 let input = arguments.first().copied().ok_or_else(unknown)?;
@@ -294,18 +369,14 @@ impl Compiler<'_> {
                 let left = self.atom(input, Some(lower), Comparison::NonNegative, budget)?;
                 let high = self.atom(input, Some(upper), Comparison::NonNegative, budget)?;
                 let right = self.push(Formula::Not(high), budget)?;
-                let truth = self.push(Formula::And(vec![left, right]), budget)?;
-                return Ok(Meaning {
-                    truth,
-                    defined: self.push(Formula::And(defined), budget)?,
-                });
+                self.push(Formula::And(vec![left, right]), budget)
             }
             PredicateKind::Equal
             | PredicateKind::Positive
             | PredicateKind::NonNegative
             | PredicateKind::NonZero => {
                 let input = arguments.first().copied().ok_or_else(unknown)?;
-                let other = if kind == PredicateKind::Equal {
+                let other = if *kind == PredicateKind::Equal {
                     arguments.get(1).copied()
                 } else {
                     None
@@ -316,15 +387,10 @@ impl Compiler<'_> {
                     PredicateKind::NonNegative => Comparison::NonNegative,
                     _ => Comparison::NonZero,
                 };
-                let truth = self.atom(input, other, comparison, budget)?;
-                return Ok(Meaning {
-                    truth,
-                    defined: self.push(Formula::And(defined), budget)?,
-                });
+                self.atom(input, other, comparison, budget)
             }
-            _ => return Err(unknown()),
-        };
-        Ok(Meaning { truth, defined: 0 })
+            _ => Err(unknown()),
+        }
     }
 
     /// Derive strict value definedness independently of a simplified coefficient view.
@@ -385,15 +451,18 @@ impl Compiler<'_> {
             slope = slope.sub(&other_slope, budget)?;
             intercept = intercept.sub(&other_intercept, budget)?;
         }
-        let (cut, negative, zero) = if slope.is_zero() {
-            (None, intercept.is_negative(), intercept.is_zero())
-        } else {
-            (
-                Some(intercept.negated(budget)?.div(&slope, budget)?),
-                slope.is_negative(),
-                false,
-            )
-        };
+        if slope.is_zero() {
+            let truth = match comparison {
+                Comparison::Equal => intercept.is_zero(),
+                Comparison::NonZero => !intercept.is_zero(),
+                Comparison::Positive => !intercept.is_negative() && !intercept.is_zero(),
+                Comparison::NonNegative => !intercept.is_negative(),
+            };
+            return self.push(Formula::Constant(truth), budget);
+        }
+        let cut = Some(intercept.negated(budget)?.div(&slope, budget)?);
+        let negative = slope.is_negative();
+        let zero = false;
         self.push(
             Formula::Atom {
                 cut,
@@ -404,6 +473,39 @@ impl Compiler<'_> {
             budget,
         )
     }
+}
+
+/// Fold only already known total Boolean constants, preserving partial predicate definedness.
+fn fold(formula: Formula, previous: &[Formula], budget: &mut Budget) -> Result<Formula, Fault> {
+    let constant = |index: &usize| match previous.get(*index) {
+        Some(Formula::Constant(value)) => Some(*value),
+        _ => None,
+    };
+    let result = match &formula {
+        Formula::And(values) => {
+            budget.condition(size(values.len(), AT)?, AT)?;
+            if values.iter().any(|id| constant(id) == Some(false)) {
+                Some(false)
+            } else if values.iter().all(|id| constant(id) == Some(true)) {
+                Some(true)
+            } else {
+                None
+            }
+        }
+        Formula::Or(values) => {
+            budget.condition(size(values.len(), AT)?, AT)?;
+            if values.iter().any(|id| constant(id) == Some(true)) {
+                Some(true)
+            } else if values.iter().all(|id| constant(id) == Some(false)) {
+                Some(false)
+            } else {
+                None
+            }
+        }
+        Formula::Not(value) => constant(value).map(|value| !value),
+        _ => None,
+    };
+    Ok(result.map_or(formula, Formula::Constant))
 }
 
 /// Resolve a Boolean expression or a graph predicate without changing its meaning.

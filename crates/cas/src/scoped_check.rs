@@ -107,6 +107,11 @@ pub(crate) fn check_application(
     crate::proof_view::measure(cas, draft, budget)?;
     let mut scalar_view = None;
     let mut conditions = match draft.rule {
+        Primitive::CaseOrdered
+        | Primitive::CaseDomain
+        | Primitive::CaseSelect
+        | Primitive::CaseCongruence
+        | Primitive::CaseEliminate => crate::case_check::check(cas, draft, premises, budget)?,
         Primitive::ContextHypothesis => crate::context_check::hypothesis(cas, draft, budget)?,
         Primitive::ContextWeaken => crate::context_check::weaken(cas, draft, premises, budget)?,
         Primitive::ContextClose => crate::context_check::close(cas, draft, premises, budget)?,
@@ -181,16 +186,7 @@ impl Cas {
         mut application: CheckedApplication,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        if application.scalar.is_none()
-            && !matches!(
-                application.rule,
-                Primitive::ContextHypothesis
-                    | Primitive::ContextWeaken
-                    | Primitive::ContextClose
-                    | Primitive::RegionDecide
-                    | Primitive::RegionConstruct
-            )
-        {
+        if application.scalar.is_none() && !application.rule.native() {
             application.scalar = Some(crate::proof_view::scalar_application(
                 self,
                 &application,
@@ -287,17 +283,10 @@ impl Cas {
                 return Err(invalid());
             }
             let mut candidate = cas.fork(budget)?;
-            if steps.iter().all(|step| {
-                step.context == *context
-                    && !matches!(
-                        step.rule,
-                        Primitive::ContextHypothesis
-                            | Primitive::ContextWeaken
-                            | Primitive::ContextClose
-                            | Primitive::RegionDecide
-                            | Primitive::RegionConstruct
-                    )
-            }) {
+            if steps
+                .iter()
+                .all(|step| step.context == *context && !step.rule.native())
+            {
                 let mut scalar = Vec::new();
                 scalar
                     .try_reserve_exact(steps.len())
