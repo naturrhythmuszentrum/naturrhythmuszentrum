@@ -85,3 +85,7 @@ requires = []
 [[document]]
 output = "crates/cas/README.md"
 requires = []
+
+[[document]]
+output = "docs/design/cas-piecewise.md"
+requires = []

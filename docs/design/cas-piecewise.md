@@ -1,0 +1,365 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Native piecewise functions and their calculus · `spec:nrz:cas-piecewise-concept`
+
+Native cases extend the graph and conditional-witness model of (`spec:nrz:cas-concept`) and revise the bounded core of (`spec:nrz:cas-design`). Regions, cases and boundaries are shared graph objects. Refinement, coverage, ownership and jets are mathematical relations with evidence. Derivatives describe interiors, one-sided jets describe joins, and antiderivatives or discrete differences organize accumulation. Distributional identities supply checked simplification routes through jumps and impulses. Logical coverage and categorical selection supply information calculus cannot recover.
+
+This concept belongs to owner NRZ, area nrz. It changes no implementation, dependency, problem record or client. The subsequent design revises the public API, graph vocabulary, conditions, proof rules and portable witnesses together. Representability, a kernel rule and a search algorithm that discovers its premises remain separate capabilities. The decisions below state alternatives locally so that owner revisions have a defined scope.
+
+## Regions, cases and boundaries · `sec:nrz:cas-piecewise-representation`
+
+**Decision (Shared region and boundary graph)** · `dec:nrz:cas-piecewise-graph-representation`
+
+The native representation extends the heterogeneous graph with region nodes, case expression nodes and boundary nodes. A case node has a domain link and unordered associations, each joining a region node to a value expression. Its storage or serialization traversal may be deterministic, but has no selection priority. Refinement, disjointness, coverage, complement, ownership and trace relations are checked applications with Proven, Assumed or open obligations. No structural edge is itself a proof. This makes the same regions and boundaries reusable by abs, sign, ramp, max and physical laws, while each theorem retains its context.
+
+Native first-match lists and partition-only lists are rejected alternatives. They store priority or a prescribed partition as the primary structure, requiring order-sensitive transformations and duplicating region/boundary descriptions unless a separate sharing layer is added. Ordered source writing instead constructs effective regions, and a disjoint partition is a proved property of a region family. Reversing this decision would change the case graph, elaboration, identity premises and wire/API contracts; the classical and distributional boundary theorems would still apply to the regions so obtained.
+
+**Definition (Region and case objects)** · `def:nrz:cas-piecewise-object`
+
+A region identifies a mathematical ambient domain, coordinate/scope and membership predicate. Predicates remain existing Boolean expression nodes, including equality, positivity, nonnegativity, integer ranges, And, Or, Not and quantification; a typed named predicate supplies no theorem by its spelling. A region is distinct from its predicate because it is an object participating in subset, meet, union, complement, boundary and cover relations. Complement is relative to a stated ambient region. Construction and membership obligations account for partial predicates; undefined membership is never read as false.
+
+A case F links its claimed domain D to finitely many region/value associations `(E_i, f_i)`, with one result sort and semantic header. Values have the same field and mathematical shape; no dependent-shape union is implicit. Under the case's single-valuedness conditions, its defined part is the union of `E_i` intersected with `Def(f_i)`. Disjointness suffices for single-valuedness. Overlapping associations instead require agreement of values and definedness on their intersection; a proved conflict blocks a function claim, and unknown compatibility stays an obligation. Admission may retain the typed unresolved object without choosing an arbitrary applicable value.
+
+Regions and boundary locations share exact structural keys in their ambient domain, semantic header and scope. Equivalent but differently written predicates need an identity or refinement proof, not an undocumented logical canonicalizer. Full contexts remain on every application and cache entry even when syntax is shared. Cases introduce no variable binder; existing binder frames apply to their guards, regions and values, and substitutions transport all three capture-safely (`def:nrz:cas-design-context`), (`constr:nrz:cas-design-substitution`).
+
+**Table (Extensions to the heterogeneous graph)** · `tab:nrz:cas-piecewise-graph-vocabulary`
+
+|Graph object or relation|Meaning and evidence|
+|------------------------|--------------------|
+|Region node and predicate/domain links|New mathematical object over existing expression, context and scope records; membership has an explicit ambient domain and definedness obligations.|
+|Case expression and region/value associations|New expression family using the existing typed-expression identity; associations are unordered semantically and the claimed-domain link is explicit.|
+|Boundary node and incidence links|Shared mathematical location or boundary set; adjacency, side and order are proved relations in the stated coordinate/domain.|
+|Refinement, meet, union, disjointness, complement and cover|New mathematical relation families realized through existing application/proof machinery; a cover has a family of premises, not a bare binary edge that asserts a theorem.|
+|Ordered-source construction|Existing occurrences retain written order and provenance; new construction applications link reached regions, effective regions, guard obligations and the resulting case.|
+|Ownership, jet and jump relations|Evidence indexed by function, context, region side and derivative order at a boundary; location sharing never identifies different functions' values or jumps.|
+|Distribution and test objects|New mathematical sorts and expression families for embeddings, deltas, derivatives and pairings; boundary-to-delta applications reference checked jump evidence.|
+
+This extends (`tab:nrz:cas-design-graph-kinds`) without choosing concrete structs, physical edge tags or encodings. Operand and proof dependencies remain acyclic. Relational incidence may be cyclic as in the existing heterogeneous graph; it grants no circular proof. A structural link records an object or candidate relation, while a checked application supplies its authority.
+
+**Decision (Explicit coverage and no default value)** · `dec:nrz:cas-piecewise-default`
+
+No implicit default value fills an uncovered region. An explicit otherwise source clause constructs an association on the residual region, with its own definedness obligation. A cover edge proves, assumes or leaves open whether the associated regions cover D; it does not establish that their values are defined. Lack of a proved cover means unknown totality, not a proof of a gap. Where an input is actually outside the union, F is undefined, never zero. The alternative totalizes every case by a named default; that changes domains and boundary values and would require explicit syntax and witness semantics.
+
+**Decision (Reached-region guard obligations)** · `dec:nrz:cas-piecewise-guard-definedness`
+
+Ordered source elaboration attaches each guard's definedness obligation to the region where it is reached. Only an associated value is required on its own region. Strict Add, Mul, Div and power rules remain unchanged. The alternative requires every source guard to be defined throughout D, simplifying some reasoning but excluding guarded partial expressions. Changing this decision affects construction obligations and the function domain, not complete traversal. Neither construction treats an undecided guard as false.
+
+**Definition (Ordered-source construction and domain)** · `def:nrz:cas-piecewise-domain`
+
+For source writing `if g_1 then f_1, else if g_2 then f_2`, and so forth, start with reached region `R_1 = D`. Construction yields `E_i` as the points in `R_i` where `g_i` is defined and true, and `R_(i+1)` as those where `g_i` is defined and false. Undefined examined guards enter neither region and cannot fall through to otherwise. A construction application proves `E_i` and `R_(i+1)` disjoint and, conditional on guard definedness throughout `R_i`, proves that they cover `R_i`. Iterating these applications derives the pairwise disjoint effective regions and the final cover if an explicit otherwise associates `R_(n+1)` with a value. Without otherwise, coverage of the remaining region is not asserted.
+
+Where the reached-guard conditions hold, `E_i` is the conjunction of `g_i` with the negations of earlier guards. Source order determines this elaboration and remains in occurrences and construction provenance; it is absent from native case associations. Reordering associations changes no function. Reordering the written guards may change their constructed regions and therefore needs a new elaboration and, for an equivalence claim, a proof. Guard-definedness, region coverage, overlap compatibility and value-definedness remain separate obligations. Unknown evidence is not a third Boolean value, a mathematical gap or a resource-refusal theorem.
+
+**Example (Partial values and guards)** · `ex:nrz:cas-piecewise-partial-selection`
+
+Let F associate the punctured real line with 1/x and the singleton zero with 0. The regions are disjoint and cover the line, and each value is defined on its own region, so F is total. For ordered source writing selecting 0 when x = 0, then 1 when 1/x > 0, and negative one otherwise, the second reached region is the punctured line. Its guard is defined there, and the effective regions are respectively zero, the positive half-line and the negative half-line. The constructed case is sign(x). Multiplying a partial value by a zero indicator would still require that value under strict multiplication and is not an equivalent encoding.
+
+**Rule (Complete source evidence)** · `rule:nrz:cas-piecewise-source-coverage`
+
+Every original guard, value and otherwise occurrence is visited, including unreachable syntax and mathematically partial operands. Traversal does not evaluate all values. It supplies the evidence required by (`rule:nrz:cas-design-occurrences`), while region construction and operator-specific definedness establish mathematical domains. The client validates all original physical operations before normalization. Native graph sharing does not erase source order, spans or the dependencies of a now-inactive source expression. A derived form has derived provenance and its own complete walk; it cannot replace the original receipt.
+
+**Definition (Named functions over shared regions)** · `def:nrz:cas-piecewise-names`
+
+On the real line, abs associates x < 0 with −x and x ≥ 0 with x; ramp associates the same two regions with zero and x. sign uses negative, zero and positive regions with values negative one, zero and one. A step `H_theta` uses those three regions with values zero, theta and one for an explicit finite real theta. Indicator(P) uses the region of a defined P and its complement with one and zero. min and max associate real order regions with the corresponding operand; ties are harmless because the values agree. A shared boundary at zero supports these different functions' ownership and jet relations.
+
+These are transparent definitions, not opaque trusted names. A named form may have checked calculus shortcuts, but its spelling grants no theorem. `H_0`, `H_(1/2)` and `H_1` have different pointwise values at zero even though their regular distributions agree. Complex ordering and physical function signatures are not supplied by these real scalar definitions.
+
+## Region identities and local witnesses · `sec:nrz:cas-piecewise-proofs`
+
+**Rule (Selection through refinement)** · `rule:nrz:cas-piecewise-local-hypotheses`
+
+Selecting a case under a hypothesis is a checked refinement from the context's admissible region into an associated region, plus value-definedness and any overlap compatibility required for that case. The local proof runs under Gamma restricted to that region. Its syntax may be shared, but its conclusion cannot escape without explicit discharge or case elimination. A context's region summarizes the relevant predicates; it never drops named hypothesis provenance or changes declarations. Weakening checks context inclusion. An impossible region is omitted by a refutation witness, not by admitting an inconsistent context as an unrestricted theorem source.
+
+**Rule (Guarded residual closure)** · `rule:nrz:cas-piecewise-conditional-closure`
+
+A proof on `E_i` with residual `P_i` contributes the scoped obligation that `P_i` holds wherever `E_i` holds, with its own definedness checked there. It is neither unconditional `P_i` nor a sibling assumption. A Not/Or encoding of implication is legitimate only with the necessary total-predicate evidence; it must not impose `P_i` or its definedness outside `E_i`. Quantified obligations retain their binder scope. This extends the executable flat Defined/NonZero representation and its union operation while preserving (`rule:nrz:cas-conditional-witnesses`). Assumed facts and open conditions remain distinct; an admitted predicate node does not implement its proof algorithm.
+
+**Rule (Case elimination, refinement and union)** · `rule:nrz:cas-piecewise-case-elimination`
+
+Case elimination checks that a region family covers D and that every member proves the same requested relation under its local hypotheses. It discharges only those hypotheses and retains guarded residuals. Boundary singletons are included when pointwise claims require them. Equality requires both endpoints defined and equal on the claimed domain; it is not equality of complete definedness sets. A domain-preserving replacement additionally proves both definedness directions.
+
+A proved empty requested domain or refuted original definedness produces the existing refuted-domain blocker, not an ordinary equality result justified only by vacuity. Refuting an empty cell within a nonempty covered domain is a different local step. This preserves strict arithmetic refusal while allowing region proofs to prune impossible alternatives.
+
+Logical elimination can use an overlapping cover because every applicable premise proves the same conclusion. A function case additionally needs its single-valuedness evidence. Combining cases constructs meet regions and proves their refinement and cover relations. Merging inserts a union region with a value-agreement identity proving that the proposed value and definedness match on each constituent. Equality on a smaller overlap is insufficient. Every such transformation is an application with positive cost, retained conditions and an independently replayable proof (`credit:nrz:cas-piecewise-rewriting`).
+
+**Table (Region and case rule families)** · `tab:nrz:cas-piecewise-kernel-rules`
+
+|Rule family|Required evidence and conclusion|
+|-----------|--------------------------------|
+|Hypothesis, ContextWeakening, AssumptionDischarge|Check hypothesis identity, context inclusion and scope; discharge only the designated local assumption.|
+|RegionRefinement, RegionMeet, RegionUnion|Check predicate inclusions and the meet/union membership law in the stated ambient domain.|
+|RegionDisjointness, RegionComplement, RegionCover|Check incompatibility, relative complement or a complete domain cover, including membership definedness.|
+|OrderedRegionConstruction|Reconstruct reached and effective regions and their guard-definedness obligations from original source occurrences.|
+|CaseSelection, CaseCongruence|Check context-region refinement and branch-local equality with selected-value and overlap obligations.|
+|CaseMerge, CaseElimination|Check union/cover evidence, compatible conclusions, assumption discharge and reconstructed residuals.|
+|BoundaryIncidence, BoundaryOwnership, OneSidedJet|Check the location, side/domain approach, membership or point-value ownership and each claimed derivative trace.|
+|InteriorDerivative, BoundaryDerivative|Check neighborhood containment or the actual difference-quotient limits; a stored jet does not itself assert differentiability.|
+|IntervalIntegralSplit, FiniteSumSplit|Check the region decomposition, exact endpoint ownership, accumulation premises and component witnesses.|
+|OneSidedLimitRestriction, SideSeriesRestriction|Check the approach, containment or common limit over a cover, side-specific relation and remainder.|
+
+These are mathematical families, not concrete byte keys or a general predicate decision procedure. Construction edges derive disjointness and coverage through these rules, subject to their reached-guard premises; they do not make an undefined guard total. Analytic rules require the arguments below, not producer success flags. Shared region identities can shorten a path without weakening any premise.
+
+**Rule (Portable region and case witness)** · `rule:nrz:cas-piecewise-replay`
+
+A witness identifies the case/domain, region and boundary objects, their predicate and scope data, construction provenance when source order was elaborated, refinement/disjointness/cover dependencies, local hypotheses, branch endpoints, residuals and discharge applications. Replay reconstructs each asserted relation, checks the whole cover or explicitly limited claim, and verifies function-indexed ownership and jets. A dropped region, changed source elaboration, altered point ownership, leaked hypothesis or lost condition must fail the expected claim. An assumed cover remains a hypothesis; an open cover is not a proved total result.
+
+The checker uses no search cache or numerical samples to establish these facts. It meters every region, context and proof dependency and publishes no verified witness after a partial replay. Later portable-format design must cover new graph objects, local contexts, distributions and guarded obligations without reinterpreting NRZCAS01 bytes (`def:nrz:cas-design-witness-format`).
+
+## Classical calculus and breakpoint evidence · `sec:nrz:cas-piecewise-calculus`
+
+**Decision (Classical and distributional layers)** · `dec:nrz:cas-piecewise-calculus-layers`
+
+Both classical and distributional calculus belong to this concept. A classical request means pointwise differentiation, integration, limits or series on its stated domain. A distributional request explicitly names its distribution space, coordinate and relation; its result has that sort and layer. A classical derivative never silently returns a distribution. The engineering reason is that simplification can shorten a walk through a checked step derivative or delta pairing only when those objects and identities exist in the graph. The alternative is a classical-only core: it would omit those routes and require a later sort, API, proof and wire refactor. The two layers preserve different information and meet only through explicit checked bridges.
+
+**Rule (Interior and boundary derivatives)** · `rule:nrz:cas-piecewise-derivatives`
+
+Inside a case, a classical derivative transfers from `f_i` only on a proved neighborhood contained in its effective region, with the branch's differentiability and original definedness conditions. Point selection alone proves no neighborhood statement. At a real interior breakpoint a where F is defined on a full neighborhood including a, the derivative exists exactly when the two limits of (F(a+h) − F(a))/h as h approaches zero from the two sides exist finitely and agree. This is the derivative definition separated into its two approaches. Finite limits imply continuity at a. Continuity together with finite matching limits of neighboring branch derivatives is a sufficient alternative under the mean-value theorem's interval hypotheses (`credit:nrz:cas-piecewise-rudin`).
+
+The output distinguishes a proved derivative on an interior region, a proved boundary derivative, proved nonexistence, and a pending existence obligation. A partial result does not certify a complete derivative on the original D. Boundary one-sided derivatives are distinct relations with explicit sides; endpoints of a restricted domain do not acquire a two-sided ambient derivative. For several variables, a partial derivative varies the named coordinate with the others fixed; a full differential requires a remainder small compared with the increment norm on the approach domain. Agreement along a finite set of directions is insufficient. Assembling partials does not silently establish that stronger differentiability claim (`credit:nrz:cas-piecewise-spivak`), (`credit:nrz:cas-piecewise-griewank`).
+
+**Example (Absolute value and ramp)** · `ex:nrz:cas-piecewise-absolute-value`
+
+For abs at zero the difference quotient is negative one when h < 0 and one when h > 0, so no classical derivative exists there. Away from zero the selected affine branch differentiates to sign. For ramp at zero the corresponding quotients are zero and one, so ramp also has no classical derivative there. Away from zero its derivative equals every `H_theta`. These calculations establish the precise excluded point; neither sign(0) nor theta repairs those derivatives.
+
+**Counterexample (Matching branch derivatives across a jump)** · `cex:nrz:cas-piecewise-jump`
+
+Let J(x) = x² for x < 0 and J(x) = x² + 1 otherwise. Both neighboring branch derivatives tend to zero, but J(0) = 1 and its left value limit is zero. Its left difference quotient is h − 1/h, which tends to positive infinity as h tends to zero from below, whereas its right quotient h tends to zero. Thus the branch-derivative limits cannot be glued into a classical derivative. The jump is one, independently of the branch derivative limits.
+
+**Example (A differentiable join with a higher kink)** · `ex:nrz:cas-piecewise-smooth-join`
+
+Let Q(x) = x² for x < 0 and Q(x) = 2x² otherwise. Q(0) = 0; its difference quotients are h and 2h, both tending to zero. Hence Q'(0) = 0, with Q'(x) = 2x to the left and 4x to the right. The difference quotients for Q' at zero are respectively two and four, so Q''(0) does not exist classically. Equal values and first jets therefore do not establish equality of higher jets.
+
+**Definition (Certified breakpoint structure)** · `def:nrz:cas-piecewise-breakpoints`
+
+A shared boundary node is the central location for breakpoint evidence. Boundary-incidence applications prove which regions meet there and from which sides in a stated coordinate and domain. Ownership and jet applications additionally name the particular function, full context and adjacent region: abs and sign can share the point zero without sharing their values or jumps. Classical ownership records the actual point value or its absence; one-sided jet edges record finite traces and derivative traces to a specified order, plus proof dependencies. Unknown traces and divergent limits are explicit. The boundary node alone asserts neither a jet nor a complete decomposition.
+
+For `a = a_i`, define the order-r jump of F as `j_(i,r) = F^(r)(a_i+) − F^(r)(a_i−)`, using function-indexed neighboring derivative traces. The value jump is `j_(i,0)`; a kink is a jump in the first derivative of a continuous function. Jump applications subtract the checked jet edges and feed the delta weights in the distributional formula. Actual singleton ownership is separate: changing that value can change a classical claim without changing traces or a regular distribution. Boundary geometry is shared; these function-specific relations are not.
+
+A finite case graph does not guarantee finitely many boundaries: an arbitrary region predicate can alternate infinitely often. A finite or locally finite interval decomposition needs a cover and boundary-completeness proof. For general regions, boundary sets need not be isolated points, so the one-dimensional point-jump rule applies only after its hypotheses are proved. Partial boundary evidence can guide search but cannot certify a whole-domain split or jump formula. The implementation may compute only the requested jet order; later work extends the evidence. No finite table proves arbitrary smoothness or analyticity.
+
+**Rule (Named functions through calculus)** · `rule:nrz:cas-piecewise-named-calculus`
+
+Classically, `ramp' = H_theta` and abs' = sign hold away from zero. Pointwise on the entire real line, abs(x) = x sign(x) because the products are negative x, zero and x in the three cases. For real a and b, max(a,b) = (a + b + abs(a − b))/2 and min(a,b) = (a + b − abs(a − b))/2: if a is at least b the absolute value is a − b, and if a is at most b it is b − a, giving the selected value in each case. These equalities include ties and assume the operands are defined. A physical client must separately authorize the arithmetic; the displayed formula does not legalize addition of affine points.
+
+Search may prefer a named calculus identity when it produces a smaller proved expression or avoids repeated splits, and prefer cases when selecting under a hypothesis, establishing a boundary value, or proving coverage. Neither is universally cheaper under every cost policy. Derivative relations alone determine primitives only up to constants on connected components and cannot recover singleton values. Thus calculus identities supplement explicit definitions and anchoring; they do not replace them with incomplete characterizations. The distributional versions preserve this distinction (`rule:nrz:cas-piecewise-distribution-shortcuts`).
+
+**Rule (Interval integration)** · `rule:nrz:cas-piecewise-integration`
+
+For a finite ordered split `a = t_0 < ... < t_m = b`, prove coverage and Riemann integrability on the closed subintervals before using additivity to sum their integrals. If branch formulas leave finitely many join values unspecified, state a bounded extension and prove that those finite changes do not affect the integral; they do not supply values to the original function. Branch antiderivatives give endpoint differences only under the relevant fundamental-theorem hypotheses, using one-sided endpoint limits when needed. Reversed bounds reverse orientation. Singularities require separate improper convergence proofs on each side; cancellation of divergent contributions is not an ordinary integral. Principal value would be a different relation (`credit:nrz:cas-piecewise-rudin`).
+
+For abs on the interval from negative one to two, integrate negative x on the first part and x on the second. Their antiderivative differences are 1/2 and 2, hence 5/2. A step is integrable across its jump, although a primitive such as ramp has no classical derivative at the jump itself. The calculus walk splits, obtains the branch primitives, checks endpoints, then combines the witnesses. Constants are local to connected primitive domains; joining them requires value evidence. Infinite accumulating subdivisions need an additional convergence theorem and remain unresolved in the finite-split route.
+
+**Rule (Discrete accumulation)** · `rule:nrz:cas-piecewise-summation`
+
+For a finite half-open integer domain m ≤ k < n with m ≤ n, prove that the selected integer sets partition it, including exact ownership of every boundary integer, before adding their sums. The empty range gives zero. The calculus-first route seeks a forward antiderivative A with A(k+1) − A(k) = F(k), and telescopes to A(n) − A(m); cancellation of intermediate terms proves the identity (`credit:nrz:cas-piecewise-concrete`). If A is piecewise, refine the selections at k and k+1 together because a single increment can cross a breakpoint. Unlike integrals, sums cannot discard singleton values.
+
+For abs(k) over negative two ≤ k < three, direct enumeration gives 2 + 1 + 0 + 1 + 2 = 6. On k < 0, `A_-(k) = −k(k−1)/2` has forward difference −k; on k ≥ 0, `A_+(k) = k(k−1)/2` has forward difference k. Splitting at zero gives `A_-(0) − A_-(−2) = 3` and `A_+(3) − A_+(0) = 3`. This independently reproduces six. Arbitrary noncontiguous integer guards require their own exact set argument; an interval formula is not imposed on them. Infinite sums require convergence evidence beyond finite coverage.
+
+**Rule (One-sided limits and side series)** · `rule:nrz:cas-piecewise-limits-series`
+
+A limit request records the point, side or other approach, and domain points arbitrarily near that approach. A proved eventually active case transfers its branch limit. If several cases persist, a finite-cover argument can combine a common limit: choose the minimum of their positive neighborhoods for a given tolerance, ignoring cells proved absent nearby. Empty approaches cannot establish a unique limit. Oscillating guards or infinite boundary accumulations require further reasoning; selecting a branch at the target point proves no neighboring limit (`credit:nrz:cas-piecewise-rudin`).
+
+A series request records the center, side, order, relation and remainder convention. Interior jets may generate Taylor candidates; a remainder theorem or analytic convergence proof must justify the claimed approximation or equality. Around zero, abs(h) is exactly −h on the negative side and h on the positive side, but has no common ordinary Taylor expansion since the first derivative fails. Q has matching value and first derivative at zero but different quadratic coefficients, so its two exact side polynomials do not form a common second-order Taylor expansion. A series based at a one-sided trace need not agree with an exceptional actual singleton value; its punctured domain says so. Formal coefficient congruence does not assert analytic convergence, and finite matching jets determine general functions neither locally nor globally (`rule:nrz:cas-limits-and-series`).
+
+**Caveat (Necessary exceptions to calculus discovery)** · `cav:nrz:cas-piecewise-calculus-exceptions`
+
+Differentiation cannot determine a categorical selector's admissible values, prove the Boolean cover of arbitrary guards, recover constants on disconnected components, or distinguish two functions differing only at a point through distributional data. These are information losses visible in the definitions, not reasons to abandon calculus for the surrounding task. Order and domain arguments establish the cells; calculus and checked boundary traces then organize identities within and across them.
+
+## Distributions and checked impulse routes · `sec:nrz:cas-piecewise-distributions`
+
+**Decision (Distribution space and explicit requests)** · `dec:nrz:cas-piecewise-distribution-space`
+
+The primary distribution layer is D'(I) for a declared open real interval I, with tests `D(I) = C_c^infinity(I)`, the smooth compactly supported functions. A distribution is a continuous linear functional on that test space. Distribution is a separate mathematical sort indexed by its interval, coordinate and scalar field; a delta is not a scalar function with an unusual value at its support. Derivative, equality, primitive, pullback and pairing requests explicitly carry their distributional meaning. A pairing returns a scalar with its test-space premises; a distributional derivative returns a distribution (`credit:nrz:cas-piecewise-friedlander`).
+
+The alternative is to require tempered distributions S'(R) from the outset. Tempered distributions act on Schwartz tests, which are smooth functions whose derivatives decrease faster than every inverse polynomial, and support Fourier routes. That restriction would exclude some locally integrable functions admitted on arbitrary intervals and would impose global growth hypotheses unnecessarily. A future Fourier request must explicitly use S'(R) and prove tempered membership, rather than infer it from D'(I) membership. Local distributional identities and their checked space distinctions are part of this concept; a Fourier algorithm is not selected here (`credit:nrz:cas-piecewise-gelfand`).
+
+**Definition (Embedding, deltas and pairing)** · `def:nrz:cas-piecewise-distribution-objects`
+
+For f locally integrable on I, its regular distribution `T_f` is defined by pairing `T_f` with phi as the integral of f phi over I. Differentiation is defined by pairing D T with phi as negative the pairing of T with phi'. Every such distribution has a derivative because test differentiation is continuous and preserves compact support. Thus every locally integrable case function has a distributional derivative, even when no pointwise derivative exists. Functions equal almost everywhere define the same `T_f`; no converse bridge to pointwise equality is implicit (`credit:nrz:cas-piecewise-friedlander`).
+
+For a in I, `delta_a` pairs with phi to give phi(a); its kth derivative `delta_a^(k)` pairs to give (−1)^k phi^(k)(a), for a nonnegative integer k. The graph therefore needs deltas located at arbitrary points, their derivative orders, exact scalar multiples, sums, distribution derivatives, regular-function embeddings and pairings. Shifts and scaling are necessary for a breakpoint at a nonzero location or a physical coordinate change, not merely shorthand for a delta at zero. Their domain maps and nonzero scale obligations remain in the witness.
+
+The ordinary pairing requires a test with the declared smoothness and compact support inside I. A compactly supported distribution, including `delta_a` and its derivatives, can also pair with a smooth function near its support through a proved cutoff equal to one there; independence of the cutoff follows because their difference vanishes near the support. This explicit extension permits useful polynomial evaluations against a delta without falsely claiming that a polynomial is a compactly supported test. Pairing with a discontinuous interval indicator or a jump at the delta's support is not silently authorized.
+
+**Rule (Distribution operations and refusals)** · `rule:nrz:cas-piecewise-distribution-operations`
+
+Addition and scalar multiplication require compatible distribution spaces. Multiplication by a smooth function psi is defined by pairing psi T with phi as the pairing of T with psi phi; smoothness ensures psi phi is a test. Consequently `psi delta_a = psi(a) delta_a`, and `(x − a) delta_a = 0`; at a = 0 this gives `x delta_0 = 0`. Leibniz differentiation of psi phi gives `psi delta_a^(k) = sum over j from zero to k of (−1)^j binomial(k,j) psi^(j)(a) delta_a^(k−j)`. These are checked identities with smoothness and trace obligations, not distribution multiplication by arbitrary point values (`credit:nrz:cas-piecewise-friedlander`).
+
+Point evaluation of a distribution is refused as DistributionPointValue. An unrestricted product of distributions is refused as DistributionProductUndefined; this includes delta times delta and delta times a step discontinuous at its support. Assigning theta to that step at the point does not supply the missing smooth multiplier. A failed smoothness or test-space premise is reported as an unmet obligation or TestSpaceMismatch, rather than guessed from samples. These names state required mathematical refusal categories; concrete API variants belong to the design. They do not claim that every specialized distribution product is impossible, only that no general product is admitted by this contract.
+
+Translations and invertible real affine pullbacks carry their coordinate maps and interval restrictions. For real alpha nonzero, `delta(alpha x − beta) = delta_(beta/alpha) / abs(alpha)`. A change of variables in the pairing contributes the absolute Jacobian, including when alpha is negative. More generally, for smooth g whose zeros `a_i` in the relevant interval are all simple and locally finite, `delta(g(x)) = sum of delta_(a_i) / abs(g'(a_i))`. Local inverse changes of variable around the zeros prove the formula; a cover ensures no other zeros contribute. The rule requires smoothness, exhaustive zero coverage on the claimed domain and nonzero derivatives at those zeros. Multiple zeros or unresolved coverage block this pullback rule; a partial zero list cannot certify the full distribution (`credit:nrz:cas-piecewise-gelfand`).
+
+**Rule (Jump formula and its regularity)** · `rule:nrz:cas-piecewise-jump-formula`
+
+Suppose a locally finite breakpoint set partitions I, f is absolutely continuous on each side up to the relevant finite joins locally, its classical derivative is locally integrable across those pieces, and its one-sided traces are finite. For compactly supported phi, only finitely many joins meet its support. Integrate negative f phi' on each interval: the interior contribution is the integral of the classical f' times phi, and the boundary contributions at a are (f(a+) − f(a−)) phi(a). The external endpoints contribute nothing because the test support lies inside I. Therefore `D T_f = T_(f'_reg) + sum of j_(i,0) delta_(a_i)`. This argument is also the integration-by-parts witness; changing f at isolated points changes neither side (`credit:nrz:cas-piecewise-friedlander`).
+
+The regular term uses the almost-everywhere classical derivative justified by absolute continuity; it does not prove pointwise differentiability at every interior point. An integration-by-parts walk may move a distribution derivative to the smooth test, with the defining minus sign, or expand the certified region derivatives and jump pairings. Delta pairing then replaces each boundary term by a trace evaluation. These are alternative checked routes for the same pairing, and neither silently drops an internal boundary.
+
+Local integrability alone guarantees D `T_f` but does not guarantee this decomposition into a regular classical derivative and discrete deltas. The piecewise absolute-continuity, integrability, trace and local-finiteness conditions above are essential. Infinite accumulations, divergent traces or other singular behavior require a different theorem and remain unresolved by this rule. Similarly a finite source-case list is not a completeness proof for a breakpoint list.
+
+For order n, require finite one-sided traces through order n−1, piecewise absolute continuity of those successive derivatives up to the joins, and a locally integrable regular nth derivative across the pieces. Under these hypotheses, repeated differentiation gives `D^n T_f = T_(f^(n)_reg) + sum over breakpoints a_i and k from zero to n−1 of j_(i,n−1−k) delta_(a_i)^(k)`. Each differentiation differentiates the previous regular part by the first-order jump formula and increments the derivative order on existing deltas, which proves the displayed recurrence by induction. Thus a jump in f contributes a delta to Df and a delta derivative to D²f, while a jump in f' contributes a delta to D²f. A proved jet order bounds what this rule can establish; unknown higher traces cannot be supplied by zero padding.
+
+**Table (Distributional primitive families)** · `tab:nrz:cas-piecewise-distribution-rules`
+
+|Rule family|Checked mathematical premises and result|
+|-----------|----------------------------------------|
+|RegularEmbedding, AlmostEverywhereTransport|Local integrability and the precise interval; equality almost everywhere transports regular distributions without asserting pointwise equality.|
+|DistributionLinearity, DistributionDerivative|Compatible spaces and linearity; derivative is defined by the negative pairing with the differentiated test.|
+|DeltaPairing, DeltaDerivativePairing|Support point inside the interval, test or justified cutoff extension, derivative order and the sign (−1)^k; reduce to a function trace.|
+|SmoothMultiplier, DeltaMultiplier|Proved smooth multiplier; check its derivatives at the support and the Leibniz coefficients, with no arbitrary product rule for distributions.|
+|AffinePullback, SimpleZeroDeltaPullback|Correct interval map, nonzero affine slope or smooth simple zeros, absolute Jacobian and exhaustive zero evidence.|
+|PiecewiseDistributionDerivative|Complete locally finite breakpoint evidence, required piecewise regularity and integrability, and independently reconstructed trace jumps.|
+|DistributionIntegrationByParts|Valid pairings and support conditions; check signs and boundary contributions, or their absence for compactly supported tests.|
+|DeltaPrimitive, DistributionPrimitiveUniqueness|A step derivative proves the primitive; any two primitives differ by a constant distribution on each connected interval.|
+|ClassicalDistributionBridge|Only an explicit regular embedding or a separate theorem with its regularity premises connects the layers; distribution equality alone proves no classical value or derivative.|
+
+No new rule treats a numerical quadrature result or a sampled jump as a theorem. DistributionPrimitiveUniqueness uses the standard argument that a test of integral zero is the derivative of another compactly supported smooth test on an interval: a distribution with zero derivative vanishes on every such test, and hence depends only on the test integral, which is a constant distribution (`credit:nrz:cas-piecewise-friedlander`). Boundary deltas belong to the specified domain or an explicitly proved extension; restricting an open interval does not implicitly extend its functions by zero.
+
+**Rule (Distributional shortcuts for named functions)** · `rule:nrz:cas-piecewise-distribution-shortcuts`
+
+`H_theta` has jump one and regular derivative zero, so `D T_(H_theta) = delta_0` for every finite theta. sign has jump two, hence `D T_sign = 2 delta_0`. abs is continuous with regular derivative sign, so `D T_abs = T_sign` and `D² T_abs = 2 delta_0`. ramp is continuous with regular derivative a step almost everywhere, so `D T_ramp = T_(H_theta)` and `D² T_ramp = delta_0`. These results follow by recomputing the one-sided traces; they coexist with the classical nonexistence results at zero. The J example gives `D T_J = T_(2x) + delta_0`, and the Q example gives `D³ T_Q = 2 delta_0` because Q and Q' have zero jumps, Q'' has traces two and four, and its regular third derivative is zero.
+
+The graph walk can replace a distribution derivative of a named function by these shorter checked forms, or derive the same route from its breakpoint jets. Pairing the resulting deltas then collapses an integration request to trace evaluations. Conversely a delta primitive is a shifted step plus a constant distribution on a connected interval, giving a shorter antiderivative route. The theta value of a representative step is not determined by that primitive relation; an actual pointwise representative needs separate source or boundary data.
+
+**Example (Delta pairings, scaling and simple zeros)** · `ex:nrz:cas-piecewise-delta-pairings`
+
+Take I = R and a smooth compactly supported cutoff chi equal to one near two. With phi(x) = chi(x)(x² + 3), `delta_2` pairs to seven and `delta_2'` pairs to negative four. The affine rule gives `delta(2x − 4) = delta_2/2`, so its pairing with phi is 7/2. These are evaluations and a Jacobian, with no singular numerical quadrature. For g(x) = x² − 1, the only zeros are negative one and one, their derivative magnitudes are both two, and `delta(g) = (delta_(-1) + delta_1)/2`. Against a smooth compactly supported test equal to x² + 3 near both zeros, this pairs to four. The factorization of g proves zero completeness and the derivatives prove simplicity.
+
+**Example (An impulse in the oscillator law)** · `ex:nrz:cas-piecewise-impulse`
+
+For constants m > 0, c and k, a displacement q continuous across t = a and smooth on each side with velocity jump `v_+ − v_- = J/m` satisfies `m D² T_q + c D T_q + k T_q = T_p + J delta_a` when its ordinary branch equation is m q'' + c q' + k q = p. Indeed continuity makes the displacement jump zero, so D `T_q` has no delta; D² `T_q` has exactly the velocity jump times `delta_a`. Multiplication by m gives weight J, while the other terms stay regular. A displacement jump would also generate a delta derivative and needs a different forcing model. The client supplies the regularity and physical meaning; the core checks the distribution identity.
+
+This is the local Green-function condition: a response G for the same linear operator with zero ordinary forcing away from a, continuous displacement and velocity jump 1/m gives `L G = delta_a`. It is not a uniqueness claim; boundary or causal conditions must select a Green function. Search can verify a proposed response by its branch equation and jump traces, then use the checked operator identity instead of re-expanding every forced equation. For an independent exact illustration take m = 2, c = k = 0, a = 0 and q(t) = (3/2) ramp(t). Then `2 D² T_q = 3 delta_0`, with velocity jump 3/2. A general convolution or numerical time integrator is not implicit in this verification route.
+
+**Rule (Distributional replay and information boundaries)** · `rule:nrz:cas-piecewise-distribution-replay`
+
+Replay verifies the distribution sort, interval, coordinate, scalar field, derivative order and requested layer; local integrability for every regular embedding; the test space, smoothness and support or cutoff evidence for every pairing; and the smoothness, maps and zero conditions of multipliers and pullbacks. For a jump rule it checks completeness of the relevant breakpoint decomposition, reconstructs each one-sided trace proof and subtracts the traces itself. It rechecks signs, Jacobians, coefficients and relation composition without trusting stored jet summaries. Any unproved premise remains a typed residual rather than a success flag.
+
+Equality in D'(I) loses exceptional point values. It cannot prove classical equality at a breakpoint, a classical derivative there, an endpoint convention, or an ordinary improper integral. A bridge back needs its own theorem; for example equal regular distributions of continuous functions on I imply pointwise equality because a nonzero continuous difference has a neighborhood and a test supported there with nonzero pairing. This argument needs continuity and does not apply to arbitrary representatives. Witnesses and caches therefore keep layer and domain in their keys and reject an expected classical claim when only a distributional one was proved.
+
+## Search, costs and bounded transformations · `sec:nrz:cas-piecewise-search`
+
+**Rule (Common refinement and union)** · `rule:nrz:cas-piecewise-operation-distribution`
+
+A strict pointwise operation combines case graphs by constructing the meet of their regions, then proving refinement, coverage, output sort and the operation's domain conditions on each surviving meet. Identical region nodes and previously proved complements or disjointness can avoid redundant intersections: two functions using the same certified two-region partition need only those two regions. Different partitions can still require up to m times n nonempty intersections. Syntax sharing is not a general geometric decision procedure, and infeasible intersections disappear only with evidence.
+
+A merge inserts a union region and an identity that the proposed value and definedness agree on each constituent. Selecting under a hypothesis inserts or reuses a refinement from the context region. These are graph identity applications with positive cost and witnesses, like algebraic identities. Classical derivatives operate on region interiors with boundary checks attached to shared boundary nodes. Integration uses a proved interval decomposition and endpoint traces; discrete sums use integer regions and exact ownership, including boundary integers. The topological boundary of a discrete set is not a substitute for its declared index endpoints and shift-crossing evidence.
+
+Distributional equality can merge regular embeddings differing only on a proved null set, but cannot merge their pointwise functions without a classical proof. Search keys include the layer, relation, domain, full context and residual obligations. Reusing jets or region identities from a different domain or context requires an explicit transport proof. No generic transformation maps every calculus operation over a case graph.
+
+**Decision (Logical cost and evidence reuse)** · `dec:nrz:cas-piecewise-cost`
+
+Retain strictly positive logical rule costs, separate result ranking and independently metered proof work (`dec:nrz:cas-path-cost`). Region refinement, union, selection, case elimination and distributional identities receive positive costs; the later policy may charge for introduced regions. Shared syntax, jets or a short delta identity do not make coverage construction or replay free. The alternative treats those operations as costless bookkeeping, distorting route comparisons and permitting repeated refinement without logical cost; it would require changing the existing positive-cost contract and is rejected here.
+
+A named derivative followed by delta pairing can be a shorter route than repeatedly splitting and integrating branch formulas. Conversely region selection can make a branch derivative cheaper than constructing a general named identity. Preference depends on the pinned cost/rank policy and available premises; there is no universal cost advantage. Search must expose both routes. A learned shortcut needs replay and a strict improvement for the exact claim class, while its primitive expansion remains charged. Frozen optimality concerns only the admitted finite graph (`rule:nrz:cas-design-optimality`).
+
+**Rule (Region, jet and distribution budgets)** · `rule:nrz:cas-piecewise-budgets`
+
+Retain the two deterministic queues. Extend limits for region meets/unions, refinement depth, pending case goals, local contexts, predicate reasoning, boundary counts, jet order, test/pairing expressions, delta derivative order, pullback zeros and their proof work. Existing byte, arithmetic, expression and replay limits still apply. Locally finite mathematical sums have finitely many contributions over a certified compact test support, but finding and proving those contributions costs work. Lazy refinement and reusable certified identities reduce duplication without implying completeness.
+
+If a cover, trace, regularity theorem or pullback premise is unsupported, or a budget expires, report the pending obligation or named exhaustion and any separately checked partial result. Do not mark an omitted region or singular term zero. These symbolic shortcuts authorize no floating evaluation order, quadrature through an impulse or enclosure claim (`rule:nrz:cas-exact-domain-policy`).
+
+## Units, physical laws and categorical clients · `sec:nrz:cas-piecewise-clients`
+
+**Rule (Physical validation of the source graph)** · `rule:nrz:cas-piecewise-unit-contract`
+
+The core owns mathematical sorts, regions, predicates, boundaries, classical and distributional relations, and witnesses. nrz-units owns dimensions, kinds, measures, affine roles, physical functions, uncertainty descriptors and assurance. Every original guard and value is checked before normalization. Comparisons require compatible quantities in common coordinates; case values need a common physical contract even when core scalar sorts match. A zero branch still has its required descriptor (`req:vision:algebraic-unit-checks`), (`rule:vision:check-before-normalization`).
+
+A client may select compatible affine points after coordinate conversion but cannot use a scalar identity that introduces forbidden point arithmetic without a checked affine interpretation. Units and kinds are checked at every syntactic use; an unreachable region is not a waiver. Shared measurement sources, covariance contributors and probabilistic versus deterministic assurance survive transformations. A derivative valid only within a region does not justify linearized uncertainty propagation across its boundary.
+
+A delta in time has inverse-time dimension so that pairing against the time measure gives evaluation; its kth derivative has inverse-time dimension to power k+1. Spatial deltas follow the corresponding coordinate dimension. An impulse J with momentum dimension times a time delta has force dimension in (`ex:nrz:cas-piecewise-impulse`). The client checks the measure and coordinate Jacobian rather than putting dimensions in the core distribution sort. A distribution is not a point-evaluable numerical slot, and smoothing an impulse is a separate approximation (`rule:vision:layer-enforcement`).
+
+**Example (Regime-dependent models)** · `ex:nrz:cas-piecewise-regime`
+
+For the damped oscillator with m > 0, k > 0 and c ≥ 0, c² − 4mk compares like dimensions: c has mass/time, k has mass/time², and m is mass. Its negative, zero and positive regions separate underdamped, critical and overdamped homogeneous regimes through the quadratic characteristic equation. The equality boundary must remain; an underdamped square-root formula does not cover the other regions. The core can verify proposed branch equations, initial conditions and impulse jumps, while the client owns force meaning and physical-model validity. Stateful hysteresis or event evolution needs explicit state; it is not an implicit pure function of one coordinate.
+
+**Decision (Categorical selectors remain with the client)** · `dec:nrz:cas-piecewise-categorical-selectors`
+
+Configuration and uncertainty-mode selectors remain categorical metadata (`rule:vision:counts-and-metadata`), (`spec:nrz:problem-data-schema`). The client validates a category and selects a plan, descriptor contract or declared same-sort mathematical family. An explicit checked bridge may translate that selection to core predicate parameters; it does not make the category a physical quantity or differentiation coordinate. The alternative introduces a generic categorical sort and family elaboration in the core, requiring additional type, schema and proof rules. It would still preserve physical meaning with the client; this concept keeps the existing boundary.
+
+**Example (Existing problem selectors)** · `ex:nrz:cas-piecewise-selectors`
+
+Resistor-network configuration changes matrix shape and the unknown set, so its complete systems cannot be values of one homogeneous matrix case node. A shared scalar observable can use a same-sort family after client validation. The coupled-oscillator boundary selector changes chain to ring and spectral multiplicities; it is not a continuous coordinate. Heat's `temperature_scale` chooses coordinates and `time_regime` chooses a model, neither being the physical time variable; affine roles remain explicit.
+
+Pendulum `uncertainty_mode` chooses alternative probabilistic or deterministic records for shared sources. Standard uncertainty and radius are not interchangeable scalar contracts, and the alternatives are not accumulated as independent contributors. Rump `precision_bits` is an execution choice and Hilbert order is structural metadata. Existing unsupported propagation, spectral and metadata-dependent expressions stay unsupported until a later migration provides their missing evidence (`rule:nrz:problem-data-unsupported`).
+
+## Impact and later work · `sec:nrz:cas-piecewise-impact`
+
+**Table (Revised and extended existing decisions)** · `tab:nrz:cas-piecewise-revised-decisions`
+
+|Existing label|Existing contract or slice|Proposed change|Reason|
+|--------------|--------------------------|---------------|------|
+|(`tab:nrz:cas-design-graph-kinds`), (`def:nrz:cas-design-interning`)|Occurrences, expressions, conditions, contexts and application/proof records; no native region, case or boundary families|Add shared region and boundary nodes, unordered case associations, domain links and checked geometric relations; add distribution/test-space sorts and operations|Coverage and ownership are graph facts, while deltas and their pairings need typed operands.|
+|(`rule:nrz:cas-design-occurrences`)|Complete original walks over ordered occurrence children associated with expression syntax|Preserve that guarantee while extending the source-to-native construction map for ordered clauses and unordered region associations|Elaboration must not replace an original source walk with a walk of normalized regions.|
+|(`def:nrz:cas-design-context`)|Immutable full contexts and a bounded scalar condition checker|Add context-region refinement, local hypothesis scope, coverage, reached-guard, regularity and test-space obligations|The new identities need premises outside the current scalar fragment.|
+|(`rule:nrz:cas-design-proof-conditions`)|Canonical residual sets under Gamma; implementation combines flat guards|Retain scoped guarded obligations and explicit assumption discharge|A condition local to a region cannot become global or disappear.|
+|(`tab:nrz:cas-design-primitives`), (`def:nrz:cas-design-rules`)|Closed first-slice primitive families and relation-specific composition|Add region, boundary, case and distribution families, plus explicit layer bridges|The checker must reconstruct the premises of each new shortcut.|
+|(`alg:nrz:cas-design-queues`)|Initialization collects original definedness and expands scalar proof states|Use reached-region/value obligations for cases; carry covers, local contexts, layers and boundary evidence|Inactive values need no evaluation, while strict operands and all source occurrences remain accounted for.|
+|(`alg:nrz:cas-design-differentiation`)|Smooth scalar grammar on open guard domains and Jacobian assembly|Add interior restriction, boundary/nonexistence evidence and separately requested distribution derivatives|Child derivatives alone establish neither joins nor a change of mathematical layer.|
+|(`def:nrz:cas-design-witness-format`), (`alg:nrz:cas-design-replay`)|Fixed v1 vocabulary, one top-level context and backward proof references|Design a version transition for new graph objects, scoped contexts, spaces, jets and pairings|Existing bytes and rule versions retain their meanings; replay needs all new premises.|
+|(`dec:nrz:cas-design-search-policy`), (`tab:nrz:cas-design-budgets`)|Positive costs, two queues and explicit limits|Extend ranks, costs and ledgers for regions, jets, delta orders, tests and zeros|Sharing does not eliminate worst-case refinement or proof growth.|
+|(`def:nrz:cas-design-api-types`), (`tab:nrz:cas-design-outcomes`)|Typed requests, witnesses and outcomes for the initial slice|Revise the public API for cases, regions, boundaries, layers, pairings and named distribution refusals|Callers must distinguish nonexistence, pending premises and different result sorts.|
+|(`tab:nrz:cas-design-deferred-operations`)|Integrals, sums, limits and series represented beyond the executable slice|Later admit individually specified case and distribution fragments|This concept supplies proof contracts, not a claim of current executable support.|
+|(`cav:nrz:cas-calculus-boundaries`), (`rule:nrz:cas-limits-and-series`)|Calculus keeps its domains, relation kinds and remainders|Extend to boundary jets and explicit distribution spaces while preserving classical conditions|Distributional derivatives coexist with classical nonexistence.|
+|(`alg:nrz:cas-later-migration`), (`alg:nrz:cas-design-client-boundary`)|Coexistence followed by explicit consumer migration|Require native piecewise support before moving all consumers and retiring nrz-algebra|Consumers should target the revised graph and calculus API.|
+|(`req:vision:expression-and-symbol-contract`), (`def:vision:algebra-expression-trees`), (`dec:vision:algebra-normal-form`)|Original trees and separate collection normal forms from nrz-algebra|Later replace package-specific APIs with occurrence receipts and explicitly chosen CAS equality/domain contracts|Syntax sharing, formal collection comparison and conditional equality differ.|
+|(`rule:nrz:problem-data-checking`), (`rule:nrz:problem-data-versions`)|Versioned scalar grammar, explicit unsupported records and replacement-only variant validation|Later migrate validation and admit case/distribution records through explicit schema policy|Selecting a variant does not execute a different topology or prove assurance.|
+|(`tab:nrz:cas-design-tests`), (`alg:nrz:cas-design-stage-three`)|Acceptance laws and the initial implementation sequence|Place new evidence in the parallel test lane's four layers and complete native semantics before consumer retirement|Initial staging does not supply boundary, distribution or migration coverage.|
+
+The table identifies revisions without changing those older documents in this lane. Complete source coverage, strict arithmetic, exact rationals, immutable declarations, capture-safe substitution, transactional admission, independent replay and physical ownership remain required. Graph sharing still distinguishes occurrences, expressions and proofs, with acyclic operand/proof dependencies and no unmetered theorem oracle. Concrete APIs, node layouts, edge tags and codec records belong to the design.
+
+**Rule (Consumer migration obligations)** · `rule:nrz:cas-piecewise-consumer-migration`
+
+After native support is implemented, nrz-units migrates original-expression checks, symbols and rationals, descriptor comparison, diagnostics and substitution revalidation to the CAS API. Its physical receipt stays distinct from a source traversal receipt and a mathematical witness. Every source branch is checked, while mathematical requests respect region-specific definedness. Distributional expressions need explicit physical signatures and cannot pass through ordinary scalar point-value interfaces. Migration tests preserve supported inputs and intended refusals.
+
+nrz-docgen problem validation depends directly on nrz-algebra for parsing, symbols and rationals. Preserve original locations, declaration snapshots, unsupported reason codes, variant roles, source relationships and deterministic validation records. Newly executable syntax or distribution records need an explicit schema/version policy and regenerated evidence. The descriptor prototype uses expressions, rationals and symbols in plans and coordinate maps; rebind slots to checked original occurrences, renew physical witnesses after substitution, and keep categorical recipe selection and distribution values out of ordinary scalar slots unless a new contract admits them.
+
+A compatibility layer cannot present normalized regions as original syntax or replace formal collection comparison with unconditional equality. Inventory and replace every dependency before removing nrz-algebra, including tests and generated ownership/census artifacts. Parser compatibility, exact exponent semantics, domain refusals and persistence need evidence. The core remains independent of physical storage, uncertainty policy and the computation scheduler (`alg:nrz:cas-later-migration`), (`rule:vision:layer-enforcement`).
+
+**Procedure (Design and implementation order)** · `alg:nrz:cas-piecewise-rollout`
+
+1. Review the graph and calculus decisions, then design public sorts, domain/layer distinctions, region/case/boundary relations, local hypotheses and residuals. Include both classical and distributional operations without implying every represented operation is immediately executable.
+2. Implement region and case admission, original-source construction maps, complete traversal, capture-safe substitution, reached-region obligations and checked refinement/union. Establish distribution/test-space sorts and basic objects within the same vocabulary plan.
+3. Extend the kernel, portable version policy and independent replay together: region relations, case selection/elimination, guarded residuals, regular embeddings, delta pairings, smooth multipliers and distribution derivatives. Refuse unsupported products and point values explicitly.
+4. Add shared boundary discovery with completeness evidence, function-indexed ownership and jets, classical interior/join claims, jump formulas and named shortcuts. Add bounded interval integration, finite sums, limits, side series, affine/simple-zero delta pullbacks and primitive/impulse verification through their specific rules.
+5. Extend deterministic search and frozen-cost manifests for those proved transitions, with ledgers for refinement and jet/pairing work. Verify that shorter routes preserve layer, domain, conditions and source evidence.
+6. Use the cas-tests-1 structure: inline module unit tests for local invariants; crate tests under src/tests/ for graph, context and transactional interactions; conformance tests under tests/conformance/ for independently derived public laws, witness mutation and refusal contracts; integration tests under tests/integration/ for consumers. Reuse setup through src/testing/ without deriving expected mathematics from the producer. Whichever implementation lands second is rebased onto the first.
+7. Migrate nrz-units, nrz-docgen problem validation and prototypes/descriptors after native support is established, then retire nrz-algebra once all consumers and their acceptance/refusal evidence have moved. Update generated artifacts and layer enforcement together and run the gate and fixed point on each coherent unit.
+
+Later evidence must cover source-order elaboration, shared regions and function-specific jets, inactive partial values, skipped partial guards, unproved covers versus actual holes, overlap conflicts, boundary ownership, hypothesis leakage, abs/J/Q joins, integral and sum endpoints, wrong jump weights, delta signs and Jacobians, incomplete or multiple-zero pullbacks, forbidden products, layer-mismatched replay, old-byte interpretation and resource boundaries. No tests or code are added here, and no external system's code, layout or test suite is copied (`rule:nrz:cas-cleanroom-scope`).
+
+## Mathematical references · `sec:nrz:cas-piecewise-references`
+
+All bibliographic details below are recalled from knowledge and were not checked against external copies in this round. Edition/year and theorem-location verification remain outstanding; no page number, quotation or verified-source claim is implied. Published mathematics supports the analytic rules. The graph, witness boundaries, costs and migration choices are this concept's proposals, and the elementary examples, jump recurrence and delta identities are also argued in the text.
+
+**Attribution (Real analysis)** · `credit:nrz:cas-piecewise-rudin`
+
+Walter Rudin, Principles of Mathematical Analysis, third edition, McGraw-Hill, 1976. Supports limits, continuity, differentiation, mean-value arguments, integration and Taylor remainders under their hypotheses. Bibliographic details unverified in this round.
+
+**Attribution (Several-variable differentiation)** · `credit:nrz:cas-piecewise-spivak`
+
+Michael Spivak, Calculus on Manifolds: A Modern Approach to Classical Theorems of Advanced Calculus, first edition, W. A. Benjamin, 1965. Supports the local linear-approximation meaning of a differential. Bibliographic details unverified in this round.
+
+**Attribution (Derivative propagation)** · `credit:nrz:cas-piecewise-griewank`
+
+Andreas Griewank and Andrea Walther, Evaluating Derivatives: Principles and Techniques of Algorithmic Differentiation, second edition, SIAM, 2008. Supports derivative composition and reuse under differentiability assumptions, not automatic correctness across boundaries. Bibliographic details unverified in this round.
+
+**Attribution (Discrete calculus)** · `credit:nrz:cas-piecewise-concrete`
+
+Ronald L. Graham, Donald E. Knuth and Oren Patashnik, Concrete Mathematics: A Foundation for Computer Science, second edition, Addison-Wesley, 1994. Supports finite differences and telescoping; the displayed sum is independently expanded. Bibliographic details unverified in this round.
+
+**Attribution (Conditional rewriting vocabulary)** · `credit:nrz:cas-piecewise-rewriting`
+
+Franz Baader and Tobias Nipkow, Term Rewriting and All That, first edition, Cambridge University Press, 1998. Supplies substitution and rewriting terminology, not the graph representation or a solver for arbitrary guard coverage. Bibliographic details unverified in this round.
+
+**Attribution (Distribution foundations)** · `credit:nrz:cas-piecewise-friedlander`
+
+F. G. Friedlander and M. Joshi, Introduction to the Theory of Distributions, second edition, Cambridge University Press, 1998. Supports test spaces, regular distributions, differentiation, smooth multiplication, support and primitives. The jump and delta formulas are also justified by their pairings. Bibliographic details unverified in this round.
+
+**Attribution (Generalized functions and transforms)** · `credit:nrz:cas-piecewise-gelfand`
+
+I. M. Gel'fand and G. E. Shilov, Generalized Functions, volume 1, Properties and Operations, first English edition, Academic Press, 1964. Supports delta changes of variable, generalized-function operations and transform spaces. Bibliographic details, including the edition designation, are unverified in this round.
+
+**Attribution (Distribution theory and pullbacks)** · `credit:nrz:cas-piecewise-schwartz-hormander`
+
+Laurent Schwartz, Théorie des distributions, volumes I and II, first editions, Hermann, 1950 and 1951; Lars Hörmander, The Analysis of Linear Partial Differential Operators I: Distribution Theory and Fourier Analysis, second edition, Springer, 1990. These supply the broader distribution framework and hypotheses behind operations such as pullback; they are not permission for unrestricted products or composition. Both bibliographic records are unverified in this round. The admitted simple-zero rule is the local inverse/change-of-variable argument stated above, not a promise of the full general theory.
