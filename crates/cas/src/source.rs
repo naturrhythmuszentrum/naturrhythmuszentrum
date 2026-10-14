@@ -10,3 +10,6 @@ pub use crate::descriptor::{SyntaxDependency, SyntaxDescriptor, SyntaxRole};
 pub use crate::descriptor_model::{ExpressionSyntax, RegionConstructor, SpaceSyntax, SyntaxNode};
 pub use crate::source_factory::{OriginalForm, case_literal, ordered_cases};
 pub use crate::source_model::{SourceClauseDraft, SourceFormDraft, SourceFormKind};
+
+pub use crate::parse_error::{ParseError, ParseFailure, SyntaxCode};
+pub use crate::parser::parse_original;

@@ -468,6 +468,31 @@ impl Rational {
         Ok(bytes)
     }
 
+    /// Use a fixed integer-power payload only when the exact exponent fits it.
+    pub(crate) fn integer_exponent(&self, budget: &mut Budget) -> Result<Option<i64>, Fault> {
+        if !self.is_integer() || self.numerator.bits() > 64 {
+            return Ok(None);
+        }
+        let at = Location::new("parsed integer exponent");
+        charge(self.numerator.bits(), 1, budget, at)?;
+        let mut magnitude = 0_u64;
+        for (position, byte) in self.numerator.to_bytes_le().iter().enumerate() {
+            let shift = u32::try_from(position)
+                .ok()
+                .and_then(|n| n.checked_mul(8))
+                .ok_or_else(|| Fault::capacity(BudgetKind::ComponentBits, at))?;
+            magnitude |= u64::from(*byte)
+                .checked_shl(shift)
+                .ok_or_else(|| Fault::capacity(BudgetKind::ComponentBits, at))?;
+        }
+        if self.negative && magnitude == (1_u64 << 63) {
+            return Ok(Some(i64::MIN));
+        }
+        Ok(i64::try_from(magnitude)
+            .ok()
+            .map(|value| if self.negative { -value } else { value }))
+    }
+
     /// Parse an exact integer, fraction, decimal or decimal scientific spelling.
     ///
     /// # Errors
@@ -589,4 +614,37 @@ fn decimal_exponent(text: &str, budget: &mut Budget) -> Result<i64, Fault> {
     let signed =
         i64::try_from(value).map_err(|_| Fault::capacity(BudgetKind::DecimalExponent, at))?;
     Ok(if negative { -signed } else { signed })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Rational;
+    use crate::{
+        Fault,
+        limits::{Budget, Limits},
+    };
+
+    /// Fixed power payloads respect both signed endpoints without narrowing exact values.
+    /// ´test:unit:parsed-integer-exponent-range´
+    #[test]
+    fn parsed_integer_exponent_range() -> Result<(), Fault> {
+        let mut budget = Budget::new(Limits::default())?;
+        for (text, expected) in [
+            ("0", Some(0)),
+            ("-0", Some(0)),
+            ("4/2", Some(2)),
+            ("9223372036854775807", Some(i64::MAX)),
+            ("-9223372036854775808", Some(i64::MIN)),
+            ("9223372036854775808", None),
+            ("-9223372036854775809", None),
+            ("18446744073709551616", None),
+            ("1/2", None),
+        ] {
+            assert_eq!(
+                Rational::parse(text, &mut budget)?.integer_exponent(&mut budget)?,
+                expected
+            );
+        }
+        Ok(())
+    }
 }
