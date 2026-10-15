@@ -57,7 +57,7 @@ mod local;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod numeric;
+pub(crate) mod numeric;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
