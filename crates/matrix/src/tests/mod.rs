@@ -1,0 +1,5 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Internal storage and resolver interactions that the public facade cannot construct.
+
+mod resolution;
+mod storage;

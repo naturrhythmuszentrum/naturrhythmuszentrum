@@ -2,4 +2,31 @@
 
 # nrz-matrix · `guide:matrix:overview`
 
-`nrz-matrix` prototypes dense binary64 solve candidates from faer's safe interface and an independent approximate-inverse certificate through `nrz-scalar`. It implements the architecture's backend boundary, inverse-norm argument and explicit refusal contract. The interface remains provisional until the units and matrix bites fix it.
+`nrz-matrix` owns a homogeneous descriptor heap with separate binary32 and binary64 faer arenas. A scalar is a 1×1 region. Values and declared absolute bounds have separate storage regions and units descriptors; every bound names the exact identity and version of its entire target region. Heap coordinates never enter CAS arithmetic. This implements the initial storage subset of (see the matrix-core design).
+
+`Heap::import_represented` admits finite coherent coordinates with explicitly represented-only coverage. `Heap::import_declared_bounds` atomically admits finite centers and nonnegative finite componentwise radius entries, deriving the radius descriptor through units. These supplied bounds remain caller assumptions. Imports use logical column order, canonicalize signed zero, and retain point/difference roles. Floating count storage and noncoherent coordinate imports refuse. Unsupported nested relative-radius derivation preserves the units error.
+
+Opaque `Handle<Category, P>` locators carry a heap scope and descriptor occupation generation. Value and companion access checks ownership, occupation, category, precision, region bounds and target versions before lending a read-only `RegionView`. Equal schemas are interned using exact descriptor equality without merging value identities. Each arena slab owns a one-column faer matrix; logical rectangles map into its contiguous entries through checked arithmetic. `RegionView::export` returns an owned raw copy without evidence or a declaration of source independence. Live borrows prevent heap mutation.
+
+`HeapLimits` bounds descriptor slots, elements per precision (including companions), and immutable schemas. Preparation scans and validates the complete bundle, reserves metadata capacity and builds every slab before an allocation-free publication step. A refusal publishes no partial value or companion. Rust allocator aborts remain outside the recoverable-capacity contract. Process-local identities never wrap and make no persistence promise.
+
+```rust
+use nrz_matrix::{Extent, Heap, HeapLimits};
+use nrz_units::Descriptor;
+
+let mut heap = Heap::new(HeapLimits::default())?;
+let imported = heap.import_declared_bounds(
+    Extent::new(2, 1)?,
+    &Descriptor::ratio(),
+    &[2.0_f64, 3.0],
+    &[0.125, 0.25],
+)?;
+let value = heap.value(imported.value())?;
+let copy = value.region().export()?;
+assert_eq!(copy.len(), 2);
+# Ok::<(), nrz_matrix::HeapError>(())
+```
+
+The prototype solve capability has been removed: `DenseSystem`, bare `certified_solve`, mutable-field `Outcome`/`Report`, the old backend adapter and solver-only tests are retired. This heap is not a replacement solve implementation or verification of one. Historical feasibility records and adversarial fixture data remain intact. Production solving returns at the later checked operation boundary.
+
+This subset supplies storage extents, not ordered physical axes or linear-operator admission. Numerical kernels, conversions, covariance/source models, aliases, compaction and operation bindings are absent. `Factor` and `Workspace` are category markers only. Replacement and retirement arrive in the next heap commit. The only scalar dependencies used here are the sealed primitive-format contract, finite admission, zero and comparison; no prototype scalar interval or certificate is used.

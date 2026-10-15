@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "Safe dense solve candidates with independent numerical certificates"
+description = "Typed descriptor heap with owned numerical regions and bound companions"
 readme = "README.md"
 keywords = ["matrix", "numerics", "validation"]
 categories = ["mathematics", "science"]
@@ -14,10 +14,8 @@ categories = ["mathematics", "science"]
 [dependencies]
 faer.workspace = true
 nrz-scalar.workspace = true
+nrz-units = { path = "../units" }
 thiserror.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true
 
 [lints]
 workspace = true

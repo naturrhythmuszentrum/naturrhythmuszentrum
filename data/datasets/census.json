@@ -32,7 +32,7 @@
       "path": "crates/scalar"
     },
     {
-      "description": "Safe dense solve candidates with independent numerical certificates",
+      "description": "Typed descriptor heap with owned numerical regions and bound companions",
       "has_readme_template": true,
       "name": "nrz-matrix",
       "path": "crates/matrix"

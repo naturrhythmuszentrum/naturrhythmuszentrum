@@ -639,7 +639,7 @@ version = "0.1.0"
 dependencies = [
  "faer",
  "nrz-scalar",
- "serde_json",
+ "nrz-units",
  "thiserror 2.0.21",
 ]
 

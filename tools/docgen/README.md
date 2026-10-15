@@ -38,7 +38,7 @@ The census lists current workspace members in manifest order; retired packages r
 |-------|----|-----------|
 |`nrz-docgen`|`tools/docgen`|Deterministic documentation datasets, rendering, and fixed-point checks|
 |`nrz-scalar`|`crates/scalar`|Validated scalar arithmetic prototype for Naturrhythmuszentrum|
-|`nrz-matrix`|`crates/matrix`|Safe dense solve candidates with independent numerical certificates|
+|`nrz-matrix`|`crates/matrix`|Typed descriptor heap with owned numerical regions and bound companions|
 |`nrz-units`|`crates/units`|Data-time quantity descriptors and checks over original symbolic expressions|
 |`nrz-cas`|`crates/cas`|Exact graph construction and checked symbolic derivations|
 
