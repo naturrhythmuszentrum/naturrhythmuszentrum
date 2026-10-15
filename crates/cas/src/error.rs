@@ -28,6 +28,12 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// The proposed delta pullback contains a repeated or nonsimple zero.
+    PullbackMultipleZero,
+    /// The supplied root list does not reconstruct the complete map polynomial.
+    PullbackIncompleteZeros,
+    /// The map, inverse or declared interval transport fails the pullback hypotheses.
+    PullbackMapMismatch,
     /// The requested limit or series gluing has incompatible checked side evidence.
     AnalyticDisagreement,
     /// Distribution point evaluation is outside the mathematical contract.

@@ -51,6 +51,8 @@ pub enum UnsupportedReason {
 /// A mathematical refusal returned before constructing an ill-sorted operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RefusalReason {
+    /// Zero completeness, simplicity or interval-map hypotheses fail.
+    PullbackHypotheses,
     /// Required one-sided limits, polynomial coefficients or centre values disagree.
     AnalyticDisagreement,
     /// Distributions have no general point values.
@@ -205,6 +207,9 @@ impl Cas {
     ) -> Result<(Handle, bool), Fault> {
         let at = Location::new("request preparation");
         let context = self.checked(&request.context)?;
+        if let Task::Pullback { map_kind, .. } = &request.task {
+            crate::pullback_wire::validate_intent(map_kind, budget)?;
+        }
         let mut encoded = Encoder::new(budget, at);
         crate::task::encode(&request.task, &mut encoded)?;
         let operation_bytes = size(encoded.finish().len(), at)?;
@@ -471,16 +476,18 @@ fn validate_task(
         }
         Task::Pair { space, .. }
         | Task::SmoothMultiply { space }
-        | Task::EmbedRegular { space } => {
+        | Task::EmbedRegular { space }
+        | Task::PrimitiveUnique { space } => {
             state.space(space.logical_id())?;
         }
         Task::Pullback {
             source_space,
             target_space,
-            ..
+            map_kind,
         } => {
             state.space(source_space.logical_id())?;
             state.space(target_space.logical_id())?;
+            crate::pullback_wire::validate_intent(map_kind, budget)?;
         }
         _ => {}
     }
@@ -491,7 +498,9 @@ fn validate_task(
 fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> Result<(), Fault> {
     let at = Location::new("native request inputs");
     let expected = match task {
-        Task::Equal { .. }
+        Task::PrimitiveUnique { .. }
+        | Task::Pullback { .. }
+        | Task::Equal { .. }
         | Task::Pair { .. }
         | Task::SmoothMultiply { .. }
         | Task::Product { .. } => Some(2),

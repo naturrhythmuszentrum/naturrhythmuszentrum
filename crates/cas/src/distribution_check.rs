@@ -11,7 +11,7 @@ use crate::proof_model::{ApplicationDraft, CheckedApplication, ScopedConditions,
 use crate::rule::Primitive;
 use std::collections::BTreeSet;
 
-/// All nine primitives retain complete typed conditions and exact contexts.
+/// Every distribution primitive retains complete typed conditions and exact contexts.
 pub(crate) fn check(
     cas: &mut Cas,
     draft: &ApplicationDraft,
@@ -40,6 +40,12 @@ pub(crate) fn check(
     let within = cas.state.context(cas.checked(&draft.context)?)?.admissible;
     crate::case_check::subset(cas, domain, within, budget)?;
     match draft.rule {
+        Primitive::DistAffinePullback | Primitive::DistSimpleZeroPullback => {
+            crate::pullback_check::check(cas, draft, premises, budget)?;
+        }
+        Primitive::DistPrimitiveUnique => {
+            crate::primitive_unique::check(cas, draft, premises, budget)?;
+        }
         Primitive::DistRegular => crate::distribution_regular::check(cas, draft, premises, budget)?,
         Primitive::DistAe => crate::distribution_ae::check(cas, draft, premises, budget)?,
         Primitive::DistLinear => crate::distribution_linear::check(cas, draft, premises, budget)?,

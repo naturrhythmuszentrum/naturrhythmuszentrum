@@ -255,6 +255,7 @@ pub(crate) fn certificate(
             crate::multiplicity::SquareFreeCertificate::decode(reader)?,
         )),
         6 => Certificate::Cases(Box::new(case_certificate(reader, records)?)),
+        11 => Certificate::Pullback(Box::new(crate::pullback_wire::decode_certificate(reader)?)),
         10 => Certificate::Germ(Box::new(crate::germ_wire::decode_certificate(reader)?)),
         9 => Certificate::Split(Box::new(crate::split_wire::decode_certificate(reader)?)),
         8 => Certificate::Distribution(Box::new(crate::distribution_decode::certificate(

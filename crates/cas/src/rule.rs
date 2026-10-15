@@ -4,6 +4,12 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// Affine delta pullback with both spaces, inverse and absolute Jacobian.
+    DistAffinePullback,
+    /// Complete rational-root factorization with nonzero slopes at every zero.
+    DistSimpleZeroPullback,
+    /// Equal distribution derivatives imply a constant difference on a connected interval.
+    DistPrimitiveUnique,
     /// Transport checked polynomial traces to standalone punctured limits.
     LimitCaseRestrict,
     /// Restrict checked jets with exact polynomial remainder evidence.
@@ -167,6 +173,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// Finite factorization, zero and inverse-Jacobian evidence.
+    Pullback,
     /// Exact polynomial side remainders.
     Germ,
     /// Finite cover, point-extension and endpoint witnesses.
@@ -217,7 +225,10 @@ impl Primitive {
     pub(crate) const fn native(self) -> bool {
         matches!(
             self,
-            Self::LimitCaseRestrict
+            Self::DistAffinePullback
+                | Self::DistSimpleZeroPullback
+                | Self::DistPrimitiveUnique
+                | Self::LimitCaseRestrict
                 | Self::SeriesCaseRestrict
                 | Self::IntegralCaseSplit
                 | Self::SumCaseSplit
@@ -250,6 +261,9 @@ impl Primitive {
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::DistAffinePullback => ("dist.affine-pullback", 12),
+            Self::DistSimpleZeroPullback => ("dist.simple-zero-pullback", 12),
+            Self::DistPrimitiveUnique => ("dist.primitive-unique", 8),
             Self::LimitCaseRestrict => ("limit.case-restrict", 2),
             Self::SeriesCaseRestrict => ("series.case-restrict", 4),
             Self::IntegralCaseSplit => ("integral.case-split", 8),
@@ -324,7 +338,10 @@ impl Primitive {
         match self {
             Self::LimitCaseRestrict | Self::SeriesCaseRestrict => ConclusionKind::Germ,
             Self::IntegralCaseSplit | Self::SumCaseSplit => ConclusionKind::Split,
-            Self::DistRegular
+            Self::DistAffinePullback
+            | Self::DistSimpleZeroPullback
+            | Self::DistPrimitiveUnique
+            | Self::DistRegular
             | Self::DistAe
             | Self::DistLinear
             | Self::DistDerivative
@@ -361,7 +378,8 @@ impl Primitive {
     /// Fixed and dependent ordered-premise arities remain visible in the registry.
     const fn premise_shape(self) -> PremiseShape {
         match self {
-            Self::DistRegular
+            Self::DistPrimitiveUnique
+            | Self::DistRegular
             | Self::DistAe
             | Self::DistLinear
             | Self::DistDerivative
@@ -401,6 +419,7 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::DistAffinePullback | Self::DistSimpleZeroPullback => CertificateSchema::Pullback,
             Self::SeriesCaseRestrict => CertificateSchema::Germ,
             Self::IntegralCaseSplit | Self::SumCaseSplit => CertificateSchema::Split,
             Self::DistRegular
@@ -431,7 +450,7 @@ impl Primitive {
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 56] = [
+pub const PRIMITIVES: [Primitive; 59] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -453,12 +472,15 @@ pub const PRIMITIVES: [Primitive; 56] = [
     Primitive::DerivativeTransport,
     Primitive::DifferentiateVariable,
     Primitive::DistAe,
+    Primitive::DistAffinePullback,
     Primitive::DistDeltaMultiply,
     Primitive::DistDeltaPair,
     Primitive::DistDerivative,
     Primitive::DistJump,
     Primitive::DistLinear,
+    Primitive::DistPrimitiveUnique,
     Primitive::DistRegular,
+    Primitive::DistSimpleZeroPullback,
     Primitive::DistSmooth,
     Primitive::DistSupportAction,
     Primitive::AddAssociate,

@@ -19,6 +19,17 @@ pub enum RegularityKind {
 /// A statement whose scalar actions retain the exact distribution space.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum DistributionStatement {
+    /// Delta pullback retaining both spaces, the map and its affine inverse when applicable.
+    Pullback(Box<crate::pullback_model::PullbackValue>),
+    /// The difference of two distributions with equal derivatives is constant on this interval.
+    PrimitiveUnique {
+        /// First primitive.
+        left: Handle,
+        /// Second primitive.
+        right: Handle,
+        /// Exact connected open interval space.
+        space: Handle,
+    },
     /// A checked analytic property of a pointwise function.
     Regularity {
         /// Pointwise function.
@@ -111,7 +122,9 @@ impl DistributionStatement {
     #[must_use]
     pub const fn space(&self) -> &Handle {
         match self {
-            Self::Regularity { space, .. }
+            Self::Pullback(value) => &value.target_space,
+            Self::PrimitiveUnique { space, .. }
+            | Self::Regularity { space, .. }
             | Self::Embedding { space, .. }
             | Self::Equality { space, .. }
             | Self::Derivative { space, .. }

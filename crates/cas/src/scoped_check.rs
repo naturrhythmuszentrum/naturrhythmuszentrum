@@ -112,7 +112,10 @@ fn rule_conditions(
         Primitive::IntegralCaseSplit | Primitive::SumCaseSplit => {
             crate::split_check::check(cas, draft, premises, budget)?
         }
-        Primitive::DistRegular
+        Primitive::DistAffinePullback
+        | Primitive::DistSimpleZeroPullback
+        | Primitive::DistPrimitiveUnique
+        | Primitive::DistRegular
         | Primitive::DistAe
         | Primitive::DistLinear
         | Primitive::DistDerivative

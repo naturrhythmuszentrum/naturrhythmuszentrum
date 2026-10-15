@@ -9,12 +9,8 @@ use nrz_cas::{Cas, FaultKind, InvalidCode};
 /// ´test:integration:calculus-reserved-key-replay´
 #[test]
 fn calculus_reserved_key_replay() -> TestResult {
-    for key in [
-        "dist.affine-pullback",
-        "dist.simple-zero-pullback",
-        "dist.primitive-unique",
-        "jet.jump",
-    ] {
+    {
+        let key = "jet.jump";
         let mut bytes = b"NRZCAS02".to_vec();
         bytes.extend_from_slice(&1_u32.to_le_bytes());
         bytes.extend_from_slice(&u32::try_from(key.len())?.to_le_bytes());

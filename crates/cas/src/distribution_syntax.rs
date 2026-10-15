@@ -113,6 +113,7 @@ pub(crate) fn statement(
     cas.state.space(space)?;
     let real = Sort::Value(AtomicSort::Scalar(Field::Real));
     match value {
+        DistributionStatement::Pullback(value) => pullback(cas, value)?,
         DistributionStatement::Regularity { function, .. } => {
             endpoint(cas, function, &real, None)?;
         }
@@ -124,7 +125,8 @@ pub(crate) fn statement(
             endpoint(cas, function, &real, None)?;
             endpoint(cas, embedding, &Sort::Distribution, Some(space))?;
         }
-        DistributionStatement::Equality { left, right, .. } => {
+        DistributionStatement::Equality { left, right, .. }
+        | DistributionStatement::PrimitiveUnique { left, right, .. } => {
             endpoint(cas, left, &Sort::Distribution, Some(space))?;
             endpoint(cas, right, &Sort::Distribution, Some(space))?;
         }
@@ -183,6 +185,22 @@ fn endpoint(
     let value = cas.state.expression(cas.checked(handle)?)?;
     if value.sort != *sort || value.space != space || !value.scope.is_empty() {
         return Err(invalid());
+    }
+    Ok(())
+}
+
+/// Source and target coordinate roles cannot be exchanged by changing a displayed map.
+fn pullback(cas: &Cas, value: &crate::pullback_model::PullbackValue) -> Result<(), Fault> {
+    let source = cas.checked(&value.source_space)?;
+    let target = cas.checked(&value.target_space)?;
+    endpoint(cas, &value.source, &Sort::Distribution, Some(source))?;
+    endpoint(cas, &value.result, &Sort::Distribution, Some(target))?;
+    let real = Sort::Value(AtomicSort::Scalar(Field::Real));
+    endpoint(cas, &value.map, &real, None)?;
+    crate::boundary_roles::coordinate(cas, &value.map, &cas.state.space(target)?.coordinate)?;
+    if let Some(inverse) = &value.inverse {
+        endpoint(cas, inverse, &real, None)?;
+        crate::boundary_roles::coordinate(cas, inverse, &cas.state.space(source)?.coordinate)?;
     }
     Ok(())
 }

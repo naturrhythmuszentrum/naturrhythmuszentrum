@@ -28,3 +28,7 @@ pub use crate::split_model::{
 };
 
 pub use crate::germ_model::{GermAt, GermCertificate, GermMode, GermValue, SeriesAt};
+
+pub use crate::pullback_model::{
+    PullbackCertificate, PullbackKind, PullbackMode, PullbackValue, PullbackZero,
+};

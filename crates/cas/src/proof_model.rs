@@ -244,6 +244,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// Complete finite roots with independently checked inverse absolute Jacobians.
+    Pullback(Box<crate::pullback_model::PullbackCertificate>),
     /// Exact polynomial remainders for a case series restriction.
     Germ(Box<crate::germ_model::GermCertificate>),
     /// Complete cover, finite-point and polynomial endpoint evidence.

@@ -15,6 +15,14 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<DistributionStatement, Fault> {
     Ok(match reader.byte()? {
+        6 => DistributionStatement::Pullback(Box::new(crate::pullback_wire::decode_statement(
+            reader, records,
+        )?)),
+        7 => DistributionStatement::PrimitiveUnique {
+            left: object(reader, records)?,
+            right: object(reader, records)?,
+            space: object(reader, records)?,
+        },
         0 => DistributionStatement::Regularity {
             function: object(reader, records)?,
             space: object(reader, records)?,

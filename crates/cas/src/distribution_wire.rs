@@ -9,6 +9,7 @@ use crate::graph::Handle;
 /// Enumerate every typed mathematical dependency in stable semantic order.
 pub(crate) fn objects(value: &DistributionStatement) -> Vec<&Handle> {
     match value {
+        DistributionStatement::Pullback(value) => crate::pullback_wire::objects(value),
         DistributionStatement::Regularity {
             function, space, ..
         } => vec![function, space],
@@ -17,7 +18,8 @@ pub(crate) fn objects(value: &DistributionStatement) -> Vec<&Handle> {
             embedding,
             space,
         } => vec![function, embedding, space],
-        DistributionStatement::Equality { left, right, space } => vec![left, right, space],
+        DistributionStatement::Equality { left, right, space }
+        | DistributionStatement::PrimitiveUnique { left, right, space } => vec![left, right, space],
         DistributionStatement::Derivative {
             distribution,
             derivative,
@@ -51,7 +53,12 @@ pub(crate) fn statement(
         DistributionStatement::Derivative { .. } => 3,
         DistributionStatement::Pairing { .. } => 4,
         DistributionStatement::SupportAction { .. } => 5,
+        DistributionStatement::Pullback(_) => 6,
+        DistributionStatement::PrimitiveUnique { .. } => 7,
     })?;
+    if let DistributionStatement::Pullback(value) = value {
+        return crate::pullback_wire::statement(value, out, write);
+    }
     for object in objects(value) {
         write(object, out)?;
     }

@@ -194,6 +194,10 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::Pullback(value) => {
+            out.byte(11)?;
+            crate::pullback_wire::certificate(value, out)
+        }
         Certificate::Germ(value) => {
             out.byte(10)?;
             crate::germ_wire::certificate(value, out)

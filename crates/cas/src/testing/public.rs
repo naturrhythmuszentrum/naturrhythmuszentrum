@@ -108,3 +108,17 @@ pub(crate) mod split;
 )]
 #[path = "germs.rs"]
 pub(crate) mod germs;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public pullback fixtures"
+)]
+#[path = "pullbacks.rs"]
+pub(crate) mod pullbacks;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public primitive fixtures"
+)]
+#[path = "primitives.rs"]
+pub(crate) mod primitives;

@@ -111,6 +111,16 @@ impl Cas {
         checker: &mut Budget,
     ) -> Result<Option<Execution>, Fault> {
         let context = self.checked(&request.context)?;
+        if matches!(&request.task, crate::task::Task::Pullback { .. }) {
+            self.check_nonempty_request(context, generation)?;
+            let result = crate::pullback_producer::execute(
+                self, request, inputs, policy, generation, checker,
+            )?;
+            return Ok(Some(Execution {
+                result: Some(result),
+                fault: None,
+            }));
+        }
         if matches!(
             &request.task,
             crate::task::Task::Limit(_) | crate::task::Task::Series(_)
@@ -514,7 +524,10 @@ fn outcome(
                 | InvalidCode::EmptyDomain
                 | InvalidCode::OverlapConflict
                 | InvalidCode::CoverageHole
-                | InvalidCode::AnalyticDisagreement,
+                | InvalidCode::AnalyticDisagreement
+                | InvalidCode::PullbackMultipleZero
+                | InvalidCode::PullbackIncompleteZeros
+                | InvalidCode::PullbackMapMismatch,
             ) => Outcome::Refused {
                 reason: crate::distribution_search::refusal(fault),
                 request: record,

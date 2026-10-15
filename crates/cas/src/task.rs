@@ -113,14 +113,19 @@ pub enum Task {
         /// Exact distribution space.
         space: Handle,
     },
-    /// Request a represented pullback between explicit spaces.
+    /// Prove that two distribution primitives differ by a constant on a connected interval.
+    PrimitiveUnique {
+        /// Exact common distribution space.
+        space: Handle,
+    },
+    /// Pull a source delta back along the second input, a scalar map from target to source.
     Pullback {
         /// Source space.
         source_space: Handle,
         /// Target space.
         target_space: Handle,
         /// Explicit map convention.
-        map_kind: String,
+        map_kind: crate::pullback_model::PullbackKind,
     },
 }
 
@@ -211,7 +216,8 @@ impl Task {
                 space,
                 action_mode: ActionMode::NearSupport { neighborhood },
             } => vec![space, neighborhood],
-            Self::EmbedRegular { space }
+            Self::PrimitiveUnique { space }
+            | Self::EmbedRegular { space }
             | Self::Pair { space, .. }
             | Self::SmoothMultiply { space } => vec![space],
             Self::Pullback {
@@ -276,10 +282,8 @@ pub(crate) fn encode_with(
                 out.name(value)?;
             }
         }
-        Task::SquareFree(value)
-        | Task::Pullback {
-            map_kind: value, ..
-        } => out.name(value)?,
+        Task::SquareFree(value) => out.name(value)?,
+        Task::Pullback { map_kind, .. } => crate::pullback_wire::intent(map_kind, out)?,
         Task::Boundary {
             coordinate,
             requested_facts,
@@ -338,5 +342,6 @@ const fn tag(value: &Task) -> u8 {
         Task::EmbedRegular { .. } => 21,
         Task::ApplyAt { .. } => 22,
         Task::Product { .. } => 23,
+        Task::PrimitiveUnique { .. } => 24,
     }
 }

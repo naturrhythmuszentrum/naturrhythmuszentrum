@@ -22,7 +22,8 @@ use std::collections::BTreeMap;
 pub(crate) fn handles(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<bool, Fault> {
     if matches!(
         task,
-        Task::EmbedRegular { .. }
+        Task::PrimitiveUnique { .. }
+            | Task::EmbedRegular { .. }
             | Task::ApplyAt { .. }
             | Task::Product { .. }
             | Task::Pair { .. }
@@ -154,7 +155,8 @@ fn finish(
 /// Resolve the exact space from intent or from an already typed distribution input.
 fn request_space(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<Option<Handle>, Fault> {
     match task {
-        Task::EmbedRegular { space }
+        Task::PrimitiveUnique { space }
+        | Task::EmbedRegular { space }
         | Task::Pair { space, .. }
         | Task::SmoothMultiply { space } => Ok(Some(space.clone())),
         _ => {
@@ -178,6 +180,9 @@ fn run(
 ) -> Result<(Handle, Handle), Fault> {
     let first = inputs.first().ok_or_else(invalid)?;
     match task {
+        Task::PrimitiveUnique { .. } => {
+            runner.primitive_unique(first, inputs.get(1).ok_or_else(invalid)?)
+        }
         Task::EmbedRegular { .. } => runner.embed(first),
         Task::Differentiate { order, .. } => {
             if named {
@@ -358,6 +363,11 @@ pub(crate) const fn refusal(fault: Fault) -> RefusalReason {
         FaultKind::Invalid(InvalidCode::TestSpaceMismatch) => RefusalReason::TestSpaceMismatch,
         FaultKind::Invalid(InvalidCode::EmptyDomain) => RefusalReason::EmptyDomain,
         FaultKind::Invalid(InvalidCode::OverlapConflict) => RefusalReason::OverlapConflict,
+        FaultKind::Invalid(
+            InvalidCode::PullbackMultipleZero
+            | InvalidCode::PullbackIncompleteZeros
+            | InvalidCode::PullbackMapMismatch,
+        ) => RefusalReason::PullbackHypotheses,
         FaultKind::Invalid(InvalidCode::CoverageHole) => RefusalReason::CoverageHole,
         FaultKind::Invalid(InvalidCode::AnalyticDisagreement) => {
             RefusalReason::AnalyticDisagreement

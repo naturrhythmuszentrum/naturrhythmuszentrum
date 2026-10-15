@@ -667,3 +667,47 @@ mod germ_producer;
     reason = "germ calculus helpers stay inside the kernel"
 )]
 mod germ_wire;
+
+mod pullback_model;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution pullback helpers stay inside the kernel"
+)]
+mod pullback_geometry;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution pullback helpers stay inside the kernel"
+)]
+mod pullback_check;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution pullback helpers stay inside the kernel"
+)]
+mod pullback_output;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution pullback helpers stay inside the kernel"
+)]
+mod pullback_producer;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution pullback helpers stay inside the kernel"
+)]
+mod pullback_wire;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "distribution pullback helpers stay inside the kernel"
+)]
+mod primitive_unique;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "total polynomial map validation stays inside the kernel"
+)]
+mod pullback_polynomial;

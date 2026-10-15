@@ -14,3 +14,5 @@ pub use crate::derivative_model::{BoundaryFacts, DerivativeMap, PendingCell, Res
 pub use crate::split_model::SplitRange;
 
 pub use crate::germ_model::{GermAt, SeriesAt};
+
+pub use crate::pullback_model::PullbackKind;
