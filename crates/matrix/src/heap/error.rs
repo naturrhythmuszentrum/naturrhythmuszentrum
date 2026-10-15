@@ -10,6 +10,9 @@ pub enum HeapError {
     /// The descriptor or arena occupation no longer exists.
     #[error("handle or arena occupation is stale")]
     StaleHandle,
+    /// A cached physical region predates the current storage relocation epoch.
+    #[error("physical layout epoch is stale")]
+    StaleLayout,
     /// An internal or erased category does not match the requested access.
     #[error("descriptor category does not match access")]
     CategoryMismatch,
@@ -28,9 +31,12 @@ pub enum HeapError {
     /// Explicit layout enumeration or packing work was exhausted.
     #[error("layout work limit exhausted")]
     WorkLimit,
-    /// Selected writes need output injectivity and scatter publication.
-    #[error("selected writes are not available at this boundary")]
-    AliasWrite,
+    /// An output repeats an address or intersects another output destination.
+    #[error("output destinations are not injective and mutually disjoint")]
+    OutputOverlap,
+    /// A partial selected replacement cannot supply bounds for unselected entries.
+    #[error("declared bounds are missing for unselected base entries")]
+    MissingCoverage,
     /// A center is not finite.
     #[error("center at logical index {index} is not finite")]
     NonFinite {

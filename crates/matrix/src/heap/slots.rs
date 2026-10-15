@@ -208,6 +208,20 @@ impl<T> Slots<T> {
         })
     }
 
+    /// Mutate already validated occupations during an allocation-free relocation commit.
+    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = (Key, &mut T)> {
+        self.entries
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(index, slot)| {
+                let key = Key {
+                    slot: index,
+                    generation: slot.generation,
+                };
+                slot.value.as_mut().map(|value| (key, value))
+            })
+    }
+
     /// Test-only corruption access for inaccessible version/dependency guards.
     #[cfg(test)]
     pub(crate) fn get_mut(&mut self, key: Key) -> Result<&mut T, HeapError> {

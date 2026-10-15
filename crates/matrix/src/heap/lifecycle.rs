@@ -49,10 +49,11 @@ impl Snapshot {
 }
 
 impl Heap {
-    /// Replace all centers while explicitly reducing coverage to represented inputs.
+    /// Replace selected centers while reducing the entire base to represented coverage.
     ///
     /// The handle and value identity survive; the version advances even for identical bits.
-    /// Old bound occupations are retired atomically. Extent, quantity and format stay fixed.
+    /// All aliases resolve the advanced base version. Old bound occupations are retired
+    /// atomically. Extent, quantity and format stay fixed; overlapping destinations refuse.
     ///
     /// # Errors
     /// Refuses invalid handles, a mismatched expected version, exhausted counters,
@@ -67,10 +68,12 @@ impl Heap {
         self.replace(handle, expected, centers, None)
     }
 
-    /// Atomically replace all centers and their declared componentwise bound region.
+    /// Atomically replace selected centers and their declared componentwise bounds.
     ///
     /// Bounds are fresh assumptions for the new version, including with identical centers.
-    /// This invalidates the old bound handle without affecting unrelated allocations.
+    /// Unselected entries keep their current centers and bounds. A partial selection of
+    /// a represented-only base refuses because bounds for the remaining entries are unknown.
+    /// The entire base advances once; unrelated allocations retain their versions.
     ///
     /// # Errors
     /// In addition to represented-replacement refusals, rejects invalid radii and
@@ -98,10 +101,11 @@ impl Heap {
         handle: Handle<Value, P>,
     ) -> Result<(), HeapError> {
         if matches!(self.record(handle)?.meaning, Meaning::Alias { .. }) {
+            let key = handle.key;
             let plan = self.descriptors.change(
                 0,
                 None,
-                std::slice::from_ref(&handle.key),
+                std::slice::from_ref(&key),
                 self.limits.descriptors,
             )?;
             self.descriptors.publish(plan.bind(Vec::new())?);
@@ -132,9 +136,6 @@ impl Heap {
         handle: Handle<Value, P>,
         expected: Option<ValueVersion>,
     ) -> Result<Snapshot, HeapError> {
-        if matches!(self.record(handle)?.meaning, Meaning::Alias { .. }) {
-            return Err(HeapError::AliasWrite);
-        }
         let view = self.value(handle)?;
         let stamp = view.stamp();
         if let Some(expected) = expected

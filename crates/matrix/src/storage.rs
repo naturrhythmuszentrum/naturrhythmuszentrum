@@ -33,6 +33,8 @@ impl Format {
 /// A contiguous occupied range within a precision-specific slab.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Region {
+    /// Storage relocation epoch; old physical maps never resolve after compaction.
+    pub(crate) epoch: u64,
     /// Arena occupation, deliberately absent from the external handle.
     pub(crate) arena: Key,
     /// Scalar format.
@@ -46,6 +48,8 @@ pub(crate) struct Region {
 /// Independent typed collections of owned slabs.
 #[derive(Debug)]
 pub(crate) struct Storage {
+    /// Relocation revision, independent of mathematical value versions.
+    epoch: u64,
     /// Binary32 owners.
     single: Slots<Mat<f32>>,
     /// Binary64 owners.
@@ -58,10 +62,28 @@ impl Storage {
     /// Empty typed arenas.
     pub(crate) const fn new() -> Self {
         Self {
+            epoch: 1,
             single: Slots::new(),
             double: Slots::new(),
             elements: [0, 0],
         }
+    }
+
+    /// Current physical-layout epoch; it advances only on complete relocation.
+    pub(crate) const fn epoch(&self) -> u64 {
+        self.epoch
+    }
+
+    /// Prepare an empty replacement owner with a checked successor epoch.
+    pub(crate) fn replacement(&self) -> Result<Self, HeapError> {
+        let epoch = self
+            .epoch
+            .checked_add(1)
+            .ok_or(HeapError::CounterExhausted)?;
+        Ok(Self {
+            epoch,
+            ..Self::new()
+        })
     }
 
     /// Prepare a complete typed storage change, including all retired allocations.
@@ -87,6 +109,7 @@ impl Storage {
                 Ok(PreparedStorage::Single {
                     slots: plan.bind(matrices)?,
                     elements,
+                    epoch: self.epoch,
                 })
             }
             Format::Binary64 => {
@@ -103,6 +126,7 @@ impl Storage {
                 Ok(PreparedStorage::Double {
                     slots: plan.bind(matrices)?,
                     elements,
+                    epoch: self.epoch,
                 })
             }
         }
@@ -150,11 +174,21 @@ impl Storage {
     /// Install only complete typed changes; their counters were checked in preparation.
     pub(crate) fn publish(&mut self, prepared: PreparedStorage) {
         match prepared {
-            PreparedStorage::Single { slots, elements } => {
+            PreparedStorage::Single {
+                slots,
+                elements,
+                epoch,
+            } => {
+                self.epoch = epoch;
                 self.single.publish(slots);
                 self.elements[0] = elements;
             }
-            PreparedStorage::Double { slots, elements } => {
+            PreparedStorage::Double {
+                slots,
+                elements,
+                epoch,
+            } => {
+                self.epoch = epoch;
                 self.double.publish(slots);
                 self.elements[1] = elements;
             }
@@ -163,6 +197,9 @@ impl Storage {
 
     /// Validate the arena generation and range before lending its storage.
     pub(crate) fn resolve(&self, region: Region) -> Result<SlabRef<'_>, HeapError> {
+        if region.epoch != self.epoch {
+            return Err(HeapError::StaleLayout);
+        }
         let slab = match region.format {
             Format::Binary32 => SlabRef::Single(self.single.get(region.arena)?),
             Format::Binary64 => SlabRef::Double(self.double.get(region.arena)?),
@@ -206,6 +243,8 @@ pub(crate) enum PreparedStorage {
         slots: PreparedSlots<Mat<f32>>,
         /// Future total live entries in this precision.
         elements: usize,
+        /// Epoch of the owner for which the change was prepared.
+        epoch: u64,
     },
     /// A binary64 change.
     Double {
@@ -213,10 +252,19 @@ pub(crate) enum PreparedStorage {
         slots: PreparedSlots<Mat<f64>>,
         /// Future total live entries in this precision.
         elements: usize,
+        /// Epoch of the owner for which the change was prepared.
+        epoch: u64,
     },
 }
 
 impl PreparedStorage {
+    /// Epoch captured during preparation, before constructing physical region records.
+    pub(crate) const fn epoch(&self) -> u64 {
+        match self {
+            Self::Single { epoch, .. } | Self::Double { epoch, .. } => *epoch,
+        }
+    }
+
     /// The exact future arena keys, before any visible publication.
     pub(crate) fn keys(&self) -> &[Key] {
         match self {
@@ -283,5 +331,39 @@ impl SlabRef<'_> {
             .downcast_ref::<P>()
             .copied()
             .ok_or(HeapError::PrecisionMismatch)
+    }
+}
+
+/// Inaccessible relocation-counter exhaustion invariant.
+#[cfg(test)]
+mod tests {
+    use super::{Format, HeapError, HeapLimits, Region, Storage};
+
+    /// Exhausted physical epochs refuse a new owner and leave current storage readable.
+    /// ´test:unit:layout-epoch-exhaustion-never-wraps´
+    #[test]
+    fn layout_epoch_exhaustion_never_wraps() -> Result<(), HeapError> {
+        let mut storage = Storage::new();
+        storage.epoch = u64::MAX;
+        let prepared = storage.prepare::<f64>(&[&[7.0]], &[], HeapLimits::default())?;
+        let arena = *prepared.keys().first().ok_or(HeapError::Capacity)?;
+        storage.publish(prepared);
+        let region = Region {
+            epoch: u64::MAX,
+            arena,
+            format: Format::Binary64,
+            offset: 0,
+            length: 1,
+        };
+        assert!(matches!(
+            storage.replacement(),
+            Err(HeapError::CounterExhausted)
+        ));
+        assert_eq!(storage.epoch(), u64::MAX);
+        assert_eq!(
+            storage.resolve(region)?.entry::<f64>(0)?.to_bits(),
+            7.0_f64.to_bits()
+        );
+        Ok(())
     }
 }

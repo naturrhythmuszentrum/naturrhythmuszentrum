@@ -61,7 +61,7 @@ category!(
 );
 
 /// Slot and occupation generation, independent of physical storage location.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct Key {
     /// Position in the owner's descriptor or arena table.
     pub(crate) slot: usize,

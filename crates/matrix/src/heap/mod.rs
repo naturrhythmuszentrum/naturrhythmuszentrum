@@ -9,6 +9,8 @@ mod lifecycle;
 mod limits;
 mod publication;
 mod records;
+mod relocation;
+mod scatter;
 mod schema;
 pub(crate) mod slots;
 mod views;

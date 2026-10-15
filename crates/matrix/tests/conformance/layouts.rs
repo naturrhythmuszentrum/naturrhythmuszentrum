@@ -168,27 +168,3 @@ fn alias_refusals_preserve_capacity() -> TestResult {
     ));
     Ok(())
 }
-
-/// Read-only alias publication cannot bypass the checked replacement boundary.
-/// ´test:integration:alias-write-awaits-output-proof´
-#[test]
-fn alias_write_awaits_output_proof() -> TestResult {
-    let mut heap = Heap::new(HeapLimits::default())?;
-    let base =
-        heap.import_represented(Extent::new(2, 1)?, &Descriptor::ratio(), &[1.0_f64, 2.0])?;
-    let alias = heap.alias(
-        base.value(),
-        &Layout::strided(Extent::new(1, 1)?, 2, 1, 0, 0)?,
-    )?;
-    let stamp = heap.value(alias)?.stamp();
-    assert!(matches!(
-        heap.replace_represented(alias, stamp.version(), &[3.0]),
-        Err(HeapError::AliasWrite)
-    ));
-    assert_eq!(heap.value(base.value())?.stamp(), stamp);
-    assert_eq!(
-        heap.value(alias)?.region().get(0, 0)?.to_bits(),
-        2.0_f64.to_bits()
-    );
-    Ok(())
-}

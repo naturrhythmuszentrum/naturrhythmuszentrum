@@ -224,3 +224,33 @@
 //! }
 //! let _ = example;
 //! ```
+//!
+//! Compaction requires the live region borrow to end first.
+//!
+//! ```rust
+//! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
+//! use nrz_units::Descriptor;
+//! fn example() -> Result<(), HeapError> {
+//!     let mut heap = Heap::new(HeapLimits::default())?;
+//!     let value = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
+//!     let view = heap.value(value.value())?;
+//!     let _ = view.region().get(0, 0)?;
+//!     heap.compact()?;
+//!     Ok(())
+//! }
+//! let _ = example;
+//! ```
+//!
+//! ```compile_fail,E0502
+//! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
+//! use nrz_units::Descriptor;
+//! fn example() -> Result<(), HeapError> {
+//!     let mut heap = Heap::new(HeapLimits::default())?;
+//!     let value = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
+//!     let view = heap.value(value.value())?;
+//!     heap.compact()?;
+//!     let _ = view.region().get(0, 0)?;
+//!     Ok(())
+//! }
+//! let _ = example;
+//! ```

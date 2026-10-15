@@ -109,7 +109,7 @@ impl Heap {
     }
 
     /// Prepare a checked replacement without touching the old value or its reverse edges.
-    pub(crate) fn replace<P: Scalar + 'static>(
+    pub(crate) fn replace_base<P: Scalar + 'static>(
         &mut self,
         handle: Handle<Value, P>,
         expected: ValueVersion,
@@ -214,6 +214,7 @@ fn assemble<P: Scalar + 'static>(
         storage.keys(),
         &schemas,
         stamp,
+        storage.epoch(),
     )?;
     Ok(PreparedImport {
         storage,
@@ -255,6 +256,7 @@ fn prepare_records<P: Scalar + 'static>(
     arenas: &[Key],
     schemas: &SchemaPlan,
     stamp: ValueStamp,
+    epoch: u64,
 ) -> Result<(Vec<Record>, PublishedBundle<P>), HeapError> {
     let target = *keys.first().ok_or(HeapError::Capacity)?;
     let value_arena = *arenas.first().ok_or(HeapError::Capacity)?;
@@ -269,6 +271,7 @@ fn prepare_records<P: Scalar + 'static>(
     records.push(Record {
         schema: schemas.value,
         location: Location::Owned(Region {
+            epoch,
             arena: value_arena,
             format: Format::of::<P>(),
             offset: 0,
@@ -285,6 +288,7 @@ fn prepare_records<P: Scalar + 'static>(
         records.push(Record {
             schema,
             location: Location::Owned(Region {
+                epoch,
                 arena,
                 format: Format::of::<P>(),
                 offset: 0,

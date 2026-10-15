@@ -14,6 +14,7 @@ fn arena_resolution_refuses_corrupt_ranges() -> Result<(), HeapError> {
     let arena = *prepared.keys().first().ok_or(HeapError::Capacity)?;
     storage.publish(prepared);
     let region = Region {
+        epoch: storage.epoch(),
         arena,
         format: Format::Binary64,
         offset: 0,
@@ -61,6 +62,7 @@ fn arena_reuse_invalidates_old_regions() -> Result<(), HeapError> {
     let arena = *prepared.keys().first().ok_or(HeapError::Capacity)?;
     storage.publish(prepared);
     let region = Region {
+        epoch: storage.epoch(),
         arena,
         format: Format::Binary64,
         offset: 0,

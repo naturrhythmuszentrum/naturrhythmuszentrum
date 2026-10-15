@@ -37,9 +37,11 @@ impl<P: Scalar + 'static> PackedRegion<P> {
         )?;
         let arena = *prepared.keys().first().ok_or(HeapError::Capacity)?;
         storage.publish(prepared);
+        let epoch = storage.epoch();
         Ok(Self {
             storage,
             region: Region {
+                epoch,
                 arena,
                 format: Format::of::<P>(),
                 offset: 0,

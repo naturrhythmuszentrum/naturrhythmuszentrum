@@ -76,6 +76,12 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
         Ok(copy)
     }
 
+    /// Physical relocation epoch; mathematical versions need not change when it advances.
+    #[must_use]
+    pub const fn layout_epoch(&self) -> u64 {
+        self.region.epoch
+    }
+
     /// The selected logical entries, relative to the owning region.
     #[must_use]
     pub const fn layout(&self) -> &Layout {

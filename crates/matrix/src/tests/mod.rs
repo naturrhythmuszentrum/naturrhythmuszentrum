@@ -2,5 +2,6 @@
 //! Internal storage and resolver interactions that the public facade cannot construct.
 
 mod publication;
+mod relocation;
 mod resolution;
 mod storage;

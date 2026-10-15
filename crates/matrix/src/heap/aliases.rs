@@ -44,6 +44,33 @@ impl Heap {
         Ok(Handle::new(self.scope, key))
     }
 
+    /// Check that all destinations are injective and mutually disjoint.
+    ///
+    /// Dense regions use an exact range proof. Other maps enumerate and sort their
+    /// combined destinations under the heap's layout work limit. This check grants
+    /// no mutable borrow; publication rechecks destinations under its exclusive borrow.
+    ///
+    /// # Errors
+    /// Refuses invalid handles, output overlap, work exhaustion or preparation capacity.
+    pub fn validate_outputs<P: Scalar + 'static>(
+        &self,
+        handles: &[Handle<Value, P>],
+    ) -> Result<(), HeapError> {
+        if handles.len() > self.limits.descriptors {
+            return Err(HeapError::Capacity);
+        }
+        let mut destinations = Vec::new();
+        destinations
+            .try_reserve_exact(handles.len())
+            .map_err(|_| HeapError::Capacity)?;
+        for &handle in handles {
+            self.value(handle)?;
+            let record = self.record(handle)?;
+            destinations.push((self.owning_region(record)?, &record.layout));
+        }
+        crate::layout::validate_outputs(&destinations, self.limits.layout_work)
+    }
+
     /// Resolve the direct base occupation without permitting alias chains or category changes.
     pub(crate) fn base_handle<P: Scalar + 'static>(
         &self,

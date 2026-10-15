@@ -63,7 +63,7 @@ pub(crate) struct Record {
     pub(crate) meaning: Meaning,
 }
 
-/// Atomic import result; its handles resolve through the heap on every access.
+/// Atomic publication result; its handles resolve through the heap on every access.
 #[derive(Clone, Copy, Debug)]
 pub struct PublishedBundle<P: Scalar> {
     /// Published value occupation.
@@ -73,13 +73,13 @@ pub struct PublishedBundle<P: Scalar> {
 }
 
 impl<P: Scalar> PublishedBundle<P> {
-    /// The imported value handle.
+    /// The published value or selected alias handle.
     #[must_use]
     pub const fn value(self) -> Handle<Value, P> {
         self.value
     }
 
-    /// The declared componentwise bound handle, if requested at import.
+    /// The whole-base declared componentwise bound handle, when coverage includes it.
     #[must_use]
     pub const fn bound(self) -> Option<Handle<Companion, P>> {
         self.bound

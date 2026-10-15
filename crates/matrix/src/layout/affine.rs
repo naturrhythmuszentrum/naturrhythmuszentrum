@@ -85,6 +85,31 @@ impl Affine {
         usize::try_from(address).map_err(|_| HeapError::InvalidLayout)
     }
 
+    /// Prove an injective contiguous address range, admitting either orientation and axis order.
+    pub(crate) fn dense_range(self, extent: Extent) -> Result<Option<(usize, usize)>, HeapError> {
+        let rows = extent.rows();
+        let columns = extent.columns();
+        let by_rows = (rows <= 1 || self.row_stride.unsigned_abs() == 1)
+            && (columns <= 1 || self.column_stride.unsigned_abs() == rows);
+        let by_columns = (columns <= 1 || self.column_stride.unsigned_abs() == 1)
+            && (rows <= 1 || self.row_stride.unsigned_abs() == columns);
+        if !by_rows && !by_columns {
+            return Ok(None);
+        }
+        let last_row = rows.checked_sub(1).ok_or(HeapError::InvalidLayout)?;
+        let last_column = columns.checked_sub(1).ok_or(HeapError::InvalidLayout)?;
+        let low_row = if self.row_stride < 0 { last_row } else { 0 };
+        let low_column = if self.column_stride < 0 {
+            last_column
+        } else {
+            0
+        };
+        let start = self.index(low_row, low_column)?;
+        let last = self.index(last_row - low_row, last_column - low_column)?;
+        let end = last.checked_add(1).ok_or(HeapError::ExtentOverflow)?;
+        Ok(Some((start, end)))
+    }
+
     /// Constant-time proof that vectorization itself is the map.
     pub(crate) fn is_identity(self, extent: Extent) -> bool {
         self.offset == 0

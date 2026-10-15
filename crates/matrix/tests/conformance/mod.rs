@@ -4,3 +4,4 @@
 mod imports;
 mod layouts;
 mod lifecycle;
+mod outputs;

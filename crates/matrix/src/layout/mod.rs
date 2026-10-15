@@ -2,7 +2,10 @@
 //! Checked maps from logical column order into one owning region.
 
 mod affine;
+mod outputs;
 mod packing;
+
+pub(crate) use outputs::validate_outputs;
 
 pub use packing::PackedRegion;
 
@@ -193,6 +196,23 @@ impl Layout {
             return Err(HeapError::InvalidLayout);
         }
         Ok(index)
+    }
+
+    /// Number of entries needed to revalidate an explicit map during relocation.
+    pub(crate) const fn validation_work(&self) -> usize {
+        match &self.map {
+            Map::Gather(indices) => indices.len(),
+            Map::Empty | Map::Affine(_) => 0,
+        }
+    }
+
+    /// A sufficient injectivity proof and its occupied range, without enumerating entries.
+    pub(crate) fn dense_range(&self) -> Result<Option<(usize, usize)>, HeapError> {
+        match &self.map {
+            Map::Empty => Ok(Some((0, 0))),
+            Map::Affine(affine) => affine.dense_range(self.extent),
+            Map::Gather(_) => Ok(None),
+        }
     }
 
     /// Copy a checked selection fallibly, bounding explicit-map allocation and scanning.
