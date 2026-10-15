@@ -40,7 +40,16 @@ fn ground_nonzero(form: &Form, budget: &mut Budget) -> Result<bool, Fault> {
     }
     match &term.coefficient.value {
         Coefficient::Scalar(value) => Ok(!value.zero(budget)?),
-        _ => Ok(false),
+        Coefficient::Fraction(value) => {
+            let (Some(numerator), Some(denominator)) = (
+                value.numerator.scalar(budget)?,
+                value.denominator.scalar(budget)?,
+            ) else {
+                return Ok(false);
+            };
+            Ok(!numerator.zero(budget)? && !denominator.zero(budget)?)
+        }
+        Coefficient::Tower(_) => Ok(false),
     }
 }
 

@@ -94,6 +94,12 @@ pub(crate) fn check(
         return Err(invalid());
     }
     let original = problem(evaluation.cas, &claim.problem)?;
+    crate::solving::elementary::member::contained(
+        evaluation.cas,
+        &claim.region,
+        &original.region,
+        budget,
+    )?;
     let count = u32::try_from(
         coordinates(evaluation.cas, &original.unknowns)?
             .coordinates

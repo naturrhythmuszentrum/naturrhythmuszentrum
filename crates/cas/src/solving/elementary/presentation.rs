@@ -52,6 +52,10 @@ fn root(
     else {
         return Err(invalid());
     };
+    if form == SolveForm::Radicals && !order_proved {
+        let leading = &polynomial.terms.first().ok_or_else(invalid)?.coefficient;
+        evaluation.nonzero(&evaluation.mapped(leading, map, budget)?, budget)?;
+    }
     reserve(pending, map.images.len(), budget)?;
     pending.extend(map.images.iter().map(Handle::logical_id));
     crate::solving::coefficients::proof::defined(
@@ -172,6 +176,9 @@ fn branches(
         }
         match &branch.kind {
             SolutionBranchKind::Finite { tuples } => {
+                if form == SolveForm::ExactFamily {
+                    return Err(invalid());
+                }
                 for handle in tuples {
                     for entry in &tuple(evaluation.cas, handle)?.entries {
                         evaluation.expression(entry.logical_id(), true, budget)?;

@@ -779,3 +779,176 @@ fn linear_pivot_budget_boundary() -> TestResult {
     }
     Ok(())
 }
+
+/// Both binomial coverage modes refuse to widen the original coefficient region.
+/// ´test:integration:binomial-original-region-containment´
+#[test]
+fn binomial_original_region_containment() -> TestResult {
+    for zero in [false, true] {
+        for restricted in [false, true] {
+            let mut fixture = crate::testing::solve_elementary::binomial_region(zero, restricted)?;
+            let before = fixture.base.cas.counts();
+            let result = fixture.base.cas.check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            );
+            if restricted {
+                assert!(result.is_err());
+                assert_eq!(fixture.base.cas.counts(), before);
+            } else {
+                let witness = result?;
+                assert_eq!(witness.hypotheses(), []);
+                assert_eq!(witness.judgment().residuals, []);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Consistent and contradictory linear systems allow restrictions and reject expansions of the original region.
+/// ´test:integration:linear-original-region-containment´
+#[test]
+fn linear_original_region_containment() -> TestResult {
+    for inconsistent in [false, true] {
+        for contained in [false, true] {
+            let mut fixture =
+                crate::testing::solve_elementary::linear_region(inconsistent, contained)?;
+            let before = fixture.base.cas.counts();
+            let result = fixture.base.cas.check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            );
+            if contained {
+                let witness = result?;
+                assert_eq!(witness.hypotheses(), []);
+                assert_eq!(witness.judgment().residuals, []);
+            } else {
+                assert!(result.is_err());
+                assert_eq!(fixture.base.cas.counts(), before);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Existence remains valid on every stratum, but radical provenance requires the specialized leading term.
+/// ´test:integration:radical-specialized-leading-coefficient´
+#[test]
+fn radical_specialized_leading_coefficient() -> TestResult {
+    for stratum in 0..3 {
+        let mut fixture = crate::testing::solve_elementary::specialized_presentation(stratum)?;
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                fixture.steps.get(..1).ok_or("missing existence")?,
+                &mut Budget::new(Limits::blind_cubic())?,
+            )
+            .map_err(|error| format!("existence stratum {stratum}: {error}"))?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if stratum == 1 {
+            let witness = result?;
+            assert_eq!(witness.hypotheses(), []);
+            assert_eq!(witness.judgment().residuals, []);
+        } else {
+            assert!(result.is_err());
+            assert_eq!(fixture.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// A finite sample cannot claim the representation of an exact family image.
+/// ´test:integration:exact-family-branch-shape´
+#[test]
+fn exact_family_branch_shape() -> TestResult {
+    for image in [false, true] {
+        let mut fixture = crate::testing::solve_elementary::family_presentation(image)?;
+        fixture.base.cas.check_proof(
+            &fixture.base.context,
+            fixture.steps.get(..1).ok_or("missing membership")?,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if image {
+            let witness = result?;
+            assert_eq!(witness.hypotheses(), []);
+            assert_eq!(witness.judgment().residuals, []);
+        } else {
+            assert!(result.is_err());
+            assert_eq!(fixture.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// A general algebraic placeholder cannot discharge a recursively radical presentation request.
+/// ´test:integration:general-root-is-not-radical-provenance´
+#[test]
+fn general_root_is_not_radical_provenance() -> TestResult {
+    for radicals in [false, true] {
+        let mut fixture = crate::testing::solve_elementary::general_presentation(radicals)?;
+        fixture.base.cas.check_proof(
+            &fixture.base.context,
+            fixture.steps.get(..2).ok_or("missing existence")?,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if radicals {
+            assert!(result.is_err());
+            assert_eq!(fixture.base.cas.counts(), before);
+        } else {
+            let witness = result?;
+            assert_eq!(witness.hypotheses(), []);
+            assert_eq!(witness.judgment().residuals, []);
+        }
+    }
+    Ok(())
+}
+
+/// Existence of independent cube-root choices never supplies a branch-unsafe equality.
+/// ´test:integration:independent-cube-root-equality-refused´
+#[test]
+fn independent_cube_root_equality_refused() -> TestResult {
+    for independent in [false, true] {
+        let mut fixture = crate::testing::solve_elementary::independent_cube_roots(independent)?;
+        fixture.base.cas.check_proof(
+            &fixture.base.context,
+            fixture.steps.get(..3).ok_or("missing existence")?,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if independent {
+            assert!(result.is_err());
+            assert_eq!(fixture.base.cas.counts(), before);
+        } else {
+            let witness = result?;
+            assert_eq!(witness.hypotheses(), []);
+            assert_eq!(witness.judgment().residuals, []);
+        }
+    }
+    Ok(())
+}

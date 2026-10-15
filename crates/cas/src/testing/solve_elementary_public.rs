@@ -2146,3 +2146,443 @@ pub(crate) fn sampled_family() -> TestResult<(Fixture, Vec<ApplicationDraft>)> {
     }
     Ok((base, steps))
 }
+
+impl Fixture {
+    /// A ground leading-unit certificate is independent of the requested root polynomial.
+    fn ground_unit(&mut self) -> TestResult<ApplicationDraft> {
+        let algebra = self.algebra.clone();
+        let one = self.coefficient(1)?;
+        let modulus = self.polynomial(&algebra, &[(1, one.clone())])?;
+        let constant = self.polynomial(&algebra, &[(0, one.clone())])?;
+        let empty = self.polynomial(&algebra, &[])?;
+        Ok(self.unit(&one, &algebra, &modulus, &constant, &empty))
+    }
+}
+
+/// General algebraic roots remain exact, but their existence does not establish a radical presentation.
+pub(crate) fn general_presentation(radicals: bool) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{
+        CertificateRootSelectionRefinement, RefinementMode, RefinementTargetKind, SolveCertificate,
+        SolveForm, SolveSchema, SolveStatement, StatementPresentation,
+    };
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    let unit = base.ground_unit()?;
+    let algebra = base.algebra.clone();
+    let one = base.coefficient(1)?;
+    let polynomial = base.polynomial(&algebra, &[(3, one.clone()), (1, one.clone()), (0, one)])?;
+    let map = base.scalar_map(&algebra, &[])?;
+    let (relation, selection, root) = base.root(&polynomial, &map)?;
+    let existence = base.adjoin(&relation, &selection, 0);
+    let zero = base.integer(0, false)?;
+    let predicate = base.equation(&zero, &zero)?;
+    let problem = base.problem("x", &predicate, &[])?;
+    let set = base.finite(&problem, &[root])?;
+    let form = if radicals {
+        SolveForm::Radicals
+    } else {
+        SolveForm::AlgebraicRoots
+    };
+    let mut step = base.step(
+        SolveSchema::RootSelectionRefinement,
+        SolveStatement::Presentation(StatementPresentation {
+            set: set.clone(),
+            form,
+            region: base.region.clone(),
+        }),
+        SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+            mode: RefinementMode::Presentation,
+            target_kind: RefinementTargetKind::SolutionSet,
+            target: set,
+            witnesses: Vec::new(),
+            compatibility: Vec::new(),
+            form: Some(form),
+        }),
+    );
+    step.premises = vec![1];
+    Ok(BinomialFixture {
+        base,
+        steps: vec![unit, existence, step],
+    })
+}
+
+/// Two separately selected cube roots satisfy the same polynomial without an equality theorem.
+pub(crate) fn independent_cube_roots(independent: bool) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{
+        CertificateConjugationTransport, SolveCertificate, SolveSchema, SolveStatement,
+        StatementCoefficientEquality,
+    };
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    let unit = base.ground_unit()?;
+    let algebra = base.algebra.clone();
+    let one = base.coefficient(1)?;
+    let negative = base.coefficient(-2)?;
+    let polynomial = base.polynomial(&algebra, &[(3, one), (0, negative)])?;
+    let map = base.scalar_map(&algebra, &[])?;
+    let (relation, selection, left) = base.root(&polynomial, &map)?;
+    let first = base.adjoin(&relation, &selection, 0);
+    let (selection, right) = base.independent_root(&relation)?;
+    let mut second = base.adjoin(&relation, &selection, 0);
+    second.premises.push(1);
+    let mut step = base.step(
+        SolveSchema::ConjugationTransport,
+        SolveStatement::CoefficientEquality(StatementCoefficientEquality {
+            right: if independent { right } else { left.clone() },
+            left,
+            map: map.clone(),
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ConjugationTransport(CertificateConjugationTransport {
+            map: map.clone(),
+            conjugate_map: map,
+            images: Vec::new(),
+            values: Vec::new(),
+            relations: Vec::new(),
+            fixed_field: Vec::new(),
+            region: base.region.clone(),
+        }),
+    );
+    step.premises = vec![1, 2];
+    Ok(BinomialFixture {
+        base,
+        steps: vec![unit, first, second, step],
+    })
+}
+
+impl Fixture {
+    /// A coefficient guard can restrict the problem independently of a claimed theorem region.
+    pub(crate) fn coefficient_guard(&mut self, nonzero: bool) -> TestResult<Handle> {
+        let parameter = self.free("a")?;
+        let zero = self.integer(0, false)?;
+        let predicate = self.equation(&parameter, &zero)?;
+        let base = Reference::Existing(self.region.clone());
+        let predicate = Reference::Existing(predicate);
+        admit(
+            &mut self.cas,
+            &Draft::Region(RegionDraft {
+                header: Reference::Existing(self.header.clone()),
+                scope: Vec::new(),
+                ambient: AmbientDomain::Product {
+                    coordinates: self.coefficients.clone(),
+                },
+                expression: if nonzero {
+                    RegionExpr::GuardFalse { base, predicate }
+                } else {
+                    RegionExpr::GuardTrue { base, predicate }
+                },
+            }),
+        )
+    }
+
+    /// Rebuild only the original region, keeping all original equations and domains identical.
+    pub(crate) fn problem_region(
+        &mut self,
+        handle: &Handle,
+        region: &Handle,
+    ) -> TestResult<Handle> {
+        let SolveView::SolveProblem(value) = self.cas.solve_view(handle)? else {
+            return Err("missing problem".into());
+        };
+        let value = value.clone();
+        admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::SolveProblem(SolveProblemData {
+                header: Reference::Existing(value.header),
+                scope: value.scope,
+                predicate: Reference::Existing(value.predicate),
+                coefficients: Reference::Existing(value.coefficients),
+                unknowns: Reference::Existing(value.unknowns),
+                region: Reference::Existing(region.clone()),
+                domain: Reference::Existing(value.domain),
+                coefficient_domain: Reference::Existing(value.coefficient_domain),
+                ambient: value.ambient,
+                denominators: value
+                    .denominators
+                    .into_iter()
+                    .map(Reference::Existing)
+                    .collect(),
+            })),
+        )
+    }
+
+    /// Preserve branch shape while rebinding a proposal to the explicitly changed original problem.
+    pub(crate) fn set_problem(&mut self, handle: &Handle, problem: &Handle) -> TestResult<Handle> {
+        use crate::test_api::solving::{SolutionBranchData, SolutionBranchKind, SolutionSetData};
+        let SolveView::SolutionSet(value) = self.cas.solve_view(handle)? else {
+            return Err("missing set".into());
+        };
+        let members = value.branches.clone();
+        let mut branches = Vec::new();
+        for member in members {
+            let SolveView::SolutionBranch(value) = self.cas.solve_view(&member)? else {
+                return Err("missing branch".into());
+            };
+            let value = value.clone();
+            let kind = match value.kind {
+                SolutionBranchKind::Finite { tuples } => SolutionBranchKind::Finite {
+                    tuples: tuples.into_iter().map(Reference::Existing).collect(),
+                },
+                SolutionBranchKind::Image { family } => SolutionBranchKind::Image {
+                    family: Reference::Existing(family),
+                },
+                SolutionBranchKind::Empty => SolutionBranchKind::Empty,
+                _ => return Err("unexpected branch".into()),
+            };
+            branches.push(Reference::Existing(admit(
+                &mut self.cas,
+                &Draft::Solve(SolveDraft::SolutionBranch(SolutionBranchData {
+                    problem: Reference::Existing(problem.clone()),
+                    region: Reference::Existing(value.region),
+                    domain: Reference::Existing(value.domain),
+                    kind,
+                })),
+            )?));
+        }
+        admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::SolutionSet(SolutionSetData {
+                problem: Reference::Existing(problem.clone()),
+                branches,
+            })),
+        )
+    }
+
+    /// Root contexts make the claimed region explicit without borrowing a hypothesis.
+    pub(crate) fn enter_region(&mut self, region: Handle) -> TestResult {
+        self.context = admit(
+            &mut self.cas,
+            &Draft::Context(ContextDraft::Root {
+                header: Reference::Existing(self.header.clone()),
+                admissible: Reference::Existing(region.clone()),
+                assumptions: Vec::new(),
+            }),
+        )?;
+        self.region = region;
+        Ok(())
+    }
+
+    /// Presentation is separate from coverage and repeats the requested form in its certificate.
+    pub(crate) fn present(
+        &self,
+        set: &Handle,
+        form: crate::test_api::solving::SolveForm,
+    ) -> ApplicationDraft {
+        use crate::test_api::solving::{
+            CertificateRootSelectionRefinement, RefinementMode, RefinementTargetKind,
+            SolveCertificate, SolveSchema, SolveStatement, StatementPresentation,
+        };
+        self.step(
+            SolveSchema::RootSelectionRefinement,
+            SolveStatement::Presentation(StatementPresentation {
+                set: set.clone(),
+                form,
+                region: self.region.clone(),
+            }),
+            SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+                mode: RefinementMode::Presentation,
+                target_kind: RefinementTargetKind::SolutionSet,
+                target: set.clone(),
+                witnesses: Vec::new(),
+                compatibility: Vec::new(),
+                form: Some(form),
+            }),
+        )
+    }
+
+    /// The formal leading coefficient a is mapped independently of its nonzero formal representation.
+    fn parameter_binomial(&mut self, image: &Handle) -> TestResult<(Handle, Handle)> {
+        use crate::test_api::solving::{CoefficientValueData, CoefficientValueObject};
+        let coordinates = coordinate_product(
+            &mut self.cas,
+            &self.header,
+            &["a"],
+            CoordinateRole::Coefficient,
+            &self.field,
+        )?;
+        let algebra = self.algebra.clone();
+        let domain = admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::CoefficientDomain(
+                CoefficientDomainData::Fraction {
+                    base: Reference::Existing(algebra.clone()),
+                    coordinates: Reference::Existing(coordinates),
+                },
+            )),
+        )?;
+        let one = self.coefficient(1)?;
+        let numerator = self.polynomial(&algebra, &[(1, one.clone())])?;
+        let denominator = self.polynomial(&algebra, &[(0, one)])?;
+        let leading = admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::CoefficientValue(CoefficientValueObject {
+                domain: Reference::Existing(domain.clone()),
+                value: CoefficientValueData::Fraction {
+                    numerator: Reference::Existing(numerator),
+                    denominator: Reference::Existing(denominator),
+                },
+            })),
+        )?;
+        let polynomial = self.polynomial(&domain, &[(2, leading)])?;
+        let map = self.scalar_map(&domain, std::slice::from_ref(image))?;
+        Ok((polynomial, map))
+    }
+}
+
+/// Constructive existence of zero in a*X² does not establish radical provenance when a can vanish.
+pub(crate) fn specialized_presentation(stratum: u8) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{
+        CertificateRootSelectionRefinement, RefinementMode, RefinementTargetKind, SolveCertificate,
+        SolveForm, SolveSchema, SolveStatement, StatementRootExistence,
+    };
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    if stratum < 2 {
+        let region = base.coefficient_guard(stratum == 1)?;
+        base.enter_region(region)?;
+    }
+    let image = base.free("a")?;
+    let (polynomial, map) = base.parameter_binomial(&image)?;
+    let (_, selection, root) = base.root(&polynomial, &map)?;
+    let zero = base.integer(0, false)?;
+    let existence = base.step(
+        SolveSchema::RootSelectionRefinement,
+        SolveStatement::RootExistence(StatementRootExistence {
+            relation: selection.clone(),
+            region: base.region.clone(),
+        }),
+        SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+            mode: RefinementMode::Existence,
+            target_kind: RefinementTargetKind::Selection,
+            target: selection,
+            witnesses: vec![zero.clone()],
+            compatibility: Vec::new(),
+            form: None,
+        }),
+    );
+    let predicate = base.equation(&zero, &zero)?;
+    let problem = base.problem("x", &predicate, &[])?;
+    let set = base.finite(&problem, &[root])?;
+    let mut presentation = base.present(&set, SolveForm::Radicals);
+    presentation.premises = vec![0];
+    Ok(BinomialFixture {
+        base,
+        steps: vec![existence, presentation],
+    })
+}
+
+/// An exact family must be represented by an image branch, including the zero-parameter subcase.
+pub(crate) fn family_presentation(image: bool) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{SolveForm, SolveStatement};
+    let (mut base, steps) = identity_family(0)?;
+    let Statement::Solve(statement) = &steps.last().ok_or("missing coverage")?.conclusion else {
+        return Err("wrong statement".into());
+    };
+    let SolveStatement::Coverage(value) = statement.as_ref() else {
+        return Err("wrong coverage".into());
+    };
+    let set = if image {
+        value.set.clone()
+    } else {
+        let zero = base.integer(0, false)?;
+        base.finite(&value.problem, &[zero])?
+    };
+    let mut presentation = base.present(&set, SolveForm::ExactFamily);
+    presentation.premises = vec![0];
+    let membership = steps.first().ok_or("missing membership")?.clone();
+    Ok(BinomialFixture {
+        base,
+        steps: vec![membership, presentation],
+    })
+}
+
+/// Only the final binomial claim changes its original region; all earlier arithmetic remains valid.
+pub(crate) fn binomial_region(zero: bool, restricted: bool) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::SolveStatement;
+    let mut fixture = if zero {
+        BinomialFixture::zero(2)?
+    } else {
+        BinomialFixture::new(2, 2)?
+    };
+    let region = if restricted {
+        fixture.base.coefficient_guard(false)?
+    } else {
+        fixture.base.region.clone()
+    };
+    let step = fixture.steps.last_mut().ok_or("missing coverage")?;
+    let Statement::Solve(statement) = &mut step.conclusion else {
+        return Err("wrong statement".into());
+    };
+    let SolveStatement::Coverage(value) = statement.as_mut() else {
+        return Err("wrong coverage".into());
+    };
+    value.problem = fixture.base.problem_region(&value.problem, &region)?;
+    value.set = fixture.base.set_problem(&value.set, &value.problem)?;
+    Ok(fixture)
+}
+
+/// A guarded linear claim is allowed inside its original region, never in the reverse direction.
+pub(crate) fn linear_region(inconsistent: bool, contained: bool) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{SolveCertificate, SolveStatement};
+    let (mut base, mut step) = linear_system(inconsistent)?;
+    let region = base.coefficient_guard(false)?;
+    let Statement::Solve(statement) = &mut step.conclusion else {
+        return Err("wrong statement".into());
+    };
+    let SolveStatement::LinearSystem(value) = statement.as_mut() else {
+        return Err("wrong system".into());
+    };
+    if contained {
+        base.enter_region(region)?;
+        value.region.clone_from(&base.region);
+        step.context.clone_from(&base.context);
+        let Certificate::Solve(certificate) = &mut step.certificate else {
+            return Err("wrong certificate".into());
+        };
+        let SolveCertificate::ExactLinearEquivalence(value) = certificate.as_mut() else {
+            return Err("wrong linear certificate".into());
+        };
+        value.region.clone_from(&base.region);
+    } else {
+        value.problem = base.problem_region(&value.problem, &region)?;
+    }
+    Ok(BinomialFixture {
+        base,
+        steps: vec![step],
+    })
+}
+
+impl Fixture {
+    /// Distinct tautological selectors retain independent choices of the same root relation.
+    fn independent_root(&mut self, relation: &Handle) -> TestResult<(Handle, Handle)> {
+        use crate::test_api::solving::{RootSelectionData, SelectionMode};
+        let zero = self.integer(0, true)?;
+        let predicate = admit(
+            &mut self.cas,
+            &Draft::Condition {
+                header: Reference::Existing(self.header.clone()),
+                scope: vec![vec![AtomicSort::Scalar(self.field.clone())]],
+                kind: PredicateKind::Equal,
+                arguments: vec![Reference::Existing(zero.clone()), Reference::Existing(zero)],
+            },
+        )?;
+        let selection = admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+                header: Reference::Existing(self.header.clone()),
+                scope: Vec::new(),
+                relations: vec![Reference::Existing(relation.clone())],
+                predicate: Reference::Existing(predicate),
+                mode: SelectionMode::Any,
+                convention: None,
+                interval: None,
+            })),
+        )?;
+        let value = admit(
+            &mut self.cas,
+            &Draft::RootValue {
+                header: Reference::Existing(self.header.clone()),
+                selection: Reference::Existing(selection.clone()),
+                slot: 0,
+            },
+        )?;
+        Ok((selection, value))
+    }
+}

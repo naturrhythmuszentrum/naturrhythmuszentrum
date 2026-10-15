@@ -178,6 +178,13 @@ fn final_case(case: u8) -> TestResult<crate::testing::solve_elementary::Binomial
         5 => real_restriction(false),
         6 => real_restriction(true),
         7 => crate::testing::solve_elementary::degree_drop_cover(),
+        9 => crate::testing::solve_elementary::specialized_presentation(1),
+        10 => crate::testing::solve_elementary::family_presentation(true),
+        11 => crate::testing::solve_elementary::general_presentation(false),
+        12 => crate::testing::solve_elementary::independent_cube_roots(false),
+        13 => crate::testing::solve_elementary::linear_region(false, true),
+        14 => crate::testing::solve_elementary::linear_region(true, true),
+        15 => crate::testing::solve_elementary::binomial_region(true, false),
         _ => {
             let (base, step) = crate::testing::solve_elementary::linear_system(true)?;
             Ok(BinomialFixture {
@@ -192,23 +199,31 @@ fn final_case(case: u8) -> TestResult<crate::testing::solve_elementary::Binomial
 /// ´test:integration:elementary-final-schemas-fresh-replay´
 #[test]
 fn elementary_final_schemas_fresh_replay() -> TestResult {
-    for case in 0..9 {
+    for case in 0..16 {
         let mut source = final_case(case)?;
-        let checked = source.base.cas.check_proof(
-            &source.base.context,
-            &source.steps,
-            &mut Budget::new(Limits::blind_cubic())?,
-        )?;
+        let checked = source
+            .base
+            .cas
+            .check_proof(
+                &source.base.context,
+                &source.steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            )
+            .map_err(|error| format!("case {case}, source proof: {error}"))?;
         let bytes = source
             .base
             .cas
             .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
         let mut target = final_case(case)?;
-        let expected = target.base.cas.check_proof(
-            &target.base.context,
-            &target.steps,
-            &mut Budget::new(Limits::blind_cubic())?,
-        )?;
+        let expected = target
+            .base
+            .cas
+            .check_proof(
+                &target.base.context,
+                &target.steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            )
+            .map_err(|error| format!("case {case}, expected proof: {error}"))?;
         let replayed = target.base.cas.replay(
             &bytes,
             expected.judgment(),

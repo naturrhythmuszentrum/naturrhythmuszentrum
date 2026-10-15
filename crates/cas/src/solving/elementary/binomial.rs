@@ -260,6 +260,7 @@ fn coverage(
     };
     let original = problem(cas, &coverage.problem)?;
     super::proof::region(cas, &draft.context, original, &coverage.region)?;
+    super::member::contained(cas, &coverage.region, &original.region, budget)?;
     let evaluation = Evaluation {
         cas,
         engine: Engine {
