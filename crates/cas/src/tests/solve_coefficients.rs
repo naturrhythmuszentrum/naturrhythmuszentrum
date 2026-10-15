@@ -1216,3 +1216,139 @@ fn coefficient_regional_header_identity() -> TestResult {
     let parameter = admit(&mut fixture.cas, &draft)?;
     assert_regional_inverse(&fixture, &parameter, false)
 }
+
+/// Scratch zero and inverse decisions close only proved factors and retain actual denominators.
+/// ´test:crate:coefficient-nonzero-product-decisions´
+#[test]
+fn coefficient_nonzero_product_decisions() -> TestResult {
+    for case in 0..10 {
+        let (fixture, handle, expected) =
+            crate::testing::solve_coefficients::nonzero_closure_fixture(case)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let field = FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+        let value = field.read(&handle, &mut budget)?;
+        let scope = EvaluationScope {
+            context: &fixture.context,
+            region: &fixture.region,
+            premises: &[],
+            localization: &[],
+        };
+        match (
+            expected,
+            field.zero_test(&value, &scope, &mut budget)?,
+            field.inverse(&value, &scope, &mut budget)?,
+        ) {
+            (true, ZeroDecision::Nonzero(_), UnitDecision::Unit { inverse, .. }) => {
+                let Value::Fraction(product) = field.mul(&value, &inverse, &mut budget)?.value
+                else {
+                    return Err("wrong reciprocal product".into());
+                };
+                assert!(
+                    product
+                        .numerator
+                        .equals(&product.denominator, &mut budget)?
+                );
+            }
+            (false, ZeroDecision::Undetermined(_), UnitDecision::Undetermined(_)) => {}
+            _ => return Err("wrong product closure decision".into()),
+        }
+    }
+    Ok(())
+}
+
+/// The zero cell refuses every reciprocal power; a missing localization remains an exact obligation.
+/// ´test:crate:coefficient-nonzero-power-obligations´
+#[test]
+fn coefficient_nonzero_power_obligations() -> TestResult {
+    use crate::syntax::Operator;
+    for exponent in 1..=3 {
+        let mut fixture = Fixture::new()?;
+        let x = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+        let children = fixture.guard_cells(&x)?;
+        let handle = fixture.reciprocal(&[(vec![exponent, 0], 1)])?;
+        let other = fixture.polynomial(2, &[(vec![0, 1], 1)])?;
+        for (cell, localization) in [
+            (&children[0], &[][..]),
+            (&children[1], std::slice::from_ref(&other)),
+        ] {
+            fixture.on_region(cell)?;
+            let mut budget = Budget::new(Limits::blind_cubic())?;
+            let field =
+                FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+            let value = field.read(&handle, &mut budget)?;
+            let scope = EvaluationScope {
+                context: &fixture.context,
+                region: cell,
+                premises: &[],
+                localization,
+            };
+            let ZeroDecision::Undetermined(obligation) =
+                field.zero_test(&value, &scope, &mut budget)?
+            else {
+                return Err("missing exact denominator obligation".into());
+            };
+            assert_eq!(obligation.region, *cell);
+            assert_eq!(obligation.context, fixture.context);
+            assert_eq!(obligation.localization, localization);
+            assert!(matches!(
+                field.inverse(&value, &scope, &mut budget)?,
+                UnitDecision::Undetermined(_)
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Discharged sealed premises use the same closure after scratch multiplication loses graph origin.
+/// ´test:crate:coefficient-nonzero-premise-powers´
+#[test]
+fn coefficient_nonzero_premise_powers() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let handle = fixture.reciprocal(&[(vec![1, 0], 1)])?;
+    let premise = coefficient_assumption(&mut fixture)?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let field = FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+    let reciprocal = field.read(&handle, &mut budget)?;
+    let value = field.pow(&reciprocal, 3, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.context,
+        region: &fixture.region,
+        premises: std::slice::from_ref(&premise),
+        localization: &[],
+    };
+    assert!(matches!(
+        field.inverse(&value, &scope, &mut budget)?,
+        UnitDecision::Unit { .. }
+    ));
+    let unproved = EvaluationScope {
+        premises: &[],
+        ..scope
+    };
+    assert!(matches!(
+        field.inverse(&value, &unproved, &mut budget)?,
+        UnitDecision::Undetermined(_)
+    ));
+    Ok(())
+}
+
+/// A retained power denominator is proved through the same closure as the actual value denominator.
+/// ´test:crate:coefficient-power-localization´
+#[test]
+fn coefficient_power_localization() -> TestResult {
+    let (mut fixture, handle, _) = crate::testing::solve_coefficients::nonzero_closure_fixture(2)?;
+    let polynomial = fixture.polynomial(2, &[(vec![3, 0], 1)])?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let field = FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+    let value = field.read(&handle, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.context,
+        region: &fixture.region,
+        premises: &[],
+        localization: std::slice::from_ref(&polynomial),
+    };
+    assert!(matches!(
+        field.inverse(&value, &scope, &mut budget)?,
+        UnitDecision::Unit { .. }
+    ));
+    Ok(())
+}

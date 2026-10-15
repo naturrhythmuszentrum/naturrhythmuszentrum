@@ -1027,3 +1027,201 @@ fn coefficient_regional_localization_retained() -> TestResult {
     );
     Ok(())
 }
+
+/// Independent denominator replay accepts powers and products only after exact factor exhaustion.
+/// ´test:integration:coefficient-nonzero-product-proofs´
+#[test]
+fn coefficient_nonzero_product_proofs() -> TestResult {
+    for case in 0..10 {
+        let (mut fixture, value, succeeds) =
+            crate::testing::solve_coefficients::nonzero_closure_fixture(case)?;
+        let domain = fixture.fractions.clone();
+        let map = fixture.identity_map(&domain)?;
+        let step = fixture.identity(&value, &value, &map);
+        let before = fixture.cas.counts();
+        let result = fixture.cas.check_proof(
+            &fixture.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if succeeds {
+            let witness = result?;
+            assert_eq!(witness.hypotheses(), []);
+            assert_eq!(witness.judgment().residuals, []);
+        } else {
+            assert!(result.is_err());
+            assert_eq!(fixture.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Every reciprocal power refuses on the exact zero child, even in a reflexive equality.
+/// ´test:integration:coefficient-reciprocal-power-zero-cell´
+#[test]
+fn coefficient_reciprocal_power_zero_cell() -> TestResult {
+    for exponent in 1..=3 {
+        let mut fixture = crate::testing::solve_coefficients::regional_fixture(0)?;
+        let value = fixture.reciprocal(&[(vec![exponent, 0], 1)])?;
+        let domain = fixture.fractions.clone();
+        let map = fixture.identity_map(&domain)?;
+        let step = fixture.identity(&value, &value, &map);
+        let before = fixture.cas.counts();
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    std::slice::from_ref(&step),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// A proved product is a whole divisor, and alternative overlapping guards cannot hide a valid route.
+/// ´test:integration:coefficient-overlapping-nonzero-factors´
+#[test]
+fn coefficient_overlapping_nonzero_factors() -> TestResult {
+    use nrz_cas::syntax::Operator;
+    for reverse in [false, true] {
+        let mut fixture = Fixture::new()?;
+        let x = fixture.free("x")?;
+        let y = fixture.free("y")?;
+        let product = fixture.guard_expression(Operator::Mul, &[x.clone(), y.clone()])?;
+        fixture.on_nonzero(&product)?;
+        let unknown = fixture.reciprocal(&[(vec![1, 0], 1)])?;
+        let domain = fixture.fractions.clone();
+        let map = fixture.identity_map(&domain)?;
+        let step = fixture.identity(&unknown, &unknown, &map);
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    std::slice::from_ref(&step),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        let square = fixture.guard_expression(Operator::IntegerPower(2), &[x])?;
+        let cube = fixture.guard_expression(Operator::IntegerPower(3), &[y])?;
+        let factors = if reverse {
+            [cube, square]
+        } else {
+            [square, cube]
+        };
+        for factor in &factors {
+            fixture.on_nonzero(factor)?;
+        }
+        let value = fixture.reciprocal(&[(vec![2, 3], 1)])?;
+        let map = fixture.identity_map(&domain)?;
+        let step = fixture.identity(&value, &value, &map);
+        assert_eq!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    std::slice::from_ref(&step),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )?
+                .hypotheses(),
+            []
+        );
+    }
+    Ok(())
+}
+
+/// Existing coefficient limits meter the new closure and preserve atomic failure at one below usage.
+/// ´test:integration:coefficient-nonzero-closure-limits´
+#[test]
+fn coefficient_nonzero_closure_limits() -> TestResult {
+    let (mut fixture, value, _) = crate::testing::solve_coefficients::nonzero_closure_fixture(5)?;
+    let domain = fixture.fractions.clone();
+    let map = fixture.identity_map(&domain)?;
+    let step = fixture.identity(&value, &value, &map);
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    fixture
+        .cas
+        .check_proof(&fixture.context, std::slice::from_ref(&step), &mut measured)?;
+    let count = measured.usage().gcd_steps;
+    assert!(count > 0);
+    for (limit, succeeds) in [(count, true), (count - 1, false)] {
+        let (mut peer, value, _) = crate::testing::solve_coefficients::nonzero_closure_fixture(5)?;
+        let domain = peer.fractions.clone();
+        let map = peer.identity_map(&domain)?;
+        let step = peer.identity(&value, &value, &map);
+        let before = peer.cas.counts();
+        let mut budget = Budget::new(Limits {
+            gcd_steps: limit,
+            ..Limits::blind_cubic()
+        })?;
+        let result = peer
+            .cas
+            .check_proof(&peer.context, std::slice::from_ref(&step), &mut budget);
+        if succeeds {
+            assert!(result.is_ok());
+        } else {
+            let error = result.err().ok_or("short closure budget accepted")?;
+            assert!(matches!(
+                error.kind,
+                nrz_cas::FaultKind::Exhausted {
+                    budget: nrz_cas::limits::BudgetKind::GcdSteps,
+                    ..
+                }
+            ));
+            assert_eq!(peer.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// A finite localization power is discharged exactly, while adding an unproved factor still refuses.
+/// ´test:integration:coefficient-power-localization-proof´
+#[test]
+fn coefficient_power_localization_proof() -> TestResult {
+    use nrz_cas::Reference;
+    use nrz_cas::proof::Certificate;
+    use nrz_cas::solving::{CoefficientMapData, MapMode, MapTarget, SolveCertificate, SolveDraft};
+    use nrz_cas::syntax::Draft;
+    for (powers, succeeds) in [([3, 0], true), ([3, 1], false)] {
+        let (mut fixture, value, _) =
+            crate::testing::solve_coefficients::nonzero_closure_fixture(2)?;
+        let denominator = fixture.polynomial(2, &[(powers.to_vec(), 1)])?;
+        let map = crate::testing::solve_graph::admit(
+            &mut fixture.cas,
+            &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+                source: Reference::Existing(fixture.fractions.clone()),
+                target: MapTarget::CoefficientDomain {
+                    domain: Reference::Existing(fixture.fractions.clone()),
+                },
+                mode: MapMode::Embedding,
+                region: Reference::Existing(fixture.region.clone()),
+                images: Vec::new(),
+                denominators: vec![Reference::Existing(denominator.clone())],
+            })),
+        )?;
+        let mut step = fixture.identity(&value, &value, &map);
+        let Certificate::Solve(certificate) = &mut step.certificate else {
+            return Err("missing coefficient certificate".into());
+        };
+        let SolveCertificate::CoefficientIdentity(identity) = certificate.as_mut() else {
+            return Err("wrong coefficient certificate".into());
+        };
+        identity.denominators.push(denominator);
+        let before = fixture.cas.counts();
+        let result = fixture.cas.check_proof(
+            &fixture.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        assert_eq!(result.is_ok(), succeeds);
+        if !succeeds {
+            assert_eq!(fixture.cas.counts(), before);
+        }
+    }
+    Ok(())
+}

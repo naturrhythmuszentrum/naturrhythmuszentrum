@@ -138,3 +138,9 @@ pub(crate) mod guard_polynomial;
     reason = "regional coefficient checks stay within the crate"
 )]
 pub(crate) mod regional;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "checked nonzero closure stays within the crate"
+)]
+pub(crate) mod nonzero;

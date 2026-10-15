@@ -16,7 +16,7 @@ use crate::test_api::{Handle, Rational, Reference};
 use crate::testing::common::TestResult;
 use crate::testing::solve_graph::admit;
 use shared::unit_step;
-pub(crate) use shared::{Fixture, SplitFixture, UnitFixture};
+pub(crate) use shared::{Fixture, SplitFixture, UnitFixture, nonzero_closure_fixture};
 
 impl UnitFixture {
     /// Independently supplied t*t - (t²-1) = 1 is needed only by public replay tests.
@@ -753,4 +753,24 @@ pub(crate) fn regional_identity(
     let inverse = fixture.literal(&reciprocal, &map)?;
     let product = fixture.guard_expression(Operator::Mul, &[left, inverse])?;
     Ok(fixture.identity(&product, &right, &map))
+}
+
+/// A nonzero fraction premise supplies both exact factors to independent denominator replay.
+pub(crate) fn nonzero_fraction_power_identity()
+-> TestResult<(Fixture, Vec<crate::test_api::proof::ApplicationDraft>)> {
+    use crate::test_api::syntax::PredicateKind;
+    let mut fixture = Fixture::new()?;
+    let numerator = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let denominator = fixture.polynomial(2, &[(vec![0, 1], 1)])?;
+    let draft = fixture.fraction(&numerator, &denominator);
+    let value = admit(&mut fixture.cas, &draft)?;
+    let map = fixture.parameter_map()?;
+    let expression = fixture.literal(&value, &map)?;
+    let assumption = fixture.assumption(&expression, PredicateKind::NonZero)?;
+    let reciprocal = fixture.reciprocal(&[(vec![2, 3], 1)])?;
+    let domain = fixture.fractions.clone();
+    let identity_map = fixture.identity_map(&domain)?;
+    let mut step = fixture.identity(&reciprocal, &reciprocal, &identity_map);
+    step.premises = vec![0];
+    Ok((fixture, vec![assumption, step]))
 }

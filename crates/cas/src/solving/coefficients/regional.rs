@@ -53,11 +53,10 @@ pub(crate) fn contained(
 fn guard(
     state: &State,
     source: &Handle,
-    polynomial: &Polynomial,
     region: LogicalId,
     predicate: LogicalId,
     budget: &mut Budget,
-) -> Result<Option<bool>, Fault> {
+) -> Result<Option<(Polynomial, bool)>, Fault> {
     let Vertex::Condition(condition) = state.node(predicate)? else {
         return Ok(None);
     };
@@ -72,7 +71,7 @@ fn guard(
             else {
                 return Ok(None);
             };
-            Ok(polynomial.equals(&value, budget)?.then_some(false))
+            Ok(Some((value, false)))
         }
         (PredicateKind::Equal, [left, right]) => {
             let Some(first) = super::guard_polynomial::read(state, source, region, *left, budget)?
@@ -84,11 +83,13 @@ fn guard(
             else {
                 return Ok(None);
             };
-            Ok(
-                ((first.zero(budget)? && polynomial.equals(&second, budget)?)
-                    || (second.zero(budget)? && polynomial.equals(&first, budget)?))
-                .then_some(true),
-            )
+            if first.zero(budget)? {
+                Ok(Some((second, true)))
+            } else if second.zero(budget)? {
+                Ok(Some((first, true)))
+            } else {
+                Ok(None)
+            }
         }
         _ => Ok(None),
     }
@@ -98,9 +99,8 @@ fn guard(
 fn at_source(
     state: &State,
     source: &Handle,
-    polynomial: &Polynomial,
     region: &Handle,
-    zero: bool,
+    visitor: &mut impl FnMut(Polynomial, bool, &mut Budget) -> Result<bool, Fault>,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
     let mut pending = vector(1, budget)?;
@@ -120,8 +120,8 @@ fn at_source(
             _ => None,
         };
         if let Some((predicate, truth)) = guarded
-            && let Some(when_true) = guard(state, source, polynomial, id, predicate, budget)?
-            && (when_true == truth) == zero
+            && let Some((value, when_true)) = guard(state, source, id, predicate, budget)?
+            && visitor(value, when_true == truth, budget)?
         {
             return Ok(true);
         }
@@ -131,18 +131,17 @@ fn at_source(
 }
 
 /// Independently recompute a regional fact, including canonical parent-field inclusions.
-pub(crate) fn proves(
+fn visit(
     state: &State,
     source: &Handle,
-    polynomial: &Polynomial,
     region: &Handle,
-    zero: bool,
+    mut visitor: impl FnMut(Polynomial, bool, &mut Budget) -> Result<bool, Fault>,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
     let mut current = source;
     loop {
         budget.work(1, AT)?;
-        if at_source(state, current, polynomial, region, zero, budget)? {
+        if at_source(state, current, region, &mut visitor, budget)? {
             return Ok(true);
         }
         let CoefficientDomainData::Quotient { level } = domain(state, current)? else {
@@ -155,4 +154,45 @@ pub(crate) fn proves(
         };
         current = &extension.parent;
     }
+}
+
+/// Exact zero facts remain distinct from the multiplicative nonzero closure.
+pub(crate) fn proves(
+    state: &State,
+    source: &Handle,
+    polynomial: &Polynomial,
+    region: &Handle,
+    zero: bool,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    visit(
+        state,
+        source,
+        region,
+        |value, is_zero, ledger| Ok(is_zero == zero && polynomial.equals(&value, ledger)?),
+        budget,
+    )
+}
+
+/// Collect only total polynomials whose exact contained guard asserts nonvanishing.
+pub(crate) fn factors(
+    state: &State,
+    source: &Handle,
+    region: &Handle,
+    result: &mut super::nonzero::Factors,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    visit(
+        state,
+        source,
+        region,
+        |value, zero, ledger| {
+            if !zero {
+                result.insert(value, ledger)?;
+            }
+            Ok(false)
+        },
+        budget,
+    )?;
+    Ok(())
 }

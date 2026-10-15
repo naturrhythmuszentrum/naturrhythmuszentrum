@@ -385,34 +385,18 @@ impl Engine<'_> {
         scope: &EvaluationScope<'_>,
         budget: &mut Budget,
     ) -> Result<bool, CoefficientFailure> {
-        if let Some(constant) = polynomial.scalar(budget)? {
-            return Ok(!constant.zero(budget)?);
-        }
-        if super::regional::proves(
+        Ok(super::nonzero::proves(
             self.state,
             self.domain,
             polynomial,
             scope.region,
-            false,
+            scope
+                .premises
+                .iter()
+                .filter(|witness| witness.is_discharged())
+                .map(|witness| &witness.judgment().statement),
             budget,
-        )? {
-            return Ok(true);
-        }
-        for witness in scope.premises {
-            if witness.is_discharged()
-                && super::nonvanishing::proves_polynomial(
-                    self.state,
-                    self.domain,
-                    polynomial,
-                    scope.region,
-                    &witness.judgment().statement,
-                    budget,
-                )?
-            {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        )?)
     }
 }
 

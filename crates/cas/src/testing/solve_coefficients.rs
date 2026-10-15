@@ -705,3 +705,78 @@ impl Fixture {
         Ok([zero, nonzero])
     }
 }
+
+impl Fixture {
+    /// A supplied reciprocal retains its exact canonical denominator for both test binaries.
+    pub(crate) fn reciprocal(&mut self, entries: &[(Vec<u32>, i64)]) -> TestResult<Handle> {
+        let denominator = self.polynomial(2, entries)?;
+        let one = self.polynomial(2, &[(vec![0, 0], 1)])?;
+        let draft = self.fraction(&one, &denominator);
+        admit(&mut self.cas, &draft)
+    }
+
+    /// Enter a fresh nonzero guard cell with no extra context assumption.
+    pub(crate) fn on_nonzero(&mut self, expression: &Handle) -> TestResult {
+        let children = self.guard_cells(expression)?;
+        self.on_region(&children[1])
+    }
+}
+
+/// Independently expanded denominators exercise powers, products and failed exact divisions.
+pub(crate) fn nonzero_closure_fixture(case: usize) -> TestResult<(Fixture, Handle, bool)> {
+    use crate::test_api::syntax::Operator;
+    let mut fixture = Fixture::new()?;
+    let x = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let y = fixture.guard_expression(Operator::Free("y".into()), &[])?;
+    let sum = fixture.guard_expression(Operator::Add, &[x.clone(), y.clone()])?;
+    let entries = match case {
+        0..=2 => {
+            fixture.on_nonzero(&x)?;
+            vec![(vec![u32::try_from(case + 1)?, 0], 1)]
+        }
+        3 | 4 => {
+            fixture.on_nonzero(&x)?;
+            if case == 4 {
+                fixture.on_nonzero(&y)?;
+            }
+            vec![(vec![2, 3], 1)]
+        }
+        5 | 6 => {
+            fixture.on_nonzero(&sum)?;
+            if case == 5 {
+                vec![
+                    (vec![3, 0], 1),
+                    (vec![2, 1], 3),
+                    (vec![1, 2], 3),
+                    (vec![0, 3], 1),
+                ]
+            } else {
+                vec![(vec![2, 0], 1), (vec![0, 2], 1)]
+            }
+        }
+        7 => {
+            let two = fixture.guard_expression(
+                Operator::Rational(Rational::from_ratio(
+                    2,
+                    1,
+                    &mut Budget::new(Limits::default())?,
+                )?),
+                &[],
+            )?;
+            let scaled = fixture.guard_expression(Operator::Mul, &[two, x])?;
+            fixture.on_nonzero(&scaled)?;
+            vec![(vec![3, 0], 1)]
+        }
+        8 | 9 => {
+            fixture.on_nonzero(&x)?;
+            if case == 8 {
+                vec![(vec![3, 0], 1), (vec![0, 0], 1)]
+            } else {
+                vec![(vec![0, 2], 1), (vec![0, 0], 1)]
+            }
+        }
+        _ => return Err("unknown closure fixture".into()),
+    };
+    let value = fixture.reciprocal(&entries)?;
+    Ok((fixture, value, matches!(case, 0..=2 | 4 | 5 | 7)))
+}

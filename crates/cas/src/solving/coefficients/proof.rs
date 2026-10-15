@@ -109,30 +109,6 @@ pub(crate) fn ground_map(
     }
 }
 
-/// A regional nonzero fact or unit theorem supplies exact nonvanishing evidence.
-fn polynomial_unit(
-    cas: &Cas,
-    denominator: &Handle,
-    source: &Handle,
-    region: &Handle,
-    premises: &[CheckedApplication],
-    budget: &mut Budget,
-) -> Result<bool, Fault> {
-    for premise in premises {
-        if super::nonvanishing::proves(
-            &cas.state,
-            source,
-            denominator,
-            region,
-            &premise.judgment.statement,
-            budget,
-        )? {
-            return Ok(true);
-        }
-    }
-    Ok(false)
-}
-
 /// Every actual denominator must be defined and nonzero on the identical coefficient region.
 pub(crate) fn denominator(
     cas: &Cas,
@@ -143,14 +119,14 @@ pub(crate) fn denominator(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let polynomial = super::read::sparse(&cas.state, handle, budget)?;
-    if let Some(constant) = polynomial.scalar(budget)?
-        && !constant.zero(budget)?
-    {
-        return Ok(());
-    }
-    if super::regional::proves(&cas.state, source, &polynomial, region, false, budget)?
-        || polynomial_unit(cas, handle, source, region, premises, budget)?
-    {
+    if super::nonzero::proves(
+        &cas.state,
+        source,
+        &polynomial,
+        region,
+        premises.iter().map(|premise| &premise.judgment.statement),
+        budget,
+    )? {
         return Ok(());
     }
     Err(invalid())

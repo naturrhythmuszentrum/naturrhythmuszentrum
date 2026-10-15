@@ -215,6 +215,13 @@ impl Polynomial {
         Ok(self.terms.is_empty())
     }
 
+    /// Canonical graded order puts the total degree in the first term.
+    pub(crate) fn total_degree(&self, budget: &mut Budget) -> Result<Option<u64>, Fault> {
+        begin(budget)?;
+        budget.work(size(self.variables, AT)?.max(1), AT)?;
+        self.terms.first().map(Term::degree).transpose()
+    }
+
     /// Recognize ground constants, including zero.
     pub(crate) fn scalar(&self, budget: &mut Budget) -> Result<Option<Scalar>, Fault> {
         begin(budget)?;

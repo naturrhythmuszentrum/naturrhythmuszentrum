@@ -251,3 +251,99 @@ fn coefficient_guards_fresh_replay() -> TestResult {
     }
     Ok(())
 }
+
+/// Guard products and powers replay in a fresh graph with exact expected scope and canonical bytes.
+/// ´test:integration:coefficient-nonzero-closure-fresh-replay´
+#[test]
+fn coefficient_nonzero_closure_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::nonzero_closure_fixture;
+    for case in [0, 1, 2, 4, 5, 7] {
+        let (mut source, value, _) = nonzero_closure_fixture(case)?;
+        let domain = source.fractions.clone();
+        let map = source.identity_map(&domain)?;
+        let step = source.identity(&value, &value, &map);
+        let witness = source.cas.check_proof(
+            &source.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let bytes = source
+            .cas
+            .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+        let (mut target, value, _) = nonzero_closure_fixture(case)?;
+        let domain = target.fractions.clone();
+        let map = target.identity_map(&domain)?;
+        let step = target.identity(&value, &value, &map);
+        let expected = target.cas.check_proof(
+            &target.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let replayed = target.cas.replay(
+            &bytes,
+            expected.judgment(),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(replayed.judgment(), expected.judgment());
+        assert_eq!(replayed.hypotheses(), []);
+        assert_eq!(replayed.judgment().residuals, []);
+        assert_eq!(
+            target
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}
+
+/// Powers justified by a sealed fraction premise keep that hypothesis through independent fresh replay.
+/// ´test:integration:coefficient-nonzero-premise-fresh-replay´
+#[test]
+fn coefficient_nonzero_premise_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::nonzero_fraction_power_identity;
+    let (mut source, steps) = nonzero_fraction_power_identity()?;
+    let witness = source.cas.check_proof(
+        &source.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let bytes = source
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut target, steps) = nonzero_fraction_power_identity()?;
+    let expected = target.cas.check_proof(
+        &target.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let replayed = target.cas.replay(
+        &bytes,
+        expected.judgment(),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(replayed.judgment(), expected.judgment());
+    assert_eq!(replayed.hypotheses().len(), 1);
+    assert_eq!(replayed.judgment().residuals, []);
+    assert_eq!(
+        target
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    let mut unproved = steps.last().ok_or("missing identity")?.clone();
+    unproved.premises.clear();
+    let before = target.cas.counts();
+    assert!(
+        target
+            .cas
+            .check_proof(
+                &target.context,
+                std::slice::from_ref(&unproved),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(target.cas.counts(), before);
+    Ok(())
+}
