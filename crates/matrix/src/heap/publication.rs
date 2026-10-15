@@ -5,12 +5,13 @@ use nrz_scalar::Scalar;
 use nrz_units::{Descriptor, UncertaintyMode, uncertainty};
 
 use super::identity::{Key, identity};
-use super::records::{Meaning, Record};
+use super::records::{Location, Meaning, Record};
 use super::schema::{Schema, check_quantity, intern};
 use super::slots::{PreparedSlots, SlotPlan};
 use super::{
     Extent, Handle, Heap, HeapError, PublishedBundle, Value, ValueId, ValueStamp, ValueVersion,
 };
+use crate::Layout;
 use crate::storage::{Format, PreparedStorage, Region};
 
 /// Fully prepared import, inaccessible until its complete bundle is linked.
@@ -267,12 +268,13 @@ fn prepare_records<P: Scalar + 'static>(
         .map_err(|_| HeapError::Capacity)?;
     records.push(Record {
         schema: schemas.value,
-        region: Region {
+        location: Location::Owned(Region {
             arena: value_arena,
             format: Format::of::<P>(),
             offset: 0,
             length: extent.entries(),
-        },
+        }),
+        layout: Layout::contiguous(extent)?,
         meaning: Meaning::Value {
             stamp,
             bound: bound_key,
@@ -282,12 +284,13 @@ fn prepare_records<P: Scalar + 'static>(
         let arena = *arenas.get(1).ok_or(HeapError::Capacity)?;
         records.push(Record {
             schema,
-            region: Region {
+            location: Location::Owned(Region {
                 arena,
                 format: Format::of::<P>(),
                 offset: 0,
                 length: extent.entries(),
-            },
+            }),
+            layout: Layout::contiguous(extent)?,
             meaning: Meaning::Bound { target, stamp },
         });
     }

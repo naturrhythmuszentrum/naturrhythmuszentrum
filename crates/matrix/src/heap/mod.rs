@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Homogeneous descriptor ownership and checked publication.
 
+mod aliases;
 mod error;
 mod extent;
 pub(crate) mod identity;

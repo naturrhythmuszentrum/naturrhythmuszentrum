@@ -193,6 +193,21 @@ impl<T> Slots<T> {
         slot.value.as_ref().ok_or(HeapError::StaleHandle)
     }
 
+    /// Visit current occupations in stable slot order without exposing vacant entries.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (Key, &T)> {
+        self.entries.iter().enumerate().filter_map(|(index, slot)| {
+            slot.value.as_ref().map(|value| {
+                (
+                    Key {
+                        slot: index,
+                        generation: slot.generation,
+                    },
+                    value,
+                )
+            })
+        })
+    }
+
     /// Test-only corruption access for inaccessible version/dependency guards.
     #[cfg(test)]
     pub(crate) fn get_mut(&mut self, key: Key) -> Result<&mut T, HeapError> {

@@ -8,6 +8,8 @@ pub struct HeapLimits {
     pub(crate) descriptors: usize,
     /// Maximum live scalar elements in each precision, including companions.
     pub(crate) elements: usize,
+    /// Maximum entries inspected by one explicit map or packing operation.
+    pub(crate) layout_work: usize,
     /// Maximum immutable schemas retained for this heap's lifetime.
     pub(crate) schemas: usize,
 }
@@ -21,7 +23,15 @@ impl HeapLimits {
             descriptors,
             elements: elements_per_precision,
             schemas,
+            layout_work: 1_048_576,
         }
+    }
+
+    /// Set the entry enumeration and packing limit; zero still permits affine checks.
+    #[must_use]
+    pub const fn with_layout_work(mut self, entries: usize) -> Self {
+        self.layout_work = entries;
+        self
     }
 }
 

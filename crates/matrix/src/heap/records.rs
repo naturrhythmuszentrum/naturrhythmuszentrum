@@ -5,6 +5,7 @@ use nrz_scalar::Scalar;
 
 use super::identity::Key;
 use super::{Companion, Handle, Value, ValueStamp};
+use crate::Layout;
 use crate::storage::Region;
 
 /// Meaning of the import's deterministic coverage.
@@ -26,6 +27,11 @@ pub(crate) enum Meaning {
         /// Reverse dependency edge to the componentwise bound, when declared.
         bound: Option<Key>,
     },
+    /// A selection that resolves directly through its surviving base occupation.
+    Alias {
+        /// Exact base value occupation; aliases never form chains.
+        base: Key,
+    },
     /// An absolute deterministic bound on the entire logical target region.
     Bound {
         /// Exact target descriptor occupation.
@@ -35,13 +41,24 @@ pub(crate) enum Meaning {
     },
 }
 
+/// Physical ownership or indirection through the base value descriptor.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Location {
+    /// An independently owned numerical allocation.
+    Owned(Region),
+    /// A checked alias of an owning value descriptor.
+    Alias,
+}
+
 /// A single descriptor slot over its own storage region and schema.
 #[derive(Debug)]
 pub(crate) struct Record {
     /// Index in the immutable exact-equality schema pool.
     pub(crate) schema: usize,
     /// Physical indirection into an arena of the recorded format.
-    pub(crate) region: Region,
+    pub(crate) location: Location,
+    /// Logical entry map into the owning region.
+    pub(crate) layout: Layout,
     /// Category, coverage and versioned dependency relation.
     pub(crate) meaning: Meaning,
 }

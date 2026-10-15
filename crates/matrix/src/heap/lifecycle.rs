@@ -97,8 +97,24 @@ impl Heap {
         &mut self,
         handle: Handle<Value, P>,
     ) -> Result<(), HeapError> {
+        if matches!(self.record(handle)?.meaning, Meaning::Alias { .. }) {
+            let plan = self.descriptors.change(
+                0,
+                None,
+                std::slice::from_ref(&handle.key),
+                self.limits.descriptors,
+            )?;
+            self.descriptors.publish(plan.bind(Vec::new())?);
+            return Ok(());
+        }
         let snapshot = self.snapshot(handle, None)?;
-        let keys = snapshot.retire_keys(true)?;
+        let mut keys = snapshot.retire_keys(true)?;
+        for (key, record) in self.descriptors.iter() {
+            if matches!(record.meaning, Meaning::Alias { base } if base == snapshot.key) {
+                keys.try_reserve(1).map_err(|_| HeapError::Capacity)?;
+                keys.push(key);
+            }
+        }
         let regions = snapshot.regions()?;
         let plan = self
             .descriptors
@@ -116,6 +132,9 @@ impl Heap {
         handle: Handle<Value, P>,
         expected: Option<ValueVersion>,
     ) -> Result<Snapshot, HeapError> {
+        if matches!(self.record(handle)?.meaning, Meaning::Alias { .. }) {
+            return Err(HeapError::AliasWrite);
+        }
         let view = self.value(handle)?;
         let stamp = view.stamp();
         if let Some(expected) = expected
@@ -131,7 +150,11 @@ impl Heap {
             return Err(HeapError::CategoryMismatch);
         };
         let companion = bound
-            .map(|key| self.descriptors.get(key).map(|entry| (key, entry.region)))
+            .map(|key| {
+                self.descriptors
+                    .get(key)
+                    .and_then(|entry| self.owning_region(entry).map(|region| (key, region)))
+            })
             .transpose()?;
         Ok(Snapshot {
             key: handle.key,
@@ -140,7 +163,7 @@ impl Heap {
                 extent: view.region().extent(),
                 quantity: view.region().descriptor().clone(),
             },
-            region: record.region,
+            region: self.owning_region(record)?,
             bound: companion,
         })
     }

@@ -2,4 +2,5 @@
 //! Public heap import contracts, refusal twins and type boundaries.
 
 mod imports;
+mod layouts;
 mod lifecycle;

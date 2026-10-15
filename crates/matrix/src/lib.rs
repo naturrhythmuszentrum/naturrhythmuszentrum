@@ -12,9 +12,16 @@
 mod heap;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "layout validation is shared across private heap and storage modules"
+)]
+mod layout;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "the storage facade is shared only inside the crate"
 )]
 mod storage;
+
+pub use layout::{Layout, PackedRegion};
 
 pub use heap::{
     Category, Companion, CompanionView, Coverage, Extent, Factor, Handle, Heap, HeapError,

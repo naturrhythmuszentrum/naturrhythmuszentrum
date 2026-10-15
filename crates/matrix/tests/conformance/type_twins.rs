@@ -202,3 +202,25 @@
 //! }
 //! let _ = example;
 //! ```
+//!
+//! A checked layout exposes accessors, while its invariant-bearing fields stay private.
+//!
+//! ```rust
+//! use nrz_matrix::{Extent, HeapError, Layout};
+//! fn example() -> Result<(), HeapError> {
+//!     let layout = Layout::contiguous(Extent::new(2, 1)?)?;
+//!     let _ = layout.extent();
+//!     Ok(())
+//! }
+//! let _ = example;
+//! ```
+//!
+//! ```compile_fail,E0616
+//! use nrz_matrix::{Extent, HeapError, Layout};
+//! fn example() -> Result<(), HeapError> {
+//!     let layout = Layout::contiguous(Extent::new(2, 1)?)?;
+//!     let _ = layout.extent;
+//!     Ok(())
+//! }
+//! let _ = example;
+//! ```

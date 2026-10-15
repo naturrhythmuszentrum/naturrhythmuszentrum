@@ -25,6 +25,12 @@ pub enum HeapError {
     /// A requested index or region lies outside its allocation.
     #[error("region or entry is outside its allocation")]
     InvalidLayout,
+    /// Explicit layout enumeration or packing work was exhausted.
+    #[error("layout work limit exhausted")]
+    WorkLimit,
+    /// Selected writes need output injectivity and scatter publication.
+    #[error("selected writes are not available at this boundary")]
+    AliasWrite,
     /// A center is not finite.
     #[error("center at logical index {index} is not finite")]
     NonFinite {

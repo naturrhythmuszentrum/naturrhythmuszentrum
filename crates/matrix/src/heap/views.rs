@@ -12,14 +12,19 @@ use super::{
     Category, Companion, Coverage, Extent, Handle, Heap, HeapError, SchemaId, Value, ValueStamp,
 };
 use crate::storage::{Format, Region, SlabRef};
+use crate::{Layout, PackedRegion};
 
-/// Checked, read-only contiguous physical coordinates and their own descriptor.
+/// Checked, read-only physical entry selection and its owning homogeneous descriptor.
 #[derive(Debug)]
 pub struct RegionView<'h, P: Scalar> {
     /// Borrowed numerical owner.
     slab: SlabRef<'h>,
     /// Checked allocated range.
     region: Region,
+    /// Checked logical map into the allocated range.
+    layout: &'h Layout,
+    /// Maximum entries copied into raw or backend scratch.
+    packing_limit: usize,
     /// Immutable homogeneous interpretation.
     schema: &'h Schema,
     /// Scoped immutable schema identity.
@@ -32,7 +37,7 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
     /// Logical extents, independent of backend padding.
     #[must_use]
     pub const fn extent(&self) -> Extent {
-        self.schema.extent
+        self.layout.extent()
     }
 
     /// This region's quantity descriptor, including its role and exact measure.
@@ -41,7 +46,7 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
         &self.schema.quantity
     }
 
-    /// Exact interned schema identity; this is not a value or source identity.
+    /// Exact owning schema identity before selection; this is not a value or source identity.
     #[must_use]
     pub const fn schema_id(&self) -> SchemaId {
         self.schema_id
@@ -52,7 +57,7 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
     /// # Errors
     /// Refuses out-of-range indices, address overflow or a mismatched storage format.
     pub fn get(&self, row: usize, column: usize) -> Result<P, HeapError> {
-        self.read_flat(self.schema.extent.index(row, column)?)
+        self.read_flat(self.layout.extent().index(row, column)?)
     }
 
     /// Export an owned column-ordered copy with no heap evidence or source independence.
@@ -62,23 +67,38 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
     /// Refuses allocation failure or an invalid resolved region.
     pub fn export(&self) -> Result<Vec<P>, HeapError> {
         let mut copy = Vec::new();
-        copy.try_reserve_exact(self.region.length)
+        crate::layout::check_work(self.layout.extent().entries(), self.packing_limit)?;
+        copy.try_reserve_exact(self.layout.extent().entries())
             .map_err(|_| HeapError::Capacity)?;
-        for index in 0..self.region.length {
+        for index in 0..self.layout.extent().entries() {
             copy.push(self.read_flat(index)?);
         }
         Ok(copy)
     }
 
+    /// The selected logical entries, relative to the owning region.
+    #[must_use]
+    pub const fn layout(&self) -> &Layout {
+        self.layout
+    }
+
+    /// Pack into a fresh, contiguous, privately owned faer slab in logical column order.
+    ///
+    /// This raw snapshot has no current heap evidence and cannot mutate published storage.
+    ///
+    /// # Errors
+    /// Refuses packing work or capacity exhaustion and invalid resolved addresses.
+    pub fn pack(&self) -> Result<PackedRegion<P>, HeapError> {
+        PackedRegion::new(self.extent(), &self.export()?)
+    }
+
     /// Read inside the allocated region, never merely inside slab capacity.
     fn read_flat(&self, index: usize) -> Result<P, HeapError> {
-        if index >= self.region.length {
-            return Err(HeapError::InvalidLayout);
-        }
+        let selected = self.layout.flat_index(index)?;
         let address = self
             .region
             .offset
-            .checked_add(index)
+            .checked_add(selected)
             .ok_or(HeapError::ExtentOverflow)?;
         self.slab.entry(address)
     }
@@ -118,7 +138,8 @@ impl<P: Scalar> ValueView<'_, P> {
         }
     }
 
-    /// Handle to the independently described bound; access must resolve it again.
+    /// Handle to the entire base value's bound; access must resolve it again.
+    /// Use `Heap::selected_bound` to apply this value selection to its bound entries.
     #[must_use]
     pub const fn bound(&self) -> Option<Handle<Companion, P>> {
         self.bound
@@ -127,7 +148,7 @@ impl<P: Scalar> ValueView<'_, P> {
 
 /// A declared absolute-bound region tied to one current value version.
 ///
-/// Its nonnegative entries cover every target entry in the same logical order.
+/// Its nonnegative entries cover every selected target entry in the same logical order.
 /// The bounds remain caller assumptions; no statistical or numerical solve claim follows.
 #[derive(Debug)]
 pub struct CompanionView<'h, P: Scalar> {
@@ -146,7 +167,7 @@ impl<P: Scalar> CompanionView<'_, P> {
         &self.region
     }
 
-    /// Target value occupation; every entry is selected in logical column order.
+    /// Base target occupation; `RegionView::layout` records its selected logical entries.
     #[must_use]
     pub const fn target(&self) -> Handle<Value, P> {
         self.target
@@ -169,7 +190,8 @@ impl Heap {
         handle: Handle<Value, P>,
     ) -> Result<ValueView<'_, P>, HeapError> {
         let record = self.record(handle)?;
-        let Meaning::Value { stamp, bound } = record.meaning else {
+        let base = self.base_handle(handle)?;
+        let Meaning::Value { stamp, bound } = self.record(base)?.meaning else {
             return Err(HeapError::CategoryMismatch);
         };
         if let Some(key) = bound {
@@ -224,30 +246,43 @@ impl Heap {
             return Err(HeapError::ForeignHandle);
         }
         let record = self.descriptors.get(handle.key)?;
-        if record.region.format != Format::of::<P>() {
+        if self.owning_region(record)?.format != Format::of::<P>() {
             return Err(HeapError::PrecisionMismatch);
         }
         Ok(record)
     }
 
-    /// Combine checked physical storage with its immutable interpretation.
-    fn region_view<P: Scalar + 'static>(
-        &self,
-        record: &Record,
-    ) -> Result<RegionView<'_, P>, HeapError> {
-        if record.region.format != Format::of::<P>() {
+    /// Combine checked physical storage with its own immutable entry selection.
+    fn region_view<'h, P: Scalar + 'static>(
+        &'h self,
+        record: &'h Record,
+    ) -> Result<RegionView<'h, P>, HeapError> {
+        self.mapped_region(record, &record.layout)
+    }
+
+    /// Apply a checked selection to a value or its whole-base bound region.
+    fn mapped_region<'h, P: Scalar + 'static>(
+        &'h self,
+        record: &'h Record,
+        layout: &'h Layout,
+    ) -> Result<RegionView<'h, P>, HeapError> {
+        let region = self.owning_region(record)?;
+        if region.format != Format::of::<P>() {
             return Err(HeapError::PrecisionMismatch);
         }
         let schema = self
             .schemas
             .get(record.schema)
             .ok_or(HeapError::InvalidLayout)?;
-        if record.region.length != schema.extent.entries() {
+        if region.length != schema.extent.entries() {
             return Err(HeapError::InvalidLayout);
         }
+        layout.validate(region.length, self.limits.layout_work)?;
         Ok(RegionView {
-            slab: self.storage.resolve(record.region)?,
-            region: record.region,
+            slab: self.storage.resolve(region)?,
+            region,
+            layout,
+            packing_limit: self.limits.layout_work.min(self.limits.elements),
             schema,
             schema_id: SchemaId {
                 scope: self.scope,
@@ -255,5 +290,25 @@ impl Heap {
             },
             marker: PhantomData,
         })
+    }
+
+    /// Resolve the current bound through exactly the value's selected entry map.
+    ///
+    /// The returned target is the base value, with its current version. Its region's
+    /// layout gives the corresponding base-target entry for every selected bound.
+    ///
+    /// # Errors
+    /// Refuses invalid handles, maps or stale evidence. Returns `None` for represented coverage.
+    pub fn selected_bound<P: Scalar + 'static>(
+        &self,
+        handle: Handle<Value, P>,
+    ) -> Result<Option<CompanionView<'_, P>>, HeapError> {
+        let value = self.value(handle)?;
+        let Some(bound) = value.bound() else {
+            return Ok(None);
+        };
+        let mut companion = self.companion(bound)?;
+        companion.region = self.mapped_region(self.record(bound)?, &self.record(handle)?.layout)?;
+        Ok(Some(companion))
     }
 }
