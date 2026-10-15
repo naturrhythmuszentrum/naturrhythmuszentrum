@@ -5,8 +5,8 @@ use crate::testing::common::TestResult;
 use nrz_cas::proof::PRIMITIVES;
 use nrz_cas::request::CostPolicy;
 
-/// All fifty-two active weights, including the nine semantic-version-one distribution checkers.
-const EXPECTED: [(&str, u64); 52] = [
+/// Complete independent expected weights for all active semantic-version-one checkers.
+const EXPECTED: [(&str, u64); 54] = [
     ("case.congruence", 4),
     ("case.domain", 2),
     ("case.eliminate", 4),
@@ -53,20 +53,22 @@ const EXPECTED: [(&str, u64); 52] = [
     ("eq.sym", 1),
     ("eq.trans", 1),
     ("exact.rational", 1),
+    ("integral.case-split", 8),
     ("jet.polynomial", 4),
     ("poly.jets-equal", 4),
     ("poly.rational-equal", 4),
     ("poly.square-free", 8),
     ("region.construct", 2),
     ("region.decide", 4),
+    ("sum.case-split", 4),
 ];
 
-/// Logical version five includes exactly the executable distribution schemas and no recipe keys.
-/// ´test:integration:distribution-policy-five-complete-manifest´
+/// The current logical policy includes exactly the executable schemas and no recipe keys.
+/// ´test:integration:active-policy-complete-manifest´
 #[test]
-fn distribution_policy_five_complete_manifest() -> TestResult {
+fn active_policy_complete_manifest() -> TestResult {
     let policy = CostPolicy::default();
-    assert_eq!(policy.version, 5);
+    assert_eq!(policy.version, 6);
     assert_eq!(PRIMITIVES.len(), EXPECTED.len());
     let actual: Vec<_> = PRIMITIVES
         .iter()

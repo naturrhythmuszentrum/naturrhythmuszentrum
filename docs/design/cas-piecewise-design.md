@@ -2,7 +2,7 @@
 
 # Native piecewise graph and calculus design · `spec:nrz:cas-piecewise-design-specification`
 
-This design implements the mathematical contracts of (`spec:nrz:cas-piecewise-concept`) in the heterogeneous graph of (`spec:nrz:cas-design`). Owner NRZ, area nrz. The implementation base is the seed CAS plus the landed cas-tests-1 test layout. The first three implementation commits are green on `main` at `ec793fbb`, with the supplied baseline of 315 workspace tests. The distribution implementation described here is pending its external gate. The concept mathematics is unchanged.
+This design implements the mathematical contracts of (`spec:nrz:cas-piecewise-concept`) in the heterogeneous graph of (`spec:nrz:cas-design`). Owner NRZ, area nrz. The implementation base is the seed CAS plus the landed cas-tests-1 test layout. The four first-lane commits are green on `main` at `331c7759`, with the supplied baseline of 345 workspace tests. The second-lane split calculus implementation is pending its external gate. The concept mathematics is unchanged.
 
 **Decision (One bounded executable slice)** · `dec:nrz:cas-piecewise-design-slice`
 
@@ -139,8 +139,8 @@ For compactness, `C; E ⊢ S` means statement S under full context C, restricted
 |Jump: `jet.jump`|Two matching-order, same-function, opposite-side jets imply right trace minus left trace|Expand exact rational subtraction and typed trace projection; Local recipe; D|
 |InteriorDerivative: `diff.case-interior`|Neighborhood contained in an arm, local function equality and checked branch derivative imply the case derivative on that open region|Check open-cell certificate and derivative/context transport; Local; P|
 |BoundaryDerivative: `diff.case-boundary`|Full neighborhood definedness, actual point value and both order-one jets imply derivative value when traces match the point and slopes agree; otherwise imply DoesNotExist when a mismatch proves it|Check point ownership, finite traces, side neighborhoods and exact comparisons; Jet; P|
-|IntervalIntegralSplit: `integral.case-split`|Finite ordered interval cover, integrability and branch integral witnesses imply oriented sum of endpoint contributions|Check closed endpoints, finite-change evidence and fundamental-theorem premises; Analytic; L|
-|FiniteSumSplit: `sum.case-split`|Disjoint finite integer-range cover and branch difference witnesses imply the sum of telescoping contributions|Check integer endpoints, completeness and forward differences; Split; L|
+|IntervalIntegralSplit: `integral.case-split`|Finite ordered interval cover, integrability and branch integral witnesses imply oriented sum of endpoint contributions|Reconstruct the closed finite cover and every owned or absent cut value; check polynomial derivatives and endpoint powers; Analytic 8; P|
+|FiniteSumSplit: `sum.case-split`|Disjoint finite integer-range cover and branch difference witnesses imply the sum of telescoping contributions|Reconstruct disjoint inclusive integer ranges; check F(x+1)−F(x) by coefficient composition and both endpoints; Split 4; P|
 |OneSidedLimitRestriction: `limit.case-restrict`|Punctured side neighborhood refinement and a branch limit imply the same one-sided case limit|Check approach, neighborhood and equality there; Local; L|
 |SideSeriesRestriction: `series.case-restrict`|Side neighborhood refinement and branch congruence/remainder evidence imply the corresponding side series|Check center, side, order and formal versus analytic relation; Jet; L|
 
@@ -203,11 +203,13 @@ A named shortcut producer and the case producer both propose proof routes. For a
 |Delta pairing and smooth multiplication|Finite delta sums, exact polynomial jets and supported-germ extension; symbolic action on declared tests|Numerical quadrature, products of distributions, discontinuous multipliers at delta support|
 |Affine pullback|Typed request retains both spaces, interval map and nonzero-scale premise|Second lane checks `δ(αx−β) = δ_(β/α)/abs(α)`, including negative scale|
 |Simple-zero pullback|Typed zero-set, simplicity, coverage and local-finiteness obligations|Second lane starts with finite factorized rational-root polynomials; multiple zeros and incomplete lists refuse the proposed rule|
-|Interval integration by split|Retain integral syntax, ordered cuts, orientation, branch primitive and integrability obligations|Second lane proves polynomial antiderivative differences, finite-point extensions and reversed bounds; improper convergence stays separate|
-|Finite sums by split|Decide integer-range partitions and retain forward-difference witnesses|Second lane executes exact integer endpoints and telescoping; arbitrary sets and infinite sums require different evidence|
+|Interval integration by split|Executable `Task::Integrate(SplitRange)` checks rational polynomial antiderivative differences, the full closed interval, every finite-point extension and reversed orientation|General integrability and improper convergence remain separate and are never inferred|
+|Finite sums by split|Executable `Task::Sum(SplitRange)` restricts the declared real coordinate to exact integer arguments and reconstructs disjoint inclusive ranges, singleton values and forward differences|Symbolic bounds, arbitrary sets and infinite sums require different evidence|
 |One-sided limits|Boundary jets can expose their already proved polynomial traces; standalone Limit still reports deferred operation|Second lane restricts a punctured side neighborhood and uses branch limit evidence; two-sided result requires agreement|
 |Side series|Retain center, side, order and formal/analytic mode; existing jet evidence is available but no series result is fabricated|Second lane expands polynomial germs; an ordinary two-sided or analytic series additionally checks agreement and remainder hypotheses|
 |Delta primitive and Green/impulse verification|A shifted step is verified by its derivative; proposed rational polynomial oscillator branches are checked by the same linear/jump rules|Primitive uniqueness theorem, general convolution, causal selection and a numerical solver are later|
+
+Finite split statements retain the original function, coordinate, closed interval, oriented rational bounds and exact value. Their certificate reconstructs the entire selector partition through the existing ledger-local cache. Each integral open cell has a rational polynomial and a checked primitive, so it extends continuously to both endpoints; every cut records its actual finite value or certified absence. The theorem concerns any finite-valued extension at those finitely many points. A hole on an open cell remains pending. Sums have no finite-point exception: every included integer must be defined. The producer solves antidifference coefficients triangularly, while replay checks polynomial composition and explicit endpoint powers. Existing `case_arms`, `region_cells`, `boundary_nodes`, polynomial, arithmetic and wire limits bound both routes; no unmetered summand enumeration is used.
 
 The split follows independent proof obligations, not the apparent simplicity of operator names. Integration and sums introduce endpoint and extension contracts; side limits and series introduce approach/remainder contracts; pullbacks introduce coordinate-space changes and zero completeness. They can use the first slice's regions, jets and wire machinery without enlarging its trusted checker during the same implementation round (`rule:nrz:cas-piecewise-integration`), (`rule:nrz:cas-piecewise-summation`), (`rule:nrz:cas-piecewise-limits-series`).
 
@@ -219,9 +221,9 @@ Merge only after proving that the proposed value and definedness match each cons
 
 **Definition (Cost policy and dominance)** · `def:nrz:cas-piecewise-design-policy`
 
-The current default policy uses key `logical`, version 5 for 52 active checkers. The nine distribution additions have the weights in (`tab:nrz:cas-piecewise-design-distribution-rules`), each at semantic version 1; the forty-three prior weights are unchanged. Existing scalar weights are unchanged; new weights use the classes in (`def:nrz:cas-piecewise-design-registration`). Every active primitive has its key/version and positive weight in the complete immutable manifest; reserved later schemas are absent. Overrides name exact primitive keys and remain in the existing positive bounded range. A changed table increments the policy version and invalidates old improvement caches. Generation work, replay work and logical proof cost remain separate accounting dimensions.
+The current default policy uses key `logical`, version 6 for 54 active checkers. The new `integral.case-split` and `sum.case-split` schemas have weights 8 and 4 and semantic version 1. The nine distribution additions have the weights in (`tab:nrz:cas-piecewise-design-distribution-rules`), each at semantic version 1; the forty-three prior weights are unchanged. Existing scalar weights are unchanged; new weights use the classes in (`def:nrz:cas-piecewise-design-registration`). Every active primitive has its key/version and positive weight in the complete immutable manifest; reserved later schemas are absent. Overrides name exact primitive keys and remain in the existing positive bounded range. A changed table increments the policy version and invalidates old improvement caches. Generation work, replay work and logical proof cost remain separate accounting dimensions.
 
-No external consumers, policy records or stored artifacts exist yet, so no frozen legacy policy is retained. The 40-entry native-case table used version 3 and the 43-entry boundary table used version 4; the executable distribution table replaces both.
+No external consumers, policy records or stored artifacts exist yet, so no frozen legacy policy is retained. The 40-entry native-case table used version 3 and the 43-entry boundary table used version 4; the version 6 split-calculus table replaces these and the 52-entry distribution table at version 5.
 
 Dominance compares only states with identical current endpoint, remaining task payload, requested statement, full context, layer/space, claimed domain, coverage status and source-receipt obligations. Coordinate order, jet order and pairing mode are part of that payload. Within that class, A may dominate B only if A has no greater cost, peak size, consumed expansion credits, proof depth or witness footprint, and its required proof/source/rule support is a subset of B's. Retain the same used-hypothesis class; residuals must be identical or related by a recorded checked implication, with that proof's cost/support included in A. Require a strict improvement in at least one resource; exact ties choose canonical proof bytes. Unknown totality cannot dominate a proved cover. A partial derivative map cannot dominate a whole-domain derivative; pointwise and distributional claims never compete. Region/boundary interning improves storage, not logical strength.
 
@@ -231,13 +233,13 @@ Frozen search pins the graph frontier, available applications/shortcuts, rule ma
 
 |Limit field|Default|Charging boundary|
 |-----------|-------|-----------------|
-|`case_arms`|256|Associations per case before allocating or sorting|
+|`case_arms`|256|Associations per case and finite split pieces before allocating or sorting|
 |`region_nodes`|2048|New or imported region records retained in a request/replay arena|
 |`region_cells`|256|Cells, including singleton cuts and exterior rays, in any one exact partition|
 |`refinement_pairs`|4096|Cumulative attempted arm meets, including empty and duplicate attempts|
 |`local_contexts`|128|New or imported local frames per request/replay|
 |`hypothesis_depth`|32|Maximum parent-frame depth, checked before descent|
-|`boundary_nodes`|128|Distinct boundary locations in one claimed decomposition|
+|`boundary_nodes`|128|Distinct boundary locations or finite integral extension points in one claimed decomposition|
 |`jet_order`|8|Highest requested trace derivative order, checked before coefficient work|
 |`jet_entries`|4096|Cumulative generated or replayed function/side/order trace entries|
 |`delta_order`|8|Highest delta derivative order; increment checked before constructing a node|

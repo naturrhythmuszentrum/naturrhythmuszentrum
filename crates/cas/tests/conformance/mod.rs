@@ -22,5 +22,7 @@ mod distribution_refusals;
 mod distribution_syntax;
 mod distributions;
 
+mod calculus_registry;
 mod parser;
 mod parser_equalities;
+mod split;

@@ -54,10 +54,10 @@ pub enum Task {
     Jacobian(Vec<String>),
     /// Rational univariate square-free multiplicity.
     SquareFree(String),
-    /// Represented integral, whose general producer is deferred.
-    Integrate,
-    /// Represented discrete sum.
-    Sum,
+    /// Finite polynomial integral, with oriented rational bounds.
+    Integrate(Box<crate::split_model::SplitRange>),
+    /// Inclusive finite polynomial sum, with exact integer endpoints.
+    Sum(Box<crate::split_model::SplitRange>),
     /// Represented limit.
     Limit,
     /// Represented series with its syntax's explicit analytic mode.
@@ -176,8 +176,6 @@ impl Task {
             } => Operation::Differentiate(coordinate.clone()),
             Self::Jacobian(values) => Operation::Jacobian(values.clone()),
             Self::SquareFree(value) => Operation::SquareFree(value.clone()),
-            Self::Integrate => Operation::Integrate,
-            Self::Sum => Operation::Sum,
             Self::Limit => Operation::Limit,
             Self::Series => Operation::Series,
             Self::Solve => Operation::Solve,
@@ -244,6 +242,7 @@ pub(crate) fn encode_with(
         write(reference, out)?;
     }
     match value {
+        Task::Integrate(range) | Task::Sum(range) => crate::split_wire::range(range, out)?,
         Task::ApplyAt { coordinate, .. } => out.name(coordinate)?,
         Task::Product { requested_sort } => crate::encoding::sort(requested_sort, out)?,
         Task::Eliminate { conclusion, .. } => {
@@ -315,8 +314,8 @@ const fn tag(value: &Task) -> u8 {
         Task::Differentiate { .. } => 3,
         Task::Jacobian(_) => 4,
         Task::SquareFree(_) => 5,
-        Task::Integrate => 6,
-        Task::Sum => 7,
+        Task::Integrate(_) => 6,
+        Task::Sum(_) => 7,
         Task::Limit => 8,
         Task::Series => 9,
         Task::Solve => 10,

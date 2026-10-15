@@ -609,3 +609,35 @@ mod distribution_recipes;
     reason = "distribution scheduling remains private"
 )]
 mod distribution_schedule;
+
+mod split_model;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "split calculus helpers stay inside the kernel"
+)]
+mod split_polynomial;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "split calculus helpers stay inside the kernel"
+)]
+mod split_geometry;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "split calculus helpers stay inside the kernel"
+)]
+mod split_check;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "split calculus helpers stay inside the kernel"
+)]
+mod split_producer;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "split calculus helpers stay inside the kernel"
+)]
+mod split_wire;

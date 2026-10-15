@@ -86,6 +86,34 @@ pub(crate) fn analyze(
 }
 
 impl Analysis {
+    /// Reconstruct one inhabited calculus cell; absence is meaningful only at a finite point.
+    pub(crate) fn calculus_cell(
+        &self,
+        cas: &mut Cas,
+        expression: LogicalId,
+        within: LogicalId,
+        cell: usize,
+        coordinate: &str,
+        budget: &mut Budget,
+    ) -> Result<Option<Vec<crate::number::Rational>>, Fault> {
+        if !self.contains(within, cell)? {
+            return Err(invalid());
+        }
+        let values = self.specialize(cas, within, cell, budget)?;
+        let mut value = match values.get(&expression).ok_or_else(invalid)? {
+            Value::Undefined => return Ok(None),
+            Value::Conflict => return Err(conflict()),
+            Value::Defined(value) => *value,
+        };
+        if cell & 1 == 1 {
+            let point = self.cells.cuts.get(cell / 2).ok_or_else(invalid)?;
+            value = at_point(cas, value, coordinate, point, budget)?;
+        }
+        Ok(Some(crate::polynomial::univariate(
+            &cas.state, value, coordinate, budget,
+        )?))
+    }
+
     /// Read a cell only through its exact declared region row.
     fn contains(&self, region: LogicalId, cell: usize) -> Result<bool, Fault> {
         let index = self

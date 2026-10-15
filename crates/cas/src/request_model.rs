@@ -347,8 +347,6 @@ pub(crate) fn validate(
         }
         let compatible = match operation {
             Operation::Equal => expression.sort == *first_sort,
-            Operation::Integrate => matches!(expression.operator, Operator::Integral { .. }),
-            Operation::Sum => matches!(expression.operator, Operator::Sum),
             Operation::Series => matches!(expression.operator, Operator::Series { .. }),
             Operation::Limit => matches!(expression.operator, Operator::Limit(_)),
             Operation::Solve => matches!(expression.operator, Operator::Set { .. }),
@@ -491,7 +489,9 @@ fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> R
         | Task::SmoothMultiply { .. }
         | Task::Product { .. } => Some(2),
         Task::Eliminate { .. } => Some(0),
-        Task::EmbedRegular { .. }
+        Task::Integrate(_)
+        | Task::Sum(_)
+        | Task::EmbedRegular { .. }
         | Task::ApplyAt { .. }
         | Task::ElaborateCases
         | Task::Select { .. }

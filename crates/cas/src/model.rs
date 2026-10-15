@@ -392,10 +392,6 @@ pub(crate) enum Operation {
     Jacobian(Vec<String>),
     /// Decompose univariate rational polynomial multiplicity layers.
     SquareFree(String),
-    /// Search for an antiderivative or definite-integral witness.
-    Integrate,
-    /// Search for a discrete antiderivative and endpoint witness.
-    Sum,
     /// Prove a requested series congruence or remainder statement.
     Series,
     /// Prove a limit under its approach/domain data.

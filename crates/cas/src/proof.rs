@@ -22,3 +22,7 @@ pub use crate::boundary_model::{
 pub use crate::distribution_model::{
     DistributionCertificate, DistributionStatement, RegularCertificate, RegularityKind,
 };
+
+pub use crate::split_model::{
+    SplitCertificate, SplitKind, SplitPiece, SplitPoint, SplitRange, SplitValue,
+};

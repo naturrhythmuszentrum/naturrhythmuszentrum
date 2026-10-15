@@ -94,3 +94,10 @@ pub(crate) mod boundary;
 )]
 #[path = "distributions.rs"]
 pub(crate) mod distributions;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public split calculus fixtures"
+)]
+#[path = "split.rs"]
+pub(crate) mod split;

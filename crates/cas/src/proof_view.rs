@@ -370,6 +370,9 @@ pub(crate) fn measure(
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
     crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
+    if let Certificate::Split(certificate) = &value.certificate {
+        crate::split_check::measure(certificate, budget)?;
+    }
     crate::boundary_measure::statement(&value.conclusion, budget)?;
     crate::boundary_measure::certificate(cas, &value.certificate, budget)?;
     let objects = match &value.conclusion {

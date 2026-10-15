@@ -76,6 +76,9 @@ pub(crate) fn statement(
             result: object(reader, records)?,
             domain: object(reader, records)?,
         },
+        23 => Statement::Split(Box::new(crate::split_wire::decode_statement(
+            reader, records,
+        )?)),
         22 => Statement::Distribution(Box::new(crate::distribution_decode::statement(
             reader, records,
         )?)),
@@ -249,6 +252,7 @@ pub(crate) fn certificate(
             crate::multiplicity::SquareFreeCertificate::decode(reader)?,
         )),
         6 => Certificate::Cases(Box::new(case_certificate(reader, records)?)),
+        9 => Certificate::Split(Box::new(crate::split_wire::decode_certificate(reader)?)),
         8 => Certificate::Distribution(Box::new(crate::distribution_decode::certificate(
             reader, records,
         )?)),

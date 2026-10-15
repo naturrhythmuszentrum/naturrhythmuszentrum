@@ -111,6 +111,18 @@ impl Cas {
         checker: &mut Budget,
     ) -> Result<Option<Execution>, Fault> {
         let context = self.checked(&request.context)?;
+        if matches!(
+            &request.task,
+            crate::task::Task::Integrate(_) | crate::task::Task::Sum(_)
+        ) {
+            self.check_nonempty_request(context, generation)?;
+            let result =
+                crate::split_producer::execute(self, request, inputs, policy, generation, checker)?;
+            return Ok(Some(Execution {
+                result: Some(result),
+                fault: None,
+            }));
+        }
         if crate::distribution_search::handles(self, &request.task, inputs)? {
             self.check_nonempty_request(context, generation)?;
             return crate::distribution_search::execute(

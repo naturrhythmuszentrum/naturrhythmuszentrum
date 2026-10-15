@@ -107,6 +107,9 @@ pub(crate) fn check_application(
     crate::proof_view::measure(cas, draft, budget)?;
     let mut scalar_view = None;
     let mut conditions = match draft.rule {
+        Primitive::IntegralCaseSplit | Primitive::SumCaseSplit => {
+            crate::split_check::check(cas, draft, premises, budget)?
+        }
         Primitive::DistRegular
         | Primitive::DistAe
         | Primitive::DistLinear

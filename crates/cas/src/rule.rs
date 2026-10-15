@@ -4,6 +4,10 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// Finite polynomial interval integration with checked endpoint differences.
+    IntegralCaseSplit,
+    /// Inclusive integer ranges with checked forward differences.
+    SumCaseSplit,
     /// Checked `dist.regular` schema.
     DistRegular,
     /// Checked `dist.ae` schema.
@@ -113,6 +117,8 @@ pub enum Primitive {
 /// Typed conclusion family selected by an executable checker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConclusionKind {
+    /// Finite split integral or sum.
+    Split,
     /// Native distribution membership, equality, derivative or scalar action.
     Distribution,
     /// Exact partition, jet, trace, jump or point derivative fact.
@@ -155,6 +161,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// Finite cover, point-extension and endpoint witnesses.
+    Split,
     /// Closed regularity, exceptional-set and support modes.
     Distribution,
     /// Closed finite boundary-calculus modes.
@@ -201,7 +209,9 @@ impl Primitive {
     pub(crate) const fn native(self) -> bool {
         matches!(
             self,
-            Self::DistRegular
+            Self::IntegralCaseSplit
+                | Self::SumCaseSplit
+                | Self::DistRegular
                 | Self::DistAe
                 | Self::DistLinear
                 | Self::DistDerivative
@@ -230,6 +240,8 @@ impl Primitive {
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::IntegralCaseSplit => ("integral.case-split", 8),
+            Self::SumCaseSplit => ("sum.case-split", 4),
             Self::DistRegular => ("dist.regular", 8),
             Self::DistAe => ("dist.ae", 4),
             Self::DistLinear => ("dist.linear", 2),
@@ -298,6 +310,7 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
+            Self::IntegralCaseSplit | Self::SumCaseSplit => ConclusionKind::Split,
             Self::DistRegular
             | Self::DistAe
             | Self::DistLinear
@@ -373,6 +386,7 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::IntegralCaseSplit | Self::SumCaseSplit => CertificateSchema::Split,
             Self::DistRegular
             | Self::DistAe
             | Self::DistLinear
@@ -401,7 +415,7 @@ impl Primitive {
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 52] = [
+pub const PRIMITIVES: [Primitive; 54] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -448,10 +462,12 @@ pub const PRIMITIVES: [Primitive; 52] = [
     Primitive::Symmetry,
     Primitive::Transitivity,
     Primitive::Exact,
+    Primitive::IntegralCaseSplit,
     Primitive::JetPolynomial,
     Primitive::Jets,
     Primitive::RationalIdentity,
     Primitive::SquareFree,
     Primitive::RegionConstruct,
     Primitive::RegionDecide,
+    Primitive::SumCaseSplit,
 ];

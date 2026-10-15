@@ -194,6 +194,10 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::Split(value) => {
+            out.byte(9)?;
+            crate::split_wire::certificate(value, out)
+        }
         Certificate::Distribution(value) => {
             out.byte(8)?;
             crate::distribution_wire::certificate(value, out, write)
@@ -282,6 +286,10 @@ pub(crate) fn encode(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Statement::Split(value) => {
+            out.byte(23)?;
+            return crate::split_wire::statement(value, out, write);
+        }
         Statement::Distribution(value) => {
             out.byte(22)?;
             return crate::distribution_wire::statement(value, out, write);
@@ -496,6 +504,7 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::Split(value) => vec![&value.function, &value.domain],
         Statement::Distribution(value) => crate::distribution_wire::objects(value),
         Statement::BoundaryPartition(_)
         | Statement::CaseDerivative(_)
@@ -680,7 +689,7 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
             | Statement::PredicateFact { .. },
             0,
         )
-        | (Statement::DefinedDomain { .. }, 1)
+        | (Statement::DefinedDomain { .. } | Statement::Split(_), 1)
         | (
             Statement::Equality { .. }
             | Statement::Compatibility { .. }
@@ -702,7 +711,8 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
             | Statement::DefinedDomain { .. }
             | Statement::Jet { .. }
             | Statement::Jump { .. }
-            | Statement::DerivativeOn { .. },
+            | Statement::DerivativeOn { .. }
+            | Statement::Split(_),
             0,
         ) => Edge::OfFunction,
         (Statement::Jet { .. }, _) => Edge::JetValue(position.saturating_sub(3)),
