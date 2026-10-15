@@ -14,7 +14,7 @@ use crate::solving::{
 };
 
 /// Only the canonical parameter interpretation is shared by regional fraction unit statements.
-fn canonical_map(
+pub(crate) fn canonical_map(
     state: &State,
     source: &Handle,
     map: crate::graph::LogicalId,

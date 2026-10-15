@@ -622,3 +622,86 @@ impl SplitFixture {
         })
     }
 }
+
+impl Fixture {
+    /// Build a scalar guard expression under the complete fixture header.
+    pub(crate) fn guard_expression(
+        &mut self,
+        operator: crate::test_api::syntax::Operator,
+        operands: &[Handle],
+    ) -> TestResult<Handle> {
+        admit(
+            &mut self.cas,
+            &crate::testing::solve_graph::expression(
+                Reference::Existing(self.header.clone()),
+                operator,
+                Sort::Value(AtomicSort::Scalar(Field::Real)),
+                operands.iter().cloned().map(Reference::Existing).collect(),
+            ),
+        )
+    }
+
+    /// Admit an exact product region without assuming any general region decision.
+    pub(crate) fn region_expression(&mut self, expression: RegionExpr) -> TestResult<Handle> {
+        use crate::test_api::solving::SolveView;
+        let SolveView::CoefficientDomain(CoefficientDomainData::Fraction { coordinates, .. }) =
+            self.cas.solve_view(&self.fractions)?
+        else {
+            return Err("missing parameter frame".into());
+        };
+        let ambient = AmbientDomain::Product {
+            coordinates: coordinates.clone(),
+        };
+        admit(
+            &mut self.cas,
+            &Draft::Region(RegionDraft {
+                header: Reference::Existing(self.header.clone()),
+                scope: Vec::new(),
+                ambient,
+                expression,
+            }),
+        )
+    }
+
+    /// A fresh root context on a cell introduces no conditional hypothesis.
+    pub(crate) fn on_region(&mut self, region: &Handle) -> TestResult {
+        self.region.clone_from(region);
+        self.context = admit(
+            &mut self.cas,
+            &Draft::Context(ContextDraft::Root {
+                header: Reference::Existing(self.header.clone()),
+                admissible: Reference::Existing(region.clone()),
+                assumptions: Vec::new(),
+            }),
+        )?;
+        Ok(())
+    }
+
+    /// Ordered zero/nonzero cells share the exact defined equality predicate and base.
+    pub(crate) fn guard_cells(&mut self, expression: &Handle) -> TestResult<[Handle; 2]> {
+        use crate::test_api::syntax::{Operator, PredicateKind};
+        let zero = self.guard_expression(Operator::Rational(Rational::zero()), &[])?;
+        let predicate = admit(
+            &mut self.cas,
+            &Draft::Condition {
+                header: Reference::Existing(self.header.clone()),
+                scope: Vec::new(),
+                kind: PredicateKind::Equal,
+                arguments: vec![
+                    Reference::Existing(expression.clone()),
+                    Reference::Existing(zero),
+                ],
+            },
+        )?;
+        let base = Reference::Existing(self.region.clone());
+        let zero = self.region_expression(RegionExpr::GuardTrue {
+            base: base.clone(),
+            predicate: Reference::Existing(predicate.clone()),
+        })?;
+        let nonzero = self.region_expression(RegionExpr::GuardFalse {
+            base,
+            predicate: Reference::Existing(predicate),
+        })?;
+        Ok([zero, nonzero])
+    }
+}

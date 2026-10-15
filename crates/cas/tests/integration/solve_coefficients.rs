@@ -197,3 +197,57 @@ fn linked_component_domains(
     assert_eq!(domains.as_slice(), children.as_slice());
     Ok(())
 }
+
+/// Both exact cells replay without residual hypotheses and reject a different expected regional claim.
+/// ´test:integration:coefficient-guards-fresh-replay´
+#[test]
+fn coefficient_guards_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::{regional_fixture, regional_identity};
+    for cell in 0..2 {
+        let mut source = regional_fixture(cell)?;
+        let step = regional_identity(&mut source, cell == 0, true)?;
+        let witness = source.cas.check_proof(
+            &source.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let bytes = source
+            .cas
+            .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut target = regional_fixture(cell)?;
+        let step = regional_identity(&mut target, cell == 0, true)?;
+        let expected = target.cas.check_proof(
+            &target.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let checked = target.cas.replay(
+            &bytes,
+            expected.judgment(),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(checked.judgment(), expected.judgment());
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+        assert_eq!(
+            target
+                .cas
+                .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+        let mut wrong = expected.judgment().clone();
+        let parameter = target.free("x")?;
+        let children = target.guard_cells(&parameter)?;
+        target.on_region(&children[0])?;
+        wrong.context.clone_from(&target.context);
+        let before = target.cas.counts();
+        assert!(
+            target
+                .cas
+                .replay(&bytes, &wrong, &mut Budget::new(Limits::blind_cubic())?)
+                .is_err()
+        );
+        assert_eq!(target.cas.counts(), before);
+    }
+    Ok(())
+}

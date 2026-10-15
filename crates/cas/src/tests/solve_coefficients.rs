@@ -989,3 +989,230 @@ fn coefficient_partial_parameter_specialization() -> TestResult {
     ));
     Ok(())
 }
+
+/// A fresh split decides only its exact cell and never loses a localization denominator.
+/// ´test:crate:coefficient-regional-decisions´
+#[test]
+fn coefficient_regional_decisions() -> TestResult {
+    use crate::syntax::Operator;
+    let mut fixture = Fixture::new()?;
+    let ambient = fixture.region.clone();
+    let expression = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let cells = fixture.guard_cells(&expression)?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let other = fixture.polynomial(2, &[(vec![0, 1], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let parameter = admit(&mut fixture.cas, &draft)?;
+    for (region, expected) in [
+        (&ambient, None),
+        (&cells[0], Some(true)),
+        (&cells[1], Some(false)),
+    ] {
+        fixture.on_region(region)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let field = FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+        let value = field.read(&parameter, &mut budget)?;
+        let scope = EvaluationScope {
+            context: &fixture.context,
+            region,
+            premises: &[],
+            localization: &[],
+        };
+        match (
+            expected,
+            field.zero_test(&value, &scope, &mut budget)?,
+            field.inverse(&value, &scope, &mut budget)?,
+        ) {
+            (None, ZeroDecision::Undetermined(_), UnitDecision::Undetermined(_))
+            | (Some(true), ZeroDecision::Zero(_), UnitDecision::Zero(_))
+            | (Some(false), ZeroDecision::Nonzero(_), UnitDecision::Unit { .. }) => {}
+            _ => return Err("incorrect regional decision".into()),
+        }
+        let localized = EvaluationScope {
+            localization: std::slice::from_ref(&other),
+            ..scope
+        };
+        assert!(matches!(
+            field.zero_test(&value, &localized, &mut budget)?,
+            ZeroDecision::Undetermined(_)
+        ));
+    }
+    Ok(())
+}
+
+/// Canonical arithmetic guards descend through meets and bases, without deciding unions or positivity.
+/// ´test:crate:coefficient-regional-polynomial-scope´
+#[test]
+fn coefficient_regional_polynomial_scope() -> TestResult {
+    use crate::domain::RegionExpr;
+    use crate::syntax::Operator;
+    let mut fixture = Fixture::new()?;
+    let ambient = fixture.region.clone();
+    let x = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let y = fixture.guard_expression(Operator::Free("y".into()), &[])?;
+    let sum = fixture.guard_expression(Operator::Add, &[y, x])?;
+    let cells = fixture.guard_cells(&sum)?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1), (vec![0, 1], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let parameter = admit(&mut fixture.cas, &draft)?;
+    let meet = fixture.region_expression(RegionExpr::Meet(vec![
+        Reference::Existing(ambient),
+        Reference::Existing(cells[1].clone()),
+    ]))?;
+    let union = fixture.region_expression(RegionExpr::Union(
+        cells.iter().cloned().map(Reference::Existing).collect(),
+    ))?;
+    for (region, nonzero) in [(meet, true), (union, false)] {
+        fixture.on_region(&region)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let field = FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+        let value = field.read(&parameter, &mut budget)?;
+        let scope = EvaluationScope {
+            context: &fixture.context,
+            region: &region,
+            premises: &[],
+            localization: std::slice::from_ref(&top),
+        };
+        assert_eq!(
+            matches!(
+                field.inverse(&value, &scope, &mut budget)?,
+                UnitDecision::Unit { .. }
+            ),
+            nonzero
+        );
+        let wrong = EvaluationScope {
+            region: &cells[0],
+            ..scope
+        };
+        assert!(field.zero_test(&value, &wrong, &mut budget).is_err());
+    }
+    Ok(())
+}
+
+/// Explicit nonzero guards and inherited bases work; positivity and partial syntax are not generalized.
+/// ´test:crate:coefficient-explicit-regional-guards´
+#[test]
+fn coefficient_explicit_regional_guards() -> TestResult {
+    use crate::domain::RegionExpr;
+    use crate::syntax::{Operator, PredicateKind};
+    let mut fixture = Fixture::new()?;
+    let x = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let parameter = admit(&mut fixture.cas, &draft)?;
+    for (kind, decided) in [
+        (PredicateKind::NonZero, true),
+        (PredicateKind::Positive, false),
+    ] {
+        let predicate = admit(
+            &mut fixture.cas,
+            &Draft::Condition {
+                header: Reference::Existing(fixture.header.clone()),
+                scope: Vec::new(),
+                kind,
+                arguments: vec![Reference::Existing(x.clone())],
+            },
+        )?;
+        let region = fixture.region_expression(RegionExpr::GuardTrue {
+            base: Reference::Existing(fixture.region.clone()),
+            predicate: Reference::Existing(predicate),
+        })?;
+        let context = fixture.context.clone();
+        let original = fixture.region.clone();
+        fixture.on_region(&region)?;
+        let y = fixture.guard_expression(Operator::Free("y".into()), &[])?;
+        let nested = fixture.guard_cells(&y)?;
+        fixture.on_region(&nested[1])?;
+        assert_regional_inverse(&fixture, &parameter, decided)?;
+        fixture.region = original;
+        fixture.context = context;
+    }
+    let partial = fixture.guard_expression(Operator::Div, &[x.clone(), x])?;
+    let cells = fixture.guard_cells(&partial)?;
+    fixture.on_region(&cells[1])?;
+    assert_regional_inverse(&fixture, &parameter, false)
+}
+
+/// Inspect the crate-private decision without adding a public arithmetic API.
+fn assert_regional_inverse(
+    fixture: &Fixture,
+    parameter: &crate::Handle,
+    expected: bool,
+) -> TestResult {
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let field = FractionCoefficients::new(&fixture.cas.state, &fixture.fractions, &mut budget)?;
+    let value = field.read(parameter, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.context,
+        region: &fixture.region,
+        premises: &[],
+        localization: &[],
+    };
+    assert_eq!(
+        matches!(
+            field.inverse(&value, &scope, &mut budget)?,
+            UnitDecision::Unit { .. }
+        ),
+        expected
+    );
+    Ok(())
+}
+
+/// Same parameter spellings under a different full header cannot reuse regional guards.
+/// ´test:crate:coefficient-regional-header-identity´
+#[test]
+fn coefficient_regional_header_identity() -> TestResult {
+    use crate::domain::HeaderDraft;
+    use crate::solving::{Coordinate, CoordinateRole, CoordinateSpaceData};
+    use crate::syntax::{AtomicSort, Branch, Declaration, Environment, Field, Operator, Sort};
+    let mut fixture = Fixture::new()?;
+    let x = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let cells = fixture.guard_cells(&x)?;
+    fixture.on_region(&cells[1])?;
+    let header = admit(
+        &mut fixture.cas,
+        &Draft::Header(HeaderDraft::Core(Environment {
+            field: Field::Real,
+            branch: Branch::StrictReal,
+            declarations: ["x", "y"]
+                .into_iter()
+                .map(|key| Declaration {
+                    key: key.into(),
+                    display_name: "changed".into(),
+                    sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+                })
+                .collect(),
+        })),
+    )?;
+    let coordinates = admit(
+        &mut fixture.cas,
+        &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            header: Reference::Existing(header),
+            coordinates: ["x", "y"]
+                .into_iter()
+                .map(|key| Coordinate {
+                    key: key.into(),
+                    field: Field::Real,
+                    role: CoordinateRole::Coefficient,
+                })
+                .collect(),
+        })),
+    )?;
+    fixture.fractions = admit(
+        &mut fixture.cas,
+        &Draft::Solve(SolveDraft::CoefficientDomain(
+            crate::solving::CoefficientDomainData::Fraction {
+                base: Reference::Existing(fixture.rational.clone()),
+                coordinates: Reference::Existing(coordinates),
+            },
+        )),
+    )?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let parameter = admit(&mut fixture.cas, &draft)?;
+    assert_regional_inverse(&fixture, &parameter, false)
+}

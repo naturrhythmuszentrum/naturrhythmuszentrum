@@ -149,6 +149,18 @@ impl Engine<'_> {
                 if value.numerator.zero(budget)? {
                     return Ok(ZeroDecision::Zero(CoefficientCertificate::FormalZero));
                 }
+                if super::regional::proves(
+                    self.state,
+                    self.domain,
+                    &value.numerator,
+                    scope.region,
+                    true,
+                    budget,
+                )? {
+                    return Ok(ZeroDecision::Zero(CoefficientCertificate::Regional(
+                        Vec::new(),
+                    )));
+                }
                 if self.polynomial_nonzero_value(&value.numerator, scope, budget)? {
                     let mut witnesses = vector(scope.premises.len(), budget)?;
                     for premise in scope.premises {
@@ -375,6 +387,16 @@ impl Engine<'_> {
     ) -> Result<bool, CoefficientFailure> {
         if let Some(constant) = polynomial.scalar(budget)? {
             return Ok(!constant.zero(budget)?);
+        }
+        if super::regional::proves(
+            self.state,
+            self.domain,
+            polynomial,
+            scope.region,
+            false,
+            budget,
+        )? {
+            return Ok(true);
         }
         for witness in scope.premises {
             if witness.is_discharged()

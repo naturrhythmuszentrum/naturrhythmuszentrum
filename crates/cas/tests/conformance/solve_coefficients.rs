@@ -865,3 +865,165 @@ fn real_root_order_mutations() -> TestResult {
     }
     Ok(())
 }
+
+/// Exact regional zero and reciprocal identities succeed only in their respective fresh split cells.
+/// ´test:integration:coefficient-guard-proof-cells´
+#[test]
+fn coefficient_guard_proof_cells() -> TestResult {
+    use crate::testing::solve_coefficients::{regional_fixture, regional_identity};
+    for cell in 0..2 {
+        let mut fixture = regional_fixture(cell)?;
+        for zero in [true, false] {
+            let step = regional_identity(&mut fixture, zero, true)?;
+            let before = fixture.cas.counts();
+            let result = fixture.cas.check_proof(
+                &fixture.context,
+                std::slice::from_ref(&step),
+                &mut Budget::new(Limits::blind_cubic())?,
+            );
+            if zero == (cell == 0) {
+                let witness = result?;
+                assert_eq!(witness.hypotheses(), []);
+                assert_eq!(witness.judgment().residuals, []);
+            } else {
+                assert!(result.is_err());
+                assert_eq!(fixture.cas.counts(), before);
+            }
+        }
+        let changed = regional_identity(&mut fixture, false, false)?;
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    std::slice::from_ref(&changed),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+    }
+    Ok(())
+}
+
+/// A denominator change fails even for a formally reflexive identity, and map scope cannot be borrowed.
+/// ´test:integration:coefficient-guard-denominator-scope´
+#[test]
+fn coefficient_guard_denominator_scope() -> TestResult {
+    use crate::testing::solve_coefficients::regional_fixture;
+    use crate::testing::solve_graph::admit;
+    let mut fixture = regional_fixture(1)?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let other = fixture.polynomial(2, &[(vec![0, 1], 1)])?;
+    let value = fixture.fraction(&one, &other);
+    let value = admit(&mut fixture.cas, &value)?;
+    let domain = fixture.fractions.clone();
+    let map = fixture.identity_map(&domain)?;
+    let step = fixture.identity(&value, &value, &map);
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                std::slice::from_ref(&step),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    let mut wrong =
+        crate::testing::solve_coefficients::regional_identity(&mut fixture, false, true)?;
+    let x = fixture.free("x")?;
+    let cells = fixture.guard_cells(&x)?;
+    fixture.on_region(&cells[0])?;
+    wrong.context.clone_from(&fixture.context);
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                std::slice::from_ref(&wrong),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// Canonical polynomial literals retain the ancestor map scope and compare normalized coefficients.
+/// ´test:integration:coefficient-literal-regional-guard´
+#[test]
+fn coefficient_literal_regional_guard() -> TestResult {
+    use crate::testing::solve_graph::admit;
+    let mut fixture = Fixture::new()?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1), (vec![0, 1], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let value = admit(&mut fixture.cas, &draft)?;
+    let map = fixture.parameter_map()?;
+    let literal = fixture.literal(&value, &map)?;
+    let cells = fixture.guard_cells(&literal)?;
+    let reciprocal = fixture.fraction(&one, &top);
+    let reciprocal = admit(&mut fixture.cas, &reciprocal)?;
+    for (cell, succeeds) in [(&cells[0], false), (&cells[1], true)] {
+        fixture.on_region(cell)?;
+        let domain = fixture.fractions.clone();
+        let map = fixture.identity_map(&domain)?;
+        let step = fixture.identity(&reciprocal, &reciprocal, &map);
+        let result = fixture.cas.check_proof(
+            &fixture.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        assert_eq!(result.is_ok(), succeeds);
+    }
+    Ok(())
+}
+
+/// Finite localization remains mandatory even when the cell proves the coefficient itself is zero.
+/// ´test:integration:coefficient-regional-localization-retained´
+#[test]
+fn coefficient_regional_localization_retained() -> TestResult {
+    use crate::testing::solve_coefficients::regional_fixture;
+    use crate::testing::solve_graph::admit;
+    use nrz_cas::Reference;
+    use nrz_cas::solving::{CoefficientMapData, MapMode, MapTarget, SolveDraft};
+    use nrz_cas::syntax::Draft;
+    let mut fixture = regional_fixture(0)?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let other = fixture.polynomial(2, &[(vec![0, 1], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let value = admit(&mut fixture.cas, &draft)?;
+    let map = admit(
+        &mut fixture.cas,
+        &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+            source: Reference::Existing(fixture.fractions.clone()),
+            target: MapTarget::CoefficientDomain {
+                domain: Reference::Existing(fixture.fractions.clone()),
+            },
+            mode: MapMode::Embedding,
+            region: Reference::Existing(fixture.region.clone()),
+            images: Vec::new(),
+            denominators: vec![Reference::Existing(other.clone())],
+        })),
+    )?;
+    let mut step = fixture.identity(&value, &value, &map);
+    let nrz_cas::proof::Certificate::Solve(certificate) = &mut step.certificate else {
+        return Err("missing certificate".into());
+    };
+    let nrz_cas::solving::SolveCertificate::CoefficientIdentity(identity) = certificate.as_mut()
+    else {
+        return Err("wrong certificate".into());
+    };
+    identity.denominators.push(other);
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                std::slice::from_ref(&step),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}

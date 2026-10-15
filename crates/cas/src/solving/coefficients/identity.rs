@@ -121,11 +121,12 @@ fn calculate(
             )
             .map_err(|error| fault(&error))?;
     }
-    if difference.terms.is_empty() {
-        Ok(())
-    } else {
-        Err(invalid())
+    for term in &difference.terms {
+        if !super::proof::zero(interpreter, &term.coefficient, budget)? {
+            return Err(invalid());
+        }
     }
+    Ok(())
 }
 
 /// Typed identity checking is read-only; publication remains the common atomic transaction's job.

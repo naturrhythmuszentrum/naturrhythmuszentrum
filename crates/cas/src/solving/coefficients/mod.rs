@@ -127,3 +127,14 @@ pub(crate) mod homomorphism;
     reason = "scoped nonzero evidence stays within the crate"
 )]
 pub(crate) mod nonvanishing;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "regional coefficient checks stay within the crate"
+)]
+pub(crate) mod guard_polynomial;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "regional coefficient checks stay within the crate"
+)]
+pub(crate) mod regional;

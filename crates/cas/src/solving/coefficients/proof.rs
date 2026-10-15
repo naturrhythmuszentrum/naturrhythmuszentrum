@@ -148,7 +148,9 @@ pub(crate) fn denominator(
     {
         return Ok(());
     }
-    if polynomial_unit(cas, handle, source, region, premises, budget)? {
+    if super::regional::proves(&cas.state, source, &polynomial, region, false, budget)?
+        || polynomial_unit(cas, handle, source, region, premises, budget)?
+    {
         return Ok(());
     }
     Err(invalid())
@@ -205,4 +207,30 @@ pub(crate) fn identity_map(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     super::homomorphism::check(cas, map, premises, budget)
+}
+
+/// Endpoint definedness is checked before an identity uses an exact regional zero coefficient.
+pub(crate) fn zero(
+    interpreter: &super::normalize::Interpretation<'_>,
+    value: &super::model::Element,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    if interpreter
+        .engine
+        .formal_zero(value, budget)
+        .map_err(|error| fault(&error))?
+    {
+        return Ok(true);
+    }
+    let super::model::Value::Fraction(fraction) = &value.value else {
+        return Ok(false);
+    };
+    super::regional::proves(
+        &interpreter.cas.state,
+        &value.domain,
+        &fraction.numerator,
+        interpreter.region,
+        true,
+        budget,
+    )
 }

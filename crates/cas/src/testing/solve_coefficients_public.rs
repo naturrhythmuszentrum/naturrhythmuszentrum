@@ -681,3 +681,76 @@ fn append_steps(
         target.len().checked_sub(1).ok_or("empty proof fragment")?,
     )?)
 }
+
+/// Independently check a fresh total split before using either exact cell.
+pub(crate) fn regional_fixture(cell: usize) -> TestResult<Fixture> {
+    use crate::test_api::proof::{ApplicationDraft, Certificate, Primitive, Statement};
+    use crate::test_api::solving::{
+        CertificateTotalPredicateSplit, PredicateSplitMode, SolveCertificate, SolveSchema,
+    };
+    use crate::test_api::syntax::Operator;
+    let mut fixture = Fixture::new()?;
+    let expression = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let children = fixture.guard_cells(&expression)?;
+    let step = ApplicationDraft {
+        rule: Primitive::Solve(SolveSchema::TotalPredicateSplit),
+        context: fixture.context.clone(),
+        conclusion: Statement::Cover {
+            domain: fixture.region.clone(),
+            members: children.to_vec(),
+        },
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: Certificate::Solve(Box::new(SolveCertificate::TotalPredicateSplit(
+            CertificateTotalPredicateSplit {
+                mode: PredicateSplitMode::ZeroNonzero,
+                expression,
+                region: fixture.region.clone(),
+                children: children.to_vec(),
+                branches: Vec::new(),
+                cover: None,
+            },
+        ))),
+    };
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        std::slice::from_ref(&step),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(witness.hypotheses(), []);
+    assert_eq!(witness.judgment().residuals, []);
+    fixture.on_region(children.get(cell).ok_or("missing cell")?)?;
+    Ok(fixture)
+}
+
+/// A value-to-zero identity and a reciprocal identity use only the exact cell's semantics.
+pub(crate) fn regional_identity(
+    fixture: &mut Fixture,
+    zero: bool,
+    denominator_x: bool,
+) -> TestResult<crate::test_api::proof::ApplicationDraft> {
+    use crate::test_api::syntax::Operator;
+    let numerator = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let denominator = if denominator_x {
+        numerator.clone()
+    } else {
+        fixture.polynomial(2, &[(vec![0, 1], 1)])?
+    };
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let empty = fixture.polynomial(2, &[])?;
+    let draft = fixture.fraction(&numerator, &one);
+    let parameter = admit(&mut fixture.cas, &draft)?;
+    let expected = fixture.fraction(if zero { &empty } else { &one }, &one);
+    let expected = admit(&mut fixture.cas, &expected)?;
+    let map = fixture.parameter_map()?;
+    let left = fixture.literal(&parameter, &map)?;
+    let right = fixture.literal(&expected, &map)?;
+    if zero {
+        return Ok(fixture.identity(&left, &right, &map));
+    }
+    let reciprocal = fixture.fraction(&one, &denominator);
+    let reciprocal = admit(&mut fixture.cas, &reciprocal)?;
+    let inverse = fixture.literal(&reciprocal, &map)?;
+    let product = fixture.guard_expression(Operator::Mul, &[left, inverse])?;
+    Ok(fixture.identity(&product, &right, &map))
+}

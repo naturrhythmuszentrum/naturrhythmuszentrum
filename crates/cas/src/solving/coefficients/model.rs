@@ -70,7 +70,7 @@ pub(crate) enum CoefficientCertificate {
     FormalIdentity,
     /// An exact existing scoped unit theorem was used.
     Premise(Handle),
-    /// A finite set of scoped, sealed nonzero premises supports the arithmetic decision.
+    /// Exact regional guards and scoped, sealed premises support the arithmetic decision.
     Regional(Vec<Handle>),
 }
 
