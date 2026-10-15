@@ -19,9 +19,9 @@ pub(crate) struct Snapshot {
     /// Immutable physical interpretation, unchanged by supported replacements.
     pub(crate) schema: Schema,
     /// Current value allocation.
-    region: Region,
+    pub(crate) region: Region,
     /// Reverse dependency edge and allocation of the current bound.
-    bound: Option<(Key, Region)>,
+    pub(crate) bound: Option<(Key, Region)>,
 }
 
 impl Snapshot {
@@ -111,7 +111,7 @@ impl Heap {
             self.descriptors.publish(plan.bind(Vec::new())?);
             return Ok(());
         }
-        let snapshot = self.snapshot(handle, None)?;
+        let snapshot = self.retirement_snapshot(handle)?;
         let mut keys = snapshot.retire_keys(true)?;
         for (key, record) in self.descriptors.iter() {
             if matches!(record.meaning, Meaning::Alias { base } if base == snapshot.key) {

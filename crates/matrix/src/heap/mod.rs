@@ -5,7 +5,7 @@ mod aliases;
 mod error;
 mod extent;
 pub(crate) mod identity;
-mod lifecycle;
+pub(crate) mod lifecycle;
 mod limits;
 pub(crate) mod publication;
 pub(crate) mod records;
@@ -46,6 +46,8 @@ pub struct Heap {
     pub(crate) descriptors: Slots<Record>,
     /// Immutable schemas interned using exact descriptor equality.
     pub(crate) schemas: Vec<Schema>,
+    /// Bounded operation records and source dependency graph.
+    pub(crate) provenance: crate::provenance::Provenance,
 }
 
 impl Heap {
@@ -60,6 +62,7 @@ impl Heap {
             storage: Storage::new(),
             descriptors: Slots::new(),
             schemas: Vec::new(),
+            provenance: crate::provenance::Provenance::new(),
         })
     }
 }

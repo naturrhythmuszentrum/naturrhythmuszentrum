@@ -69,6 +69,7 @@ impl<P: Scalar + 'static> Binding<P> {
             .enumerate()
         {
             dependency.validate(heap, contract, slot)?;
+            heap.validate_bound_shape(dependency.handle(), contract, slot)?;
         }
         let execution = ExecutionId(identity()?);
         let reservations = Reservations::prepare(heap, &dependencies)?;
@@ -79,6 +80,7 @@ impl<P: Scalar + 'static> Binding<P> {
             dependencies,
             execution,
             reservations,
+            issued: std::cell::Cell::new(None),
         })
     }
 }
@@ -96,6 +98,8 @@ pub struct Bound<'h, P: Scalar> {
     pub(crate) execution: ExecutionId,
     /// Fully private output storage and descriptor occupations.
     pub(crate) reservations: Reservations<P>,
+    /// The one issued candidate token, unavailable before successful evaluation.
+    pub(crate) issued: std::cell::Cell<Option<u64>>,
 }
 
 impl<P: Scalar> Bound<'_, P> {

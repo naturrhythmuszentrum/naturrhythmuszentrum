@@ -36,4 +36,16 @@ pub enum OperationError {
     /// Input evidence belongs to another binding's execution.
     #[error("normalized inputs belong to another execution")]
     ForeignInputs,
+    /// A candidate belongs to another binding or its token was not issued here.
+    #[error("candidate belongs to another execution or its token was consumed")]
+    ForeignCandidate,
+    /// This binding has already issued its one candidate token.
+    #[error("execution has already issued a candidate")]
+    AlreadyEvaluated,
+    /// A private candidate does not satisfy the reserved complete output contract.
+    #[error("candidate output or companion contract is incomplete")]
+    CandidateContract,
+    /// The immutable provenance graph would exceed its explicit capacity or work policy.
+    #[error("provenance resource limit exhausted")]
+    ProvenanceLimit,
 }

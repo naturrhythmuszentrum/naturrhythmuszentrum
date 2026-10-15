@@ -17,7 +17,7 @@ pub(crate) fn identity() -> Result<u64, HeapError> {
 }
 
 /// The isolated counter parameter permits exhaustion tests without global mutation.
-fn allocate_identity(counter: &AtomicU64) -> Result<u64, HeapError> {
+pub(crate) fn allocate_identity(counter: &AtomicU64) -> Result<u64, HeapError> {
     counter
         .try_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
             next.checked_add(1)

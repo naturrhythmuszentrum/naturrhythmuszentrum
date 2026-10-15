@@ -85,3 +85,30 @@ use crate as test_api;
     reason = "fixtures are shared across private test modules"
 )]
 mod binding_testing;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the heap owns private provenance storage"
+)]
+mod provenance;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "publication prepares private transaction records"
+)]
+mod publication;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "records are shared across private transaction modules"
+)]
+mod records;
+
+pub use provenance::{ProvenanceId, ProvenanceLimits, ProvenanceUsage, ProvenanceView};
+pub use publication::Candidate;
+pub use records::{
+    CopyEvidence, Dependency, Failure, FailureRecord, OperationRecord, Outcome, OutputRecord,
+    RecordId,
+};
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/publication_twins.rs"]
+mod publication_twins;

@@ -196,6 +196,7 @@ impl Heap {
         handle: Handle<Value, P>,
     ) -> Result<ValueView<'_, P>, HeapError> {
         let record = self.record(handle)?;
+        self.validate_provenance(handle)?;
         let base = self.base_handle(handle)?;
         let Meaning::Value { stamp, bound } = self.record(base)?.meaning else {
             return Err(HeapError::CategoryMismatch);
@@ -223,6 +224,7 @@ impl Heap {
             return Err(HeapError::CategoryMismatch);
         };
         let target_handle = Handle::<Value, P>::new(self.scope, target);
+        self.validate_provenance(target_handle)?;
         let target_record = self
             .record(target_handle)
             .map_err(|_| HeapError::StaleEvidence)?;
@@ -259,7 +261,7 @@ impl Heap {
     }
 
     /// Combine checked physical storage with its own immutable entry selection.
-    fn region_view<'h, P: Scalar + 'static>(
+    pub(crate) fn region_view<'h, P: Scalar + 'static>(
         &'h self,
         record: &'h Record,
     ) -> Result<RegionView<'h, P>, HeapError> {
