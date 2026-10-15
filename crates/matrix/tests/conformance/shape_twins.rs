@@ -29,6 +29,24 @@
 //! let _ = use_shape;
 //! ```
 //!
+//! A structured metric exposes exact coefficients without permitting forged metric entries.
+//!
+//! ```rust
+//! use nrz_matrix::ExpansionMetric;
+//! fn inspect(metric: &ExpansionMetric) {
+//!     let _ = metric.entries();
+//! }
+//! let _ = inspect;
+//! ```
+//!
+//! ```compile_fail,E0616
+//! use nrz_matrix::ExpansionMetric;
+//! fn inspect(metric: &ExpansionMetric) {
+//!     let _ = metric.entries;
+//! }
+//! let _ = inspect;
+//! ```
+//!
 //! ```compile_fail,E0308
 //! use nrz_matrix::{CheckedShape, ShapeDraft};
 //! fn consume(_: &CheckedShape) {}

@@ -3,6 +3,7 @@
 
 mod aliases;
 mod compaction;
+mod coordinates;
 mod imports;
 mod layouts;
 mod lifecycle;

@@ -5,6 +5,7 @@ mod assembly;
 mod axis;
 mod entry;
 mod error;
+mod expansion;
 mod factor;
 mod limits;
 mod maps;
@@ -19,6 +20,10 @@ pub use assembly::{BlockDraft, ShapeDraft};
 pub use axis::{Axis, AxisEntry};
 pub use entry::{EntryContract, EntryDraft};
 pub use error::ShapeError;
+pub use expansion::{
+    ExactCoefficient, ExpansionEntry, ExpansionMetric, ExpansionNorm, ExpansionRow, ExpansionTerm,
+    StructuredExpansion,
+};
 pub use factor::{CholeskyRootContract, QrShapeContract};
 pub use limits::ShapeLimits;
 pub use maps::{AxisAlignment, EntryMap};

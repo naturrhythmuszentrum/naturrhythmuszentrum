@@ -42,6 +42,18 @@ pub enum ShapeError {
     /// A nonempty square operator and positive RHS width are required.
     #[error("solve requires positive square order and at least one right-hand side")]
     SolveExtent,
+    /// A normalization reference is not a positive exact difference definition.
+    #[error("normalization requires positive exact source-free difference references")]
+    Reference,
+    /// Point coordinates lack a compatible declared exact origin.
+    #[error("point origin is missing, extra or incompatible")]
+    Origin,
+    /// The requested metric is unsupported or disagrees with the expansion Gram matrix.
+    #[error("requested metric is not established by this schema")]
+    UnsupportedMetric,
+    /// Center-only structure cannot restrict uncertainty coordinates.
+    #[error("structured companion coordinates require whole-family structure")]
+    StructureScope,
     /// A scalar operation could not be admitted.
     #[error("units descriptor check failed: {0}")]
     Units(#[from] nrz_units::UnitError),

@@ -113,6 +113,23 @@ impl AxisEntry {
         }
     }
 
+    /// Declare affine coordinates for this same physical coordinate identity.
+    ///
+    /// # Errors
+    /// Refuses a non-point target, incompatible kind or formal dual coordinate.
+    pub fn with_origin(&self, quantity: Descriptor) -> Result<Self, ShapeError> {
+        if quantity.role() != Role::Point {
+            return Err(ShapeError::Origin);
+        }
+        self.scalar()?
+            .difference()
+            .conversion_to(&quantity.difference())?;
+        Ok(Self {
+            quantity,
+            ..self.clone()
+        })
+    }
+
     /// Construct the formal dual, or recover the original on a second dualization.
     pub(crate) fn reciprocal(&self) -> Result<Self, ShapeError> {
         if self.quantity.role() != Role::Difference {

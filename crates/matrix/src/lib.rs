@@ -5,6 +5,8 @@
     reason = "faer and units carry duplicate transitive dependency versions"
 )]
 
+#[path = "coordinates/schema.rs"]
+mod coordinate_schema;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible"
@@ -30,8 +32,14 @@ pub use layout::{Layout, PackedRegion};
 
 pub use shape::{
     Axis, AxisAlignment, AxisEntry, BlockDraft, CheckedShape, CholeskyRootContract, EntryContract,
-    EntryDraft, EntryMap, Partition, QrShapeContract, ShapeDraft, ShapeError, ShapeLimits,
-    ShapeRecipe, StructureScope,
+    EntryDraft, EntryMap, ExactCoefficient, ExpansionEntry, ExpansionMetric, ExpansionNorm,
+    ExpansionRow, ExpansionTerm, Partition, QrShapeContract, ShapeDraft, ShapeError, ShapeLimits,
+    ShapeRecipe, StructureScope, StructuredExpansion,
+};
+
+pub use coordinate_schema::{
+    CoordinateMap, EntryNormalization, NormalizationSchema, OriginCorrection, PointOrigin,
+    ReferenceScale,
 };
 
 pub use heap::{
