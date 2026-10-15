@@ -47,10 +47,6 @@ output = "docs/records/feasibility.md"
 requires = []
 
 [[document]]
-output = "crates/algebra/README.md"
-requires = []
-
-[[document]]
 output = "crates/units/README.md"
 requires = []
 

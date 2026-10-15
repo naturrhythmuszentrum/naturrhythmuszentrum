@@ -32,12 +32,13 @@ Problem and fixture schema v2 is specified in `docs/design/problem-data-schema.m
 
 ## Workspace · `sec:docgen:workspace`
 
+The census lists current workspace members in manifest order; retired packages remain in repository history.
+
 |Package|Path|Description|
 |-------|----|-----------|
 |`nrz-docgen`|`tools/docgen`|Deterministic documentation datasets, rendering, and fixed-point checks|
 |`nrz-scalar`|`crates/scalar`|Validated scalar arithmetic prototype for Naturrhythmuszentrum|
 |`nrz-matrix`|`crates/matrix`|Safe dense solve candidates with independent numerical certificates|
-|`nrz-algebra`|`crates/algebra`|Exact symbolic expressions and deterministic collection normal forms|
 |`nrz-units`|`crates/units`|Data-time quantity descriptors and checks over original symbolic expressions|
 |`nrz-cas`|`crates/cas`|Exact graph construction and checked symbolic derivations|
 

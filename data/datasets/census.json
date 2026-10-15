@@ -12,7 +12,6 @@
     "tools/docgen/Cargo.toml",
     "crates/scalar/Cargo.toml",
     "crates/matrix/Cargo.toml",
-    "crates/algebra/Cargo.toml",
     "crates/units/Cargo.toml",
     "crates/cas/Cargo.toml"
   ],
@@ -37,12 +36,6 @@
       "has_readme_template": true,
       "name": "nrz-matrix",
       "path": "crates/matrix"
-    },
-    {
-      "description": "Exact symbolic expressions and deterministic collection normal forms",
-      "has_readme_template": true,
-      "name": "nrz-algebra",
-      "path": "crates/algebra"
     },
     {
       "description": "Data-time quantity descriptors and checks over original symbolic expressions",

@@ -8,7 +8,7 @@
 
 [workspace]
 resolver = "3"
-members = ["tools/docgen", "crates/scalar", "crates/matrix", "crates/algebra", "crates/units", "crates/cas"]
+members = ["tools/docgen", "crates/scalar", "crates/matrix", "crates/units", "crates/cas"]
 
 [workspace.package]
 version = "0.1.0"
@@ -28,7 +28,6 @@ toml = "1"
 clap = { version = "4", features = ["derive"] }
 thiserror = "2"
 nrz-scalar = { path = "crates/scalar" }
-nrz-algebra = { path = "crates/algebra" }
 faer = { version = "0.24.4", default-features = false, features = ["std", "linalg"] }
 tempfile = "3"
 

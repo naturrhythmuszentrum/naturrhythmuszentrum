@@ -35,6 +35,8 @@ Problem and fixture schema v2 is specified in `docs/design/problem-data-schema.m
 
 ## Workspace · `sec:docgen:workspace`
 
+The census lists current workspace members in manifest order; retired packages remain in repository history.
+
 |Package|Path|Description|
 |-------|----|-----------|
 {% for member in census.members %}|`{{ member.name }}`|`{{ member.path }}`|{{ member.description if member.description is not none else "—" }}|

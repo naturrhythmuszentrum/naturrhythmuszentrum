@@ -8,7 +8,6 @@ owners = [
   "DOCGEN",
   "SCALAR",
   "MATRIX",
-  "ALGEBRA",
   "UNITS",
   "CAS",
 ]
@@ -21,7 +20,6 @@ partitions = [
   { name = "docgen", owner = "DOCGEN", pattern = '[ %s"templates/" ] %s"tools/docgen" [ "/" *VCHAR ]' },
   { name = "scalar", owner = "SCALAR", pattern = '[ %s"templates/" ] %s"crates/scalar" [ "/" *VCHAR ]' },
   { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"crates/matrix" [ "/" *VCHAR ]' },
-  { name = "algebra", owner = "ALGEBRA", pattern = '[ %s"templates/" ] %s"crates/algebra" [ "/" *VCHAR ]' },
   { name = "units", owner = "UNITS", pattern = '[ %s"templates/" ] %s"crates/units" [ "/" *VCHAR ]' },
   { name = "cas", owner = "CAS", pattern = '[ %s"templates/" ] %s"crates/cas" [ "/" *VCHAR ]' },
 ]

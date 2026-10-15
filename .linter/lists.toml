@@ -75,24 +75,6 @@ allowances = []
 [MATRIX."owners.reach-conform"]
 allowances = []
 
-[ALGEBRA."labels.mints-well-formed"]
-allowances = []
-
-[ALGEBRA."labels.mints-kind-conform"]
-allowances = []
-
-[ALGEBRA."labels.mints-unique"]
-allowances = []
-
-[ALGEBRA."labels.heads-conform"]
-allowances = []
-
-[ALGEBRA."labels.citations-local-resolve"]
-allowances = []
-
-[ALGEBRA."owners.reach-conform"]
-allowances = []
-
 [UNITS."labels.mints-well-formed"]
 allowances = []
 
