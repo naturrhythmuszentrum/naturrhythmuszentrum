@@ -10,6 +10,8 @@ use crate::solving::coefficients::proof::fault;
 /// Uncancelled denominator factors retain the defined domain of every input operation.
 #[derive(Debug)]
 pub(crate) struct Value {
+    /// Exact scalar coefficient maps used before arithmetic cancellation.
+    pub(crate) maps: Vec<crate::graph::LogicalId>,
     /// Polynomial numerator.
     pub(crate) numerator: Form,
     /// Polynomial denominator; no cancellation removes its obligations.
@@ -17,6 +19,26 @@ pub(crate) struct Value {
 }
 
 impl Value {
+    /// Preserve map identities even when an arithmetic term cancels to zero.
+    fn combined_maps(
+        &self,
+        other: &Self,
+        budget: &mut Budget,
+    ) -> Result<Vec<crate::graph::LogicalId>, Fault> {
+        let mut result = crate::solving::coefficients::storage::copied(&self.maps, budget)?;
+        for map in &other.maps {
+            budget.work(
+                crate::graph::size(result.len(), super::proof::AT)?.max(1),
+                super::proof::AT,
+            )?;
+            if !result.contains(map) {
+                crate::solving::coefficients::storage::reserve(&mut result, 1, budget)?;
+                result.push(*map);
+            }
+        }
+        Ok(result)
+    }
+
     /// Embed an exact polynomial as a total rational expression.
     pub(crate) fn polynomial(
         numerator: Form,
@@ -30,6 +52,7 @@ impl Value {
         )
         .map_err(|e| fault(&e))?;
         Ok(Self {
+            maps: crate::solving::coefficients::storage::vector(0, budget)?,
             numerator,
             denominator,
         })
@@ -60,6 +83,7 @@ impl Value {
     /// Copy both uncancelled components with metering.
     pub(crate) fn copy(&self, engine: &Engine<'_>, budget: &mut Budget) -> Result<Self, Fault> {
         Ok(Self {
+            maps: crate::solving::coefficients::storage::copied(&self.maps, budget)?,
             numerator: self.numerator.copy(engine, budget).map_err(|e| fault(&e))?,
             denominator: self
                 .denominator
@@ -71,6 +95,7 @@ impl Value {
     /// Negation preserves every original denominator.
     pub(crate) fn neg(&self, engine: &Engine<'_>, budget: &mut Budget) -> Result<Self, Fault> {
         Ok(Self {
+            maps: crate::solving::coefficients::storage::copied(&self.maps, budget)?,
             numerator: self.numerator.neg(engine, budget).map_err(|e| fault(&e))?,
             denominator: self
                 .denominator
@@ -95,6 +120,7 @@ impl Value {
             .mul(&self.denominator, engine, budget)
             .map_err(|e| fault(&e))?;
         Ok(Self {
+            maps: self.combined_maps(other, budget)?,
             numerator: left.add(&right, engine, budget).map_err(|e| fault(&e))?,
             denominator: self
                 .denominator
@@ -121,6 +147,7 @@ impl Value {
         budget: &mut Budget,
     ) -> Result<Self, Fault> {
         Ok(Self {
+            maps: self.combined_maps(other, budget)?,
             numerator: self
                 .numerator
                 .mul(&other.numerator, engine, budget)
@@ -140,6 +167,7 @@ impl Value {
         budget: &mut Budget,
     ) -> Result<Self, Fault> {
         Ok(Self {
+            maps: self.combined_maps(other, budget)?,
             numerator: self
                 .numerator
                 .mul(&other.denominator, engine, budget)
@@ -159,6 +187,7 @@ impl Value {
         budget: &mut Budget,
     ) -> Result<Self, Fault> {
         Ok(Self {
+            maps: crate::solving::coefficients::storage::copied(&self.maps, budget)?,
             numerator: self
                 .numerator
                 .pow(exponent, engine, budget)

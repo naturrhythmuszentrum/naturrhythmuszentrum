@@ -79,15 +79,22 @@ impl Matrix {
     fn scale(
         &mut self,
         evaluation: &Evaluation<'_>,
+        context: &Handle,
         row: u32,
         value: &Handle,
         unit: u32,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        premise(evaluation.premises, unit)?;
+        let proof = premise(evaluation.premises, unit)?;
         budget.solving(BudgetKind::LinearPivots, 1, AT)?;
         let factor = evaluation.expression(value.logical_id(), true, budget)?;
-        evaluation.nonzero(&factor, budget)?;
+        crate::solving::elementary::inverse::check(
+            evaluation,
+            &factor,
+            context,
+            std::slice::from_ref(proof),
+            budget,
+        )?;
         let row = usize::try_from(row).map_err(|_| invalid())?;
         if row >= self.rows {
             return Err(invalid());
@@ -136,6 +143,7 @@ impl Matrix {
     pub(crate) fn operation(
         &mut self,
         evaluation: &Evaluation<'_>,
+        context: &Handle,
         operation: &RowOperation<Handle>,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
@@ -154,7 +162,7 @@ impl Matrix {
                 Ok(())
             }
             RowOperation::Scale { row, value, unit } => {
-                self.scale(evaluation, *row, value, *unit, budget)
+                self.scale(evaluation, context, *row, value, *unit, budget)
             }
             RowOperation::AddMultiple {
                 destination,
@@ -184,6 +192,7 @@ impl Matrix {
     pub(crate) fn rank(
         &self,
         evaluation: &Evaluation<'_>,
+        context: &Handle,
         pivots: &[u32],
         minor: &Handle,
         budget: &mut Budget,
@@ -199,7 +208,13 @@ impl Matrix {
             }
             let column = usize::try_from(*pivot).map_err(|_| invalid())?;
             budget.solving(BudgetKind::LinearPivots, 1, AT)?;
-            evaluation.nonzero(self.at(row, column)?, budget)?;
+            crate::solving::elementary::inverse::check(
+                evaluation,
+                self.at(row, column)?,
+                context,
+                evaluation.premises,
+                budget,
+            )?;
             determinant = determinant.mul(self.at(row, column)?, &evaluation.engine, budget)?;
             for before in 0..column {
                 evaluation.zero(self.at(row, before)?, budget)?;

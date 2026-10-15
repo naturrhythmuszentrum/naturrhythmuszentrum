@@ -11,6 +11,16 @@ pub(crate) use restriction::{
     assumed_restriction, degree_restriction, mixed_restriction, symbolic_restriction,
 };
 
+#[path = "solve_elementary_pivots_public.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public test fixtures stay inside the test target"
+)]
+mod pivots;
+pub(crate) use pivots::{
+    embedded_fraction, embedded_tower_one, inverse_pivot, inverse_pivot_mutation,
+};
+
 use super::common::TestResult;
 use crate::test_api::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::test_api::limits::{Budget, Limits};

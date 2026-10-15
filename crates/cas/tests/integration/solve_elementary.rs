@@ -294,3 +294,41 @@ fn symbolic_real_restriction_fresh_replay() -> TestResult {
     }
     Ok(())
 }
+
+/// Algebraic inverse identities and all their interpretation maps survive fresh-store replay.
+/// ´test:integration:checked-inverse-pivots-fresh-replay´
+#[test]
+fn checked_inverse_pivots_fresh_replay() -> TestResult {
+    for scale in [false, true] {
+        let mut source = crate::testing::solve_elementary::inverse_pivot(scale)?;
+        let checked = source.base.cas.check_proof(
+            &source.base.context,
+            &source.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let bytes = source
+            .base
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut target = crate::testing::solve_elementary::inverse_pivot(scale)?;
+        let expected = target.base.cas.check_proof(
+            &target.base.context,
+            &target.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let replayed = target.base.cas.replay(
+            &bytes,
+            expected.judgment(),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(replayed.judgment(), expected.judgment());
+        assert_eq!(
+            target
+                .base
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}

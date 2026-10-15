@@ -21,6 +21,11 @@ pub(crate) mod evaluate;
 pub(crate) mod evidence;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "exact inverse evidence is shared with linear replay"
+)]
+pub(crate) mod inverse;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "shared exact solving checks remain crate-private"
 )]
 pub(crate) mod member;

@@ -144,10 +144,16 @@ pub(crate) fn check(
     let reduced = matrix::Matrix::read(&evaluation, &value.reduced, budget)?;
     let mut transformed = matrix::Matrix::read(&evaluation, &value.matrix, budget)?;
     for operation in &value.operations {
-        transformed.operation(&evaluation, operation, budget)?;
+        transformed.operation(&evaluation, &draft.context, operation, budget)?;
     }
     transformed.equal(&evaluation, &reduced, budget)?;
-    reduced.rank(&evaluation, &value.pivots, &value.minor, budget)?;
+    reduced.rank(
+        &evaluation,
+        &draft.context,
+        &value.pivots,
+        &value.minor,
+        budget,
+    )?;
     conclusion(
         &evaluation,
         draft,

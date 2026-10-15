@@ -30,7 +30,33 @@ pub(crate) fn predicate(
     }
 }
 
-/// Only a nonzero ground coefficient is unconditionally a unit here.
+/// Canonical constant embeddings preserve nonzero ground scalars without asserting quotient fields.
+pub(crate) fn ground_unit(value: &Coefficient, budget: &mut Budget) -> Result<bool, Fault> {
+    let mut current = value;
+    loop {
+        budget.work(1, AT)?;
+        match current {
+            Coefficient::Scalar(value) => return Ok(!value.zero(budget)?),
+            Coefficient::Fraction(value) => {
+                let (Some(numerator), Some(denominator)) = (
+                    value.numerator.scalar(budget)?,
+                    value.denominator.scalar(budget)?,
+                ) else {
+                    return Ok(false);
+                };
+                return Ok(!numerator.zero(budget)? && !denominator.zero(budget)?);
+            }
+            Coefficient::Tower(coefficients) => {
+                let [constant] = coefficients.as_slice() else {
+                    return Ok(false);
+                };
+                current = &constant.value;
+            }
+        }
+    }
+}
+
+/// Formal parameter numerators and nonconstant quotient representatives remain undecided.
 fn ground_nonzero(form: &Form, budget: &mut Budget) -> Result<bool, Fault> {
     let [term] = form.terms.as_slice() else {
         return Ok(false);
@@ -38,19 +64,7 @@ fn ground_nonzero(form: &Form, budget: &mut Budget) -> Result<bool, Fault> {
     if !term.powers.is_empty() {
         return Ok(false);
     }
-    match &term.coefficient.value {
-        Coefficient::Scalar(value) => Ok(!value.zero(budget)?),
-        Coefficient::Fraction(value) => {
-            let (Some(numerator), Some(denominator)) = (
-                value.numerator.scalar(budget)?,
-                value.denominator.scalar(budget)?,
-            ) else {
-                return Ok(false);
-            };
-            Ok(!numerator.zero(budget)? && !denominator.zero(budget)?)
-        }
-        Coefficient::Tower(_) => Ok(false),
-    }
+    ground_unit(&term.coefficient.value, budget)
 }
 
 impl Evaluation<'_> {

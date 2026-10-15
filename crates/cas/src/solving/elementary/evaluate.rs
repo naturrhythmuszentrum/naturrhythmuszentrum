@@ -98,7 +98,13 @@ impl Evaluation<'_> {
         else {
             return Err(invalid());
         };
-        self.mapped(&self.cas.handle(value), mapping, budget)
+        let mut interpreted = self.mapped(&self.cas.handle(value), mapping, budget)?;
+        reserve(&mut interpreted.maps, 1, budget)?;
+        budget.work(crate::graph::size(interpreted.maps.len(), AT)?.max(1), AT)?;
+        if !interpreted.maps.contains(&map) {
+            interpreted.maps.push(map);
+        }
+        Ok(interpreted)
     }
 
     /// A selected root is usable only with existence of that exact joint selection.

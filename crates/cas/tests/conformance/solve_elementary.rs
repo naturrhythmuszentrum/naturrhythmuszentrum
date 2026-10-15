@@ -1150,3 +1150,82 @@ fn symbolic_real_restriction_mixed_cubic() -> TestResult {
     assert_eq!(fixture.base.cas.counts(), before);
     Ok(())
 }
+
+/// Constant fractions and towers discharge one; a parameter requires its actual regional guard.
+/// ´test:integration:embedded-ground-units-retain-parameter-guards´
+#[test]
+fn embedded_ground_units_retain_parameter_guards() -> TestResult {
+    let mut unguarded = crate::testing::solve_elementary::embedded_fraction(false)?;
+    let rank = unguarded.steps.pop().ok_or("missing rank")?;
+    unguarded.base.cas.check_proof(
+        &unguarded.base.context,
+        &unguarded.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    unguarded.steps.push(rank);
+    let before = unguarded.base.cas.counts();
+    assert!(
+        unguarded
+            .base
+            .cas
+            .check_proof(
+                &unguarded.base.context,
+                &unguarded.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(unguarded.base.cas.counts(), before);
+    for mut fixture in [
+        crate::testing::solve_elementary::embedded_fraction(true)?,
+        crate::testing::solve_elementary::embedded_tower_one()?,
+    ] {
+        fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+    }
+    Ok(())
+}
+
+/// Exact quotient inverses support both echelon pivots and reversible scaling.
+/// ´test:integration:checked-inverse-pivots´
+#[test]
+fn checked_inverse_pivots() -> TestResult {
+    for scale in [false, true] {
+        let mut fixture = crate::testing::solve_elementary::inverse_pivot(scale)?;
+        let witness = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(witness.hypotheses(), []);
+        assert_eq!(witness.judgment().residuals, []);
+    }
+    Ok(())
+}
+
+/// Wrong inverses and changes to the exact map, context or region cannot certify a pivot.
+/// ´test:integration:checked-inverse-pivot-mutations´
+#[test]
+fn checked_inverse_pivot_mutations() -> TestResult {
+    for mutation in 0..4 {
+        let mut fixture =
+            crate::testing::solve_elementary::inverse_pivot_mutation(false, mutation)?;
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &fixture.steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}

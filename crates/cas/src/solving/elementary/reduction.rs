@@ -6,7 +6,6 @@ use crate::budget::Budget;
 use crate::error::Fault;
 use crate::solving::coefficients::arithmetic::Engine;
 use crate::solving::coefficients::forms::{Form, Term};
-use crate::solving::coefficients::model::Value;
 use crate::solving::coefficients::proof::fault;
 use crate::solving::coefficients::storage::vector;
 
@@ -24,11 +23,8 @@ pub(crate) fn reduce(
     let Some(factor) = divisor.terms.first() else {
         return Ok(None);
     };
-    let Value::Scalar(coefficient) = &factor.coefficient.value else {
+    if !super::evidence::ground_unit(&factor.coefficient.value, budget)? {
         return Ok(None);
-    };
-    if coefficient.zero(budget)? {
-        return Err(invalid());
     }
     let mut powers = crate::solving::coefficients::storage::copied(&leading.powers, budget)?;
     for (variable, exponent) in &factor.powers {
