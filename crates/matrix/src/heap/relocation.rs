@@ -67,6 +67,9 @@ impl Heap {
         record: &Record,
     ) -> Result<(), HeapError> {
         match record.meaning {
+            Meaning::Statistical => {
+                self.region_view::<P>(record)?;
+            }
             Meaning::Value { .. } | Meaning::Alias { .. } => {
                 self.value(Handle::<Value, P>::new(self.scope, key))?;
             }
@@ -105,7 +108,7 @@ impl Heap {
         for (key, record) in self.descriptors.iter() {
             let owner = match record.meaning {
                 Meaning::Alias { base } => base,
-                Meaning::Value { .. } | Meaning::Bound { .. } => key,
+                Meaning::Value { .. } | Meaning::Bound { .. } | Meaning::Statistical => key,
             };
             let index = prepared
                 .locations

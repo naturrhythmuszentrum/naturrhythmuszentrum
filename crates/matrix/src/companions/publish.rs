@@ -1,0 +1,265 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Prepare independent factor regions and all relation metadata before publication.
+
+use super::{CompanionRef, JointRecord, TargetMap};
+use crate::heap::{
+    identity::Key,
+    records::{Location, Meaning, Record},
+    schema::{Schema, intern},
+};
+use crate::storage::{Format, Region};
+use crate::{Extent, Heap, HeapError, JointError, JointLimits, JointModel, Layout};
+use nrz_scalar::Scalar;
+use nrz_units::{Descriptor, PairingWitness, UncertaintyMode};
+use std::{marker::PhantomData, rc::Rc};
+
+/// Unpublished two-sided source relation over existing versioned value selections.
+#[derive(Clone, Debug)]
+pub struct CompanionSetDraft<P: Scalar> {
+    /// Immutable admitted joint model.
+    model: JointModel<P>,
+    /// Covariance row and column target maps.
+    targets: [TargetMap<P>; 2],
+    /// Corresponding ordered source coordinates.
+    selections: [Vec<usize>; 2],
+}
+impl<P: Scalar> CompanionSetDraft<P> {
+    /// Describe both target sides and source maps; publication validates every entry.
+    #[must_use]
+    pub const fn new(
+        model: JointModel<P>,
+        targets: [TargetMap<P>; 2],
+        selections: [Vec<usize>; 2],
+    ) -> Self {
+        Self {
+            model,
+            targets,
+            selections,
+        }
+    }
+}
+impl Heap {
+    /// Publish factor regions and a complete statistical coverage inventory atomically.
+    ///
+    /// Targets are operating centers, not asserted expectations. Source fluctuations
+    /// are zero-mean. Attaching after any operation history refuses, since those
+    /// historical recipes did not capture this statistical dependency.
+    ///
+    /// # Errors
+    /// Refuses stale/wrong targets, inconsistent source maps, unsupported descriptors,
+    /// operation history and exhausted storage/work capacity. No partial region escapes.
+    pub fn publish_joint<P: Scalar + 'static>(
+        &mut self,
+        draft: CompanionSetDraft<P>,
+        limits: JointLimits,
+    ) -> Result<CompanionRef<P>, JointError> {
+        if self.provenance_usage().records() != 0 {
+            return Err(JointError::UnsupportedMode);
+        }
+        let pairings = validate_draft(self, &draft, limits)?;
+        let index = self.joint.records.len();
+        if index >= self.limits.descriptors || index >= limits.entries {
+            return Err(JointError::ResourceLimit);
+        }
+        self.joint
+            .records
+            .try_reserve(1)
+            .map_err(|_| JointError::ResourceLimit)?;
+        let prepared = prepare_regions(self, draft.model.factor())?;
+        let [row_target, column_target] = draft.targets;
+        let record = JointRecord {
+            targets: [row_target.target, column_target.target],
+            selections: draft.selections,
+            model: Rc::new(draft.model),
+            regions: prepared.keys,
+            pairings,
+        };
+        self.storage.publish(prepared.storage);
+        self.schemas.extend(prepared.schemas);
+        self.descriptors.publish(prepared.records);
+        self.joint.records.push(record);
+        Ok(CompanionRef {
+            scope: self.scope,
+            index,
+            marker: PhantomData,
+        })
+    }
+}
+/// Validate concrete source schemas and complete ordered target maps before allocation.
+fn validate_draft<P: Scalar + 'static>(
+    heap: &Heap,
+    draft: &CompanionSetDraft<P>,
+    limits: JointLimits,
+) -> Result<Vec<PairingWitness>, JointError> {
+    if draft.targets[0].stamp() == draft.targets[1].stamp()
+        && (draft.targets[0].layout() != draft.targets[1].layout()
+            || draft.selections[0] != draft.selections[1])
+    {
+        return Err(JointError::SourceConflict);
+    }
+    let count = limits.matrix(draft.selections[0].len(), draft.selections[1].len())?;
+    let selections = draft.selections[0]
+        .len()
+        .checked_add(draft.selections[1].len())
+        .ok_or(JointError::ResourceLimit)?;
+    let work = selections
+        .checked_mul(selections)
+        .and_then(|value| {
+            heap.joint
+                .records
+                .len()
+                .checked_mul(selections.max(1))
+                .and_then(|old| value.checked_add(old))
+        })
+        .and_then(|value| value.checked_add(count))
+        .ok_or(JointError::ResourceLimit)?;
+    limits.check_work(work)?;
+    for (side, (target, selection)) in draft.targets.iter().zip(&draft.selections).enumerate() {
+        validate_selection(heap, &draft.model, target, selection)?;
+        validate_existing(heap, draft, side)?;
+    }
+    let mut pairings = Vec::new();
+    for &column in &draft.selections[1] {
+        for &row in &draft.selections[0] {
+            pairings.push(PairingWitness::uncertainty(
+                UncertaintyMode::Covariance,
+                draft.model.sources()[row].descriptor(),
+                Some(draft.model.sources()[column].descriptor()),
+                None,
+            )?);
+        }
+    }
+    Ok(pairings)
+}
+/// Assemble independently owned statistical descriptor records with checked shapes.
+fn region_records<P: Scalar + 'static>(
+    schemas: &[usize],
+    extents: &[Extent],
+    arenas: &[Key],
+    epoch: u64,
+) -> Result<Vec<Record>, JointError> {
+    let mut records = Vec::new();
+    for ((&schema, &extent), &arena) in schemas.iter().zip(extents).zip(arenas) {
+        records.push(Record {
+            schema,
+            layout: Layout::contiguous(extent)?,
+            location: Location::Owned(Region {
+                epoch,
+                arena,
+                format: Format::of::<P>(),
+                offset: 0,
+                length: extent.entries(),
+            }),
+            meaning: Meaning::Statistical,
+        });
+    }
+    Ok(records)
+}
+
+/// Completely prepared independent region occupations.
+struct PreparedRegions {
+    /// Private numerical allocations.
+    storage: crate::storage::PreparedStorage,
+    /// Reserved immutable schema interpretations.
+    schemas: Vec<Schema>,
+    /// Fully bound descriptor slots.
+    records: crate::heap::slots::PreparedSlots<Record>,
+    /// Future factor and weight locators.
+    keys: [Key; 2],
+}
+/// Prepare every allocation before the metadata publication step.
+fn prepare_regions<P: Scalar + 'static>(
+    heap: &mut Heap,
+    factor: &crate::SourceFactor<P>,
+) -> Result<PreparedRegions, JointError> {
+    let extents = [
+        Extent::new(factor.rows(), factor.columns())?,
+        Extent::new(factor.columns(), 1)?,
+    ];
+    let mut schemas = Vec::new();
+    let mut indices = Vec::new();
+    for extent in extents {
+        indices.push(intern(
+            &heap.schemas,
+            &mut schemas,
+            Schema {
+                extent,
+                quantity: Descriptor::ratio(),
+            },
+            heap.limits.schemas,
+        )?);
+    }
+    heap.schemas
+        .try_reserve(schemas.len())
+        .map_err(|_| JointError::ResourceLimit)?;
+    let plan = heap.descriptors.prepare(2, heap.limits.descriptors)?;
+    let keys: [Key; 2] = plan.keys().try_into().map_err(|_| HeapError::Capacity)?;
+    let storage =
+        heap.storage
+            .prepare(&[factor.coefficients(), factor.weights()], &[], heap.limits)?;
+    let records = region_records::<P>(&indices, &extents, storage.keys(), storage.epoch())?;
+    let records = plan.bind(records)?;
+    Ok(PreparedRegions {
+        storage,
+        schemas,
+        records,
+        keys,
+    })
+}
+
+/// Validate one declared selection, including repeated base coordinates.
+fn validate_selection<P: Scalar + 'static>(
+    heap: &Heap,
+    model: &JointModel<P>,
+    target: &TargetMap<P>,
+    selection: &[usize],
+) -> Result<(), JointError> {
+    target.target.validate(heap)?;
+    if target.layout().extent().entries() != selection.len() {
+        return Err(JointError::WrongTarget);
+    }
+    let schema = &heap
+        .schemas
+        .get(heap.descriptors.get(target.target.key)?.schema)
+        .ok_or(HeapError::InvalidLayout)?
+        .quantity;
+    for (position, &index) in selection.iter().enumerate() {
+        for (earlier, &previous) in selection[..position].iter().enumerate() {
+            if target.layout().flat_index(position)? == target.layout().flat_index(earlier)?
+                && index != previous
+            {
+                return Err(JointError::SourceConflict);
+            }
+        }
+        let source = model.sources().get(index).ok_or(JointError::WrongTarget)?;
+        if source.descriptor() != &schema.difference() {
+            return Err(JointError::WrongTarget);
+        }
+    }
+    Ok(())
+}
+/// An existing target version cannot acquire another source declaration.
+fn validate_existing<P: Scalar + 'static>(
+    heap: &Heap,
+    draft: &CompanionSetDraft<P>,
+    side: usize,
+) -> Result<(), JointError> {
+    let target = &draft.targets[side];
+    for old in &heap.joint.records {
+        for (previous, map) in old.targets.iter().zip(&old.selections) {
+            if previous.stamp == target.stamp() {
+                let model = old
+                    .model
+                    .downcast_ref::<JointModel<P>>()
+                    .ok_or(JointError::SourceConflict)?;
+                if model.id() != draft.model.id()
+                    || previous.layout != target.target.layout
+                    || map != &draft.selections[side]
+                {
+                    return Err(JointError::SourceConflict);
+                }
+            }
+        }
+    }
+    Ok(())
+}

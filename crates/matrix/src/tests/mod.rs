@@ -10,3 +10,5 @@ mod storage;
 mod binding;
 
 mod transactions;
+
+mod joint_companions;

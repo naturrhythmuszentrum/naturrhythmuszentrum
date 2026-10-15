@@ -197,6 +197,7 @@ impl Heap {
     ) -> Result<ValueView<'_, P>, HeapError> {
         let record = self.record(handle)?;
         self.validate_provenance(handle)?;
+        self.validate_joint_value(handle)?;
         let base = self.base_handle(handle)?;
         let Meaning::Value { stamp, bound } = self.record(base)?.meaning else {
             return Err(HeapError::CategoryMismatch);

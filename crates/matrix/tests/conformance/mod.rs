@@ -13,3 +13,9 @@ mod shapes;
 mod binding;
 
 mod transactions;
+
+mod joint_sources;
+
+mod joint_zero;
+
+mod joint_repeated;

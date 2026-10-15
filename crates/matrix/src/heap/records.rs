@@ -20,6 +20,8 @@ pub enum Coverage {
 /// Category-specific dependency edges; companions are never scalar fields.
 #[derive(Debug)]
 pub(crate) enum Meaning {
+    /// Independent statistical parameter region; targets live in the joint store.
+    Statistical,
     /// A value and its complete supported companion set.
     Value {
         /// Independent identity and content version.

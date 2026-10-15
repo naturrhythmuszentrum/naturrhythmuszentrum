@@ -85,14 +85,17 @@ impl Heap {
                 }
                 Ok(target)
             }
-            Meaning::Bound { .. } => Err(HeapError::CategoryMismatch),
+            Meaning::Bound { .. } | Meaning::Statistical => Err(HeapError::CategoryMismatch),
         }
     }
 
     /// Follow one alias edge, checking that the allocation still belongs to a base value.
     pub(crate) fn owning_region(&self, record: &Record) -> Result<Region, HeapError> {
         match (&record.location, &record.meaning) {
-            (Location::Owned(region), Meaning::Value { .. } | Meaning::Bound { .. }) => Ok(*region),
+            (
+                Location::Owned(region),
+                Meaning::Value { .. } | Meaning::Bound { .. } | Meaning::Statistical,
+            ) => Ok(*region),
             (Location::Alias, Meaning::Alias { base }) => {
                 let owner = self.descriptors.get(*base)?;
                 match (&owner.location, &owner.meaning) {

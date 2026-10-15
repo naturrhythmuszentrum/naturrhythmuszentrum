@@ -112,3 +112,19 @@ pub use records::{
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/publication_twins.rs"]
 mod publication_twins;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "statistical records are owned by the private heap"
+)]
+mod companions;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "source declarations are shared across private companion modules"
+)]
+mod sources;
+
+pub use companions::{CompanionRef, CompanionSetDraft, StatisticalView, TargetMap};
+pub use sources::{
+    CovarianceBlock, JointError, JointLimits, JointModel, ModelId, Source, SourceFactor, SourceId,
+};

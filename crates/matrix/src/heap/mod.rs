@@ -48,6 +48,8 @@ pub struct Heap {
     pub(crate) schemas: Vec<Schema>,
     /// Bounded operation records and source dependency graph.
     pub(crate) provenance: crate::provenance::Provenance,
+    /// Immutable source relations and independent statistical companion regions.
+    pub(crate) joint: crate::companions::JointStore,
 }
 
 impl Heap {
@@ -63,6 +65,7 @@ impl Heap {
             descriptors: Slots::new(),
             schemas: Vec::new(),
             provenance: crate::provenance::Provenance::new(),
+            joint: crate::companions::JointStore::default(),
         })
     }
 }

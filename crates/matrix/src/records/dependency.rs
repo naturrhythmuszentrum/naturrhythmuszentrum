@@ -96,7 +96,9 @@ impl Dependency {
         let base = match selected.meaning {
             Meaning::Value { .. } => self.key,
             Meaning::Alias { base } => base,
-            Meaning::Bound { .. } => return Err(HeapError::CategoryMismatch),
+            Meaning::Bound { .. } | Meaning::Statistical => {
+                return Err(HeapError::CategoryMismatch);
+            }
         };
         let owner = heap.descriptors.get(base)?;
         let Meaning::Value { stamp, bound } = owner.meaning else {
