@@ -3,7 +3,7 @@
 
 use nrz_scalar::Scalar;
 
-use super::{Bound, CopyContract, ExecutionId, OperationError, buffer};
+use super::{Bound, ExecutionId, OperationError, RegionContract, buffer};
 use crate::{CompanionView, Extent, HeapError, ValueStamp, ValueView};
 
 /// Immutable physical coordinates, with their checked original shape.
@@ -12,7 +12,7 @@ pub struct PhysicalView<'b, P: Scalar> {
     /// Current region and complete supported companion relation.
     value: ValueView<'b, P>,
     /// Operation-owned physical shape and exact unit-reference definitions.
-    contract: &'b CopyContract,
+    contract: &'b RegionContract,
 }
 
 impl<P: Scalar + 'static> PhysicalView<'_, P> {
@@ -24,7 +24,7 @@ impl<P: Scalar + 'static> PhysicalView<'_, P> {
     }
     /// Exact physical interpretation and ordered shape.
     #[must_use]
-    pub const fn contract(&self) -> &CopyContract {
+    pub const fn contract(&self) -> &RegionContract {
         self.contract
     }
     /// Captured current value identity and version.
@@ -41,11 +41,23 @@ pub struct NormalizedView<'b, P: Scalar> {
     value: ValueView<'b, P>,
     /// Selected companion, using exactly the same logical map as the value.
     bound: Option<CompanionView<'b, P>>,
+    /// Separately selected numerical error; it overlaps the total bound.
+    evaluation: Option<CompanionView<'b, P>>,
     /// Original shape and retained exact reference identities.
-    contract: &'b CopyContract,
+    contract: &'b RegionContract,
 }
 
 impl<P: Scalar + 'static> NormalizedView<'_, P> {
+    /// Read the separately retained numerical evaluation radius.
+    /// # Errors
+    /// Refuses an invalid selected coordinate or stale companion.
+    pub fn evaluation(&self, row: usize, column: usize) -> Result<Option<P>, HeapError> {
+        self.evaluation
+            .as_ref()
+            .map(|view| view.region().get(row, column))
+            .transpose()
+    }
+
     /// Read one normalized coordinate; coherent unit references make this bit-exact.
     /// # Errors
     /// Refuses an out-of-range entry or invalid storage.
@@ -68,7 +80,7 @@ impl<P: Scalar + 'static> NormalizedView<'_, P> {
     }
     /// Retained physical contract and exact unit-reference normalization.
     #[must_use]
-    pub const fn contract(&self) -> &CopyContract {
+    pub const fn contract(&self) -> &RegionContract {
         self.contract
     }
 }
@@ -95,7 +107,7 @@ impl<P: Scalar> NormalizedInputs<'_, P> {
     }
 }
 
-impl<P: Scalar + 'static> Bound<'_, P> {
+impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     /// Borrow one physical operand for inspection, without normalized kernel authority.
     /// # Errors
     /// Refuses an invalid slot or any no-longer-resolvable internal dependency.
@@ -127,6 +139,7 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             views.push(NormalizedView {
                 value: self.heap.value(input.handle())?,
                 bound: self.heap.selected_bound(input.handle())?,
+                evaluation: self.heap.selected_evaluation(input.handle())?,
                 contract,
             });
         }

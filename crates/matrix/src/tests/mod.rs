@@ -11,4 +11,5 @@ mod binding;
 
 mod transactions;
 
+mod conversion;
 mod joint_companions;

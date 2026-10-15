@@ -28,6 +28,10 @@ pub(crate) enum Meaning {
         stamp: ValueStamp,
         /// Reverse dependency edge to the componentwise bound, when declared.
         bound: Option<Key>,
+        /// Independent conversion evaluation region, overlapping the total bound.
+        evaluation: Option<Key>,
+        /// Physical versus represented problem covered by the total.
+        coverage: Coverage,
     },
     /// A selection that resolves directly through its surviving base occupation.
     Alias {
@@ -72,9 +76,17 @@ pub struct PublishedBundle<P: Scalar> {
     pub(crate) value: Handle<Value, P>,
     /// Independently allocated and described bound occupation.
     pub(crate) bound: Option<Handle<Companion, P>>,
+    /// New evaluation error, never an independent physical uncertainty.
+    pub(crate) evaluation: Option<Handle<Companion, P>>,
 }
 
 impl<P: Scalar> PublishedBundle<P> {
+    /// Separate evaluation-error region, already included in the total bound.
+    #[must_use]
+    pub const fn evaluation(self) -> Option<Handle<Companion, P>> {
+        self.evaluation
+    }
+
     /// The published value or selected alias handle.
     #[must_use]
     pub const fn value(self) -> Handle<Value, P> {

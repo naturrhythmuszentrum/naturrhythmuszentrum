@@ -24,6 +24,10 @@ pub struct Dependency {
     pub(crate) layout: Layout,
     /// Captured companion occupation, target occupation/version and separate schema.
     pub(crate) companion: Option<BoundDependency>,
+    /// Separate numerical error occupation and exact target dependency.
+    pub(crate) evaluation: Option<BoundDependency>,
+    /// Captured physical versus represented input coverage.
+    pub(crate) coverage: crate::Coverage,
 }
 
 /// Exact independent companion dependency; no scalar carries this evidence.
@@ -49,6 +53,13 @@ impl Dependency {
             precision: P::PRECISION,
             schema: input.schema(),
             layout: input.layout().clone(),
+            evaluation: input.evaluation.as_ref().map(|bound| BoundDependency {
+                key: bound.handle().key,
+                target: bound.target().key,
+                stamp: bound.stamp(),
+                schema: bound.schema(),
+            }),
+            coverage: input.coverage,
             companion: input.companion().map(|bound| BoundDependency {
                 key: bound.handle().key,
                 target: bound.target().key,
@@ -101,15 +112,28 @@ impl Dependency {
             }
         };
         let owner = heap.descriptors.get(base)?;
-        let Meaning::Value { stamp, bound } = owner.meaning else {
+        let Meaning::Value {
+            stamp,
+            bound,
+            evaluation,
+            coverage,
+        } = owner.meaning
+        else {
             return Err(HeapError::CategoryMismatch);
         };
-        if stamp != self.stamp || bound != self.companion.as_ref().map(|value| value.key) {
+        if stamp != self.stamp
+            || bound != self.companion.as_ref().map(|value| value.key)
+            || evaluation != self.evaluation.as_ref().map(|value| value.key)
+            || coverage != self.coverage
+        {
             return Err(HeapError::StaleEvidence);
         }
         validate_region(heap, owner, self.precision)?;
         self.layout
             .validate(heap.owning_region(owner)?.length, heap.limits.layout_work)?;
+        if let Some(companion) = &self.evaluation {
+            companion.validate(heap, base, self.precision)?;
+        }
         if let Some(companion) = &self.companion {
             companion.validate(heap, base, self.precision)?;
         }
@@ -178,6 +202,17 @@ impl Dependency {
             precision: P::PRECISION,
             schema: output.schema(),
             layout: Layout::contiguous(output.extent())?,
+            evaluation: match (bundle.evaluation(), bound_schema) {
+                (Some(handle), Some(schema)) => Some(BoundDependency {
+                    key: handle.key,
+                    target: bundle.value().key,
+                    stamp: output.stamp(),
+                    schema,
+                }),
+                (None, _) => None,
+                _ => return Err(crate::OperationError::CandidateContract),
+            },
+            coverage: output.coverage(),
             companion,
         })
     }

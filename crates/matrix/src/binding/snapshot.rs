@@ -3,7 +3,7 @@
 
 use nrz_scalar::Scalar;
 
-use super::{CopyContract, OperationError};
+use super::{OperationError, RegionContract};
 use crate::{Companion, Handle, Heap, Layout, SchemaId, StructureScope, Value, ValueStamp};
 
 /// Captured companion occupation, interpretation and exact target version.
@@ -55,6 +55,10 @@ pub struct InputSnapshot<P: Scalar> {
     layout: Layout,
     /// Complete supported companion dependency.
     companion: Option<CompanionSnapshot<P>>,
+    /// Distinct numerical-error region, when carried by a derived value.
+    pub(crate) evaluation: Option<CompanionSnapshot<P>>,
+    /// Physical-input coverage is retained independently of numerical companions.
+    pub(crate) coverage: crate::Coverage,
 }
 
 impl<P: Scalar> InputSnapshot<P> {
@@ -102,12 +106,26 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
                 })
             })
             .transpose()?;
+        let evaluation = value
+            .evaluation()
+            .map(|handle| {
+                let view = heap.companion(handle)?;
+                Ok::<_, crate::HeapError>(CompanionSnapshot {
+                    handle,
+                    target: view.target(),
+                    stamp: view.target_stamp(),
+                    schema: view.region().schema_id(),
+                })
+            })
+            .transpose()?;
         Ok(Self {
             handle,
             stamp: value.stamp(),
             schema: value.region().schema_id(),
             layout: value.region().layout().clone(),
             companion,
+            evaluation,
+            coverage: value.coverage(),
         })
     }
 
@@ -115,7 +133,7 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
     pub(crate) fn validate(
         &self,
         heap: &Heap,
-        contract: &CopyContract,
+        contract: &RegionContract,
         slot: usize,
     ) -> Result<(), OperationError> {
         let value = heap.value(self.handle)?;

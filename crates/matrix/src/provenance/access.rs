@@ -225,7 +225,7 @@ impl Heap {
     pub(crate) fn validate_bound_shape<P: Scalar + 'static>(
         &self,
         handle: Handle<Value, P>,
-        contract: &crate::CopyContract,
+        contract: &crate::RegionContract,
         slot: usize,
     ) -> Result<(), OperationError> {
         let base = self.base_handle(handle)?;
@@ -241,7 +241,7 @@ impl Heap {
             let record = self.historical_record(node.record)?;
             let original = record
                 .operation
-                .inputs()
+                .outputs
                 .get(node.slot)
                 .ok_or(HeapError::StaleEvidence)?
                 .shape();

@@ -4,6 +4,9 @@
 /// A refused operation contract, binding, evaluation or publication.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum OperationError {
+    /// Checked numerical conversion refused before publication.
+    #[error("conversion: {0}")]
+    Conversion(#[from] crate::conversion::ConversionError),
     /// Heap resolution, capacity or payload validation failed.
     #[error("heap transaction: {0}")]
     Heap(#[from] crate::HeapError),
@@ -48,4 +51,10 @@ pub enum OperationError {
     /// The immutable provenance graph would exceed its explicit capacity or work policy.
     #[error("provenance resource limit exhausted")]
     ProvenanceLimit,
+}
+
+impl From<nrz_units::MapError> for OperationError {
+    fn from(cause: nrz_units::MapError) -> Self {
+        Self::Conversion(cause.into())
+    }
 }

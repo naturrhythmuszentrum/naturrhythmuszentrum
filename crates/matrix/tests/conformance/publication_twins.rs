@@ -58,7 +58,7 @@
 //! ```compile_fail,E0451
 //! use nrz_matrix::Candidate;
 //! fn inspect(candidate: Candidate<f64>) {
-//!     let _ = Candidate::<f64> { execution: candidate.execution(), token: 0, revision: 1, outputs: Vec::new() };
+//!     let _ = Candidate::<f64> { execution: candidate.execution(), token: 0, revision: 1, outputs: Vec::new(), evidence: Vec::new() };
 //! }
 //! let _ = inspect;
 //! ```

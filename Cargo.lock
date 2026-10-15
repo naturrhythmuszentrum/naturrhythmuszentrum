@@ -648,6 +648,7 @@ name = "nrz-matrix"
 version = "0.1.0"
 dependencies = [
  "faer",
+ "nrz-accuracy",
  "nrz-scalar",
  "nrz-units",
  "thiserror 2.0.21",

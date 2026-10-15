@@ -19,6 +19,9 @@ pub(super) fn fill<P: Scalar + 'static>(
         if let Some(bounds) = &output.bounds {
             slices.push(bounds.as_slice());
         }
+        if let Some(evaluation) = &output.evaluation {
+            slices.push(evaluation.as_slice());
+        }
     }
     if slices.len() != storage.keys().len() {
         return Err(OperationError::CandidateContract);

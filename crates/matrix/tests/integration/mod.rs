@@ -15,4 +15,7 @@ mod transactions;
 
 mod joint_companions;
 
+mod conversion;
 mod joint_dense;
+
+mod schema_conversion;

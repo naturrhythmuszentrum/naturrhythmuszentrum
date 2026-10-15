@@ -57,7 +57,7 @@ pub struct OperationRecord {
     /// Output-specific facts and graph edges, in matching order.
     pub(crate) outputs: Vec<OutputRecord>,
     /// Independently established bit-copy claims, never floating arithmetic certificates.
-    pub(crate) evidence: Vec<CopyEvidence>,
+    pub(crate) evidence: Vec<crate::RecipeEvidence>,
     /// Representation of the copied coordinates and companions.
     pub(crate) precision: Precision,
 }
@@ -90,7 +90,7 @@ impl OperationRecord {
     }
     /// Established exact-copy claims, with explicitly preserved input coverage.
     #[must_use]
-    pub fn evidence(&self) -> &[CopyEvidence] {
+    pub fn evidence(&self) -> &[crate::RecipeEvidence] {
         &self.evidence
     }
     /// Sealed input/output precision, unchanged by this recipe.
@@ -101,9 +101,16 @@ impl OperationRecord {
     /// Environment interpretation: exact finite bit copies require no rounding-mode premise.
     #[must_use]
     pub const fn environment(&self) -> &'static str {
-        match self.precision {
-            Precision::F32 => "finite binary32 bit copy; no floating arithmetic",
-            Precision::F64 => "finite binary64 bit copy; no floating arithmetic",
+        match (&self.operation.recipe, self.precision) {
+            (crate::binding::NativeRecipe::Copy, Precision::F32) => {
+                "finite binary32 bit copy; no floating arithmetic"
+            }
+            (crate::binding::NativeRecipe::Copy, Precision::F64) => {
+                "finite binary64 bit copy; no floating arithmetic"
+            }
+            (crate::binding::NativeRecipe::Affine(_), _) => {
+                "IEEE binary32/binary64; nearest ties to even; gradual underflow; scalar outward arithmetic revision 1"
+            }
         }
     }
 }

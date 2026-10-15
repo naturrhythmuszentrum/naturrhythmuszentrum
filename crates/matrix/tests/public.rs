@@ -26,3 +26,16 @@ use nrz_matrix as test_api;
     reason = "fixtures are shared across public test modules"
 )]
 mod binding_testing;
+
+#[path = "../src/testing/conversion_oracle.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent numerical oracle is shared by conversion tests"
+)]
+mod conversion_oracle;
+#[path = "../src/testing/conversion.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "conversion fixtures are shared across public test modules"
+)]
+mod conversion_testing;

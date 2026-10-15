@@ -48,7 +48,7 @@ pub struct FailureRecord<P: Scalar> {
     /// Captured actual dependencies, preserved independently of the heap borrow.
     pub(crate) inputs: Vec<InputSnapshot<P>>,
     /// Individually valid claims established before the refusal.
-    pub(crate) evidence: Vec<CopyEvidence>,
+    pub(crate) evidence: Vec<crate::RecipeEvidence>,
 }
 
 impl<P: Scalar + 'static> FailureRecord<P> {
@@ -64,17 +64,17 @@ impl<P: Scalar + 'static> FailureRecord<P> {
     }
     /// Historical partial claims, without current-evidence authority.
     #[must_use]
-    pub fn historical_evidence(&self) -> &[CopyEvidence] {
+    pub fn historical_evidence(&self) -> &[crate::RecipeEvidence] {
         &self.evidence
     }
     /// Inspect one partial claim after rechecking only its actual input dependencies.
     /// # Errors
     /// Refuses invalid claim positions, foreign owners and stale source evidence.
-    pub fn evidence(&self, heap: &Heap, index: usize) -> Result<&CopyEvidence, HeapError> {
+    pub fn evidence(&self, heap: &Heap, index: usize) -> Result<&crate::RecipeEvidence, HeapError> {
         let claim = self.evidence.get(index).ok_or(HeapError::InvalidLayout)?;
         let input = self
             .inputs
-            .get(claim.slot)
+            .get(claim.slot())
             .ok_or(HeapError::StaleEvidence)?;
         super::Dependency::from_snapshot(input).validate(heap)?;
         heap.validate_provenance(input.handle())?;

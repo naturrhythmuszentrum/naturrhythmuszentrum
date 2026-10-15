@@ -5,12 +5,12 @@ use super::{Candidate, Payload};
 use crate::binding::buffer;
 use crate::heap::identity::identity;
 use crate::{
-    Bound, CopyEvidence, Coverage, Failure, FailureRecord, NormalizedInputs, NormalizedView,
-    OperationError, OutputReservation,
+    Bound, CopyEvidence, Failure, FailureRecord, NormalizedInputs, NormalizedView, OperationError,
+    OutputReservation,
 };
 use nrz_scalar::Scalar;
 
-impl<P: Scalar + 'static> Bound<'_, P> {
+impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     /// Evaluate this binding's operation-ordered normalized inputs into private scratch.
     ///
     /// The copy recipe preserves represented bits and every supported companion. Only
@@ -18,7 +18,7 @@ impl<P: Scalar + 'static> Bound<'_, P> {
     /// # Errors
     /// Refuses foreign bundles, repeated evaluation, exhausted identities or allocation.
     /// Independently completed copy claims remain in the unpublished failure record.
-    pub fn evaluate(&self, inputs: NormalizedInputs<'_, P>) -> Result<Candidate<P>, Failure<P>> {
+    pub fn evaluate(&self, inputs: NormalizedInputs<'_, P>) -> Result<Candidate<Q>, Failure<P>> {
         let mut evidence = Vec::new();
         self.copy_inputs(inputs, &mut evidence, identity)
             .map_err(|cause| self.failure(cause, evidence))
@@ -28,9 +28,9 @@ impl<P: Scalar + 'static> Bound<'_, P> {
     fn copy_inputs(
         &self,
         inputs: NormalizedInputs<'_, P>,
-        evidence: &mut Vec<CopyEvidence>,
+        evidence: &mut Vec<crate::RecipeEvidence>,
         allocate: impl FnOnce() -> Result<u64, crate::HeapError>,
-    ) -> Result<Candidate<P>, OperationError> {
+    ) -> Result<Candidate<Q>, OperationError> {
         if inputs.execution != self.execution {
             return Err(OperationError::ForeignInputs);
         }
@@ -45,18 +45,22 @@ impl<P: Scalar + 'static> Bound<'_, P> {
         evidence
             .try_reserve_exact(inputs.views.len())
             .map_err(|_| crate::HeapError::Capacity)?;
+        let context = match self.operation.recipe {
+            crate::binding::NativeRecipe::Copy => None,
+            crate::binding::NativeRecipe::Affine(_) => {
+                Some(nrz_scalar::ArithmeticContext::new().map_err(crate::ConversionError::from)?)
+            }
+        };
+        let mut cache = buffer(inputs.views.len())?;
         for (slot, (view, reservation)) in inputs
             .views
             .into_iter()
             .zip(&self.reservations.outputs)
             .enumerate()
         {
-            let payload = copy_view(&view, *reservation)?;
-            evidence.push(CopyEvidence {
-                slot,
-                entries: payload.extent.entries(),
-                coverage: reservation.coverage(),
-            });
+            let (payload, claim) =
+                self.evaluate_slot(slot, &view, *reservation, &mut cache, context.as_ref())?;
+            evidence.push(claim);
             outputs.push(payload);
         }
         self.issued.set(Some(token));
@@ -65,11 +69,48 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             token,
             revision: self.operation.revision(),
             outputs,
+            evidence: evidence.clone(),
         })
     }
 
+    /// Dispatch only crate-defined numerical schedules after the common execution gate.
+    fn evaluate_slot(
+        &self,
+        slot: usize,
+        view: &NormalizedView<'_, P>,
+        reservation: OutputReservation,
+        cache: &mut Vec<crate::coordinate_numeric::LoweredMap<Q>>,
+        context: Option<&nrz_scalar::ArithmeticContext>,
+    ) -> Result<(Payload<Q>, crate::RecipeEvidence), OperationError> {
+        match &self.operation.recipe {
+            crate::binding::NativeRecipe::Copy => {
+                let payload = copy_view(view, reservation)?;
+                let claim = crate::RecipeEvidence::Copy(CopyEvidence {
+                    slot,
+                    entries: payload.extent.entries(),
+                    coverage: reservation.coverage(),
+                });
+                Ok((payload, claim))
+            }
+            crate::binding::NativeRecipe::Affine(contracts) => crate::conversion::evaluate(
+                view,
+                reservation,
+                contracts
+                    .get(slot)
+                    .ok_or(OperationError::CandidateContract)?,
+                cache,
+                context.ok_or(OperationError::CandidateContract)?,
+                slot,
+            ),
+        }
+    }
+
     /// Retain attempt facts without borrowing the execution or constructing success handles.
-    pub(crate) fn failure(&self, cause: OperationError, evidence: Vec<CopyEvidence>) -> Failure<P> {
+    pub(crate) fn failure(
+        &self,
+        cause: OperationError,
+        evidence: Vec<crate::RecipeEvidence>,
+    ) -> Failure<P> {
         Failure {
             record: Box::new(FailureRecord {
                 cause,
@@ -83,28 +124,39 @@ impl<P: Scalar + 'static> Bound<'_, P> {
 }
 
 /// Copy one coherent-reference view and its companion in exactly logical column order.
-fn copy_view<P: Scalar + 'static>(
+fn copy_view<P: Scalar + 'static, Q: Scalar + 'static>(
     view: &NormalizedView<'_, P>,
     reservation: OutputReservation,
-) -> Result<Payload<P>, OperationError> {
+) -> Result<Payload<Q>, OperationError> {
     let extent = view.extent();
     if extent != reservation.extent() {
         return Err(OperationError::CandidateContract);
     }
     let mut centers = buffer(extent.entries())?;
-    let mut bounds = if reservation.coverage() == Coverage::DeclaredBounds {
+    let mut bounds = if reservation.bounded {
+        Some(buffer(extent.entries())?)
+    } else {
+        None
+    };
+    let mut evaluation = if reservation.evaluation {
         Some(buffer(extent.entries())?)
     } else {
         None
     };
     for column in 0..extent.columns() {
         for row in 0..extent.rows() {
-            centers.push(view.get(row, column)?);
+            centers.push(crate::conversion::same_format(view.get(row, column)?)?);
+            if let Some(values) = &mut evaluation {
+                values.push(crate::conversion::same_format(
+                    view.evaluation(row, column)?
+                        .ok_or(OperationError::CandidateContract)?,
+                )?);
+            }
             if let Some(values) = &mut bounds {
-                values.push(
+                values.push(crate::conversion::same_format(
                     view.bound(row, column)?
                         .ok_or(OperationError::CandidateContract)?,
-                );
+                )?);
             }
         }
     }
@@ -114,6 +166,7 @@ fn copy_view<P: Scalar + 'static>(
         target: reservation.stamp(),
         centers,
         bounds,
+        evaluation,
     })
 }
 

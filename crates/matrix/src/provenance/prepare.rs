@@ -5,7 +5,7 @@ use super::limits::add;
 use super::{Node, Provenance, ProvenanceId, ProvenanceUsage, ReverseEdge};
 use crate::binding::buffer;
 use crate::{
-    CopyEvidence, Dependency, HeapError, OperationError, OperationRecord, OutputRecord, RecordId,
+    Dependency, HeapError, OperationError, OperationRecord, OutputRecord, RecipeEvidence, RecordId,
 };
 use std::cell::Cell;
 
@@ -122,7 +122,7 @@ impl Provenance {
                 + size_of::<Cell<bool>>()
                 + size_of::<Dependency>()
                 + size_of::<OutputRecord>()
-                + size_of::<CopyEvidence>();
+                + size_of::<RecipeEvidence>();
             let entries = add(
                 input.layout().extent().entries(),
                 output.dependency.layout().extent().entries(),

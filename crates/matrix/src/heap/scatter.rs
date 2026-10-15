@@ -45,7 +45,10 @@ impl Heap {
         base: Handle<Value, P>,
         layout: &Layout,
     ) -> Result<Vec<P>, HeapError> {
-        if let Some(bound) = self.value(base)?.bound() {
+        let value = self.value(base)?;
+        if value.coverage() == super::Coverage::DeclaredBounds
+            && let Some(bound) = value.bound()
+        {
             return self.companion(bound)?.region().export();
         }
         // An injective map with this cardinality selects every base entry exactly once.

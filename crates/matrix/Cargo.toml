@@ -14,6 +14,7 @@ categories = ["mathematics", "science"]
 [dependencies]
 faer.workspace = true
 nrz-scalar.workspace = true
+nrz-accuracy = { path = "../accuracy" }
 nrz-units = { path = "../units" }
 thiserror.workspace = true
 

@@ -119,9 +119,19 @@ pub struct ValueView<'h, P: Scalar> {
     stamp: ValueStamp,
     /// Current declared-bound relation, if any.
     bound: Option<Handle<Companion, P>>,
+    /// Retained problem scope, independent of a computed error region.
+    coverage: Coverage,
+    /// Separate numerical evaluation companion.
+    evaluation: Option<Handle<Companion, P>>,
 }
 
 impl<P: Scalar> ValueView<'_, P> {
+    /// Separate numerical error, overlapping the complete deterministic bound.
+    #[must_use]
+    pub const fn evaluation(&self) -> Option<Handle<Companion, P>> {
+        self.evaluation
+    }
+
     /// Center region and its physical interpretation.
     #[must_use]
     pub const fn region(&self) -> &RegionView<'_, P> {
@@ -137,11 +147,7 @@ impl<P: Scalar> ValueView<'_, P> {
     /// Explicit supported deterministic coverage.
     #[must_use]
     pub const fn coverage(&self) -> Coverage {
-        if self.bound.is_some() {
-            Coverage::DeclaredBounds
-        } else {
-            Coverage::RepresentedInputs
-        }
+        self.coverage
     }
 
     /// Handle to the entire base value's bound; access must resolve it again.
@@ -199,16 +205,27 @@ impl Heap {
         self.validate_provenance(handle)?;
         self.validate_joint_value(handle)?;
         let base = self.base_handle(handle)?;
-        let Meaning::Value { stamp, bound } = self.record(base)?.meaning else {
+        let Meaning::Value {
+            stamp,
+            bound,
+            evaluation,
+            coverage,
+        } = self.record(base)?.meaning
+        else {
             return Err(HeapError::CategoryMismatch);
         };
         if let Some(key) = bound {
+            self.companion(Handle::<Companion, P>::new(self.scope, key))?;
+        }
+        if let Some(key) = evaluation {
             self.companion(Handle::<Companion, P>::new(self.scope, key))?;
         }
         Ok(ValueView {
             region: self.region_view(record)?,
             stamp,
             bound: bound.map(|key| Handle::new(self.scope, key)),
+            evaluation: evaluation.map(|key| Handle::new(self.scope, key)),
+            coverage,
         })
     }
 
@@ -229,8 +246,8 @@ impl Heap {
         let target_record = self
             .record(target_handle)
             .map_err(|_| HeapError::StaleEvidence)?;
-        if !matches!(target_record.meaning, Meaning::Value { stamp: current, bound: Some(key) }
-            if current == stamp && key == handle.key)
+        if !matches!(target_record.meaning, Meaning::Value { stamp: current, bound, evaluation, .. }
+            if current == stamp && (bound == Some(handle.key) || evaluation == Some(handle.key)))
         {
             return Err(HeapError::StaleEvidence);
         }
@@ -318,6 +335,25 @@ impl Heap {
         };
         let mut companion = self.companion(bound)?;
         companion.region = self.mapped_region(self.record(bound)?, &self.record(handle)?.layout)?;
+        Ok(Some(companion))
+    }
+}
+
+impl Heap {
+    /// Select a numerical-error region with exactly its value's logical entry map.
+    /// # Errors
+    /// Refuses invalid value/companion occupations, maps or stale target evidence.
+    pub fn selected_evaluation<P: Scalar + 'static>(
+        &self,
+        handle: Handle<Value, P>,
+    ) -> Result<Option<CompanionView<'_, P>>, HeapError> {
+        let value = self.value(handle)?;
+        let Some(evaluation) = value.evaluation() else {
+            return Ok(None);
+        };
+        let mut companion = self.companion(evaluation)?;
+        companion.region =
+            self.mapped_region(self.record(evaluation)?, &self.record(handle)?.layout)?;
         Ok(Some(companion))
     }
 }

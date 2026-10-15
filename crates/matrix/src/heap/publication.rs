@@ -36,6 +36,8 @@ pub(crate) struct SchemaPlan {
     pub(crate) value: usize,
     /// Independently derived radius interpretation.
     pub(crate) bound: Option<usize>,
+    /// Separate numerical error descriptor when the recipe creates one.
+    pub(crate) evaluation: Option<usize>,
 }
 
 impl Heap {
@@ -194,6 +196,7 @@ impl Heap {
             pending,
             value,
             bound,
+            evaluation: None,
         })
     }
 }
@@ -281,6 +284,12 @@ pub(crate) fn prepare_records<P: Scalar + 'static>(
         meaning: Meaning::Value {
             stamp,
             bound: bound_key,
+            evaluation: None,
+            coverage: if bound_key.is_some() {
+                super::Coverage::DeclaredBounds
+            } else {
+                super::Coverage::RepresentedInputs
+            },
         },
     });
     if let Some(schema) = schemas.bound {
@@ -298,11 +307,65 @@ pub(crate) fn prepare_records<P: Scalar + 'static>(
             meaning: Meaning::Bound { target, stamp },
         });
     }
+    let evaluation = prepare_evaluation::<P>(
+        scope,
+        extent,
+        keys,
+        arenas,
+        schemas,
+        stamp,
+        epoch,
+        &mut records,
+    )?;
+    if let Some(record) = records.first_mut()
+        && let Meaning::Value {
+            evaluation: edge, ..
+        } = &mut record.meaning
+    {
+        *edge = evaluation.map(|handle| handle.key);
+    }
     Ok((
         records,
         PublishedBundle {
             value: Handle::new(scope, target),
             bound: bound_key.map(|key| Handle::new(scope, key)),
+            evaluation,
         },
     ))
+}
+
+/// Allocate the distinct evaluation region with the same exact converted-value target.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the helper forwards an existing checked storage reservation"
+)]
+fn prepare_evaluation<P: Scalar + 'static>(
+    scope: u64,
+    extent: Extent,
+    keys: &[Key],
+    arenas: &[Key],
+    schemas: &SchemaPlan,
+    stamp: ValueStamp,
+    epoch: u64,
+    records: &mut Vec<Record>,
+) -> Result<Option<Handle<super::Companion, P>>, HeapError> {
+    let Some(schema) = schemas.evaluation else {
+        return Ok(None);
+    };
+    let key = *keys.get(2).ok_or(HeapError::Capacity)?;
+    let arena = *arenas.get(2).ok_or(HeapError::Capacity)?;
+    let target = *keys.first().ok_or(HeapError::Capacity)?;
+    records.push(Record {
+        schema,
+        location: Location::Owned(Region {
+            epoch,
+            arena,
+            format: Format::of::<P>(),
+            offset: 0,
+            length: extent.entries(),
+        }),
+        layout: Layout::contiguous(extent)?,
+        meaning: Meaning::Bound { target, stamp },
+    });
+    Ok(Some(Handle::new(scope, key)))
 }

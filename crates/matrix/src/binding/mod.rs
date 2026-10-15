@@ -10,7 +10,8 @@ mod views;
 
 pub use error::OperationError;
 pub use limits::ExecutionLimits;
-pub use operation::{CheckedOperation, CopyContract, OperationDraft};
+pub(crate) use operation::NativeRecipe;
+pub use operation::{CheckedOperation, OperationDraft, RegionContract};
 pub use reservation::OutputReservation;
 pub use snapshot::{CompanionSnapshot, InputSnapshot};
 pub use views::{NormalizedInputs, NormalizedView, PhysicalView};
@@ -26,13 +27,15 @@ pub struct ExecutionId(pub(crate) u64);
 
 /// Proposed concrete operands; only validation can lend numerical inputs.
 #[derive(Debug)]
-pub struct Binding<P: Scalar> {
+pub struct Binding<P: Scalar, Q: Scalar = P> {
     /// Private checked recipe, never an unchecked draft.
     operation: CheckedOperation,
     /// Operation-ordered input locators.
     inputs: Vec<Handle<Value, P>>,
     /// Explicit work and private scratch limits.
     limits: ExecutionLimits,
+    /// Output scalar type, fixed independently of the input handle type.
+    output: std::marker::PhantomData<Q>,
 }
 
 impl<P: Scalar + 'static> Binding<P> {
@@ -47,21 +50,43 @@ impl<P: Scalar + 'static> Binding<P> {
             operation,
             inputs,
             limits,
+            output: std::marker::PhantomData,
         }
     }
+}
 
+impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
     /// Freeze actual dependencies and reserve complete fresh disjoint output bundles.
     ///
     /// Dropping the result discards all reservations without publishing any handle.
     /// # Errors
     /// Refuses stale/foreign/category/precision mismatches, schemas, structure or limits.
-    pub fn validate(self, heap: &mut Heap) -> Result<Bound<'_, P>, OperationError> {
+    pub fn validate(self, heap: &mut Heap) -> Result<Bound<'_, P, Q>, OperationError> {
+        if P::PRECISION != Q::PRECISION {
+            return Err(HeapError::PrecisionMismatch.into());
+        }
         if self.inputs.len() != self.operation.inputs.len() {
             return Err(OperationError::InputCount);
         }
         self.limits.check(self.inputs.len(), 0)?;
         let dependencies = capture(heap, &self.inputs)?;
         let entries = payload_entries(&dependencies)?;
+        let output_entries = dependencies.iter().try_fold(0_usize, |total, input| {
+            let copies = if matches!(self.operation.recipe, NativeRecipe::Affine(_)) {
+                3
+            } else {
+                1 + usize::from(input.companion().is_some())
+                    + usize::from(input.evaluation.is_some())
+            };
+            input
+                .layout()
+                .extent()
+                .entries()
+                .checked_mul(copies)
+                .and_then(|count| total.checked_add(count))
+                .ok_or(OperationError::ResourceLimit)
+        })?;
+        self.limits.check(self.inputs.len(), output_entries)?;
         self.limits.check(self.inputs.len(), entries)?;
         for (slot, (dependency, contract)) in dependencies
             .iter()
@@ -72,7 +97,7 @@ impl<P: Scalar + 'static> Binding<P> {
             heap.validate_bound_shape(dependency.handle(), contract, slot)?;
         }
         let execution = ExecutionId(identity()?);
-        let reservations = Reservations::prepare(heap, &dependencies)?;
+        let reservations = Reservations::prepare(heap, &dependencies, &self.operation)?;
         reservations.validate(heap)?;
         Ok(Bound {
             heap,
@@ -87,7 +112,7 @@ impl<P: Scalar + 'static> Binding<P> {
 
 /// Evidence-owning execution lease; every view borrows for less than this exclusive borrow.
 #[derive(Debug)]
-pub struct Bound<'h, P: Scalar> {
+pub struct Bound<'h, P: Scalar, Q: Scalar = P> {
     /// The only mutable access to the owner throughout this execution.
     pub(crate) heap: &'h mut Heap,
     /// Checked original recipe and exact normalization references.
@@ -97,12 +122,12 @@ pub struct Bound<'h, P: Scalar> {
     /// Unforgeable association between a binding and its borrowed numerical inputs.
     pub(crate) execution: ExecutionId,
     /// Fully private output storage and descriptor occupations.
-    pub(crate) reservations: Reservations<P>,
+    pub(crate) reservations: Reservations<Q>,
     /// The one issued candidate token, unavailable before successful evaluation.
     pub(crate) issued: std::cell::Cell<Option<u64>>,
 }
 
-impl<P: Scalar> Bound<'_, P> {
+impl<P: Scalar, Q: Scalar> Bound<'_, P, Q> {
     /// Execution identity shared by this binding's views and later candidates.
     #[must_use]
     pub const fn execution(&self) -> ExecutionId {
@@ -144,7 +169,10 @@ fn payload_entries<P: Scalar>(inputs: &[InputSnapshot<P>]) -> Result<usize, Oper
             .layout()
             .extent()
             .entries()
-            .checked_mul(1 + usize::from(input.companion().is_some()))
+            .checked_mul(
+                1 + usize::from(input.companion().is_some())
+                    + usize::from(input.evaluation.is_some()),
+            )
             .ok_or(OperationError::ResourceLimit)?;
         total
             .checked_add(count)

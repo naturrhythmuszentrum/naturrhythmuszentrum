@@ -22,6 +22,8 @@ pub(crate) struct Snapshot {
     pub(crate) region: Region,
     /// Reverse dependency edge and allocation of the current bound.
     pub(crate) bound: Option<(Key, Region)>,
+    /// Additional evaluation allocation retired with its complete target bundle.
+    pub(crate) evaluation: Option<(Key, Region)>,
 }
 
 impl Snapshot {
@@ -29,21 +31,23 @@ impl Snapshot {
     pub(crate) fn regions(&self) -> Result<Vec<Region>, HeapError> {
         let mut regions = Vec::new();
         regions
-            .try_reserve_exact(2)
+            .try_reserve_exact(3)
             .map_err(|_| HeapError::Capacity)?;
         regions.push(self.region);
         regions.extend(self.bound.map(|(_, region)| region));
+        regions.extend(self.evaluation.map(|(_, region)| region));
         Ok(regions)
     }
 
     /// Retire the bound edge, and optionally the base value occupation.
     pub(crate) fn retire_keys(&self, include_value: bool) -> Result<Vec<Key>, HeapError> {
         let mut keys = Vec::new();
-        keys.try_reserve_exact(2).map_err(|_| HeapError::Capacity)?;
+        keys.try_reserve_exact(3).map_err(|_| HeapError::Capacity)?;
         if include_value {
             keys.push(self.key);
         }
         keys.extend(self.bound.map(|(key, _)| key));
+        keys.extend(self.evaluation.map(|(key, _)| key));
         Ok(keys)
     }
 }
@@ -166,6 +170,14 @@ impl Heap {
             },
             region: self.owning_region(record)?,
             bound: companion,
+            evaluation: view
+                .evaluation()
+                .map(|handle| {
+                    self.record(handle).and_then(|entry| {
+                        self.owning_region(entry).map(|region| (handle.key, region))
+                    })
+                })
+                .transpose()?,
         })
     }
 }

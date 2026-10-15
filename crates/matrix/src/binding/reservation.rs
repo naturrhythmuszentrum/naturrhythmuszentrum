@@ -25,6 +25,10 @@ pub struct OutputReservation {
     schema: SchemaId,
     /// Complete propagated coverage for this output.
     coverage: Coverage,
+    /// Reserved total and evaluation regions are independent of physical coverage.
+    pub(crate) bounded: bool,
+    /// Distinct evaluation companion exists for this output.
+    pub(crate) evaluation: bool,
 }
 
 impl OutputReservation {
@@ -65,14 +69,15 @@ pub(crate) struct Reservations<P: Scalar> {
     pub(crate) outputs: Vec<OutputReservation>,
 }
 
-impl<P: Scalar + 'static> Reservations<P> {
+impl<Q: Scalar + 'static> Reservations<Q> {
     /// Allocate all destinations as one reservation using existing storage and slot plans.
-    pub(crate) fn prepare(
+    pub(crate) fn prepare<P: Scalar + 'static>(
         heap: &mut Heap,
         inputs: &[InputSnapshot<P>],
+        operation: &crate::CheckedOperation,
     ) -> Result<Self, OperationError> {
-        let (plans, schemas) = schema_plans(heap, inputs)?;
-        let payloads = zeros(inputs)?;
+        let (plans, schemas) = schema_plans(heap, inputs, operation)?;
+        let payloads = zeros::<P, Q>(inputs, &plans)?;
         let slices = payloads.iter().map(Vec::as_slice).collect::<Vec<_>>();
         let slots = heap
             .descriptors
@@ -83,14 +88,15 @@ impl<P: Scalar + 'static> Reservations<P> {
         let mut outputs = buffer(inputs.len())?;
         for (input, plan) in inputs.iter().zip(plans) {
             let start = records.len();
-            let count = 1 + usize::from(plan.bound.is_some());
+            let count =
+                1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some());
             let end = start.checked_add(count).ok_or(HeapError::Capacity)?;
             let stamp = ValueStamp {
                 id: ValueId(identity()?),
                 version: ValueVersion(1),
             };
             let extent = input.layout().extent();
-            let (prepared, bundle) = prepare_records::<P>(
+            let (mut prepared, bundle) = prepare_records::<Q>(
                 heap.scope,
                 extent,
                 slots.keys().get(start..end).ok_or(HeapError::Capacity)?,
@@ -99,6 +105,11 @@ impl<P: Scalar + 'static> Reservations<P> {
                 stamp,
                 storage.epoch(),
             )?;
+            if let Some(record) = prepared.first_mut()
+                && let crate::heap::records::Meaning::Value { coverage, .. } = &mut record.meaning
+            {
+                *coverage = input.coverage;
+            }
             outputs.push(OutputReservation {
                 stamp,
                 extent,
@@ -106,11 +117,9 @@ impl<P: Scalar + 'static> Reservations<P> {
                     scope: heap.scope,
                     index: plan.value,
                 },
-                coverage: if plan.bound.is_some() {
-                    Coverage::DeclaredBounds
-                } else {
-                    Coverage::RepresentedInputs
-                },
+                coverage: input.coverage,
+                bounded: plan.bound.is_some(),
+                evaluation: plan.evaluation.is_some(),
             });
             records.extend(prepared);
             bundles.push(bundle);
@@ -158,38 +167,49 @@ impl<P: Scalar + 'static> Reservations<P> {
 fn schema_plans<P: Scalar + 'static>(
     heap: &mut Heap,
     inputs: &[InputSnapshot<P>],
+    operation: &crate::CheckedOperation,
 ) -> Result<(Vec<SchemaPlan>, Vec<Schema>), OperationError> {
     let mut plans = buffer(inputs.len())?;
     let mut pending = Vec::new();
-    for input in inputs {
+    let numerical = matches!(operation.recipe, super::NativeRecipe::Affine(_));
+    for (input, output) in inputs.iter().zip(operation.outputs.iter()) {
         let extent = input.layout().extent();
-        let quantity = heap.value(input.handle())?.region().descriptor().clone();
+        let quantity = output.descriptor().clone();
         let value = intern(
             &heap.schemas,
             &mut pending,
-            Schema { extent, quantity },
+            Schema {
+                extent,
+                quantity: quantity.clone(),
+            },
             heap.limits.schemas,
         )?;
-        let bound = input
-            .companion()
-            .map(|companion| {
-                let quantity = heap
-                    .companion(companion.handle())?
-                    .region()
-                    .descriptor()
-                    .clone();
-                intern(
-                    &heap.schemas,
-                    &mut pending,
-                    Schema { extent, quantity },
-                    heap.limits.schemas,
-                )
-            })
-            .transpose()?;
+        let bounded = numerical || input.companion().is_some();
+        let bound = if bounded {
+            let radius =
+                nrz_units::uncertainty(nrz_units::UncertaintyMode::Radius, &quantity, None, None)
+                    .map_err(HeapError::from)?;
+            Some(intern(
+                &heap.schemas,
+                &mut pending,
+                Schema {
+                    extent,
+                    quantity: radius,
+                },
+                heap.limits.schemas,
+            )?)
+        } else {
+            None
+        };
         plans.push(SchemaPlan {
             pending: Vec::new(),
             value,
             bound,
+            evaluation: if numerical || input.evaluation.is_some() {
+                bound
+            } else {
+                None
+            },
         });
     }
     heap.schemas
@@ -198,20 +218,25 @@ fn schema_plans<P: Scalar + 'static>(
     Ok((plans, pending))
 }
 
-/// Allocate a bounded all-zero placeholder set; no checked output can observe these bytes.
-fn zeros<P: Scalar>(inputs: &[InputSnapshot<P>]) -> Result<Vec<Vec<P>>, HeapError> {
-    let count = inputs.iter().try_fold(0_usize, |total, input| {
+/// Allocate every private value, total-bound and evaluation region before evaluation.
+fn zeros<P: Scalar, Q: Scalar>(
+    inputs: &[InputSnapshot<P>],
+    plans: &[SchemaPlan],
+) -> Result<Vec<Vec<Q>>, HeapError> {
+    let count = plans.iter().try_fold(0_usize, |total, plan| {
         total
-            .checked_add(1 + usize::from(input.companion().is_some()))
+            .checked_add(
+                1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some()),
+            )
             .ok_or(HeapError::Capacity)
     })?;
     let mut payloads = buffer(count)?;
-    for input in inputs {
-        let copies = 1 + usize::from(input.companion().is_some());
+    for (input, plan) in inputs.iter().zip(plans) {
+        let copies = 1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some());
         for _ in 0..copies {
             let length = input.layout().extent().entries();
             let mut values = buffer(length)?;
-            values.resize(length, P::ZERO);
+            values.resize(length, Q::ZERO);
             payloads.push(values);
         }
     }

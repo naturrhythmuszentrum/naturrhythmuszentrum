@@ -16,7 +16,13 @@ impl Heap {
         handle: Handle<Value, P>,
     ) -> Result<Snapshot, HeapError> {
         let record = self.record(handle)?;
-        let Meaning::Value { stamp, bound } = record.meaning else {
+        let Meaning::Value {
+            stamp,
+            bound,
+            evaluation,
+            ..
+        } = record.meaning
+        else {
             return Err(HeapError::CategoryMismatch);
         };
         let view = self.region_view::<P>(record)?;
@@ -36,6 +42,9 @@ impl Heap {
             schema: schema.clone(),
             region: self.owning_region(record)?,
             bound: companion,
+            evaluation: evaluation
+                .map(|key| self.retired_companion::<P>(key, handle.key, stamp, view.extent()))
+                .transpose()?,
         })
     }
 

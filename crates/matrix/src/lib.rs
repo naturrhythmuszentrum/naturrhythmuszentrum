@@ -35,9 +35,9 @@ mod shape;
 mod storage;
 
 pub use binding::{
-    Binding, Bound, CheckedOperation, CompanionSnapshot, CopyContract, ExecutionId,
-    ExecutionLimits, InputSnapshot, NormalizedInputs, NormalizedView, OperationDraft,
-    OperationError, OutputReservation, PhysicalView,
+    Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
+    InputSnapshot, NormalizedInputs, NormalizedView, OperationDraft, OperationError,
+    OutputReservation, PhysicalView, RegionContract,
 };
 
 pub use layout::{Layout, PackedRegion};
@@ -137,6 +137,38 @@ pub use companions::CrossLineage;
 
 pub use companions::MeanParameters;
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "conversion contracts and kernels are shared across private transaction modules"
+)]
+mod conversion;
+#[path = "coordinates/numeric.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "lowered descriptor maps are shared by the numerical conversion recipes"
+)]
+mod coordinate_numeric;
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/joint_twins.rs"]
 mod joint_twins;
+pub use conversion::{
+    ConstantEvidence, ConversionContract, ConversionError, ConversionEvidence, ConversionMode,
+    RecipeEvidence,
+};
+
+#[cfg(test)]
+#[path = "testing/conversion_oracle.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent numerical oracle is shared by conversion tests"
+)]
+mod conversion_oracle;
+#[cfg(test)]
+#[path = "testing/conversion.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "conversion fixtures are shared across private test modules"
+)]
+mod conversion_testing;
+
+pub use conversion::{NormalizationMaps, NormalizedEntryMaps};

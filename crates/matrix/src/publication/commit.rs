@@ -6,12 +6,12 @@ use crate::binding::buffer;
 use crate::heap::records::Meaning;
 use crate::provenance::PreparedGraph;
 use crate::{
-    Bound, CopyEvidence, Coverage, Dependency, Failure, HeapError, OperationError, OperationRecord,
-    Outcome, OutputRecord, ProvenanceId, PublishedBundle, RecordId, SchemaId,
+    Bound, Dependency, Failure, HeapError, OperationError, OperationRecord, Outcome, OutputRecord,
+    ProvenanceId, PublishedBundle, RecordId, SchemaId,
 };
 use nrz_scalar::Scalar;
 
-impl<P: Scalar + 'static> Bound<'_, P> {
+impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     /// Consume this execution and atomically publish its complete checked output bundle.
     ///
     /// Every payload, target, source edge, record, limit and allocation is prepared before
@@ -21,8 +21,8 @@ impl<P: Scalar + 'static> Bound<'_, P> {
     /// nonfinite or incorrect copies, stale dependencies and provenance capacity/work.
     pub fn publish(
         mut self,
-        candidate: Candidate<P>,
-    ) -> Result<Outcome<Vec<PublishedBundle<P>>>, Failure<P>> {
+        candidate: Candidate<Q>,
+    ) -> Result<Outcome<Vec<PublishedBundle<Q>>>, Failure<P>> {
         let mut evidence = Vec::new();
         let prepared = self.prepare_publication(&candidate, &mut evidence);
         drop(candidate);
@@ -35,8 +35,8 @@ impl<P: Scalar + 'static> Bound<'_, P> {
     /// Complete all checks and fallible allocations under the uninterrupted exclusive borrow.
     fn prepare_publication(
         &mut self,
-        candidate: &Candidate<P>,
-        evidence: &mut Vec<CopyEvidence>,
+        candidate: &Candidate<Q>,
+        evidence: &mut Vec<crate::RecipeEvidence>,
     ) -> Result<PreparedGraph, OperationError> {
         if candidate.execution != self.execution || self.issued.get() != Some(candidate.token) {
             return Err(OperationError::ForeignCandidate);
@@ -51,25 +51,60 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             .try_reserve_exact(candidate.outputs.len())
             .map_err(|_| HeapError::Capacity)?;
         for (slot, payload) in candidate.outputs.iter().enumerate() {
-            self.verify_copy(slot, payload)?;
+            self.verify_payload(slot, payload)?;
+            match &self.operation.recipe {
+                crate::binding::NativeRecipe::Copy => {
+                    if !matches!(
+                        candidate.evidence.get(slot),
+                        Some(crate::RecipeEvidence::Copy(_))
+                    ) {
+                        return Err(OperationError::CandidateContract);
+                    }
+                    self.verify_copy(slot, payload)?;
+                }
+                crate::binding::NativeRecipe::Affine(contracts) => {
+                    let contract = contracts
+                        .get(slot)
+                        .ok_or(OperationError::CandidateContract)?;
+                    let Some(crate::RecipeEvidence::Conversion(claim)) =
+                        candidate.evidence.get(slot)
+                    else {
+                        return Err(OperationError::CandidateContract);
+                    };
+                    if claim.map() != contract.map() || claim.precision() != Q::PRECISION {
+                        return Err(OperationError::CandidateContract);
+                    }
+                }
+            }
             let output = self
                 .reservations
                 .outputs
                 .get(slot)
                 .ok_or(OperationError::CandidateContract)?;
-            evidence.push(CopyEvidence {
-                slot,
-                entries: payload.extent.entries(),
-                coverage: output.coverage(),
-            });
+            let claim = candidate
+                .evidence
+                .get(slot)
+                .ok_or(OperationError::CandidateContract)?;
+            if claim.slot() != slot
+                || claim.entries() != payload.extent.entries()
+                || claim.coverage() != output.coverage()
+            {
+                return Err(OperationError::CandidateContract);
+            }
+            evidence.push(claim.clone());
         }
         let record = self.prepare_record(candidate.token, evidence)?;
         super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
         self.heap.provenance.prepare(record)
     }
 
-    /// Independently recheck bit identity and all carried bounds against the frozen inputs.
-    fn verify_copy(&self, slot: usize, payload: &Payload<P>) -> Result<(), OperationError> {
+    /// Check reserved targets, finite coordinates and every required companion region.
+    fn verify_payload(&self, slot: usize, payload: &Payload<Q>) -> Result<(), OperationError> {
+        let input = self
+            .dependencies
+            .get(slot)
+            .ok_or(OperationError::CandidateContract)?;
+        Dependency::from_snapshot(input).validate(self.heap)?;
         let reservation = self
             .reservations
             .outputs
@@ -77,7 +112,8 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             .ok_or(OperationError::CandidateContract)?;
         if payload.target != reservation.stamp()
             || payload.extent != reservation.extent()
-            || payload.bounds.is_some() != (reservation.coverage() == Coverage::DeclaredBounds)
+            || payload.bounds.is_some() != reservation.bounded
+            || payload.evaluation.is_some() != reservation.evaluation
         {
             return Err(OperationError::CandidateContract);
         }
@@ -86,6 +122,54 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             &payload.centers,
             payload.bounds.as_deref(),
         )?;
+        if let Some(evaluation) = &payload.evaluation {
+            crate::heap::publication::scan(payload.extent, &payload.centers, Some(evaluation))?;
+            let total = payload
+                .bounds
+                .as_ref()
+                .ok_or(OperationError::CandidateContract)?;
+            if evaluation
+                .iter()
+                .zip(total)
+                .any(|(error, radius)| error > radius)
+            {
+                return Err(OperationError::CandidateContract);
+            }
+        }
+        self.verify_output_structure(slot, payload)
+    }
+
+    /// Every declared output structural zero is checked before its schema can escape.
+    fn verify_output_structure(
+        &self,
+        slot: usize,
+        payload: &Payload<Q>,
+    ) -> Result<(), OperationError> {
+        let contract = self
+            .operation
+            .outputs
+            .get(slot)
+            .ok_or(OperationError::CandidateContract)?;
+        for (entry, meaning) in contract.shape().entries().iter().enumerate() {
+            if meaning.is_zero() {
+                let center = payload
+                    .centers
+                    .get(entry)
+                    .ok_or(OperationError::CandidateContract)?;
+                let bound = payload.bounds.as_ref().and_then(|values| values.get(entry));
+                if *center != Q::ZERO
+                    || (contract.shape().structure_scope() == crate::StructureScope::WholeFamily
+                        && bound.is_some_and(|radius| *radius != Q::ZERO))
+                {
+                    return Err(OperationError::StructureMismatch { slot, entry });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Exact-copy publication still requires identity of every coordinate and companion.
+    fn verify_copy(&self, slot: usize, payload: &Payload<Q>) -> Result<(), OperationError> {
         let input = self
             .dependencies
             .get(slot)
@@ -93,15 +177,31 @@ impl<P: Scalar + 'static> Bound<'_, P> {
         Dependency::from_snapshot(input).validate(self.heap)?;
         let source = self.heap.value(input.handle())?;
         let bound = self.heap.selected_bound(input.handle())?;
+        let evaluation = self.heap.selected_evaluation(input.handle())?;
         for (index, center) in payload.centers.iter().enumerate() {
             let row = index % payload.extent.rows();
             let column = index / payload.extent.rows();
-            if !center.same_bits(source.region().get(row, column)?) {
+            if !center
+                .to_f64()
+                .same_bits(source.region().get(row, column)?.to_f64())
+            {
+                return Err(OperationError::CandidateContract);
+            }
+            if let (Some(values), Some(original)) = (&payload.evaluation, &evaluation)
+                && !values
+                    .get(index)
+                    .ok_or(OperationError::CandidateContract)?
+                    .to_f64()
+                    .same_bits(original.region().get(row, column)?.to_f64())
+            {
                 return Err(OperationError::CandidateContract);
             }
             if let (Some(values), Some(original)) = (&payload.bounds, &bound) {
                 let radius = values.get(index).ok_or(OperationError::CandidateContract)?;
-                if !radius.same_bits(original.region().get(row, column)?) {
+                if !radius
+                    .to_f64()
+                    .same_bits(original.region().get(row, column)?.to_f64())
+                {
                     return Err(OperationError::CandidateContract);
                 }
             }
@@ -113,7 +213,7 @@ impl<P: Scalar + 'static> Bound<'_, P> {
     fn prepare_record(
         &self,
         token: u64,
-        evidence: &[CopyEvidence],
+        evidence: &[crate::RecipeEvidence],
     ) -> Result<OperationRecord, OperationError> {
         let mut inputs = buffer(self.dependencies.len())?;
         for input in &self.dependencies {
@@ -133,7 +233,7 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             inputs,
             outputs,
             evidence: claims,
-            precision: P::PRECISION,
+            precision: Q::PRECISION,
         })
     }
 
@@ -153,8 +253,9 @@ impl<P: Scalar + 'static> Bound<'_, P> {
                 .values
                 .get(position)
                 .ok_or(OperationError::CandidateContract)?;
-            if !matches!(record.meaning, Meaning::Value { stamp, bound }
-                if stamp == reservation.stamp() && bound == bundle.bound().map(|handle| handle.key))
+            if !matches!(record.meaning, Meaning::Value { stamp, bound, evaluation, coverage }
+                if stamp == reservation.stamp() && bound == bundle.bound().map(|handle| handle.key)
+                    && evaluation == bundle.evaluation().map(|handle| handle.key) && coverage == reservation.coverage())
                 || record.schema != reservation.schema().index
             {
                 return Err(OperationError::CandidateContract);
@@ -180,6 +281,21 @@ impl<P: Scalar + 'static> Bound<'_, P> {
             } else {
                 None
             };
+            if let Some(handle) = bundle.evaluation() {
+                let companion = self
+                    .reservations
+                    .records
+                    .values
+                    .get(position)
+                    .ok_or(OperationError::CandidateContract)?;
+                if !matches!(companion.meaning, Meaning::Bound { target, stamp }
+                    if target == bundle.value().key && stamp == reservation.stamp())
+                    || self.reservations.records.keys().get(position) != Some(&handle.key)
+                {
+                    return Err(OperationError::CandidateContract);
+                }
+                position = position.checked_add(1).ok_or(HeapError::Capacity)?;
+            }
             outputs.push(OutputRecord {
                 dependency: Dependency::reserved(*bundle, *reservation, bound_schema)?,
                 provenance: ProvenanceId {
@@ -195,7 +311,7 @@ impl<P: Scalar + 'static> Bound<'_, P> {
     }
 
     /// Link only already prepared objects; no fallible allocation, callback or kernel remains.
-    fn commit(self, graph: PreparedGraph) -> Outcome<Vec<PublishedBundle<P>>> {
+    fn commit(self, graph: PreparedGraph) -> Outcome<Vec<PublishedBundle<Q>>> {
         let record = graph.record_id();
         self.heap.storage.publish(self.reservations.storage);
         self.heap.schemas.extend(self.reservations.schemas);

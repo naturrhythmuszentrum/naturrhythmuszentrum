@@ -22,6 +22,8 @@ pub struct Candidate<P: Scalar> {
     pub(crate) revision: u32,
     /// Complete private outputs in operation order.
     pub(crate) outputs: Vec<Payload<P>>,
+    /// Independently established per-output recipe evidence.
+    pub(crate) evidence: Vec<crate::RecipeEvidence>,
 }
 
 impl<P: Scalar> Candidate<P> {
@@ -48,4 +50,6 @@ pub(crate) struct Payload<P: Scalar> {
     pub(crate) centers: Vec<P>,
     /// Unpublished complete declared-bound region, if carried by the input.
     pub(crate) bounds: Option<Vec<P>>,
+    /// Separate numerical evaluation radii, already included in total bounds.
+    pub(crate) evaluation: Option<Vec<P>>,
 }
