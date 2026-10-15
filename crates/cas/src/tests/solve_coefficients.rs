@@ -347,6 +347,351 @@ fn coefficient_arithmetic_boundary() -> TestResult {
     Ok(())
 }
 
+/// Quotient multiplication reduces t² to one, while t-1 requires a genuine component split.
+/// ´test:crate:tower-unit-and-split-decisions´
+#[test]
+fn tower_unit_and_split_decisions() -> TestResult {
+    use crate::solving::coefficients::interface::TowerCoefficients;
+    use crate::testing::solve_coefficients::UnitFixture;
+    let mut fixture = UnitFixture::new()?;
+    let negative = fixture.base.integer(-1)?;
+    let one = fixture.base.integer(1)?;
+    let divisor = fixture
+        .base
+        .tower_value(&fixture.domain, &[negative, one])?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let field = TowerCoefficients::new(&fixture.base.cas.state, &fixture.domain, &mut budget)?;
+    let generator = field.read(&fixture.generator, &mut budget)?;
+    let square = field.mul(&generator, &generator, &mut budget)?;
+    let Value::Tower(coefficients) = square.value else {
+        return Err("wrong tower representation".into());
+    };
+    assert_eq!(coefficients.len(), 1);
+    assert_eq!(
+        ratio(coefficients.first().ok_or("missing constant")?, &mut budget)?,
+        (1, 1)
+    );
+    let scope = EvaluationScope {
+        context: &fixture.base.context,
+        region: &fixture.base.region,
+        premises: &[],
+        localization: &[],
+    };
+    assert!(matches!(
+        field.inverse(&generator, &scope, &mut budget)?,
+        UnitDecision::Unit { .. }
+    ));
+    assert!(matches!(
+        field.inverse(
+            &field.read(&fixture.zero, &mut budget)?,
+            &scope,
+            &mut budget
+        )?,
+        UnitDecision::Zero(_)
+    ));
+    let UnitDecision::Split(split) =
+        field.inverse(&field.read(&divisor, &mut budget)?, &scope, &mut budget)?
+    else {
+        return Err("zero divisor was treated as a unit".into());
+    };
+    assert_eq!(split.level, fixture.level);
+    assert_eq!(split.left.coefficients.len(), 2);
+    assert_eq!(split.right.coefficients.len(), 2);
+    assert_eq!(
+        ratio(
+            split
+                .left
+                .coefficients
+                .first()
+                .ok_or("missing left constant")?,
+            &mut budget
+        )?,
+        (-1, 1)
+    );
+    assert_eq!(
+        ratio(
+            split
+                .right
+                .coefficients
+                .first()
+                .ok_or("missing right constant")?,
+            &mut budget
+        )?,
+        (1, 1)
+    );
+    Ok(())
+}
+
+/// A child inverse cannot bypass a nonunit leading coefficient in its parent algebra.
+/// ´test:crate:tower-parent-before-child-split´
+#[test]
+fn tower_parent_before_child_split() -> TestResult {
+    use crate::solving::coefficients::interface::TowerCoefficients;
+    use crate::testing::solve_coefficients::UnitFixture;
+    let mut fixture = UnitFixture::new()?;
+    let negative = fixture.base.integer(-1)?;
+    let one = fixture.base.integer(1)?;
+    let parent_one = fixture
+        .base
+        .tower_value(&fixture.domain, std::slice::from_ref(&one))?;
+    let parent_divisor = fixture
+        .base
+        .tower_value(&fixture.domain, &[negative, one])?;
+    let polynomial = fixture
+        .base
+        .univariate(&fixture.domain, &[(0, parent_one.clone()), (2, parent_one)])?;
+    let (_, child) = fixture.base.tower(&fixture.domain, &polynomial)?;
+    let value = fixture
+        .base
+        .tower_value(&child, std::slice::from_ref(&parent_divisor))?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let field = TowerCoefficients::new(&fixture.base.cas.state, &child, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.base.context,
+        region: &fixture.base.region,
+        premises: &[],
+        localization: &[],
+    };
+    let before = fixture.base.cas.counts();
+    let UnitDecision::Split(split) =
+        field.inverse(&field.read(&value, &mut budget)?, &scope, &mut budget)?
+    else {
+        return Err("parent split missing".into());
+    };
+    assert_eq!(split.level, fixture.level);
+    assert_eq!(fixture.base.cas.counts(), before);
+    Ok(())
+}
+
+/// A parent obstruction beneath u²+t retains the exact earlier level and dependent coefficient value.
+fn rebuild_fixture() -> TestResult<(
+    crate::testing::solve_coefficients::UnitFixture,
+    crate::Handle,
+    crate::Handle,
+    Box<crate::solving::towers::SplitCertificate>,
+)> {
+    use crate::solving::coefficients::interface::TowerCoefficients;
+    let mut fixture = crate::testing::solve_coefficients::UnitFixture::new()?;
+    let one = fixture.base.integer(1)?;
+    let negative = fixture.base.integer(-1)?;
+    let parent_one = fixture
+        .base
+        .tower_value(&fixture.domain, std::slice::from_ref(&one))?;
+    let obstructed = fixture
+        .base
+        .tower_value(&fixture.domain, &[negative, one])?;
+    let polynomial = fixture.base.univariate(
+        &fixture.domain,
+        &[(0, fixture.generator.clone()), (2, parent_one)],
+    )?;
+    let (_, upper) = fixture.base.tower(&fixture.domain, &polynomial)?;
+    let value = fixture
+        .base
+        .tower_value(&upper, std::slice::from_ref(&obstructed))?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = TowerCoefficients::new(&fixture.base.cas.state, &upper, &mut budget)?;
+    let element = engine.read(&value, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.base.context,
+        region: &fixture.base.region,
+        premises: &[],
+        localization: &[],
+    };
+    let UnitDecision::Split(proposal) = engine.inverse(&element, &scope, &mut budget)? else {
+        return Err("missing parent split".into());
+    };
+    Ok((fixture, upper, value, proposal))
+}
+
+/// Parent splitting rebuilds higher levels on both children and atomically refuses one below its arithmetic cost.
+/// ´test:crate:tower-parent-rebuild-boundary´
+#[test]
+fn tower_parent_rebuild_boundary() -> TestResult {
+    use crate::solving::coefficients::arithmetic::Engine;
+    use crate::solving::towers::staging::stage;
+    let (mut fixture, upper, value, proposal) = rebuild_fixture()?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    let result = stage(
+        &mut fixture.base.cas,
+        &fixture.domain,
+        &proposal,
+        &[upper, value],
+        &fixture.base.region,
+        &[],
+        &mut measured,
+    )?;
+    let count = measured.usage().arithmetic_steps;
+    for (images, expected) in result.dependents.iter().zip([0, -2]) {
+        let domain = images.first().ok_or("missing upper domain")?;
+        let value = images.get(1).ok_or("missing upper value")?;
+        let engine = Engine {
+            state: &fixture.base.cas.state,
+            domain,
+        };
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let independent = Rational::from_ratio(expected, 1, &mut budget)?;
+        assert!(engine.formal_equal(
+            &engine.read(value, &mut budget)?,
+            &engine.rational(&independent, &mut budget)?,
+            &mut budget
+        )?);
+    }
+    assert_ne!(result.children.first(), result.children.get(1));
+    assert!(count > 0);
+    for (limit, succeeds) in [(count, true), (count - 1, false)] {
+        let (mut peer, upper, value, proposal) = rebuild_fixture()?;
+        let before = peer.base.cas.counts();
+        let mut budget = Budget::new(Limits {
+            arithmetic_steps: limit,
+            ..Limits::blind_cubic()
+        })?;
+        let staged = stage(
+            &mut peer.base.cas,
+            &peer.domain,
+            &proposal,
+            &[upper, value],
+            &peer.base.region,
+            &[],
+            &mut budget,
+        );
+        if succeeds {
+            assert!(staged.is_ok());
+        } else {
+            let error = staged.err().ok_or("short rebuild budget accepted")?;
+            assert!(matches!(
+                error.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::ArithmeticSteps,
+                    ..
+                }
+            ));
+            assert_eq!(peer.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Canonical parent inclusions and both component projections execute through the same sealed map boundary.
+/// ´test:crate:tower-canonical-map-laws´
+#[test]
+fn tower_canonical_map_laws() -> TestResult {
+    use crate::solving::coefficients::arithmetic::Engine;
+    let mut fixture = crate::testing::solve_coefficients::SplitFixture::new()?;
+    let one = fixture.unit.base.integer(1)?;
+    let scope = EvaluationScope {
+        context: &fixture.unit.base.context,
+        region: &fixture.unit.base.region,
+        premises: &[],
+        localization: &[],
+    };
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let parent = RationalCoefficients::new(
+        &fixture.unit.base.cas.state,
+        &fixture.unit.base.rational,
+        &mut budget,
+    )?;
+    let map = CoefficientMapData {
+        source: fixture.unit.base.rational.clone(),
+        target: MapTarget::CoefficientDomain {
+            domain: fixture.unit.domain.clone(),
+        },
+        mode: MapMode::Embedding,
+        region: fixture.unit.base.region.clone(),
+        images: Vec::new(),
+        denominators: Vec::new(),
+    };
+    let embedded = parent.map(&parent.read(&one, &mut budget)?, &map, &scope, &mut budget)?;
+    let tower = Engine {
+        state: &fixture.unit.base.cas.state,
+        domain: &fixture.unit.domain,
+    };
+    assert!(tower.formal_equal(&embedded, &tower.constant(true, &mut budget)?, &mut budget)?);
+    projection_laws(&fixture, &scope, &mut budget)?;
+    Ok(())
+}
+
+/// Both independently supplied component maps send t to the correct signed constant.
+fn projection_laws(
+    fixture: &crate::testing::solve_coefficients::SplitFixture,
+    scope: &EvaluationScope<'_>,
+    budget: &mut Budget,
+) -> TestResult {
+    use crate::proof::{ApplicationDraft, Certificate};
+    use crate::solving::coefficients::arithmetic::Engine;
+    use crate::solving::coefficients::interface::TowerCoefficients;
+    use crate::solving::{SolveCertificate, SolveView};
+    let interface =
+        TowerCoefficients::new(&fixture.unit.base.cas.state, &fixture.unit.domain, budget)?;
+    let generator = interface.read(&fixture.unit.generator, budget)?;
+    let ApplicationDraft {
+        certificate: Certificate::Solve(certificate),
+        ..
+    } = fixture.steps.last().ok_or("missing split")?
+    else {
+        return Err("wrong certificate".into());
+    };
+    let SolveCertificate::ComponentSplit(certificate) = certificate.as_ref() else {
+        return Err("wrong split".into());
+    };
+    let SolveView::ComponentSplit(split) = fixture.unit.base.cas.solve_view(&certificate.split)?
+    else {
+        return Err("wrong split view".into());
+    };
+    for (handle, expected) in [&split.left_map, &split.right_map].into_iter().zip([1, -1]) {
+        let SolveView::CoefficientMap(projection) = fixture.unit.base.cas.solve_view(handle)?
+        else {
+            return Err("wrong map".into());
+        };
+        let MapTarget::CoefficientDomain { domain } = &projection.target else {
+            return Err("wrong target".into());
+        };
+        let image = interface.map(&generator, projection, scope, budget)?;
+        let destination = Engine {
+            state: &fixture.unit.base.cas.state,
+            domain,
+        };
+        let independent = Rational::from_ratio(expected, 1, budget)?;
+        assert!(destination.formal_equal(
+            &image,
+            &destination.rational(&independent, budget)?,
+            budget
+        )?);
+    }
+    Ok(())
+}
+
+/// Repeated support cannot manufacture a disjoint split or an inverse for a nilpotent.
+/// ´test:crate:tower-repeated-support-refusal´
+#[test]
+fn tower_repeated_support_refusal() -> TestResult {
+    use crate::solving::coefficients::interface::TowerCoefficients;
+    let mut fixture = Fixture::new()?;
+    let polynomial = fixture.polynomial(1, &[(vec![2], 1), (vec![1], -2), (vec![0], 1)])?;
+    let parent = fixture.rational.clone();
+    let (_, domain) = fixture.tower(&parent, &polynomial)?;
+    let negative = fixture.integer(-1)?;
+    let one = fixture.integer(1)?;
+    let value = fixture.tower_value(&domain, &[negative, one])?;
+    let before = fixture.cas.counts();
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = TowerCoefficients::new(&fixture.cas.state, &domain, &mut budget)?;
+    let element = engine.read(&value, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.context,
+        region: &fixture.region,
+        premises: &[],
+        localization: &[],
+    };
+    assert!(matches!(
+        engine.inverse(&element, &scope, &mut budget),
+        Err(CoefficientFailure::Unsupported(
+            crate::solving::SolveReason::ComponentChoicePending
+        ))
+    ));
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
 /// Distinct coordinate renaming is injective; identifying two independent parameters is refused.
 /// ´test:crate:coefficient-renaming-injectivity´
 #[test]

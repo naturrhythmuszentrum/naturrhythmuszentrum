@@ -27,6 +27,8 @@ pub(crate) enum Value {
     Scalar(Scalar),
     /// A rational function in independent formal parameters.
     Fraction(Fraction),
+    /// A reduced vector over an earlier parent algebra.
+    Tower(Vec<Element>),
 }
 
 /// A complete scoped evaluation environment; premises remain sealed graph witnesses.
@@ -64,9 +66,11 @@ pub(crate) enum CoefficientCertificate {
     Ground,
     /// A formal zero, on a localization whose denominators have been checked.
     FormalZero,
+    /// A replayable formal product or reduction identity.
+    FormalIdentity,
     /// An exact existing scoped unit theorem was used.
     Premise(Handle),
-    /// Scoped nonzero premises supporting a regional arithmetic decision.
+    /// A finite set of scoped, sealed nonzero premises supports the arithmetic decision.
     Regional(Vec<Handle>),
 }
 
@@ -77,6 +81,8 @@ pub(crate) enum ZeroDecision {
     Zero(CoefficientCertificate),
     /// Independently supported regional nonvanishing.
     Nonzero(CoefficientCertificate),
+    /// An earlier or current quotient requires a component split.
+    Split(Box<crate::solving::towers::SplitCertificate>),
     /// A polynomial nonvanishing obligation remains.
     Undetermined(GuardedObligation),
 }
@@ -93,6 +99,8 @@ pub(crate) enum UnitDecision<E> {
     },
     /// Zero is not invertible.
     Zero(CoefficientCertificate),
+    /// An earlier or current quotient requires a component split.
+    Split(Box<crate::solving::towers::SplitCertificate>),
     /// No regional nonvanishing evidence is available.
     Undetermined(GuardedObligation),
 }

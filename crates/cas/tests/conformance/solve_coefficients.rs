@@ -106,3 +106,375 @@ fn fraction_gcd_budget_boundary() -> TestResult {
     }
     Ok(())
 }
+
+/// Unit replay checks the inverse, gcd quotients and Bezout identities independently and atomically.
+/// ´test:integration:tower-unit-mutations´
+#[test]
+fn tower_unit_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::UnitFixture;
+    use nrz_cas::proof::{Certificate, Statement};
+    use nrz_cas::solving::{SolveCertificate, SolveStatement};
+    let mut fixture = UnitFixture::new()?;
+    let valid_step = fixture.step()?;
+    let checked = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        std::slice::from_ref(&valid_step),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals, []);
+    let Statement::Solve(statement) = &checked.judgment().statement else {
+        return Err("wrong unit judgment".into());
+    };
+    let SolveStatement::Unit(unit) = statement.as_ref() else {
+        return Err("wrong unit conclusion".into());
+    };
+    assert_eq!(unit.value, fixture.generator);
+    for mutation in 0..3 {
+        let mut step = valid_step.clone();
+        if mutation == 0 {
+            let Statement::Solve(statement) = &mut step.conclusion else {
+                return Err("wrong unit statement".into());
+            };
+            let SolveStatement::Unit(unit) = statement.as_mut() else {
+                return Err("wrong unit variant".into());
+            };
+            unit.inverse.clone_from(&fixture.zero);
+        } else {
+            let Certificate::Solve(certificate) = &mut step.certificate else {
+                return Err("wrong certificate".into());
+            };
+            let SolveCertificate::ExtensionUnit(unit) = certificate.as_mut() else {
+                return Err("wrong unit certificate".into());
+            };
+            if mutation == 1 {
+                unit.gcd.clone_from(&fixture.modulus);
+            } else {
+                unit.quotients.swap(0, 1);
+            }
+        }
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    std::slice::from_ref(&step),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Both coprime components are covered; changed Bezout data and a selected root sent to the wrong child refuse.
+/// ´test:integration:tower-split-mutations´
+#[test]
+fn tower_split_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::SplitFixture;
+    use nrz_cas::proof::Certificate;
+    use nrz_cas::solving::SolveCertificate;
+    let mut fixture = SplitFixture::new()?;
+    let checked = fixture.unit.base.cas.check_proof(
+        &fixture.unit.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals, []);
+    let children = fixture.children()?;
+    let selections = fixture.selections()?;
+    assert_ne!(children[0], children[1]);
+    assert_ne!(selections[0], selections[1]);
+    for mutation in 0..3 {
+        let mut steps = fixture.steps.clone();
+        let last = steps.last_mut().ok_or("missing split")?;
+        let Certificate::Solve(certificate) = &mut last.certificate else {
+            return Err("wrong certificate".into());
+        };
+        let SolveCertificate::ComponentSplit(split) = certificate.as_mut() else {
+            return Err("wrong split certificate".into());
+        };
+        match mutation {
+            0 => split.selections.swap(0, 1),
+            1 => split.bezout.swap(0, 1),
+            _ => split.square_free = 0,
+        }
+        let before = fixture.unit.base.cas.counts();
+        assert!(
+            fixture
+                .unit
+                .base
+                .cas
+                .check_proof(
+                    &fixture.unit.base.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.unit.base.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Tower certificate replay has a measured arithmetic boundary and publishes no prefix on refusal.
+/// ´test:integration:tower-replay-arithmetic-boundary´
+#[test]
+fn tower_replay_arithmetic_boundary() -> TestResult {
+    use crate::testing::solve_coefficients::UnitFixture;
+    let mut fixture = UnitFixture::new()?;
+    let valid_step = fixture.step()?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        std::slice::from_ref(&valid_step),
+        &mut measured,
+    )?;
+    let count = measured.usage().arithmetic_steps;
+    assert!(count > 0);
+    for (limit, succeeds) in [(count, true), (count - 1, false)] {
+        let mut fresh = UnitFixture::new()?;
+        let fresh_step = fresh.step()?;
+        let before = fresh.base.cas.counts();
+        let result = fresh.base.cas.check_proof(
+            &fresh.base.context,
+            std::slice::from_ref(&fresh_step),
+            &mut Budget::new(Limits {
+                arithmetic_steps: limit,
+                ..Limits::blind_cubic()
+            })?,
+        );
+        if succeeds {
+            assert!(result.is_ok());
+        } else {
+            let failure = result.err().ok_or("short arithmetic budget accepted")?;
+            assert!(matches!(
+                failure.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::ArithmeticSteps,
+                    ..
+                }
+            ));
+            assert_eq!(fresh.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Independent Gaussian multiplication certifies (2+i)^3 = 2+11i and rejects a sign mutation.
+/// ´test:integration:coefficient-identity-mutation´
+#[test]
+fn coefficient_identity_mutation() -> TestResult {
+    use crate::testing::solve_coefficients::gaussian_identity;
+    let (mut valid, step) = gaussian_identity(11)?;
+    let checked = valid.cas.check_proof(
+        &valid.context,
+        std::slice::from_ref(&step),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals, []);
+    let (mut false_claim, changed) = gaussian_identity(-11)?;
+    let before = false_claim.cas.counts();
+    assert!(
+        false_claim
+            .cas
+            .check_proof(
+                &false_claim.context,
+                std::slice::from_ref(&changed),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(false_claim.cas.counts(), before);
+    assert_eq!(nrz_cas::solving::active_schema_bitmap() & 0b1101, 0b1101);
+    Ok(())
+}
+
+/// A formal nonzero denominator is guarded until the exact scoped parameter hypothesis is replayed.
+/// ´test:integration:fraction-regional-definedness´
+#[test]
+fn fraction_regional_definedness() -> TestResult {
+    use crate::testing::solve_graph::admit;
+    use nrz_cas::syntax::PredicateKind;
+    let mut fixture = Fixture::new()?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let divisor = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let draft = fixture.fraction(&one, &divisor);
+    let value = admit(&mut fixture.cas, &draft)?;
+    let map = fixture.identity_map(&fixture.fractions.clone())?;
+    let unguarded = fixture.identity(&value, &value, &map);
+    let before = fixture.cas.counts();
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                std::slice::from_ref(&unguarded),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    let parameter = fixture.free("x")?;
+    let assumption = fixture.assumption(&parameter, PredicateKind::NonZero)?;
+    let mut guarded = fixture.identity(&value, &value, &map);
+    guarded.premises = vec![0];
+    let checked = fixture.cas.check_proof(
+        &fixture.context,
+        &[assumption, guarded.clone()],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses().len(), 1);
+    assert_eq!(checked.judgment().residuals, []);
+    let other = fixture.free("y")?;
+    let unrelated = fixture.assumption(&other, PredicateKind::NonZero)?;
+    guarded.context.clone_from(&fixture.context);
+    let before = fixture.cas.counts();
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &[unrelated, guarded],
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
+/// Constrained children preserve one shared predicate; changing only one child cannot claim a complete cover.
+/// ´test:integration:tower-constrained-selection-transport´
+#[test]
+fn tower_constrained_selection_transport() -> TestResult {
+    use crate::testing::solve_coefficients::SplitFixture;
+    use nrz_cas::proof::Certificate;
+    use nrz_cas::solving::{SolveCertificate, SolveView};
+    let mut fixture = SplitFixture::new()?;
+    let mut selected = Vec::new();
+    let original = fixture.selections()?.to_vec();
+    for handle in &original {
+        let SolveView::RootSelection(selection) = fixture.unit.base.cas.solve_view(handle)? else {
+            return Err("wrong selection".into());
+        };
+        let relation = selection
+            .relations
+            .first()
+            .ok_or("missing relation")?
+            .clone();
+        selected.push(fixture.unit.base.positive_selection(&relation, true)?);
+    }
+    let step = fixture.steps.last_mut().ok_or("missing cover")?;
+    let Certificate::Solve(certificate) = &mut step.certificate else {
+        return Err("wrong certificate".into());
+    };
+    let SolveCertificate::ComponentSplit(split) = certificate.as_mut() else {
+        return Err("wrong split".into());
+    };
+    split.selections.clone_from(&selected);
+    let checked = fixture.unit.base.cas.check_proof(
+        &fixture.unit.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    let last = fixture.steps.last_mut().ok_or("missing cover")?;
+    let Certificate::Solve(certificate) = &mut last.certificate else {
+        return Err("wrong certificate".into());
+    };
+    let SolveCertificate::ComponentSplit(split) = certificate.as_mut() else {
+        return Err("wrong split".into());
+    };
+    *split
+        .selections
+        .get_mut(1)
+        .ok_or("missing right selection")? =
+        original.get(1).ok_or("missing unrestricted child")?.clone();
+    let before = fixture.unit.base.cas.counts();
+    assert!(
+        fixture
+            .unit
+            .base
+            .cas
+            .check_proof(
+                &fixture.unit.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.unit.base.cas.counts(), before);
+    Ok(())
+}
+
+/// Exact rational identities use independent expected fractions and reject changed numerators.
+/// ´test:integration:coefficient-rational-identity-oracle´
+#[test]
+fn coefficient_rational_identity_oracle() -> TestResult {
+    use crate::testing::solve_graph::{admit, expression};
+    use nrz_cas::Reference;
+    use nrz_cas::syntax::{AtomicSort, Field, Operator, Sort};
+    for (expected, succeeds) in [("29/30", true), ("31/30", false)] {
+        let mut fixture = Fixture::new()?;
+        let left = fixture.rational_value("3/10")?;
+        let right = fixture.rational_value("2/3")?;
+        let independent = fixture.rational_value(expected)?;
+        let rational = fixture.rational.clone();
+        let map = fixture.scalar_map(&rational, &Field::Real)?;
+        let first = fixture.literal(&left, &map)?;
+        let second = fixture.literal(&right, &map)?;
+        let expected = fixture.literal(&independent, &map)?;
+        let total = admit(
+            &mut fixture.cas,
+            &expression(
+                Reference::Existing(fixture.header.clone()),
+                Operator::Add,
+                Sort::Value(AtomicSort::Scalar(Field::Real)),
+                vec![Reference::Existing(first), Reference::Existing(second)],
+            ),
+        )?;
+        let step = fixture.identity(&total, &expected, &map);
+        let before = fixture.cas.counts();
+        let result = fixture.cas.check_proof(
+            &fixture.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if succeeds {
+            assert_eq!(result?.hypotheses(), []);
+        } else {
+            assert!(result.is_err());
+            assert_eq!(fixture.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Independent fraction products need their scoped nonzero premise and reject a changed second factor.
+/// ´test:integration:coefficient-fraction-identity-oracle´
+#[test]
+fn coefficient_fraction_identity_oracle() -> TestResult {
+    use crate::testing::solve_coefficients::fraction_identity;
+    for succeeds in [true, false] {
+        let (mut fixture, steps) = fraction_identity(succeeds)?;
+        let before = fixture.cas.counts();
+        let result = fixture.cas.check_proof(
+            &fixture.context,
+            &steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if succeeds {
+            assert_eq!(result?.hypotheses().len(), 1);
+        } else {
+            assert!(result.is_err());
+            assert_eq!(fixture.cas.counts(), before);
+        }
+    }
+    Ok(())
+}

@@ -242,3 +242,9 @@ coefficient_domain!(
     CoefficientDomainData::Fraction { .. },
     "Sealed canonical rational-function arithmetic over an admitted ground field."
 );
+
+coefficient_domain!(
+    TowerCoefficients,
+    CoefficientDomainData::Quotient { .. },
+    "Sealed arithmetic in a monic finite quotient, without an implicit field assertion."
+);

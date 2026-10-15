@@ -10,7 +10,7 @@ use nrz_cas::solving::{
 use nrz_cas::syntax::Draft;
 use nrz_cas::{FaultKind, Reference};
 
-/// Exact arithmetic availability does not advertise any unavailable theorem checker.
+/// Exact arithmetic availability is independent of the separately tested theorem bitmap.
 /// ´test:integration:numeric-capability-is-available´
 #[test]
 fn numeric_capability_is_available() {
@@ -18,7 +18,6 @@ fn numeric_capability_is_available() {
         nrz_cas::solving::capabilities().first(),
         Some(&Availability::Available)
     );
-    assert_eq!(nrz_cas::solving::active_schema_bitmap(), 0);
 }
 
 /// Gaussian drafts retain reduced rational components and canonical positive zero.

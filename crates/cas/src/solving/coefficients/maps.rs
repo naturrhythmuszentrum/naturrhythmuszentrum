@@ -158,6 +158,114 @@ pub(crate) fn inclusion(
     )?)))
 }
 
+/// Follow the actual parent chain, sharing its graph identities and embedding from the bottom up.
+pub(crate) fn canonical(
+    state: &State,
+    element: &Element,
+    target: &Handle,
+    budget: &mut Budget,
+) -> Result<Element, CoefficientFailure> {
+    begin(budget)?;
+    let mut chain = vector(0, budget)?;
+    let mut current = target;
+    while *current != element.domain {
+        let CoefficientDomainData::Quotient { level } = domain(state, current)? else {
+            break;
+        };
+        let crate::solving::SolveDraft::ExtensionLevel(extension) =
+            crate::solving::graph::object(state, level.logical_id())?
+        else {
+            return Err(invalid().into());
+        };
+        super::storage::reserve(&mut chain, 1, budget)?;
+        chain.push(current);
+        budget.check(
+            crate::budget::BudgetKind::Depth,
+            crate::graph::size(chain.len(), AT)?,
+            AT,
+        )?;
+        current = &extension.parent;
+    }
+    let mut result = if *current == element.domain {
+        Engine {
+            state,
+            domain: current,
+        }
+        .copy(element, budget)?
+    } else {
+        constant(state, element, current, budget)?
+    };
+    for child in chain.into_iter().rev() {
+        result = Engine {
+            state,
+            domain: child,
+        }
+        .include_parent(&result, budget)?;
+    }
+    Ok(result)
+}
+
+/// Horner evaluation of a parent-coefficient polynomial through canonical inclusion.
+fn horner(
+    state: &State,
+    polynomial: &crate::solving::towers::dense::Dense,
+    image: &Element,
+    target: &Handle,
+    budget: &mut Budget,
+) -> Result<Element, CoefficientFailure> {
+    let engine = Engine {
+        state,
+        domain: target,
+    };
+    let mut result = engine.constant(false, budget)?;
+    for coefficient in polynomial.coefficients.iter().rev() {
+        result = engine.add(
+            &engine.mul(&result, image, budget)?,
+            &canonical(state, coefficient, target, budget)?,
+            budget,
+        )?;
+    }
+    Ok(result)
+}
+
+/// Quotient specialization verifies the defining relation before reducing any projected value.
+pub(crate) fn quotient(
+    state: &State,
+    element: &Element,
+    map: &CoefficientMapData<Handle>,
+    target: &Handle,
+    budget: &mut Budget,
+) -> Result<Element, CoefficientFailure> {
+    begin(budget)?;
+    if map.mode != MapMode::Specialization {
+        return Err(invalid().into());
+    }
+    let [image] = map.images.as_slice() else {
+        return Err(invalid().into());
+    };
+    let source = Engine {
+        state,
+        domain: &element.domain,
+    };
+    let (_, extension) = crate::solving::towers::arithmetic::level(&source)?;
+    let destination = Engine {
+        state,
+        domain: target,
+    };
+    let image = destination.read(image, budget)?;
+    let modulus = crate::solving::towers::dense::Dense::read(state, &extension.polynomial, budget)?;
+    if !destination.formal_zero(&horner(state, &modulus, &image, target, budget)?, budget)? {
+        return Err(invalid().into());
+    }
+    horner(
+        state,
+        &crate::solving::towers::arithmetic::dense(&source, element, budget)?,
+        &image,
+        target,
+        budget,
+    )
+}
+
 /// Evaluate a formal polynomial into an admitted target algebra without asserting injectivity.
 pub(crate) fn evaluate(
     state: &State,
@@ -184,7 +292,7 @@ pub(crate) fn evaluate(
             value: Value::Scalar(term.coefficient.copy(budget)?),
             origin: None,
         };
-        let mut product = constant(state, &ground, target, budget)?;
+        let mut product = canonical(state, &ground, target, budget)?;
         for (image, exponent) in images.iter().zip(&term.powers) {
             product = engine.mul(&product, &engine.pow(image, *exponent, budget)?, budget)?;
         }

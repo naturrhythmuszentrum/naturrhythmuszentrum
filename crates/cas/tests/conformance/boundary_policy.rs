@@ -100,7 +100,13 @@ fn active_policy_complete_manifest() -> TestResult {
             assert_eq!(rule.version, 1);
             assert_eq!(
                 rule.available,
-                !matches!(primitive, nrz_cas::proof::Primitive::Solve(_))
+                match primitive {
+                    nrz_cas::proof::Primitive::Solve(schema) => matches!(
+                        schema.availability(),
+                        nrz_cas::solving::Availability::Available
+                    ),
+                    _ => true,
+                }
             );
             (rule.key, rule.weight)
         })

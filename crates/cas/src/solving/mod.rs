@@ -87,7 +87,7 @@ mod symmetric;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod towers;
+pub(crate) mod towers;
 
 pub(crate) use registry::check;
 pub use registry::{SOLVE_SCHEMAS, SolveSchema, active_schema_bitmap};

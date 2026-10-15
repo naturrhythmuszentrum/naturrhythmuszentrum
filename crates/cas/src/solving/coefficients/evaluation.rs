@@ -130,6 +130,16 @@ impl Engine<'_> {
             return Ok(pending);
         }
         match &element.value {
+            Value::Tower(_) => Ok(
+                match crate::solving::towers::units::inverse(self, element, scope, budget)? {
+                    UnitDecision::Unit { certificate, .. } => ZeroDecision::Nonzero(certificate),
+                    UnitDecision::Zero(certificate) => ZeroDecision::Zero(certificate),
+                    UnitDecision::Split(certificate) => ZeroDecision::Split(certificate),
+                    UnitDecision::Undetermined(obligation) => {
+                        ZeroDecision::Undetermined(obligation)
+                    }
+                },
+            ),
             Value::Scalar(value) => Ok(if value.zero(budget)? {
                 ZeroDecision::Zero(CoefficientCertificate::Ground)
             } else {
@@ -161,8 +171,22 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<UnitDecision<Element>, CoefficientFailure> {
         begin(budget)?;
-
+        if matches!(element.value, Value::Tower(_)) {
+            self.scope(scope, budget)?;
+            if let Some(ZeroDecision::Undetermined(obligation)) =
+                self.localization(scope, budget)?
+            {
+                return Ok(UnitDecision::Undetermined(obligation));
+            }
+            if let Some(ZeroDecision::Undetermined(obligation)) =
+                self.defined_value(element, scope, budget)?
+            {
+                return Ok(UnitDecision::Undetermined(obligation));
+            }
+            return crate::solving::towers::units::inverse(self, element, scope, budget);
+        }
         let certificate = match self.zero_test(element, scope, budget)? {
+            ZeroDecision::Split(certificate) => return Ok(UnitDecision::Split(certificate)),
             ZeroDecision::Zero(certificate) => return Ok(UnitDecision::Zero(certificate)),
             ZeroDecision::Undetermined(obligation) => {
                 return Ok(UnitDecision::Undetermined(obligation));
@@ -174,6 +198,7 @@ impl Engine<'_> {
                 Value::Scalar(Scalar::constant(value.ground(), true, budget)?.div(value, budget)?)
             }
             Value::Fraction(value) => Value::Fraction(value.reciprocal(budget)?),
+            Value::Tower(_) => return Err(invalid().into()),
         });
         Ok(UnitDecision::Unit {
             inverse,
@@ -190,6 +215,9 @@ impl Engine<'_> {
     ) -> Result<Element, CoefficientFailure> {
         match self.inverse(value, scope, budget)? {
             UnitDecision::Unit { inverse, .. } => Ok(inverse),
+            UnitDecision::Split(_) => Err(CoefficientFailure::Unsupported(
+                crate::solving::SolveReason::ComponentChoicePending,
+            )),
             UnitDecision::Zero(_) | UnitDecision::Undetermined(_) => {
                 Err(CoefficientFailure::Unsupported(
                     crate::solving::SolveReason::SpecializationGuardPending,
@@ -301,10 +329,19 @@ impl Engine<'_> {
         {
             return self.specialize(element, map, target, scope, budget);
         }
-
+        if map.mode == MapMode::Specialization && matches!(element.value, Value::Tower(_)) {
+            if self.localization(scope, budget)?.is_some()
+                || self.defined_value(element, scope, budget)?.is_some()
+            {
+                return Err(CoefficientFailure::Unsupported(
+                    crate::solving::SolveReason::SpecializationGuardPending,
+                ));
+            }
+            return super::maps::quotient(self.state, element, map, target, budget);
+        }
         if map.mode == MapMode::Embedding {
-            if map.images.is_empty() && matches!(element.value, Value::Scalar(_)) {
-                return super::maps::constant(self.state, element, target, budget);
+            if map.images.is_empty() {
+                return super::maps::canonical(self.state, element, target, budget);
             }
             return super::maps::inclusion(self.state, element, map, target, budget);
         }
@@ -377,6 +414,26 @@ impl Engine<'_> {
                 } else {
                     Ok(Some(self.pending(&value.denominator, scope, budget)?))
                 }
+            }
+            Value::Tower(coefficients) => {
+                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let parent = Self {
+                    state: self.state,
+                    domain: &extension.parent,
+                };
+                for coefficient in coefficients {
+                    if let Some(pending) = parent.defined_value(coefficient, scope, budget)? {
+                        return Ok(Some(pending));
+                    }
+                }
+                let modulus = super::storage::polynomial(self.state, &extension.polynomial)?;
+                for term in &modulus.terms {
+                    let coefficient = parent.read(&term.coefficient, budget)?;
+                    if let Some(pending) = parent.defined_value(&coefficient, scope, budget)? {
+                        return Ok(Some(pending));
+                    }
+                }
+                Ok(None)
             }
         }
     }

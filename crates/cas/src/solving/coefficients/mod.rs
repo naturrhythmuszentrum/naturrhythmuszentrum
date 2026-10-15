@@ -3,7 +3,7 @@
 
 #![expect(
     dead_code,
-    reason = "the independent identity checker consumes the arithmetic interface in the next lane commit"
+    reason = "later solving producers consume the sealed arithmetic and staging interfaces"
 )]
 
 #[expect(
@@ -64,25 +64,22 @@ pub(crate) const fn availability() -> super::Availability {
 }
 
 /// Per-subtype capability permits independently green checker slices in this leaf.
-pub(crate) const fn schema_availability(_tag: u8) -> super::Availability {
-    super::Availability::Unavailable
+pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
+    if tag == 0 {
+        super::Availability::Available
+    } else {
+        super::Availability::Unavailable
+    }
 }
 
-/// Reject every application until this lane supplies its independent typed checker.
+/// Independently replay the typed coefficient identity certificate.
 pub(crate) fn check(
-    _cas: &crate::graph::Cas,
-    _draft: &crate::proof_model::ApplicationDraft,
-    _premises: &[crate::proof_model::CheckedApplication],
+    cas: &crate::graph::Cas,
+    draft: &crate::proof_model::ApplicationDraft,
+    premises: &[crate::proof_model::CheckedApplication],
     budget: &mut crate::budget::Budget,
 ) -> Result<crate::proof_model::ScopedConditions, crate::error::Fault> {
-    budget.work(
-        1,
-        crate::error::Location::new("unavailable solving checker"),
-    )?;
-    Err(crate::error::Fault::invalid(
-        crate::error::InvalidCode::UnsupportedFragment,
-        crate::error::Location::new("unavailable solving checker"),
-    ))
+    identity::check(cas, draft, premises, budget)
 }
 
 /// Independently verify coprimality and the monic denominator during graph admission.
@@ -94,6 +91,36 @@ pub(crate) fn canonical_fraction(
 ) -> Result<(), crate::error::Fault> {
     read::canonical_fraction(state, numerator, denominator, budget)
 }
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent coefficient replay stays within the crate"
+)]
+pub(crate) mod proof;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent coefficient replay stays within the crate"
+)]
+pub(crate) mod forms;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent coefficient replay stays within the crate"
+)]
+pub(crate) mod normalize;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent coefficient replay stays within the crate"
+)]
+pub(crate) mod identity;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "explicit map hypotheses stay within the crate"
+)]
+pub(crate) mod homomorphism;
 
 #[expect(
     clippy::redundant_pub_crate,

@@ -61,10 +61,8 @@ impl Engine<'_> {
                 numerator: super::read::sparse(self.state, numerator, budget)?,
                 denominator: super::read::sparse(self.state, denominator, budget)?,
             })),
-            CoefficientValueData::Tower { .. } => {
-                return Err(CoefficientFailure::Unsupported(
-                    crate::solving::SolveReason::CoefficientDomainUnavailable,
-                ));
+            CoefficientValueData::Tower { coefficients } => {
+                crate::solving::towers::arithmetic::read(self, coefficients, budget)?
             }
         };
         result.origin = Some(handle.clone());
@@ -118,9 +116,7 @@ impl Engine<'_> {
                 })
             }
             CoefficientDomainData::Quotient { .. } => {
-                return Err(CoefficientFailure::Unsupported(
-                    crate::solving::SolveReason::CoefficientDomainUnavailable,
-                ));
+                return crate::solving::towers::arithmetic::constant(self, nonzero, budget);
             }
         };
         Ok(self.element(result))
@@ -137,6 +133,9 @@ impl Engine<'_> {
         let mut result = self.element(match &operand.value {
             Value::Scalar(value) => Value::Scalar(value.copy(budget)?),
             Value::Fraction(value) => Value::Fraction(value.copy(budget)?),
+            Value::Tower(_) => Value::Tower(
+                crate::solving::towers::arithmetic::dense(self, operand, budget)?.coefficients,
+            ),
         });
         result.origin.clone_from(&operand.origin);
         Ok(result)
@@ -153,6 +152,9 @@ impl Engine<'_> {
         Ok(self.element(match &operand.value {
             Value::Scalar(value) => Value::Scalar(value.neg(budget)?),
             Value::Fraction(value) => Value::Fraction(value.neg(budget)?),
+            Value::Tower(_) => {
+                return crate::solving::towers::arithmetic::neg(self, operand, budget);
+            }
         }))
     }
 
@@ -169,6 +171,9 @@ impl Engine<'_> {
         Ok(self.element(match (&left.value, &right.value) {
             (Value::Scalar(a), Value::Scalar(b)) => Value::Scalar(a.add(b, budget)?),
             (Value::Fraction(a), Value::Fraction(b)) => Value::Fraction(a.add(b, budget)?),
+            (Value::Tower(_), Value::Tower(_)) => {
+                return crate::solving::towers::arithmetic::add(self, left, right, budget);
+            }
             _ => return Err(invalid().into()),
         }))
     }
@@ -197,6 +202,9 @@ impl Engine<'_> {
         Ok(self.element(match (&left.value, &right.value) {
             (Value::Scalar(a), Value::Scalar(b)) => Value::Scalar(a.mul(b, budget)?),
             (Value::Fraction(a), Value::Fraction(b)) => Value::Fraction(a.mul(b, budget)?),
+            (Value::Tower(_), Value::Tower(_)) => {
+                return crate::solving::towers::arithmetic::mul(self, left, right, budget);
+            }
             _ => return Err(invalid().into()),
         }))
     }
@@ -235,12 +243,120 @@ impl Engine<'_> {
         begin(budget)?;
         self.validate(operand)?;
         match &operand.value {
-            Value::Scalar(_) => self.copy(operand, budget),
+            Value::Scalar(_) | Value::Tower(_) => self.copy(operand, budget),
             Value::Fraction(value) => Ok(self.element(Value::Fraction(Fraction::new(
                 &value.numerator,
                 &value.denominator,
                 budget,
             )?))),
         }
+    }
+}
+
+impl Engine<'_> {
+    /// Formal zero is used only for canonical algebraic reduction, never as a unit decision.
+    pub(crate) fn formal_zero(
+        &self,
+        element: &Element,
+        budget: &mut Budget,
+    ) -> Result<bool, CoefficientFailure> {
+        begin(budget)?;
+        self.validate(element)?;
+        match &element.value {
+            Value::Scalar(value) => Ok(value.zero(budget)?),
+            Value::Fraction(value) => Ok(value.numerator.zero(budget)?),
+            Value::Tower(values) => {
+                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let parent = Engine {
+                    state: self.state,
+                    domain: &extension.parent,
+                };
+                for value in values {
+                    if !parent.formal_zero(value, budget)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+        }
+    }
+
+    /// Equality in the formal algebra, with no claim about specialization definedness.
+    pub(crate) fn formal_equal(
+        &self,
+        left: &Element,
+        right: &Element,
+        budget: &mut Budget,
+    ) -> Result<bool, CoefficientFailure> {
+        begin(budget)?;
+        self.formal_zero(&self.sub(left, right, budget)?, budget)
+    }
+}
+
+impl Engine<'_> {
+    /// Canonical rational constants enter each parent before a child quotient.
+    pub(crate) fn rational(
+        &self,
+        scalar: &crate::number::Rational,
+        budget: &mut Budget,
+    ) -> Result<Element, CoefficientFailure> {
+        begin(budget)?;
+        match domain(self.state, self.domain)? {
+            CoefficientDomainData::Rational => Ok(self.element(Value::Scalar(Scalar::Rational(
+                super::scalar::rational_copy(scalar, budget)?,
+            )))),
+            CoefficientDomainData::Gaussian => {
+                let zero = crate::number::Rational::zero();
+                Ok(self.element(Value::Scalar(Scalar::Gaussian(
+                    crate::solving::numeric::Gaussian::from_parts(scalar, &zero, budget)?,
+                ))))
+            }
+            CoefficientDomainData::Fraction { base, .. } => {
+                let parent = Self {
+                    state: self.state,
+                    domain: base,
+                };
+                super::maps::constant(
+                    self.state,
+                    &parent.rational(scalar, budget)?,
+                    self.domain,
+                    budget,
+                )
+            }
+            CoefficientDomainData::Quotient { .. } => {
+                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let parent = Self {
+                    state: self.state,
+                    domain: &extension.parent,
+                };
+                let mut entries = super::storage::vector(1, budget)?;
+                entries.push(parent.rational(scalar, budget)?);
+                let value = crate::solving::towers::dense::Dense::new(&parent, entries, budget)?;
+                crate::solving::towers::arithmetic::reduced(self, value, budget)
+            }
+        }
+    }
+}
+
+impl Engine<'_> {
+    /// Canonical parent inclusion is injective because the child defining relation is monic.
+    pub(crate) fn include_parent(
+        &self,
+        value: &Element,
+        budget: &mut Budget,
+    ) -> Result<Element, CoefficientFailure> {
+        begin(budget)?;
+        let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+        if value.domain != extension.parent {
+            return Err(invalid().into());
+        }
+        let parent = Self {
+            state: self.state,
+            domain: &extension.parent,
+        };
+        let mut coefficients = super::storage::vector(1, budget)?;
+        coefficients.push(parent.copy(value, budget)?);
+        let polynomial = crate::solving::towers::dense::Dense::new(&parent, coefficients, budget)?;
+        crate::solving::towers::arithmetic::reduced(self, polynomial, budget)
     }
 }

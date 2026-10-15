@@ -282,7 +282,7 @@ fn solve_blind_cubic_profile() -> TestResult {
     Ok(())
 }
 
-/// Registered solving types have stable tags and weights but cannot admit or replay a theorem.
+/// Registered schema metadata stays stable; unavailable schemas refuse admission and replay.
 /// ´test:integration:solve-unavailable-schemas´
 #[test]
 fn solve_unavailable_schemas() -> TestResult {
@@ -290,11 +290,18 @@ fn solve_unavailable_schemas() -> TestResult {
     use nrz_cas::solving::{Availability, SOLVE_SCHEMAS};
     let mut fixture = Fixture::new()?;
     let before = fixture.cas.counts();
+    let mut expected_bitmap = 0_u32;
     for (index, schema) in SOLVE_SCHEMAS.iter().copied().enumerate() {
         let spec = schema.specification();
         assert_eq!(usize::from(schema.tag()), index);
-        assert_eq!(schema.availability(), Availability::Unavailable);
-        assert!(!spec.available);
+        assert_eq!(
+            spec.available,
+            matches!(schema.availability(), Availability::Available)
+        );
+        if spec.available {
+            expected_bitmap |= 1_u32 << schema.tag();
+            continue;
+        }
         let application = ApplicationDraft {
             rule: Primitive::Solve(schema),
             context: fixture.context.clone(),
@@ -334,10 +341,10 @@ fn solve_unavailable_schemas() -> TestResult {
         );
         assert_eq!(fixture.cas.counts(), before);
     }
-    assert_eq!(nrz_cas::solving::active_schema_bitmap(), 0);
+    assert_eq!(nrz_cas::solving::active_schema_bitmap(), expected_bitmap);
     assert_eq!(
         nrz_cas::request::SearchPolicy::default().active_schema_bitmap(),
-        0
+        expected_bitmap
     );
     Ok(())
 }
