@@ -33,3 +33,9 @@ pub(crate) mod boundary_native;
     reason = "shared internal distribution evidence"
 )]
 pub(crate) mod distribution_native;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared admission fixtures stay crate-visible"
+)]
+pub(crate) mod admission;

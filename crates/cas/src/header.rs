@@ -41,7 +41,7 @@ impl Cas {
                 declarations,
                 spaces,
             } => {
-                let parent = self.resolve(parent, locals)?;
+                let parent = self.resolve(state, parent, locals)?;
                 let inherited = state.header(parent)?;
                 let mut environment = inherited.environment.clone();
                 for declaration in declarations {
@@ -126,7 +126,7 @@ impl Cas {
             {
                 return Err(Fault::invalid(InvalidCode::Sort, AT));
             }
-            let space = self.resolve(&draft.space, locals)?;
+            let space = self.resolve(state, &draft.space, locals)?;
             state.space(space)?;
             result.push((draft.key.clone(), space));
         }

@@ -29,8 +29,8 @@ impl Cas {
                 admissible,
                 assumptions,
             } => {
-                let header_id = self.resolve(header, locals)?;
-                let admissible = self.resolve(admissible, locals)?;
+                let header_id = self.resolve(state, header, locals)?;
+                let admissible = self.resolve(state, admissible, locals)?;
                 let region = state.region(admissible)?;
                 if !region.scope.is_empty()
                     || !crate::header::embeds(state, region.header, header_id, budget)?
@@ -64,8 +64,8 @@ impl Cas {
                 region,
                 hypotheses,
             } => {
-                let parent = self.resolve(parent, locals)?;
-                let region = self.resolve(region, locals)?;
+                let parent = self.resolve(state, parent, locals)?;
+                let region = self.resolve(state, region, locals)?;
                 self.local_context(state, parent, region, hypotheses, locals, pending, budget)?
             }
         };
@@ -96,7 +96,7 @@ impl Cas {
         let vertex = Vertex::Context(value);
         if local {
             let (_, key) = vertex_key(&vertex, state, budget)?;
-            if !state.intern.contains_key(&key) {
+            if state.interned(&key, budget)?.is_none() {
                 budget.specialized(BudgetKind::LocalContexts, 1, true, AT)?;
             }
         }
@@ -123,7 +123,7 @@ impl Cas {
             if draft.key.is_empty() || !names.insert(draft.key.clone()) {
                 return Err(Fault::invalid(InvalidCode::Context, AT));
             }
-            let id = self.resolve(&draft.condition, locals)?;
+            let id = self.resolve(state, &draft.condition, locals)?;
             let Vertex::Condition(value) = state.node(id)? else {
                 return Err(Fault::invalid(InvalidCode::Reference, AT));
             };

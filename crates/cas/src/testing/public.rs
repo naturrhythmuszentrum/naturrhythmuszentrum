@@ -122,3 +122,10 @@ pub(crate) mod pullbacks;
 )]
 #[path = "primitives.rs"]
 pub(crate) mod primitives;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared admission fixtures stay crate-visible"
+)]
+#[path = "admission.rs"]
+pub(crate) mod admission;

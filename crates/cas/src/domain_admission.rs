@@ -81,7 +81,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         crate::validation::scope_limit(&draft.scope, budget)?;
-        let header = self.resolve(&draft.header, locals)?;
+        let header = self.resolve(state, &draft.header, locals)?;
         ambient_header(state, header, &draft.ambient)?;
         let mut edges = vec![(header, Edge::InHeader)];
         let expression = match &draft.expression {
@@ -89,9 +89,9 @@ impl Cas {
             RegionExpr::Empty => RegionExpr::Empty,
             RegionExpr::GuardTrue { base, predicate }
             | RegionExpr::GuardFalse { base, predicate } => {
-                let base = self.resolve(base, locals)?;
+                let base = self.resolve(state, base, locals)?;
                 region_context(state, base, header, &draft.scope, &draft.ambient, budget)?;
-                let predicate = self.resolve(predicate, locals)?;
+                let predicate = self.resolve(state, predicate, locals)?;
                 let (actual, scope) = predicate_context(state, predicate)?;
                 if scope != &draft.scope || !crate::header::embeds(state, actual, header, budget)? {
                     return Err(Fault::invalid(InvalidCode::Scope, AT));
@@ -105,7 +105,7 @@ impl Cas {
                 }
             }
             RegionExpr::Meet(items) | RegionExpr::Union(items) => {
-                let mut members = self.resolve_all(items, locals, budget)?;
+                let mut members = self.resolve_all(state, items, locals, budget)?;
                 let count = size(members.len(), AT)?;
                 budget.work(
                     count
@@ -126,8 +126,8 @@ impl Cas {
                 }
             }
             RegionExpr::Difference { base, excluded } => {
-                let base = self.resolve(base, locals)?;
-                let excluded = self.resolve(excluded, locals)?;
+                let base = self.resolve(state, base, locals)?;
+                let excluded = self.resolve(state, excluded, locals)?;
                 for id in [base, excluded] {
                     region_context(state, id, header, &draft.scope, &draft.ambient, budget)?;
                 }
@@ -156,7 +156,7 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         let vertex = Vertex::Region(region);
         let (_, key) = vertex_key(&vertex, state, budget)?;
-        if !state.intern.contains_key(&key) {
+        if state.interned(&key, budget)?.is_none() {
             budget.specialized(BudgetKind::RegionNodes, 1, true, AT)?;
         }
         self.insert(state, vertex, edges, pending, budget)
@@ -171,8 +171,8 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(&draft.header, locals)?;
-        let domain = self.resolve(&draft.domain, locals)?;
+        let header = self.resolve(state, &draft.header, locals)?;
+        let domain = self.resolve(state, &draft.domain, locals)?;
         region_context(
             state,
             domain,
@@ -213,9 +213,9 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(&draft.header, locals)?;
-        let region = self.resolve(&draft.region, locals)?;
-        let value = self.resolve(&draft.value, locals)?;
+        let header = self.resolve(state, &draft.header, locals)?;
+        let region = self.resolve(state, &draft.region, locals)?;
+        let value = self.resolve(state, &draft.value, locals)?;
         let term = state.expression(value)?;
         if !matches!(term.sort, Sort::Value(AtomicSort::Scalar(_)))
             || term.scope != draft.scope
@@ -254,9 +254,9 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(&draft.header, locals)?;
+        let header = self.resolve(state, &draft.header, locals)?;
         ambient_header(state, header, &draft.ambient)?;
-        let location = self.resolve(&draft.location, locals)?;
+        let location = self.resolve(state, &draft.location, locals)?;
         let point = state.expression(location)?;
         let expected = match &draft.ambient {
             AmbientDomain::Real(_) => Sort::Value(AtomicSort::Scalar(Field::Real)),
@@ -277,7 +277,7 @@ impl Cas {
         };
         let vertex = Vertex::Boundary(boundary);
         let (_, key) = vertex_key(&vertex, state, budget)?;
-        if !state.intern.contains_key(&key) {
+        if state.interned(&key, budget)?.is_none() {
             budget.specialized(BudgetKind::BoundaryNodes, 1, true, AT)?;
         }
         self.insert(
@@ -304,8 +304,8 @@ impl Cas {
             false,
             AT,
         )?;
-        let header = self.resolve(&draft.header, locals)?;
-        let domain = self.resolve(&draft.domain, locals)?;
+        let header = self.resolve(state, &draft.header, locals)?;
+        let domain = self.resolve(state, &draft.domain, locals)?;
         let region = state.region(domain)?;
         region_context(state, domain, header, &draft.scope, &region.ambient, budget)?;
         let mut clauses = Vec::new();
@@ -315,8 +315,8 @@ impl Cas {
         let mut values = Vec::new();
         let mut edges = vec![(header, Edge::InHeader), (domain, Edge::CaseDomain)];
         for clause in &draft.clauses {
-            let selector = self.resolve(&clause.selector, locals)?;
-            let value = self.resolve(&clause.value, locals)?;
+            let selector = self.resolve(state, &clause.selector, locals)?;
+            let value = self.resolve(state, &clause.value, locals)?;
             if draft.kind == SourceFormKind::OrderedCases {
                 let (actual, scope) = predicate_context(state, selector)?;
                 if scope != &draft.scope || !crate::header::embeds(state, actual, header, budget)? {
@@ -345,7 +345,7 @@ impl Cas {
         let otherwise = draft
             .otherwise
             .as_ref()
-            .map(|item| self.resolve(item, locals))
+            .map(|item| self.resolve(state, item, locals))
             .transpose()?;
         if let Some(value) = otherwise {
             if draft.kind == SourceFormKind::CaseLiteral {
@@ -405,6 +405,27 @@ fn check_values(
 }
 
 impl Cas {
+    /// Resolve and canonicalize the finite unordered arm inventory under its own work charge.
+    fn case_arms(
+        &self,
+        state: &State,
+        draft: &crate::domain_model::CasesDraft,
+        locals: &[LogicalId],
+        budget: &mut Budget,
+    ) -> Result<Vec<LogicalId>, Fault> {
+        let at = Location::new("native case admission");
+        let mut arms = self.resolve_all(state, &draft.arms, locals, budget)?;
+        budget.work(
+            size(arms.len(), at)?
+                .checked_mul(size(arms.len(), at)?)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?,
+            at,
+        )?;
+        arms.sort_unstable();
+        arms.dedup();
+        Ok(arms)
+    }
+
     /// Admit only well-scoped native arm syntax; totality and overlap remain proof obligations.
     pub(crate) fn admit_cases(
         &self,
@@ -416,21 +437,13 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("native case admission");
         budget.specialized(BudgetKind::CaseArms, size(draft.arms.len(), at)?, false, at)?;
-        let header = self.resolve(&draft.header, locals)?;
+        let header = self.resolve(state, &draft.header, locals)?;
         state.header(header)?;
         crate::validation::scope_limit(&draft.scope, budget)?;
-        let domain = self.resolve(&draft.domain, locals)?;
+        let domain = self.resolve(state, &draft.domain, locals)?;
         let region = state.region(domain)?;
         region_context(state, domain, header, &draft.scope, &region.ambient, budget)?;
-        let mut arms = self.resolve_all(&draft.arms, locals, budget)?;
-        budget.work(
-            size(arms.len(), at)?
-                .checked_mul(size(arms.len(), at)?)
-                .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?,
-            at,
-        )?;
-        arms.sort_unstable();
-        arms.dedup();
+        let arms = self.case_arms(state, draft, locals, budget)?;
         let first = state.arm(
             *arms
                 .first()
