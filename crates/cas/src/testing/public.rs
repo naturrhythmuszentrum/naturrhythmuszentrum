@@ -158,7 +158,7 @@ pub(crate) mod solve_coefficients;
 )]
 pub(crate) mod solve_elementary;
 
-#[path = "solve_orbits.rs"]
+#[path = "solve_orbits_public.rs"]
 #[expect(
     clippy::redundant_pub_crate,
     reason = "shared solving fixtures remain crate-visible"

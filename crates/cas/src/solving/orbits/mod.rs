@@ -1,48 +1,37 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Unavailable orbits capability, reserved for its owning lane.
+//! Independent replay of finite polynomial orbits under declared permutations.
 
-/// This leaf has no checker or producer until its supplied-certificate tests land.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "orbit internals stay within the crate"
+)]
+mod action;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "orbit internals stay within the crate"
+)]
+mod replay;
+
+/// Exact finite orbit certificates have an independent checker.
 pub(crate) const fn availability() -> super::Availability {
-    super::Availability::Unavailable
+    super::Availability::Available
 }
 
-/// Per-subtype capability permits independently green checker slices in this leaf.
-pub(crate) const fn schema_availability(_tag: u8) -> super::Availability {
-    super::Availability::Unavailable
+/// Only the finite orbit schema is implemented by this leaf.
+pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
+    if tag == 14 {
+        super::Availability::Available
+    } else {
+        super::Availability::Unavailable
+    }
 }
 
-/// Reject every application until this lane supplies its independent typed checker.
+/// Reconstruct the exact generated orbit without trusting a producer's enumeration.
 pub(crate) fn check(
-    _cas: &crate::graph::Cas,
-    _draft: &crate::proof_model::ApplicationDraft,
-    _premises: &[crate::proof_model::CheckedApplication],
+    cas: &crate::graph::Cas,
+    draft: &crate::proof_model::ApplicationDraft,
+    premises: &[crate::proof_model::CheckedApplication],
     budget: &mut crate::budget::Budget,
 ) -> Result<crate::proof_model::ScopedConditions, crate::error::Fault> {
-    budget.work(
-        1,
-        crate::error::Location::new("unavailable solving checker"),
-    )?;
-    Err(crate::error::Fault::invalid(
-        crate::error::InvalidCode::UnsupportedFragment,
-        crate::error::Location::new("unavailable solving checker"),
-    ))
-}
-
-#[cfg(test)]
-mod tests {
-    /// The placeholder cannot advertise an executable capability.
-    /// ´test:unit:orbits-unavailable´
-    #[test]
-    fn orbits_unavailable() {
-        assert_eq!(
-            super::availability(),
-            crate::solving::Availability::Unavailable
-        );
-        for tag in 0..18 {
-            assert_eq!(
-                super::schema_availability(tag),
-                crate::solving::Availability::Unavailable
-            );
-        }
-    }
+    replay::check(cas, draft, premises, budget)
 }
