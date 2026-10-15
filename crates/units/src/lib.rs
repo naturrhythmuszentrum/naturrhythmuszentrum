@@ -39,6 +39,7 @@ mod measure;
         unreachable_pub"
 )]
 mod original;
+mod pairing;
 mod registry;
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};
@@ -50,6 +51,10 @@ pub use error::UnitError;
 pub use evidence::{CheckedDeclarations, SnapshotError, SnapshotId};
 pub use kind::{CountDomain, Kind, UncertaintyMode};
 pub use measure::{Conversion, Measure, Scale};
+pub use pairing::{
+    EvaluationDescriptor, EvaluationKind, NamedReference, PairingError, PairingKind, PairingSide,
+    PairingWitness,
+};
 pub use registry::{BinaryOp, Registry};
 
 #[cfg(test)]

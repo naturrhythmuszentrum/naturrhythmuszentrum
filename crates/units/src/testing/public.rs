@@ -7,3 +7,10 @@
 )]
 #[path = "declarations.rs"]
 pub(crate) mod declarations;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public pairing fixtures stay crate-visible inside the private harness"
+)]
+#[path = "pairing.rs"]
+pub(crate) mod pairing;

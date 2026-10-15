@@ -14,6 +14,11 @@ pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 /// Predeclare real mathematical keys, with one optional unary function key.
 pub(crate) fn context(keys: &[&str]) -> TestResult<Context> {
+    context_with_registry(Registry::new(ExponentPolicy::Rational), keys)
+}
+
+/// Predeclare mathematical keys with an explicitly supplied physical rule registry.
+pub(crate) fn context_with_registry(registry: Registry, keys: &[&str]) -> TestResult<Context> {
     let environment = Environment {
         declarations: keys
             .iter()
@@ -32,11 +37,7 @@ pub(crate) fn context(keys: &[&str]) -> TestResult<Context> {
             .collect(),
         ..Environment::default()
     };
-    Ok(Context::new(
-        Registry::new(ExponentPolicy::Rational),
-        Limits::default(),
-        environment,
-    )?)
+    Ok(Context::new(registry, Limits::default(), environment)?)
 }
 
 /// A declared length kind with coherent difference coordinates.

@@ -2,3 +2,4 @@
 //! Client lifecycles preserve descriptor evidence and original source ownership.
 
 mod evidence;
+mod pairing;
