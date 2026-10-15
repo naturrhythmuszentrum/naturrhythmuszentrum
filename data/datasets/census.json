@@ -26,7 +26,7 @@
       "path": "tools/docgen"
     },
     {
-      "description": "Validated scalar arithmetic prototype for Naturrhythmuszentrum",
+      "description": "Finite binary element arithmetic with outward enclosures",
       "has_readme_template": true,
       "name": "nrz-scalar",
       "path": "crates/scalar"

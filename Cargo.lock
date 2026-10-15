@@ -647,7 +647,9 @@ dependencies = [
 name = "nrz-scalar"
 version = "0.1.0"
 dependencies = [
- "serde_json",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
  "thiserror 2.0.21",
 ]
 

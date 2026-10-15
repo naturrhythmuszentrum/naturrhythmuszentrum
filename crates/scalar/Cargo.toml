@@ -6,7 +6,7 @@ license.workspace = true
 publish.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "Validated scalar arithmetic prototype for Naturrhythmuszentrum"
+description = "Finite binary element arithmetic with outward enclosures"
 readme = "README.md"
 keywords = ["numerics", "interval", "validation"]
 categories = ["mathematics", "science"]
@@ -15,7 +15,9 @@ categories = ["mathematics", "science"]
 thiserror.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
+num-bigint.workspace = true
+num-rational.workspace = true
+num-traits.workspace = true
 
 [lints]
 workspace = true
