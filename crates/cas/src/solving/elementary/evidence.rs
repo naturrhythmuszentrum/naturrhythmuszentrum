@@ -174,7 +174,10 @@ impl Evaluation<'_> {
         if value.numerator.terms.is_empty() {
             return Ok(());
         }
-        let relations = self.relations(budget)?;
+        let mut relations = self.relations(budget)?;
+        let roots = self.root_relations(&value.numerator, budget)?;
+        reserve(&mut relations, roots.len(), budget)?;
+        relations.extend(roots);
         let mut remainder = value
             .numerator
             .copy(&self.engine, budget)

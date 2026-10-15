@@ -49,7 +49,7 @@ fn shape(
 }
 
 /// Interpret the arbitrary source tuple as independent formal unknown coordinates.
-fn unknowns(
+pub(crate) fn unknowns(
     evaluation: &Evaluation<'_>,
     source: &SolveProblemData<Handle>,
     budget: &mut Budget,
@@ -158,27 +158,6 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let Statement::Solve(statement) = &draft.conclusion else {
-        return Err(invalid());
-    };
-    let SolveStatement::Equivalent(equivalent) = statement.as_ref() else {
-        return Err(invalid());
-    };
-    if (
-        &equivalent.source,
-        &equivalent.target,
-        &equivalent.forward,
-        &equivalent.backward,
-        &equivalent.region,
-    ) != (
-        &certificate.source,
-        &certificate.target,
-        &certificate.forward,
-        &certificate.backward,
-        &certificate.region,
-    ) {
-        return Err(invalid());
-    }
     let source = problem(cas, &certificate.source)?;
     let target = problem(cas, &certificate.target)?;
     if (
@@ -222,5 +201,173 @@ pub(crate) fn check(
         bound: &[],
     };
     direction(&evaluation, source, target, forward, backward, budget)?;
-    direction(&evaluation, target, source, backward, forward, budget)
+    direction(&evaluation, target, source, backward, forward, budget)?;
+    conclusion(&evaluation, draft, certificate, budget)
+}
+
+/// Transported facts use the appropriate edge and retain exactly the certificate's region.
+fn conclusion(
+    evaluation: &Evaluation<'_>,
+    draft: &ApplicationDraft,
+    certificate: &CertificateSolutionTransport,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let Statement::Solve(statement) = &draft.conclusion else {
+        return Err(invalid());
+    };
+    match statement.as_ref() {
+        SolveStatement::Equivalent(value) => {
+            if (
+                &value.source,
+                &value.target,
+                &value.forward,
+                &value.backward,
+                &value.region,
+            ) == (
+                &certificate.source,
+                &certificate.target,
+                &certificate.forward,
+                &certificate.backward,
+                &certificate.region,
+            ) {
+                Ok(())
+            } else {
+                Err(invalid())
+            }
+        }
+        SolveStatement::Coverage(value) => covered(evaluation, certificate, value, budget),
+        SolveStatement::Member(value) => member(evaluation, certificate, value, budget),
+        _ => Err(invalid()),
+    }
+}
+
+/// Select the actual reverse edge when transporting back from a transformed problem.
+fn edge<'a>(
+    certificate: &'a CertificateSolutionTransport,
+    destination: &Handle,
+) -> Result<(&'a Handle, &'a Handle), Fault> {
+    if destination == &certificate.source {
+        Ok((&certificate.target, &certificate.backward))
+    } else if destination == &certificate.target {
+        Ok((&certificate.source, &certificate.forward))
+    } else {
+        Err(invalid())
+    }
+}
+
+/// A transported member still passes the original predicate/domain check after exact map evaluation.
+fn member(
+    evaluation: &Evaluation<'_>,
+    certificate: &CertificateSolutionTransport,
+    target: &crate::solving::StatementMember,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if target.region != certificate.region {
+        return Err(invalid());
+    }
+    let (origin, map) = edge(certificate, &target.problem)?;
+    let mut source = None;
+    for premise in evaluation.premises {
+        budget.work(1, AT)?;
+        if let Statement::Solve(statement) = &premise.judgment.statement
+            && let SolveStatement::Member(value) = statement.as_ref()
+            && (&value.problem, &value.region) == (origin, &certificate.region)
+        {
+            source = Some(value);
+            break;
+        }
+    }
+    let supplied = tuple(evaluation.cas, &source.ok_or_else(invalid)?.tuple)?;
+    let mut input = vector(supplied.entries.len(), budget)?;
+    for entry in &supplied.entries {
+        input.push(evaluation.expression(entry.logical_id(), true, budget)?);
+    }
+    let output = apply(evaluation, family(evaluation.cas, map)?, &input, budget)?;
+    let claimed = tuple(evaluation.cas, &target.tuple)?;
+    if output.len() != claimed.entries.len() {
+        return Err(invalid());
+    }
+    for (value, handle) in output.iter().zip(&claimed.entries) {
+        evaluation.zero(
+            &value.sub(
+                &evaluation.expression(handle.logical_id(), true, budget)?,
+                &evaluation.engine,
+                budget,
+            )?,
+            budget,
+        )?;
+    }
+    let original = problem(evaluation.cas, &target.problem)?;
+    super::product::membership(evaluation, original, &claimed.entries, budget)
+}
+
+/// A finite covered image is checked in both directions, including the empty set.
+fn covered(
+    evaluation: &Evaluation<'_>,
+    certificate: &CertificateSolutionTransport,
+    target: &crate::solving::StatementCoverage,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if target.region != certificate.region {
+        return Err(invalid());
+    }
+    let (origin, map) = edge(certificate, &target.problem)?;
+    let mut source = None;
+    for premise in evaluation.premises {
+        budget.work(1, AT)?;
+        if let Statement::Solve(statement) = &premise.judgment.statement
+            && let SolveStatement::Coverage(value) = statement.as_ref()
+            && (&value.problem, &value.region) == (origin, &certificate.region)
+        {
+            source = Some(value);
+            break;
+        }
+    }
+    let inputs = super::product::entries(evaluation.cas, source.ok_or_else(invalid)?, budget)?;
+    let targets = super::product::entries(evaluation.cas, target, budget)?;
+    let mut outputs = vector(inputs.len(), budget)?;
+    for entry in &inputs {
+        let input = [evaluation.expression(entry.logical_id(), true, budget)?];
+        let mut image = apply(evaluation, family(evaluation.cas, map)?, &input, budget)?;
+        if image.len() != 1 {
+            return Err(invalid());
+        }
+        outputs.push(image.pop().ok_or_else(invalid)?);
+    }
+    let mut actual = vector(targets.len(), budget)?;
+    for entry in &targets {
+        actual.push(evaluation.expression(entry.logical_id(), true, budget)?);
+    }
+    same_values(evaluation, &outputs, &actual, budget)?;
+    same_values(evaluation, &actual, &outputs, budget)?;
+    super::product::membership(
+        evaluation,
+        problem(evaluation.cas, &target.problem)?,
+        &targets,
+        budget,
+    )
+}
+
+/// Every value has a proved equal image, without assuming syntactic set order.
+fn same_values(
+    evaluation: &Evaluation<'_>,
+    left: &[Value],
+    right: &[Value],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    for value in left {
+        let mut found = false;
+        for candidate in right {
+            if super::product::decides(
+                evaluation.zero(&value.sub(candidate, &evaluation.engine, budget)?, budget),
+            )? {
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Err(invalid());
+        }
+    }
+    Ok(())
 }

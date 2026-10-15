@@ -98,29 +98,7 @@ impl Evaluation<'_> {
         else {
             return Err(invalid());
         };
-        if mapping.source != *self.engine.domain || mapping.region != *self.region {
-            return Err(invalid());
-        }
-        crate::solving::coefficients::proof::identity_map(
-            self.cas,
-            mapping,
-            self.premises,
-            budget,
-        )?;
-        let handle = self.cas.handle(value);
-        crate::solving::coefficients::proof::defined(
-            self.cas,
-            &handle,
-            self.region,
-            self.premises,
-            budget,
-        )?;
-        let coefficient = self.engine.read(&handle, budget).map_err(|e| fault(&e))?;
-        Value::polynomial(
-            Form::constant(coefficient, &self.engine, budget).map_err(|e| fault(&e))?,
-            &self.engine,
-            budget,
-        )
+        self.mapped(&self.cas.handle(value), mapping, budget)
     }
 
     /// A selected root is usable only with existence of that exact joint selection.

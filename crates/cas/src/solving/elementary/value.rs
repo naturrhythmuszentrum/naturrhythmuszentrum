@@ -35,6 +35,18 @@ impl Value {
         })
     }
 
+    /// Construct a small integer through prepaid rational arithmetic.
+    pub(crate) fn integer(
+        value: i64,
+        engine: &Engine<'_>,
+        budget: &mut Budget,
+    ) -> Result<Self, Fault> {
+        let rational = crate::number::Rational::from_ratio(value, 1, budget)?;
+        let coefficient = engine.rational(&rational, budget).map_err(|e| fault(&e))?;
+        let polynomial = Form::constant(coefficient, engine, budget).map_err(|e| fault(&e))?;
+        Self::polynomial(polynomial, engine, budget)
+    }
+
     /// Construct a formal atom without assigning it any equation or nonzero property.
     pub(crate) fn variable(
         variable: Variable,

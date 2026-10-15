@@ -237,3 +237,135 @@ fn elementary_identity_budget_boundary() -> TestResult {
     }
     Ok(())
 }
+
+/// Exact binomial order and complete products work in more than one degree.
+/// ´test:integration:binomial-complete-products´
+#[test]
+fn binomial_complete_products() -> TestResult {
+    for order in [2, 3, 5] {
+        let mut fixture = crate::testing::solve_elementary::BinomialFixture::new(order, 2)?;
+        let checked = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits {
+                tower_degree: 32,
+                ..Limits::blind_cubic()
+            })?,
+        )?;
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+        assert!(
+            matches!(&checked.judgment().statement, nrz_cas::proof::Statement::Solve(statement) if matches!(statement.as_ref(), nrz_cas::solving::SolveStatement::Coverage(_)))
+        );
+    }
+    let (mut base, steps) = crate::testing::solve_elementary::constant_cover()?;
+    let checked = base.cas.check_proof(
+        &base.context,
+        &steps,
+        &mut Budget::new(Limits {
+            tower_degree: 32,
+            ..Limits::blind_cubic()
+        })?,
+    )?;
+    assert_eq!(checked.judgment().residuals, []);
+    Ok(())
+}
+
+/// Wrong order, prime factorization, omitted factors and changed multiplicities cannot certify coverage.
+/// ´test:integration:binomial-product-mutations´
+#[test]
+fn binomial_product_mutations() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::BinomialFixture::new(2, 2)?;
+    for mutation in 0..4 {
+        let mut steps = fixture.steps.clone();
+        let index = if mutation < 2 { 2 } else { 6 };
+        let Certificate::Solve(certificate) = &mut steps
+            .get_mut(index)
+            .ok_or("missing certificate")?
+            .certificate
+        else {
+            return Err("wrong certificate".into());
+        };
+        match certificate.as_mut() {
+            SolveCertificate::BinomialCoverage(value) => {
+                if mutation == 0 {
+                    value.order = 3;
+                } else {
+                    value.factors.first_mut().ok_or("missing prime")?.prime = 4;
+                }
+            }
+            SolveCertificate::ProductCompleteness(value) => {
+                if mutation == 2 {
+                    value.factors.pop();
+                } else {
+                    value
+                        .factors
+                        .first_mut()
+                        .ok_or("missing factor")?
+                        .multiplicity = 2;
+                }
+            }
+            _ => return Err("wrong variant".into()),
+        }
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// A constructive witness proves existence; the linear uniqueness subcase checks its leading coefficient separately.
+/// ´test:integration:root-refinement-witness-mutations´
+#[test]
+fn root_refinement_witness_mutations() -> TestResult {
+    for unique in [false, true] {
+        for (value, succeeds) in [(2, true), (-2, false)] {
+            let (mut fixture, step) =
+                crate::testing::solve_elementary::root_refinement(value, unique)?;
+            let before = fixture.cas.counts();
+            let result = fixture.cas.check_proof(
+                &fixture.context,
+                std::slice::from_ref(&step),
+                &mut Budget::new(Limits::blind_cubic())?,
+            );
+            if succeeds {
+                assert_eq!(result?.hypotheses(), []);
+            } else {
+                assert!(result.is_err());
+                assert_eq!(fixture.cas.counts(), before);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Zero radicands retain one root while translations recover the original quadratic exactly.
+/// ´test:integration:quadratic-translation-and-zero-radicand´
+#[test]
+fn quadratic_translation_and_zero_radicand() -> TestResult {
+    use crate::testing::solve_elementary::BinomialFixture;
+    for mut fixture in [
+        BinomialFixture::zero(2)?,
+        BinomialFixture::zero(3)?,
+        BinomialFixture::translated()?,
+    ] {
+        let checked = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+    }
+    Ok(())
+}

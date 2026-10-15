@@ -1,12 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independently replayed membership, strict coordinate transport and total degree partitions.
 
+mod binomial;
 mod constraints;
 mod evaluate;
 mod evidence;
 mod member;
+mod product;
 mod proof;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the later search lane consumes unsealed elementary recipes"
+    )
+)]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "elementary recipes remain crate-private"
+)]
+pub(crate) mod recipes;
 mod reduction;
+mod refine;
+mod selected;
 mod split;
 mod total;
 mod transport;
@@ -19,7 +35,7 @@ pub(crate) const fn availability() -> super::Availability {
 
 /// Enable a schema only together with its concrete checker.
 pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
-    if matches!(tag, 4..=6) {
+    if matches!(tag, 4..=8 | 10) {
         super::Availability::Available
     } else {
         super::Availability::Unavailable
@@ -51,6 +67,18 @@ pub(crate) fn check(
             crate::rule::Primitive::Solve(SolveSchema::TotalPredicateSplit),
             SolveCertificate::TotalPredicateSplit(value),
         ) => split::check(cas, draft, value, premises, budget)?,
+        (
+            crate::rule::Primitive::Solve(SolveSchema::ProductCompleteness),
+            SolveCertificate::ProductCompleteness(value),
+        ) => product::check(cas, draft, value, premises, budget)?,
+        (
+            crate::rule::Primitive::Solve(SolveSchema::BinomialCoverage),
+            SolveCertificate::BinomialCoverage(value),
+        ) => binomial::check(cas, draft, value, premises, budget)?,
+        (
+            crate::rule::Primitive::Solve(SolveSchema::RootSelectionRefinement),
+            SolveCertificate::RootSelectionRefinement(value),
+        ) => refine::check(cas, draft, value, premises, budget)?,
         _ => return Err(proof::invalid()),
     }
     Ok(inherited)

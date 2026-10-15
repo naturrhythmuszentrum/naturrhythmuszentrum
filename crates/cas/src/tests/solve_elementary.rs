@@ -124,3 +124,131 @@ fn membership(
     };
     Ok(membership)
 }
+
+/// Translation is computed for degree zero, one, two and five, with every output class explicit.
+/// ´test:crate:elementary-generic-degree-recipes´
+#[test]
+fn elementary_generic_degree_recipes() -> TestResult {
+    use crate::solving::coefficients::arithmetic::Engine;
+    use crate::solving::coefficients::model::EvaluationScope;
+    use crate::solving::elementary::recipes::{BinomialRecipe, Recipe, derive};
+    use crate::solving::towers::dense::Dense;
+    use crate::testing::solve_elementary::RecipeFixture;
+    let cases: &[(&[i64], u32, i64, i64, i64)] = &[
+        (&[-6, 2], 1, -3, 2, 0),
+        (&[-3, 2, 1], 2, 1, 1, 4),
+        (&[-2, 0, 0, 0, 0, 1], 5, 0, 1, 2),
+    ];
+    for (coefficients, expected_degree, expected_shift, expected_scale, expected_radicand) in cases
+    {
+        let fixture = RecipeFixture::ground(coefficients)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let engine = Engine {
+            state: &fixture.cas.state,
+            domain: &fixture.domain,
+        };
+        let polynomial = Dense::read(&fixture.cas.state, &fixture.polynomial, &mut budget)?;
+        let scope = EvaluationScope {
+            context: &fixture.context,
+            region: &fixture.region,
+            premises: &fixture.premises,
+            localization: &[],
+        };
+        let Recipe::Binomial(recipe) = derive(&engine, &polynomial, &scope, &mut budget)? else {
+            return Err("missing translated binomial".into());
+        };
+        let BinomialRecipe {
+            degree,
+            shift,
+            scale,
+            radicand,
+        } = *recipe;
+        assert_eq!(degree, *expected_degree);
+        for (value, expected) in [
+            (&shift, expected_shift),
+            (&scale, expected_scale),
+            (&radicand, expected_radicand),
+        ] {
+            let rational = crate::number::Rational::from_ratio(*expected, 1, &mut budget)?;
+            assert!(engine.formal_equal(
+                value,
+                &engine.rational(&rational, &mut budget)?,
+                &mut budget
+            )?);
+        }
+    }
+    for (coefficients, expected) in [(Vec::new(), 0), (vec![3], 1), (vec![1, 1, 0, 1], 2)] {
+        let fixture = RecipeFixture::ground(&coefficients)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let engine = Engine {
+            state: &fixture.cas.state,
+            domain: &fixture.domain,
+        };
+        let polynomial = Dense::read(&fixture.cas.state, &fixture.polynomial, &mut budget)?;
+        let scope = EvaluationScope {
+            context: &fixture.context,
+            region: &fixture.region,
+            premises: &[],
+            localization: &[],
+        };
+        match derive(&engine, &polynomial, &scope, &mut budget)? {
+            Recipe::Zero => assert_eq!(expected, 0),
+            Recipe::Constant(value) => {
+                assert_eq!(expected, 1);
+                assert!(!engine.formal_zero(&value, &mut budget)?);
+            }
+            Recipe::General(recipe) => {
+                assert_eq!(expected, 2);
+                assert!(engine.formal_zero(&recipe.shift, &mut budget)?);
+                assert_eq!(recipe.coefficients.coefficients.len(), 4);
+            }
+            Recipe::Binomial(_) => return Err("wrong recipe class".into()),
+        }
+    }
+    Ok(())
+}
+
+/// Independent symbolic coefficients derive the general quadratic; removing the leading guard stops inversion.
+/// ´test:crate:elementary-symbolic-quadratic-translation´
+#[test]
+fn elementary_symbolic_quadratic_translation() -> TestResult {
+    use crate::solving::coefficients::arithmetic::Engine;
+    use crate::solving::coefficients::model::EvaluationScope;
+    use crate::solving::elementary::recipes::{BinomialRecipe, Recipe, derive};
+    use crate::solving::towers::dense::Dense;
+    let fixture = crate::testing::solve_elementary::RecipeFixture::symbolic()?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = Engine {
+        state: &fixture.cas.state,
+        domain: &fixture.domain,
+    };
+    let polynomial = Dense::read(&fixture.cas.state, &fixture.polynomial, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &fixture.context,
+        region: &fixture.region,
+        premises: &fixture.premises,
+        localization: &[],
+    };
+    let Recipe::Binomial(recipe) = derive(&engine, &polynomial, &scope, &mut budget)? else {
+        return Err("general quadratic was not derived".into());
+    };
+    let BinomialRecipe {
+        degree,
+        shift,
+        scale,
+        radicand,
+    } = *recipe;
+    assert_eq!(degree, 2);
+    for (value, expected) in [&shift, &scale, &radicand]
+        .into_iter()
+        .zip(&fixture.expected)
+    {
+        assert!(engine.formal_equal(value, &engine.read(expected, &mut budget)?, &mut budget)?);
+    }
+    let unguarded = EvaluationScope {
+        premises: &[],
+        ..scope
+    };
+    assert!(derive(&engine, &polynomial, &unguarded, &mut budget).is_err());
+    Ok(())
+}
