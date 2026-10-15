@@ -7,7 +7,7 @@ use faer::Mat;
 use nrz_scalar::Scalar;
 
 use crate::heap::identity::Key;
-use crate::heap::slots::Slots;
+use crate::heap::slots::{PreparedSlots, Slots};
 use crate::{HeapError, HeapLimits};
 
 /// Runtime format tag; external scalar implementations are sealed by `Scalar`.
@@ -64,43 +64,99 @@ impl Storage {
         }
     }
 
-    /// Check capacity and reserve all arena table growth before backend allocation.
-    pub(crate) fn reserve<P: Scalar + 'static>(
+    /// Prepare a complete typed storage change, including all retired allocations.
+    pub(crate) fn prepare<P: Scalar + 'static>(
         &mut self,
-        count: usize,
-        length: usize,
+        payloads: &[&[P]],
+        retired: &[Region],
         limits: HeapLimits,
-    ) -> Result<Vec<Key>, HeapError> {
-        let bytes = length
-            .checked_mul(size_of::<P>())
-            .ok_or(HeapError::ExtentOverflow)?;
-        // Leave room for backend alignment rounding as well as signed address arithmetic.
-        if bytes > isize::MAX.unsigned_abs() / 2 {
-            return Err(HeapError::ExtentOverflow);
-        }
-        let amount = length.checked_mul(count).ok_or(HeapError::Capacity)?;
+    ) -> Result<PreparedStorage, HeapError> {
+        let (elements, retired_keys) = self.preflight::<P>(payloads, retired, limits)?;
         match Format::of::<P>() {
             Format::Binary32 => {
-                check_capacity(self.elements[0], amount, limits.elements)?;
-                self.single.prepare(count, limits.descriptors)
+                let plan =
+                    self.single
+                        .change(payloads.len(), None, &retired_keys, limits.descriptors)?;
+                let mut matrices = Vec::new();
+                matrices
+                    .try_reserve_exact(payloads.len())
+                    .map_err(|_| HeapError::Capacity)?;
+                for values in payloads {
+                    matrices.push(pack_single(values)?);
+                }
+                Ok(PreparedStorage::Single {
+                    slots: plan.bind(matrices)?,
+                    elements,
+                })
             }
             Format::Binary64 => {
-                check_capacity(self.elements[1], amount, limits.elements)?;
-                self.double.prepare(count, limits.descriptors)
+                let plan =
+                    self.double
+                        .change(payloads.len(), None, &retired_keys, limits.descriptors)?;
+                let mut matrices = Vec::new();
+                matrices
+                    .try_reserve_exact(payloads.len())
+                    .map_err(|_| HeapError::Capacity)?;
+                for values in payloads {
+                    matrices.push(pack_double(values)?);
+                }
+                Ok(PreparedStorage::Double {
+                    slots: plan.bind(matrices)?,
+                    elements,
+                })
             }
         }
     }
 
-    /// Install only fully prepared matrices into previously reserved tables.
+    /// Validate old allocations and account for the complete future live set.
+    fn preflight<P: Scalar + 'static>(
+        &self,
+        payloads: &[&[P]],
+        retired: &[Region],
+        limits: HeapLimits,
+    ) -> Result<(usize, Vec<Key>), HeapError> {
+        let mut removed = 0_usize;
+        let mut keys = Vec::new();
+        keys.try_reserve_exact(retired.len())
+            .map_err(|_| HeapError::Capacity)?;
+        for region in retired {
+            if region.format != Format::of::<P>() {
+                return Err(HeapError::PrecisionMismatch);
+            }
+            let slab = self.resolve(*region)?;
+            if region.offset != 0 || region.length != slab.len()? || keys.contains(&region.arena) {
+                return Err(HeapError::InvalidLayout);
+            }
+            removed = removed
+                .checked_add(region.length)
+                .ok_or(HeapError::Capacity)?;
+            keys.push(region.arena);
+        }
+        let amount = payload_size(payloads)?;
+        let used = match Format::of::<P>() {
+            Format::Binary32 => self.elements[0],
+            Format::Binary64 => self.elements[1],
+        };
+        let total = used
+            .checked_sub(removed)
+            .and_then(|remaining| remaining.checked_add(amount))
+            .ok_or(HeapError::Capacity)?;
+        if total > limits.elements {
+            return Err(HeapError::Capacity);
+        }
+        Ok((total, keys))
+    }
+
+    /// Install only complete typed changes; their counters were checked in preparation.
     pub(crate) fn publish(&mut self, prepared: PreparedStorage) {
         match prepared {
-            PreparedStorage::Single { matrices, elements } => {
-                self.single.publish(matrices.into_iter());
-                self.elements[0] += elements;
+            PreparedStorage::Single { slots, elements } => {
+                self.single.publish(slots);
+                self.elements[0] = elements;
             }
-            PreparedStorage::Double { matrices, elements } => {
-                self.double.publish(matrices.into_iter());
-                self.elements[1] += elements;
+            PreparedStorage::Double { slots, elements } => {
+                self.double.publish(slots);
+                self.elements[1] = elements;
             }
         }
     }
@@ -122,32 +178,52 @@ impl Storage {
     }
 }
 
-/// Check the complete bundle against the precision's element capacity.
-fn check_capacity(used: usize, amount: usize, limit: usize) -> Result<(), HeapError> {
-    if used.checked_add(amount).is_none_or(|total| total > limit) {
-        Err(HeapError::Capacity)
-    } else {
-        Ok(())
+/// Check scalar address arithmetic for every scratch allocation before entering faer.
+fn payload_size<P: Scalar>(payloads: &[&[P]]) -> Result<usize, HeapError> {
+    let mut amount = 0_usize;
+    for values in payloads {
+        let bytes = values
+            .len()
+            .checked_mul(size_of::<P>())
+            .ok_or(HeapError::ExtentOverflow)?;
+        // Reserve space for backend alignment rounding and signed address arithmetic.
+        if bytes > isize::MAX.unsigned_abs() / 2 {
+            return Err(HeapError::ExtentOverflow);
+        }
+        amount = amount
+            .checked_add(values.len())
+            .ok_or(HeapError::Capacity)?;
     }
+    Ok(amount)
 }
 
-/// Backend allocations still private to a transaction.
+/// Complete private backend allocations and their checked occupation changes.
 #[derive(Debug)]
 pub(crate) enum PreparedStorage {
-    /// A binary32 import bundle.
+    /// A binary32 change.
     Single {
-        /// Owned value and optional bound slabs.
-        matrices: Vec<Mat<f32>>,
-        /// Total prepared entries.
+        /// Prepared owners and arena occupations.
+        slots: PreparedSlots<Mat<f32>>,
+        /// Future total live entries in this precision.
         elements: usize,
     },
-    /// A binary64 import bundle.
+    /// A binary64 change.
     Double {
-        /// Owned value and optional bound slabs.
-        matrices: Vec<Mat<f64>>,
-        /// Total prepared entries.
+        /// Prepared owners and arena occupations.
+        slots: PreparedSlots<Mat<f64>>,
+        /// Future total live entries in this precision.
         elements: usize,
     },
+}
+
+impl PreparedStorage {
+    /// The exact future arena keys, before any visible publication.
+    pub(crate) fn keys(&self) -> &[Key] {
+        match self {
+            Self::Single { slots, .. } => slots.keys(),
+            Self::Double { slots, .. } => slots.keys(),
+        }
+    }
 }
 
 /// Pack a primitive format through safe, bounds-checked faer indexing.
@@ -173,42 +249,6 @@ macro_rules! pack {
 
 pack!(pack_single, f32);
 pack!(pack_double, f64);
-
-impl PreparedStorage {
-    /// Prepare every slab; no public descriptor points here until publication.
-    pub(crate) fn new<P: Scalar + 'static>(
-        centers: &[P],
-        bounds: Option<&[P]>,
-    ) -> Result<Self, HeapError> {
-        let count = 1 + usize::from(bounds.is_some());
-        let elements = centers
-            .len()
-            .checked_mul(count)
-            .ok_or(HeapError::Capacity)?;
-        match Format::of::<P>() {
-            Format::Binary32 => {
-                let mut matrices = Vec::new();
-                matrices
-                    .try_reserve_exact(count)
-                    .map_err(|_| HeapError::Capacity)?;
-                for values in [Some(centers), bounds].into_iter().flatten() {
-                    matrices.push(pack_single(values)?);
-                }
-                Ok(Self::Single { matrices, elements })
-            }
-            Format::Binary64 => {
-                let mut matrices = Vec::new();
-                matrices
-                    .try_reserve_exact(count)
-                    .map_err(|_| HeapError::Capacity)?;
-                for values in [Some(centers), bounds].into_iter().flatten() {
-                    matrices.push(pack_double(values)?);
-                }
-                Ok(Self::Double { matrices, elements })
-            }
-        }
-    }
-}
 
 /// Read-only borrow of one checked slab; never an external backend view.
 #[derive(Debug)]

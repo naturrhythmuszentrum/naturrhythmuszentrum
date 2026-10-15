@@ -46,6 +46,14 @@ pub enum HeapError {
     /// A companion does not cover the current target occupation and version.
     #[error("companion target evidence is stale")]
     StaleEvidence,
+    /// The caller's expected content version differs from the current version.
+    #[error("expected value version {expected:?}, found {actual:?}")]
+    VersionMismatch {
+        /// Version captured by the caller.
+        expected: super::ValueVersion,
+        /// Current version of the surviving occupation.
+        actual: super::ValueVersion,
+    },
     /// Floating arenas cannot hold discrete counts.
     #[error("discrete counts require an integer arena")]
     CountStorage,

@@ -2,3 +2,4 @@
 //! Public import and ownership lifecycles.
 
 mod imports;
+mod lifecycle;

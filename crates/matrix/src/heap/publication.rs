@@ -7,7 +7,10 @@ use nrz_units::{Descriptor, UncertaintyMode, uncertainty};
 use super::identity::{Key, identity};
 use super::records::{Meaning, Record};
 use super::schema::{Schema, check_quantity, intern};
-use super::{Extent, Handle, Heap, HeapError, PublishedBundle, ValueId, ValueStamp, ValueVersion};
+use super::slots::{PreparedSlots, SlotPlan};
+use super::{
+    Extent, Handle, Heap, HeapError, PublishedBundle, Value, ValueId, ValueStamp, ValueVersion,
+};
 use crate::storage::{Format, PreparedStorage, Region};
 
 /// Fully prepared import, inaccessible until its complete bundle is linked.
@@ -18,7 +21,7 @@ struct PreparedImport<P: Scalar> {
     /// New immutable interpretations.
     schemas: Vec<Schema>,
     /// Complete value and optional companion descriptors.
-    records: Vec<Record>,
+    records: PreparedSlots<Record>,
     /// Future locators, returned only after publication.
     bundle: PublishedBundle<P>,
 }
@@ -78,10 +81,7 @@ impl Heap {
         bounds: Option<&[P]>,
     ) -> Result<PublishedBundle<P>, HeapError> {
         let prepared = self.prepare_import(extent, quantity, centers, bounds)?;
-        self.storage.publish(prepared.storage);
-        self.schemas.extend(prepared.schemas);
-        self.descriptors.publish(prepared.records.into_iter());
-        Ok(prepared.bundle)
+        Ok(self.publish_bundle(prepared))
     }
 
     /// Finish every fallible check and allocation before linking any public record.
@@ -96,23 +96,63 @@ impl Heap {
         scan(extent, centers, bounds)?;
         let schema_plan = self.prepare_schemas(extent, quantity, bounds.is_some())?;
         let count = 1 + usize::from(bounds.is_some());
-        let keys = self.descriptors.prepare(count, self.limits.descriptors)?;
-        let arenas = self
-            .storage
-            .reserve::<P>(count, extent.entries(), self.limits)?;
+        let descriptors = self.descriptors.prepare(count, self.limits.descriptors)?;
+        let payloads = [centers, bounds.unwrap_or(&[])];
+        let inputs = payloads.get(..count).ok_or(HeapError::LengthMismatch)?;
+        let storage = self.storage.prepare(inputs, &[], self.limits)?;
         let stamp = ValueStamp {
             id: ValueId(identity()?),
             version: ValueVersion(1),
         };
-        let (records, bundle) =
-            prepare_records::<P>(self.scope, extent, &keys, &arenas, &schema_plan, stamp)?;
-        let storage = PreparedStorage::new(centers, bounds)?;
-        Ok(PreparedImport {
-            storage,
-            schemas: schema_plan.pending,
-            records,
-            bundle,
-        })
+        assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)
+    }
+
+    /// Prepare a checked replacement without touching the old value or its reverse edges.
+    pub(crate) fn replace<P: Scalar + 'static>(
+        &mut self,
+        handle: Handle<Value, P>,
+        expected: ValueVersion,
+        centers: &[P],
+        bounds: Option<&[P]>,
+    ) -> Result<PublishedBundle<P>, HeapError> {
+        let snapshot = self.snapshot(handle, Some(expected))?;
+        let next = snapshot
+            .stamp
+            .version
+            .0
+            .checked_add(1)
+            .ok_or(HeapError::CounterExhausted)?;
+        let extent = snapshot.schema.extent;
+        scan(extent, centers, bounds)?;
+        let schema_plan =
+            self.prepare_schemas(extent, &snapshot.schema.quantity, bounds.is_some())?;
+        let count = 1 + usize::from(bounds.is_some());
+        let retired = snapshot.retire_keys(false)?;
+        let descriptors = self.descriptors.change(
+            count,
+            Some(snapshot.key),
+            &retired,
+            self.limits.descriptors,
+        )?;
+        let payloads = [centers, bounds.unwrap_or(&[])];
+        let inputs = payloads.get(..count).ok_or(HeapError::LengthMismatch)?;
+        let storage = self
+            .storage
+            .prepare(inputs, &snapshot.regions()?, self.limits)?;
+        let stamp = ValueStamp {
+            id: snapshot.stamp.id,
+            version: ValueVersion(next),
+        };
+        let prepared = assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)?;
+        Ok(self.publish_bundle(prepared))
+    }
+
+    /// The only visible bundle commit: no checks, allocations or caller code remain.
+    fn publish_bundle<P: Scalar>(&mut self, prepared: PreparedImport<P>) -> PublishedBundle<P> {
+        self.storage.publish(prepared.storage);
+        self.schemas.extend(prepared.schemas);
+        self.descriptors.publish(prepared.records);
+        prepared.bundle
     }
 
     /// Derive and intern immutable metadata without changing the visible schema pool.
@@ -155,6 +195,31 @@ impl Heap {
             bound,
         })
     }
+}
+
+/// Bind matching descriptor payloads to their reserved occupations before publication.
+fn assemble<P: Scalar + 'static>(
+    scope: u64,
+    extent: Extent,
+    schemas: SchemaPlan,
+    stamp: ValueStamp,
+    descriptors: SlotPlan,
+    storage: PreparedStorage,
+) -> Result<PreparedImport<P>, HeapError> {
+    let (records, bundle) = prepare_records::<P>(
+        scope,
+        extent,
+        descriptors.keys(),
+        storage.keys(),
+        &schemas,
+        stamp,
+    )?;
+    Ok(PreparedImport {
+        storage,
+        schemas: schemas.pending,
+        records: descriptors.bind(records)?,
+        bundle,
+    })
 }
 
 /// Scan all payloads before any backend allocation; indices are logical column indices.

@@ -39,3 +39,22 @@ fn forged_locator_refusals() -> Result<(), HeapError> {
     assert!(matches!(heap.value(foreign), Err(HeapError::ForeignHandle)));
     Ok(())
 }
+
+/// A full heap actually reuses descriptor positions while advancing both occupations.
+/// ´test:crate:bundle-retirement-reuses-exact-slots´
+#[test]
+fn bundle_retirement_reuses_exact_slots() -> Result<(), HeapError> {
+    let mut heap = Heap::new(HeapLimits::new(2, 2, 2))?;
+    let extent = Extent::new(1, 1)?;
+    let quantity = Descriptor::ratio();
+    let old = heap.import_declared_bounds(extent, &quantity, &[2.0_f64], &[0.5])?;
+    let old_bound = old.bound().ok_or(HeapError::StaleEvidence)?;
+    heap.retire(old.value())?;
+    let fresh = heap.import_declared_bounds(extent, &quantity, &[2.0_f64], &[0.5])?;
+    let fresh_bound = fresh.bound().ok_or(HeapError::StaleEvidence)?;
+    assert_eq!(old.value().key.slot, fresh.value().key.slot);
+    assert_eq!(old_bound.key.slot, fresh_bound.key.slot);
+    assert_eq!(fresh.value().key.generation, old.value().key.generation + 1);
+    assert_eq!(fresh_bound.key.generation, old_bound.key.generation + 1);
+    Ok(())
+}

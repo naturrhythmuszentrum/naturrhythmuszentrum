@@ -4,6 +4,7 @@
 mod error;
 mod extent;
 pub(crate) mod identity;
+mod lifecycle;
 mod limits;
 mod publication;
 mod records;

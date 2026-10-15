@@ -170,3 +170,35 @@
 //! let _ = import;
 //! let _ = External;
 //! ```
+//!
+//! A live region borrow prevents checked replacement of its owner.
+//!
+//! ```rust
+//! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
+//! use nrz_units::Descriptor;
+//! fn example() -> Result<(), HeapError> {
+//!     let mut heap = Heap::new(HeapLimits::default())?;
+//!     let bundle = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
+//!     let view = heap.value(bundle.value())?;
+//!     let version = view.stamp().version();
+//!     let _ = view.region().get(0, 0)?;
+//!     heap.replace_represented(bundle.value(), version, &[2.0_f64])?;
+//!     Ok(())
+//! }
+//! let _ = example;
+//! ```
+//!
+//! ```compile_fail,E0502
+//! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
+//! use nrz_units::Descriptor;
+//! fn example() -> Result<(), HeapError> {
+//!     let mut heap = Heap::new(HeapLimits::default())?;
+//!     let bundle = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
+//!     let view = heap.value(bundle.value())?;
+//!     let version = view.stamp().version();
+//!     heap.replace_represented(bundle.value(), version, &[2.0_f64])?;
+//!     let _ = view.region().get(0, 0)?;
+//!     Ok(())
+//! }
+//! let _ = example;
+//! ```

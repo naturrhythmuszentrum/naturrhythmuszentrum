@@ -2,7 +2,7 @@
 //! Crate interaction with the private storage facade.
 
 use crate::heap::identity::Key;
-use crate::storage::{Format, PreparedStorage, Region, Storage};
+use crate::storage::{Format, Region, Storage};
 use crate::{HeapError, HeapLimits};
 
 /// Arena generations and allocated ranges are rechecked before any entry read.
@@ -10,9 +10,9 @@ use crate::{HeapError, HeapLimits};
 #[test]
 fn arena_resolution_refuses_corrupt_ranges() -> Result<(), HeapError> {
     let mut storage = Storage::new();
-    let keys = storage.reserve::<f64>(1, 2, HeapLimits::default())?;
-    let arena = *keys.first().ok_or(HeapError::Capacity)?;
-    storage.publish(PreparedStorage::new(&[1.0_f64, 2.0], None)?);
+    let prepared = storage.prepare::<f64>(&[&[1.0, 2.0]], &[], HeapLimits::default())?;
+    let arena = *prepared.keys().first().ok_or(HeapError::Capacity)?;
+    storage.publish(prepared);
     let region = Region {
         arena,
         format: Format::Binary64,
@@ -48,5 +48,42 @@ fn arena_resolution_refuses_corrupt_ranges() -> Result<(), HeapError> {
         }),
         Err(HeapError::StaleHandle)
     ));
+    Ok(())
+}
+
+/// Reusing an arena occupation cannot make a cached old physical region readable.
+/// ´test:crate:arena-reuse-invalidates-old-regions´
+#[test]
+fn arena_reuse_invalidates_old_regions() -> Result<(), HeapError> {
+    let mut storage = Storage::new();
+    let limits = HeapLimits::new(1, 1, 1);
+    let prepared = storage.prepare::<f64>(&[&[1.0]], &[], limits)?;
+    let arena = *prepared.keys().first().ok_or(HeapError::Capacity)?;
+    storage.publish(prepared);
+    let region = Region {
+        arena,
+        format: Format::Binary64,
+        offset: 0,
+        length: 1,
+    };
+    let changed = storage.prepare::<f64>(&[&[2.0]], std::slice::from_ref(&region), limits)?;
+    let replacement = *changed.keys().first().ok_or(HeapError::Capacity)?;
+    storage.publish(changed);
+    assert_eq!(replacement.slot, arena.slot);
+    assert_eq!(replacement.generation, arena.generation + 1);
+    assert!(matches!(
+        storage.resolve(region),
+        Err(HeapError::StaleHandle)
+    ));
+    assert_eq!(
+        storage
+            .resolve(Region {
+                arena: replacement,
+                ..region
+            })?
+            .entry::<f64>(0)?
+            .to_bits(),
+        2.0_f64.to_bits()
+    );
     Ok(())
 }
