@@ -95,5 +95,5 @@ output = "docs/design/cas-solving-design.md"
 requires = []
 
 [[document]]
-output = "docs/design/foundations-design.md"
+output = "docs/design/matrix-core-design.md"
 requires = []
