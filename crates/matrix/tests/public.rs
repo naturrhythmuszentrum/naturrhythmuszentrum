@@ -8,5 +8,12 @@
 )]
 mod testing;
 
+#[path = "../src/testing/shapes.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shape fixtures are shared only within this public test target"
+)]
+mod shape_testing;
+
 mod conformance;
 mod integration;

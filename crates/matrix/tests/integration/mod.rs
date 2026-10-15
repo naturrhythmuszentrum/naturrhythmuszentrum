@@ -6,3 +6,4 @@ mod compaction;
 mod imports;
 mod layouts;
 mod lifecycle;
+mod shapes;

@@ -17,11 +17,22 @@ mod heap;
 mod layout;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "shape contracts are shared across private matrix modules"
+)]
+mod shape;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "the storage facade is shared only inside the crate"
 )]
 mod storage;
 
 pub use layout::{Layout, PackedRegion};
+
+pub use shape::{
+    Axis, AxisAlignment, AxisEntry, BlockDraft, CheckedShape, CholeskyRootContract, EntryContract,
+    EntryDraft, EntryMap, Partition, QrShapeContract, ShapeDraft, ShapeError, ShapeLimits,
+    ShapeRecipe, StructureScope,
+};
 
 pub use heap::{
     Category, Companion, CompanionView, Coverage, Extent, Factor, Handle, Heap, HeapError,
@@ -32,6 +43,10 @@ pub use heap::{
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/type_twins.rs"]
 mod type_twins;
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/shape_twins.rs"]
+mod shape_twins;
 
 #[cfg(test)]
 mod tests;

@@ -4,4 +4,5 @@
 mod publication;
 mod relocation;
 mod resolution;
+mod shapes;
 mod storage;
