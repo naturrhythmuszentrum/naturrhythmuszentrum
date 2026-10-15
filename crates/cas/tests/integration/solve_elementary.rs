@@ -332,3 +332,41 @@ fn checked_inverse_pivots_fresh_replay() -> TestResult {
     }
     Ok(())
 }
+
+/// Recursive composition survives fresh-store replay with all closed branch identities intact.
+/// ´test:integration:closed-strata-presentation-fresh-replay´
+#[test]
+fn closed_strata_presentation_fresh_replay() -> TestResult {
+    let mut source = crate::testing::solve_elementary::closed_presentations()?;
+    let checked = source.base.cas.check_proof(
+        &source.base.context,
+        &source.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let bytes = source
+        .base
+        .cas
+        .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+    let mut target = crate::testing::solve_elementary::closed_presentations()?;
+    let expected = target.base.cas.check_proof(
+        &target.base.context,
+        &target.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let replayed = target.base.cas.replay(
+        &bytes,
+        expected.judgment(),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(replayed.judgment(), expected.judgment());
+    assert_eq!(replayed.hypotheses(), []);
+    assert_eq!(replayed.judgment().residuals, []);
+    assert_eq!(
+        target
+            .base
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}

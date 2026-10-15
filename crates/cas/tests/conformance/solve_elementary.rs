@@ -1229,3 +1229,63 @@ fn checked_inverse_pivot_mutations() -> TestResult {
     }
     Ok(())
 }
+
+/// Two levels of total coefficient splits retain closed leaf representations and complete coverage.
+/// ´test:integration:closed-strata-presentations´
+#[test]
+fn closed_strata_presentations() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::closed_presentations()?;
+    let checked = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals, []);
+    Ok(())
+}
+
+/// Complete child proofs cannot supply missing, widened, differently formed or foreign branches.
+/// ´test:integration:closed-strata-presentation-mutations´
+#[test]
+fn closed_strata_presentation_mutations() -> TestResult {
+    for mutation in 0..5 {
+        let mut fixture = crate::testing::solve_elementary::closed_presentation_mutation(mutation)?;
+        let roots = fixture
+            .steps
+            .last()
+            .ok_or("missing final presentation")?
+            .premises
+            .clone();
+        for root in roots {
+            let prefix = fixture
+                .steps
+                .get(..=usize::try_from(root)?)
+                .ok_or("missing premise prefix")?;
+            let closure = crate::testing::solve_elementary::presentation_closure(prefix)?;
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &closure,
+                    &mut Budget::new(Limits::blind_cubic())?,
+                )
+                .map_err(|fault| format!("mutation {mutation}, premise {root}: {fault:?}"))?;
+        }
+        let before = fixture.base.cas.counts();
+        let fault = fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            )
+            .err()
+            .ok_or("false presentation accepted")?;
+        assert_eq!(fault.location.operation, "elementary solving");
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}

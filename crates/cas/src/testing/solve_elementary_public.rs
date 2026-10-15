@@ -21,6 +21,16 @@ pub(crate) use pivots::{
     embedded_fraction, embedded_tower_one, inverse_pivot, inverse_pivot_mutation,
 };
 
+#[path = "solve_elementary_presentations_public.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public test fixtures stay inside the test target"
+)]
+mod presentations;
+pub(crate) use presentations::{
+    closed_presentation_mutation, closed_presentations, presentation_closure,
+};
+
 use super::common::TestResult;
 use crate::test_api::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::test_api::limits::{Budget, Limits};

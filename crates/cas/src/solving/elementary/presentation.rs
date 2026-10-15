@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Structural exact presentations retain all root and family provenance.
 
+mod compose;
+
 use super::evaluate::Evaluation;
 use super::proof::{AT, invalid, problem, tuple};
 use crate::budget::Budget;
@@ -225,9 +227,6 @@ pub(crate) fn check(
     {
         return Err(invalid());
     }
-    for slot in &certificate.compatibility {
-        super::proof::premise(premises, *slot)?;
-    }
     let SolveDraft::SolutionSet(set) =
         crate::solving::graph::object(&cas.state, claim.set.logical_id())?
     else {
@@ -246,5 +245,9 @@ pub(crate) fn check(
         free: &[],
         bound: &[],
     };
-    branches(&evaluation, set, claim.form, budget)
+    if certificate.compatibility.is_empty() {
+        branches(&evaluation, set, claim.form, budget)
+    } else {
+        compose::check(&evaluation, draft, certificate, set, budget)
+    }
 }
