@@ -14,6 +14,34 @@ use crate::exact::budget;
 use crate::{CheckedExpression, Context, Diagnostic, Expectation, Failure, Location, Registry};
 
 impl Context {
+    /// Create real scalar mathematical declarations without constructing a CAS header.
+    ///
+    /// Each key has the same display name and the real scalar value sort. Standard
+    /// scalar functions are supplied by `Context::new`; physical declarations must
+    /// still be added with `Context::declare` before checking or freezing.
+    ///
+    /// # Errors
+    /// Refuses invalid or duplicate mathematical keys, builtin name collisions,
+    /// invalid limits and exhausted store admission through `Context::new`.
+    pub fn with_real_symbols(
+        registry: Registry,
+        limits: Limits,
+        keys: &[&str],
+    ) -> Result<Self, Fault> {
+        let environment = Environment {
+            declarations: keys
+                .iter()
+                .map(|key| Declaration {
+                    key: (*key).into(),
+                    display_name: (*key).into(),
+                    sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+                })
+                .collect(),
+            ..Environment::default()
+        };
+        Self::new(registry, limits, environment)
+    }
+
     /// Create physical rules over explicit mathematical declaration keys.
     ///
     /// Forward references belong in `environment` before their physical declarations.
