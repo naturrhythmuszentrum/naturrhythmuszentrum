@@ -194,6 +194,10 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::Germ(value) => {
+            out.byte(10)?;
+            crate::germ_wire::certificate(value, out)
+        }
         Certificate::Split(value) => {
             out.byte(9)?;
             crate::split_wire::certificate(value, out)
@@ -286,14 +290,6 @@ pub(crate) fn encode(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
-        Statement::Split(value) => {
-            out.byte(23)?;
-            return crate::split_wire::statement(value, out, write);
-        }
-        Statement::Distribution(value) => {
-            out.byte(22)?;
-            return crate::distribution_wire::statement(value, out, write);
-        }
         Statement::Equality {
             left,
             right,
@@ -380,6 +376,18 @@ fn encode_values(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Statement::Germ(value) => {
+            out.byte(24)?;
+            return crate::germ_wire::statement(value, out, write);
+        }
+        Statement::Split(value) => {
+            out.byte(23)?;
+            return crate::split_wire::statement(value, out, write);
+        }
+        Statement::Distribution(value) => {
+            out.byte(22)?;
+            return crate::distribution_wire::statement(value, out, write);
+        }
         Statement::DerivativeOn {
             function,
             derivative,
@@ -504,6 +512,7 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::Germ(value) => vec![&value.function, &value.at.point],
         Statement::Split(value) => vec![&value.function, &value.domain],
         Statement::Distribution(value) => crate::distribution_wire::objects(value),
         Statement::BoundaryPartition(_)
@@ -701,7 +710,13 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
         ) => Edge::ArgumentRegion(0),
         (Statement::Cover { .. }, _) => Edge::CoverMember(position.saturating_sub(1)),
         (Statement::Incidence { .. }, 0) => Edge::IncidentRegion,
-        (Statement::Incidence { .. } | Statement::Ownership { .. } | Statement::Jump { .. }, 1)
+        (
+            Statement::Incidence { .. }
+            | Statement::Ownership { .. }
+            | Statement::Jump { .. }
+            | Statement::Germ(_),
+            1,
+        )
         | (Statement::Jet { .. }, 2) => Edge::AtBoundary,
         (Statement::Incidence { side, .. }, 2) | (Statement::Jet { side, .. }, 1) => {
             Edge::SideRegion(*side)
@@ -712,7 +727,8 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
             | Statement::Jet { .. }
             | Statement::Jump { .. }
             | Statement::DerivativeOn { .. }
-            | Statement::Split(_),
+            | Statement::Split(_)
+            | Statement::Germ(_),
             0,
         ) => Edge::OfFunction,
         (Statement::Jet { .. }, _) => Edge::JetValue(position.saturating_sub(3)),

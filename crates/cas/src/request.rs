@@ -12,3 +12,5 @@ pub use crate::task::{ActionMode, BoundaryFact, Task};
 pub use crate::derivative_model::{BoundaryFacts, DerivativeMap, PendingCell, ResultPayload};
 
 pub use crate::split_model::SplitRange;
+
+pub use crate::germ_model::{GermAt, SeriesAt};

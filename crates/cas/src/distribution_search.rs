@@ -359,6 +359,9 @@ pub(crate) const fn refusal(fault: Fault) -> RefusalReason {
         FaultKind::Invalid(InvalidCode::EmptyDomain) => RefusalReason::EmptyDomain,
         FaultKind::Invalid(InvalidCode::OverlapConflict) => RefusalReason::OverlapConflict,
         FaultKind::Invalid(InvalidCode::CoverageHole) => RefusalReason::CoverageHole,
+        FaultKind::Invalid(InvalidCode::AnalyticDisagreement) => {
+            RefusalReason::AnalyticDisagreement
+        }
         _ => RefusalReason::RefutedDomain,
     }
 }

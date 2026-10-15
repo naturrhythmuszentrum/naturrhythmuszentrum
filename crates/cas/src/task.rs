@@ -58,10 +58,10 @@ pub enum Task {
     Integrate(Box<crate::split_model::SplitRange>),
     /// Inclusive finite polynomial sum, with exact integer endpoints.
     Sum(Box<crate::split_model::SplitRange>),
-    /// Represented limit.
-    Limit,
-    /// Represented series with its syntax's explicit analytic mode.
-    Series,
+    /// Standalone finite polynomial limit on an explicit punctured approach.
+    Limit(Box<crate::germ_model::GermAt>),
+    /// Polynomial side series with exact remainder and explicit analytic mode.
+    Series(Box<crate::germ_model::SeriesAt>),
     /// Represented solution set.
     Solve,
     /// Represented spectral operation.
@@ -176,8 +176,6 @@ impl Task {
             } => Operation::Differentiate(coordinate.clone()),
             Self::Jacobian(values) => Operation::Jacobian(values.clone()),
             Self::SquareFree(value) => Operation::SquareFree(value.clone()),
-            Self::Limit => Operation::Limit,
-            Self::Series => Operation::Series,
             Self::Solve => Operation::Solve,
             Self::Spectral => Operation::Spectral,
             _ => return None,
@@ -187,6 +185,8 @@ impl Task {
     /// Every graph reference participates in validation and request identity.
     pub(crate) fn references(&self) -> Vec<&Handle> {
         match self {
+            Self::Limit(at) => vec![&at.point],
+            Self::Series(series) => vec![&series.at.point],
             Self::Equal { domain, .. }
             | Self::Differentiate { domain, .. }
             | Self::Coverage { domain } => vec![domain],
@@ -243,6 +243,12 @@ pub(crate) fn encode_with(
     }
     match value {
         Task::Integrate(range) | Task::Sum(range) => crate::split_wire::range(range, out)?,
+        Task::Limit(at) => crate::germ_wire::approach(at, out, &mut write)?,
+        Task::Series(series) => {
+            crate::germ_wire::approach(&series.at, out, &mut write)?;
+            out.unsigned(u64::from(series.order))?;
+            out.byte(u8::from(series.analytic))?;
+        }
         Task::ApplyAt { coordinate, .. } => out.name(coordinate)?,
         Task::Product { requested_sort } => crate::encoding::sort(requested_sort, out)?,
         Task::Eliminate { conclusion, .. } => {
@@ -316,8 +322,8 @@ const fn tag(value: &Task) -> u8 {
         Task::SquareFree(_) => 5,
         Task::Integrate(_) => 6,
         Task::Sum(_) => 7,
-        Task::Limit => 8,
-        Task::Series => 9,
+        Task::Limit(_) => 8,
+        Task::Series(_) => 9,
         Task::Solve => 10,
         Task::Spectral => 11,
         Task::ElaborateCases => 12,

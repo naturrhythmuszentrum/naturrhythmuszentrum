@@ -26,3 +26,5 @@ pub use crate::distribution_model::{
 pub use crate::split_model::{
     SplitCertificate, SplitKind, SplitPiece, SplitPoint, SplitRange, SplitValue,
 };
+
+pub use crate::germ_model::{GermAt, GermCertificate, GermMode, GermValue, SeriesAt};

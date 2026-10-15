@@ -28,6 +28,8 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// The requested limit or series gluing has incompatible checked side evidence.
+    AnalyticDisagreement,
     /// Distribution point evaluation is outside the mathematical contract.
     DistributionPointValue,
     /// No admitted general distribution product or discontinuous multiplier exists.

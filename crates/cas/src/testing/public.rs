@@ -101,3 +101,10 @@ pub(crate) mod distributions;
 )]
 #[path = "split.rs"]
 pub(crate) mod split;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public germ calculus fixtures"
+)]
+#[path = "germs.rs"]
+pub(crate) mod germs;

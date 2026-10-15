@@ -4,6 +4,10 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// Transport checked polynomial traces to standalone punctured limits.
+    LimitCaseRestrict,
+    /// Restrict checked jets with exact polynomial remainder evidence.
+    SeriesCaseRestrict,
     /// Finite polynomial interval integration with checked endpoint differences.
     IntegralCaseSplit,
     /// Inclusive integer ranges with checked forward differences.
@@ -117,6 +121,8 @@ pub enum Primitive {
 /// Typed conclusion family selected by an executable checker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConclusionKind {
+    /// Finite limit or polynomial series on an explicit approach.
+    Germ,
     /// Finite split integral or sum.
     Split,
     /// Native distribution membership, equality, derivative or scalar action.
@@ -161,6 +167,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// Exact polynomial side remainders.
+    Germ,
     /// Finite cover, point-extension and endpoint witnesses.
     Split,
     /// Closed regularity, exceptional-set and support modes.
@@ -209,7 +217,9 @@ impl Primitive {
     pub(crate) const fn native(self) -> bool {
         matches!(
             self,
-            Self::IntegralCaseSplit
+            Self::LimitCaseRestrict
+                | Self::SeriesCaseRestrict
+                | Self::IntegralCaseSplit
                 | Self::SumCaseSplit
                 | Self::DistRegular
                 | Self::DistAe
@@ -240,6 +250,8 @@ impl Primitive {
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::LimitCaseRestrict => ("limit.case-restrict", 2),
+            Self::SeriesCaseRestrict => ("series.case-restrict", 4),
             Self::IntegralCaseSplit => ("integral.case-split", 8),
             Self::SumCaseSplit => ("sum.case-split", 4),
             Self::DistRegular => ("dist.regular", 8),
@@ -310,6 +322,7 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
+            Self::LimitCaseRestrict | Self::SeriesCaseRestrict => ConclusionKind::Germ,
             Self::IntegralCaseSplit | Self::SumCaseSplit => ConclusionKind::Split,
             Self::DistRegular
             | Self::DistAe
@@ -357,9 +370,11 @@ impl Primitive {
             | Self::DistDeltaMultiply
             | Self::DistSupportAction
             | Self::DistJump => PremiseShape::DistributionEvidence,
-            Self::JetPolynomial | Self::CaseInterior | Self::CaseBoundary => {
-                PremiseShape::BoundaryEvidence
-            }
+            Self::LimitCaseRestrict
+            | Self::SeriesCaseRestrict
+            | Self::JetPolynomial
+            | Self::CaseInterior
+            | Self::CaseBoundary => PremiseShape::BoundaryEvidence,
             Self::CaseOrdered
             | Self::CaseDomain
             | Self::CaseSelect
@@ -386,6 +401,7 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::SeriesCaseRestrict => CertificateSchema::Germ,
             Self::IntegralCaseSplit | Self::SumCaseSplit => CertificateSchema::Split,
             Self::DistRegular
             | Self::DistAe
@@ -415,7 +431,7 @@ impl Primitive {
 }
 
 /// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 54] = [
+pub const PRIMITIVES: [Primitive; 56] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -464,10 +480,12 @@ pub const PRIMITIVES: [Primitive; 54] = [
     Primitive::Exact,
     Primitive::IntegralCaseSplit,
     Primitive::JetPolynomial,
+    Primitive::LimitCaseRestrict,
     Primitive::Jets,
     Primitive::RationalIdentity,
     Primitive::SquareFree,
     Primitive::RegionConstruct,
     Primitive::RegionDecide,
+    Primitive::SeriesCaseRestrict,
     Primitive::SumCaseSplit,
 ];

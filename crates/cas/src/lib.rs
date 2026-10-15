@@ -641,3 +641,29 @@ mod split_producer;
     reason = "split calculus helpers stay inside the kernel"
 )]
 mod split_wire;
+
+mod germ_model;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "germ calculus helpers stay inside the kernel"
+)]
+mod germ_polynomial;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "germ calculus helpers stay inside the kernel"
+)]
+mod germ_check;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "germ calculus helpers stay inside the kernel"
+)]
+mod germ_producer;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "germ calculus helpers stay inside the kernel"
+)]
+mod germ_wire;

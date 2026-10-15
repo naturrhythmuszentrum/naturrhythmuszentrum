@@ -370,6 +370,9 @@ pub(crate) fn measure(
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
     crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
+    if let Certificate::Germ(certificate) = &value.certificate {
+        crate::germ_wire::measure(certificate, budget)?;
+    }
     if let Certificate::Split(certificate) = &value.certificate {
         crate::split_check::measure(certificate, budget)?;
     }

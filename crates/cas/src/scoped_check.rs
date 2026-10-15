@@ -97,16 +97,18 @@ fn scalar(
     Ok((result, checked))
 }
 
-/// Replay one rule with already checked premise applications, in an unpublished candidate.
-pub(crate) fn check_application(
+/// Dispatch each closed native family while keeping scalar projection explicit.
+fn rule_conditions(
     cas: &mut Cas,
     draft: &ApplicationDraft,
     premises: &[CheckedApplication],
     budget: &mut Budget,
-) -> Result<CheckedApplication, Fault> {
-    crate::proof_view::measure(cas, draft, budget)?;
+) -> Result<(ScopedConditions, Option<crate::scalar_model::CheckedStep>), Fault> {
     let mut scalar_view = None;
-    let mut conditions = match draft.rule {
+    let conditions = match draft.rule {
+        Primitive::LimitCaseRestrict | Primitive::SeriesCaseRestrict => {
+            crate::germ_check::check(cas, draft, premises, budget)?
+        }
         Primitive::IntegralCaseSplit | Primitive::SumCaseSplit => {
             crate::split_check::check(cas, draft, premises, budget)?
         }
@@ -150,6 +152,18 @@ pub(crate) fn check_application(
             conditions
         }
     };
+    Ok((conditions, scalar_view))
+}
+
+/// Replay one rule with already checked premise applications, in an unpublished candidate.
+pub(crate) fn check_application(
+    cas: &mut Cas,
+    draft: &ApplicationDraft,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<CheckedApplication, Fault> {
+    crate::proof_view::measure(cas, draft, budget)?;
+    let (mut conditions, scalar_view) = rule_conditions(cas, draft, premises, budget)?;
     conditions.requirements = crate::statement::union(cas, &conditions.requirements, budget)?;
     conditions.residuals = crate::statement::union(cas, &conditions.residuals, budget)?;
     crate::statement::canonical_hypotheses(cas, &mut conditions.hypotheses, budget)?;

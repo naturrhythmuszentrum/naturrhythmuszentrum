@@ -392,10 +392,6 @@ pub(crate) enum Operation {
     Jacobian(Vec<String>),
     /// Decompose univariate rational polynomial multiplicity layers.
     SquareFree(String),
-    /// Prove a requested series congruence or remainder statement.
-    Series,
-    /// Prove a limit under its approach/domain data.
-    Limit,
     /// Prove candidates or complete solution-set coverage.
     Solve,
     /// Prove the requested spectral statement.

@@ -113,6 +113,18 @@ impl Cas {
         let context = self.checked(&request.context)?;
         if matches!(
             &request.task,
+            crate::task::Task::Limit(_) | crate::task::Task::Series(_)
+        ) {
+            self.check_nonempty_request(context, generation)?;
+            let result =
+                crate::germ_producer::execute(self, request, inputs, policy, generation, checker)?;
+            return Ok(Some(Execution {
+                result: Some(result),
+                fault: None,
+            }));
+        }
+        if matches!(
+            &request.task,
             crate::task::Task::Integrate(_) | crate::task::Task::Sum(_)
         ) {
             self.check_nonempty_request(context, generation)?;
@@ -501,7 +513,8 @@ fn outcome(
                 | InvalidCode::RefutedDomain
                 | InvalidCode::EmptyDomain
                 | InvalidCode::OverlapConflict
-                | InvalidCode::CoverageHole,
+                | InvalidCode::CoverageHole
+                | InvalidCode::AnalyticDisagreement,
             ) => Outcome::Refused {
                 reason: crate::distribution_search::refusal(fault),
                 request: record,

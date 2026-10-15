@@ -26,3 +26,5 @@ mod calculus_registry;
 mod parser;
 mod parser_equalities;
 mod split;
+
+mod germs;

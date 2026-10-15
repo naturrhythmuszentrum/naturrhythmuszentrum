@@ -51,6 +51,8 @@ pub enum UnsupportedReason {
 /// A mathematical refusal returned before constructing an ill-sorted operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RefusalReason {
+    /// Required one-sided limits, polynomial coefficients or centre values disagree.
+    AnalyticDisagreement,
     /// Distributions have no general point values.
     DistributionPointValue,
     /// The requested product has no admitted distribution meaning.
@@ -347,8 +349,6 @@ pub(crate) fn validate(
         }
         let compatible = match operation {
             Operation::Equal => expression.sort == *first_sort,
-            Operation::Series => matches!(expression.operator, Operator::Series { .. }),
-            Operation::Limit => matches!(expression.operator, Operator::Limit(_)),
             Operation::Solve => matches!(expression.operator, Operator::Set { .. }),
             Operation::Spectral => matches!(expression.operator, Operator::Spectral(_)),
             Operation::Differentiate(_) | Operation::Jacobian(_) | Operation::SquareFree(_) => {
@@ -459,6 +459,13 @@ fn validate_task(
                 state.region(region.logical_id())?;
             }
         }
+        Task::Limit(germ) => {
+            state.boundary(germ.point.logical_id())?;
+        }
+        Task::Series(series) => {
+            state.boundary(series.at.point.logical_id())?;
+            budget.check(BudgetKind::JetOrder, u64::from(series.order), at)?;
+        }
         Task::Boundary { point, .. } => {
             state.boundary(point.logical_id())?;
         }
@@ -489,7 +496,9 @@ fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> R
         | Task::SmoothMultiply { .. }
         | Task::Product { .. } => Some(2),
         Task::Eliminate { .. } => Some(0),
-        Task::Integrate(_)
+        Task::Limit(_)
+        | Task::Series(_)
+        | Task::Integrate(_)
         | Task::Sum(_)
         | Task::EmbedRegular { .. }
         | Task::ApplyAt { .. }

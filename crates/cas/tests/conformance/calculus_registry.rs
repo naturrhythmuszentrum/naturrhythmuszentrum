@@ -10,8 +10,6 @@ use nrz_cas::{Cas, FaultKind, InvalidCode};
 #[test]
 fn calculus_reserved_key_replay() -> TestResult {
     for key in [
-        "limit.case-restrict",
-        "series.case-restrict",
         "dist.affine-pullback",
         "dist.simple-zero-pullback",
         "dist.primitive-unique",
