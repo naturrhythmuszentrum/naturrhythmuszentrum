@@ -58,6 +58,10 @@ pub trait Scalar:
     fn min_positive_normal() -> Self;
     /// Largest finite value.
     fn max_finite() -> Self;
+    /// Exact conversion of a byte-sized unsigned integer.
+    fn from_u8(value: u8) -> Self;
+    /// Native numeric parser used only to select a candidate inside bounded decoding.
+    fn parse_nearest(text: &str) -> Option<Self>;
     /// Exact representation in binary64.
     fn to_f64(self) -> f64;
     /// Whether two primitive values have identical bit patterns.
@@ -110,6 +114,12 @@ macro_rules! impl_scalar {
             }
             fn max_finite() -> Self {
                 Self::MAX
+            }
+            fn from_u8(value: u8) -> Self {
+                Self::from(value)
+            }
+            fn parse_nearest(text: &str) -> Option<Self> {
+                text.parse().ok()
             }
             fn to_f64(self) -> f64 {
                 f64::from(self)

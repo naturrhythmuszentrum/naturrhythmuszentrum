@@ -187,3 +187,31 @@ impl<P: Scalar> Enclosure<P> {
         Ok(result)
     }
 }
+
+impl<P: Scalar> Enclosure<P> {
+    /// Bound a finite candidate's distance from every point of this enclosure.
+    ///
+    /// The bound includes outward evaluation of both endpoint differences.
+    /// It describes numerical displacement only; callers retain its target.
+    ///
+    /// # Errors
+    /// Refuses a nonfinite outward difference or bound.
+    pub fn displacement_from(
+        self,
+        candidate: Finite<P>,
+        context: &ArithmeticContext,
+    ) -> Result<Finite<P>, ArithmeticFailure> {
+        Ok(Self::singleton(candidate).sub(self, context)?.abs().upper())
+    }
+}
+
+impl Enclosure<f32> {
+    /// Widen both endpoints exactly; existing enclosure width is preserved.
+    #[must_use]
+    pub fn widen(self) -> Enclosure<f64> {
+        Enclosure {
+            lower: self.lower.widen(),
+            upper: self.upper.widen(),
+        }
+    }
+}

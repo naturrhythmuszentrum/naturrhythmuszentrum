@@ -19,6 +19,15 @@ pub enum ArithmeticFailure {
     /// A rounded result or required outward neighbour is nonfinite.
     #[error("the result cannot be enclosed by finite endpoints")]
     Overflow,
+    /// Numeric text does not follow the bounded literal grammar.
+    #[error("invalid numeric literal")]
+    InvalidLiteral,
+    /// Literal evaluation needs an unbounded intermediate or result.
+    #[error("numeric literal exceeds the supported evaluation range")]
+    LiteralRange,
+    /// A literal's digit, exponent or work limit was exceeded.
+    #[error("numeric literal resource limit exceeded")]
+    ResourceLimit,
     /// Dot-product slices have different lengths.
     #[error("dot-product lengths differ")]
     LengthMismatch,

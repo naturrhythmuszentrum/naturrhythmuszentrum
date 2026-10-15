@@ -2,6 +2,8 @@
 //! Public finite-format and enclosure conformance.
 
 mod admission;
+mod conversion;
 mod fused;
+mod literals;
 mod primitives;
 mod reductions;

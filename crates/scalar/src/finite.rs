@@ -71,3 +71,13 @@ impl<P: Scalar> Finite<P> {
         Self::new(self.value.next_down()).map_err(|_| ArithmeticFailure::Overflow)
     }
 }
+
+impl Finite<f32> {
+    /// Widen a represented binary32 value exactly into binary64.
+    #[must_use]
+    pub fn widen(self) -> Finite<f64> {
+        Finite {
+            value: f64::from(self.value),
+        }
+    }
+}
