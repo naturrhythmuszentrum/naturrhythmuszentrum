@@ -1,32 +1,42 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Locally owned rational invariants over budgeted arbitrary-precision magnitudes.
+//! Canonical `Ratio` backing with prepaid arbitrary-precision magnitude arithmetic.
 
 use std::cmp::Ordering;
 use std::fmt;
 
-use num_bigint::BigUint;
+use num_bigint::{BigInt, BigUint, Sign};
+use num_integer::Integer;
+use num_rational::Ratio;
+use num_traits::{One, Zero};
 
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
 
 /// A reduced exact rational with independently measured component sizes.
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct Rational {
-    /// True only for a nonzero negative numerator.
+    /// Reduced signed numerator and strictly positive denominator; zero is 0/1.
+    value: Ratio<BigInt>,
+    /// Cached numerator sign preserves the public constant sign query.
     negative: bool,
-    /// Coprime nonnegative numerator magnitude.
-    numerator: BigUint,
-    /// Coprime strictly positive denominator.
-    denominator: BigUint,
 }
+
+impl PartialEq for Rational {
+    // Canonical components avoid the dependency's arithmetic comparison path.
+    fn eq(&self, other: &Self) -> bool {
+        self.value.numer() == other.value.numer() && self.value.denom() == other.value.denom()
+    }
+}
+
+impl Eq for Rational {}
 
 impl fmt::Debug for Rational {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Rational")
             .field("negative", &self.negative)
-            .field("numerator_bits", &self.numerator.bits())
-            .field("denominator_bits", &self.denominator.bits())
+            .field("numerator_bits", &self.numerator().bits())
+            .field("denominator_bits", &self.denominator().bits())
             .finish_non_exhaustive()
     }
 }
@@ -38,13 +48,14 @@ fn limbs(bits: u64, at: Location) -> Result<u64, Fault> {
         .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))
 }
 
-/// Prepay a conservative quadratic operation bound, including linear overhead.
+/// Prepay `C(B) = 8(L(B) + 1)^2` at the largest operand/intermediate bound.
+/// This also covers linear scans and both copied magnitudes' retained bytes.
 fn charge(a: u64, b: u64, budget: &mut Budget, at: Location) -> Result<(), Fault> {
-    let left = limbs(a, at)?;
-    let right = limbs(b, at)?;
-    let amount = left
+    let extent = limbs(a.max(b), at)?
         .checked_add(1)
-        .and_then(|n| right.checked_add(1).and_then(|m| n.checked_mul(m)))
+        .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?;
+    let amount = extent
+        .checked_mul(extent)
         .and_then(|n| n.checked_mul(8))
         .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?;
     budget.arithmetic(amount, at)
@@ -60,37 +71,131 @@ fn product(a: &BigUint, b: &BigUint, budget: &mut Budget, at: Location) -> Resul
             .ok_or_else(|| Fault::capacity(BudgetKind::IntermediateBits, at))?
     };
     budget.check(BudgetKind::IntermediateBits, bound, at)?;
-    charge(a.bits(), b.bits(), budget, at)?;
+    charge(bound.max(a.bits()), b.bits(), budget, at)?;
     let result = a * b;
     budget.check(BudgetKind::IntermediateBits, result.bits(), at)?;
     Ok(result)
 }
 
-/// Divide with an explicit nonzero check and a conservative work preflight.
-fn quotient(a: &BigUint, b: &BigUint, budget: &mut Budget, at: Location) -> Result<BigUint, Fault> {
-    if b.bits() == 0 {
-        return Err(Fault::invalid(InvalidCode::ZeroDenominator, at));
+/// Bound long division's normalized dividend as well as its returned magnitudes.
+/// A divisor above 32 bits may need a left shift to fill a dependency limb;
+/// rounding to 64 bits conservatively covers both 32-bit and 64-bit digits.
+fn division_bits(a: &BigUint, b: &BigUint, at: Location) -> Result<u64, Fault> {
+    let largest = a.bits().max(b.bits());
+    if a.bits() < b.bits() || b.bits() <= 32 {
+        return Ok(largest);
     }
-    budget.check(BudgetKind::IntermediateBits, a.bits(), at)?;
-    charge(a.bits(), b.bits(), budget, at)?;
-    Ok(a / b)
+    let shift = (64 - b.bits() % 64) % 64;
+    a.bits()
+        .checked_add(shift)
+        .map(|bound| bound.max(largest))
+        .ok_or_else(|| Fault::capacity(BudgetKind::IntermediateBits, at))
 }
 
-/// Euclidean gcd with a charge before every remainder and owned copy.
+/// Divide only after checking the divisor, both inputs and the full work bound.
+fn divide(
+    a: &BigUint,
+    b: &BigUint,
+    budget: &mut Budget,
+    at: Location,
+) -> Result<(BigUint, BigUint), Fault> {
+    if b.is_zero() {
+        return Err(Fault::invalid(InvalidCode::ZeroDenominator, at));
+    }
+    let bound = division_bits(a, b, at)?;
+    budget.check(BudgetKind::IntermediateBits, bound, at)?;
+    charge(bound, b.bits(), budget, at)?;
+    let (whole, rest) = a.div_rem(b);
+    budget.check(BudgetKind::IntermediateBits, whole.bits(), at)?;
+    budget.check(BudgetKind::IntermediateBits, rest.bits(), at)?;
+    Ok((whole, rest))
+}
+
+/// Read the quotient from the prepaid integer division adapter.
+fn quotient(a: &BigUint, b: &BigUint, budget: &mut Budget, at: Location) -> Result<BigUint, Fault> {
+    divide(a, b, budget, at).map(|(whole, _)| whole)
+}
+
+/// Read the remainder from the prepaid integer division adapter.
+fn remainder(
+    a: &BigUint,
+    b: &BigUint,
+    budget: &mut Budget,
+    at: Location,
+) -> Result<BigUint, Fault> {
+    divide(a, b, budget, at).map(|(_, rest)| rest)
+}
+
+/// Euclidean gcd with a charge before every `Integer::div_rem` and owned copy.
+/// Every two remainders halve the larger input, giving at most `2B + 1` steps.
 fn gcd(a: &BigUint, b: &BigUint, budget: &mut Budget, at: Location) -> Result<BigUint, Fault> {
+    budget.check(BudgetKind::IntermediateBits, a.bits().max(b.bits()), at)?;
     charge(a.bits(), b.bits(), budget, at)?;
     let mut left = a.clone();
     let mut right = b.clone();
-    while right.bits() != 0 {
-        charge(left.bits(), right.bits(), budget, at)?;
-        let remainder = &left % &right;
+    while !right.is_zero() {
+        let rest = remainder(&left, &right, budget, at)?;
         left = right;
-        right = remainder;
+        right = rest;
     }
+    budget.check(BudgetKind::IntermediateBits, left.bits(), at)?;
     Ok(left)
 }
 
+/// Accumulate signed magnitudes only after prepaying comparison and sum bounds.
+fn signed_sum(
+    (left_negative, left): (bool, BigUint),
+    (right_negative, right): (bool, BigUint),
+    budget: &mut Budget,
+    at: Location,
+) -> Result<(bool, BigUint), Fault> {
+    let bound = left
+        .bits()
+        .max(right.bits())
+        .checked_add(1)
+        .ok_or_else(|| Fault::capacity(BudgetKind::IntermediateBits, at))?;
+    budget.check(BudgetKind::IntermediateBits, bound, at)?;
+    charge(left.bits(), right.bits(), budget, at)?;
+    let (negative, magnitude) = if left_negative == right_negative {
+        (left_negative, left + right)
+    } else {
+        let order = left.cmp(&right);
+        charge(left.bits(), right.bits(), budget, at)?;
+        if order == Ordering::Less {
+            (right_negative, right - left)
+        } else {
+            (left_negative, left - right)
+        }
+    };
+    budget.check(BudgetKind::IntermediateBits, magnitude.bits(), at)?;
+    Ok((negative, magnitude))
+}
+
 impl Rational {
+    /// Move already coprime magnitudes into `Ratio` without hidden normalization.
+    /// Callers establish a nonzero denominator and prepay any magnitude allocation.
+    fn from_coprime_magnitudes(negative: bool, numerator: BigUint, denominator: BigUint) -> Self {
+        let negative = negative && !numerator.is_zero();
+        let sign = if negative { Sign::Minus } else { Sign::Plus };
+        Self {
+            value: Ratio::new_raw(
+                BigInt::from_biguint(sign, numerator),
+                BigInt::from(denominator),
+            ),
+            negative,
+        }
+    }
+
+    /// Borrow the canonical numerator magnitude without copying or normalizing.
+    fn numerator(&self) -> &BigUint {
+        self.value.numer().magnitude()
+    }
+
+    /// Borrow the strictly positive canonical denominator magnitude.
+    fn denominator(&self) -> &BigUint {
+        self.value.denom().magnitude()
+    }
+
     /// Construct and reduce signed magnitudes under the active bit budgets.
     ///
     /// # Errors
@@ -112,31 +217,23 @@ impl Rational {
         let denominator = quotient(denominator, &divisor, budget, at)?;
         budget.check(BudgetKind::ComponentBits, numerator.bits(), at)?;
         budget.check(BudgetKind::ComponentBits, denominator.bits(), at)?;
-        Ok(Self {
-            negative: negative && numerator.bits() != 0,
+        Ok(Self::from_coprime_magnitudes(
+            negative,
             numerator,
             denominator,
-        })
+        ))
     }
 
     /// The exact additive identity.
     #[must_use]
     pub fn zero() -> Self {
-        Self {
-            negative: false,
-            numerator: BigUint::from(0_u8),
-            denominator: BigUint::from(1_u8),
-        }
+        Self::from_coprime_magnitudes(false, BigUint::zero(), BigUint::one())
     }
 
     /// The exact multiplicative identity.
     #[must_use]
     pub fn one() -> Self {
-        Self {
-            negative: false,
-            numerator: BigUint::from(1_u8),
-            denominator: BigUint::from(1_u8),
-        }
+        Self::from_coprime_magnitudes(false, BigUint::one(), BigUint::one())
     }
 
     /// Construct a small exact fraction, including the signed minimum safely.
@@ -160,17 +257,17 @@ impl Rational {
     pub(crate) fn floor(&self, budget: &mut Budget) -> Result<Self, Fault> {
         let at = Location::new("integer region rounding");
         self.check(budget, at)?;
-        let mut whole = quotient(&self.numerator, &self.denominator, budget, at)?;
-        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
-        let remainder = &self.numerator % &self.denominator;
-        if self.negative && remainder.bits() != 0 {
+        let mut whole = quotient(self.numerator(), self.denominator(), budget, at)?;
+        let rest = remainder(self.numerator(), self.denominator(), budget, at)?;
+        if self.negative && !rest.is_zero() {
             let bound = whole
                 .bits()
                 .checked_add(1)
                 .ok_or_else(|| Fault::capacity(BudgetKind::IntermediateBits, at))?;
             budget.check(BudgetKind::IntermediateBits, bound, at)?;
             charge(whole.bits(), 1, budget, at)?;
-            whole += BigUint::from(1_u8);
+            whole += BigUint::one();
+            budget.check(BudgetKind::IntermediateBits, whole.bits(), at)?;
         }
         Self::new(self.negative, &whole, &BigUint::from(1_u8), budget)
     }
@@ -178,13 +275,13 @@ impl Rational {
     /// Whether the canonical numerator is zero.
     #[must_use]
     pub fn is_zero(&self) -> bool {
-        self.numerator.bits() == 0
+        self.numerator().bits() == 0
     }
 
     /// Whether the reduced denominator is exactly one.
     #[must_use]
     pub fn is_integer(&self) -> bool {
-        self.denominator.bits() == 1
+        self.denominator().bits() == 1
     }
 
     /// Whether the canonical rational is negative.
@@ -196,7 +293,7 @@ impl Rational {
     /// Measured numerator and denominator bit lengths.
     #[must_use]
     pub fn component_bits(&self) -> (u64, u64) {
-        (self.numerator.bits(), self.denominator.bits())
+        (self.numerator().bits(), self.denominator().bits())
     }
 
     /// Validate an existing value against a possibly smaller call budget.
@@ -204,8 +301,8 @@ impl Rational {
     /// # Errors
     /// Returns `ArithmeticRange` before copying a component that exceeds the limit.
     pub fn check(&self, budget: &Budget, at: Location) -> Result<(), Fault> {
-        budget.check(BudgetKind::ComponentBits, self.numerator.bits(), at)?;
-        budget.check(BudgetKind::ComponentBits, self.denominator.bits(), at)
+        budget.check(BudgetKind::ComponentBits, self.numerator().bits(), at)?;
+        budget.check(BudgetKind::ComponentBits, self.denominator().bits(), at)
     }
 
     /// Copy and negate without a machine signed-minimum special case.
@@ -215,10 +312,17 @@ impl Rational {
     pub fn negated(&self, budget: &mut Budget) -> Result<Self, Fault> {
         let at = Location::new("rational negation");
         self.check(budget, at)?;
-        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
-        let mut value = self.clone();
-        value.negative = !value.negative && !value.is_zero();
-        Ok(value)
+        charge(
+            self.numerator().bits(),
+            self.denominator().bits(),
+            budget,
+            at,
+        )?;
+        Ok(Self::from_coprime_magnitudes(
+            !self.negative,
+            self.numerator().clone(),
+            self.denominator().clone(),
+        ))
     }
 
     /// Add through denominator gcd reduction and signed-magnitude accumulation.
@@ -229,30 +333,14 @@ impl Rational {
         let at = Location::new("rational addition");
         self.check(budget, at)?;
         other.check(budget, at)?;
-        let common = gcd(&self.denominator, &other.denominator, budget, at)?;
-        let left_scale = quotient(&other.denominator, &common, budget, at)?;
-        let right_scale = quotient(&self.denominator, &common, budget, at)?;
-        let left = product(&self.numerator, &left_scale, budget, at)?;
-        let right = product(&other.numerator, &right_scale, budget, at)?;
-        let bound = left
-            .bits()
-            .max(right.bits())
-            .checked_add(1)
-            .ok_or_else(|| Fault::capacity(BudgetKind::IntermediateBits, at))?;
-        budget.check(BudgetKind::IntermediateBits, bound, at)?;
-        charge(left.bits(), right.bits(), budget, at)?;
-        let (negative, numerator) = if self.negative == other.negative {
-            (self.negative, left + right)
-        } else {
-            let order = left.cmp(&right);
-            charge(left.bits(), right.bits(), budget, at)?;
-            if order == Ordering::Less {
-                (other.negative, right - left)
-            } else {
-                (self.negative, left - right)
-            }
-        };
-        let denominator = product(&self.denominator, &left_scale, budget, at)?;
+        let common = gcd(self.denominator(), other.denominator(), budget, at)?;
+        let left_scale = quotient(other.denominator(), &common, budget, at)?;
+        let right_scale = quotient(self.denominator(), &common, budget, at)?;
+        let left = product(self.numerator(), &left_scale, budget, at)?;
+        let right = product(other.numerator(), &right_scale, budget, at)?;
+        let (negative, numerator) =
+            signed_sum((self.negative, left), (other.negative, right), budget, at)?;
+        let denominator = product(self.denominator(), &left_scale, budget, at)?;
         Self::new(negative, &numerator, &denominator, budget).map_err(|mut error| {
             error.location = at;
             error
@@ -276,12 +364,12 @@ impl Rational {
         let at = Location::new("rational multiplication");
         self.check(budget, at)?;
         other.check(budget, at)?;
-        let first = gcd(&self.numerator, &other.denominator, budget, at)?;
-        let second = gcd(&other.numerator, &self.denominator, budget, at)?;
-        let left_n = quotient(&self.numerator, &first, budget, at)?;
-        let right_n = quotient(&other.numerator, &second, budget, at)?;
-        let left_d = quotient(&self.denominator, &second, budget, at)?;
-        let right_d = quotient(&other.denominator, &first, budget, at)?;
+        let first = gcd(self.numerator(), other.denominator(), budget, at)?;
+        let second = gcd(other.numerator(), self.denominator(), budget, at)?;
+        let left_n = quotient(self.numerator(), &first, budget, at)?;
+        let right_n = quotient(other.numerator(), &second, budget, at)?;
+        let left_d = quotient(self.denominator(), &second, budget, at)?;
+        let right_d = quotient(other.denominator(), &first, budget, at)?;
         let numerator = product(&left_n, &right_n, budget, at)?;
         let denominator = product(&left_d, &right_d, budget, at)?;
         Self::new(
@@ -306,12 +394,17 @@ impl Rational {
         if other.is_zero() {
             return Err(Fault::invalid(InvalidCode::ZeroDenominator, at));
         }
-        charge(other.numerator.bits(), other.denominator.bits(), budget, at)?;
-        let reciprocal = Self {
-            negative: other.negative,
-            numerator: other.denominator.clone(),
-            denominator: other.numerator.clone(),
-        };
+        charge(
+            other.numerator().bits(),
+            other.denominator().bits(),
+            budget,
+            at,
+        )?;
+        let reciprocal = Self::from_coprime_magnitudes(
+            other.negative,
+            other.denominator().clone(),
+            other.numerator().clone(),
+        );
         self.mul(&reciprocal, budget).map_err(|mut error| {
             error.location = at;
             error
@@ -330,11 +423,21 @@ impl Rational {
         if self.is_zero() && exponent <= 0 {
             return Err(Fault::invalid(InvalidCode::UndefinedPower, at));
         }
-        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
-        let mut factor = self.clone();
-        if exponent < 0 {
-            std::mem::swap(&mut factor.numerator, &mut factor.denominator);
-        }
+        charge(
+            self.numerator().bits(),
+            self.denominator().bits(),
+            budget,
+            at,
+        )?;
+        let mut factor = if exponent < 0 {
+            Self::from_coprime_magnitudes(
+                self.negative,
+                self.denominator().clone(),
+                self.numerator().clone(),
+            )
+        } else {
+            self.clone()
+        };
         let mut result = Self::one();
         while remaining != 0 {
             if remaining & 1 == 1 {
@@ -356,8 +459,18 @@ impl Rational {
         let at = Location::new("rational comparison");
         self.check(budget, at)?;
         other.check(budget, at)?;
-        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
-        charge(other.numerator.bits(), other.denominator.bits(), budget, at)?;
+        charge(
+            self.numerator().bits(),
+            self.denominator().bits(),
+            budget,
+            at,
+        )?;
+        charge(
+            other.numerator().bits(),
+            other.denominator().bits(),
+            budget,
+            at,
+        )?;
         if self.negative != other.negative {
             return Ok(if self.negative {
                 Ordering::Less
@@ -365,8 +478,8 @@ impl Rational {
                 Ordering::Greater
             });
         }
-        let (mut an, mut ad) = (self.numerator.clone(), self.denominator.clone());
-        let (mut bn, mut bd) = (other.numerator.clone(), other.denominator.clone());
+        let (mut an, mut ad) = (self.numerator().clone(), self.denominator().clone());
+        let (mut bn, mut bd) = (other.numerator().clone(), other.denominator().clone());
         let mut reverse = self.negative;
         loop {
             let aq = quotient(&an, &ad, budget, at)?;
@@ -376,10 +489,8 @@ impl Rational {
             if order != Ordering::Equal {
                 return Ok(if reverse { order.reverse() } else { order });
             }
-            charge(an.bits(), ad.bits(), budget, at)?;
-            charge(bn.bits(), bd.bits(), budget, at)?;
-            let ar = &an % &ad;
-            let br = &bn % &bd;
+            let ar = remainder(&an, &ad, budget, at)?;
+            let br = remainder(&bn, &bd, budget, at)?;
             if ar.bits() == 0 || br.bits() == 0 {
                 let order = ar.bits().cmp(&br.bits());
                 return Ok(if reverse { order.reverse() } else { order });
@@ -398,22 +509,27 @@ impl Rational {
         let at = Location::new("rational formatting");
         self.check(budget, at)?;
         let bound = self
-            .numerator
+            .numerator()
             .bits()
-            .checked_add(self.denominator.bits())
+            .checked_add(self.denominator().bits())
             .and_then(|n| n.checked_add(3))
             .ok_or_else(|| Fault::capacity(BudgetKind::OutputBytes, at))?;
         budget.check(BudgetKind::OutputBytes, bound, at)?;
-        charge(self.numerator.bits(), self.numerator.bits(), budget, at)?;
-        charge(self.denominator.bits(), self.denominator.bits(), budget, at)?;
+        charge(self.numerator().bits(), self.numerator().bits(), budget, at)?;
+        charge(
+            self.denominator().bits(),
+            self.denominator().bits(),
+            budget,
+            at,
+        )?;
         let prefix = if self.negative { "-" } else { "" };
         if self.is_integer() {
-            Ok(format!("{prefix}{}", self.numerator.to_str_radix(10)))
+            Ok(format!("{prefix}{}", self.numerator().to_str_radix(10)))
         } else {
             Ok(format!(
                 "{prefix}{}/{}",
-                self.numerator.to_str_radix(10),
-                self.denominator.to_str_radix(10)
+                self.numerator().to_str_radix(10),
+                self.denominator().to_str_radix(10)
             ))
         }
     }
@@ -435,15 +551,20 @@ impl Rational {
     fn encode_magnitudes(&self, budget: &mut Budget, limit: BudgetKind) -> Result<Vec<u8>, Fault> {
         let at = Location::new("rational encoding");
         self.check(budget, at)?;
-        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
-        for bits in [self.numerator.bits(), self.denominator.bits()] {
+        charge(
+            self.numerator().bits(),
+            self.denominator().bits(),
+            budget,
+            at,
+        )?;
+        for bits in [self.numerator().bits(), self.denominator().bits()] {
             u32::try_from(bits.div_ceil(8)).map_err(|_| Fault::capacity(limit, at))?;
         }
         let size = self
-            .numerator
+            .numerator()
             .bits()
             .div_ceil(8)
-            .checked_add(self.denominator.bits().div_ceil(8))
+            .checked_add(self.denominator().bits().div_ceil(8))
             .and_then(|n| n.checked_add(9))
             .ok_or_else(|| Fault::capacity(BudgetKind::OutputBytes, at))?;
         budget.check(limit, size, at)?;
@@ -454,7 +575,7 @@ impl Rational {
             )
             .map_err(|_| Fault::allocation(at))?;
         bytes.push(u8::from(self.negative));
-        for magnitude in [&self.numerator, &self.denominator] {
+        for magnitude in [self.numerator(), self.denominator()] {
             let digits = if magnitude.bits() == 0 {
                 Vec::new()
             } else {
@@ -478,12 +599,17 @@ impl Rational {
     pub fn small_ratio(&self, budget: &mut Budget) -> Result<Option<(i64, u64)>, Fault> {
         let at = Location::new("small rational components");
         self.check(budget, at)?;
-        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
-        if self.numerator.bits() > 64 || self.denominator.bits() > 64 {
+        charge(
+            self.numerator().bits(),
+            self.denominator().bits(),
+            budget,
+            at,
+        )?;
+        if self.numerator().bits() > 64 || self.denominator().bits() > 64 {
             return Ok(None);
         }
-        let magnitude = self.numerator.iter_u64_digits().next().unwrap_or(0);
-        let denominator = self.denominator.iter_u64_digits().next().unwrap_or(1);
+        let magnitude = self.numerator().iter_u64_digits().next().unwrap_or(0);
+        let denominator = self.denominator().iter_u64_digits().next().unwrap_or(1);
         let numerator = if self.negative && magnitude == (1_u64 << 63) {
             i64::MIN
         } else if let Ok(value) = i64::try_from(magnitude) {
@@ -496,13 +622,13 @@ impl Rational {
 
     /// Use a fixed integer-power payload only when the exact exponent fits it.
     pub(crate) fn integer_exponent(&self, budget: &mut Budget) -> Result<Option<i64>, Fault> {
-        if !self.is_integer() || self.numerator.bits() > 64 {
+        if !self.is_integer() || self.numerator().bits() > 64 {
             return Ok(None);
         }
         let at = Location::new("parsed integer exponent");
-        charge(self.numerator.bits(), 1, budget, at)?;
+        charge(self.numerator().bits(), 1, budget, at)?;
         let mut magnitude = 0_u64;
-        for (position, byte) in self.numerator.to_bytes_le().iter().enumerate() {
+        for (position, byte) in self.numerator().to_bytes_le().iter().enumerate() {
             let shift = u32::try_from(position)
                 .ok()
                 .and_then(|n| n.checked_mul(8))
@@ -614,6 +740,7 @@ fn digits(text: &str, budget: &mut Budget) -> Result<BigUint, Fault> {
         budget.check(BudgetKind::IntermediateBits, bound, at)?;
         charge(value.bits(), 4, budget, at)?;
         value += BigUint::from(digit - b'0');
+        budget.check(BudgetKind::IntermediateBits, value.bits(), at)?;
     }
     Ok(value)
 }
@@ -644,11 +771,269 @@ fn decimal_exponent(text: &str, budget: &mut Budget) -> Result<i64, Fault> {
 
 #[cfg(test)]
 mod tests {
-    use super::Rational;
+    use num_bigint::{BigInt, BigUint, Sign};
+
+    use super::{Rational, charge, divide, gcd, product, signed_sum};
     use crate::{
-        Fault,
-        limits::{Budget, Limits},
+        Fault, InvalidCode, Location,
+        limits::{Budget, BudgetKind, Limits},
     };
+
+    /// Reduction, zero and sign are invariants of the private `Ratio` itself.
+    /// ´test:unit:ratio-backing-canonical´
+    #[test]
+    fn ratio_backing_canonical() -> Result<(), Fault> {
+        let mut budget = Budget::new(Limits::default())?;
+        for (negative, numerator, denominator, expected) in [
+            (false, 42_u8, 30_u8, (7_i64, 5_u64)),
+            (true, 42, 30, (-7, 5)),
+            (false, 0, 19, (0, 1)),
+            (true, 0, 19, (0, 1)),
+            (true, 18, 18, (-1, 1)),
+        ] {
+            let value = Rational::new(
+                negative,
+                &BigUint::from(numerator),
+                &BigUint::from(denominator),
+                &mut budget,
+            )?;
+            assert_eq!(value.value.numer(), &BigInt::from(expected.0));
+            assert_eq!(value.value.denom(), &BigInt::from(expected.1));
+            assert_eq!(
+                value.is_negative(),
+                value.value.numer().sign() == Sign::Minus
+            );
+        }
+        Ok(())
+    }
+
+    /// Equivalent spellings have identical private components and canonical bytes.
+    /// ´test:unit:ratio-backing-canonical-bytes´
+    #[test]
+    fn ratio_backing_canonical_bytes() -> Result<(), Fault> {
+        let mut budget = Budget::new(Limits::default())?;
+        for text in ["-1/2", "-2/4", "-0.5", "-5e-1"] {
+            let value = Rational::parse(text, &mut budget)?;
+            assert_eq!(value.value.numer(), &BigInt::from(-1));
+            assert_eq!(value.value.denom(), &BigInt::from(2));
+            assert_eq!(
+                value.canonical_bytes(&mut budget)?,
+                [1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 2]
+            );
+        }
+        Ok(())
+    }
+
+    /// Sign-changing paths preserve a positive denominator and the cached sign.
+    /// ´test:unit:ratio-backing-sign-operations´
+    #[test]
+    fn ratio_backing_sign_operations() -> Result<(), Fault> {
+        let mut budget = Budget::new(Limits::default())?;
+        let value = Rational::from_ratio(-2, 3, &mut budget)?;
+        for (result, numerator, denominator) in [
+            (value.negated(&mut budget)?, 2, 3),
+            (Rational::one().div(&value, &mut budget)?, -3, 2),
+            (value.pow(-3, &mut budget)?, -27, 8),
+            (value.sub(&value, &mut budget)?, 0, 1),
+            (Rational::zero().negated(&mut budget)?, 0, 1),
+        ] {
+            assert_eq!(result.value.numer(), &BigInt::from(numerator));
+            assert_eq!(result.value.denom(), &BigInt::from(denominator));
+            assert_eq!(
+                result.is_negative(),
+                result.value.numer().sign() == Sign::Minus
+            );
+        }
+        Ok(())
+    }
+
+    /// Product size refusal precedes arithmetic, at the bound and one bit below.
+    /// ´test:unit:product-preflight-bits´
+    #[test]
+    fn product_preflight_bits() -> Result<(), Fault> {
+        let at = Location::new("product preflight test");
+        let value = BigUint::from(15_u8);
+        let mut exact = Budget::new(Limits {
+            component_bits: 4,
+            intermediate_bits: 8,
+            ..Limits::default()
+        })?;
+        assert_eq!(
+            product(&value, &value, &mut exact, at)?,
+            BigUint::from(225_u8)
+        );
+        let mut short = Budget::new(Limits {
+            intermediate_bits: 7,
+            ..exact.limits().clone()
+        })?;
+        let before = short.usage();
+        assert_eq!(
+            product(&value, &value, &mut short, at),
+            Err(Fault::exhausted(BudgetKind::IntermediateBits, 7, 8, at))
+        );
+        assert_eq!(short.usage(), before);
+        Ok(())
+    }
+
+    /// Addition reserves its carry bit even when opposite signs could cancel.
+    /// ´test:unit:sum-preflight-bits´
+    #[test]
+    fn sum_preflight_bits() -> Result<(), Fault> {
+        let at = Location::new("sum preflight test");
+        let mut exact = Budget::new(Limits {
+            component_bits: 4,
+            intermediate_bits: 5,
+            ..Limits::default()
+        })?;
+        assert_eq!(
+            signed_sum((false, 15_u8.into()), (false, 1_u8.into()), &mut exact, at)?,
+            (false, BigUint::from(16_u8))
+        );
+        let mut short = Budget::new(Limits {
+            intermediate_bits: 4,
+            ..exact.limits().clone()
+        })?;
+        let before = short.usage();
+        assert_eq!(
+            signed_sum((false, 15_u8.into()), (true, 15_u8.into()), &mut short, at),
+            Err(Fault::exhausted(BudgetKind::IntermediateBits, 4, 5, at))
+        );
+        assert_eq!(short.usage(), before);
+        Ok(())
+    }
+
+    /// Product work covers a 65-bit predicted result before the dependency call.
+    /// ´test:unit:product-preflight-work´
+    #[test]
+    fn product_preflight_work() -> Result<(), Fault> {
+        let at = Location::new("product work test");
+        let large = BigUint::from(u64::MAX);
+        let unit = BigUint::from(1_u8);
+        let mut exact = Budget::new(Limits {
+            work: 72,
+            arithmetic_steps: 1,
+            ..Limits::default()
+        })?;
+        assert_eq!(product(&large, &unit, &mut exact, at)?, large);
+        assert_eq!(exact.usage().work, 72);
+        assert_eq!(exact.usage().arithmetic_steps, 1);
+        let mut short = Budget::new(Limits {
+            work: 71,
+            ..exact.limits().clone()
+        })?;
+        let before = short.usage();
+        assert_eq!(
+            product(&large, &unit, &mut short, at),
+            Err(Fault::exhausted(BudgetKind::Work, 71, 72, at))
+        );
+        assert_eq!(short.usage(), before);
+        Ok(())
+    }
+
+    /// Division charges both outputs once and rejects zero before spending work.
+    /// ´test:unit:division-preflight-steps´
+    #[test]
+    fn division_preflight_steps() -> Result<(), Fault> {
+        let at = Location::new("division preflight test");
+        let dividend = BigUint::from(17_u8);
+        let divisor = BigUint::from(5_u8);
+        let mut exact = Budget::new(Limits {
+            arithmetic_steps: 1,
+            ..Limits::default()
+        })?;
+        assert_eq!(
+            divide(&dividend, &divisor, &mut exact, at)?,
+            (BigUint::from(3_u8), BigUint::from(2_u8))
+        );
+        let mut short = Budget::new(Limits {
+            arithmetic_steps: 0,
+            ..exact.limits().clone()
+        })?;
+        let before = short.usage();
+        assert_eq!(
+            divide(&dividend, &divisor, &mut short, at),
+            Err(Fault::exhausted(BudgetKind::ArithmeticSteps, 0, 1, at))
+        );
+        assert_eq!(
+            divide(&dividend, &BigUint::from(0_u8), &mut short, at),
+            Err(Fault::invalid(InvalidCode::ZeroDenominator, at))
+        );
+        assert_eq!(short.usage(), before);
+        Ok(())
+    }
+
+    /// Division also preflights the dependency's normalized temporary dividend.
+    /// ´test:unit:division-preflight-scratch´
+    #[test]
+    fn division_preflight_scratch() -> Result<(), Fault> {
+        let at = Location::new("division scratch test");
+        let dividend = BigUint::from(u128::MAX);
+        let divisor = BigUint::from(u64::MAX) + BigUint::from(2_u8);
+        let mut exact = Budget::new(Limits {
+            component_bits: 128,
+            intermediate_bits: 191,
+            ..Limits::default()
+        })?;
+        assert_eq!(
+            divide(&dividend, &divisor, &mut exact, at)?,
+            (BigUint::from(u64::MAX), BigUint::from(0_u8))
+        );
+        let mut short = Budget::new(Limits {
+            intermediate_bits: 190,
+            ..exact.limits().clone()
+        })?;
+        let before = short.usage();
+        assert_eq!(
+            divide(&dividend, &divisor, &mut short, at),
+            Err(Fault::exhausted(BudgetKind::IntermediateBits, 190, 191, at))
+        );
+        assert_eq!(short.usage(), before);
+        Ok(())
+    }
+
+    /// Euclidean remainders stop on the first unpaid call without refunding work.
+    /// ´test:unit:gcd-preflight-steps´
+    #[test]
+    fn gcd_preflight_steps() -> Result<(), Fault> {
+        let at = Location::new("gcd preflight test");
+        let left = BigUint::from(55_u8);
+        let right = BigUint::from(34_u8);
+        let mut exact = Budget::new(Limits {
+            arithmetic_steps: 9,
+            ..Limits::default()
+        })?;
+        assert_eq!(gcd(&left, &right, &mut exact, at)?, BigUint::from(1_u8));
+        assert_eq!(exact.usage().arithmetic_steps, 9);
+        assert_eq!(exact.usage().work, 9 * 32);
+        let mut short = Budget::new(Limits {
+            arithmetic_steps: 8,
+            ..exact.limits().clone()
+        })?;
+        assert_eq!(
+            gcd(&left, &right, &mut short, at),
+            Err(Fault::exhausted(BudgetKind::ArithmeticSteps, 8, 9, at))
+        );
+        assert_eq!(short.usage().arithmetic_steps, 8);
+        assert_eq!(short.usage().work, 8 * 32);
+        Ok(())
+    }
+
+    /// Overflow in the dependency-work bound refuses before ledger mutation.
+    /// ´test:unit:arithmetic-preflight-capacity´
+    #[test]
+    fn arithmetic_preflight_capacity() -> Result<(), Fault> {
+        let at = Location::new("arithmetic capacity test");
+        let mut budget = Budget::new(Limits::default())?;
+        let before = budget.usage();
+        for bits in [u64::MAX, u64::MAX - 63] {
+            assert_eq!(
+                charge(bits, 1, &mut budget, at),
+                Err(Fault::capacity(BudgetKind::Work, at))
+            );
+            assert_eq!(budget.usage(), before);
+        }
+        Ok(())
+    }
 
     /// Fixed power payloads respect both signed endpoints without narrowing exact values.
     /// ´test:unit:parsed-integer-exponent-range´
