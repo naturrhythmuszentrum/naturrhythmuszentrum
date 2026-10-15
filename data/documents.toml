@@ -93,3 +93,7 @@ requires = []
 [[document]]
 output = "docs/design/cas-solving-design.md"
 requires = []
+
+[[document]]
+output = "docs/design/foundations-design.md"
+requires = []
