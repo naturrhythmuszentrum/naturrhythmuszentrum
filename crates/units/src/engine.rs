@@ -25,7 +25,26 @@ impl Context {
     pub fn new(
         registry: Registry,
         limits: Limits,
+        environment: Environment,
+    ) -> Result<Self, Fault> {
+        Self::with_cas_limits(registry, limits, environment, Limits::default())
+    }
+
+    /// Create a context with explicit permanent CAS ceilings and separate physical limits.
+    ///
+    /// `cas_limits` bounds the store and every symbolic request. Request overrides
+    /// must also explicitly select any work allowance above the CAS defaults;
+    /// they can never exceed this store ceiling. Sensitivity construction resolves
+    /// the same explicit policy into its separate ledger. Parsing and physical checks keep
+    /// their existing ledgers. This constructor does not change any global default.
+    ///
+    /// # Errors
+    /// Refuses invalid limits, mathematical declarations or exhausted store admission.
+    pub fn with_cas_limits(
+        registry: Registry,
+        limits: Limits,
         mut environment: Environment,
+        cas_limits: Limits,
     ) -> Result<Self, Fault> {
         limits.validate()?;
         for (key, arity) in [
@@ -49,13 +68,14 @@ impl Context {
                 },
             });
         }
-        let mut cas = Cas::new(Limits::default())?;
+        let mut cas = Cas::new(cas_limits.clone())?;
         let semantic = semantic_context(&mut cas, environment)?;
         Ok(Self {
             cas: RefCell::new(cas),
             semantic,
             registry,
             limits,
+            cas_limits,
             revision: 0,
             declarations: std::collections::BTreeMap::new(),
             functions: std::collections::BTreeMap::new(),

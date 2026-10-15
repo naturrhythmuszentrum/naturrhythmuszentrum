@@ -41,6 +41,12 @@ mod measure;
 mod original;
 mod pairing;
 mod registry;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod sensitivity;
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
@@ -56,6 +62,10 @@ pub use pairing::{
     PairingWitness,
 };
 pub use registry::{BinaryOp, Registry};
+pub use sensitivity::{
+    CheckedSensitivity, JacobianEntry, JacobianEvidence, SensitivityEntry, SensitivityError,
+    SensitivityKernel, SensitivityObligation, SensitivityRecipe, SensitivityWork,
+};
 
 #[cfg(test)]
 mod tests;

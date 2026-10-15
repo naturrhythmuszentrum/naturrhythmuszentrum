@@ -171,6 +171,8 @@ pub struct Context {
     pub(super) revision: u64,
     /// Expression, expansion and work limits for each independent check.
     pub(super) limits: Limits,
+    /// Permanent symbolic ceilings, also used by sensitivity construction ledgers.
+    pub(super) cas_limits: Limits,
 }
 
 impl Context {

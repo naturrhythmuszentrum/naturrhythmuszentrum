@@ -14,3 +14,10 @@ pub(crate) mod declarations;
 )]
 #[path = "pairing.rs"]
 pub(crate) mod pairing;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public sensitivity fixtures stay crate-visible inside the private harness"
+)]
+#[path = "sensitivity.rs"]
+pub(crate) mod sensitivity;
