@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Reversible coordinate changes preserve both equations and strict domains.
+
+use super::constraints::Constraints;
+use super::evaluate::Evaluation;
+use super::proof::{AT, coordinates, family, invalid, problem, tuple};
+use super::value::Value;
+use crate::budget::Budget;
+use crate::error::Fault;
+use crate::graph::{Cas, Handle};
+use crate::proof_model::{ApplicationDraft, CheckedApplication, Statement};
+use crate::solving::coefficients::arithmetic::Engine;
+use crate::solving::coefficients::forms::Variable;
+use crate::solving::coefficients::storage::vector;
+use crate::solving::{
+    CertificateSolutionTransport, FamilyMapData, SolveProblemData, SolveStatement,
+};
+
+/// Map sources explicitly bind a fresh family product with the original ordered scalar fields.
+fn shape(
+    cas: &Cas,
+    map: &FamilyMapData<Handle>,
+    source: &SolveProblemData<Handle>,
+    target: &SolveProblemData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if (&map.header, &map.coefficients, &map.target, &map.scope)
+        != (
+            &source.header,
+            &source.coefficients,
+            &target.unknowns,
+            &source.scope,
+        )
+    {
+        return Err(invalid());
+    }
+    let input = coordinates(cas, &map.family)?;
+    let original = coordinates(cas, &source.unknowns)?;
+    if input.coordinates.len() != original.coordinates.len() {
+        return Err(invalid());
+    }
+    for (coordinate, expected) in input.coordinates.iter().zip(&original.coordinates) {
+        budget.work(1, AT)?;
+        if coordinate.field != expected.field {
+            return Err(invalid());
+        }
+    }
+    Ok(())
+}
+
+/// Interpret the arbitrary source tuple as independent formal unknown coordinates.
+fn unknowns(
+    evaluation: &Evaluation<'_>,
+    source: &SolveProblemData<Handle>,
+    budget: &mut Budget,
+) -> Result<Vec<Value>, Fault> {
+    let coordinates = coordinates(evaluation.cas, &source.unknowns)?;
+    let environment = &evaluation
+        .cas
+        .state
+        .header(source.header.logical_id())?
+        .environment;
+    let mut result = vector(coordinates.coordinates.len(), budget)?;
+    for coordinate in &coordinates.coordinates {
+        let mut found = None;
+        for (index, declaration) in environment.declarations.iter().enumerate() {
+            budget.work(1, AT)?;
+            if declaration.key == coordinate.key {
+                found = Some(u32::try_from(index).map_err(|_| invalid())?);
+                break;
+            }
+        }
+        result.push(Value::variable(
+            Variable::Slot(found.ok_or_else(invalid)?),
+            &evaluation.engine,
+            budget,
+        )?);
+    }
+    Ok(result)
+}
+
+/// Substitute the complete source tuple simultaneously into one bound map body.
+pub(crate) fn apply(
+    evaluation: &Evaluation<'_>,
+    map: &FamilyMapData<Handle>,
+    input: &[Value],
+    budget: &mut Budget,
+) -> Result<Vec<Value>, Fault> {
+    let body = tuple(evaluation.cas, &map.body)?;
+    let mut result = vector(body.entries.len(), budget)?;
+    let lifted = Evaluation {
+        bound: input,
+        ..evaluation.unbound()
+    };
+    for entry in &body.entries {
+        result.push(lifted.expression(entry.logical_id(), false, budget)?);
+    }
+    Ok(result)
+}
+
+/// A direction checks solution preservation, source admission and the full inverse composition.
+fn direction(
+    evaluation: &Evaluation<'_>,
+    source: &SolveProblemData<Handle>,
+    target: &SolveProblemData<Handle>,
+    forward: &FamilyMapData<Handle>,
+    backward: &FamilyMapData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    shape(evaluation.cas, forward, source, target, budget)?;
+    let original = Constraints::problem(evaluation, source, budget)?;
+    let input = unknowns(evaluation, source, budget)?;
+    let output = apply(evaluation, forward, &input, budget)?;
+    let target_coordinates = coordinates(evaluation.cas, &target.unknowns)?;
+    let mut replacements = vector(output.len(), budget)?;
+    for (coordinate, value) in target_coordinates.coordinates.iter().zip(&output) {
+        replacements.push((
+            coordinate.key.as_str(),
+            value.copy(&evaluation.engine, budget)?,
+        ));
+    }
+    let substituted = Evaluation {
+        free: &replacements,
+        ..evaluation.unbound()
+    };
+    let mut requirements = Constraints::problem(&substituted, target, budget)?;
+    let lifted = Evaluation {
+        bound: &input,
+        ..evaluation.unbound()
+    };
+    requirements.domain(&lifted, forward.region.logical_id(), budget)?;
+    for value in &output {
+        requirements.defined(value, evaluation, budget)?;
+    }
+    original.implies(evaluation, &requirements, budget)?;
+    let recovered = apply(evaluation, backward, &output, budget)?;
+    if recovered.len() != input.len() {
+        return Err(invalid());
+    }
+    for (value, expected) in recovered.iter().zip(&input) {
+        let mut domain = Constraints::new();
+        domain.defined(value, evaluation, budget)?;
+        original.implies(evaluation, &domain, budget)?;
+        original.zero(
+            evaluation,
+            &value.sub(expected, &evaluation.engine, budget)?,
+            budget,
+        )?;
+    }
+    Ok(())
+}
+
+/// Independently recompute both directions; supplied identities never replace inverse checking.
+pub(crate) fn check(
+    cas: &Cas,
+    draft: &ApplicationDraft,
+    certificate: &CertificateSolutionTransport,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let Statement::Solve(statement) = &draft.conclusion else {
+        return Err(invalid());
+    };
+    let SolveStatement::Equivalent(equivalent) = statement.as_ref() else {
+        return Err(invalid());
+    };
+    if (
+        &equivalent.source,
+        &equivalent.target,
+        &equivalent.forward,
+        &equivalent.backward,
+        &equivalent.region,
+    ) != (
+        &certificate.source,
+        &certificate.target,
+        &certificate.forward,
+        &certificate.backward,
+        &certificate.region,
+    ) {
+        return Err(invalid());
+    }
+    let source = problem(cas, &certificate.source)?;
+    let target = problem(cas, &certificate.target)?;
+    if (
+        &source.header,
+        &source.coefficients,
+        &source.coefficient_domain,
+        &source.scope,
+        &source.ambient,
+    ) != (
+        &target.header,
+        &target.coefficients,
+        &target.coefficient_domain,
+        &target.scope,
+        &target.ambient,
+    ) {
+        return Err(invalid());
+    }
+    super::proof::region(cas, &draft.context, source, &certificate.region)?;
+    super::member::contained(cas, &certificate.region, &source.region, budget)?;
+    super::member::contained(cas, &certificate.region, &target.region, budget)?;
+    for slot in certificate
+        .definedness
+        .iter()
+        .chain(&certificate.equations)
+        .chain(&certificate.forward_inverse)
+        .chain(&certificate.backward_inverse)
+    {
+        super::proof::premise(premises, *slot)?;
+    }
+    let forward = family(cas, &certificate.forward)?;
+    let backward = family(cas, &certificate.backward)?;
+    let evaluation = Evaluation {
+        cas,
+        engine: Engine {
+            state: &cas.state,
+            domain: &source.coefficient_domain,
+        },
+        region: &certificate.region,
+        premises,
+        free: &[],
+        bound: &[],
+    };
+    direction(&evaluation, source, target, forward, backward, budget)?;
+    direction(&evaluation, target, source, backward, forward, budget)
+}

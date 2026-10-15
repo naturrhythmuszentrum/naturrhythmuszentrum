@@ -27,7 +27,7 @@ pub(crate) mod coefficients;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod elementary;
+pub(crate) mod elementary;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"

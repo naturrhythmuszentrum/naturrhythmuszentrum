@@ -1,48 +1,57 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Unavailable elementary capability, reserved for its owning lane.
+//! Independently replayed membership, strict coordinate transport and total degree partitions.
 
-/// This leaf has no checker or producer until its supplied-certificate tests land.
+mod constraints;
+mod evaluate;
+mod evidence;
+mod member;
+mod proof;
+mod reduction;
+mod split;
+mod total;
+mod transport;
+mod value;
+
+/// Elementary availability follows the implemented independently checked schemas.
 pub(crate) const fn availability() -> super::Availability {
-    super::Availability::Unavailable
+    super::Availability::Available
 }
 
-/// Per-subtype capability permits independently green checker slices in this leaf.
-pub(crate) const fn schema_availability(_tag: u8) -> super::Availability {
-    super::Availability::Unavailable
+/// Enable a schema only together with its concrete checker.
+pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
+    if matches!(tag, 4..=6) {
+        super::Availability::Available
+    } else {
+        super::Availability::Unavailable
+    }
 }
 
-/// Reject every application until this lane supplies its independent typed checker.
+/// Dispatch exact certificate subtypes and preserve the complete scoped premise conditions.
 pub(crate) fn check(
-    _cas: &crate::graph::Cas,
-    _draft: &crate::proof_model::ApplicationDraft,
-    _premises: &[crate::proof_model::CheckedApplication],
+    cas: &crate::graph::Cas,
+    draft: &crate::proof_model::ApplicationDraft,
+    premises: &[crate::proof_model::CheckedApplication],
     budget: &mut crate::budget::Budget,
 ) -> Result<crate::proof_model::ScopedConditions, crate::error::Fault> {
-    budget.work(
-        1,
-        crate::error::Location::new("unavailable solving checker"),
-    )?;
-    Err(crate::error::Fault::invalid(
-        crate::error::InvalidCode::UnsupportedFragment,
-        crate::error::Location::new("unavailable solving checker"),
-    ))
-}
-
-#[cfg(test)]
-mod tests {
-    /// The placeholder cannot advertise an executable capability.
-    /// ´test:unit:elementary-unavailable´
-    #[test]
-    fn elementary_unavailable() {
-        assert_eq!(
-            super::availability(),
-            crate::solving::Availability::Unavailable
-        );
-        for tag in 0..18 {
-            assert_eq!(
-                super::schema_availability(tag),
-                crate::solving::Availability::Unavailable
-            );
-        }
+    use crate::solving::{SolveCertificate, SolveSchema};
+    let crate::proof_model::Certificate::Solve(certificate) = &draft.certificate else {
+        return Err(proof::invalid());
+    };
+    let inherited = proof::conditions(cas, draft, premises, budget)?;
+    match (draft.rule, certificate.as_ref()) {
+        (
+            crate::rule::Primitive::Solve(SolveSchema::Membership),
+            SolveCertificate::Membership(value),
+        ) => member::check(cas, draft, value, premises, budget)?,
+        (
+            crate::rule::Primitive::Solve(SolveSchema::SolutionTransport),
+            SolveCertificate::SolutionTransport(value),
+        ) => transport::check(cas, draft, value, premises, budget)?,
+        (
+            crate::rule::Primitive::Solve(SolveSchema::TotalPredicateSplit),
+            SolveCertificate::TotalPredicateSplit(value),
+        ) => split::check(cas, draft, value, premises, budget)?,
+        _ => return Err(proof::invalid()),
     }
+    Ok(inherited)
 }
