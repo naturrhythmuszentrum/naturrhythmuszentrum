@@ -13,6 +13,12 @@ pub struct OperationDraft {
     pub(crate) inputs: Vec<CheckedShape>,
     /// Optional checked numerical maps; absence selects exact copy.
     pub(crate) conversions: Option<Vec<crate::conversion::ConversionContract>>,
+    /// Explicit distinct source and target formats with preserved region contracts.
+    pub(crate) precision: Option<(
+        Vec<crate::conversion::PrecisionContract>,
+        nrz_scalar::Precision,
+        nrz_scalar::Precision,
+    )>,
 }
 
 impl OperationDraft {
@@ -22,6 +28,7 @@ impl OperationDraft {
         Self {
             inputs,
             conversions: None,
+            precision: None,
         }
     }
 
@@ -32,6 +39,9 @@ impl OperationDraft {
     /// # Errors
     /// Refuses empty recipes, nonhomogeneous or formal entry schemas, points and limits.
     pub fn check(self, limits: ExecutionLimits) -> Result<CheckedOperation, OperationError> {
+        if let Some((contracts, source, target)) = self.precision {
+            return crate::conversion::precision::check(contracts, source, target, limits);
+        }
         if let Some(conversions) = self.conversions {
             return crate::conversion::check_operations(conversions, limits);
         }
@@ -192,4 +202,11 @@ pub(crate) enum NativeRecipe {
     Copy,
     /// Checked exact affine descriptor maps, in output order.
     Affine(std::rc::Rc<[crate::conversion::ConversionContract]>),
+    /// A new arena representation with a separately checked displacement region.
+    Precision {
+        /// Source format required by every typed input slot.
+        source: nrz_scalar::Precision,
+        /// Fresh output format, never a reinterpretation of an old arena.
+        target: nrz_scalar::Precision,
+    },
 }

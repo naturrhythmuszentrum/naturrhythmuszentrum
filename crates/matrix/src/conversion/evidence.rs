@@ -115,6 +115,8 @@ pub enum RecipeEvidence {
     Copy(CopyEvidence),
     /// Outward affine evaluation and propagated deterministic companions.
     Conversion(Box<ConversionEvidence>),
+    /// New representation with retained prior bounds and a separate center displacement.
+    Precision(PrecisionEvidence),
 }
 
 impl RecipeEvidence {
@@ -124,6 +126,7 @@ impl RecipeEvidence {
         match self {
             Self::Copy(claim) => claim.slot(),
             Self::Conversion(claim) => claim.slot,
+            Self::Precision(claim) => claim.slot,
         }
     }
     /// Number of logical center entries covered by this claim.
@@ -132,6 +135,7 @@ impl RecipeEvidence {
         match self {
             Self::Copy(claim) => claim.entries(),
             Self::Conversion(claim) => claim.entries,
+            Self::Precision(claim) => claim.entries,
         }
     }
     /// Retained physical or represented-input scope.
@@ -140,6 +144,42 @@ impl RecipeEvidence {
         match self {
             Self::Copy(claim) => claim.coverage(),
             Self::Conversion(claim) => claim.coverage,
+            Self::Precision(claim) => claim.coverage,
         }
+    }
+}
+
+/// Numerical coverage of one explicit representation change, with no unit-map evaluation.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrecisionEvidence {
+    /// Position in the connected conversion bundle.
+    pub(crate) slot: usize,
+    /// Number of logical entries covered by the total and displacement regions.
+    pub(crate) entries: usize,
+    /// Original deterministic problem scope.
+    pub(crate) coverage: Coverage,
+    /// Source arena precision.
+    pub(crate) source: Precision,
+    /// Newly allocated arena precision.
+    pub(crate) target: Precision,
+    /// Scalar environment/rounding proof revision.
+    pub(crate) revision: u32,
+}
+
+impl PrecisionEvidence {
+    /// Original arena format, which remains unchanged and readable.
+    #[must_use]
+    pub const fn source_precision(&self) -> Precision {
+        self.source
+    }
+    /// Format of the fresh output representation.
+    #[must_use]
+    pub const fn target_precision(&self) -> Precision {
+        self.target
+    }
+    /// Scalar rounding proof revision for endpoint and displacement conversion.
+    #[must_use]
+    pub const fn arithmetic_revision(&self) -> u32 {
+        self.revision
     }
 }

@@ -29,13 +29,13 @@ pub struct ExecutionId(pub(crate) u64);
 #[derive(Debug)]
 pub struct Binding<P: Scalar, Q: Scalar = P> {
     /// Private checked recipe, never an unchecked draft.
-    operation: CheckedOperation,
+    pub(crate) operation: CheckedOperation,
     /// Operation-ordered input locators.
-    inputs: Vec<Handle<Value, P>>,
+    pub(crate) inputs: Vec<Handle<Value, P>>,
     /// Explicit work and private scratch limits.
-    limits: ExecutionLimits,
+    pub(crate) limits: ExecutionLimits,
     /// Output scalar type, fixed independently of the input handle type.
-    output: std::marker::PhantomData<Q>,
+    pub(crate) output: std::marker::PhantomData<Q>,
 }
 
 impl<P: Scalar + 'static> Binding<P> {
@@ -62,8 +62,11 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
     /// # Errors
     /// Refuses stale/foreign/category/precision mismatches, schemas, structure or limits.
     pub fn validate(self, heap: &mut Heap) -> Result<Bound<'_, P, Q>, OperationError> {
-        if P::PRECISION != Q::PRECISION {
-            return Err(HeapError::PrecisionMismatch.into());
+        match self.operation.recipe {
+            NativeRecipe::Precision { source, target }
+                if source == P::PRECISION && target == Q::PRECISION => {}
+            NativeRecipe::Copy | NativeRecipe::Affine(_) if P::PRECISION == Q::PRECISION => {}
+            _ => return Err(HeapError::PrecisionMismatch.into()),
         }
         if self.inputs.len() != self.operation.inputs.len() {
             return Err(OperationError::InputCount);
@@ -72,11 +75,11 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         let dependencies = capture(heap, &self.inputs)?;
         let entries = payload_entries(&dependencies)?;
         let output_entries = dependencies.iter().try_fold(0_usize, |total, input| {
-            let copies = if matches!(self.operation.recipe, NativeRecipe::Affine(_)) {
-                3
-            } else {
+            let copies = if matches!(self.operation.recipe, NativeRecipe::Copy) {
                 1 + usize::from(input.companion().is_some())
                     + usize::from(input.evaluation.is_some())
+            } else {
+                3
             };
             input
                 .layout()

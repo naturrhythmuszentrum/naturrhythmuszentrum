@@ -105,8 +105,8 @@ mod records;
 pub use provenance::{ProvenanceId, ProvenanceLimits, ProvenanceUsage, ProvenanceView};
 pub use publication::Candidate;
 pub use records::{
-    CopyEvidence, Dependency, Failure, FailureRecord, OperationRecord, Outcome, OutputRecord,
-    RecordId,
+    BundleTargetMap, CopyEvidence, Dependency, Failure, FailureRecord, OperationRecord, Outcome,
+    OutputRecord, RecordId,
 };
 
 #[cfg(any(doc, doctest))]
@@ -153,7 +153,7 @@ mod coordinate_numeric;
 mod joint_twins;
 pub use conversion::{
     ConstantEvidence, ConversionContract, ConversionError, ConversionEvidence, ConversionMode,
-    RecipeEvidence,
+    PrecisionContract, PrecisionEvidence, RecipeEvidence,
 };
 
 #[cfg(test)]
@@ -172,3 +172,6 @@ mod conversion_oracle;
 mod conversion_testing;
 
 pub use conversion::{NormalizationMaps, NormalizedEntryMaps};
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/conversion_twins.rs"]
+mod conversion_twins;

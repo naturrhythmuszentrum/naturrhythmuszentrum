@@ -83,12 +83,16 @@ impl OperationDraft {
         Self {
             inputs: Vec::new(),
             conversions: Some(conversions),
+            precision: None,
         }
     }
 }
 
 /// Validate the homogeneous tangent shape while preserving the actual point or measure schema.
-fn region(shape: CheckedShape, descriptor: &Descriptor) -> Result<RegionContract, OperationError> {
+pub(super) fn region(
+    shape: CheckedShape,
+    descriptor: &Descriptor,
+) -> Result<RegionContract, OperationError> {
     if descriptor.role() == nrz_units::Role::Point
         && shape.entries().iter().any(crate::EntryContract::is_zero)
     {

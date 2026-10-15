@@ -171,7 +171,7 @@ fn schema_plans<P: Scalar + 'static>(
 ) -> Result<(Vec<SchemaPlan>, Vec<Schema>), OperationError> {
     let mut plans = buffer(inputs.len())?;
     let mut pending = Vec::new();
-    let numerical = matches!(operation.recipe, super::NativeRecipe::Affine(_));
+    let numerical = !matches!(operation.recipe, super::NativeRecipe::Copy);
     for (input, output) in inputs.iter().zip(operation.outputs.iter()) {
         let extent = input.layout().extent();
         let quantity = output.descriptor().clone();

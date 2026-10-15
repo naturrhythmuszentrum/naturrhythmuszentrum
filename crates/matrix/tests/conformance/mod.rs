@@ -20,3 +20,7 @@ mod joint_zero;
 
 mod conversion;
 mod joint_repeated;
+
+mod conversion_twins;
+
+mod precision_conversion;

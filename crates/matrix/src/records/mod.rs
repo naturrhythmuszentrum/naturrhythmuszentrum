@@ -108,7 +108,11 @@ impl OperationRecord {
             (crate::binding::NativeRecipe::Copy, Precision::F64) => {
                 "finite binary64 bit copy; no floating arithmetic"
             }
-            (crate::binding::NativeRecipe::Affine(_), _) => {
+            (
+                crate::binding::NativeRecipe::Affine(_)
+                | crate::binding::NativeRecipe::Precision { .. },
+                _,
+            ) => {
                 "IEEE binary32/binary64; nearest ties to even; gradual underflow; scalar outward arithmetic revision 1"
             }
         }
@@ -139,5 +143,49 @@ impl<T> Outcome<T> {
     #[must_use]
     pub const fn record(&self) -> RecordId {
         self.record
+    }
+}
+
+/// One atomic source-to-destination target map, including each side's companion dependencies.
+#[derive(Debug)]
+pub struct BundleTargetMap<'a> {
+    /// Frozen source identity, selection and original format.
+    source: &'a Dependency,
+    /// Fresh output identity, complete companion targets and destination format.
+    target: &'a Dependency,
+}
+
+impl BundleTargetMap<'_> {
+    /// Original representation, preserved by the conversion.
+    #[must_use]
+    pub const fn source(&self) -> &Dependency {
+        self.source
+    }
+    /// Fresh representation whose companions were retargeted in the same commit.
+    #[must_use]
+    pub const fn target(&self) -> &Dependency {
+        self.target
+    }
+}
+
+impl OperationRecord {
+    /// Inspect one ordered target map from this atomic bundle.
+    ///
+    /// Obtain the record through `Heap::operation_record` for current evidence;
+    /// a historical record supplies only historical target facts.
+    /// # Errors
+    /// Refuses an output position outside the checked complete bundle.
+    pub fn target_map(&self, slot: usize) -> Result<BundleTargetMap<'_>, crate::HeapError> {
+        Ok(BundleTargetMap {
+            source: self
+                .inputs
+                .get(slot)
+                .ok_or(crate::HeapError::InvalidLayout)?,
+            target: &self
+                .outputs
+                .get(slot)
+                .ok_or(crate::HeapError::InvalidLayout)?
+                .dependency,
+        })
     }
 }

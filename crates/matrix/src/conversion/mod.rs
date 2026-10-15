@@ -29,7 +29,7 @@ pub use contract::ConversionContract;
 pub(crate) use contract::check_operations;
 
 mod evidence;
-pub use evidence::{ConstantEvidence, ConversionEvidence, RecipeEvidence};
+pub use evidence::{ConstantEvidence, ConversionEvidence, PrecisionEvidence, RecipeEvidence};
 
 mod evaluate;
 pub(crate) use evaluate::evaluate;
@@ -116,3 +116,5 @@ mod cache;
 mod definitions;
 mod schema;
 pub use schema::{NormalizationMaps, NormalizedEntryMaps};
+pub(crate) mod precision;
+pub use precision::PrecisionContract;

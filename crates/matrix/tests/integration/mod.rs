@@ -18,4 +18,5 @@ mod joint_companions;
 mod conversion;
 mod joint_dense;
 
+mod precision_conversion;
 mod schema_conversion;

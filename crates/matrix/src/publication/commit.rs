@@ -75,6 +75,16 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                         return Err(OperationError::CandidateContract);
                     }
                 }
+                crate::binding::NativeRecipe::Precision { source, target } => {
+                    let Some(crate::RecipeEvidence::Precision(claim)) =
+                        candidate.evidence.get(slot)
+                    else {
+                        return Err(OperationError::CandidateContract);
+                    };
+                    if claim.source_precision() != *source || claim.target_precision() != *target {
+                        return Err(OperationError::CandidateContract);
+                    }
+                }
             }
             let output = self
                 .reservations

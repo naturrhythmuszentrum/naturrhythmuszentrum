@@ -47,7 +47,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .map_err(|_| crate::HeapError::Capacity)?;
         let context = match self.operation.recipe {
             crate::binding::NativeRecipe::Copy => None,
-            crate::binding::NativeRecipe::Affine(_) => {
+            crate::binding::NativeRecipe::Affine(_)
+            | crate::binding::NativeRecipe::Precision { .. } => {
                 Some(nrz_scalar::ArithmeticContext::new().map_err(crate::ConversionError::from)?)
             }
         };
@@ -102,6 +103,14 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 context.ok_or(OperationError::CandidateContract)?,
                 slot,
             ),
+            crate::binding::NativeRecipe::Precision { .. } => {
+                crate::conversion::precision::evaluate(
+                    view,
+                    reservation,
+                    context.ok_or(OperationError::CandidateContract)?,
+                    slot,
+                )
+            }
         }
     }
 
