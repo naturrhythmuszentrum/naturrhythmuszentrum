@@ -116,8 +116,12 @@ fn native_reciprocal_retains_domain_premises() -> TestResult {
             SensitivityObligation::Nonzero { coordinate: 1 }
         ]
     );
-    assert!(checked.jacobian().witness().is_discharged());
-    assert_eq!(checked.jacobian().witness().hypotheses().len(), 2);
+    let witnesses = checked.jacobian().witnesses();
+    let [witness] = witnesses else {
+        return Err("missing native assembly".into());
+    };
+    assert!(witness.is_discharged());
+    assert_eq!(witness.hypotheses().len(), 2);
     let cas = checked.declarations().cas()?;
     for (entry, expected) in
         checked

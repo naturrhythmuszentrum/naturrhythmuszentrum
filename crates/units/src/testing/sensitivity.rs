@@ -192,3 +192,76 @@ pub(crate) fn replay_boundary(
     assert!(replay_usage.work <= below);
     Ok(())
 }
+
+/// Generation includes optional response bytes, so locate the actual complete-proof boundary.
+pub(crate) fn generation_boundary(
+    lower: impl Fn(&LimitsOverride) -> TestResult<CheckedSensitivity>,
+) -> TestResult {
+    let baseline = lower(&request_limits())?.jacobian().work();
+    assert!(
+        baseline.generation <= GENERATION_WORK / 2,
+        "generation headroom: {baseline:?}"
+    );
+    assert!(
+        baseline.replay <= REPLAY_WORK / 2,
+        "replay headroom: {baseline:?}"
+    );
+    assert!(
+        baseline.construction <= GENERATION_WORK / 2,
+        "construction headroom: {baseline:?}"
+    );
+    assert!(baseline.generation > baseline.replay && baseline.generation > baseline.construction);
+    let threshold = generation_limit(&lower, baseline.construction, baseline.generation)?;
+    let mut limits = request_limits();
+    limits.work = Some(threshold);
+    let exact = lower(&limits)?;
+    assert_eq!(exact.jacobian().work().requests, baseline.requests);
+    assert!(exact.jacobian().work().generation <= threshold);
+    let below = threshold.checked_sub(1).ok_or("empty generation ledger")?;
+    limits.work = Some(below);
+    generation_exhausted(
+        lower(&limits)
+            .err()
+            .ok_or("one-below generation request succeeded")?,
+        below,
+    )
+}
+
+/// Fresh deterministic schedules find the success/refusal boundary in at most 64 bounded trials.
+fn generation_limit(
+    lower: &impl Fn(&LimitsOverride) -> TestResult<CheckedSensitivity>,
+    mut floor: u64,
+    mut ceiling: u64,
+) -> TestResult<u64> {
+    for _ in 0..u64::BITS {
+        if floor == ceiling {
+            return Ok(floor);
+        }
+        let middle = floor + (ceiling - floor) / 2;
+        let mut limits = request_limits();
+        limits.work = Some(middle);
+        match lower(&limits) {
+            Ok(_) => ceiling = middle,
+            Err(error) => {
+                generation_exhausted(error, middle)?;
+                floor = middle.checked_add(1).ok_or("boundary overflow")?;
+            }
+        }
+    }
+    Err("generation boundary did not converge".into())
+}
+
+/// Only a generation-work refusal, not a semantic or replay failure, brackets this boundary.
+fn generation_exhausted(error: Box<dyn std::error::Error>, ceiling: u64) -> TestResult {
+    let Some(SensitivityError::Evidence(outcome)) = error.downcast_ref::<SensitivityError>() else {
+        return Err(error);
+    };
+    let nrz_cas::request::Outcome::Exhausted { fault, usage, .. } = outcome.as_ref() else {
+        return Err("generation request did not exhaust".into());
+    };
+    assert!(
+        matches!(fault.kind, nrz_cas::FaultKind::Exhausted { budget: nrz_cas::limits::BudgetKind::Work, limit, .. } if limit == ceiling)
+    );
+    assert!(usage.work <= ceiling);
+    Ok(())
+}

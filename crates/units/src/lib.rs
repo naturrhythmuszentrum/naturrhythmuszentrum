@@ -12,6 +12,12 @@ mod checker;
     reason = "items shared across private modules stay crate-visible because the workspace denies \
         unreachable_pub"
 )]
+mod constants;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
 mod coordinates;
 mod declaration;
 mod descriptor;
@@ -49,6 +55,7 @@ mod registry;
 mod sensitivity;
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};
+pub use constants::{CheckedMap, ConstantKind, DescriptorConstant, MapError, MapIdentity, MapKind};
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};
 pub use diagnostic::{Diagnostic, Expectation, Failure, Location};
@@ -64,7 +71,7 @@ pub use pairing::{
 pub use registry::{BinaryOp, Registry};
 pub use sensitivity::{
     CheckedSensitivity, JacobianEntry, JacobianEvidence, SensitivityEntry, SensitivityError,
-    SensitivityKernel, SensitivityObligation, SensitivityRecipe, SensitivityWork,
+    SensitivityKernel, SensitivityObligation, SensitivityRecipe, SensitivityWork, SolveSymbols,
 };
 
 #[cfg(test)]

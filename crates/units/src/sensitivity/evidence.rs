@@ -27,6 +27,8 @@ pub struct SensitivityWork {
 pub struct JacobianEntry {
     /// The CAS derivative expression, never an original physical expression.
     pub(crate) expression: Handle,
+    /// Index of the replayed derivative or assembly in `JacobianEvidence::witnesses`.
+    pub(crate) witness_index: usize,
     /// Expected quotient supplied by the derivative relationship, including for zero.
     pub(crate) pairing: PairingWitness,
     /// Replayed equality to the closed recipe's expected coefficient.
@@ -38,6 +40,12 @@ impl JacobianEntry {
     #[must_use]
     pub const fn expression(&self) -> &Handle {
         &self.expression
+    }
+
+    /// Exact replayed proof backing this partial in `JacobianEvidence::witnesses`.
+    #[must_use]
+    pub const fn witness_index(&self) -> usize {
+        self.witness_index
     }
 
     /// Formal output-over-input descriptor; zero has this same typed relationship.
@@ -60,8 +68,8 @@ pub struct JacobianEvidence {
     pub(crate) originals: Vec<CheckedExpression>,
     /// Independent scalar coordinates in exact request order.
     pub(crate) coordinates: Vec<String>,
-    /// Replayed assembly, whose public CAS cells are row ordered.
-    pub(crate) witness: VerifiedWitness,
+    /// Replayed native assembly or individually replayed implicit scalar partials.
+    pub(crate) witnesses: Vec<VerifiedWitness>,
     /// Observed bounded request work, including coefficient equalities.
     pub(crate) work: SensitivityWork,
     /// Explicitly permuted cells at `row + rows*column`.
@@ -81,10 +89,13 @@ impl JacobianEvidence {
         &self.coordinates
     }
 
-    /// Original CAS assembly with its domain and qualified assumptions intact.
+    /// CAS derivative proofs with their domains and qualified assumptions intact.
+    ///
+    /// Native recipes retain one row-ordered assembly; implicit recipes retain one
+    /// scalar derivative per cell. Each entry identifies its proof by index.
     #[must_use]
-    pub const fn witness(&self) -> &VerifiedWitness {
-        &self.witness
+    pub fn witnesses(&self) -> &[VerifiedWitness] {
+        &self.witnesses
     }
 
     /// Per-request work peaks, useful for selecting explicit finite service limits.
@@ -136,6 +147,10 @@ pub struct CheckedSensitivity {
     pub(crate) recipe: SensitivityRecipe,
     /// Independent input keys in the final derivative's column order.
     pub(crate) coordinates: Vec<String>,
+    /// Checked value recipes, or entrywise defining relations for an implicit solve.
+    pub(crate) originals: Vec<CheckedExpression>,
+    /// Output placeholder keys, excluded from the independent input inventory.
+    pub(crate) auxiliary: Vec<String>,
     /// Input descriptors in their declared coordinates.
     pub(crate) inputs: Vec<Descriptor>,
     /// Output descriptors in coherent coordinates.
@@ -171,6 +186,18 @@ impl CheckedSensitivity {
     #[must_use]
     pub fn coordinates(&self) -> &[String] {
         &self.coordinates
+    }
+
+    /// Original value recipes, or the entrywise defining equations of a solve.
+    #[must_use]
+    pub fn originals(&self) -> &[CheckedExpression] {
+        &self.originals
+    }
+
+    /// Root/solution placeholders in output order; these are not independent inputs.
+    #[must_use]
+    pub fn auxiliary_symbols(&self) -> &[String] {
+        &self.auxiliary
     }
 
     /// Input descriptors, whose scales participate in the fixed schedule.

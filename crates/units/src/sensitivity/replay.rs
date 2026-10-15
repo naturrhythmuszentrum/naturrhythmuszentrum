@@ -55,6 +55,27 @@ pub(crate) fn equality(
     }
 }
 
+/// Bind one replayed partial to the checked original, exact coordinate and full domain.
+pub(crate) fn derivative(
+    graph: &Graph<'_>,
+    witness: &VerifiedWitness,
+    original: &CheckedExpression,
+    key: &str,
+) -> Result<Handle, SensitivityError> {
+    scope(witness, &graph.context)?;
+    match &witness.judgment().statement {
+        Statement::DerivativeOn {
+            function,
+            derivative,
+            coordinate,
+            domain,
+        } if function == &original.coordinates && coordinate == key && domain == &graph.domain => {
+            Ok(derivative.clone())
+        }
+        _ => Err(SensitivityError::WitnessMismatch),
+    }
+}
+
 /// Check the actual assembled source column, then explicitly transpose cell enumeration.
 pub(crate) fn jacobian_cells(
     graph: &mut Graph<'_>,
@@ -144,6 +165,49 @@ mod tests {
         let witness = graph.equal(&one, &one)?;
         assert!(matches!(
             equality(&witness, &one, &zero, &graph.context, &graph.domain),
+            Err(SensitivityError::WitnessMismatch)
+        ));
+        Ok(())
+    }
+
+    /// An implicit partial cannot be reassigned to another original or coordinate.
+    /// ´test:unit:implicit-partial-witness-association´
+    #[test]
+    fn implicit_partial_witness_association() -> Result<(), Box<dyn std::error::Error>> {
+        use crate::{Declaration, Descriptor, Evidence};
+        use nrz_cas::syntax::{AtomicSort, Declaration as Mathematical, Field, Sort};
+
+        let mut builder = Context::new(
+            Registry::new(ExponentPolicy::Rational),
+            Limits::default(),
+            Environment {
+                declarations: vec![Mathematical {
+                    key: "x".into(),
+                    display_name: "x".into(),
+                    sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+                }],
+                ..Environment::default()
+            },
+        )?;
+        builder.declare(
+            "x".into(),
+            Declaration::Input {
+                descriptor: Descriptor::ratio(),
+                nonzero: false,
+                evidence: Evidence::default(),
+            },
+        )?;
+        let square = builder.check(&builder.parse("square", "x^2")?)?;
+        let cube = builder.check(&builder.parse("cube", "x^3")?)?;
+        let mut graph = Graph::new(&builder, &nrz_cas::limits::LimitsOverride::default())?;
+        let witness = graph.differentiate(&square, "x")?;
+        assert!(super::derivative(&graph, &witness, &square, "x").is_ok());
+        assert!(matches!(
+            super::derivative(&graph, &witness, &cube, "x"),
+            Err(SensitivityError::WitnessMismatch)
+        ));
+        assert!(matches!(
+            super::derivative(&graph, &witness, &square, "y"),
             Err(SensitivityError::WitnessMismatch)
         ));
         Ok(())

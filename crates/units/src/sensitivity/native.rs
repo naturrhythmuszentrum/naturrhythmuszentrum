@@ -36,6 +36,12 @@ impl Context {
         limits: &LimitsOverride,
     ) -> Result<CheckedSensitivity, SensitivityError> {
         let checks = self.check_all()?;
+        if !matches!(
+            recipe,
+            SensitivityRecipe::Square | SensitivityRecipe::Reciprocal
+        ) {
+            return Err(SensitivityError::UnsupportedRecipe);
+        }
         let inputs = coordinate_checks(&self, &checks, coordinates)?;
         let checked = originals
             .iter()
@@ -52,6 +58,8 @@ impl Context {
             declarations: CheckedDeclarations::new(self, checks),
             recipe,
             coordinates: coordinates.to_vec(),
+            originals: jacobian.originals.clone(),
+            auxiliary: Vec::new(),
             inputs: inputs
                 .iter()
                 .map(|input| input.descriptor().clone())
@@ -122,7 +130,7 @@ fn lower(
         JacobianEvidence {
             originals,
             coordinates: coordinates.to_vec(),
-            witness,
+            witnesses: vec![witness],
             work: graph.work,
             entries: derivatives,
         },
@@ -154,12 +162,13 @@ fn lower_entries(
                 PairingWitness::sensitivity(&original.descriptor().coherent(), input.descriptor())?;
             derivatives.push(JacobianEntry {
                 expression: cell.clone(),
+                witness_index: 0,
                 pairing: pairing.clone(),
                 identity,
             });
             entries.push(SensitivityEntry {
                 pairing,
-                kernel: kernel(recipe, column, active),
+                kernel: kernel(recipe, column, active)?,
             });
         }
     }
@@ -220,7 +229,7 @@ fn premises(
 }
 
 /// The fixed derivative formula includes the input measure's exact chain-rule factor.
-fn coefficient(
+pub(crate) fn coefficient(
     graph: &mut Graph<'_>,
     recipe: SensitivityRecipe,
     input: &CheckedExpression,
@@ -237,6 +246,9 @@ fn coefficient(
             let doubled = graph.term(Operator::Mul, &[two, coherent])?;
             graph.term(Operator::Mul, &[doubled, scale])
         }
+        SensitivityRecipe::PositiveRoot | SensitivityRecipe::Solve { .. } => {
+            Err(SensitivityError::UnsupportedRecipe)
+        }
         SensitivityRecipe::Reciprocal => {
             let square = graph.term(Operator::Mul, &[coherent.clone(), coherent])?;
             let negative = graph.term(Operator::Neg, &[scale])?;
@@ -246,12 +258,19 @@ fn coefficient(
 }
 
 /// Associate the tested formula with its closed numerical instruction.
-const fn kernel(recipe: SensitivityRecipe, coordinate: usize, active: bool) -> SensitivityKernel {
+const fn kernel(
+    recipe: SensitivityRecipe,
+    coordinate: usize,
+    active: bool,
+) -> Result<SensitivityKernel, SensitivityError> {
     if !active {
-        return SensitivityKernel::Zero;
+        return Ok(SensitivityKernel::Zero);
     }
     match recipe {
-        SensitivityRecipe::Square => SensitivityKernel::Square { coordinate },
-        SensitivityRecipe::Reciprocal => SensitivityKernel::Reciprocal { coordinate },
+        SensitivityRecipe::Square => Ok(SensitivityKernel::Square { coordinate }),
+        SensitivityRecipe::Reciprocal => Ok(SensitivityKernel::Reciprocal { coordinate }),
+        SensitivityRecipe::PositiveRoot | SensitivityRecipe::Solve { .. } => {
+            Err(SensitivityError::UnsupportedRecipe)
+        }
     }
 }

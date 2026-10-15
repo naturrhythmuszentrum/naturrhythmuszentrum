@@ -48,8 +48,12 @@ fn sensitivity_checked_coordinate_association() -> Result<(), Box<dyn std::error
         &["x".into()],
         &LimitsOverride::default(),
     )?;
-    let Statement::Jacobian { input, .. } = &recipe.jacobian().witness().judgment().statement
-    else {
+    let witness = recipe
+        .jacobian()
+        .witnesses()
+        .first()
+        .ok_or("missing assembly")?;
+    let Statement::Jacobian { input, .. } = &witness.judgment().statement else {
         return Err("missing Jacobian".into());
     };
     let cas = recipe.declarations().cas()?;

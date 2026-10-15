@@ -124,6 +124,22 @@ impl<'a> Graph<'a> {
         Ok(())
     }
 
+    /// Materialize every use of a fixed native defining relation as original syntax.
+    pub(crate) fn original(
+        &mut self,
+        syntax: Handle,
+        key: &str,
+    ) -> Result<nrz_cas::source::OriginalForm, SensitivityError> {
+        let source = self.admit(Draft::Source {
+            key: key.into(),
+            text: key.into(),
+        })?;
+        let root = self
+            .cas
+            .materialize_original(&syntax, &source, &mut self.budget)?;
+        Ok(nrz_cas::source::OriginalForm { syntax, root })
+    }
+
     /// Cover a generated coefficient by a complete walk with original provenance.
     pub(crate) fn cover(
         &mut self,
@@ -153,6 +169,24 @@ impl<'a> Graph<'a> {
             inputs.push(self.cover(&original.coordinates, &original.original().syntax)?);
         }
         self.request(Task::Jacobian(coordinates.to_vec()), inputs)
+    }
+
+    /// Request one scalar partial with an explicit coordinate, order, layer and domain.
+    pub(crate) fn differentiate(
+        &mut self,
+        original: &CheckedExpression,
+        coordinate: &str,
+    ) -> Result<VerifiedWitness, SensitivityError> {
+        let input = self.cover(&original.coordinates, &original.original().syntax)?;
+        self.request(
+            Task::Differentiate {
+                coordinate: coordinate.into(),
+                order: 1,
+                layer: nrz_cas::domain::Layer::Pointwise,
+                domain: self.domain.clone(),
+            },
+            vec![input],
+        )
     }
 
     /// Prove equality to a fixed native coefficient; callers cannot supply this formula.
@@ -198,5 +232,87 @@ impl<'a> Graph<'a> {
                 .ok_or(SensitivityError::ResourceLimit)?;
         }
         super::replay::completed(outcome)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nrz_cas::limits::{Limits, LimitsOverride};
+    use nrz_cas::request::Outcome;
+    use nrz_cas::syntax::{AtomicSort, Declaration as Mathematical, Environment, Field, Sort};
+
+    use super::Graph;
+    use crate::{
+        Context, Declaration, Descriptor, Evidence, ExponentPolicy, Registry, SensitivityError,
+    };
+
+    /// A real public-facade context for testing the private replay admission boundary.
+    fn fixture() -> Result<Context, Box<dyn std::error::Error>> {
+        let mut builder = Context::new(
+            Registry::new(ExponentPolicy::Rational),
+            Limits::default(),
+            Environment {
+                declarations: vec![Mathematical {
+                    key: "x".into(),
+                    display_name: "x".into(),
+                    sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+                }],
+                ..Environment::default()
+            },
+        )?;
+        builder.declare(
+            "x".into(),
+            Declaration::Input {
+                descriptor: Descriptor::ratio(),
+                nonzero: false,
+                evidence: Evidence::default(),
+            },
+        )?;
+        Ok(builder)
+    }
+
+    /// Unsupported named-root derivative grammar cannot create an explicit derivative witness.
+    /// ´test:unit:sensitivity-unsupported-cas-evidence-refusal´
+    #[test]
+    fn sensitivity_unsupported_cas_evidence_refusal() -> Result<(), Box<dyn std::error::Error>> {
+        let builder = fixture()?;
+        let original = builder.parse("unsupported derivative", "sqrt(x)")?;
+        let checked = builder.check(&original)?;
+        let mut graph = Graph::new(&builder, &LimitsOverride::default())?;
+        let error = graph
+            .jacobian(&[checked], &["x".into()])
+            .err()
+            .ok_or("unsupported CAS derivative accepted")?;
+        let SensitivityError::Evidence(outcome) = error else {
+            return Err("CAS outcome not retained".into());
+        };
+        assert!(matches!(
+            *outcome,
+            Outcome::Unresolved { .. } | Outcome::Unsupported { .. }
+        ));
+        Ok(())
+    }
+
+    /// Exhaustion cannot promote a partial or best-so-far witness into a closed schedule.
+    /// ´test:unit:sensitivity-unfinished-cas-evidence-refusal´
+    #[test]
+    fn sensitivity_unfinished_cas_evidence_refusal() -> Result<(), Box<dyn std::error::Error>> {
+        let builder = fixture()?;
+        let original = builder.parse("limited derivative", "x^2")?;
+        let checked = builder.check(&original)?;
+        let mut graph = Graph::new(&builder, &LimitsOverride::default())?;
+        graph.limits = LimitsOverride {
+            work: Some(1),
+            ..LimitsOverride::default()
+        };
+        let error = graph
+            .jacobian(&[checked], &["x".into()])
+            .err()
+            .ok_or("unfinished CAS derivative accepted")?;
+        let SensitivityError::Evidence(outcome) = error else {
+            return Err("CAS outcome not retained".into());
+        };
+        assert!(matches!(*outcome, Outcome::Exhausted { .. }));
+        Ok(())
     }
 }
