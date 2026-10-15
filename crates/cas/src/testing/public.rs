@@ -129,3 +129,66 @@ pub(crate) mod primitives;
 )]
 #[path = "admission.rs"]
 pub(crate) mod admission;
+
+#[path = "solve_numeric.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_numeric;
+
+#[path = "solve_graph.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_graph;
+
+#[path = "solve_coefficients.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_coefficients;
+
+#[path = "solve_elementary.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_elementary;
+
+#[path = "solve_orbits.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_orbits;
+
+#[path = "solve_blind.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_blind;
+
+#[path = "solve_rational.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_rational;
+
+#[path = "solve_linear.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_linear;
+
+#[path = "solve_local.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_local;

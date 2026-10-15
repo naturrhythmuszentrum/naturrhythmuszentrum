@@ -18,6 +18,11 @@ pub enum Layer {
 /// A semantic coordinate domain, independent of a context's assumptions.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum AmbientDomain {
+    /// An explicitly ordered product of declared coordinates.
+    Product {
+        /// Earlier admitted product space.
+        coordinates: Handle,
+    },
     /// All assignments to the declared scalar coordinates.
     Assignments,
     /// One declared real coordinate.

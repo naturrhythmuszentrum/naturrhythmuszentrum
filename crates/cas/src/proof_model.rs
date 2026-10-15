@@ -36,6 +36,8 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// An exact solving judgment, checked only by its closed schema.
+    Solve(Box<crate::solving::SolveStatement>),
     /// Standalone punctured limit or polynomial side-series relation.
     Germ(Box<crate::germ_model::GermValue>),
     /// Exact finite integral or integer sum with explicit finite-extension semantics.
@@ -244,6 +246,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// Untrusted typed solving evidence.
+    Solve(Box<crate::solving::SolveCertificate>),
     /// Complete finite roots with independently checked inverse absolute Jacobians.
     Pullback(Box<crate::pullback_model::PullbackCertificate>),
     /// Exact polynomial remainders for a case series restriction.

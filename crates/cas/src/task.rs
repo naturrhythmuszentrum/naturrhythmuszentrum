@@ -62,8 +62,8 @@ pub enum Task {
     Limit(Box<crate::germ_model::GermAt>),
     /// Polynomial side series with exact remainder and explicit analytic mode.
     Series(Box<crate::germ_model::SeriesAt>),
-    /// Represented solution set.
-    Solve,
+    /// Original graph-owned problem and exact requested coverage and form.
+    Solve(Box<crate::solving::SolveSpec>),
     /// Represented spectral operation.
     Spectral,
     /// Elaborate an ordered original case form.
@@ -181,7 +181,6 @@ impl Task {
             } => Operation::Differentiate(coordinate.clone()),
             Self::Jacobian(values) => Operation::Jacobian(values.clone()),
             Self::SquareFree(value) => Operation::SquareFree(value.clone()),
-            Self::Solve => Operation::Solve,
             Self::Spectral => Operation::Spectral,
             _ => return None,
         })
@@ -190,6 +189,7 @@ impl Task {
     /// Every graph reference participates in validation and request identity.
     pub(crate) fn references(&self) -> Vec<&Handle> {
         match self {
+            Self::Solve(value) => vec![&value.problem],
             Self::Limit(at) => vec![&at.point],
             Self::Series(series) => vec![&series.at.point],
             Self::Equal { domain, .. }
@@ -248,6 +248,11 @@ pub(crate) fn encode_with(
         write(reference, out)?;
     }
     match value {
+        Task::Solve(spec) => {
+            out.byte(spec.goal.tag())?;
+            out.byte(spec.form.tag())?;
+            out.byte(spec.exclusions.tag())?;
+        }
         Task::Integrate(range) | Task::Sum(range) => crate::split_wire::range(range, out)?,
         Task::Limit(at) => crate::germ_wire::approach(at, out, &mut write)?,
         Task::Series(series) => {
@@ -328,7 +333,7 @@ const fn tag(value: &Task) -> u8 {
         Task::Sum(_) => 7,
         Task::Limit(_) => 8,
         Task::Series(_) => 9,
-        Task::Solve => 10,
+        Task::Solve(_) => 10,
         Task::Spectral => 11,
         Task::ElaborateCases => 12,
         Task::Select { .. } => 13,

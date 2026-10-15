@@ -151,6 +151,9 @@ fn describe_entity(
             object(out, &mut record.references, cas.checked(&value.predicate)?)
         }
         Entity::Statement(value) => {
+            if matches!(value.statement, crate::proof_model::Statement::Solve(_)) {
+                return Err(invalid());
+            }
             record.tag = 10;
             record.layer = value.layer;
             record.space = value
@@ -247,6 +250,12 @@ fn describe_object(
             record.tag = 1;
             object(out, &mut record.references, value.header)?;
             encoding::scope(&value.scope, out)?;
+            if matches!(
+                value.ambient,
+                crate::domain_model::AmbientDomain::Product { .. }
+            ) {
+                return Err(invalid());
+            }
             crate::domain_encoding::ambient(&value.ambient, out)?;
             let start = record.references.len();
             crate::domain_encoding::region(&value.expression, out, |id, out| {
@@ -266,6 +275,16 @@ fn describe_object(
             out.name(&value.test_family)?;
         }
         Vertex::Expression(value) => {
+            if value.attachment.is_some()
+                || matches!(
+                    value.operator,
+                    crate::model::Operator::Conjugate
+                        | crate::model::Operator::RealPart
+                        | crate::model::Operator::ImagPart
+                )
+            {
+                return Err(invalid());
+            }
             record.tag = 3;
             record.layer = value.layer;
             record.space = value.space.map(Entity::Object);
@@ -315,6 +334,12 @@ fn describe_remaining(
             record.tag = 5;
             object(out, &mut record.references, value.header)?;
             encoding::scope(&value.scope, out)?;
+            if matches!(
+                value.ambient,
+                crate::domain_model::AmbientDomain::Product { .. }
+            ) {
+                return Err(invalid());
+            }
             crate::domain_encoding::ambient(&value.ambient, out)?;
             object(out, &mut record.references, value.location)?;
         }

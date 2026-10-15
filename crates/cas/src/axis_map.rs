@@ -325,6 +325,9 @@ impl Mapping {
             AmbientDomain::Real(key) => AmbientDomain::Real(self.key(key)),
             AmbientDomain::Integer(key) => AmbientDomain::Integer(self.key(key)),
             AmbientDomain::Opaque(key) => AmbientDomain::Opaque(self.key(key)),
+            AmbientDomain::Product { coordinates } => AmbientDomain::Product {
+                coordinates: coordinates.clone(),
+            },
         }
     }
 }

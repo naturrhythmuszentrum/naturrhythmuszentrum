@@ -39,3 +39,57 @@ pub(crate) mod distribution_native;
     reason = "shared admission fixtures stay crate-visible"
 )]
 pub(crate) mod admission;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_numeric;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_graph;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_coefficients;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_elementary;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_orbits;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_blind;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_rational;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_linear;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared solving fixtures remain crate-visible"
+)]
+pub(crate) mod solve_local;

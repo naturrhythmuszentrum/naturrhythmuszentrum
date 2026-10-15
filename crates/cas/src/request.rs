@@ -16,3 +16,7 @@ pub use crate::split_model::SplitRange;
 pub use crate::germ_model::{GermAt, SeriesAt};
 
 pub use crate::pullback_model::PullbackKind;
+
+pub use crate::solving::{
+    ExclusionPolicy, SolveAnswer, SolveBlocker, SolveForm, SolveGoal, SolveReason, SolveSpec,
+};

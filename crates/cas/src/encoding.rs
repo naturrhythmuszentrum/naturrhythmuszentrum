@@ -307,6 +307,11 @@ const fn operator_tag(value: &Operator) -> u8 {
         Operator::MatrixMap(_) => 25,
         Operator::IntegerEmbed => 26,
         Operator::Entrywise(_) => 27,
+        Operator::Conjugate => 43,
+        Operator::RealPart => 44,
+        Operator::ImagPart => 45,
+        Operator::RootValue { .. } => 46,
+        Operator::ExactCoefficient => 47,
         Operator::Cases => 28,
         Operator::NamedCase(_) => 29,
         Operator::RegularEmbed => 30,
@@ -329,6 +334,7 @@ const fn operator_tag(value: &Operator) -> u8 {
 pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fault> {
     out.byte(operator_tag(value))?;
     match value {
+        Operator::RootValue { slot } => crate::wire::index(*slot, out),
         Operator::NamedCase(value) => crate::named_case::encode(value, out),
         Operator::Delta { order }
         | Operator::DistributionDerivative { order }
@@ -385,7 +391,11 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
             crate::model::ScalarOperation::Multiply => 1,
             crate::model::ScalarOperation::Divide => 2,
         }),
-        Operator::Neg
+        Operator::Conjugate
+        | Operator::RealPart
+        | Operator::ImagPart
+        | Operator::ExactCoefficient
+        | Operator::Neg
         | Operator::Add
         | Operator::Sub
         | Operator::Mul

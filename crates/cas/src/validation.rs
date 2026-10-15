@@ -166,6 +166,24 @@ pub(crate) fn draft_payload(drafts: &[Draft], budget: &mut Budget) -> Result<u64
 /// Measure a draft's complete nonrecursive payload through a bounded key sink.
 fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
     match draft {
+        Draft::Solve(value) => {
+            out.byte(value.tag())?;
+            value.encode(out, &mut crate::domain_encoding::reference)?;
+        }
+        Draft::RootValue {
+            header,
+            selection,
+            slot,
+        } => {
+            reference(header, out)?;
+            reference(selection, out)?;
+            crate::wire::index(*slot, out)?;
+        }
+        Draft::ExactCoefficient { header, value, map } => {
+            reference(header, out)?;
+            reference(value, out)?;
+            reference(map, out)?;
+        }
         Draft::Source { key, text } => {
             out.name(key)?;
             out.count(text.len())?;
@@ -186,72 +204,104 @@ fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
             header,
             scope,
             arguments,
-        } => {
-            encoding::predicate(kind, out)?;
-            reference(header, out)?;
-            encoding::scope(scope, out)?;
-            out.count(arguments.len())?;
-            for argument in arguments {
-                reference(argument, out)?;
-            }
-        }
-        Draft::Expression(value) => {
-            out.byte(u8::from(value.space.is_some()))?;
-            if let Some(space) = &value.space {
-                reference(space, out)?;
-            }
-            encoding::operator(&value.operator, out)?;
-            encoding::sort(&value.sort, out)?;
-            reference(&value.header, out)?;
-            encoding::scope(&value.scope, out)?;
-            encoding::binding(value.binding.as_ref(), out)?;
-            out.count(value.operands.len())?;
-            for operand in &value.operands {
-                reference(operand, out)?;
-            }
-        }
-        Draft::Occurrence(value) => {
-            reference(&value.expression, out)?;
-            for optional in [&value.source, &value.provenance] {
-                out.byte(u8::from(optional.is_some()))?;
-                if let Some(value) = optional {
-                    reference(value, out)?;
-                }
-            }
-            if let Some(span) = value.span {
-                out.unsigned(span.start)?;
-                out.unsigned(span.end)?;
-            }
-            out.count(value.children.len())?;
-            for child in &value.children {
-                reference(child, out)?;
-            }
-            out.count(value.binder_names.len())?;
-            for name in &value.binder_names {
-                out.name(name)?;
-            }
-        }
+        } => encode_condition(kind, header, scope, arguments, out)?,
+        Draft::Expression(value) => encode_expression(value, out)?,
+        Draft::Occurrence(value) => encode_occurrence(value, out)?,
         Draft::Request {
             task,
             premises,
             context,
             inputs,
             limits,
-        } => {
-            crate::task::encode(task, out)?;
-            out.count(premises.len())?;
-            for premise in premises {
-                reference(premise, out)?;
-            }
-            reference(context, out)?;
-            out.count(inputs.len())?;
-            for input in inputs {
-                reference(input, out)?;
-            }
-            for kind in crate::budget::ALL_KINDS {
-                out.unsigned(limits.get(kind))?;
-            }
+        } => encode_request(task, premises, context, inputs, limits, out)?,
+    }
+    Ok(())
+}
+
+/// Retain a condition's predicate, header, scope and ordered arguments in the measured key.
+fn encode_condition(
+    kind: &crate::model::PredicateKind,
+    header: &Reference,
+    scope: &Scope,
+    arguments: &[Reference],
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    encoding::predicate(kind, out)?;
+    reference(header, out)?;
+    encoding::scope(scope, out)?;
+    out.count(arguments.len())?;
+    for argument in arguments {
+        reference(argument, out)?;
+    }
+    Ok(())
+}
+
+/// Measure ordinary expression metadata before its ordered operand references.
+fn encode_expression(value: &ExpressionDraft, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    out.byte(u8::from(value.space.is_some()))?;
+    if let Some(space) = &value.space {
+        reference(space, out)?;
+    }
+    encoding::operator(&value.operator, out)?;
+    encoding::sort(&value.sort, out)?;
+    reference(&value.header, out)?;
+    encoding::scope(&value.scope, out)?;
+    encoding::binding(value.binding.as_ref(), out)?;
+    out.count(value.operands.len())?;
+    for operand in &value.operands {
+        reference(operand, out)?;
+    }
+    Ok(())
+}
+
+/// Measure source ownership, optional provenance and the complete occurrence child inventory.
+fn encode_occurrence(
+    value: &crate::graph::OccurrenceDraft,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    reference(&value.expression, out)?;
+    for optional in [&value.source, &value.provenance] {
+        out.byte(u8::from(optional.is_some()))?;
+        if let Some(value) = optional {
+            reference(value, out)?;
         }
+    }
+    if let Some(span) = value.span {
+        out.unsigned(span.start)?;
+        out.unsigned(span.end)?;
+    }
+    out.count(value.children.len())?;
+    for child in &value.children {
+        reference(child, out)?;
+    }
+    out.count(value.binder_names.len())?;
+    for name in &value.binder_names {
+        out.name(name)?;
+    }
+    Ok(())
+}
+
+/// Measure the exact request task, premise/input order and resolved limit table.
+fn encode_request(
+    task: &crate::task::Task,
+    premises: &[Reference],
+    context: &Reference,
+    inputs: &[Reference],
+    limits: &crate::budget::Limits,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    crate::task::encode(task, out)?;
+    out.count(premises.len())?;
+    for premise in premises {
+        reference(premise, out)?;
+    }
+    reference(context, out)?;
+    out.count(inputs.len())?;
+    for input in inputs {
+        reference(input, out)?;
+    }
+    for kind in crate::budget::ALL_KINDS {
+        out.unsigned(limits.get(kind))?;
     }
     Ok(())
 }
@@ -617,7 +667,19 @@ fn operator_sorts(
         | Operator::RegularAction => {
             crate::distribution_syntax::sorts(operator, result, children, budget)?
         }
-        Operator::Cases => false,
+        Operator::Cases | Operator::RootValue { .. } | Operator::ExactCoefficient => false,
+        Operator::Conjugate => {
+            children.len() == 1
+                && result == &Sort::Value(AtomicSort::Scalar(Field::Complex))
+                && children.first().is_some_and(|child| child.sort == *result)
+        }
+        Operator::RealPart | Operator::ImagPart => {
+            children.len() == 1
+                && result == &Sort::Value(AtomicSort::Scalar(Field::Real))
+                && children.first().is_some_and(|child| {
+                    child.sort == Sort::Value(AtomicSort::Scalar(Field::Complex))
+                })
+        }
         Operator::NamedCase(value) => {
             children.len() == 1 && same && named_case_sort(value, result, scope, environment)
         }

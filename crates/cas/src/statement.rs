@@ -194,6 +194,10 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::Solve(value) => {
+            out.byte(12)?;
+            value.encode(out, &mut write)
+        }
         Certificate::Pullback(value) => {
             out.byte(11)?;
             crate::pullback_wire::certificate(value, out)
@@ -294,6 +298,10 @@ pub(crate) fn encode(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Statement::Solve(value) => {
+            out.byte(25)?;
+            value.encode(out, &mut write)?;
+        }
         Statement::Equality {
             left,
             right,
@@ -516,6 +524,7 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::Solve(value) => value.objects(),
         Statement::Germ(value) => vec![&value.function, &value.at.point],
         Statement::Split(value) => vec![&value.function, &value.domain],
         Statement::Distribution(value) => crate::distribution_wire::objects(value),
@@ -744,7 +753,8 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
 pub(crate) const fn layer(value: &Statement) -> Layer {
     match value {
         Statement::Distribution(_) => Layer::Distribution,
-        Statement::BoundaryPartition(_)
+        Statement::Solve(_)
+        | Statement::BoundaryPartition(_)
         | Statement::PredicateFact { .. }
         | Statement::Subset { .. }
         | Statement::Disjoint { .. }

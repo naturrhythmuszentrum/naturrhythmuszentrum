@@ -70,6 +70,8 @@ const AT: Location = Location::new("typed syntax descriptor");
 /// Borrow metadata without interpreting a non-expression as scalar syntax.
 pub(crate) fn metadata(state: &State, id: LogicalId) -> Result<(LogicalId, &Scope), Fault> {
     match state.node(id)? {
+        Vertex::Solve(value) => crate::solving::graph::metadata(state, value)?
+            .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT)),
         Vertex::Expression(v) => Ok((v.header, &v.scope)),
         Vertex::Condition(v) => Ok((v.header, &v.scope)),
         Vertex::Region(v) => Ok((v.header, &v.scope)),

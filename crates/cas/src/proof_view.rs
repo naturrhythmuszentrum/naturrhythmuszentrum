@@ -381,6 +381,11 @@ pub(crate) fn measure(
     }
     crate::boundary_measure::statement(&value.conclusion, budget)?;
     crate::boundary_measure::certificate(cas, &value.certificate, budget)?;
+    if let Certificate::Solve(certificate) = &value.certificate {
+        for object in certificate.objects() {
+            cas.checked(object)?;
+        }
+    }
     let objects = match &value.conclusion {
         Statement::BoundaryPartition(value) => {
             budget.check(
@@ -452,6 +457,12 @@ pub(crate) fn validate_judgment(
     }
     for object in crate::statement::objects(&value.statement) {
         let header = match cas.state.node(cas.checked(object)?)? {
+            Vertex::Solve(value) => {
+                let Some((header, _)) = crate::solving::graph::metadata(&cas.state, value)? else {
+                    continue;
+                };
+                header
+            }
             Vertex::Expression(value) => value.header,
             Vertex::Region(value) => value.header,
             Vertex::Boundary(value) => value.header,

@@ -232,6 +232,19 @@ pub enum RootSelection {
 /// Mathematical syntax tags; all operands remain explicitly ordered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// Complex conjugation, preserving the complex scalar field.
+    Conjugate,
+    /// The real component of a complex scalar.
+    RealPart,
+    /// The imaginary component of a complex scalar.
+    ImagPart,
+    /// One explicitly linked root selection slot.
+    RootValue {
+        /// Ordered joint selection position.
+        slot: u32,
+    },
+    /// An explicitly mapped exact coefficient literal.
+    ExactCoefficient,
     /// A regular distribution; local integrability still requires checked evidence.
     RegularEmbed,
     /// Zero in the explicitly linked distribution space.
@@ -392,8 +405,6 @@ pub(crate) enum Operation {
     Jacobian(Vec<String>),
     /// Decompose univariate rational polynomial multiplicity layers.
     SquareFree(String),
-    /// Prove candidates or complete solution-set coverage.
-    Solve,
     /// Prove the requested spectral statement.
     Spectral,
 }

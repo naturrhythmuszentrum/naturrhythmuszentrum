@@ -772,7 +772,7 @@ pub(crate) fn partition_at(
         AmbientDomain::Real(key) => (key.as_str(), false),
         AmbientDomain::Integer(key) => (key.as_str(), true),
         AmbientDomain::Assignments => ("", false),
-        AmbientDomain::Opaque(_) => return Err(unknown()),
+        AmbientDomain::Opaque(_) | AmbientDomain::Product { .. } => return Err(unknown()),
     };
     for root in roots {
         let region = state.region(*root)?;

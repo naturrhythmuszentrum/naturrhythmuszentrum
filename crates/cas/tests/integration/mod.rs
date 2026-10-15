@@ -20,3 +20,21 @@ mod germs;
 
 mod primitive_unique;
 mod pullbacks;
+
+mod solve_numeric;
+
+mod solve_graph;
+
+mod solve_coefficients;
+
+mod solve_elementary;
+
+mod solve_orbits;
+
+mod solve_blind;
+
+mod solve_rational;
+
+mod solve_linear;
+
+mod solve_local;

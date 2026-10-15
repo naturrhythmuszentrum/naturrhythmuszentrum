@@ -51,6 +51,12 @@ pub enum UnsupportedReason {
 /// A mathematical refusal returned before constructing an ill-sorted operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RefusalReason {
+    /// Complex roots have no admitted ordering.
+    ComplexOrdering,
+    /// Requested root choices are proved incompatible.
+    IncompatibleSelection,
+    /// A requested branch has been independently refuted.
+    RefutedBranch,
     /// Zero completeness, simplicity or interval-map hypotheses fail.
     PullbackHypotheses,
     /// Required one-sided limits, polynomial coefficients or centre values disagree.
@@ -81,6 +87,26 @@ pub enum ContextConsistency {
 /// Checked results and honest deferred, invalid or exhausted outcomes.
 #[derive(Clone, Debug)]
 pub enum Outcome {
+    /// The exact requested solution strength and representation have been proved.
+    Solved {
+        /// Retained original request.
+        request: Handle,
+        /// Independently replayed solution facts.
+        answer: crate::solving::SolveAnswer,
+        /// Monotone generation usage.
+        usage: BudgetUsage,
+    },
+    /// Checked solution facts remain, but the requested target is not yet proved.
+    SolvePartial {
+        /// Retained original request.
+        request: Handle,
+        /// Only independently replayed partial facts.
+        answer: crate::solving::SolveAnswer,
+        /// Exact missing proof capability or obligation.
+        reason: crate::solving::SolveReason,
+        /// Monotone generation usage.
+        usage: BudgetUsage,
+    },
     /// A replayed statement proves the requested point derivative does not exist.
     Nonexistent {
         /// Retained exact request.
@@ -141,6 +167,8 @@ pub enum Outcome {
     },
     /// A valid first-class request whose derivation algorithm remains pending.
     Unresolved {
+        /// Missing solving proof, absent for other services.
+        solve_reason: Option<crate::solving::SolveReason>,
         /// Graph-owned request record.
         request: Handle,
         /// Explicit absence of a general consistency proof.
@@ -181,6 +209,8 @@ pub enum Outcome {
     },
     /// A resource limit, optionally retaining an already replayed best result.
     Exhausted {
+        /// Previously replayed solving facts, if any.
+        solve_best: Option<Box<crate::solving::SolveAnswer>>,
         /// Only a previously checked result may survive later exhaustion.
         best: Option<crate::search::SearchResult>,
         /// Independent checker work consumed before refusal.
@@ -225,7 +255,9 @@ impl Cas {
             if input.root != input.receipt.root {
                 return Err(Fault::invalid(InvalidCode::Receipt, at));
             }
-            if matches!(request.task, Task::ElaborateCases) && !input.receipt.is_original() {
+            if matches!(request.task, Task::ElaborateCases | Task::Solve(_))
+                && !input.receipt.is_original()
+            {
                 return Err(Fault::invalid(InvalidCode::Receipt, at));
             }
             budget.check(BudgetKind::OriginalOccurrences, input.receipt.visited, at)?;
@@ -277,6 +309,7 @@ pub(crate) const fn failure(fault: Fault, usage: BudgetUsage) -> Outcome {
     match fault.kind {
         FaultKind::Invalid(_) => Outcome::Invalid { fault, usage },
         FaultKind::Exhausted { .. } => Outcome::Exhausted {
+            solve_best: None,
             fault,
             usage,
             best: None,
@@ -326,6 +359,9 @@ pub(crate) fn validate(
             return Err(Fault::invalid(InvalidCode::Scope, at));
         }
     }
+    if let Task::Solve(spec) = task {
+        return crate::solving::graph::request(state, spec, context, inputs, budget);
+    }
     let Some(operation) = task.scalar() else {
         validate_native_inputs(state, task, inputs)?;
         return Ok(());
@@ -333,7 +369,7 @@ pub(crate) fn validate(
     let operation = &operation;
     let expected = match operation {
         Operation::Equal => Some(2),
-        Operation::Jacobian(_) | Operation::Solve => None,
+        Operation::Jacobian(_) => None,
         _ => Some(1),
     };
     if inputs.is_empty() || expected.is_some_and(|expected| inputs.len() != expected) {
@@ -354,7 +390,6 @@ pub(crate) fn validate(
         }
         let compatible = match operation {
             Operation::Equal => expression.sort == *first_sort,
-            Operation::Solve => matches!(expression.operator, Operator::Set { .. }),
             Operation::Spectral => matches!(expression.operator, Operator::Spectral(_)),
             Operation::Differentiate(_) | Operation::Jacobian(_) | Operation::SquareFree(_) => {
                 matches!(expression.sort, Sort::Value(AtomicSort::Scalar(_)))

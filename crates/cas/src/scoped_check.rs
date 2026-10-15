@@ -104,6 +104,9 @@ fn rule_conditions(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(ScopedConditions, Option<crate::scalar_model::CheckedStep>), Fault> {
+    if matches!(&draft.certificate, Certificate::Solve(_)) {
+        return Ok((crate::solving::check(cas, draft, premises, budget)?, None));
+    }
     let mut scalar_view = None;
     let conditions = match draft.rule {
         Primitive::LimitCaseRestrict | Primitive::SeriesCaseRestrict => {

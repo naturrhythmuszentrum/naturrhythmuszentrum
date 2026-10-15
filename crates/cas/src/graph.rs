@@ -20,6 +20,37 @@ use crate::source_model::{SourceForm, SourceFormDraft};
 /// A disjoint namespace for logical identifiers.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum VertexKind {
+    /// Exact solving `CoordinateSpace` object.
+    CoordinateSpace,
+    /// Exact solving `Tuple` object.
+    Tuple,
+    /// Exact solving `SolutionSet` object.
+    SolutionSet,
+    /// Exact solving `FamilyMap` object.
+    FamilyMap,
+    /// Exact solving `CoefficientDomain` object.
+    CoefficientDomain,
+    /// Exact solving `Polynomial` object.
+    Polynomial,
+    /// Exact solving `ExtensionLevel` object.
+    ExtensionLevel,
+    /// Exact solving `CoefficientMap` object.
+    CoefficientMap,
+    /// Exact solving `RootRelation` object.
+    RootRelation,
+    /// Exact solving `RootSelection` object.
+    RootSelection,
+    /// Exact solving `ComponentSplit` object.
+    ComponentSplit,
+    /// Exact solving `CoefficientValue` object.
+    CoefficientValue,
+    /// Exact solving `SolutionBranch` object.
+    SolutionBranch,
+    /// Exact solving `SolveProblem` object.
+    SolveProblem,
+    /// Exact solving `LocalBranch` object.
+    LocalBranch,
+
     /// Immutable source bytes.
     Source,
     /// Mathematical context and hypothesis declarations.
@@ -74,6 +105,21 @@ impl VertexKind {
             Self::Boundary => 13,
             Self::SourceForm => 14,
             Self::Header => 15,
+            Self::CoordinateSpace => 16,
+            Self::Tuple => 17,
+            Self::SolutionSet => 18,
+            Self::FamilyMap => 19,
+            Self::CoefficientDomain => 20,
+            Self::Polynomial => 21,
+            Self::ExtensionLevel => 22,
+            Self::CoefficientMap => 23,
+            Self::RootRelation => 24,
+            Self::RootSelection => 25,
+            Self::ComponentSplit => 26,
+            Self::CoefficientValue => 27,
+            Self::SolutionBranch => 28,
+            Self::SolveProblem => 29,
+            Self::LocalBranch => 30,
         }
     }
 }
@@ -182,6 +228,26 @@ pub struct OccurrenceDraft {
 /// One flat draft node. Arbitrary identity/proof nodes cannot be supplied here.
 #[derive(Clone, Debug)]
 pub enum Draft {
+    /// Admit typed solving syntax without creating evidence.
+    Solve(crate::solving::SolveDraft),
+    /// A root slot selected jointly with all other slots.
+    RootValue {
+        /// Exact semantic header.
+        header: Reference,
+        /// Earlier joint selection.
+        selection: Reference,
+        /// Ordered root slot.
+        slot: u32,
+    },
+    /// Embed an exact coefficient through an explicit checked map.
+    ExactCoefficient {
+        /// Exact semantic header.
+        header: Reference,
+        /// Earlier coefficient value.
+        value: Reference,
+        /// Earlier scalar-target coefficient map.
+        map: Reference,
+    },
     /// Retain immutable UTF-8 source bytes.
     Source {
         /// Caller source key.
@@ -282,9 +348,25 @@ pub(crate) struct Condition {
     pub(crate) arguments: Vec<LogicalId>,
 }
 
+/// Extra semantic links of exact scalar literals, absent on ordinary expressions.
+#[derive(Clone, Debug)]
+pub(crate) enum ExpressionAttachment {
+    /// An ordered slot of one joint selection.
+    SelectedRoot(LogicalId),
+    /// A coefficient and its explicit scalar evaluation map.
+    ExactCoefficient {
+        /// Earlier canonical coefficient value.
+        value: LogicalId,
+        /// Exact scalar interpretation map.
+        map: LogicalId,
+    },
+}
+
 /// Immutable expression weight and cached, checked shape statistics.
 #[derive(Clone, Debug)]
 pub(crate) struct Expression {
+    /// Typed literal dependencies, never concealed in an operator.
+    pub(crate) attachment: Option<ExpressionAttachment>,
     /// Complete operator metadata.
     pub(crate) operator: Operator,
     /// Checked result sort.
@@ -346,6 +428,8 @@ pub(crate) struct RequestRecord {
 /// One authoritative heterogeneous vertex weight.
 #[derive(Clone, Debug)]
 pub(crate) enum Vertex {
+    /// Immutable exact solving payload with checked handles.
+    Solve(Box<crate::solving::SolveDraft<Handle>>),
     /// Immutable semantic declarations.
     Header(Header),
     /// Exact set syntax.
@@ -403,6 +487,83 @@ pub(crate) enum Vertex {
 /// Typed graph edge roles; only internal validated admission can create edges.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Edge {
+    /// Typed solving `Coordinates` dependency.
+    Coordinates,
+    /// Typed solving `CoefficientCoordinates` dependency.
+    CoefficientCoordinates,
+    /// Typed solving `UnknownCoordinates` dependency.
+    UnknownCoordinates,
+    /// Typed solving `FamilyCoordinates` dependency.
+    FamilyCoordinates,
+    /// Typed solving `TupleEntry` dependency.
+    TupleEntry(u32),
+    /// Typed solving `FamilyBody` dependency.
+    FamilyBody,
+    /// Typed solving `Problem` dependency.
+    Problem,
+    /// Typed solving `BranchMember` dependency.
+    BranchMember(u32),
+    /// Typed solving `ParameterRegion` dependency.
+    ParameterRegion,
+    /// Typed solving `SolutionDomain` dependency.
+    SolutionDomain,
+    /// Typed solving `CoefficientBase` dependency.
+    CoefficientBase,
+    /// Typed solving `DefiningPolynomial` dependency.
+    DefiningPolynomial,
+    /// Typed solving `TowerParent` dependency.
+    TowerParent,
+    /// Typed solving `TowerLevel` dependency.
+    TowerLevel,
+    /// Typed solving `CoefficientTerm` dependency.
+    CoefficientTerm(u32),
+    /// Typed solving `MapSource` dependency.
+    MapSource,
+    /// Typed solving `MapTarget` dependency.
+    MapTarget,
+    /// Typed solving `GeneratorImage` dependency.
+    GeneratorImage(u32),
+    /// Typed solving `RootSlot` dependency.
+    RootSlot(u32),
+    /// Typed solving `SelectionPredicate` dependency.
+    SelectionPredicate,
+    /// Typed solving `SelectedBy` dependency.
+    SelectedBy,
+    /// Typed solving `CoefficientLiteralValue` dependency.
+    CoefficientLiteralValue,
+    /// Typed solving `CoefficientLiteralMap` dependency.
+    CoefficientLiteralMap,
+    /// Typed solving `SplitParent` dependency.
+    SplitParent,
+    /// Typed solving `SplitChild` dependency.
+    SplitChild(u32),
+    /// Typed solving `SplitMap` dependency.
+    SplitMap(u32),
+    /// Typed solving `OriginalPredicate` dependency.
+    OriginalPredicate,
+    /// Typed solving `OriginalDenominator` dependency.
+    OriginalDenominator(u32),
+    /// Typed solving `LocalBase` dependency.
+    LocalBase(u32),
+    /// Typed solving `LocalJacobian` dependency.
+    LocalJacobian,
+    /// Typed solving `LocalInverse` dependency.
+    LocalInverse,
+    /// Typed solving `SplitFactor` dependency.
+    SplitFactor(u32),
+    /// Typed solving `DenominatorFactor` dependency.
+    DenominatorFactor(u32),
+    /// Typed solving `TupleMember` dependency.
+    TupleMember(u32),
+    /// Typed solving `FamilyImage` dependency.
+    FamilyImage,
+    /// Typed solving `LocalGerm` dependency.
+    LocalGerm,
+    /// Typed solving `FractionNumerator` dependency.
+    FractionNumerator,
+    /// Typed solving `FractionDenominator` dependency.
+    FractionDenominator,
+
     /// An ordered mathematical operand.
     Operand(u32),
     /// A source occurrence's mathematical meaning.
@@ -1075,6 +1236,10 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         match draft {
+            Draft::Solve(value) => self.admit_solve(state, value, locals, pending, budget),
+            Draft::RootValue { .. } | Draft::ExactCoefficient { .. } => {
+                self.admit_solve_literal(state, draft, locals, pending, budget)
+            }
             Draft::Source { key, text } => self.admit_source(state, key, text, pending, budget),
             Draft::Header(value) => self.admit_header(state, value, locals, pending, budget),
             Draft::Context(value) => {
@@ -1270,6 +1435,7 @@ impl Cas {
             budget,
         )?;
         let expression = Vertex::Expression(Expression {
+            attachment: None,
             operator: draft.operator.clone(),
             sort: draft.sort.clone(),
             header,
@@ -1561,6 +1727,7 @@ pub(crate) fn vertex_key(
     let mut out = Encoder::new(budget, Location::new("structural key"));
     out.byte(kind.tag())?;
     match vertex {
+        Vertex::Solve(value) => value.encode(&mut out, &mut crate::statement::handle)?,
         Vertex::Header(_)
         | Vertex::Region(_)
         | Vertex::Space(_)
@@ -1637,6 +1804,7 @@ pub(crate) fn vertex_key(
 /// Classify a graph-owned record without exposing physical indices.
 const fn vertex_kind(vertex: &Vertex) -> VertexKind {
     match vertex {
+        Vertex::Solve(value) => value.kind(),
         Vertex::Header(_) => VertexKind::Header,
         Vertex::Region(_) => VertexKind::Region,
         Vertex::Space(_) => VertexKind::Space,
@@ -1684,6 +1852,7 @@ fn context_key(context: &Context, out: &mut Encoder<'_>) -> Result<(), Fault> {
 
 /// Encode every retained expression identity field.
 fn expression_key(expression: &Expression, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    crate::solving::graph::attachment_key(expression.attachment.as_ref(), out)?;
     encode_id(expression.header, out)?;
     out.byte(expression.layer.tag())?;
     out.byte(u8::from(expression.space.is_some()))?;

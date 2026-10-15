@@ -24,6 +24,10 @@ pub(crate) fn reference(value: &Reference, out: &mut Encoder<'_>) -> Result<(), 
 /// Encode the complete coordinate interpretation.
 pub(crate) fn ambient(value: &AmbientDomain, out: &mut Encoder<'_>) -> Result<(), Fault> {
     match value {
+        AmbientDomain::Product { coordinates } => {
+            out.byte(4)?;
+            encode_id(coordinates.logical_id(), out)
+        }
         AmbientDomain::Assignments => out.byte(0),
         AmbientDomain::Real(key) => {
             out.byte(1)?;

@@ -32,3 +32,5 @@ pub use crate::germ_model::{GermAt, GermCertificate, GermMode, GermValue, Series
 pub use crate::pullback_model::{
     PullbackCertificate, PullbackKind, PullbackMode, PullbackValue, PullbackZero,
 };
+
+pub use crate::solving::{SolveCertificate, SolveStatement};

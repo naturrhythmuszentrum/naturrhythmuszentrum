@@ -711,3 +711,5 @@ mod primitive_unique;
     reason = "total polynomial map validation stays inside the kernel"
 )]
 mod pullback_polynomial;
+
+pub mod solving;

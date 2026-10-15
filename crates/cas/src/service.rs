@@ -56,6 +56,18 @@ impl Cas {
                 usage: generation.usage(),
             };
         }
+        if matches!(request.task, crate::task::Task::Solve(_)) {
+            let outcome = crate::solving::execute(
+                &mut candidate,
+                request,
+                &record,
+                policy,
+                &mut generation,
+                &mut checker,
+            );
+            self.state = candidate.state;
+            return outcome;
+        }
         let mut execution = candidate.execute(request, policy, &mut generation, &mut checker);
         if let Some(result) = &mut execution.result {
             result.replay_usage = checker.usage();
@@ -248,7 +260,7 @@ impl Cas {
                     fault: None,
                 })
             }
-            _ => Ok(Execution {
+            Operation::Spectral => Ok(Execution {
                 result: None,
                 fault: None,
             }),
@@ -535,6 +547,7 @@ fn outcome(
                 usage,
             },
             FaultKind::Exhausted { .. } => Outcome::Exhausted {
+                solve_best: None,
                 fault,
                 usage,
                 replay_usage,
@@ -553,6 +566,7 @@ fn outcome(
                 usage,
             },
             FaultKind::Invalid(InvalidCode::UnsupportedFragment) => Outcome::Unresolved {
+                solve_reason: None,
                 request: record,
                 consistency: ContextConsistency::Unknown,
                 blocker: Some(fault),
@@ -627,6 +641,7 @@ fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: Budget
             usage,
         },
         None => Outcome::Unresolved {
+            solve_reason: None,
             request: record,
             consistency: ContextConsistency::Unknown,
             blocker: None,

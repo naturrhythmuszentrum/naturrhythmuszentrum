@@ -55,6 +55,14 @@ pub(crate) fn ambient_header(
 ) -> Result<(), Fault> {
     let environment = &state.header(header)?.environment;
     let (key, expected) = match ambient {
+        AmbientDomain::Product { coordinates } => {
+            let product = crate::solving::graph::coordinates(state, coordinates.logical_id())?;
+            return if product.header.logical_id() == header {
+                Ok(())
+            } else {
+                Err(Fault::invalid(InvalidCode::Scope, AT))
+            };
+        }
         AmbientDomain::Assignments => return Ok(()),
         AmbientDomain::Real(key) => (key, Some(Sort::Value(AtomicSort::Scalar(Field::Real)))),
         AmbientDomain::Integer(key) => (key, Some(Sort::Value(AtomicSort::Integer))),
@@ -82,8 +90,18 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         crate::validation::scope_limit(&draft.scope, budget)?;
         let header = self.resolve(state, &draft.header, locals)?;
+        if let AmbientDomain::Product { coordinates } = &draft.ambient {
+            self.resolve(
+                state,
+                &crate::graph::Reference::Existing(coordinates.clone()),
+                locals,
+            )?;
+        }
         ambient_header(state, header, &draft.ambient)?;
         let mut edges = vec![(header, Edge::InHeader)];
+        if let AmbientDomain::Product { coordinates } = &draft.ambient {
+            edges.push((coordinates.logical_id(), Edge::Coordinates));
+        }
         let expression = match &draft.expression {
             RegionExpr::Ambient => RegionExpr::Ambient,
             RegionExpr::Empty => RegionExpr::Empty,
@@ -498,6 +516,7 @@ impl Cas {
         self.insert(
             state,
             Vertex::Expression(crate::graph::Expression {
+                attachment: None,
                 header,
                 scope: draft.scope.clone(),
                 sort,
