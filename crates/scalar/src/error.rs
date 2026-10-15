@@ -19,6 +19,9 @@ pub enum ArithmeticFailure {
     /// A rounded result or required outward neighbour is nonfinite.
     #[error("the result cannot be enclosed by finite endpoints")]
     Overflow,
+    /// Dot-product slices have different lengths.
+    #[error("dot-product lengths differ")]
+    LengthMismatch,
     /// The target or selected floating environment probes are unsupported.
     #[error("the floating arithmetic environment is unsupported")]
     UnsupportedEnvironment,

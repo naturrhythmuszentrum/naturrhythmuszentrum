@@ -45,6 +45,12 @@ pub trait Scalar:
     /// Next representable value toward negative infinity, possibly infinite.
     #[must_use]
     fn next_down(self) -> Self;
+    /// Explicit fused multiply-add with one rounding.
+    #[must_use]
+    fn mul_add(self, multiplier: Self, addend: Self) -> Self;
+    /// Positive normal power-of-two scale; subnormals use the smallest normal.
+    #[must_use]
+    fn power_of_two_scale(self) -> Self;
     /// Square root rounded to nearest under the admitted environment.
     #[must_use]
     fn sqrt(self) -> Self;
@@ -68,7 +74,7 @@ mod private {
 
 /// Implement only the primitive format operations, without exactness guesses.
 macro_rules! impl_scalar {
-    ($ty:ty, $precision:ident) => {
+    ($ty:ty, $precision:ident, $mask:expr) => {
         impl Scalar for $ty {
             const PRECISION: Precision = Precision::$precision;
             const ZERO: Self = 0.0;
@@ -84,6 +90,17 @@ macro_rules! impl_scalar {
             }
             fn next_down(self) -> Self {
                 self.next_down()
+            }
+            fn mul_add(self, multiplier: Self, addend: Self) -> Self {
+                self.mul_add(multiplier, addend)
+            }
+            fn power_of_two_scale(self) -> Self {
+                let exponent = self.abs().to_bits() & $mask;
+                if exponent == 0 {
+                    Self::MIN_POSITIVE
+                } else {
+                    Self::from_bits(exponent)
+                }
             }
             fn sqrt(self) -> Self {
                 self.sqrt()
@@ -104,5 +121,5 @@ macro_rules! impl_scalar {
     };
 }
 
-impl_scalar!(f32, F32);
-impl_scalar!(f64, F64);
+impl_scalar!(f32, F32, 0x7f80_0000);
+impl_scalar!(f64, F64, 0x7ff0_0000_0000_0000);
