@@ -2,6 +2,11 @@
 
 //! Command-line entry point for deterministic documentation generation.
 
+#![expect(
+    clippy::multiple_crate_versions,
+    reason = "nrz-cas uses petgraph 0.8.3 with hashbrown 0.15 while indexmap uses hashbrown 0.17"
+)]
+
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;

@@ -10,7 +10,7 @@ Accuracy governs acceptance before speed; dimensions, measures, kinds and affine
 
 ## Workspace · `sec:nrz:overview-workspace`
 
-The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The generic algebra package supplies exact original expressions and collection forms; the units client checks declared physical operations before normalization. Descriptor representation and typed checked access are selected by (`spec:nrz:descriptor-units-boundary`); problem schema v2 and docgen now apply that authority to reference declarations (`spec:nrz:problem-data-schema`); production numerical integration remains under (`dec:nrz:algebra-and-data-time-units-boundary`).
+The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The `nrz-cas` package supplies exact original occurrences, budgeted rationals and proved equalities; the units client checks declared physical operations before normalization. Descriptor representation and typed checked access are selected by (`spec:nrz:descriptor-units-boundary`); problem schema v2 and docgen now apply that authority to reference declarations (`spec:nrz:problem-data-schema`); production numerical integration remains under (`dec:nrz:algebra-and-data-time-units-boundary`).
 
 The computation contract connects storage and graph evaluation through (`spec:nrz:descriptor-heap-computation`); its implementation responsibilities remain in the existing bites (`dec:nrz:computation-model-implementation-boundary`).
 
@@ -18,17 +18,16 @@ The computation contract connects storage and graph evaluation through (`spec:nr
 
 |Directory|Crate|Responsibility|Engine dependencies|Architecture|
 |---------|-----|--------------|-------------------|------------|
-|`crates/algebra`|`nrz-algebra`|Exact symbolic scalar expressions and collection normal forms|None of the other engine packages|(`tab:vision:package-structure`)|
+|`crates/cas`|`nrz-cas`|Exact original occurrences, mathematical graphs and checked symbolic derivations|None of the other engine packages|(`tab:vision:package-structure`)|
 |`crates/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
 |`crates/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
-|`crates/units`|`nrz-units`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence|`nrz-algebra`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
+|`crates/units`|`nrz-units`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence|`nrz-cas`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
 |`crates/matrix`|`nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked views, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-units`|(`tab:vision:package-structure`)|
 |`crates/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-units`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
 |`crates/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|
-|`tools/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|Tooling dependencies on `nrz-units` and `nrz-algebra`|(`tab:vision:package-structure`)|
-|`prototypes/descriptors`|`nrz-descriptor-prototype`|Decision-only schema, checked binding and static-comparison experiments|`nrz-units`, `nrz-algebra`; no production dependents|(`dec:nrz:descriptor-prototype-promotion`)|
+|`tools/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|Tooling dependencies on `nrz-units` and `nrz-cas`|(`tab:vision:package-structure`)|
 
-Only the matrix package integrates faer, and only the physics package integrates petgraph. Engine interfaces check and preserve dimensions, measures, kinds, normalization maps, and intrinsic uncertainty companions across those boundaries (`rule:vision:backend-boundaries`), (`rule:vision:heterogeneous-assembly`), (`def:vision:intrinsic-uncertainty-companions`).
+The matrix package integrates faer. Physics owns physical and computational petgraph schemas; `nrz-cas` owns its private mathematical graph. Engine interfaces check and preserve dimensions, measures, kinds, normalization maps, and intrinsic uncertainty companions across those boundaries (`rule:vision:backend-boundaries`), (`rule:vision:heterogeneous-assembly`), (`def:vision:intrinsic-uncertainty-companions`).
 
 ## Documentation · `sec:nrz:overview-documentation`
 

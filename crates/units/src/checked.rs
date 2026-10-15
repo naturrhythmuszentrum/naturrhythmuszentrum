@@ -3,7 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use nrz_algebra::{Error, Expr, Limits, NormalForm, Symbol};
+use crate::exact::budget;
+use nrz_cas::proof::DomainContract;
+use nrz_cas::request::{CoveredInput, Request, Task};
+use nrz_cas::{Cas, Fault, Handle, limits::LimitsOverride, source::OriginalForm};
 
 use crate::{Companion, Conversion, Declaration, Descriptor, Location, UncertaintyMode};
 
@@ -25,7 +28,7 @@ pub enum CompanionEvidence {
         /// The declared target relationship, available to later uncertainty operations.
         companion: Companion,
         /// Contributing uncertainty symbols and their checked value relationships.
-        contributors: BTreeMap<Symbol, Companion>,
+        contributors: BTreeMap<String, Companion>,
     },
 }
 
@@ -41,7 +44,7 @@ impl CompanionEvidence {
     /// Preserve the evidence source while changing a supported uncertainty mode or reference.
     ///
     /// TODO ´todo:code:transform-uncertainty-reference-maps-and-paired´: transform uncertainty reference maps and paired axes together with each supported mode under rule:nrz:correlation-and-relative-shapes.
-    pub(super) fn transform(&mut self, mode: UncertaintyMode, reference: Option<Symbol>) {
+    pub(super) fn transform(&mut self, mode: UncertaintyMode, reference: Option<String>) {
         let (Self::Established(companion) | Self::Propagated { companion, .. }) = self;
         companion.mode = mode;
         companion.reference = reference;
@@ -72,18 +75,18 @@ pub struct NodeEvidence {
 /// TODO ´todo:code:associate-reusable-checks-with-immutable-declaration´: associate reusable checks with immutable declaration and operation snapshots under rule:nrz:plan-validation.
 ///
 /// TODO ´todo:code:retain-checked-schema-admission-witnesses-for´: retain checked schema admission witnesses for descriptor publication under rule:nrz:descriptor-publication-validation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct CheckedExpression {
     /// Original source operations, including those that a normal form would erase.
-    pub(super) original: Expr,
+    pub(super) original: OriginalForm,
     /// Root descriptor with its semantic identity and affine role.
     pub(super) descriptor: Descriptor,
     /// Every original node's postorder checking evidence.
     pub(super) nodes: Vec<NodeEvidence>,
     /// Coherent coordinate expression built only after each original operation passes.
-    pub(super) coordinates: Expr,
+    pub(super) coordinates: Handle,
     /// Owned declaration snapshots, including provenance and original derived expressions.
-    pub(super) declarations: BTreeMap<Symbol, Declaration>,
+    pub(super) declarations: BTreeMap<String, Declaration>,
     /// Optional conversion from coherent coordinates to the caller's expected measure.
     pub(super) output: Option<Conversion>,
     /// Established or propagated value and reference identity, when supplied by the expression.
@@ -116,7 +119,7 @@ impl CheckedExpression {
 
     /// Original operations; these remain authoritative for domains and physical validity.
     #[must_use]
-    pub const fn original(&self) -> &Expr {
+    pub const fn original(&self) -> &OriginalForm {
         &self.original
     }
 
@@ -140,7 +143,7 @@ impl CheckedExpression {
     ///
     /// TODO ´todo:code:expose-declaration-snapshot-identity-alongside-the´: expose declaration snapshot identity alongside the retained evidence inventory under rule:nrz:computation-cache-validity.
     #[must_use]
-    pub const fn declarations(&self) -> &BTreeMap<Symbol, Declaration> {
+    pub const fn declarations(&self) -> &BTreeMap<String, Declaration> {
         &self.declarations
     }
 
@@ -150,18 +153,44 @@ impl CheckedExpression {
     ///
     /// TODO ´todo:code:associate-exposed-conversion-evidence-with-its´: associate exposed conversion evidence with its checked binding schema version under rule:nrz:binding-validation.
     #[must_use]
-    pub const fn output_conversion(&self) -> Option<Conversion> {
-        self.output
+    pub const fn output_conversion(&self) -> Option<&Conversion> {
+        self.output.as_ref()
     }
 
-    /// Compute a generic collection form of coherent coordinates after validation.
-    ///
-    /// The result carries no physical descriptor and is not an input to the checker.
-    /// Original domain obligations and declared nonzero assumptions remain separate.
-    ///
-    /// # Errors
-    /// Refuses algebraic overflow, literal undefinedness or resource exhaustion.
-    pub fn normal_form(&self, limits: Limits) -> Result<NormalForm, Error> {
-        NormalForm::new(&self.coordinates, limits)
+    /// Cover both endpoints before requesting equality from the engine simplifier.
+    pub(super) fn equality_request(
+        &self,
+        cas: &mut Cas,
+        context: &Handle,
+        target: &OriginalForm,
+        limits: LimitsOverride,
+    ) -> Result<Request, Fault> {
+        let mut ledger = budget()?;
+        let root =
+            cas.materialize_derived(&self.coordinates, &self.original.syntax, &mut ledger)?;
+        let receipt = cas
+            .walk_derived(&root, &mut ledger)
+            .map_err(|error| error.fault)?
+            .receipt;
+        let target_receipt = cas
+            .walk_original(&target.root, &mut ledger)
+            .map_err(|error| error.fault)?
+            .receipt;
+        Ok(Request {
+            task: Task::Equal {
+                domain: cas.admissible_region(context)?,
+                domain_contract: DomainContract::DefinedAndEqual,
+            },
+            context: context.clone(),
+            inputs: vec![
+                CoveredInput { root, receipt },
+                CoveredInput {
+                    root: target.root.clone(),
+                    receipt: target_receipt,
+                },
+            ],
+            premises: Vec::new(),
+            limits,
+        })
     }
 }

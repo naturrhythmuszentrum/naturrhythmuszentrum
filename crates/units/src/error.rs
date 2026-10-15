@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Descriptor-level refusals, independent of expression locations.
 
-use nrz_algebra::{ArithmeticError, Symbol};
+use nrz_cas::Fault;
 
 /// A mechanical descriptor check failed.
 ///
@@ -13,7 +13,10 @@ pub enum UnitError {
     KindDepth,
     /// Exact descriptor arithmetic exceeded its finite representation.
     #[error(transparent)]
-    Arithmetic(#[from] ArithmeticError),
+    Arithmetic(#[from] Fault),
+    /// A dimension exponent exceeds the signed numerator or unsigned denominator range.
+    #[error("dimension exponent is outside the signed 64-bit component range")]
+    ExponentRange,
     /// The requested dimension is outside the selected exponent policy.
     #[error("fractional dimension is not admitted by the exponent policy")]
     NonIntegralDimension,
@@ -46,7 +49,7 @@ pub enum UnitError {
     DuplicateRule,
     /// A kind name has conflicting declarations.
     #[error("conflicting kind declaration: {}", .0.as_str())]
-    ConflictingKind(Symbol),
+    ConflictingKind(String),
     /// A count domain is inconsistent or its closure cannot be established.
     #[error("count-domain condition is invalid or unproved")]
     CountDomain,

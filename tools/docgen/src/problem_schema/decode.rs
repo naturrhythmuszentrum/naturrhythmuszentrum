@@ -3,7 +3,6 @@
 
 use std::collections::BTreeSet;
 
-use nrz_algebra::{Rational, Symbol};
 use serde_json::Value;
 
 use super::record::Record;
@@ -32,7 +31,7 @@ pub(super) struct Item<'a> {
     /// Full source record.
     pub(super) record: Record<'a>,
     /// Identifier shared across all declaration categories.
-    pub(super) name: Symbol,
+    pub(super) name: String,
     /// Stable inventory category.
     pub(super) category: &'static str,
     /// Input or executable formula contract.
@@ -269,7 +268,7 @@ fn parameter_items<'a>(record: &Record<'a>, items: &mut Vec<Item<'a>>) -> Result
                 &[],
             )?;
             let value = record.at("value")?.rational()?;
-            if record.at("nonzero")?.boolean()? && value == Rational::ZERO {
+            if record.at("nonzero")?.boolean()? && value.is_zero() {
                 return Err(record
                     .at("value")?
                     .error("value contradicts nonzero assumption"));
@@ -379,7 +378,7 @@ fn magnitude_value(component: &Record<'_>, magnitude: &Record<'_>) -> Result<(),
         _ => return Err(component.error("unknown uncertainty mode")),
     };
     magnitude.keys(&[key], &[])?;
-    if magnitude.at(key)?.rational()? < Rational::ZERO && key != "covariance" {
+    if magnitude.at(key)?.rational()?.is_negative() && key != "covariance" {
         return Err(magnitude.error("uncertainty magnitude must be nonnegative"));
     }
     Ok(())
@@ -405,10 +404,9 @@ pub(super) fn metadata(record: &Record<'_>, value: &Record<'_>) -> Result<(), Er
             let minimum = record.at("minimum")?.integer()?;
             let maximum = record.bound("maximum")?;
             let number = value.rational()?;
-            if maximum.is_some_and(|max| max < minimum)
-                || !number.is_integer()
-                || number.numerator() < minimum
-                || maximum.is_some_and(|max| number.numerator() > max)
+            if nrz_units::CountDomain::new(Some(minimum), maximum)
+                .and_then(|domain| domain.check(&number))
+                .is_err()
             {
                 return Err(value.error("value is outside metadata integer range"));
             }

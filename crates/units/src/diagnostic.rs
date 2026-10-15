@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Structured failures retain both source location and descriptor evidence.
 
-use nrz_algebra::{Error, Span, Symbol};
+use nrz_cas::{Fault, syntax::Span};
 
 use crate::{Descriptor, UnitError};
 
@@ -17,7 +17,7 @@ pub struct Location {
     /// Optional parser byte range in the current declaration's source.
     pub span: Option<Span>,
     /// Declarations entered while reaching this node, in resolution order.
-    pub definitions: Vec<Symbol>,
+    pub definitions: Vec<String>,
 }
 
 /// A diagnostic expectation can be a concrete descriptor or an operation rule.
@@ -43,21 +43,24 @@ pub enum Failure {
     /// Descriptor algebra refused the operation.
     #[error(transparent)]
     Units(#[from] UnitError),
+    /// The original source does not follow the admitted expression grammar.
+    #[error("invalid original expression syntax: {0:?}")]
+    Syntax(nrz_cas::source::SyntaxCode),
     /// Generic expression construction or its resource limits failed.
     #[error(transparent)]
-    Algebra(#[from] Error),
+    Algebra(#[from] Fault),
     /// Expanded or converted coordinates exceeded their construction limits.
     #[error("coordinate construction failed: {0}")]
-    Coordinates(#[source] Error),
+    Coordinates(#[source] Fault),
     /// A value name has no declaration.
     #[error("unknown value symbol: {}", .0.as_str())]
-    UnknownSymbol(Symbol),
+    UnknownSymbol(String),
     /// Metadata cannot appear as a numerical operand.
     #[error("metadata used as a numerical operand: {}", .0.as_str())]
-    Metadata(Symbol),
+    Metadata(String),
     /// The application has no declared interpretation.
     #[error("unknown function: {}", .0.as_str())]
-    UnknownFunction(Symbol),
+    UnknownFunction(String),
     /// The application has the wrong number of arguments.
     #[error("function expects {expected} arguments, found {derived}")]
     Arity {
@@ -68,10 +71,10 @@ pub enum Failure {
     },
     /// The declaration dependency graph contains a cycle.
     #[error("cyclic derived declaration: {0:?}")]
-    Cycle(Vec<Symbol>),
+    Cycle(Vec<String>),
     /// Names are immutable once declared in a context.
     #[error("duplicate or reserved declaration: {}", .0.as_str())]
-    Duplicate(Symbol),
+    Duplicate(String),
 }
 
 /// A refusal with original location, expected constraint and derived operands.

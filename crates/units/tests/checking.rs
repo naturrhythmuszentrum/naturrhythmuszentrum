@@ -1,7 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original-operation checks and declared observable contracts.
 
-use nrz_algebra::{Error, Expr, Limits, NormalForm, Rational, Symbol, parse};
+use nrz_cas::{
+    Fault, FaultKind, InvalidCode, Rational,
+    limits::{BudgetKind, Limits, LimitsOverride},
+    request::Outcome,
+};
+#[path = "support/arithmetic.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod support;
+use support::rational;
+#[path = "support/engine.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod engine;
+use engine::{fixture, original, prove};
+
 use nrz_units::{
     BaseDimension, BinaryOp, Companion, Context, CountDomain, Declaration, Descriptor, Dimension,
     Evidence, Expectation, ExponentPolicy, Failure, FunctionSignature, Kind, Measure, Observable,
@@ -11,15 +32,10 @@ use nrz_units::{
 /// Shared fallible fixture result.
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// Parse an original expression under the documented default limits.
-fn expression(source: &str) -> Result<Expr, nrz_algebra::ParseError> {
-    parse(source, Limits::default())
-}
-
 /// A physical kind with a coherent linear measure.
 fn named(name: &str, dimension: Dimension) -> Result<Descriptor, Box<dyn std::error::Error>> {
     Ok(Descriptor::new(
-        Kind::Named(Symbol::new(name)?, dimension),
+        Kind::Named(name.to_owned(), Box::new(dimension)),
         Measure::coherent(),
         Role::Difference,
     )?)
@@ -28,7 +44,7 @@ fn named(name: &str, dimension: Dimension) -> Result<Descriptor, Box<dyn std::er
 /// Register a source input with a visible provenance and assurance claim.
 fn input(context: &mut Context, name: &str, descriptor: &Descriptor, nonzero: bool) -> TestResult {
     context.declare(
-        Symbol::new(name)?,
+        name.to_owned(),
         Declaration::Input {
             descriptor: descriptor.clone(),
             nonzero,
@@ -50,12 +66,12 @@ fn uncertainty_input(
     mode: UncertaintyMode,
 ) -> TestResult {
     context.declare(
-        Symbol::new(name)?,
+        name.to_owned(),
         Declaration::UncertaintyInput {
             descriptor: descriptor.clone(),
             companion: Companion {
                 mode,
-                value: Symbol::new(value)?,
+                value: value.to_owned(),
                 other: None,
                 reference: None,
             },
@@ -67,8 +83,8 @@ fn uncertainty_input(
 
 /// Assert the reason for refusal, not merely the absence of a successful result.
 fn refusal(context: &Context, source: &str, expected: &Failure) -> TestResult {
-    let diagnostic = context
-        .check(&expression(source)?)
+    let diagnostic = original(context, source)
+        .and_then(|original| context.check(&original))
         .err()
         .ok_or("expected refusal")?;
     assert_eq!(&diagnostic.failure, expected, "{source}");
@@ -86,7 +102,11 @@ fn refusal(context: &Context, source: &str, expected: &Failure) -> TestResult {
 fn original_operations_before_normalization() -> TestResult {
     let length = named("length", Dimension::base(BaseDimension::Length))?;
     let time = named("time", Dimension::base(BaseDimension::Time))?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["missing", "t", "x", "zero_length"],
+    )?;
     input(&mut context, "x", &length, false)?;
     input(&mut context, "t", &time, false)?;
     for source in ["0*(x+t)", "(x+t)-(x+t)", "(x+t)^0"] {
@@ -95,10 +115,10 @@ fn original_operations_before_normalization() -> TestResult {
     refusal(
         &context,
         "0*missing",
-        &Failure::UnknownSymbol(Symbol::new("missing")?),
+        &Failure::UnknownSymbol("missing".to_owned()),
     )?;
     let failure = context
-        .check(&expression("0*(x+t)")?)
+        .check(&original(&context, "0*(x+t)")?)
         .err()
         .ok_or("missing physical diagnostic")?;
     assert_eq!(failure.location.path, vec![1]);
@@ -108,43 +128,45 @@ fn original_operations_before_normalization() -> TestResult {
         failure.failure,
         Failure::Units(UnitError::DimensionMismatch)
     ));
-    let zero = context.check(&expression("x-x")?)?;
+    let zero = context.check(&original(&context, "x-x")?)?;
     assert_eq!(zero.descriptor().kind(), length.kind());
-    assert_eq!(
-        zero.normal_form(Limits::default())?.constant(),
-        Some(Rational::ZERO)
-    );
+    prove(&context, &zero, "0", None)?;
     let error = context
-        .check_against(&expression("0")?, &length)
+        .check_against(&original(&context, "0")?, &length)
         .err()
         .ok_or("expected physical zero refusal")?;
     assert_eq!(error.failure, Failure::Units(UnitError::DimensionMismatch));
-    let source = expression("x/x")?;
+    let source = original(&context, "x/x")?;
     let quotient = context.check(&source)?;
-    assert_eq!(quotient.original(), &source);
-    assert_eq!(
-        quotient.normal_form(Limits::default())?.constant(),
-        Some(Rational::ONE)
-    );
+    assert_eq!(quotient.original().root, source.root);
+    assert_eq!(quotient.original().syntax, source.syntax);
+    prove(&context, &quotient, "1", Some("x"))?;
     assert_eq!(quotient.nodes().len(), 3);
-    assert!(quotient.declarations().contains_key(&Symbol::new("x")?));
-    assert_eq!(
-        context
-            .check(&expression("0*(1/0)")?)?
-            .normal_form(Limits::default()),
-        Err(Error::Arithmetic(
-            nrz_algebra::ArithmeticError::ZeroDenominator
-        ))
-    );
+    assert!(quotient.declarations().contains_key("x"));
+    let undefined = context.check(&original(&context, "0*(1/0)")?)?;
+    assert!(matches!(
+        context.prove_equal(
+            &undefined,
+            &original(&context, "0")?,
+            LimitsOverride::default()
+        )?,
+        Outcome::Refused {
+            fault: Fault {
+                kind: FaultKind::Invalid(InvalidCode::RefutedDomain),
+                ..
+            },
+            ..
+        }
+    ));
     context.declare(
-        Symbol::new("zero_length")?,
+        "zero_length".to_owned(),
         Declaration::Constant {
             descriptor: length.clone(),
-            value: Rational::ZERO,
+            value: Rational::zero(),
             evidence: Evidence::default(),
         },
     )?;
-    context.check_against(&expression("zero_length")?, &length)?;
+    context.check_against(&original(&context, "zero_length")?, &length)?;
     Ok(())
 }
 
@@ -158,50 +180,51 @@ fn original_operations_before_normalization() -> TestResult {
 #[test]
 fn coordinate_evidence() -> TestResult {
     let temperature = Kind::Named(
-        Symbol::new("temperature")?,
-        Dimension::base(BaseDimension::Temperature),
+        "temperature".to_owned(),
+        Box::new(Dimension::base(BaseDimension::Temperature)),
     );
     let point = Descriptor::new(
         temperature,
         Measure::new(
             "Celsius",
-            Scale::Exact(Rational::ONE),
-            Rational::new(27315, 100)?,
+            Scale::Exact(Rational::one()),
+            rational(27315, 100)?,
         )?,
         Role::Point,
     )?;
     let length = named("length", Dimension::base(BaseDimension::Length))?;
     let millimetres = Descriptor::new(
         length.kind().clone(),
-        Measure::new("mm", Scale::Exact(Rational::new(1, 1000)?), Rational::ZERO)?,
+        Measure::new("mm", Scale::Exact(rational(1, 1000)?), Rational::zero())?,
         Role::Difference,
     )?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["a", "b", "dx", "mm"],
+    )?;
     input(&mut context, "a", &point, false)?;
     input(&mut context, "b", &point, false)?;
     input(&mut context, "dx", &point.difference(), false)?;
     input(&mut context, "mm", &millimetres, false)?;
-    let difference = context.check(&expression("a-b")?)?;
+    let difference = context.check(&original(&context, "a-b")?)?;
     assert_eq!(difference.descriptor().role(), Role::Difference);
-    let celsius_offset = Rational::new(27315, 100)?;
+    let celsius_offset = rational(27315, 100)?;
     assert!(
         difference
             .nodes()
             .iter()
             .any(|node| node.conversion.shift == celsius_offset)
     );
-    context.check(&expression("a+dx")?)?;
-    context.check(&expression("dx+a")?)?;
-    assert_eq!(
-        difference.normal_form(Limits::default())?,
-        NormalForm::new(&expression("a-b")?, Limits::default())?
-    );
-    context.check(&expression("a+(b-a)/2")?)?;
+    context.check(&original(&context, "a+dx")?)?;
+    context.check(&original(&context, "dx+a")?)?;
+    prove(&context, &difference, "a-b", None)?;
+    context.check(&original(&context, "a+(b-a)/2")?)?;
     for source in ["a+b", "dx-a", "0*a", "a/a", "a^0", "-a", "0.5*a+0.5*b"] {
         refusal(&context, source, &UnitError::AffineRole.into())?;
     }
-    let checked = context.check_against(&expression("mm")?, &length)?;
-    let millimetre_scale = Rational::new(1, 1000)?;
+    let checked = context.check_against(&original(&context, "mm")?, &length)?;
+    let millimetre_scale = rational(1, 1000)?;
     assert!(
         checked
             .nodes()
@@ -213,7 +236,7 @@ fn coordinate_evidence() -> TestResult {
             .output_conversion()
             .ok_or("missing output conversion")?
             .scale,
-        Rational::ONE
+        Rational::one()
     );
     Ok(())
 }
@@ -228,13 +251,13 @@ fn coordinate_evidence() -> TestResult {
 #[test]
 fn observables_equations_and_blocks() -> TestResult {
     let mass = named("mass", Dimension::base(BaseDimension::Mass))?;
-    let stiffness = named("stiffness", Dimension::integers([0, 1, -2, 0, 0, 0, 0]))?;
-    let eigenvalue = named("eigenvalue", Dimension::integers([0, 0, -2, 0, 0, 0, 0]))?;
+    let stiffness = named("stiffness", Dimension::integers([0, 1, -2, 0, 0, 0, 0])?)?;
+    let eigenvalue = named("eigenvalue", Dimension::integers([0, 0, -2, 0, 0, 0, 0])?)?;
     let omega = named(
         "angular_frequency",
-        Dimension::integers([0, 0, -1, 0, 0, 0, 0]),
+        Dimension::integers([0, 0, -1, 0, 0, 0, 0])?,
     )?;
-    let mode_shape = named("mode_shape", Dimension::ZERO)?;
+    let mode_shape = named("mode_shape", Dimension::zero())?;
     let mut registry = Registry::new(ExponentPolicy::Rational);
     registry.register_binary(
         BinaryOp::Divide,
@@ -244,36 +267,42 @@ fn observables_equations_and_blocks() -> TestResult {
     )?;
     registry.register_power(
         eigenvalue.kind().clone(),
-        Rational::new(1, 2)?,
+        rational(1, 2)?,
         omega.kind().clone(),
     )?;
-    let mut context = Context::new(registry, Limits::default());
+    let mut context = fixture(registry, Limits::default(), &["K", "M", "lambda", "shape"])?;
     input(&mut context, "K", &stiffness, false)?;
     input(&mut context, "M", &mass, true)?;
     input(&mut context, "shape", &mode_shape, false)?;
     context.declare(
-        Symbol::new("lambda")?,
+        "lambda".to_owned(),
         Declaration::Derived(Observable {
             descriptor: eigenvalue,
-            expression: expression("K/M")?,
+            expression: original(&context, "K/M")?,
             evidence: Evidence::default(),
         }),
     )?;
-    context.check_against(&expression("sqrt(lambda)")?, &omega)?;
-    context.check_equation(&expression("lambda")?, &expression("K/M")?)?;
+    context.check_against(&original(&context, "sqrt(lambda)")?, &omega)?;
+    context.check_equation(&original(&context, "lambda")?, &original(&context, "K/M")?)?;
     let error = context
-        .check_against(&expression("shape")?, &omega)
+        .check_against(&original(&context, "shape")?, &omega)
         .err()
         .ok_or("expected shape mismatch")?;
     assert_eq!(error.failure, Failure::Units(UnitError::DimensionMismatch));
     assert_eq!(
         context
-            .check_block(&[expression("K")?, expression("2*K")?], &stiffness)?
+            .check_block(
+                &[original(&context, "K")?, original(&context, "2*K")?],
+                &stiffness
+            )?
             .len(),
         2
     );
     let failure = context
-        .check_block(&[expression("K")?, expression("M")?], &stiffness)
+        .check_block(
+            &[original(&context, "K")?, original(&context, "M")?],
+            &stiffness,
+        )
         .err()
         .ok_or("missing block failure")?;
     assert_eq!(failure.location.path, vec![1]);
@@ -292,8 +321,12 @@ fn observables_equations_and_blocks() -> TestResult {
 #[test]
 fn function_signatures() -> TestResult {
     let angle = Descriptor::new(Kind::Angle, Measure::coherent(), Role::Difference)?;
-    let shape = named("mode_shape", Dimension::ZERO)?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let shape = named("mode_shape", Dimension::zero())?;
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["project", "shape", "theta", "unknown"],
+    )?;
     input(&mut context, "theta", &angle, false)?;
     input(&mut context, "shape", &shape, false)?;
     for source in [
@@ -303,7 +336,7 @@ fn function_signatures() -> TestResult {
         "sin(asin(0.5))",
         "exp(log(2))",
     ] {
-        context.check_against(&expression(source)?, &Descriptor::ratio())?;
+        context.check_against(&original(&context, source)?, &Descriptor::ratio())?;
     }
     for source in ["sin(1)", "sin(shape)", "log(theta)", "asin(theta)"] {
         refusal(&context, source, &UnitError::KindMismatch.into())?;
@@ -327,16 +360,16 @@ fn function_signatures() -> TestResult {
     refusal(
         &context,
         "unknown(theta)",
-        &Failure::UnknownFunction(Symbol::new("unknown")?),
+        &Failure::UnknownFunction("unknown".to_owned()),
     )?;
     let diagnostic = context
-        .check(&expression("sin(shape)")?)
+        .check(&original(&context, "sin(shape)")?)
         .err()
         .ok_or("missing function diagnostic")?;
     assert_eq!(diagnostic.location.path, vec![0]);
     assert_eq!(
         diagnostic.location.span,
-        Some(nrz_algebra::Span::new(4, 9)?)
+        Some(nrz_cas::syntax::Span { start: 4, end: 9 })
     );
     assert_eq!(
         diagnostic.expected,
@@ -344,13 +377,13 @@ fn function_signatures() -> TestResult {
     );
     assert_eq!(diagnostic.derived, vec![shape.clone()]);
     context.declare_function(
-        Symbol::new("project")?,
+        "project".to_owned(),
         FunctionSignature {
             parameters: vec![shape.clone(), angle.clone()],
             result: Descriptor::ratio(),
         },
     )?;
-    context.check(&expression("project(shape,theta)")?)?;
+    context.check(&original(&context, "project(shape,theta)")?)?;
     refusal(
         &context,
         "project(theta,shape)",
@@ -358,7 +391,7 @@ fn function_signatures() -> TestResult {
     )?;
     let error = context
         .declare_function(
-            Symbol::new("sin")?,
+            "sin".to_owned(),
             FunctionSignature {
                 parameters: vec![angle],
                 result: shape,
@@ -366,7 +399,7 @@ fn function_signatures() -> TestResult {
         )
         .err()
         .ok_or("expected reserved function refusal")?;
-    assert_eq!(error.failure, Failure::Duplicate(Symbol::new("sin")?));
+    assert_eq!(error.failure, Failure::Duplicate("sin".to_owned()));
     Ok(())
 }
 
@@ -376,12 +409,16 @@ fn function_signatures() -> TestResult {
 #[test]
 fn counts_and_metadata() -> TestResult {
     let count = Descriptor::new(
-        Kind::Count(Symbol::new("events")?, CountDomain::NONNEGATIVE),
+        Kind::Count("events".to_owned(), CountDomain::NONNEGATIVE),
         Measure::coherent(),
         Role::Difference,
     )?;
     let sigma = uncertainty(UncertaintyMode::Standard, &count, None, None)?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["fractional_count", "label", "n", "r", "sigma_n"],
+    )?;
     input(&mut context, "n", &count, true)?;
     uncertainty_input(
         &mut context,
@@ -392,7 +429,7 @@ fn counts_and_metadata() -> TestResult {
     )?;
     input(&mut context, "r", &Descriptor::ratio(), false)?;
     context.declare(
-        Symbol::new("label")?,
+        "label".to_owned(),
         Declaration::Metadata("display only".into()),
     )?;
     for source in [
@@ -403,7 +440,7 @@ fn counts_and_metadata() -> TestResult {
         "0.5*sigma_n",
         "sigma_n/n",
     ] {
-        context.check(&expression(source)?)?;
+        context.check(&original(&context, source)?)?;
     }
     for source in ["n/n", "n*0.5", "n*r", "-n", "n^0", "n-n"] {
         let error = if source == "n*0.5" {
@@ -416,17 +453,13 @@ fn counts_and_metadata() -> TestResult {
     for source in ["n+1", "n-1", "count_ratio(n,r)"] {
         refusal(&context, source, &UnitError::KindMismatch.into())?;
     }
-    refusal(
-        &context,
-        "0*label",
-        &Failure::Metadata(Symbol::new("label")?),
-    )?;
+    refusal(&context, "0*label", &Failure::Metadata("label".to_owned()))?;
     let error = context
         .declare(
-            Symbol::new("fractional_count")?,
+            "fractional_count".to_owned(),
             Declaration::Constant {
                 descriptor: count,
-                value: Rational::new(1, 2)?,
+                value: rational(1, 2)?,
                 evidence: Evidence::default(),
             },
         )
@@ -453,7 +486,19 @@ fn uncertainty_expressions() -> TestResult {
         None,
         Some((&length, true)),
     )?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &[
+            "bad_sigma",
+            "radius",
+            "reference",
+            "relative",
+            "sigma",
+            "variance",
+            "x",
+        ],
+    )?;
     input(&mut context, "x", &length, false)?;
     input(&mut context, "reference", &length, true)?;
     uncertainty_input(
@@ -465,40 +510,40 @@ fn uncertainty_expressions() -> TestResult {
     )?;
     input(&mut context, "radius", &radius, false)?;
     context.declare(
-        Symbol::new("variance")?,
+        "variance".to_owned(),
         Declaration::Uncertainty {
             observable: Observable {
                 descriptor: variance.clone(),
-                expression: expression("sigma^2")?,
+                expression: original(&context, "sigma^2")?,
                 evidence: Evidence::default(),
             },
             companion: Companion {
                 mode: UncertaintyMode::Variance,
-                value: Symbol::new("x")?,
+                value: "x".to_owned(),
                 other: None,
                 reference: None,
             },
         },
     )?;
     context.declare(
-        Symbol::new("relative")?,
+        "relative".to_owned(),
         Declaration::Uncertainty {
             observable: Observable {
                 descriptor: relative.clone(),
-                expression: expression("sigma/reference")?,
+                expression: original(&context, "sigma/reference")?,
                 evidence: Evidence::default(),
             },
             companion: Companion {
                 mode: UncertaintyMode::RelativeStandard,
-                value: Symbol::new("x")?,
+                value: "x".to_owned(),
                 other: None,
-                reference: Some(Symbol::new("reference")?),
+                reference: Some("reference".to_owned()),
             },
         },
     )?;
-    context.check_against(&expression("variance")?, &variance)?;
-    context.check_against(&expression("sqrt(variance)")?, &standard)?;
-    context.check_against(&expression("relative")?, &relative)?;
+    context.check_against(&original(&context, "variance")?, &variance)?;
+    context.check_against(&original(&context, "sqrt(variance)")?, &standard)?;
+    context.check_against(&original(&context, "relative")?, &relative)?;
     for source in ["sigma/x", "sigma/(-reference)"] {
         refusal(&context, source, &UnitError::RelativeReference.into())?;
     }
@@ -507,16 +552,16 @@ fn uncertainty_expressions() -> TestResult {
     }
     refusal(&context, "radius^2", &UnitError::UnsupportedKindRule.into())?;
     context.declare(
-        Symbol::new("bad_sigma")?,
+        "bad_sigma".to_owned(),
         Declaration::Uncertainty {
             observable: Observable {
                 descriptor: length,
-                expression: expression("x")?,
+                expression: original(&context, "x")?,
                 evidence: Evidence::default(),
             },
             companion: Companion {
                 mode: UncertaintyMode::Standard,
-                value: Symbol::new("x")?,
+                value: "x".to_owned(),
                 other: None,
                 reference: None,
             },
@@ -533,45 +578,259 @@ fn uncertainty_expressions() -> TestResult {
 /// ´test:integration:declaration-refusals´
 #[test]
 fn declaration_refusals() -> TestResult {
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["a", "b", "missing"],
+    )?;
     for (name, body) in [("a", "b+1"), ("b", "a-1")] {
         context.declare(
-            Symbol::new(name)?,
+            name.to_owned(),
             Declaration::Derived(Observable {
                 descriptor: Descriptor::ratio(),
-                expression: expression(body)?,
+                expression: original(&context, body)?,
                 evidence: Evidence::default(),
             }),
         )?;
     }
-    context.check(&expression("1")?)?;
+    context.check(&original(&context, "1")?)?;
     let failure = context.check_all().err().ok_or("missing cycle failure")?;
     assert!(matches!(failure.failure, Failure::Cycle(_)));
     assert_eq!(
         failure.location.definitions,
-        vec![Symbol::new("a")?, Symbol::new("b")?]
+        vec!["a".to_owned(), "b".to_owned()]
     );
     let duplicate = context
-        .declare(Symbol::new("a")?, Declaration::Metadata(String::new()))
+        .declare("a".to_owned(), Declaration::Metadata(String::new()))
         .err()
         .ok_or("expected duplicate declaration refusal")?;
-    assert_eq!(duplicate.failure, Failure::Duplicate(Symbol::new("a")?));
+    assert_eq!(duplicate.failure, Failure::Duplicate("a".to_owned()));
     let unknown = context
-        .check(&expression("missing+1")?)
+        .check(&original(&context, "missing+1")?)
         .err()
         .ok_or("missing unknown-symbol failure")?;
     assert!(matches!(unknown.failure, Failure::UnknownSymbol(_)));
-    let tiny = Context::new(
+    let tiny = fixture(
         Registry::new(ExponentPolicy::Rational),
         Limits {
             work: 1,
             ..Limits::default()
         },
-    );
-    refusal(
-        &tiny,
-        "1+2",
-        &Failure::Algebra(Error::Limit("units traversal")),
+        &[],
     )?;
+    let failure = tiny
+        .check(&original(&tiny, "1+2")?)
+        .err()
+        .ok_or("missing work refusal")?;
+    assert!(matches!(
+        failure.failure,
+        Failure::Algebra(Fault {
+            kind: FaultKind::Exhausted {
+                budget: BudgetKind::Work,
+                limit: 1,
+                ..
+            },
+            ..
+        })
+    ));
+    Ok(())
+}
+
+/// Reproduce the coupled-oscillator descriptor rules without numerical root evaluation.
+fn nested_root_context(
+    limits: Limits,
+    source_padding: usize,
+) -> Result<(Context, Descriptor), Box<dyn std::error::Error>> {
+    let mass = named("mass", Dimension::base(BaseDimension::Mass))?;
+    let stiffness = named("stiffness", Dimension::integers([0, 1, -2, 0, 0, 0, 0])?)?;
+    let squared = named(
+        "frequency_squared",
+        Dimension::integers([0, 0, -2, 0, 0, 0, 0])?,
+    )?;
+    let angular = named(
+        "angular_frequency",
+        Dimension::integers([0, 0, -1, 0, 0, 0, 0])?,
+    )?;
+    let mut registry = Registry::new(ExponentPolicy::Rational);
+    registry.register_binary(
+        BinaryOp::Divide,
+        stiffness.kind().clone(),
+        mass.kind().clone(),
+        squared.kind().clone(),
+    )?;
+    registry.register_power(
+        squared.kind().clone(),
+        rational(1, 2)?,
+        angular.kind().clone(),
+    )?;
+    let mut context = fixture(registry, limits, &["k", "m", "omega1"])?;
+    if source_padding > 0 {
+        context.parse(
+            "coordinate-budget-padding",
+            &format!("{}k", " ".repeat(source_padding)),
+        )?;
+    }
+    input(&mut context, "k", &stiffness, false)?;
+    input(&mut context, "m", &mass, true)?;
+    context.declare(
+        "omega1".to_owned(),
+        Declaration::Derived(Observable {
+            descriptor: angular.clone(),
+            expression: original(&context, "sqrt((2 - sqrt(2)) * k / m)")?,
+            evidence: Evidence::default(),
+        }),
+    )?;
+    Ok((context, angular))
+}
+
+/// A nested irrational root remains physically checked even in an accumulated CAS store.
+///
+/// ´test:integration:nested-root-coordinate-batch´
+#[test]
+fn nested_root_coordinate_batch() -> TestResult {
+    let (context, expected) = nested_root_context(Limits::default(), 100_000)?;
+    let payload = context.cas()?.counts().payload_bytes;
+    // The former three whole-store walks plus one admission charged at least seven payloads.
+    assert!(payload > Limits::default().work / 7);
+    let expression = original(&context, "omega1")?;
+    let checked = context.check_against(&expression, &expected)?;
+    assert_eq!(checked.descriptor(), &expected);
+    assert_eq!(checked.original().root, expression.root);
+    assert!(checked.declarations().contains_key("k"));
+    assert!(checked.declarations().contains_key("m"));
+    assert!(checked.nodes().iter().any(|node| {
+        node.location.path == [0]
+            && node.location.definitions == ["omega1"]
+            && node.descriptor == expected
+    }));
+    Ok(())
+}
+
+/// Coordinate expansion adds exact half exponents and retains the original refusal location.
+///
+/// ´test:integration:nested-root-coordinate-budget´
+#[test]
+fn nested_root_coordinate_budget() -> TestResult {
+    let (context, _) = nested_root_context(
+        Limits {
+            peak_expression_size: 9,
+            ..Limits::default()
+        },
+        0,
+    )?;
+    let diagnostic = context
+        .check(&original(&context, "omega1")?)
+        .err()
+        .ok_or("expected coordinate size refusal")?;
+    assert!(matches!(
+        diagnostic.failure,
+        Failure::Coordinates(Fault {
+            kind: FaultKind::Exhausted {
+                budget: BudgetKind::PeakExpressionSize,
+                limit: 9,
+                needed: 11,
+                ..
+            },
+            ..
+        })
+    ));
+    assert_eq!(
+        diagnostic.expected,
+        Expectation::Rule("bounded exact coordinate expression")
+    );
+    assert_eq!(diagnostic.location.path, vec![0]);
+    assert_eq!(diagnostic.location.definitions, vec!["omega1"]);
+    assert_eq!(
+        diagnostic.location.span,
+        Some(nrz_cas::syntax::Span { start: 0, end: 27 })
+    );
+    assert_eq!(diagnostic.derived, []);
+    Ok(())
+}
+
+/// Reproduce the damped oscillator's two-level derived stiffness calculation.
+fn derived_chain_rules() -> Result<(Registry, [Descriptor; 5]), Box<dyn std::error::Error>> {
+    let mass = named("mass", Dimension::base(BaseDimension::Mass))?;
+    let stiffness = named("stiffness", Dimension::integers([0, 1, -2, 0, 0, 0, 0])?)?;
+    let damping = named("damping", Dimension::integers([0, 1, -1, 0, 0, 0, 0])?)?;
+    let angular = named(
+        "angular_frequency",
+        Dimension::integers([0, 0, -1, 0, 0, 0, 0])?,
+    )?;
+    let frequency = named(
+        "frequency_squared",
+        Dimension::integers([0, 0, -2, 0, 0, 0, 0])?,
+    )?;
+    let squared = named(
+        "stiffness_squared",
+        Dimension::integers([0, 2, -4, 0, 0, 0, 0])?,
+    )?;
+    let mut registry = Registry::new(ExponentPolicy::Rational);
+    for (left, right, output) in [
+        (&mass, &frequency, &stiffness),
+        (&damping, &angular, &stiffness),
+    ] {
+        registry.register_binary(
+            BinaryOp::Multiply,
+            left.kind().clone(),
+            right.kind().clone(),
+            output.kind().clone(),
+        )?;
+    }
+    for (base, output) in [(&angular, &frequency), (&stiffness, &squared)] {
+        registry.register_power(base.kind().clone(), rational(2, 1)?, output.kind().clone())?;
+    }
+    Ok((registry, [mass, stiffness, damping, angular, squared]))
+}
+
+/// Multiple derived bodies share a finite check ledger without paying for unrelated sources.
+///
+/// ´test:integration:derived-chain-in-large-store´
+#[test]
+fn derived_chain_in_large_store() -> TestResult {
+    let (registry, [mass, stiffness, damping, angular, squared]) = derived_chain_rules()?;
+    let mut context = fixture(
+        registry,
+        Limits::default(),
+        &["c", "d", "k", "m", "omega", "q"],
+    )?;
+    context.parse("chain-padding", &format!("{}k", " ".repeat(100_000)))?;
+    for (name, descriptor) in [
+        ("c", &damping),
+        ("k", &stiffness),
+        ("m", &mass),
+        ("omega", &angular),
+    ] {
+        input(&mut context, name, descriptor, false)?;
+    }
+    for (name, text, descriptor) in [
+        ("d", "k-m*omega^2", &stiffness),
+        ("q", "d^2+(c*omega)^2", &squared),
+    ] {
+        context.declare(
+            name.to_owned(),
+            Declaration::Derived(Observable {
+                descriptor: descriptor.clone(),
+                expression: original(&context, text)?,
+                evidence: Evidence::default(),
+            }),
+        )?;
+    }
+    assert!(context.cas()?.counts().payload_bytes > Limits::default().work / 7);
+    let checked = context.check_against(&original(&context, "q")?, &squared)?;
+    assert_eq!(checked.descriptor(), &squared);
+    assert_eq!(
+        checked
+            .declarations()
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>(),
+        ["c", "d", "k", "m", "omega", "q"]
+    );
+    assert!(checked.nodes().iter().any(|node| {
+        node.location.definitions == ["q", "d"]
+            && node.location.span == Some(nrz_cas::syntax::Span { start: 0, end: 11 })
+            && node.descriptor == stiffness
+    }));
     Ok(())
 }

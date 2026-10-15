@@ -13,7 +13,7 @@ keywords = ["units", "dimensions", "validation"]
 categories = ["mathematics", "science"]
 
 [dependencies]
-nrz-algebra.workspace = true
+nrz-cas = { path = "../cas" }
 thiserror.workspace = true
 
 [lints]

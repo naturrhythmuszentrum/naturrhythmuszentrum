@@ -63,10 +63,6 @@ output = "docs/design/computation.md"
 requires = []
 
 [[document]]
-output = "prototypes/descriptors/README.md"
-requires = []
-
-[[document]]
 output = "docs/design/units-design.md"
 requires = []
 

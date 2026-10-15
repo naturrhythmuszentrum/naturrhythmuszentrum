@@ -7,7 +7,12 @@ mod record;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use nrz_algebra::{Limits, Rational, Symbol, parse};
+use nrz_cas::{
+    Rational,
+    limits::Limits,
+    source::{SyntaxNode, WalkEvent},
+    syntax::{AtomicSort, Declaration as CasDeclaration, Environment, Field, Operator, Sort},
+};
 use nrz_units::{
     CheckedExpression, Companion, CompanionEvidence, Context, Declaration, Descriptor, Evidence,
     Kind, Observable, Role, uncertainty,
@@ -17,7 +22,7 @@ use serde_json::{Value, json};
 use crate::error::Error;
 use decode::{Formula, Item};
 use kinds::Kinds;
-use record::Record;
+use record::{Record, budget, exact};
 
 /// Validate one source payload and attach deterministically regenerated evidence.
 ///
@@ -70,10 +75,10 @@ pub(crate) fn validate(
             &mut BTreeSet::new(),
         )?;
     }
-    dependencies(&by_name)?;
-    let mut context = Context::new(registry, Limits::default());
+    let mut context = schema_context(registry, &items, &entry)?;
+    dependencies(&by_name, &context)?;
     for item in &items {
-        if let Some(declaration) = declaration(item, &descriptors)? {
+        if let Some(declaration) = declaration(item, &descriptors, &context)? {
             context
                 .declare(item.name.clone(), declaration)
                 .map_err(|error| item.record.error(error))?;
@@ -87,6 +92,31 @@ pub(crate) fn validate(
     context.check_all().map_err(|error| entry.error(error))?;
     records.extend(equations(&entry, &context, &by_name, &kinds)?);
     variants(&entry, &by_name, &descriptors)?;
+    Ok(validation_records(value, &items, &records))
+}
+
+/// Declare every schema name before parsing forward references.
+fn schema_context(
+    registry: nrz_units::Registry,
+    items: &[Item<'_>],
+    entry: &Record<'_>,
+) -> Result<Context, Error> {
+    let environment = Environment {
+        declarations: items
+            .iter()
+            .map(|item| CasDeclaration {
+                key: item.name.clone(),
+                display_name: item.name.clone(),
+                sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+            })
+            .collect(),
+        ..Environment::default()
+    };
+    Context::new(registry, Limits::default(), environment).map_err(|error| entry.error(error))
+}
+
+/// Attach checked counts and normalized absent collections to the unchanged source payload.
+fn validation_records(value: &Value, items: &[Item<'_>], records: &[Value]) -> Value {
     let checked = items
         .iter()
         .filter(|item| item.category == "observable" && matches!(item.formula, Formula::Algebra(_)))
@@ -125,7 +155,7 @@ pub(crate) fn validate(
         "checked_expressions": checked_expressions,
         "unsupported_expressions": unsupported_expressions,
     });
-    Ok(result)
+    result
 }
 
 /// Recompute all evidence rather than trusting a committed checked flag.
@@ -147,9 +177,9 @@ pub(crate) fn revalidate(value: &Value, path: &str, slug: &str, kind: &str) -> R
 }
 
 /// All explicitly named edges, including unsupported and relationship dependencies.
-fn edges(item: &Item<'_>) -> Result<BTreeSet<Symbol>, Error> {
+fn edges(item: &Item<'_>, context: &Context) -> Result<BTreeSet<String>, Error> {
     let mut names = match &item.formula {
-        Formula::Algebra(expression) => expression.expression()?.symbols(),
+        Formula::Algebra(expression) => symbols(expression, context)?,
         Formula::Unsupported(record) => record
             .array("dependencies")?
             .iter()
@@ -168,10 +198,10 @@ fn edges(item: &Item<'_>) -> Result<BTreeSet<Symbol>, Error> {
 }
 
 /// Bound all declaration cycles before descriptor or expression resolution.
-fn dependencies(items: &BTreeMap<Symbol, &Item<'_>>) -> Result<(), Error> {
+fn dependencies(items: &BTreeMap<String, &Item<'_>>, context: &Context) -> Result<(), Error> {
     let mut complete = BTreeSet::new();
     for item in items.values() {
-        visit(item, items, &mut BTreeSet::new(), &mut complete)?;
+        visit(item, items, &mut BTreeSet::new(), &mut complete, context)?;
     }
     Ok(())
 }
@@ -179,9 +209,10 @@ fn dependencies(items: &BTreeMap<Symbol, &Item<'_>>) -> Result<(), Error> {
 /// Walk named dependencies without allowing unsupported values to become substitute inputs.
 fn visit(
     item: &Item<'_>,
-    items: &BTreeMap<Symbol, &Item<'_>>,
-    active: &mut BTreeSet<Symbol>,
-    complete: &mut BTreeSet<Symbol>,
+    items: &BTreeMap<String, &Item<'_>>,
+    active: &mut BTreeSet<String>,
+    complete: &mut BTreeSet<String>,
+    context: &Context,
 ) -> Result<(), Error> {
     if complete.contains(&item.name) {
         return Ok(());
@@ -189,7 +220,7 @@ fn visit(
     if active.len() >= 128 || !active.insert(item.name.clone()) {
         return Err(item.record.error("declaration cycle or depth limit"));
     }
-    for name in edges(item)? {
+    for name in edges(item, context)? {
         let dependency = items.get(&name).ok_or_else(|| {
             item.record
                 .error(format!("unknown symbol {}", name.as_str()))
@@ -202,7 +233,7 @@ fn visit(
                 name.as_str()
             )));
         }
-        visit(dependency, items, active, complete)?;
+        visit(dependency, items, active, complete, context)?;
     }
     active.remove(&item.name);
     complete.insert(item.name.clone());
@@ -229,7 +260,7 @@ fn companion(record: &Record<'_>) -> Result<Companion, Error> {
 fn target<'a, 'data>(
     record: &Record<'_>,
     key: &str,
-    items: &BTreeMap<Symbol, &'a Item<'data>>,
+    items: &BTreeMap<String, &'a Item<'data>>,
 ) -> Result<Option<&'a Item<'data>>, Error> {
     record
         .optional(key)
@@ -245,10 +276,10 @@ fn target<'a, 'data>(
 /// Resolve descriptors independently of expression success, including unused declarations.
 fn resolve_descriptor(
     item: &Item<'_>,
-    items: &BTreeMap<Symbol, &Item<'_>>,
+    items: &BTreeMap<String, &Item<'_>>,
     kinds: &Kinds,
-    resolved: &mut BTreeMap<Symbol, Descriptor>,
-    active: &mut BTreeSet<Symbol>,
+    resolved: &mut BTreeMap<String, Descriptor>,
+    active: &mut BTreeSet<String>,
 ) -> Result<Option<Descriptor>, Error> {
     if let Some(value) = resolved.get(&item.name) {
         return Ok(Some(value.clone()));
@@ -292,7 +323,7 @@ fn resolve_descriptor(
         if descriptor.kind().count_domain().is_some() {
             if let Some(value) = item.record.optional("value") {
                 descriptor
-                    .check_count_literal(value.rational()?)
+                    .check_count_literal(&value.rational()?)
                     .map_err(|error| value.error(error))?;
             }
             if item.category == "observable" && item.record.string("value_kind")? != "exact" {
@@ -307,10 +338,10 @@ fn resolve_descriptor(
 /// Resolve one numerical target's independently checked descriptor.
 fn target_descriptor(
     item: &Item<'_>,
-    items: &BTreeMap<Symbol, &Item<'_>>,
+    items: &BTreeMap<String, &Item<'_>>,
     kinds: &Kinds,
-    resolved: &mut BTreeMap<Symbol, Descriptor>,
-    active: &mut BTreeSet<Symbol>,
+    resolved: &mut BTreeMap<String, Descriptor>,
+    active: &mut BTreeSet<String>,
 ) -> Result<Descriptor, Error> {
     resolve_descriptor(item, items, kinds, resolved, active)?.ok_or_else(|| {
         item.record
@@ -322,10 +353,10 @@ fn target_descriptor(
 fn companion_descriptor(
     item: &Item<'_>,
     relationship: &Record<'_>,
-    items: &BTreeMap<Symbol, &Item<'_>>,
+    items: &BTreeMap<String, &Item<'_>>,
     kinds: &Kinds,
-    resolved: &mut BTreeMap<Symbol, Descriptor>,
-    active: &mut BTreeSet<Symbol>,
+    resolved: &mut BTreeMap<String, Descriptor>,
+    active: &mut BTreeSet<String>,
 ) -> Result<Option<Descriptor>, Error> {
     let primary = target(relationship, "target", items)?
         .ok_or_else(|| relationship.error("missing target"))?;
@@ -340,7 +371,7 @@ fn companion_descriptor(
     let nonzero = reference_item.map(is_nonzero).transpose()?.unwrap_or(false);
     if relationship.string("mode")? != "covariance"
         && let Some(value) = item.record.optional("value")
-        && value.rational()? < Rational::ZERO
+        && value.rational()?.is_negative()
     {
         return Err(value.error("uncertainty value must be nonnegative"));
     }
@@ -352,7 +383,7 @@ fn companion_descriptor(
         Box::new(primary.kind().clone()),
         other.as_ref().map(|value| Box::new(value.kind().clone())),
     );
-    if kind != expected_kind || role != Role::Difference || measure.offset() != Rational::ZERO {
+    if kind != expected_kind || role != Role::Difference || !measure.offset().is_zero() {
         return Err(intended.error("uncertainty kind, role or origin disagrees with its targets"));
     }
     let expected = uncertainty(
@@ -364,7 +395,7 @@ fn companion_descriptor(
     if decode::unsupported_scope(&item.formula, "descriptor") {
         // The current missing surface is a relative reference without nonzero evidence.
         // Retain the intended schema, but never construct an admitted substitute.
-        if !kind.is_relative() || expected.is_ok() || measure.scale() != Rational::ONE {
+        if !kind.is_relative() || expected.is_ok() || measure.scale() != &Rational::one() {
             return Err(intended.error(
                 "descriptor scope is only available for an unadmitted relative relationship",
             ));
@@ -395,7 +426,7 @@ fn companion_descriptor(
 fn is_nonzero(item: &Item<'_>) -> Result<bool, Error> {
     match item.formula {
         Formula::Input => item.record.at("nonzero")?.boolean(),
-        Formula::Constant => Ok(item.record.at("value")?.rational()? != Rational::ZERO),
+        Formula::Constant => Ok(item.record.at("value")?.rational()? != Rational::zero()),
         _ => Ok(false),
     }
 }
@@ -420,7 +451,8 @@ fn provenance(item: &Item<'_>) -> Result<Evidence, Error> {
 /// Map each admitted schema alternative directly onto the public declaration API.
 fn declaration(
     item: &Item<'_>,
-    descriptors: &BTreeMap<Symbol, Descriptor>,
+    descriptors: &BTreeMap<String, Descriptor>,
+    context: &Context,
 ) -> Result<Option<Declaration>, Error> {
     if matches!(item.formula, Formula::Unsupported(_)) {
         return Ok(None);
@@ -455,7 +487,7 @@ fn declaration(
         Formula::Algebra(expression) => {
             let observable = Observable {
                 descriptor,
-                expression: expression.expression()?,
+                expression: expression.expression(context)?,
                 evidence,
             };
             match relation {
@@ -477,7 +509,7 @@ fn declaration(
 fn check_item(
     item: &Item<'_>,
     context: &Context,
-    descriptors: &BTreeMap<Symbol, Descriptor>,
+    descriptors: &BTreeMap<String, Descriptor>,
     kinds: &Kinds,
 ) -> Result<Value, Error> {
     let mut record = json!({
@@ -507,8 +539,9 @@ fn check_item(
         record["unsupported"] = unsupported.value.clone();
         return Ok(record);
     }
-    let probe =
-        parse(item.name.as_str(), Limits::default()).map_err(|error| item.record.error(error))?;
+    let probe = context
+        .parse(&format!("{}:probe", item.record.path), item.name.as_str())
+        .map_err(|error| item.record.error(error))?;
     let checked = context
         .check(&probe)
         .map_err(|error| item.record.error(error))?;
@@ -517,12 +550,12 @@ fn check_item(
             .get(&item.name)
             .ok_or_else(|| item.record.error("missing output descriptor"))?;
         let output = context
-            .check_against(&expression.expression()?, descriptor)
+            .check_against(&expression.expression(context)?, descriptor)
             .map_err(|error| item.record.error(format!("expression.text: {error}")))?;
         record["expression_status"] = json!("checked");
-        checked_fields(&mut record, &output);
+        checked_fields(&mut record, &output, &item.record)?;
     } else {
-        checked_fields(&mut record, &checked);
+        checked_fields(&mut record, &checked, &item.record)?;
     }
     if let Some(evidence) = checked.companion_evidence() {
         record["companion_evidence"] = match evidence {
@@ -566,27 +599,32 @@ fn companion_json(companion: &Companion) -> Value {
 }
 
 /// Retain the actual dependency inventory and coordinate conversion evidence.
-fn checked_fields(record: &mut Value, checked: &CheckedExpression) {
+fn checked_fields(
+    record: &mut Value,
+    checked: &CheckedExpression,
+    source: &Record<'_>,
+) -> Result<(), Error> {
     record["used_declarations"] = json!(
         checked
             .declarations()
             .keys()
-            .map(Symbol::as_str)
+            .map(String::as_str)
             .collect::<Vec<_>>()
     );
     if let Some(conversion) = checked.output_conversion() {
         record["output_conversion"] = json!({
-            "scale": conversion.scale.to_string(),
-            "shift": conversion.shift.to_string()
+            "scale": exact(&conversion.scale, source)?,
+            "shift": exact(&conversion.shift, source)?
         });
     }
+    Ok(())
 }
 
 /// Check every equation's original sides with the authority's side-indexed diagnostics.
 fn equations(
     entry: &Record<'_>,
     context: &Context,
-    items: &BTreeMap<Symbol, &Item<'_>>,
+    items: &BTreeMap<String, &Item<'_>>,
     kinds: &Kinds,
 ) -> Result<Vec<Value>, Error> {
     let mut names = BTreeSet::new();
@@ -612,12 +650,12 @@ fn equations(
                     return Err(equation.error("algebra equations require two algebra sides"));
                 };
                 let (left, right) = context
-                    .check_equation(&left.expression()?, &right.expression()?)
+                    .check_equation(&left.expression(context)?, &right.expression(context)?)
                     .map_err(|error| equation.error(error))?;
                 record["expression_status"] = json!("checked");
                 record["left_descriptor"] = kinds::evidence(left.descriptor(), kinds, &equation)?;
                 record["right_descriptor"] = kinds::evidence(right.descriptor(), kinds, &equation)?;
-                checked_fields(&mut record, &right);
+                checked_fields(&mut record, &right, &equation)?;
             }
             "unsupported" => {
                 equation.keys(&["name", "kind", "expression", "source", "assurance"], &[])?;
@@ -649,8 +687,8 @@ fn equations(
 /// Admit all variant replacements against unchanged parameter contracts.
 fn variants(
     entry: &Record<'_>,
-    items: &BTreeMap<Symbol, &Item<'_>>,
-    descriptors: &BTreeMap<Symbol, Descriptor>,
+    items: &BTreeMap<String, &Item<'_>>,
+    descriptors: &BTreeMap<String, Descriptor>,
 ) -> Result<(), Error> {
     let mut names = BTreeSet::new();
     for variant in entry.optional_array("variants")? {
@@ -668,7 +706,7 @@ fn variants(
                 .ok_or_else(|| overrides.error("expected override object"))?;
             for (name, value) in values {
                 let value = Record::new(value, format!("{}.overrides.{name}", variant.path));
-                let symbol = Symbol::new(name).map_err(|error| value.error(error))?;
+                let symbol = name.clone();
                 let item = items
                     .get(&symbol)
                     .filter(|item| item.category == "parameter")
@@ -677,7 +715,7 @@ fn variants(
                     decode::metadata(&item.record.at("metadata")?, &value)?;
                 } else {
                     let coordinate = value.rational()?;
-                    if coordinate == Rational::ZERO && is_nonzero(item)? {
+                    if coordinate == Rational::zero() && is_nonzero(item)? {
                         return Err(value.error("replacement contradicts nonzero assumption"));
                     }
                     let descriptor = descriptors
@@ -685,7 +723,7 @@ fn variants(
                         .ok_or_else(|| value.error("missing parameter descriptor"))?;
                     if descriptor.kind().count_domain().is_some() {
                         descriptor
-                            .check_count_literal(coordinate)
+                            .check_count_literal(&coordinate)
                             .map_err(|error| value.error(error))?;
                     }
                 }
@@ -693,6 +731,30 @@ fn variants(
         }
     }
     Ok(())
+}
+
+/// Inspect all original operands when collecting dependencies, including cancelled names.
+fn symbols(record: &Record<'_>, context: &Context) -> Result<BTreeSet<String>, Error> {
+    let original = record.expression(context)?;
+    let cas = context.cas().map_err(|error| record.error(error))?;
+    let mut ledger = budget().map_err(|error| record.error(error))?;
+    let walk = cas
+        .walk_original(&original.root, &mut ledger)
+        .map_err(|error| record.error(error))?;
+    let mut keys = BTreeSet::new();
+    for event in walk.events {
+        if let WalkEvent::Visit(visit) = event {
+            let descriptor = cas
+                .describe_syntax(&visit.expression, &mut ledger)
+                .map_err(|error| record.error(error))?;
+            if let SyntaxNode::Expression(expression) = descriptor.node
+                && let Operator::Free(key) = expression.operator
+            {
+                keys.insert(key);
+            }
+        }
+    }
+    Ok(keys)
 }
 
 #[cfg(test)]

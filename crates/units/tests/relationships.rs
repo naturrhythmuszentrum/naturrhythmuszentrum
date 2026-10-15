@@ -1,7 +1,28 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Value identity, reference binding and distinct diagnostic boundaries.
 
-use nrz_algebra::{Error, Expr, Limits, Rational, Span, Symbol, parse};
+use nrz_cas::{
+    Fault, FaultKind, Rational,
+    limits::{BudgetKind, Limits},
+    syntax::Span,
+};
+#[path = "support/arithmetic.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod support;
+use support::rational;
+#[path = "support/engine.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod engine;
+use engine::{fixture, original, prove};
+
 use nrz_units::{
     BaseDimension, BinaryOp, Companion, Context, CountDomain, Declaration, Descriptor, Dimension,
     Evidence, ExponentPolicy, Failure, Kind, Measure, Observable, Registry, Role, Scale,
@@ -11,15 +32,10 @@ use nrz_units::{
 /// Fallible fixtures report their setup errors directly.
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-/// Parse an original source tree independently of the checking context's limits.
-fn expression(source: &str) -> Result<Expr, nrz_algebra::ParseError> {
-    parse(source, Limits::default())
-}
-
 /// Declare an ordinary numerical input.
 fn input(context: &mut Context, name: &str, value: &Descriptor, nonzero: bool) -> TestResult {
     context.declare(
-        Symbol::new(name)?,
+        name.to_owned(),
         Declaration::Input {
             descriptor: value.clone(),
             nonzero,
@@ -39,14 +55,14 @@ fn bound(
     reference: Option<&str>,
 ) -> TestResult {
     context.declare(
-        Symbol::new(name)?,
+        name.to_owned(),
         Declaration::UncertaintyInput {
             descriptor: descriptor.clone(),
             companion: Companion {
                 mode,
-                value: Symbol::new(value)?,
+                value: value.to_owned(),
                 other: None,
-                reference: reference.map(Symbol::new).transpose()?,
+                reference: reference.map(str::to_owned),
             },
             evidence: Evidence::default(),
         },
@@ -55,11 +71,11 @@ fn bound(
 }
 
 /// Construct the named length kind used by independent identity tests.
-fn length() -> Result<Descriptor, Box<dyn std::error::Error>> {
+fn length_descriptor() -> Result<Descriptor, Box<dyn std::error::Error>> {
     Ok(Descriptor::new(
         Kind::Named(
-            Symbol::new("length")?,
-            Dimension::base(BaseDimension::Length),
+            "length".to_owned(),
+            Box::new(Dimension::base(BaseDimension::Length)),
         ),
         Measure::coherent(),
         Role::Difference,
@@ -82,7 +98,11 @@ fn ratio_uncertainty_scaling_and_references() -> TestResult {
         None,
         Some((&ratio, true)),
     )?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["eff", "r", "rel", "sigma", "var"],
+    )?;
     input(&mut context, "eff", &ratio, true)?;
     input(&mut context, "r", &ratio, false)?;
     bound(
@@ -117,20 +137,16 @@ fn ratio_uncertainty_scaling_and_references() -> TestResult {
         ("rel/2", &relative),
         ("sigma/eff", &relative),
     ] {
-        context.check_against(&expression(source)?, expected)?;
+        context.check_against(&original(&context, source)?, expected)?;
     }
-    assert_eq!(
-        context
-            .check(&expression("sigma/2")?)?
-            .normal_form(Limits::default())?,
-        context
-            .check(&expression("0.5*sigma")?)?
-            .normal_form(Limits::default())?
-    );
-    let checked = context.check(&expression("sigma/eff")?)?;
+    let divided = context.check(&original(&context, "sigma/2")?)?;
+    let multiplied = context.check(&original(&context, "0.5*sigma")?)?;
+    prove(&context, &divided, "0.5*sigma", None)?;
+    prove(&context, &multiplied, "0.5*sigma", None)?;
+    let checked = context.check(&original(&context, "sigma/eff")?)?;
     let relation = checked.companion().ok_or("missing relative identity")?;
-    assert_eq!(relation.value, Symbol::new("eff")?);
-    assert_eq!(relation.reference, Some(Symbol::new("eff")?));
+    assert_eq!(relation.value, "eff".to_owned());
+    assert_eq!(relation.reference, Some("eff".to_owned()));
     Ok(())
 }
 
@@ -143,7 +159,7 @@ fn ratio_uncertainty_scaling_and_references() -> TestResult {
 /// ´test:integration:uncertainty-value-and-reference-identities´
 #[test]
 fn uncertainty_value_and_reference_identities() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
     let variance = uncertainty(UncertaintyMode::Variance, &length, None, None)?;
     let relative = uncertainty(
@@ -152,7 +168,20 @@ fn uncertainty_value_and_reference_identities() -> TestResult {
         None,
         Some((&length, true)),
     )?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &[
+            "other",
+            "r",
+            "u_x",
+            "u_y",
+            "wrong_reference",
+            "wrong_value",
+            "x",
+            "y",
+        ],
+    )?;
     for name in ["x", "y", "r", "other"] {
         input(&mut context, name, &length, true)?;
     }
@@ -172,13 +201,13 @@ fn uncertainty_value_and_reference_identities() -> TestResult {
         UncertaintyMode::Standard,
         None,
     )?;
-    let square = context.check_against(&expression("u_x*u_x")?, &variance)?;
+    let square = context.check_against(&original(&context, "u_x*u_x")?, &variance)?;
     assert_eq!(
         square.companion().ok_or("missing variance identity")?.value,
-        Symbol::new("x")?
+        "x".to_owned()
     );
     let error = context
-        .check(&expression("u_x*u_y")?)
+        .check(&original(&context, "u_x*u_y")?)
         .err()
         .ok_or("expected refusal")?;
     assert_eq!(
@@ -202,23 +231,23 @@ fn uncertainty_value_and_reference_identities() -> TestResult {
         ),
     ] {
         context.declare(
-            Symbol::new(name)?,
+            name.to_owned(),
             Declaration::Uncertainty {
                 observable: Observable {
                     descriptor,
-                    expression: expression(body)?,
+                    expression: original(&context, body)?,
                     evidence: Evidence::default(),
                 },
                 companion: Companion {
                     mode,
-                    value: Symbol::new("x")?,
+                    value: "x".to_owned(),
                     other: None,
-                    reference: reference.map(Symbol::new).transpose()?,
+                    reference: reference.map(str::to_owned),
                 },
             },
         )?;
         let error = context
-            .check(&expression(name)?)
+            .check(&original(&context, name)?)
             .err()
             .ok_or("expected refusal")?;
         assert_eq!(
@@ -236,14 +265,18 @@ fn uncertainty_value_and_reference_identities() -> TestResult {
 /// ´test:integration:relative-declaration-refusals´
 #[test]
 fn relative_declaration_refusals() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let relative = uncertainty(
         UncertaintyMode::RelativeStandard,
         &length,
         None,
         Some((&length, true)),
     )?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["missing_reference", "unbound", "x"],
+    )?;
     input(&mut context, "x", &length, true)?;
     let declarations = [
         Declaration::Input {
@@ -253,18 +286,18 @@ fn relative_declaration_refusals() -> TestResult {
         },
         Declaration::Constant {
             descriptor: relative.clone(),
-            value: Rational::ONE,
+            value: Rational::one(),
             evidence: Evidence::default(),
         },
         Declaration::Derived(Observable {
             descriptor: relative.clone(),
-            expression: expression("1")?,
+            expression: original(&context, "1")?,
             evidence: Evidence::default(),
         }),
     ];
     for declaration in declarations {
         let error = context
-            .declare(Symbol::new("unbound")?, declaration)
+            .declare("unbound".to_owned(), declaration)
             .err()
             .ok_or("expected declaration refusal")?;
         assert_eq!(error.failure, Failure::Units(UnitError::RelativeReference));
@@ -278,7 +311,7 @@ fn relative_declaration_refusals() -> TestResult {
         None,
     )?;
     let error = context
-        .check(&expression("missing_reference")?)
+        .check(&original(&context, "missing_reference")?)
         .err()
         .ok_or("expected reference refusal")?;
     assert_eq!(error.failure, Failure::Units(UnitError::RelativeReference));
@@ -293,17 +326,18 @@ fn relative_declaration_refusals() -> TestResult {
 /// ´test:integration:equation-side-diagnostics´
 #[test]
 fn equation_side_diagnostics() -> TestResult {
-    let context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["missing"],
+    )?;
     for (left, right, path) in [("missing", "1", vec![0]), ("1", "missing", vec![1])] {
         let error = context
-            .check_equation(&expression(left)?, &expression(right)?)
+            .check_equation(&original(&context, left)?, &original(&context, right)?)
             .err()
             .ok_or("expected equation refusal")?;
         assert_eq!(error.location.path, path);
-        assert_eq!(
-            error.failure,
-            Failure::UnknownSymbol(Symbol::new("missing")?)
-        );
+        assert_eq!(error.failure, Failure::UnknownSymbol("missing".to_owned()));
     }
     Ok(())
 }
@@ -313,48 +347,68 @@ fn equation_side_diagnostics() -> TestResult {
 /// ´test:integration:coordinate-resource-diagnostics´
 #[test]
 fn coordinate_resource_diagnostics() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let millimetres = Descriptor::new(
         length.kind().clone(),
-        Measure::new("mm", Scale::Exact(Rational::new(1, 1000)?), Rational::ZERO)?,
+        Measure::new("mm", Scale::Exact(rational(1, 1000)?), Rational::zero())?,
         Role::Difference,
     )?;
-    let mut context = Context::new(
+    let mut context = fixture(
         Registry::new(ExponentPolicy::Rational),
         Limits {
-            nodes: 1,
+            peak_expression_size: 1,
             ..Limits::default()
         },
-    );
+        &["d", "metres", "mm", "r"],
+    )?;
     input(&mut context, "metres", &length, false)?;
     input(&mut context, "mm", &millimetres, false)?;
-    context.check(&expression("metres")?)?;
+    context.check(&original(&context, "metres")?)?;
     let error = context
-        .check(&expression("mm")?)
+        .check(&original(&context, "mm")?)
         .err()
         .ok_or("expected coordinate limit")?;
-    assert_eq!(error.failure, Failure::Coordinates(Error::Limit("nodes")));
-    let mut expanded = Context::new(
+    assert!(matches!(
+        error.failure,
+        Failure::Coordinates(Fault {
+            kind: FaultKind::Exhausted {
+                budget: BudgetKind::PeakExpressionSize,
+                ..
+            },
+            ..
+        })
+    ));
+    let mut expanded = fixture(
         Registry::new(ExponentPolicy::Rational),
         Limits {
-            nodes: 7,
+            peak_expression_size: 7,
             ..Limits::default()
         },
-    );
+        &["d", "metres", "mm", "r"],
+    )?;
     input(&mut expanded, "r", &Descriptor::ratio(), false)?;
     expanded.declare(
-        Symbol::new("d")?,
+        "d".to_owned(),
         Declaration::Derived(Observable {
             descriptor: Descriptor::ratio(),
-            expression: expression("r+r")?,
+            expression: original(&expanded, "r+r")?,
             evidence: Evidence::default(),
         }),
     )?;
     let error = expanded
-        .check(&expression("d+d+d")?)
+        .check(&original(&expanded, "d+d+d")?)
         .err()
         .ok_or("expected expansion limit")?;
-    assert_eq!(error.failure, Failure::Coordinates(Error::Limit("nodes")));
+    assert!(matches!(
+        error.failure,
+        Failure::Coordinates(Fault {
+            kind: FaultKind::Exhausted {
+                budget: BudgetKind::PeakExpressionSize,
+                ..
+            },
+            ..
+        })
+    ));
     Ok(())
 }
 
@@ -364,12 +418,12 @@ fn coordinate_resource_diagnostics() -> TestResult {
 #[test]
 fn registered_count_composition() -> TestResult {
     let count = Descriptor::new(
-        Kind::Count(Symbol::new("events")?, CountDomain::NONNEGATIVE),
+        Kind::Count("events".to_owned(), CountDomain::NONNEGATIVE),
         Measure::coherent(),
         Role::Difference,
     )?;
     let mean = Descriptor::new(
-        Kind::Named(Symbol::new("mean")?, Dimension::ZERO),
+        Kind::Named("mean".to_owned(), Box::new(Dimension::zero())),
         Measure::coherent(),
         Role::Difference,
     )?;
@@ -380,11 +434,11 @@ fn registered_count_composition() -> TestResult {
         Kind::Ratio,
         mean.kind().clone(),
     )?;
-    let mut context = Context::new(registry, Limits::default());
+    let mut context = fixture(registry, Limits::default(), &["n", "r"])?;
     input(&mut context, "n", &count, false)?;
     input(&mut context, "r", &Descriptor::ratio(), false)?;
-    context.check_against(&expression("n*r")?, &mean)?;
-    context.check_against(&expression("n*2")?, &mean)?;
+    context.check_against(&original(&context, "n*r")?, &mean)?;
+    context.check_against(&original(&context, "n*2")?, &mean)?;
     Ok(())
 }
 
@@ -397,33 +451,37 @@ fn registered_count_composition() -> TestResult {
 /// ´test:integration:declaration-source-and-descriptor-evidence´
 #[test]
 fn declaration_source_and_descriptor_evidence() -> TestResult {
-    let length = length()?;
-    let mut context = Context::new(Registry::new(ExponentPolicy::Rational), Limits::default());
+    let length = length_descriptor()?;
+    let mut context = fixture(
+        Registry::new(ExponentPolicy::Rational),
+        Limits::default(),
+        &["bad", "bad_companion", "good", "r", "time", "u", "x"],
+    )?;
     input(&mut context, "x", &length, false)?;
     context.declare(
-        Symbol::new("bad")?,
+        "bad".to_owned(),
         Declaration::Derived(Observable {
             descriptor: length.clone(),
-            expression: expression("1")?,
+            expression: original(&context, "1")?,
             evidence: Evidence::default(),
         }),
     )?;
     let error = context
-        .check(&expression("        bad")?)
+        .check(&original(&context, "        bad")?)
         .err()
         .ok_or("expected mismatch")?;
-    assert_eq!(error.location.span, Some(Span::new(0, 1)?));
+    assert_eq!(error.location.span, Some(Span { start: 0, end: 1 }));
     assert_eq!(error.location.path, vec![0]);
     context.declare(
-        Symbol::new("good")?,
+        "good".to_owned(),
         Declaration::Derived(Observable {
             descriptor: Descriptor::ratio(),
-            expression: expression("1")?,
+            expression: original(&context, "1")?,
             evidence: Evidence::default(),
         }),
     )?;
-    let checked = context.check(&expression("good")?)?;
-    let definitions = vec![Symbol::new("good")?];
+    let checked = context.check(&original(&context, "good")?)?;
+    let definitions = vec!["good".to_owned()];
     let node = checked
         .nodes()
         .iter()
@@ -431,10 +489,13 @@ fn declaration_source_and_descriptor_evidence() -> TestResult {
         .ok_or("missing observable body evidence")?;
     assert_eq!(node.location.path, error.location.path);
     assert_eq!(node.location.span, error.location.span);
-    assert_eq!(error.location.definitions, vec![Symbol::new("bad")?]);
+    assert_eq!(error.location.definitions, vec!["bad".to_owned()]);
     assert_eq!(error.failure, Failure::Units(UnitError::DimensionMismatch));
     let time = Descriptor::new(
-        Kind::Named(Symbol::new("time")?, Dimension::base(BaseDimension::Time)),
+        Kind::Named(
+            "time".to_owned(),
+            Box::new(Dimension::base(BaseDimension::Time)),
+        ),
         Measure::coherent(),
         Role::Difference,
     )?;
@@ -446,41 +507,58 @@ fn declaration_source_and_descriptor_evidence() -> TestResult {
         Some((&length, true)),
     )?;
     context.declare(
-        Symbol::new("bad_companion")?,
+        "bad_companion".to_owned(),
         Declaration::Uncertainty {
             observable: Observable {
                 descriptor: relative.clone(),
-                expression: expression("u/r")?,
+                expression: original(&context, "u/r")?,
                 evidence: Evidence::default(),
             },
             companion: Companion {
                 mode: UncertaintyMode::RelativeStandard,
-                value: Symbol::new("x")?,
+                value: "x".to_owned(),
                 other: None,
-                reference: Some(Symbol::new("r")?),
+                reference: Some("r".to_owned()),
             },
         },
     )?;
     let error = context
-        .check(&expression("    bad_companion")?)
+        .check(&original(&context, "    bad_companion")?)
         .err()
         .ok_or("expected companion mismatch")?;
-    assert_eq!(error.location.span, Some(Span::new(0, 3)?));
+    assert_eq!(error.location.span, Some(Span { start: 0, end: 3 }));
     assert_eq!(error.location.path, vec![0]);
-    assert_eq!(
-        error.location.definitions,
-        vec![Symbol::new("bad_companion")?]
-    );
+    assert_eq!(error.location.definitions, vec!["bad_companion".to_owned()]);
     assert_eq!(error.failure, Failure::Units(UnitError::RelativeReference));
     assert_eq!(error.derived, vec![relative, length, time]);
     Ok(())
 }
 
 /// Build a derived value with a transitive dependency and one unrelated numerical input.
-fn propagation_context(registry: Registry) -> Result<Context, Box<dyn std::error::Error>> {
-    let length = length()?;
+fn propagation_context(
+    registry: Registry,
+    keys: &[&str],
+) -> Result<Context, Box<dyn std::error::Error>> {
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
-    let mut context = Context::new(registry, Limits::default());
+    let mut names = vec![
+        "eff",
+        "k1",
+        "k2",
+        "middle",
+        "outside",
+        "r",
+        "reference",
+        "rho",
+        "u_out",
+        "u_x",
+        "u_y",
+        "x",
+        "y",
+        "z",
+    ];
+    names.extend_from_slice(keys);
+    let mut context = fixture(registry, Limits::default(), &names)?;
     for name in ["x", "y", "outside", "reference"] {
         input(&mut context, name, &length, true)?;
     }
@@ -489,10 +567,10 @@ fn propagation_context(registry: Registry) -> Result<Context, Box<dyn std::error
     }
     for name in ["k1", "k2"] {
         context.declare(
-            Symbol::new(name)?,
+            name.to_owned(),
             Declaration::Constant {
                 descriptor: Descriptor::ratio(),
-                value: Rational::integer(2),
+                value: rational(2, 1)?,
                 evidence: Evidence::default(),
             },
         )?;
@@ -509,10 +587,10 @@ fn propagation_context(registry: Registry) -> Result<Context, Box<dyn std::error
     }
     for (name, body) in [("z", "middle+y"), ("middle", "x")] {
         context.declare(
-            Symbol::new(name)?,
+            name.to_owned(),
             Declaration::Derived(Observable {
                 descriptor: length.clone(),
-                expression: expression(body)?,
+                expression: original(&context, body)?,
                 evidence: Evidence::default(),
             }),
         )?;
@@ -526,13 +604,13 @@ fn relation(
     value: &str,
     other: Option<&str>,
     reference: Option<&str>,
-) -> Result<Companion, nrz_algebra::Error> {
-    Ok(Companion {
+) -> Companion {
+    Companion {
         mode,
-        value: Symbol::new(value)?,
-        other: other.map(Symbol::new).transpose()?,
-        reference: reference.map(Symbol::new).transpose()?,
-    })
+        value: value.to_owned(),
+        other: other.map(str::to_owned),
+        reference: reference.map(str::to_owned),
+    }
 }
 
 /// Declare an uncertainty body independently of the value's numerical expression.
@@ -544,11 +622,11 @@ fn observable_companion(
     companion: Companion,
 ) -> TestResult {
     context.declare(
-        Symbol::new(name)?,
+        name.to_owned(),
         Declaration::Uncertainty {
             observable: Observable {
                 descriptor: descriptor.clone(),
-                expression: expression(body)?,
+                expression: original(context, body)?,
                 evidence: Evidence::default(),
             },
             companion,
@@ -566,10 +644,13 @@ fn observable_companion(
 /// ´test:integration:derived-uncertainty-propagation´
 #[test]
 fn derived_uncertainty_propagation() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
-    let mut context = propagation_context(Registry::new(ExponentPolicy::Rational))?;
-    let target = relation(UncertaintyMode::Standard, "z", None, None)?;
+    let mut context = propagation_context(
+        Registry::new(ExponentPolicy::Rational),
+        &["rel_z", "u_z", "var_z"],
+    )?;
+    let target = relation(UncertaintyMode::Standard, "z", None, None);
     observable_companion(
         &mut context,
         "u_z",
@@ -577,17 +658,17 @@ fn derived_uncertainty_propagation() -> TestResult {
         &standard,
         target.clone(),
     )?;
-    let checked = context.check(&expression("u_z")?)?;
+    let checked = context.check(&original(&context, "u_z")?)?;
     let expected = nrz_units::CompanionEvidence::Propagated {
         companion: target,
         contributors: std::collections::BTreeMap::from([
             (
-                Symbol::new("u_x")?,
-                relation(UncertaintyMode::Standard, "x", None, None)?,
+                "u_x".to_owned(),
+                relation(UncertaintyMode::Standard, "x", None, None),
             ),
             (
-                Symbol::new("u_y")?,
-                relation(UncertaintyMode::Standard, "y", None, None)?,
+                "u_y".to_owned(),
+                relation(UncertaintyMode::Standard, "y", None, None),
             ),
         ]),
     };
@@ -602,9 +683,9 @@ fn derived_uncertainty_propagation() -> TestResult {
         ),
     ] {
         let descriptor = uncertainty(mode, &length, None, reference.map(|_| (&length, true)))?;
-        let companion = relation(mode, "z", None, reference)?;
+        let companion = relation(mode, "z", None, reference);
         observable_companion(&mut context, name, body, &descriptor, companion.clone())?;
-        let checked = context.check_against(&expression(name)?, &descriptor)?;
+        let checked = context.check_against(&original(&context, name)?, &descriptor)?;
         assert_eq!(checked.companion(), Some(&companion));
         assert!(matches!(
             checked.companion_evidence(),
@@ -621,9 +702,17 @@ fn derived_uncertainty_propagation() -> TestResult {
 /// ´test:integration:propagation-closure-refusals´
 #[test]
 fn propagation_closure_refusals() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
-    let mut context = propagation_context(Registry::new(ExponentPolicy::Rational))?;
+    let mut context = propagation_context(
+        Registry::new(ExponentPolicy::Rational),
+        &[
+            "cancelled_outside",
+            "outside_body",
+            "unbound",
+            "unbound_body",
+        ],
+    )?;
     input(&mut context, "unbound", &standard, false)?;
     for (name, body) in [
         ("outside_body", "sqrt(u_x^2+u_out^2)"),
@@ -635,10 +724,10 @@ fn propagation_closure_refusals() -> TestResult {
             name,
             body,
             &standard,
-            relation(UncertaintyMode::Standard, "z", None, None)?,
+            relation(UncertaintyMode::Standard, "z", None, None),
         )?;
         let error = context
-            .check(&expression(name)?)
+            .check(&original(&context, name)?)
             .err()
             .ok_or("expected contributor refusal")?;
         assert_eq!(
@@ -657,11 +746,11 @@ fn propagation_closure_refusals() -> TestResult {
 /// ´test:integration:registered-uncertainty-terms-require-contributors´
 #[test]
 fn registered_uncertainty_terms_require_contributors() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
     let variance = uncertainty(UncertaintyMode::Variance, &length, None, None)?;
     let coefficient = Descriptor::new(
-        Kind::Named(Symbol::new("coefficient")?, Dimension::ZERO),
+        Kind::Named("coefficient".to_owned(), Box::new(Dimension::zero())),
         Measure::coherent(),
         Role::Difference,
     )?;
@@ -674,10 +763,11 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
     )?;
     registry.register_power(
         length.kind().clone(),
-        Rational::integer(2),
+        rational(2, 1)?,
         variance.kind().clone(),
     )?;
-    let mut context = propagation_context(registry)?;
+    let mut context =
+        propagation_context(registry, &["binary_term", "k", "power_term", "tracked"])?;
     input(&mut context, "k", &coefficient, false)?;
     for (name, body) in [
         ("binary_term", "sqrt(u_x^2+(k*x)^2)"),
@@ -688,10 +778,10 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
             name,
             body,
             &standard,
-            relation(UncertaintyMode::Standard, "z", None, None)?,
+            relation(UncertaintyMode::Standard, "z", None, None),
         )?;
         let error = context
-            .check(&expression(name)?)
+            .check(&original(&context, name)?)
             .err()
             .ok_or("expected untracked uncertainty refusal")?;
         assert_eq!(
@@ -700,7 +790,7 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
         );
         assert_eq!(error.location.path, vec![0]);
     }
-    let companion = relation(UncertaintyMode::Standard, "z", None, None)?;
+    let companion = relation(UncertaintyMode::Standard, "z", None, None);
     observable_companion(
         &mut context,
         "tracked",
@@ -708,12 +798,12 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
         &standard,
         companion.clone(),
     )?;
-    let checked = context.check_against(&expression("tracked")?, &standard)?;
+    let checked = context.check_against(&original(&context, "tracked")?, &standard)?;
     let expected = nrz_units::CompanionEvidence::Propagated {
         companion,
         contributors: std::collections::BTreeMap::from([(
-            Symbol::new("u_x")?,
-            relation(UncertaintyMode::Standard, "x", None, None)?,
+            "u_x".to_owned(),
+            relation(UncertaintyMode::Standard, "x", None, None),
         )]),
     };
     assert_eq!(checked.companion_evidence(), Some(&expected));
@@ -729,7 +819,7 @@ fn registered_uncertainty_terms_require_contributors() -> TestResult {
 /// ´test:integration:covariance-propagation´
 #[test]
 fn covariance_propagation() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
     let covariance = uncertainty(UncertaintyMode::Covariance, &length, Some(&length), None)?;
     let mut registry = Registry::new(ExponentPolicy::Rational);
@@ -739,8 +829,8 @@ fn covariance_propagation() -> TestResult {
         standard.kind().clone(),
         covariance.kind().clone(),
     )?;
-    let mut context = propagation_context(registry)?;
-    let pair = relation(UncertaintyMode::Covariance, "x", Some("y"), None)?;
+    let mut context = propagation_context(registry, &["bad_cov", "cov_xy"])?;
+    let pair = relation(UncertaintyMode::Covariance, "x", Some("y"), None);
     observable_companion(
         &mut context,
         "cov_xy",
@@ -748,7 +838,7 @@ fn covariance_propagation() -> TestResult {
         &covariance,
         pair.clone(),
     )?;
-    let checked = context.check_against(&expression("cov_xy")?, &covariance)?;
+    let checked = context.check_against(&original(&context, "cov_xy")?, &covariance)?;
     assert_eq!(checked.companion(), Some(&pair));
     let Some(nrz_units::CompanionEvidence::Propagated { contributors, .. }) =
         checked.companion_evidence()
@@ -757,11 +847,11 @@ fn covariance_propagation() -> TestResult {
     };
     assert_eq!(
         contributors.keys().cloned().collect::<Vec<_>>(),
-        vec![Symbol::new("u_x")?, Symbol::new("u_y")?]
+        vec!["u_x".to_owned(), "u_y".to_owned()]
     );
     observable_companion(&mut context, "bad_cov", "rho*u_x*u_out", &covariance, pair)?;
     let error = context
-        .check(&expression("bad_cov")?)
+        .check(&original(&context, "bad_cov")?)
         .err()
         .ok_or("expected covariance closure refusal")?;
     assert_eq!(
@@ -778,9 +868,17 @@ fn covariance_propagation() -> TestResult {
 /// ´test:integration:ratio-quantity-identity-boundary´
 #[test]
 fn ratio_quantity_identity_boundary() -> TestResult {
-    let length = length()?;
+    let length = length_descriptor()?;
     let standard = uncertainty(UncertaintyMode::Standard, &length, None, None)?;
-    let mut context = propagation_context(Registry::new(ExponentPolicy::Rational))?;
+    let mut context = propagation_context(
+        Registry::new(ExponentPolicy::Rational),
+        &[
+            "quantity_expression",
+            "quantity_product",
+            "quantity_quotient",
+            "scaled_z",
+        ],
+    )?;
     for (name, body) in [
         ("quantity_product", "u_x*eff"),
         ("quantity_quotient", "u_x/r"),
@@ -791,10 +889,10 @@ fn ratio_quantity_identity_boundary() -> TestResult {
             name,
             body,
             &standard,
-            relation(UncertaintyMode::Standard, "x", None, None)?,
+            relation(UncertaintyMode::Standard, "x", None, None),
         )?;
         let error = context
-            .check(&expression(name)?)
+            .check(&original(&context, name)?)
             .err()
             .ok_or("expected ratio quantity identity refusal")?;
         assert_eq!(
@@ -802,9 +900,9 @@ fn ratio_quantity_identity_boundary() -> TestResult {
             Failure::Units(UnitError::UncertaintyIdentity)
         );
     }
-    let companion = relation(UncertaintyMode::Standard, "x", None, None)?;
+    let companion = relation(UncertaintyMode::Standard, "x", None, None);
     for source in ["2*u_x", "u_x/2", "k1*u_x", "u_x/k1"] {
-        let checked = context.check(&expression(source)?)?;
+        let checked = context.check(&original(&context, source)?)?;
         assert_eq!(checked.companion(), Some(&companion));
         assert!(matches!(
             checked.companion_evidence(),
@@ -816,16 +914,16 @@ fn ratio_quantity_identity_boundary() -> TestResult {
         "scaled_z",
         "u_x*eff",
         &standard,
-        relation(UncertaintyMode::Standard, "z", None, None)?,
+        relation(UncertaintyMode::Standard, "z", None, None),
     )?;
-    let checked = context.check(&expression("scaled_z")?)?;
+    let checked = context.check(&original(&context, "scaled_z")?)?;
     assert!(matches!(
         checked.companion_evidence(),
         Some(nrz_units::CompanionEvidence::Propagated { .. })
     ));
-    context.check(&expression("(2*u_x)^2")?)?;
+    context.check(&original(&context, "(2*u_x)^2")?)?;
     let error = context
-        .check(&expression("(2*u_x)*(2*u_x)")?)
+        .check(&original(&context, "(2*u_x)*(2*u_x)")?)
         .err()
         .ok_or("expected scaled-origin boundary")?;
     assert_eq!(

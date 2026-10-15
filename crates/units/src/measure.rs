@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact rational measure definitions and role-aware conversion recipes.
 
-use nrz_algebra::Rational;
+use nrz_cas::Rational;
 
-use crate::{Role, UnitError};
+use crate::{Role, UnitError, exact::budget};
 
 /// A proposed scale definition, including the explicitly unsupported future boundary.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -37,7 +37,7 @@ impl Measure {
                 return Err(UnitError::UnsupportedMeasureScale(definition));
             }
         };
-        if scale <= Rational::ZERO {
+        if scale.is_negative() || scale.is_zero() {
             return Err(UnitError::InvalidScale);
         }
         let name = name.into();
@@ -56,8 +56,8 @@ impl Measure {
     pub fn coherent() -> Self {
         Self {
             name: "SI".to_owned(),
-            scale: Rational::ONE,
-            offset: Rational::ZERO,
+            scale: Rational::one(),
+            offset: Rational::zero(),
         }
     }
 
@@ -69,14 +69,14 @@ impl Measure {
 
     /// Exact scale relative to coherent coordinates.
     #[must_use]
-    pub const fn scale(&self) -> Rational {
-        self.scale
+    pub const fn scale(&self) -> &Rational {
+        &self.scale
     }
 
     /// Coherent-coordinate origin.
     #[must_use]
-    pub const fn offset(&self) -> Rational {
-        self.offset
+    pub const fn offset(&self) -> &Rational {
+        &self.offset
     }
 
     /// The difference measure keeps the scale and removes the affine origin.
@@ -84,8 +84,8 @@ impl Measure {
     pub fn difference(&self) -> Self {
         Self {
             name: self.name.clone(),
-            scale: self.scale,
-            offset: Rational::ZERO,
+            scale: self.scale.clone(),
+            offset: Rational::zero(),
         }
     }
 
@@ -97,17 +97,18 @@ impl Measure {
     /// Refuses offset-bearing differences and exact arithmetic overflow.
     pub fn conversion_to(&self, target: &Self, role: Role) -> Result<Conversion, UnitError> {
         if role == Role::Difference
-            && (self.offset != Rational::ZERO || target.offset != Rational::ZERO)
+            && (self.offset != Rational::zero() || target.offset != Rational::zero())
         {
             return Err(UnitError::OffsetOnDifference);
         }
-        let scale = self.scale.checked_div(target.scale)?;
+        let mut ledger = budget()?;
+        let scale = self.scale.div(&target.scale, &mut ledger)?;
         let shift = if role == Role::Point {
             self.offset
-                .checked_sub(target.offset)?
-                .checked_div(target.scale)?
+                .sub(&target.offset, &mut ledger)?
+                .div(&target.scale, &mut ledger)?
         } else {
-            Rational::ZERO
+            Rational::zero()
         };
         Ok(Conversion { scale, shift })
     }
@@ -116,7 +117,7 @@ impl Measure {
 /// An exact coordinate map; it does not change the quantity's role or kind.
 ///
 /// TODO ´todo:code:compose-coordinate-conversions-with-explicit-operator´: compose coordinate conversions with explicit operator and companion maps at shape owners under def:nrz:shape-normalization.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Conversion {
     /// Multiplicative coordinate factor.
     pub scale: Rational,
@@ -131,10 +132,11 @@ impl Conversion {
     ///
     /// # Errors
     /// Refuses exact arithmetic overflow; no floating conversion bound is implied.
-    pub fn apply(self, coordinate: Rational) -> Result<Rational, UnitError> {
+    pub fn apply(&self, coordinate: &Rational) -> Result<Rational, UnitError> {
+        let mut ledger = budget()?;
         Ok(self
             .scale
-            .checked_mul(coordinate)?
-            .checked_add(self.shift)?)
+            .mul(coordinate, &mut ledger)?
+            .add(&self.shift, &mut ledger)?)
     }
 }

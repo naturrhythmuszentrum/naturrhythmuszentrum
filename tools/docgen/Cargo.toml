@@ -15,7 +15,7 @@ categories = ["development-tools"]
 workspace = true
 
 [dependencies]
-nrz-algebra.workspace = true
+nrz-cas = { path = "../../crates/cas" }
 nrz-units = { path = "../../crates/units" }
 minijinja.workspace = true
 serde.workspace = true

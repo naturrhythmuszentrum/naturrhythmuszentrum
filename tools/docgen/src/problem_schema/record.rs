@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Strict, located access to the versioned JSON/TOML wire records.
 
-use nrz_algebra::{Expr, Limits, Node, Rational, Symbol, parse};
+use nrz_cas::{
+    Fault, Rational,
+    limits::{Budget, Limits},
+    source::OriginalForm,
+};
+use nrz_units::Context;
 use serde_json::Value;
 
 use crate::error::Error;
@@ -124,25 +129,36 @@ impl<'a> Record<'a> {
     }
 
     /// Read a parser-valid identifier.
-    pub(super) fn symbol(&self) -> Result<Symbol, Error> {
-        Symbol::new(self.text()?).map_err(|error| self.error(error))
+    pub(super) fn symbol(&self) -> Result<String, Error> {
+        let key = self.text()?;
+        if !key.bytes().enumerate().all(|(index, byte)| {
+            byte == b'_' || byte.is_ascii_alphabetic() || (index > 0 && byte.is_ascii_digit())
+        }) {
+            return Err(self.error("invalid portable declaration key"));
+        }
+        Ok(key.to_owned())
     }
 
     /// Decode exact coordinates without accepting general algebra or rounding.
     pub(super) fn rational(&self) -> Result<Rational, Error> {
         let text = self.text()?;
         let parts: Vec<_> = text.split('/').collect();
-        match parts.as_slice() {
+        let result = match parts.as_slice() {
             [value] => self.literal(value),
             [numerator, denominator] => self
                 .literal(numerator)?
-                .checked_div(self.literal(denominator)?)
+                .div(
+                    &self.literal(denominator)?,
+                    &mut budget().map_err(|error| self.error(error))?,
+                )
                 .map_err(|error| self.error(error)),
             _ => Err(self.error("a coordinate is a literal or a single literal fraction")),
-        }
+        }?;
+        self.component_range(&result)?;
+        Ok(result)
     }
 
-    /// Decode one signed decimal/scientific literal with the algebra parser.
+    /// Decode one signed decimal/scientific literal with the CAS rational parser.
     fn literal(&self, text: &str) -> Result<Rational, Error> {
         if text.is_empty()
             || text.bytes().any(|byte| {
@@ -151,19 +167,41 @@ impl<'a> Record<'a> {
         {
             return Err(self.error("invalid exact literal"));
         }
-        let expression = parse(text, Limits::default()).map_err(|error| self.error(error))?;
-        match expression.node() {
-            Node::Constant(value) => Ok(*value),
-            Node::Neg(child) => match child.node() {
-                Node::Constant(value) => value.checked_neg().map_err(|error| self.error(error)),
-                _ => Err(self.error("a coordinate is not an arithmetic expression")),
-            },
-            _ => Err(self.error("a coordinate is not an arithmetic expression")),
+        let mut ledger = budget().map_err(|error| self.error(error))?;
+        let value = Rational::parse(text, &mut ledger).map_err(|error| self.error(error))?;
+        self.component_range(&value)?;
+        Ok(value)
+    }
+
+    /// Preserve the schema's finite exact-coordinate range after fraction arithmetic.
+    fn component_range(&self, value: &Rational) -> Result<(), Error> {
+        let mut ledger = budget().map_err(|error| self.error(error))?;
+        if value
+            .small_ratio(&mut ledger)
+            .map_err(|error| self.error(error))?
+            .is_none()
+        {
+            return Err(self.error("exact coordinate exceeds the signed 64-bit component range"));
         }
+        Ok(())
     }
 
     /// Parse an original algebra expression without normalization.
-    pub(super) fn expression(&self) -> Result<Expr, Error> {
-        parse(self.text()?, Limits::default()).map_err(|error| self.error(error))
+    pub(super) fn expression(&self, context: &Context) -> Result<OriginalForm, Error> {
+        context
+            .parse(&self.path, self.text()?)
+            .map_err(|error| self.error(error))
     }
+}
+
+/// Independent exact schema operations use the engine's default ledger.
+pub(super) fn budget() -> Result<Budget, Fault> {
+    Budget::new(Limits::default())
+}
+
+/// Format exact evidence without floating conversion or debug text.
+pub(super) fn exact(value: &Rational, record: &Record<'_>) -> Result<String, Error> {
+    value
+        .exact_string(&mut budget().map_err(|error| record.error(error))?)
+        .map_err(|error| record.error(error))
 }

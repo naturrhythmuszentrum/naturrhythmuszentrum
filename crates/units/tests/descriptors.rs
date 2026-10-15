@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Descriptor laws without any dependency on the expression checker.
 
-use nrz_algebra::{Rational, Symbol};
+use nrz_cas::Rational;
+#[path = "support/arithmetic.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
+mod support;
+use support::rational;
+
 use nrz_units::{
     BaseDimension, BinaryOp, CountDomain, Descriptor, Dimension, ExponentPolicy, Kind, Measure,
     Registry, Role, Scale, UncertaintyMode, UnitError, uncertainty,
@@ -13,7 +22,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 /// Make a named linear descriptor in coherent measure.
 fn named(name: &str, dimension: Dimension) -> Result<Descriptor, Box<dyn std::error::Error>> {
     Ok(Descriptor::new(
-        Kind::Named(Symbol::new(name)?, dimension),
+        Kind::Named(name.to_owned(), Box::new(dimension)),
         Measure::coherent(),
         Role::Difference,
     )?)
@@ -36,10 +45,10 @@ fn dimension_laws() -> TestResult {
         let dimension = Dimension::base(axis);
         for numerator in -3..=3 {
             for denominator in 1..=3 {
-                let exponent = Rational::new(numerator, denominator)?;
-                let powered = dimension.power(exponent, ExponentPolicy::Rational)?;
-                assert_eq!(powered.quotient(powered)?, Dimension::ZERO);
-                assert_eq!(powered.product(dimension)?, dimension.product(powered)?);
+                let exponent = rational(numerator, denominator)?;
+                let powered = dimension.power(&exponent, ExponentPolicy::Rational)?;
+                assert_eq!(powered.quotient(&powered)?, Dimension::zero());
+                assert_eq!(powered.product(&dimension)?, dimension.product(&powered)?);
                 let expected = if exponent.is_integer() {
                     Ok(())
                 } else {
@@ -50,17 +59,14 @@ fn dimension_laws() -> TestResult {
         }
     }
     let mass = Dimension::base(BaseDimension::Mass);
-    let stiffness = Dimension::integers([0, 1, -2, 0, 0, 0, 0]);
+    let stiffness = Dimension::integers([0, 1, -2, 0, 0, 0, 0])?;
     assert_eq!(
-        stiffness.quotient(mass)?,
-        Dimension::integers([0, 0, -2, 0, 0, 0, 0])
+        stiffness.quotient(&mass)?,
+        Dimension::integers([0, 0, -2, 0, 0, 0, 0])?
     );
     assert_eq!(
-        Dimension::new([Rational::integer(i64::MAX); 7])
-            .product(Dimension::new([Rational::ONE; 7])),
-        Err(UnitError::Arithmetic(
-            nrz_algebra::ArithmeticError::Overflow
-        ))
+        Dimension::integers([i64::MAX; 7])?.product(&Dimension::integers([1; 7])?),
+        Err(UnitError::ExponentRange)
     );
     Ok(())
 }
@@ -75,31 +81,24 @@ fn dimension_laws() -> TestResult {
 #[test]
 fn affine_measures() -> TestResult {
     let kind = Kind::Named(
-        Symbol::new("temperature")?,
-        Dimension::base(BaseDimension::Temperature),
+        "temperature".to_owned(),
+        Box::new(Dimension::base(BaseDimension::Temperature)),
     );
     let celsius = Descriptor::new(
         kind,
-        Measure::new(
-            "degC",
-            Scale::Exact(Rational::ONE),
-            Rational::new(27315, 100)?,
-        )?,
+        Measure::new("degC", Scale::Exact(Rational::one()), rational(27315, 100)?)?,
         Role::Point,
     )?;
     let kelvin = celsius.coherent();
     let conversion = celsius.conversion_to(&kelvin)?;
-    assert_eq!(
-        conversion.apply(Rational::ZERO)?,
-        Rational::new(27315, 100)?
-    );
+    assert_eq!(conversion.apply(&Rational::zero())?, rational(27315, 100)?);
     fahrenheit_conversion(&celsius)?;
     for coordinate in -10..=10 {
-        let original = Rational::integer(coordinate);
+        let original = rational(coordinate, 1)?;
         assert_eq!(
             kelvin
                 .conversion_to(&celsius)?
-                .apply(conversion.apply(original)?)?,
+                .apply(&conversion.apply(&original)?)?,
             original
         );
     }
@@ -108,7 +107,7 @@ fn affine_measures() -> TestResult {
             .difference()
             .conversion_to(&kelvin.difference())?
             .shift,
-        Rational::ZERO
+        Rational::zero()
     );
     let registry = Registry::new(ExponentPolicy::Rational);
     assert_eq!(
@@ -138,16 +137,16 @@ fn affine_measures() -> TestResult {
         Err(UnitError::AffineRole)
     );
     assert_eq!(
-        registry.power(&celsius, Rational::ZERO),
+        registry.power(&celsius, &Rational::zero()),
         Err(UnitError::AffineRole)
     );
     assert_eq!(registry.negate(&celsius), Err(UnitError::AffineRole));
     assert_eq!(
-        Measure::new("degree", Scale::Symbolic("pi/180".into()), Rational::ZERO),
+        Measure::new("degree", Scale::Symbolic("pi/180".into()), Rational::zero()),
         Err(UnitError::UnsupportedMeasureScale("pi/180".into()))
     );
     assert_eq!(
-        Measure::new("bad", Scale::Exact(Rational::ZERO), Rational::ZERO),
+        Measure::new("bad", Scale::Exact(Rational::zero()), Rational::zero()),
         Err(UnitError::InvalidScale)
     );
     assert_eq!(
@@ -165,36 +164,32 @@ fn affine_measures() -> TestResult {
 fn fahrenheit_conversion(celsius: &Descriptor) -> TestResult {
     let fahrenheit = Descriptor::new(
         celsius.kind().clone(),
-        Measure::new(
-            "degF",
-            Scale::Exact(Rational::new(5, 9)?),
-            Rational::new(45967, 180)?,
-        )?,
+        Measure::new("degF", Scale::Exact(rational(5, 9)?), rational(45967, 180)?)?,
         Role::Point,
     )?;
     let to_fahrenheit = celsius.conversion_to(&fahrenheit)?;
-    assert_eq!(to_fahrenheit.scale, Rational::new(9, 5)?);
-    assert_eq!(to_fahrenheit.shift, Rational::integer(32));
+    assert_eq!(to_fahrenheit.scale, rational(9, 5)?);
+    assert_eq!(to_fahrenheit.shift, rational(32, 1)?);
     for coordinate in -10..=10 {
-        let coordinate = Rational::integer(coordinate);
-        let converted = to_fahrenheit.apply(coordinate)?;
+        let coordinate = rational(coordinate, 1)?;
+        let converted = to_fahrenheit.apply(&coordinate)?;
         assert_eq!(
-            fahrenheit.conversion_to(celsius)?.apply(converted)?,
+            fahrenheit.conversion_to(celsius)?.apply(&converted)?,
             coordinate
         );
     }
     assert_eq!(
         fahrenheit
             .conversion_to(celsius)?
-            .apply(Rational::integer(32))?,
-        Rational::ZERO
+            .apply(&rational(32, 1)?)?,
+        Rational::zero()
     );
     assert_eq!(
         fahrenheit
             .difference()
             .conversion_to(&celsius.difference())?
-            .apply(Rational::integer(18))?,
-        Rational::integer(10)
+            .apply(&rational(18, 1)?)?,
+        rational(10, 1)?
     );
     Ok(())
 }
@@ -207,13 +202,13 @@ fn fahrenheit_conversion(celsius: &Descriptor) -> TestResult {
 #[test]
 fn declared_kind_rules() -> TestResult {
     let mass = named("mass", Dimension::base(BaseDimension::Mass))?;
-    let stiffness = named("stiffness", Dimension::integers([0, 1, -2, 0, 0, 0, 0]))?;
-    let eigenvalue = named("eigenvalue", Dimension::integers([0, 0, -2, 0, 0, 0, 0]))?;
+    let stiffness = named("stiffness", Dimension::integers([0, 1, -2, 0, 0, 0, 0])?)?;
+    let eigenvalue = named("eigenvalue", Dimension::integers([0, 0, -2, 0, 0, 0, 0])?)?;
     let omega = named(
         "angular_frequency",
-        Dimension::integers([0, 0, -1, 0, 0, 0, 0]),
+        Dimension::integers([0, 0, -1, 0, 0, 0, 0])?,
     )?;
-    let mode_shape = named("mode_shape", Dimension::ZERO)?;
+    let mode_shape = named("mode_shape", Dimension::zero())?;
     let mut registry = Registry::new(ExponentPolicy::Rational);
     assert_eq!(
         registry.binary(BinaryOp::Divide, &stiffness, &mass),
@@ -231,10 +226,10 @@ fn declared_kind_rules() -> TestResult {
     );
     registry.register_power(
         eigenvalue.kind().clone(),
-        Rational::new(1, 2)?,
+        rational(1, 2)?,
         omega.kind().clone(),
     )?;
-    assert_eq!(registry.power(&eigenvalue, Rational::new(1, 2)?)?, omega);
+    assert_eq!(registry.power(&eigenvalue, &rational(1, 2)?)?, omega);
     assert_eq!(
         mode_shape.conversion_to(&Descriptor::ratio()),
         Err(UnitError::KindMismatch)
@@ -243,16 +238,16 @@ fn declared_kind_rules() -> TestResult {
         mode_shape.conversion_to(&omega),
         Err(UnitError::DimensionMismatch)
     );
-    let energy = named("energy", Dimension::integers([2, 1, -2, 0, 0, 0, 0]))?;
-    let torque = named("torque", energy.dimension())?;
+    let energy = named("energy", Dimension::integers([2, 1, -2, 0, 0, 0, 0])?)?;
+    let torque = named("torque", energy.dimension().clone())?;
     assert_eq!(
         energy.compatible_kind(&torque),
         Err(UnitError::KindMismatch)
     );
     registry.admit(&energy)?;
     assert_eq!(
-        registry.admit(&named("energy", Dimension::ZERO)?),
-        Err(UnitError::ConflictingKind(Symbol::new("energy")?))
+        registry.admit(&named("energy", Dimension::zero())?),
+        Err(UnitError::ConflictingKind("energy".to_owned()))
     );
     assert_eq!(
         registry.register_binary(
@@ -272,7 +267,7 @@ fn declared_kind_rules() -> TestResult {
 #[test]
 fn count_domains() -> TestResult {
     let count = Descriptor::new(
-        Kind::Count(Symbol::new("particles")?, CountDomain::NONNEGATIVE),
+        Kind::Count("particles".to_owned(), CountDomain::NONNEGATIVE),
         Measure::coherent(),
         Role::Difference,
     )?;
@@ -286,14 +281,14 @@ fn count_domains() -> TestResult {
         Err(UnitError::DimensionMismatch)
     );
     assert_eq!(
-        count.check_count_literal(Rational::new(1, 2)?),
+        count.check_count_literal(&rational(1, 2)?),
         Err(UnitError::CountValue)
     );
     assert_eq!(
-        count.check_count_literal(Rational::integer(-1)),
+        count.check_count_literal(&rational(-1, 1)?),
         Err(UnitError::CountValue)
     );
-    count.check_count_literal(Rational::integer(12))?;
+    count.check_count_literal(&rational(12, 1)?)?;
     registry.binary(BinaryOp::Add, &count, &count)?;
     assert_eq!(
         registry.binary(BinaryOp::Subtract, &count, &count),
@@ -304,19 +299,19 @@ fn count_domains() -> TestResult {
         Err(UnitError::CountDomain)
     );
     assert_eq!(registry.count_ratio(&count, &count)?, Descriptor::ratio());
-    registry.scale_count(&count, Rational::integer(2))?;
+    registry.scale_count(&count, &rational(2, 1)?)?;
     assert_eq!(
-        registry.scale_count(&count, Rational::new(1, 2)?),
+        registry.scale_count(&count, &rational(1, 2)?),
         Err(UnitError::CountValue)
     );
     assert_eq!(
-        registry.scale_count(&count, Rational::integer(-1)),
+        registry.scale_count(&count, &rational(-1, 1)?),
         Err(UnitError::CountDomain)
     );
     let bounded = CountDomain::new(Some(0), Some(10))?;
     assert!(!bounded.admits_addition());
     assert_eq!(
-        bounded.admits_scale(Rational::integer(2)),
+        bounded.admits_scale(&rational(2, 1)?),
         Err(UnitError::CountDomain)
     );
     assert_eq!(
@@ -342,9 +337,9 @@ fn uncertainty_descriptors() -> TestResult {
     let variance = uncertainty(UncertaintyMode::Variance, &length, None, None)?;
     assert_eq!(
         variance.dimension(),
-        length
+        &length
             .dimension()
-            .power(Rational::integer(2), ExponentPolicy::Rational)?
+            .power(&rational(2, 1)?, ExponentPolicy::Rational)?
     );
     assert_eq!(
         standard.compatible_kind(&radius),
@@ -353,7 +348,7 @@ fn uncertainty_descriptors() -> TestResult {
     let covariance = uncertainty(UncertaintyMode::Covariance, &length, Some(&time), None)?;
     assert_eq!(
         covariance.dimension(),
-        length.dimension().product(time.dimension())?
+        &length.dimension().product(time.dimension())?
     );
     uncertainty_measures(&length, &time)?;
     let relative = uncertainty(
@@ -362,7 +357,7 @@ fn uncertainty_descriptors() -> TestResult {
         None,
         Some((&length, true)),
     )?;
-    assert_eq!(relative.dimension(), Dimension::ZERO);
+    assert_eq!(relative.dimension(), &Dimension::zero());
     assert_eq!(
         relative.compatible_kind(&Descriptor::ratio()),
         Err(UnitError::KindMismatch)
@@ -391,15 +386,15 @@ fn uncertainty_descriptors() -> TestResult {
     );
     let registry = Registry::new(ExponentPolicy::Rational);
     assert_eq!(
-        registry.power(&standard, Rational::integer(2))?,
+        registry.power(&standard, &rational(2, 1)?)?,
         variance.coherent()
     );
     assert_eq!(
-        registry.power(&variance, Rational::new(1, 2)?)?,
+        registry.power(&variance, &rational(1, 2)?)?,
         standard.coherent()
     );
     let count = Descriptor::new(
-        Kind::Count(Symbol::new("events")?, CountDomain::NONNEGATIVE),
+        Kind::Count("events".to_owned(), CountDomain::NONNEGATIVE),
         Measure::coherent(),
         Role::Difference,
     )?;
@@ -415,19 +410,19 @@ fn uncertainty_descriptors() -> TestResult {
 fn uncertainty_measures(length: &Descriptor, time: &Descriptor) -> TestResult {
     let centimetres = Descriptor::new(
         length.kind().clone(),
-        Measure::new("cm", Scale::Exact(Rational::new(1, 100)?), Rational::ZERO)?,
+        Measure::new("cm", Scale::Exact(rational(1, 100)?), Rational::zero())?,
         Role::Difference,
     )?;
     let milliseconds = Descriptor::new(
         time.kind().clone(),
-        Measure::new("ms", Scale::Exact(Rational::new(1, 1000)?), Rational::ZERO)?,
+        Measure::new("ms", Scale::Exact(rational(1, 1000)?), Rational::zero())?,
         Role::Difference,
     )?;
     assert_eq!(
         uncertainty(UncertaintyMode::Variance, &centimetres, None, None)?
             .measure()
             .scale(),
-        Rational::new(1, 10_000)?
+        &rational(1, 10_000)?
     );
     assert_eq!(
         uncertainty(
@@ -438,7 +433,7 @@ fn uncertainty_measures(length: &Descriptor, time: &Descriptor) -> TestResult {
         )?
         .measure()
         .scale(),
-        Rational::new(1, 100_000)?
+        &rational(1, 100_000)?
     );
     Ok(())
 }
@@ -497,14 +492,18 @@ fn unreachable_operation_registrations() -> TestResult {
     let mut registry = Registry::new(ExponentPolicy::Rational);
     let length = named("length", Dimension::base(BaseDimension::Length))?;
     assert_eq!(
-        registry.register_power(Kind::Ratio, Rational::integer(2), Kind::Ratio),
+        registry.register_power(Kind::Ratio, rational(2, 1)?, Kind::Ratio),
         Err(UnitError::UnsupportedKindRule)
     );
     assert_eq!(
-        registry.register_power(length.kind().clone(), Rational::ONE, length.kind().clone()),
+        registry.register_power(
+            length.kind().clone(),
+            Rational::one(),
+            length.kind().clone()
+        ),
         Err(UnitError::UnsupportedKindRule)
     );
-    let count = Kind::Count(Symbol::new("events")?, CountDomain::NONNEGATIVE);
+    let count = Kind::Count("events".to_owned(), CountDomain::NONNEGATIVE);
     assert_eq!(
         registry.register_binary(BinaryOp::Divide, count.clone(), count, Kind::Ratio),
         Err(UnitError::UnsupportedKindRule)

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact vectors in the fixed seven-dimensional SI basis.
 
-use nrz_algebra::Rational;
+use nrz_cas::Rational;
 
-use crate::UnitError;
+use crate::{
+    UnitError,
+    exact::{budget, ratio},
+};
 
 /// Basis order for every dimension vector.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -34,28 +37,41 @@ pub enum ExponentPolicy {
 }
 
 /// A dimension with no scale, origin, semantic kind or numerical value.
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Dimension([Rational; 7]);
 
 impl Dimension {
     /// The zero vector; not a semantic permission to mix kinds.
-    pub const ZERO: Self = Self([Rational::ZERO; 7]);
+    #[must_use]
+    pub fn zero() -> Self {
+        Self(std::array::from_fn(|_| Rational::zero()))
+    }
 
     /// Construct a vector in the documented basis order.
-    #[must_use]
-    pub const fn new(exponents: [Rational; 7]) -> Self {
-        Self(exponents)
+    ///
+    /// # Errors
+    /// Refuses components outside the signed numerator and unsigned denominator range.
+    pub fn new(exponents: [Rational; 7]) -> Result<Self, UnitError> {
+        let result = Self(exponents);
+        result.admit(ExponentPolicy::Rational)?;
+        Ok(result)
     }
 
     /// Construct integer exponents without a numerical conversion.
-    #[must_use]
-    pub fn integers(exponents: [i64; 7]) -> Self {
-        Self(exponents.map(Rational::integer))
+    ///
+    /// # Errors
+    /// Refuses exhausted exact arithmetic budgets.
+    pub fn integers(exponents: [i64; 7]) -> Result<Self, UnitError> {
+        let mut result = Self::zero();
+        for (value, exponent) in result.0.iter_mut().zip(exponents) {
+            *value = ratio(exponent, 1)?;
+        }
+        Ok(result)
     }
 
     /// One basis dimension.
     #[must_use]
-    pub const fn base(base: BaseDimension) -> Self {
+    pub fn base(base: BaseDimension) -> Self {
         let index = match base {
             BaseDimension::Length => 0,
             BaseDimension::Mass => 1,
@@ -65,8 +81,8 @@ impl Dimension {
             BaseDimension::Amount => 5,
             BaseDimension::LuminousIntensity => 6,
         };
-        let mut exponents = [Rational::ZERO; 7];
-        exponents[index] = Rational::ONE;
+        let mut exponents = std::array::from_fn(|_| Rational::zero());
+        exponents[index] = Rational::one();
         Self(exponents)
     }
 
@@ -80,34 +96,37 @@ impl Dimension {
     ///
     /// # Errors
     /// Refuses rational exponent overflow.
-    pub fn product(self, rhs: Self) -> Result<Self, UnitError> {
-        let mut result = self.0;
-        for (value, other) in result.iter_mut().zip(rhs.0) {
-            *value = value.checked_add(other)?;
+    pub fn product(&self, rhs: &Self) -> Result<Self, UnitError> {
+        let mut result = self.0.clone();
+        let mut ledger = budget()?;
+        for (value, other) in result.iter_mut().zip(&rhs.0) {
+            *value = value.add(other, &mut ledger)?;
         }
-        Ok(Self(result))
+        Self::new(result)
     }
 
     /// Quotient dimensions subtract exponents.
     ///
     /// # Errors
     /// Refuses rational exponent overflow.
-    pub fn quotient(self, rhs: Self) -> Result<Self, UnitError> {
-        let mut result = self.0;
-        for (value, other) in result.iter_mut().zip(rhs.0) {
-            *value = value.checked_sub(other)?;
+    pub fn quotient(&self, rhs: &Self) -> Result<Self, UnitError> {
+        let mut result = self.0.clone();
+        let mut ledger = budget()?;
+        for (value, other) in result.iter_mut().zip(&rhs.0) {
+            *value = value.sub(other, &mut ledger)?;
         }
-        Ok(Self(result))
+        Self::new(result)
     }
 
     /// Power dimensions scale every exponent before checking admission.
     ///
     /// # Errors
     /// Refuses overflow or fractional resulting dimensions under an integral policy.
-    pub fn power(self, exponent: Rational, policy: ExponentPolicy) -> Result<Self, UnitError> {
-        let mut result = self.0;
+    pub fn power(&self, exponent: &Rational, policy: ExponentPolicy) -> Result<Self, UnitError> {
+        let mut result = self.0.clone();
+        let mut ledger = budget()?;
         for value in &mut result {
-            *value = value.checked_mul(exponent)?;
+            *value = value.mul(exponent, &mut ledger)?;
         }
         let dimension = Self(result);
         dimension.admit(policy)?;
@@ -118,7 +137,13 @@ impl Dimension {
     ///
     /// # Errors
     /// Refuses a fractional exponent under an integral policy.
-    pub fn admit(self, policy: ExponentPolicy) -> Result<(), UnitError> {
+    pub fn admit(&self, policy: ExponentPolicy) -> Result<(), UnitError> {
+        let mut ledger = budget()?;
+        for value in &self.0 {
+            if value.small_ratio(&mut ledger)?.is_none() {
+                return Err(UnitError::ExponentRange);
+            }
+        }
         if policy == ExponentPolicy::Integral && self.0.iter().any(|value| !value.is_integer()) {
             Err(UnitError::NonIntegralDimension)
         } else {

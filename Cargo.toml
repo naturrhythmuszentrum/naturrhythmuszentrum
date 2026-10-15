@@ -8,7 +8,7 @@
 
 [workspace]
 resolver = "3"
-members = ["tools/docgen", "crates/scalar", "crates/matrix", "crates/algebra", "crates/units", "prototypes/descriptors", "crates/cas"]
+members = ["tools/docgen", "crates/scalar", "crates/matrix", "crates/algebra", "crates/units", "crates/cas"]
 
 [workspace.package]
 version = "0.1.0"

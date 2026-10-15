@@ -3,7 +3,8 @@
 
 use std::collections::BTreeMap;
 
-use nrz_algebra::{Expr, Limits, Rational, Symbol};
+use nrz_cas::{Cas, Handle, Rational, limits::Limits, source::OriginalForm};
+use std::cell::RefCell;
 
 use crate::{Descriptor, Diagnostic, Failure, Registry, UncertaintyMode, UnitError};
 
@@ -23,12 +24,12 @@ pub struct Evidence {
 /// TODO ´todo:code:attach-declared-output-shapes-and-indexed´: attach declared output shapes and indexed dependencies to future matrix observables under rule:nrz:shape-data-time-evidence.
 ///
 /// TODO ´todo:code:retain-original-observable-dependencies-when-clients´: retain original observable dependencies when clients assign plan slots under def:nrz:plan-binding.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct Observable {
     /// Expected dimension, kind, role and output coordinate measure.
     pub descriptor: Descriptor,
     /// Original operations, never a normalized substitute for checking.
-    pub expression: Expr,
+    pub expression: OriginalForm,
     /// Declared provenance and assurance, retained without numerical verification.
     pub evidence: Evidence,
 }
@@ -47,15 +48,15 @@ pub struct Companion {
     /// Primary value declaration.
     ///
     /// TODO ´todo:code:retain-the-primary-target-entry-map´: retain the primary target entry map through views and structural expansion under conv:nrz:shape-entry-order and rule:nrz:structured-companion-coordinates.
-    pub value: Symbol,
+    pub value: String,
     /// Second value declaration, required exactly for covariance.
     ///
     /// TODO ´todo:code:retain-the-second-covariance-axis-and´: retain the second covariance axis and cross block target identities under def:nrz:covariance-shape.
-    pub other: Option<Symbol>,
+    pub other: Option<String>,
     /// Compatible nonzero reference, required exactly for relative modes.
     ///
     /// TODO ´todo:code:identify-per-component-nonzero-references-and´: identify per component nonzero references and paired relative covariance scales under rule:nrz:correlation-and-relative-shapes.
-    pub reference: Option<Symbol>,
+    pub reference: Option<String>,
 }
 
 /// A symbol's data-time meaning.
@@ -63,7 +64,7 @@ pub struct Companion {
 /// TODO ´todo:code:extend-declared-quantities-with-ordered-shapes´: extend declared quantities with ordered shapes while keeping extents separate from physical counts under def:nrz:matrix-shape.
 ///
 /// TODO ´todo:code:identify-immutable-declaration-versions-for-reusable´: identify immutable declaration versions for reusable plan validation under rule:nrz:plan-validation.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Declaration {
     /// A numerical input with an explicit nonzero assumption if required.
     Input {
@@ -129,7 +130,7 @@ impl Declaration {
     pub fn is_nonzero(&self) -> bool {
         match self {
             Self::Input { nonzero, .. } => *nonzero,
-            Self::Constant { value, .. } => *value != Rational::ZERO,
+            Self::Constant { value, .. } => *value != Rational::zero(),
             Self::Derived(_)
             | Self::Uncertainty { .. }
             | Self::UncertaintyInput { .. }
@@ -156,30 +157,23 @@ pub struct FunctionSignature {
 /// TODO ´todo:code:retain-shape-and-value-identity-snapshots´: retain shape and value identity snapshots independently of later declarations or batch reuse under dec:nrz:shape-descriptor-ownership.
 ///
 /// TODO ´todo:code:expose-stable-declaration-snapshot-identities-for´: expose stable declaration snapshot identities for client binding reuse under rule:nrz:binding-validation.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Context {
+    /// The engine owns all original occurrences and generated coordinates.
+    pub(super) cas: RefCell<Cas>,
+    /// Immutable mathematical declarations shared by source parsing and proofs.
+    pub(super) semantic: Handle,
     /// Explicit physical operation rules.
     pub(super) registry: Registry,
     /// Value and metadata declarations in deterministic name order.
-    pub(super) declarations: BTreeMap<Symbol, Declaration>,
+    pub(super) declarations: BTreeMap<String, Declaration>,
     /// Client-defined fixed function signatures in a separate namespace.
-    pub(super) functions: BTreeMap<Symbol, FunctionSignature>,
+    pub(super) functions: BTreeMap<String, FunctionSignature>,
     /// Expression, expansion and work limits for each independent check.
     pub(super) limits: Limits,
 }
 
 impl Context {
-    /// Create an environment with explicit resource limits.
-    #[must_use]
-    pub const fn new(registry: Registry, limits: Limits) -> Self {
-        Self {
-            registry,
-            declarations: BTreeMap::new(),
-            functions: BTreeMap::new(),
-            limits,
-        }
-    }
-
     /// Add a declaration atomically; forward references are checked during resolution.
     ///
     /// TODO ´todo:code:validate-shape-declarations-and-companion-target´: validate shape declarations and companion target maps atomically at the context boundary under rule:nrz:shape-data-time-evidence.
@@ -188,7 +182,7 @@ impl Context {
     ///
     /// # Errors
     /// Refuses duplicate names, inconsistent kinds and invalid exact count imports.
-    pub fn declare(&mut self, name: Symbol, declaration: Declaration) -> Result<(), Diagnostic> {
+    pub fn declare(&mut self, name: String, declaration: Declaration) -> Result<(), Diagnostic> {
         if self.declarations.contains_key(&name) {
             return Err(Diagnostic::declaration(Failure::Duplicate(name)));
         }
@@ -196,9 +190,12 @@ impl Context {
         if let Declaration::Derived(observable) | Declaration::Uncertainty { observable, .. } =
             &declaration
         {
-            observable
-                .expression
-                .validate_limits(self.limits)
+            self.cas()
+                .and_then(|cas| {
+                    cas.walk_original(&observable.expression.root, &mut crate::exact::budget()?)
+                        .map(|_| ())
+                        .map_err(|error| error.fault)
+                })
                 .map_err(|error| Diagnostic::declaration(error.into()))?;
         }
         if let Some(descriptor) = declaration.descriptor() {
@@ -217,7 +214,7 @@ impl Context {
                 && descriptor.kind().count_domain().is_some()
             {
                 descriptor
-                    .check_count_literal(*value)
+                    .check_count_literal(value)
                     .map_err(|error| Diagnostic::declaration(error.into()))?;
             }
         }
@@ -236,7 +233,7 @@ impl Context {
     /// Refuses inconsistent descriptors and duplicate or builtin function names.
     pub fn declare_function(
         &mut self,
-        name: Symbol,
+        name: String,
         signature: FunctionSignature,
     ) -> Result<(), Diagnostic> {
         if signature.result.kind().is_relative() {

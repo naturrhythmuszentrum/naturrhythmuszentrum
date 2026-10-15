@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 #![doc = include_str!("../README.md")]
+#![expect(
+    clippy::multiple_crate_versions,
+    reason = "nrz-cas uses petgraph 0.8.3 with hashbrown 0.15 while indexmap uses hashbrown 0.17"
+)]
 
 #[expect(
     clippy::redundant_pub_crate,

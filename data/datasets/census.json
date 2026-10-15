@@ -14,7 +14,6 @@
     "crates/matrix/Cargo.toml",
     "crates/algebra/Cargo.toml",
     "crates/units/Cargo.toml",
-    "prototypes/descriptors/Cargo.toml",
     "crates/cas/Cargo.toml"
   ],
   "labels": [
@@ -50,12 +49,6 @@
       "has_readme_template": true,
       "name": "nrz-units",
       "path": "crates/units"
-    },
-    {
-      "description": "Descriptor schema interning and checked computation boundary prototypes",
-      "has_readme_template": true,
-      "name": "nrz-descriptor-prototype",
-      "path": "prototypes/descriptors"
     },
     {
       "description": "Exact graph construction and checked symbolic derivations",

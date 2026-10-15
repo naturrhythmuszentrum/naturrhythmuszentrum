@@ -10,7 +10,6 @@ owners = [
   "MATRIX",
   "ALGEBRA",
   "UNITS",
-  "DESCRIPTORS",
   "CAS",
 ]
 
@@ -24,7 +23,6 @@ partitions = [
   { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"crates/matrix" [ "/" *VCHAR ]' },
   { name = "algebra", owner = "ALGEBRA", pattern = '[ %s"templates/" ] %s"crates/algebra" [ "/" *VCHAR ]' },
   { name = "units", owner = "UNITS", pattern = '[ %s"templates/" ] %s"crates/units" [ "/" *VCHAR ]' },
-  { name = "descriptors", owner = "DESCRIPTORS", pattern = '[ %s"templates/" ] %s"prototypes/descriptors" [ "/" *VCHAR ]' },
   { name = "cas", owner = "CAS", pattern = '[ %s"templates/" ] %s"crates/cas" [ "/" *VCHAR ]' },
 ]
 

@@ -3,7 +3,8 @@
 
 use std::collections::BTreeMap;
 
-use nrz_algebra::{Rational, Symbol};
+use crate::exact::ratio;
+use nrz_cas::Rational;
 
 use crate::{
     Descriptor, Dimension, ExponentPolicy, Kind, Measure, Role, UncertaintyMode, UnitError,
@@ -31,11 +32,11 @@ pub struct Registry {
     /// Admitted dimension exponents, independent of static representation choices.
     policy: ExponentPolicy,
     /// Invariant dimensions of declared named kinds.
-    names: BTreeMap<Symbol, Dimension>,
+    names: BTreeMap<String, Dimension>,
     /// Ordered multiplication and division rules.
-    binary: BTreeMap<(BinaryOp, Kind, Kind), Kind>,
+    binary: Vec<((BinaryOp, Kind, Kind), Kind)>,
     /// Declared power rules beyond the small builtin set.
-    powers: BTreeMap<(Kind, Rational), Kind>,
+    powers: Vec<((Kind, Rational), Kind)>,
 }
 
 impl Registry {
@@ -45,8 +46,8 @@ impl Registry {
         Self {
             policy,
             names: BTreeMap::new(),
-            binary: BTreeMap::new(),
-            powers: BTreeMap::new(),
+            binary: Vec::new(),
+            powers: Vec::new(),
         }
     }
 
@@ -65,17 +66,17 @@ impl Registry {
 
     /// Validate a kind and collect names without partially mutating the registry.
     fn bind(
-        names: &mut BTreeMap<Symbol, Dimension>,
+        names: &mut BTreeMap<String, Dimension>,
         kind: &Kind,
         policy: ExponentPolicy,
     ) -> Result<(), UnitError> {
         kind.dimension()?.admit(policy)?;
         match kind {
             Kind::Named(name, dimension) => {
-                if names.get(name).is_some_and(|old| old != dimension) {
+                if names.get(name).is_some_and(|old| old != dimension.as_ref()) {
                     return Err(UnitError::ConflictingKind(name.clone()));
                 }
-                names.insert(name.clone(), *dimension);
+                names.insert(name.clone(), dimension.as_ref().clone());
             }
             Kind::Uncertainty(_, value, other) => {
                 Self::bind(names, value, policy)?;
@@ -116,8 +117,8 @@ impl Registry {
             return Err(UnitError::RelativeReference);
         }
         let dimension = match operation {
-            BinaryOp::Multiply => left.dimension()?.product(right.dimension()?)?,
-            BinaryOp::Divide => left.dimension()?.quotient(right.dimension()?)?,
+            BinaryOp::Multiply => left.dimension()?.product(&right.dimension()?)?,
+            BinaryOp::Divide => left.dimension()?.quotient(&right.dimension()?)?,
             BinaryOp::Add | BinaryOp::Subtract => return Err(UnitError::UnsupportedKindRule),
         };
         if result.count_domain().is_some() {
@@ -127,7 +128,7 @@ impl Registry {
             return Err(UnitError::DimensionMismatch);
         }
         let key = (operation, left, right);
-        if self.binary.contains_key(&key) {
+        if self.binary.iter().any(|(old, _)| old == &key) {
             return Err(UnitError::DuplicateRule);
         }
         let mut names = self.names.clone();
@@ -135,7 +136,7 @@ impl Registry {
             Self::bind(&mut names, kind, self.policy)?;
         }
         self.names = names;
-        self.binary.insert(key, result);
+        self.binary.push((key, result));
         Ok(())
     }
 
@@ -153,7 +154,7 @@ impl Registry {
         exponent: Rational,
         result: Kind,
     ) -> Result<(), UnitError> {
-        if base == Kind::Ratio || exponent == Rational::ONE {
+        if base == Kind::Ratio || exponent == Rational::one() {
             return Err(UnitError::UnsupportedKindRule);
         }
         if result.is_relative() {
@@ -162,18 +163,18 @@ impl Registry {
         if base.count_domain().is_some() || result.count_domain().is_some() {
             return Err(UnitError::CountDomain);
         }
-        if base.dimension()?.power(exponent, self.policy)? != result.dimension()? {
+        if base.dimension()?.power(&exponent, self.policy)? != result.dimension()? {
             return Err(UnitError::DimensionMismatch);
         }
         let key = (base, exponent);
-        if self.powers.contains_key(&key) {
+        if self.powers.iter().any(|(old, _)| old == &key) {
             return Err(UnitError::DuplicateRule);
         }
         let mut names = self.names.clone();
         Self::bind(&mut names, &key.0, self.policy)?;
         Self::bind(&mut names, &result, self.policy)?;
         self.names = names;
-        self.powers.insert(key, result);
+        self.powers.push((key, result));
         Ok(())
     }
 
@@ -261,7 +262,11 @@ impl Registry {
         left: &Kind,
         right: &Kind,
     ) -> Result<Kind, UnitError> {
-        if let Some(result) = self.binary.get(&(operation, left.clone(), right.clone())) {
+        if let Some((_, result)) = self
+            .binary
+            .iter()
+            .find(|((op, lhs, rhs), _)| *op == operation && lhs == left && rhs == right)
+        {
             return Ok(result.clone());
         }
         if left.count_domain().is_some() || right.count_domain().is_some() {
@@ -319,7 +324,7 @@ impl Registry {
     ///
     /// # Errors
     /// Refuses points, counts, unsupported kind rules and unadmitted dimensions.
-    pub fn power(&self, base: &Descriptor, exponent: Rational) -> Result<Descriptor, UnitError> {
+    pub fn power(&self, base: &Descriptor, exponent: &Rational) -> Result<Descriptor, UnitError> {
         self.validate(base)?;
         if base.role() != Role::Difference {
             return Err(UnitError::AffineRole);
@@ -328,20 +333,24 @@ impl Registry {
             return Err(UnitError::CountDomain);
         }
         base.dimension().power(exponent, self.policy)?;
-        if exponent == Rational::ONE || base.kind() == &Kind::Ratio {
+        if exponent == &Rational::one() || base.kind() == &Kind::Ratio {
             return Ok(base.coherent());
         }
-        let kind = if let Some(result) = self.powers.get(&(base.kind().clone(), exponent)) {
+        let kind = if let Some((_, result)) = self
+            .powers
+            .iter()
+            .find(|((kind, power), _)| kind == base.kind() && power == exponent)
+        {
             result.clone()
         } else {
             match base.kind() {
                 Kind::Uncertainty(UncertaintyMode::Standard, value, None)
-                    if exponent == Rational::integer(2) =>
+                    if exponent == &ratio(2, 1)? =>
                 {
                     Kind::Uncertainty(UncertaintyMode::Variance, value.clone(), None)
                 }
                 Kind::Uncertainty(UncertaintyMode::Variance, value, None)
-                    if exponent == Rational::new(1, 2)? =>
+                    if exponent == &ratio(1, 2)? =>
                 {
                     Kind::Uncertainty(UncertaintyMode::Standard, value.clone(), None)
                 }
@@ -361,7 +370,7 @@ impl Registry {
             return Err(UnitError::AffineRole);
         }
         if let Some(domain) = value.kind().count_domain() {
-            domain.admits_scale(Rational::integer(-1))?;
+            domain.admits_scale(&ratio(-1, 1)?)?;
         }
         Ok(value.coherent())
     }
@@ -373,7 +382,7 @@ impl Registry {
     pub fn scale_count(
         &self,
         count: &Descriptor,
-        scale: Rational,
+        scale: &Rational,
     ) -> Result<Descriptor, UnitError> {
         self.validate(count)?;
         count

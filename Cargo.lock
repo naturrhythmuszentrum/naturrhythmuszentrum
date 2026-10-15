@@ -622,20 +622,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "nrz-descriptor-prototype"
-version = "0.1.0"
-dependencies = [
- "nrz-algebra",
- "nrz-units",
-]
-
-[[package]]
 name = "nrz-docgen"
 version = "0.1.0"
 dependencies = [
  "clap",
  "minijinja",
- "nrz-algebra",
+ "nrz-cas",
  "nrz-units",
  "serde",
  "serde_json",
@@ -666,7 +658,7 @@ dependencies = [
 name = "nrz-units"
 version = "0.1.0"
 dependencies = [
- "nrz-algebra",
+ "nrz-cas",
  "thiserror 2.0.21",
 ]
 

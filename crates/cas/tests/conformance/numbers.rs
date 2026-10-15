@@ -207,3 +207,54 @@ fn cross_cancellation() -> Result<(), Fault> {
     assert_eq!(left.mul(&right, &mut ledger)?, Rational::one());
     Ok(())
 }
+
+/// Component access preserves signed boundaries and refuses narrowing of either component.
+/// ´test:integration:small-rational-components´
+#[test]
+fn small_rational_components() -> Result<(), Fault> {
+    for (text, expected) in [
+        ("0", Some((0, 1))),
+        ("2/4", Some((1, 2))),
+        ("-9223372036854775808", Some((i64::MIN, 1))),
+        ("9223372036854775807", Some((i64::MAX, 1))),
+        ("1/18446744073709551615", Some((1, u64::MAX))),
+        ("9223372036854775808", None),
+        ("-9223372036854775809", None),
+        ("9223372036854775808/3", None),
+        ("1/18446744073709551616", None),
+    ] {
+        let mut ledger = budget()?;
+        let value = Rational::parse(text, &mut ledger)?;
+        assert_eq!(value.small_ratio(&mut ledger)?, expected, "{text}");
+    }
+    let mut empty = Budget::new(Limits {
+        work: 0,
+        ..Limits::default()
+    })?;
+    assert!(matches!(
+        Rational::one().small_ratio(&mut empty),
+        Err(Fault {
+            kind: FaultKind::Exhausted {
+                budget: BudgetKind::Work,
+                ..
+            },
+            ..
+        })
+    ));
+    let large = Rational::parse("256", &mut budget()?)?;
+    let mut narrow = Budget::new(Limits {
+        component_bits: 8,
+        ..Limits::default()
+    })?;
+    assert!(matches!(
+        large.small_ratio(&mut narrow),
+        Err(Fault {
+            kind: FaultKind::Exhausted {
+                budget: BudgetKind::ComponentBits,
+                ..
+            },
+            ..
+        })
+    ));
+    Ok(())
+}

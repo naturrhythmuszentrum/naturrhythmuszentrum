@@ -3,14 +3,14 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use nrz_algebra::Rational;
+use nrz_cas::Rational;
 use nrz_units::{
     BinaryOp, CountDomain, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry, Role,
     Scale, UncertaintyMode,
 };
 use serde_json::{Value, json};
 
-use super::record::Record;
+use super::record::{Record, exact};
 use crate::error::Error;
 
 /// Declared names mapped to independently constructed semantic kinds.
@@ -22,11 +22,11 @@ pub(super) fn dimension(record: &Record<'_>) -> Result<Dimension, Error> {
     if values.len() != 7 {
         return Err(record.error("dimensions must have seven exact rational strings"));
     }
-    let mut exponents = [Rational::ZERO; 7];
+    let mut exponents = std::array::from_fn(|_| Rational::zero());
     for (index, value) in values.iter().enumerate() {
         exponents[index] = value.rational()?;
     }
-    Ok(Dimension::new(exponents))
+    Dimension::new(exponents).map_err(|error| record.error(error))
 }
 
 /// Decode a mode without conflating standard uncertainty and deterministic radius.
@@ -126,7 +126,7 @@ fn resolve(
             match record.string("type")? {
                 "ratio" => Kind::Ratio,
                 "angle" => Kind::Angle,
-                _ => Kind::Named(record.at("name")?.symbol()?, dimensions),
+                _ => Kind::Named(record.at("name")?.symbol()?, Box::new(dimensions.clone())),
             }
         }
         "count" => {
@@ -213,12 +213,12 @@ pub(super) fn evidence(
         .map(|(name, _)| name)
         .ok_or_else(|| record.error("checked kind has no declared identity"))?;
     Ok(json!({
-        "dimensions": value.dimension().exponents().iter().map(ToString::to_string).collect::<Vec<_>>(),
+        "dimensions": value.dimension().exponents().iter().map(|value| exact(value, record)).collect::<Result<Vec<_>, _>>()?,
         "kind": name,
         "measure": {
             "display": value.measure().name(),
-            "scale": value.measure().scale().to_string(),
-            "offset": value.measure().offset().to_string(),
+            "scale": exact(value.measure().scale(), record)?,
+            "offset": exact(value.measure().offset(), record)?,
         },
         "affine_role": if value.role() == Role::Point { "point" } else { "difference" },
     }))

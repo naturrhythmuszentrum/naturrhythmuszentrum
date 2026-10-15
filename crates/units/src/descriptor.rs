@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked quantity and independent uncertainty descriptors.
 
-use nrz_algebra::Rational;
+use nrz_cas::Rational;
 
+use crate::exact::budget;
 use crate::{Conversion, Dimension, Kind, Measure, Scale, UncertaintyMode, UnitError};
 
 /// Affine coordinates and linear differences obey distinct operation rules.
@@ -50,11 +51,11 @@ impl Descriptor {
         if role == Role::Point && !kind.admits_points() {
             return Err(UnitError::AffineRole);
         }
-        if role == Role::Difference && measure.offset() != Rational::ZERO {
+        if role == Role::Difference && !measure.offset().is_zero() {
             return Err(UnitError::OffsetOnDifference);
         }
         if kind.count_domain().is_some()
-            && (measure.scale() != Rational::ONE || measure.offset() != Rational::ZERO)
+            && (measure.scale() != &Rational::one() || !measure.offset().is_zero())
         {
             return Err(UnitError::CountMeasure);
         }
@@ -70,7 +71,7 @@ impl Descriptor {
     #[must_use]
     pub fn ratio() -> Self {
         Self {
-            dimension: Dimension::ZERO,
+            dimension: Dimension::zero(),
             kind: Kind::Ratio,
             measure: Measure::coherent(),
             role: Role::Difference,
@@ -79,8 +80,8 @@ impl Descriptor {
 
     /// Dimension, derived independently of the coordinate measure.
     #[must_use]
-    pub const fn dimension(&self) -> Dimension {
-        self.dimension
+    pub const fn dimension(&self) -> &Dimension {
+        &self.dimension
     }
 
     /// Semantic identity.
@@ -105,7 +106,7 @@ impl Descriptor {
     #[must_use]
     pub fn coherent(&self) -> Self {
         Self {
-            dimension: self.dimension,
+            dimension: self.dimension.clone(),
             kind: self.kind.clone(),
             measure: Measure::coherent(),
             role: self.role,
@@ -116,7 +117,7 @@ impl Descriptor {
     #[must_use]
     pub fn difference(&self) -> Self {
         Self {
-            dimension: self.dimension,
+            dimension: self.dimension.clone(),
             kind: self.kind.clone(),
             measure: self.measure.difference(),
             role: Role::Difference,
@@ -159,7 +160,7 @@ impl Descriptor {
     ///
     /// # Errors
     /// Refuses a non-count descriptor or a value outside its declared integer domain.
-    pub fn check_count_literal(&self, value: Rational) -> Result<(), UnitError> {
+    pub fn check_count_literal(&self, value: &Rational) -> Result<(), UnitError> {
         self.kind
             .count_domain()
             .ok_or(UnitError::KindMismatch)?
@@ -203,14 +204,15 @@ pub fn uncertainty(
         return Err(UnitError::UncertaintyRelationship);
     }
     let scale = match mode {
-        UncertaintyMode::Radius | UncertaintyMode::Standard => value.measure.scale(),
-        UncertaintyMode::RelativeRadius | UncertaintyMode::RelativeStandard => Rational::ONE,
-        UncertaintyMode::Variance => value.measure.scale().checked_pow(2)?,
-        UncertaintyMode::Covariance => value.measure.scale().checked_mul(
+        UncertaintyMode::Radius | UncertaintyMode::Standard => value.measure.scale().clone(),
+        UncertaintyMode::RelativeRadius | UncertaintyMode::RelativeStandard => Rational::one(),
+        UncertaintyMode::Variance => value.measure.scale().pow(2, &mut budget()?)?,
+        UncertaintyMode::Covariance => value.measure.scale().mul(
             other
                 .ok_or(UnitError::UncertaintyRelationship)?
                 .measure
                 .scale(),
+            &mut budget()?,
         )?,
     };
     let kind = Kind::Uncertainty(
@@ -220,7 +222,7 @@ pub fn uncertainty(
     );
     Descriptor::validated(
         kind,
-        Measure::new("uncertainty", Scale::Exact(scale), Rational::ZERO)?,
+        Measure::new("uncertainty", Scale::Exact(scale), Rational::zero())?,
         Role::Difference,
     )
 }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Semantic identity and discrete count-domain declarations.
 
-use nrz_algebra::{Rational, Symbol};
+use crate::exact::{budget, ratio};
+use nrz_cas::Rational;
 
 use crate::{Dimension, ExponentPolicy, UnitError};
 
@@ -42,19 +43,22 @@ impl CountDomain {
     ///
     /// # Errors
     /// Refuses a fractional value or one outside the declared range.
-    pub fn check(self, value: Rational) -> Result<(), UnitError> {
-        if !value.is_integer()
-            || self
-                .minimum
-                .is_some_and(|minimum| value.numerator() < minimum)
-            || self
-                .maximum
-                .is_some_and(|maximum| value.numerator() > maximum)
-        {
-            Err(UnitError::CountValue)
-        } else {
-            Ok(())
+    pub fn check(self, value: &Rational) -> Result<(), UnitError> {
+        if !value.is_integer() {
+            return Err(UnitError::CountValue);
         }
+        let mut ledger = budget()?;
+        for (bound, forbidden) in [
+            (self.minimum, std::cmp::Ordering::Less),
+            (self.maximum, std::cmp::Ordering::Greater),
+        ] {
+            if let Some(bound) = bound
+                && value.compare(&ratio(bound, 1)?, &mut ledger)? == forbidden
+            {
+                return Err(UnitError::CountValue);
+            }
+        }
+        Ok(())
     }
 
     /// Whether unconstrained addition is closed in this supported domain.
@@ -73,14 +77,14 @@ impl CountDomain {
     ///
     /// # Errors
     /// Refuses a fractional multiplier or an unproved domain condition.
-    pub fn admits_scale(self, scale: Rational) -> Result<(), UnitError> {
+    pub fn admits_scale(self, scale: &Rational) -> Result<(), UnitError> {
         if !scale.is_integer() {
             return Err(UnitError::CountValue);
         }
-        if scale == Rational::ONE
+        if scale == &Rational::one()
             || self == Self::SIGNED
-            || (self == Self::NONNEGATIVE && scale >= Rational::ZERO)
-            || (scale == Rational::ZERO && self.check(Rational::ZERO).is_ok())
+            || (self == Self::NONNEGATIVE && !scale.is_negative())
+            || (scale.is_zero() && self.check(&Rational::zero()).is_ok())
         {
             Ok(())
         } else {
@@ -111,16 +115,16 @@ pub enum UncertaintyMode {
 /// Semantic meaning, kept even when dimension vectors cancel.
 ///
 /// TODO ´todo:code:retain-paired-target-kinds-during-covariance´: retain paired target kinds during covariance contractions without equating dual roles to automatic scalar reciprocals under def:nrz:covariance-shape and rule:nrz:shape-transpose-and-duality.
-#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Kind {
     /// A continuous dimensionless ratio.
     Ratio,
     /// An angle, with coherent measure radians.
     Angle,
     /// A discrete tally of a declared thing in a declared integer domain.
-    Count(Symbol, CountDomain),
+    Count(String, CountDomain),
     /// A declared physical kind with its invariant dimension.
-    Named(Symbol, Dimension),
+    Named(String, Box<Dimension>),
     /// A distinct uncertainty kind with its referenced value kinds.
     Uncertainty(UncertaintyMode, Box<Self>, Option<Box<Self>>),
 }
@@ -156,8 +160,8 @@ impl Kind {
             return Err(UnitError::RelativeReference);
         }
         match self {
-            Self::Ratio | Self::Angle | Self::Count(_, _) => Ok(Dimension::ZERO),
-            Self::Named(_, dimension) => Ok(*dimension),
+            Self::Ratio | Self::Angle | Self::Count(_, _) => Ok(Dimension::zero()),
+            Self::Named(_, dimension) => Ok(dimension.as_ref().clone()),
             Self::Uncertainty(mode, value, other) => {
                 let dimension = value.dimension_at(depth + 1)?;
                 if (*mode == UncertaintyMode::Covariance) != other.is_some() {
@@ -166,13 +170,13 @@ impl Kind {
                 match mode {
                     UncertaintyMode::Radius | UncertaintyMode::Standard => Ok(dimension),
                     UncertaintyMode::RelativeRadius | UncertaintyMode::RelativeStandard => {
-                        Ok(Dimension::ZERO)
+                        Ok(Dimension::zero())
                     }
                     UncertaintyMode::Variance => {
-                        dimension.power(Rational::integer(2), ExponentPolicy::Rational)
+                        dimension.power(&ratio(2, 1)?, ExponentPolicy::Rational)
                     }
                     UncertaintyMode::Covariance => dimension.product(
-                        other
+                        &other
                             .as_ref()
                             .ok_or(UnitError::UncertaintyRelationship)?
                             .dimension_at(depth + 1)?,

@@ -468,6 +468,32 @@ impl Rational {
         Ok(bytes)
     }
 
+    /// Read reduced components when the numerator fits `i64` and denominator fits `u64`.
+    ///
+    /// A negative numerator includes the signed minimum. Values outside this finite
+    /// component contract return `None` without narrowing or rounding.
+    ///
+    /// # Errors
+    /// Refuses component or work budget exhaustion before reading magnitudes.
+    pub fn small_ratio(&self, budget: &mut Budget) -> Result<Option<(i64, u64)>, Fault> {
+        let at = Location::new("small rational components");
+        self.check(budget, at)?;
+        charge(self.numerator.bits(), self.denominator.bits(), budget, at)?;
+        if self.numerator.bits() > 64 || self.denominator.bits() > 64 {
+            return Ok(None);
+        }
+        let magnitude = self.numerator.iter_u64_digits().next().unwrap_or(0);
+        let denominator = self.denominator.iter_u64_digits().next().unwrap_or(1);
+        let numerator = if self.negative && magnitude == (1_u64 << 63) {
+            i64::MIN
+        } else if let Ok(value) = i64::try_from(magnitude) {
+            if self.negative { -value } else { value }
+        } else {
+            return Ok(None);
+        };
+        Ok(Some((numerator, denominator)))
+    }
+
     /// Use a fixed integer-power payload only when the exact exponent fits it.
     pub(crate) fn integer_exponent(&self, budget: &mut Budget) -> Result<Option<i64>, Fault> {
         if !self.is_integer() || self.numerator.bits() > 64 {
