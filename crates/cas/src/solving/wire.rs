@@ -14,8 +14,9 @@ use super::model::{
     CoordinateSpaceData, ExclusionPolicy, ExtensionLevelData, FamilyMapData, GeneratorPair,
     IdentityMode, IsolationInterval, LocalBranchData, LocalMode, MapMode, MapTarget,
     MultiplicityMode, Neighborhood, PolynomialData, PolynomialTerm, PredicateSplitMode, PrimePower,
-    RationalInterval, RefinementMode, RefinementTargetKind, RegularityKind, RelationMultiple,
-    RootFactor, RootRelationData, RootSelectionData, RowOperation, SelectionMode,
+    RationalInterval, RealRestrictionTransport, RefinementMode, RefinementTargetKind,
+    RegularityKind, RelationMultiple, RestrictionCondition, RestrictionConditionKind,
+    RestrictionPair, RootFactor, RootRelationData, RootSelectionData, RowOperation, SelectionMode,
     SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveCertificate, SolveDraft,
     SolveForm, SolveGoal, SolveProblemData, SolveStatement, SolveSubstitution, SquareFreeRequest,
     StatementCoefficientEquality, StatementComponentCover, StatementCoverage, StatementEquivalent,
@@ -1243,6 +1244,65 @@ impl<R> CertificateConjugationTransport<R> {
     }
 }
 
+impl<R> RestrictionPair<R> {
+    /// Ordered endpoint encoding never substitutes display names for graph identity.
+    fn encode(
+        &self,
+        out: &mut Encoder<'_>,
+        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
+    ) -> Result<(), Fault> {
+        write(&self.real, out)?;
+        write(&self.complex, out)
+    }
+}
+
+impl<R> RestrictionCondition<R> {
+    /// Encode the exact source-condition address and its transported obligation.
+    fn encode(
+        &self,
+        out: &mut Encoder<'_>,
+        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
+    ) -> Result<(), Fault> {
+        crate::wire::index(self.premise, out)?;
+        out.byte(match self.kind {
+            RestrictionConditionKind::Hypothesis => 0,
+            RestrictionConditionKind::Requirement => 1,
+            RestrictionConditionKind::Residual => 2,
+        })?;
+        crate::wire::index(self.index, out)?;
+        self.contexts.encode(out, write)?;
+        self.regions.encode(out, write)?;
+        self.predicates.encode(out, write)?;
+        out.byte(u8::from(self.discharge.is_some()))?;
+        if let Some(slot) = self.discharge {
+            crate::wire::index(slot, out)?;
+        }
+        Ok(())
+    }
+}
+
+impl<R> RealRestrictionTransport<R> {
+    /// The mandatory transport follows the problem and set in subtype thirteen.
+    fn encode(
+        &self,
+        out: &mut Encoder<'_>,
+        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
+    ) -> Result<(), Fault> {
+        write(&self.coefficient_map, out)?;
+        for pairs in [&self.coefficients, &self.unknowns, &self.regions] {
+            out.count(pairs.len())?;
+            for pair in pairs {
+                pair.encode(out, write)?;
+            }
+        }
+        out.count(self.conditions.len())?;
+        for condition in &self.conditions {
+            condition.encode(out, write)?;
+        }
+        crate::wire::index(self.real_cover, out)
+    }
+}
+
 impl<R> CertificateRealRestriction<R> {
     /// Encode every payload field in its specified semantic order.
     pub(crate) fn encode(
@@ -1253,6 +1313,7 @@ impl<R> CertificateRealRestriction<R> {
         crate::wire::index(self.coverage, out)?;
         write(&self.problem, out)?;
         write(&self.set, out)?;
+        self.transport.encode(out, write)?;
         out.count(self.retained.len())?;
         for item0 in &self.retained {
             write(item0, out)?;
@@ -3023,6 +3084,82 @@ impl CertificateConjugationTransport<Handle> {
     }
 }
 
+impl RestrictionPair<Handle> {
+    /// Both endpoints must be earlier admitted graph records.
+    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
+        Ok(Self {
+            real: crate::wire_decode::object(reader, records)?,
+            complex: crate::wire_decode::object(reader, records)?,
+        })
+    }
+}
+
+impl RestrictionCondition<Handle> {
+    /// Reject unknown source kinds and malformed optional proof slots.
+    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
+        Ok(Self {
+            premise: reader.index()?,
+            kind: match reader.byte()? {
+                0 => RestrictionConditionKind::Hypothesis,
+                1 => RestrictionConditionKind::Requirement,
+                2 => RestrictionConditionKind::Residual,
+                _ => return Err(invalid()),
+            },
+            index: reader.index()?,
+            contexts: RestrictionPair::decode(reader, records)?,
+            regions: RestrictionPair::decode(reader, records)?,
+            predicates: RestrictionPair::decode(reader, records)?,
+            discharge: if reader.boolean()? {
+                Some(reader.index()?)
+            } else {
+                None
+            },
+        })
+    }
+}
+
+impl RealRestrictionTransport<Handle> {
+    /// All count and byte bounds precede allocation of transport vectors.
+    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
+        Ok(Self {
+            coefficient_map: crate::wire_decode::object(reader, records)?,
+            coefficients: decode_vector(
+                reader,
+                records,
+                BudgetKind::PolynomialVariables,
+                8,
+                128,
+                RestrictionPair::decode,
+            )?,
+            unknowns: decode_vector(
+                reader,
+                records,
+                BudgetKind::PolynomialVariables,
+                8,
+                128,
+                RestrictionPair::decode,
+            )?,
+            regions: decode_vector(
+                reader,
+                records,
+                BudgetKind::CaseArms,
+                8,
+                128,
+                RestrictionPair::decode,
+            )?,
+            conditions: decode_vector(
+                reader,
+                records,
+                BudgetKind::ConditionAtoms,
+                34,
+                448,
+                RestrictionCondition::decode,
+            )?,
+            real_cover: reader.index()?,
+        })
+    }
+}
+
 impl CertificateRealRestriction<Handle> {
     /// Decode exactly the specified ordered payload with bounded child vectors.
     fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
@@ -3030,6 +3167,7 @@ impl CertificateRealRestriction<Handle> {
             coverage: reader.index()?,
             problem: crate::wire_decode::object(reader, records)?,
             set: crate::wire_decode::object(reader, records)?,
+            transport: RealRestrictionTransport::decode(reader, records)?,
             retained: decode_vector(
                 reader,
                 records,

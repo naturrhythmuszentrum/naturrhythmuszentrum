@@ -1,6 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public elementary proof fixtures with independent, explicitly supplied mathematics.
 
+#[path = "solve_elementary_restriction_public.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public test fixtures stay inside the test target"
+)]
+mod restriction;
+pub(crate) use restriction::{
+    assumed_restriction, degree_restriction, mixed_restriction, symbolic_restriction,
+};
+
 use super::common::TestResult;
 use crate::test_api::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::test_api::limits::{Budget, Limits};
@@ -1763,10 +1773,11 @@ pub(crate) fn real_restriction(nonreal: bool) -> TestResult<BinomialFixture> {
         return Err("missing set".into());
     };
     let branches = set.branches.clone();
+    let complex_problem = coverage.problem.clone();
     let zero = fixture.base.integer(0, false)?;
     let partition = fixture.base.split(&zero)?;
     let partition_index = u32::try_from(fixture.steps.len())?;
-    fixture.steps.push(partition);
+    fixture.steps.push(partition.clone());
     fixture.base.enter_real()?;
     let (problem, _) = fixture.base.quadratic(if nonreal { -1 } else { 1 })?;
     let values = if nonreal {
@@ -1778,6 +1789,17 @@ pub(crate) fn real_restriction(nonreal: bool) -> TestResult<BinomialFixture> {
         ]
     };
     let set = fixture.base.finite(&problem, &values)?;
+    let zero = fixture.base.integer(0, false)?;
+    let real_cover = fixture.base.split(&zero)?;
+    let real_cover_index = u32::try_from(fixture.steps.len())?;
+    let transport = restriction::transport(
+        &mut fixture.base,
+        &problem,
+        &complex_problem,
+        &real_cover,
+        &partition,
+    )?;
+    fixture.steps.push(real_cover);
     let mut step = fixture.base.step(
         SolveSchema::RealRestriction,
         SolveStatement::Coverage(StatementCoverage {
@@ -1789,6 +1811,7 @@ pub(crate) fn real_restriction(nonreal: bool) -> TestResult<BinomialFixture> {
             coverage: 0,
             problem,
             set,
+            transport,
             retained: if nonreal {
                 Vec::new()
             } else {
@@ -1799,7 +1822,7 @@ pub(crate) fn real_restriction(nonreal: bool) -> TestResult<BinomialFixture> {
             cover: 1,
         }),
     );
-    step.premises = vec![covered_index, partition_index];
+    step.premises = vec![covered_index, partition_index, real_cover_index];
     if nonreal {
         step.premises.extend([1, 4]);
     }
@@ -1955,11 +1978,15 @@ fn close_partition_branch(
 
 /// Degree/pivot zero keeps the full family while its complement keeps exactly the zero singleton.
 pub(crate) fn degree_drop_cover() -> TestResult<BinomialFixture> {
+    degree_drop_into(Fixture::new()?)
+}
+
+/// Build the same guarded cover in an existing store and either scalar ambient.
+fn degree_drop_into(mut base: Fixture) -> TestResult<BinomialFixture> {
     use crate::test_api::solving::{
         CertificateTotalPredicateSplit, PredicateSplitMode, SolutionSetData, SolveCertificate,
         SolveSchema, SolveStatement, StatementCoverage,
     };
-    let mut base = Fixture::new()?;
     let coefficient = base.free("a")?;
     let unknown = base.free("x")?;
     let polynomial = base.expression(Operator::Mul, &[coefficient.clone(), unknown], false)?;

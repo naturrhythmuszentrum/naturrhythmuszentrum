@@ -11,15 +11,16 @@ use super::model::{
     CertificateTotalPredicateSplit, CoefficientDomainData, CoefficientMapData,
     CoefficientValueData, CoefficientValueObject, ComponentSplitData, CoordinateRole,
     CoordinateSpaceData, ExtensionLevelData, FamilyMapData, GeneratorPair, LocalBranchData,
-    MapMode, MapTarget, Neighborhood, PolynomialData, PolynomialTerm, RelationMultiple, RootFactor,
-    RootRelationData, RootSelectionData, RowOperation, SelectionMode, SolutionBranchData,
-    SolutionBranchKind, SolutionSetData, SolveCertificate, SolveDraft, SolveProblemData, SolveSpec,
-    SolveStatement, SolveSubstitution, SolveView, StatementCoefficientEquality,
-    StatementComponentCover, StatementCoverage, StatementEquivalent, StatementFamilyCoverage,
-    StatementFamilyMembership, StatementIsolation, StatementLinearSystem, StatementLocalBranch,
-    StatementLocalDerivative, StatementMember, StatementMultiplicity, StatementOrbit,
-    StatementPresentation, StatementRank, StatementRealValues, StatementRootExistence,
-    StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
+    MapMode, MapTarget, Neighborhood, PolynomialData, PolynomialTerm, RealRestrictionTransport,
+    RelationMultiple, RestrictionCondition, RestrictionPair, RootFactor, RootRelationData,
+    RootSelectionData, RowOperation, SelectionMode, SolutionBranchData, SolutionBranchKind,
+    SolutionSetData, SolveCertificate, SolveDraft, SolveProblemData, SolveSpec, SolveStatement,
+    SolveSubstitution, SolveView, StatementCoefficientEquality, StatementComponentCover,
+    StatementCoverage, StatementEquivalent, StatementFamilyCoverage, StatementFamilyMembership,
+    StatementIsolation, StatementLinearSystem, StatementLocalBranch, StatementLocalDerivative,
+    StatementMember, StatementMultiplicity, StatementOrbit, StatementPresentation, StatementRank,
+    StatementRealValues, StatementRootExistence, StatementRootOrder, StatementSelectionUnique,
+    StatementUnit, TupleData,
 };
 use crate::budget::{Budget, BudgetKind};
 use crate::encoding::Encoder;
@@ -971,11 +972,47 @@ impl<R> CertificateConjugationTransport<R> {
     }
 }
 
+impl<R> RestrictionPair<R> {
+    /// Preserve the ordered real and complex graph dependencies.
+    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
+        result.push(&self.real);
+        result.push(&self.complex);
+    }
+}
+
+impl<R> RestrictionCondition<R> {
+    /// Conditions retain both qualified contexts, regions and predicates.
+    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
+        self.contexts.references(result);
+        self.regions.references(result);
+        self.predicates.references(result);
+    }
+}
+
+impl<R> RealRestrictionTransport<R> {
+    /// Every transport endpoint participates in canonical reachability and replay.
+    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
+        result.push(&self.coefficient_map);
+        for pair in self
+            .coefficients
+            .iter()
+            .chain(&self.unknowns)
+            .chain(&self.regions)
+        {
+            pair.references(result);
+        }
+        for condition in &self.conditions {
+            condition.references(result);
+        }
+    }
+}
+
 impl<R> CertificateRealRestriction<R> {
     /// Enumerate every referenced object in semantic field order.
     fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
         result.push(&self.problem);
         result.push(&self.set);
+        self.transport.references(result);
         for item in &self.retained {
             result.push(item);
         }

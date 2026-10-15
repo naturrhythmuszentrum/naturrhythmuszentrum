@@ -228,11 +228,22 @@ fn atom(evaluation: &Evaluation<'_>, id: LogicalId, budget: &mut Budget) -> Resu
 }
 
 /// Literal Gaussian parts are canonical; general mapped extensions need their own certified images.
-fn leaf(evaluation: &Evaluation<'_>, id: LogicalId, budget: &mut Budget) -> Result<Parts, Fault> {
+fn leaf(
+    evaluation: &Evaluation<'_>,
+    id: LogicalId,
+    parameters: &[crate::graph::Handle],
+    budget: &mut Budget,
+) -> Result<Parts, Fault> {
     let expression = evaluation.cas.state.expression(id)?;
     match (&expression.operator, &expression.attachment) {
         (Operator::Rational(value), None) => {
             Parts::rational(evaluation, value, &crate::number::Rational::zero(), budget)
+        }
+        (Operator::Free(key), None) if real_parameter(evaluation, key, parameters, budget)? => {
+            Ok(Parts {
+                real: evaluation.expression(id, true, budget)?,
+                imaginary: Value::integer(0, &evaluation.engine, budget)?,
+            })
         }
         (Operator::Free(_) | Operator::Bound { .. }, None) => atom(evaluation, id, budget),
         (Operator::RootValue { .. }, Some(ExpressionAttachment::SelectedRoot(selected))) => {
@@ -280,6 +291,7 @@ fn operation(
     evaluation: &Evaluation<'_>,
     id: LogicalId,
     values: &[Parts],
+    parameters: &[crate::graph::Handle],
     budget: &mut Budget,
 ) -> Result<Parts, Fault> {
     match (&evaluation.cas.state.expression(id)?.operator, values) {
@@ -301,15 +313,42 @@ fn operation(
             imaginary: Value::integer(0, &evaluation.engine, budget)?,
         }),
         (Operator::IntegerPower(power), [value]) => value.power(*power, evaluation, budget),
-        (_, []) => leaf(evaluation, id, budget),
+        (_, []) => leaf(evaluation, id, parameters, budget),
         _ => Err(invalid()),
     }
 }
 
-/// Iterative component normalization is bounded by ordinary expression depth and charged storage.
+/// Only a caller's explicit real-parameter transport supplies this fixed-subfield fact.
+fn real_parameter(
+    evaluation: &Evaluation<'_>,
+    key: &str,
+    parameters: &[crate::graph::Handle],
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    for handle in parameters {
+        budget.work(1, AT)?;
+        if matches!(&evaluation.cas.state.expression(handle.logical_id())?.operator, Operator::Free(name) if name == key)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Ordinary conjugation has no additional cross-header parameter assumptions.
 pub(crate) fn expression(
     evaluation: &Evaluation<'_>,
     root: LogicalId,
+    budget: &mut Budget,
+) -> Result<Parts, Fault> {
+    restricted(evaluation, root, &[], budget)
+}
+
+/// Iterative component normalization is bounded by ordinary expression depth and charged storage.
+pub(crate) fn restricted(
+    evaluation: &Evaluation<'_>,
+    root: LogicalId,
+    parameters: &[crate::graph::Handle],
     budget: &mut Budget,
 ) -> Result<Parts, Fault> {
     let mut pending = vector(1, budget)?;
@@ -354,6 +393,7 @@ pub(crate) fn expression(
                 evaluation,
                 id,
                 values.get(start..).ok_or_else(invalid)?,
+                parameters,
                 budget,
             )?;
             values.truncate(start);

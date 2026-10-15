@@ -952,3 +952,201 @@ fn independent_cube_root_equality_refused() -> TestResult {
     }
     Ok(())
 }
+
+/// Symbolic roots, exact renamed declarations and distinct coefficient domains survive restriction.
+/// ´test:integration:symbolic-real-restriction-strata´
+#[test]
+fn symbolic_real_restriction_strata() -> TestResult {
+    for shape in 0..6 {
+        let mut fixture = crate::testing::solve_elementary::symbolic_restriction(shape)?;
+        let witness = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(witness.hypotheses(), []);
+        assert_eq!(witness.judgment().residuals, []);
+    }
+    Ok(())
+}
+
+/// A false coefficient map, changed region and display-only declaration pairing are refused atomically.
+/// ´test:integration:symbolic-real-restriction-transport-mutations´
+#[test]
+fn symbolic_real_restriction_transport_mutations() -> TestResult {
+    for mutation in 0..3 {
+        let mut fixture = crate::testing::solve_elementary::symbolic_restriction(0)?;
+        let algebra = fixture.base.algebra.clone();
+        let false_map = fixture.base.scalar_map(&algebra, &[])?;
+        let mut steps = fixture.steps.clone();
+        let Certificate::Solve(certificate) =
+            &mut steps.last_mut().ok_or("missing restriction")?.certificate
+        else {
+            return Err("wrong certificate".into());
+        };
+        let SolveCertificate::RealRestriction(value) = certificate.as_mut() else {
+            return Err("wrong restriction".into());
+        };
+        match mutation {
+            0 => value.transport.coefficient_map = false_map,
+            1 => {
+                let changed = value
+                    .transport
+                    .regions
+                    .get(1)
+                    .ok_or("missing stratum")?
+                    .real
+                    .clone();
+                value
+                    .transport
+                    .regions
+                    .first_mut()
+                    .ok_or("missing overall region")?
+                    .real = changed;
+            }
+            _ => {
+                let wrong = value
+                    .transport
+                    .coefficients
+                    .get(1)
+                    .ok_or("missing coefficient")?
+                    .complex
+                    .clone();
+                value
+                    .transport
+                    .coefficients
+                    .first_mut()
+                    .ok_or("missing coefficient")?
+                    .complex = wrong;
+            }
+        }
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Used hypotheses become target-context evidence or explicit residuals, never foreign identities.
+/// ´test:integration:symbolic-real-restriction-conditions´
+#[test]
+fn symbolic_real_restriction_conditions() -> TestResult {
+    for discharge in [false, true] {
+        let mut fixture = crate::testing::solve_elementary::assumed_restriction(discharge)?;
+        let witness = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        if discharge {
+            assert_eq!(witness.hypotheses().len(), 1);
+            assert_eq!(
+                witness
+                    .hypotheses()
+                    .first()
+                    .ok_or("missing target hypothesis")?
+                    .context,
+                fixture.base.context
+            );
+            assert_eq!(witness.judgment().residuals, []);
+        } else {
+            assert_eq!(witness.hypotheses(), []);
+            assert_eq!(witness.judgment().residuals.len(), 1);
+            assert_eq!(
+                witness
+                    .judgment()
+                    .residuals
+                    .first()
+                    .ok_or("missing residual")?
+                    .home,
+                fixture.base.context
+            );
+        }
+        let mut steps = fixture.steps.clone();
+        let Certificate::Solve(certificate) =
+            &mut steps.last_mut().ok_or("missing restriction")?.certificate
+        else {
+            return Err("wrong certificate".into());
+        };
+        let SolveCertificate::RealRestriction(value) = certificate.as_mut() else {
+            return Err("wrong restriction".into());
+        };
+        value.transport.conditions.clear();
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Closed zero/nonzero parameter strata keep the identity family and singleton independently.
+/// ´test:integration:symbolic-real-restriction-degree-cover´
+#[test]
+fn symbolic_real_restriction_degree_cover() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::degree_restriction()?;
+    let witness = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(witness.hypotheses(), []);
+    assert_eq!(witness.judgment().residuals, []);
+    Ok(())
+}
+
+/// The parameterized cubic retains its real linear factor and independently excludes both quadratic roots.
+/// ´test:integration:symbolic-real-restriction-mixed-cubic´
+#[test]
+fn symbolic_real_restriction_mixed_cubic() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::mixed_restriction()?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let mut steps = fixture.steps.clone();
+    let Certificate::Solve(certificate) =
+        &mut steps.last_mut().ok_or("missing restriction")?.certificate
+    else {
+        return Err("wrong certificate".into());
+    };
+    let SolveCertificate::RealRestriction(value) = certificate.as_mut() else {
+        return Err("wrong restriction".into());
+    };
+    let rejected = value.rejected.pop().ok_or("missing rejected root")?;
+    value.retained.push(rejected);
+    let before = fixture.base.cas.counts();
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.base.cas.counts(), before);
+    Ok(())
+}

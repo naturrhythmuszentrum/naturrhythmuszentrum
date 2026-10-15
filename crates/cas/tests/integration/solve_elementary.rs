@@ -242,3 +242,55 @@ fn elementary_final_schemas_fresh_replay() -> TestResult {
     }
     Ok(())
 }
+
+/// Supplied symbolic, mixed and conditional restrictions share the same public replay lifecycle.
+fn restriction_case(case: u8) -> TestResult<crate::testing::solve_elementary::BinomialFixture> {
+    use crate::testing::solve_elementary::{
+        assumed_restriction, degree_restriction, mixed_restriction, symbolic_restriction,
+    };
+    match case {
+        0..=5 => symbolic_restriction(case),
+        6 => degree_restriction(),
+        7 => mixed_restriction(),
+        8 => assumed_restriction(false),
+        _ => assumed_restriction(true),
+    }
+}
+
+/// Mandatory transport bytes retain every symbolic stratum and replay canonically in a fresh store.
+/// ´test:integration:symbolic-real-restriction-fresh-replay´
+#[test]
+fn symbolic_real_restriction_fresh_replay() -> TestResult {
+    for shape in 0..10 {
+        let mut source = restriction_case(shape)?;
+        let checked = source.base.cas.check_proof(
+            &source.base.context,
+            &source.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let bytes = source
+            .base
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut target = restriction_case(shape)?;
+        let expected = target.base.cas.check_proof(
+            &target.base.context,
+            &target.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let replayed = target.base.cas.replay(
+            &bytes,
+            expected.judgment(),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(replayed.judgment(), expected.judgment());
+        assert_eq!(
+            target
+                .base
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}

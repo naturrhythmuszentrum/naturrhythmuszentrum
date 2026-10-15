@@ -959,6 +959,62 @@ pub struct CertificateConjugationTransport<R = Handle> {
     pub region: R,
 }
 
+/// Ordered endpoints of an explicit real-to-complex transport.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RestrictionPair<R = Handle> {
+    /// Real-header endpoint, qualified by its actual graph identity.
+    pub real: R,
+    /// Complex-header endpoint, qualified by its actual graph identity.
+    pub complex: R,
+}
+
+/// The exact source collection addressed by a condition transport row.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RestrictionConditionKind {
+    /// A qualified used hypothesis; the index is its position in the premise's used hypotheses.
+    Hypothesis,
+    /// An original definedness or logical requirement, including discharged requirements.
+    Requirement,
+    /// An unresolved guarded obligation.
+    Residual,
+}
+
+/// Transport one actually used condition, retaining it unless explicitly discharged.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RestrictionCondition<R = Handle> {
+    /// Source application in the ordered premise vector.
+    pub premise: u32,
+    /// Source condition collection.
+    pub kind: RestrictionConditionKind,
+    /// Exact position in that collection.
+    pub index: u32,
+    /// Source and destination home contexts.
+    pub contexts: RestrictionPair<R>,
+    /// Source and destination regions.
+    pub regions: RestrictionPair<R>,
+    /// Source and destination predicates.
+    pub predicates: RestrictionPair<R>,
+    /// Optional proof of the transported predicate in the real context.
+    pub discharge: Option<u32>,
+}
+
+/// Mandatory cross-header data; none of these correspondences assert a theorem.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RealRestrictionTransport<R = Handle> {
+    /// Directed embedding from the real problem's coefficient domain to the complex domain.
+    pub coefficient_map: R,
+    /// Free expressions in the real coefficient-coordinate order.
+    pub coefficients: Vec<RestrictionPair<R>>,
+    /// Free expressions in the real unknown-coordinate order.
+    pub unknowns: Vec<RestrictionPair<R>>,
+    /// Overall region pair followed by the ordered coefficient strata.
+    pub regions: Vec<RestrictionPair<R>>,
+    /// Every used foreign hypothesis, requirement and residual has an explicit row.
+    pub conditions: Vec<RestrictionCondition<R>>,
+    /// Earlier cover of the exact real coefficient region by the listed strata.
+    pub real_cover: u32,
+}
+
 /// Typed `RealRestriction` certificate payload; its fields are untrusted until replay.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CertificateRealRestriction<R = Handle> {
@@ -968,6 +1024,8 @@ pub struct CertificateRealRestriction<R = Handle> {
     pub problem: R,
     /// Explicit set.
     pub set: R,
+    /// Explicit ordered coefficient, declaration, region and condition transport.
+    pub transport: RealRestrictionTransport<R>,
     /// Ordered retained entries.
     pub retained: Vec<R>,
     /// Ordered rejected entries.
