@@ -57,7 +57,10 @@ mod sensitivity;
 pub use nrz_cas::limits::{Limits, LimitsOverride};
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};
-pub use constants::{CheckedMap, ConstantKind, DescriptorConstant, MapError, MapIdentity, MapKind};
+pub use constants::{
+    CheckedMap, ConstantKind, DescriptorConstant, MapCoordinates, MapError, MapIdentity, MapKind,
+    OriginDefinition, ReferenceDefinition,
+};
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};
 pub use diagnostic::{Diagnostic, Expectation, Failure, Location};

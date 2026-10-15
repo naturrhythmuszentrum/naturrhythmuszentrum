@@ -21,3 +21,10 @@ pub(crate) mod pairing;
 )]
 #[path = "sensitivity.rs"]
 pub(crate) mod sensitivity;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared exact definition fixtures stay crate-visible inside the private harness"
+)]
+#[path = "constants.rs"]
+pub(crate) mod constants;

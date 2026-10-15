@@ -6,8 +6,8 @@ use nrz_cas::{
     limits::{Budget, Limits, LimitsOverride},
 };
 
-use super::MapError;
-use crate::{CheckedDeclarations, Conversion, Descriptor, NamedReference, SnapshotId};
+use super::{MapCoordinates, MapError, OriginDefinition, ReferenceDefinition};
+use crate::{CheckedDeclarations, Conversion, NamedReference, SnapshotId};
 
 /// Mathematical interpretation and direction of a checked affine coordinate map.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -20,17 +20,6 @@ pub enum MapKind {
     Restoration,
 }
 
-/// An exact declaration retained in a map's identity.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) struct ConstantDeclaration {
-    /// Declaration key within the frozen semantic state.
-    pub(crate) key: String,
-    /// Original descriptor, including any point origin.
-    pub(crate) descriptor: Descriptor,
-    /// Exact declared descriptor/reference coordinate, never a heap value.
-    pub(crate) value: Rational,
-}
-
 /// Full immutable map identity for caches keyed additionally by precision and arithmetic revision.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MapIdentity {
@@ -39,15 +28,15 @@ pub struct MapIdentity {
     /// Meaning and direction, retained independently of equal coefficients.
     pub(crate) kind: MapKind,
     /// Input coordinate descriptor.
-    pub(crate) source: Descriptor,
+    pub(crate) source: MapCoordinates,
     /// Output coordinate descriptor.
-    pub(crate) target: Descriptor,
+    pub(crate) target: MapCoordinates,
     /// Exact positive difference-reference declaration when normalizing.
-    pub(crate) reference: Option<ConstantDeclaration>,
-    /// Explicit nonzero difference-reference schema checked through the pairing surface.
-    pub(crate) named_reference: Option<NamedReference>,
+    pub(crate) reference: Option<ReferenceDefinition>,
+    /// Ordered denominator reference for a formal row/column quotient.
+    pub(crate) column_reference: Option<ReferenceDefinition>,
     /// Exact point-origin declaration when normalizing a point.
-    pub(crate) origin: Option<ConstantDeclaration>,
+    pub(crate) origin: Option<OriginDefinition>,
 }
 
 impl MapIdentity {
@@ -65,26 +54,44 @@ impl MapIdentity {
 
     /// Input descriptor of this direction.
     #[must_use]
-    pub const fn source(&self) -> &Descriptor {
+    pub const fn source(&self) -> &MapCoordinates {
         &self.source
     }
 
     /// Output descriptor of this direction.
     #[must_use]
-    pub const fn target(&self) -> &Descriptor {
+    pub const fn target(&self) -> &MapCoordinates {
         &self.target
     }
 
     /// Named exact difference reference, if normalization requires one.
     #[must_use]
-    pub const fn reference(&self) -> Option<&NamedReference> {
-        self.named_reference.as_ref()
+    pub fn reference(&self) -> Option<&NamedReference> {
+        self.reference.as_ref().map(ReferenceDefinition::reference)
+    }
+
+    /// Complete numerator or scalar reference definition, including its immutable identity.
+    #[must_use]
+    pub const fn reference_definition(&self) -> Option<&ReferenceDefinition> {
+        self.reference.as_ref()
+    }
+
+    /// Complete denominator definition of a formal row/column quotient.
+    #[must_use]
+    pub const fn column_reference(&self) -> Option<&ReferenceDefinition> {
+        self.column_reference.as_ref()
+    }
+
+    /// Complete exact point-origin definition.
+    #[must_use]
+    pub const fn origin_definition(&self) -> Option<&OriginDefinition> {
+        self.origin.as_ref()
     }
 
     /// Named point-origin declaration, if this map removes or restores one.
     #[must_use]
     pub fn origin(&self) -> Option<&str> {
-        self.origin.as_ref().map(|origin| origin.key.as_str())
+        self.origin.as_ref().map(OriginDefinition::name)
     }
 }
 

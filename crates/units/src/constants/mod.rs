@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact descriptor maps cross to numerical clients only as bounded constant definitions.
 
+mod coordinates;
+mod definitions;
 mod maps;
 mod model;
+mod schema;
 
+pub use coordinates::MapCoordinates;
+pub use definitions::{OriginDefinition, ReferenceDefinition};
 pub use model::{CheckedMap, ConstantKind, DescriptorConstant, MapIdentity, MapKind};
 
 use crate::{SnapshotError, UnitError};
@@ -11,6 +16,9 @@ use crate::{SnapshotError, UnitError};
 /// Checked descriptor-map construction failures, without any numerical evaluation.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum MapError {
+    /// Ordered formal quotient targets do not match the supplied exact definitions.
+    #[error(transparent)]
+    Pairing(#[from] crate::PairingError),
     /// Source, target, origin or reference descriptors do not admit the map.
     #[error(transparent)]
     Units(#[from] UnitError),

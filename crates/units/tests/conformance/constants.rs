@@ -58,8 +58,8 @@ fn descriptor_map_exact_affine_spellings() -> TestResult {
     let limits = LimitsOverride::default();
     assert_eq!(map.scale().export(&limits)?, "5/9");
     assert_eq!(map.shift().export(&limits)?, "-160/9");
-    assert_eq!(map.id().source(), &fahrenheit);
-    assert_eq!(map.id().target(), &celsius);
+    assert_eq!(map.id().source().descriptor(), Some(&fahrenheit));
+    assert_eq!(map.id().target().descriptor(), Some(&celsius));
     assert_eq!(map.scale().map_id(), map.id());
     assert_eq!(map.shift().map_id(), map.id());
     let inverse = map.inverse()?;
