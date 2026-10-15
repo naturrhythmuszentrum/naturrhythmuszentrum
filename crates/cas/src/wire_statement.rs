@@ -26,6 +26,9 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<Statement, Fault> {
     Ok(match reader.byte()? {
+        25 => Statement::Solve(Box::new(crate::solving::SolveStatement::decode(
+            reader, records,
+        )?)),
         0 => Statement::Equality {
             left: object(reader, records)?,
             right: object(reader, records)?,
@@ -232,6 +235,9 @@ pub(crate) fn certificate(
     records: &[Decoded],
 ) -> Result<Certificate, Fault> {
     Ok(match reader.byte()? {
+        12 => Certificate::Solve(Box::new(crate::solving::SolveCertificate::decode(
+            reader, records,
+        )?)),
         0 => Certificate::None,
         1 => Certificate::Region(region(reader)?),
         2 => Certificate::Hypothesis(HypothesisRef {

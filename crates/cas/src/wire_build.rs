@@ -301,7 +301,7 @@ pub(crate) fn encode(cas: &Cas, proof: LogicalId, budget: &mut Budget) -> Result
         hypotheses: application.conditions.hypotheses,
     };
     let (records, root, rules) = table(cas, root, budget)?;
-    envelope(records, root, &rules, b"NRZCAS02", budget)
+    envelope(records, root, &rules, b"NRZCAS03", budget)
 }
 
 /// A portable theorem comparison includes precisely its complete context and residual tuple set.
@@ -316,13 +316,13 @@ pub(crate) fn judgment_key(
         hypotheses: Vec::new(),
     };
     let (records, root, rules) = table(cas, root, budget)?;
-    envelope(records, root, &rules, b"NRZJDG02", budget)
+    envelope(records, root, &rules, b"NRZJDG03", budget)
 }
 
 /// Build a complete portable syntax key without exposing allocation-dependent logical identifiers.
 pub(crate) fn syntax_key(cas: &Cas, id: LogicalId, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
     let (records, root, rules) = table(cas, Entity::Object(id), budget)?;
-    envelope(records, root, &rules, b"NRZSYN02", budget)
+    envelope(records, root, &rules, b"NRZSYN03", budget)
 }
 
 /// Frame the already canonical records with their exact primitive manifest.

@@ -12,7 +12,11 @@ mod model;
     reason = "the typed checker facade stays within the crate"
 )]
 mod registry;
-mod wire;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "typed encoding helpers stay within the crate"
+)]
+pub(crate) mod wire;
 
 #[expect(
     clippy::redundant_pub_crate,

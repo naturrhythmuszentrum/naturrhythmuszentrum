@@ -870,7 +870,7 @@ fn checked_jacobian_assembly() -> TestResult {
 fn witness_payload_tampering() -> TestResult {
     let original = canonical_fixture()?;
     let mut receiver = Cas::new(budget()?.limits().clone())?;
-    for (position, byte) in [(244, 0), (209, 2), (172, 4), (301, 255)] {
+    for (position, byte) in [(247, 0), (211, 2), (173, 4), (304, 255)] {
         let mut changed = original.clone();
         *changed
             .get_mut(position)
@@ -879,8 +879,8 @@ fn witness_payload_tampering() -> TestResult {
         assert_eq!(receiver.counts().vertices, 0);
     }
     let mut unreduced = original;
-    *unreduced.get_mut(209).ok_or("missing numerator")? = 2;
-    *unreduced.get_mut(214).ok_or("missing denominator")? = 2;
+    *unreduced.get_mut(211).ok_or("missing numerator")? = 2;
+    *unreduced.get_mut(216).ok_or("missing denominator")? = 2;
     let fault = receiver
         .inspect(&unreduced, &mut budget()?)
         .err()

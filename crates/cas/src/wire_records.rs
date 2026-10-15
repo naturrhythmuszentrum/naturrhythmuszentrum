@@ -151,9 +151,6 @@ fn describe_entity(
             object(out, &mut record.references, cas.checked(&value.predicate)?)
         }
         Entity::Statement(value) => {
-            if matches!(value.statement, crate::proof_model::Statement::Solve(_)) {
-                return Err(invalid());
-            }
             record.tag = 10;
             record.layer = value.layer;
             record.space = value
@@ -250,13 +247,7 @@ fn describe_object(
             record.tag = 1;
             object(out, &mut record.references, value.header)?;
             encoding::scope(&value.scope, out)?;
-            if matches!(
-                value.ambient,
-                crate::domain_model::AmbientDomain::Product { .. }
-            ) {
-                return Err(invalid());
-            }
-            crate::domain_encoding::ambient(&value.ambient, out)?;
+            ambient(&value.ambient, record, out)?;
             let start = record.references.len();
             crate::domain_encoding::region(&value.expression, out, |id, out| {
                 object(out, &mut record.references, *id)
@@ -275,16 +266,6 @@ fn describe_object(
             out.name(&value.test_family)?;
         }
         Vertex::Expression(value) => {
-            if value.attachment.is_some()
-                || matches!(
-                    value.operator,
-                    crate::model::Operator::Conjugate
-                        | crate::model::Operator::RealPart
-                        | crate::model::Operator::ImagPart
-                )
-            {
-                return Err(invalid());
-            }
             record.tag = 3;
             record.layer = value.layer;
             record.space = value.space.map(Entity::Object);
@@ -297,6 +278,7 @@ fn describe_object(
             for operand in &value.operands {
                 object(out, &mut record.references, *operand)?;
             }
+            attachment(value.attachment.as_ref(), record, out)?;
             out.byte(u8::from(value.domain.is_some()))?;
             if let Some(domain) = value.domain {
                 object(out, &mut record.references, domain)?;
@@ -321,6 +303,7 @@ fn describe_remaining(
     out: &mut Encoder<'_>,
 ) -> Result<(), Fault> {
     match cas.state.node(id)? {
+        Vertex::Solve(value) => describe_solve(cas, value, record, out)?,
         Vertex::CaseArm(value) => {
             record.tag = 4;
             record.layer = Layer::Pointwise;
@@ -334,13 +317,7 @@ fn describe_remaining(
             record.tag = 5;
             object(out, &mut record.references, value.header)?;
             encoding::scope(&value.scope, out)?;
-            if matches!(
-                value.ambient,
-                crate::domain_model::AmbientDomain::Product { .. }
-            ) {
-                return Err(invalid());
-            }
-            crate::domain_encoding::ambient(&value.ambient, out)?;
+            ambient(&value.ambient, record, out)?;
             object(out, &mut record.references, value.location)?;
         }
         Vertex::SourceForm(value) => {
@@ -394,6 +371,74 @@ fn describe_remaining(
             }
         }
         _ => return Err(invalid()),
+    }
+    Ok(())
+}
+
+/// Product coordinate identities are ordinary earlier wire dependencies.
+fn ambient(
+    value: &crate::domain_model::AmbientDomain,
+    record: &mut Record,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    if let crate::domain_model::AmbientDomain::Product { coordinates } = value {
+        out.byte(4)?;
+        object(out, &mut record.references, coordinates.logical_id())
+    } else {
+        crate::domain_encoding::ambient(value, out)
+    }
+}
+
+/// Every expression has an explicit attachment byte, including ordinary scalar leaves.
+fn attachment(
+    value: Option<&crate::graph::ExpressionAttachment>,
+    record: &mut Record,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    match value {
+        None => out.byte(0),
+        Some(crate::graph::ExpressionAttachment::SelectedRoot(selection)) => {
+            out.byte(1)?;
+            object(out, &mut record.references, *selection)
+        }
+        Some(crate::graph::ExpressionAttachment::ExactCoefficient { value, map }) => {
+            out.byte(2)?;
+            object(out, &mut record.references, *value)?;
+            object(out, &mut record.references, *map)
+        }
+    }
+}
+
+/// Encode the specified new graph schema and only its explicitly unordered families.
+fn describe_solve(
+    cas: &Cas,
+    value: &crate::solving::SolveDraft<crate::graph::Handle>,
+    record: &mut Record,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    use crate::solving::{SolutionBranchKind, SolveDraft};
+    record.tag = value.record_tag();
+    let start = record.references.len();
+    value.encode(out, &mut |handle, out| {
+        object(out, &mut record.references, cas.checked(handle)?)
+    })?;
+    let set_start = match value {
+        SolveDraft::SolutionSet(_) => Some(start.checked_add(1).ok_or_else(invalid)?),
+        SolveDraft::CoefficientMap(value) => Some(
+            start
+                .checked_add(3)
+                .and_then(|n| n.checked_add(value.images.len()))
+                .ok_or_else(invalid)?,
+        ),
+        SolveDraft::SolutionBranch(value)
+            if matches!(value.kind, SolutionBranchKind::Finite { .. }) =>
+        {
+            Some(start.checked_add(3).ok_or_else(invalid)?)
+        }
+        _ => None,
+    };
+    if let Some(start) = set_start {
+        record.sets.push((start..record.references.len()).collect());
     }
     Ok(())
 }

@@ -225,6 +225,30 @@ const fn occurrence(expression: Reference, source: Reference, children: Vec<Refe
     })
 }
 
+/// Existing hypothesis replay can carry exact coefficient syntax without enabling a solve theorem.
+pub(crate) fn coefficient_witness() -> TestResult<(Cas, crate::test_api::proof::VerifiedWitness)> {
+    let mut cas = Cas::new(Limits::default())?;
+    let header = admit(
+        &mut cas,
+        &Draft::Header(HeaderDraft::Core(Environment {
+            field: Field::Complex,
+            branch: Branch::PrincipalComplex,
+            declarations: Vec::new(),
+        })),
+    )?;
+    let coordinates = admit(
+        &mut cas,
+        &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            header: Reference::Existing(header.clone()),
+            coordinates: Vec::new(),
+        })),
+    )?;
+    let region = product(&mut cas, &header, coordinates)?;
+    let literal = coefficient_literal_fixture(&mut cas, &header, &region)?;
+    let witness = assumed_literal(&mut cas, &header, region, literal)?;
+    Ok((cas, witness))
+}
+
 /// Construct a family proposal using either its bound slot or an escaped free declaration.
 pub(crate) fn family_draft(fixture: &mut Fixture, escaped: bool) -> TestResult<Draft> {
     use crate::test_api::solving::{FamilyMapData, SolveView};
@@ -268,6 +292,56 @@ pub(crate) fn family_draft(fixture: &mut Fixture, escaped: bool) -> TestResult<D
     })))
 }
 
+/// Build the Gaussian constant and its explicit standard ambient embedding.
+fn coefficient_literal_fixture(
+    cas: &mut Cas,
+    header: &Handle,
+    region: &Handle,
+) -> TestResult<Handle> {
+    use crate::test_api::solving::{
+        CoefficientDomainData, CoefficientMapData, CoefficientValueData, CoefficientValueObject,
+        MapMode, MapTarget,
+    };
+    let domain = admit(
+        cas,
+        &Draft::Solve(SolveDraft::CoefficientDomain(
+            CoefficientDomainData::Gaussian,
+        )),
+    )?;
+    let value = admit(
+        cas,
+        &Draft::Solve(SolveDraft::CoefficientValue(CoefficientValueObject {
+            domain: Reference::Existing(domain.clone()),
+            value: CoefficientValueData::Gaussian {
+                real: crate::test_api::Rational::zero(),
+                imaginary: crate::test_api::Rational::one(),
+            },
+        })),
+    )?;
+    let map = admit(
+        cas,
+        &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+            source: Reference::Existing(domain),
+            target: MapTarget::ScalarAmbient {
+                header: Reference::Existing(header.clone()),
+                field: Field::Complex,
+            },
+            mode: MapMode::Embedding,
+            region: Reference::Existing(region.clone()),
+            images: Vec::new(),
+            denominators: Vec::new(),
+        })),
+    )?;
+    admit(
+        cas,
+        &Draft::ExactCoefficient {
+            header: Reference::Existing(header.clone()),
+            value: Reference::Existing(value),
+            map: Reference::Existing(map),
+        },
+    )
+}
+
 /// The body uses a typed bound frame, with a deliberate escaped-key mutation for refusal tests.
 fn family_body(
     cas: &mut Cas,
@@ -300,6 +374,218 @@ fn family_body(
             scope,
             coordinates: Reference::Existing(target.clone()),
             entries: vec![Reference::Existing(entry)],
+        })),
+    )
+}
+
+/// An explicit hypothesis transports syntax without claiming any solving theorem.
+fn assumed_literal(
+    cas: &mut Cas,
+    header: &Handle,
+    region: Handle,
+    literal: Handle,
+) -> TestResult<crate::test_api::proof::VerifiedWitness> {
+    let predicate = admit(
+        cas,
+        &Draft::Condition {
+            kind: PredicateKind::Named("supplied-coefficient-property".into()),
+            header: Reference::Existing(header.clone()),
+            scope: Vec::new(),
+            arguments: vec![Reference::Existing(literal)],
+        },
+    )?;
+    let context = admit(
+        cas,
+        &Draft::Context(ContextDraft::Root {
+            header: Reference::Existing(header.clone()),
+            admissible: Reference::Existing(region.clone()),
+            assumptions: vec![crate::test_api::domain::AssumptionDraft {
+                key: "supplied".into(),
+                condition: Reference::Existing(predicate.clone()),
+            }],
+        }),
+    )?;
+    let step = crate::test_api::proof::ApplicationDraft {
+        rule: crate::test_api::proof::Primitive::ContextHypothesis,
+        context: context.clone(),
+        conclusion: crate::test_api::proof::Statement::PredicateFact { region, predicate },
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: crate::test_api::proof::Certificate::Hypothesis(
+            crate::test_api::domain::HypothesisRef {
+                context: context.clone(),
+                slot: 0,
+            },
+        ),
+    };
+    Ok(cas.check_proof(
+        &context,
+        std::slice::from_ref(&step),
+        &mut Budget::new(Limits::default())?,
+    )?)
+}
+
+/// Carry a bound root selection through a supplied hypothesis and independent v3 replay.
+pub(crate) fn root_witness() -> TestResult<(Cas, crate::test_api::proof::VerifiedWitness)> {
+    let mut cas = Cas::new(Limits::default())?;
+    let header = admit(
+        &mut cas,
+        &Draft::Header(HeaderDraft::Core(Environment {
+            field: Field::Complex,
+            branch: Branch::PrincipalComplex,
+            declarations: Vec::new(),
+        })),
+    )?;
+    let coordinates = admit(
+        &mut cas,
+        &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            header: Reference::Existing(header.clone()),
+            coordinates: Vec::new(),
+        })),
+    )?;
+    let region = product(&mut cas, &header, coordinates)?;
+    let selection = root_selection_fixture(&mut cas, &header, &region, Field::Complex)?;
+    let literal = admit(
+        &mut cas,
+        &Draft::RootValue {
+            header: Reference::Existing(header.clone()),
+            selection: Reference::Existing(selection),
+            slot: 0,
+        },
+    )?;
+    let witness = assumed_literal(&mut cas, &header, region, literal)?;
+    Ok((cas, witness))
+}
+
+/// The relation is a monic formal quadratic over Q with an explicit scalar specialization.
+fn root_selection_fixture(
+    cas: &mut Cas,
+    header: &Handle,
+    region: &Handle,
+    field: Field,
+) -> TestResult<Handle> {
+    use crate::test_api::solving::{
+        CoefficientDomainData, CoefficientMapData, MapMode, MapTarget, RootRelationData,
+    };
+    let domain = admit(
+        cas,
+        &Draft::Solve(SolveDraft::CoefficientDomain(
+            CoefficientDomainData::Rational,
+        )),
+    )?;
+    let polynomial = quadratic_fixture(cas, &domain, field.clone())?;
+    let map = admit(
+        cas,
+        &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+            source: Reference::Existing(domain),
+            target: MapTarget::ScalarAmbient {
+                header: Reference::Existing(header.clone()),
+                field: field.clone(),
+            },
+            mode: MapMode::Specialization,
+            region: Reference::Existing(region.clone()),
+            images: Vec::new(),
+            denominators: Vec::new(),
+        })),
+    )?;
+    let relation = admit(
+        cas,
+        &Draft::Solve(SolveDraft::RootRelation(RootRelationData {
+            header: Reference::Existing(header.clone()),
+            scope: Vec::new(),
+            ambient: field.clone(),
+            polynomial: Reference::Existing(polynomial),
+            binder: vec![AtomicSort::Scalar(field.clone())],
+            map: Reference::Existing(map),
+            region: Reference::Existing(region.clone()),
+            multiplicity: None,
+        })),
+    )?;
+    joint_selection(cas, header, relation, field)
+}
+
+/// Polynomial coefficients are independent exact rational graph values in decreasing graded order.
+fn quadratic_fixture(cas: &mut Cas, domain: &Handle, field: Field) -> TestResult<Handle> {
+    use crate::test_api::solving::{
+        CoefficientValueData, CoefficientValueObject, PolynomialData, PolynomialTerm,
+    };
+    let mut coefficients = Vec::new();
+    for text in ["1", "-2"] {
+        let value = crate::test_api::Rational::parse(text, &mut Budget::new(Limits::default())?)?;
+        coefficients.push(admit(
+            cas,
+            &Draft::Solve(SolveDraft::CoefficientValue(CoefficientValueObject {
+                domain: Reference::Existing(domain.clone()),
+                value: CoefficientValueData::Rational { value },
+            })),
+        )?);
+    }
+    admit(
+        cas,
+        &Draft::Solve(SolveDraft::Polynomial(PolynomialData {
+            domain: Reference::Existing(domain.clone()),
+            variables: vec![field],
+            terms: vec![
+                PolynomialTerm {
+                    exponents: vec![2],
+                    coefficient: Reference::Existing(
+                        coefficients
+                            .first()
+                            .ok_or("leading coefficient missing")?
+                            .clone(),
+                    ),
+                },
+                PolynomialTerm {
+                    exponents: vec![0],
+                    coefficient: Reference::Existing(
+                        coefficients.get(1).ok_or("constant missing")?.clone(),
+                    ),
+                },
+            ],
+        })),
+    )
+}
+
+/// One bound slot is constrained by definedness, without asserting its existence.
+fn joint_selection(
+    cas: &mut Cas,
+    header: &Handle,
+    relation: Handle,
+    field: Field,
+) -> TestResult<Handle> {
+    use crate::test_api::solving::{RootSelectionData, SelectionMode};
+    let scope = vec![vec![AtomicSort::Scalar(field.clone())]];
+    let bound = admit(
+        cas,
+        &Draft::Expression(ExpressionDraft {
+            header: Reference::Existing(header.clone()),
+            scope: scope.clone(),
+            operator: Operator::Bound { depth: 0, slot: 0 },
+            sort: Sort::Value(AtomicSort::Scalar(field)),
+            space: None,
+            binding: None,
+            operands: Vec::new(),
+        }),
+    )?;
+    let predicate = admit(
+        cas,
+        &Draft::Condition {
+            header: Reference::Existing(header.clone()),
+            scope,
+            kind: PredicateKind::Defined,
+            arguments: vec![Reference::Existing(bound)],
+        },
+    )?;
+    admit(
+        cas,
+        &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            header: Reference::Existing(header.clone()),
+            scope: Vec::new(),
+            relations: vec![Reference::Existing(relation)],
+            predicate: Reference::Existing(predicate),
+            mode: SelectionMode::Constrained,
+            convention: None,
+            interval: None,
         })),
     )
 }

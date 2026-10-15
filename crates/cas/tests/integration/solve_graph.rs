@@ -50,6 +50,52 @@ fn solve_request_predicate_mismatch() -> TestResult {
     Ok(())
 }
 
+/// A fresh receiver replays a typed coefficient closure through the existing hypothesis checker.
+/// ´test:integration:solve-coefficient-witness-v3-round-trip´
+#[test]
+fn solve_coefficient_witness_v3_round_trip() -> TestResult {
+    use nrz_cas::limits::{Budget, Limits};
+    let (origin, witness) = crate::testing::solve_graph::coefficient_witness()?;
+    let bytes = origin.export_witness(&witness, &mut Budget::new(Limits::default())?)?;
+    assert_eq!(bytes.get(..8), Some(b"NRZCAS03".as_slice()));
+    assert_eq!(witness.hypotheses().len(), 1);
+    let mut receiver = nrz_cas::Cas::new(Limits::default())?;
+    let replayed = receiver.inspect(&bytes, &mut Budget::new(Limits::default())?)?;
+    assert_eq!(
+        receiver.export_witness(&replayed, &mut Budget::new(Limits::default())?)?,
+        bytes
+    );
+    assert_eq!(replayed.hypotheses().len(), 1);
+    let expected = replayed.judgment().clone();
+    let checked = receiver.replay(&bytes, &expected, &mut Budget::new(Limits::default())?)?;
+    assert_eq!(checked.judgment(), &expected);
+    Ok(())
+}
+
+/// Root binders, polynomial order and scalar selection attachments survive fresh-store replay.
+/// ´test:integration:solve-root-witness-v3-round-trip´
+#[test]
+fn solve_root_witness_v3_round_trip() -> TestResult {
+    use nrz_cas::limits::{Budget, Limits};
+    let (origin, witness) = crate::testing::solve_graph::root_witness()?;
+    let bytes = origin.export_witness(&witness, &mut Budget::new(Limits::default())?)?;
+    assert_eq!(witness.hypotheses().len(), 1);
+    let mut receiver = nrz_cas::Cas::new(Limits::default())?;
+    let replayed = receiver.inspect(&bytes, &mut Budget::new(Limits::default())?)?;
+    assert_eq!(
+        receiver.export_witness(&replayed, &mut Budget::new(Limits::default())?)?,
+        bytes
+    );
+    let expected = replayed.judgment().clone();
+    assert_eq!(
+        receiver
+            .replay(&bytes, &expected, &mut Budget::new(Limits::default())?)?
+            .judgment(),
+        &expected
+    );
+    Ok(())
+}
+
 /// Original denominator obligations survive source coverage and cannot be erased by cancellation.
 /// ´test:integration:solve-original-denominators-survive´
 #[test]

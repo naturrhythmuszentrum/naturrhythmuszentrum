@@ -93,7 +93,7 @@ fn manifest(reader: &mut Reader<'_, '_>) -> Result<Vec<Primitive>, Fault> {
             .iter()
             .find(|rule| {
                 let spec = rule.specification();
-                spec.key == key && spec.version == version
+                spec.key == key && spec.version == version && spec.available
             })
             .copied()
             .ok_or_else(|| Fault::invalid(InvalidCode::UnsupportedVersion, AT))?;
@@ -109,10 +109,9 @@ pub(crate) fn inspect(
     bytes: &[u8],
     budget: &mut Budget,
 ) -> Result<VerifiedWitness, Fault> {
+    magic(bytes)?;
     let mut reader = Reader::new(bytes, budget)?;
-    if reader.take(8)? != b"NRZCAS02" {
-        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
-    }
+    reader.take(8)?;
     let manifest = manifest(&mut reader)?;
     let count = reader.count(BudgetKind::Vertices, 11, 512)?;
     let mut records = Vec::new();
@@ -174,8 +173,10 @@ fn decode(
     manifest: &[Primitive],
 ) -> Result<Decoded, Fault> {
     match tag {
-        0..=8 => crate::wire_objects::decode(cas, tag, layer, space.as_ref(), reader, records)
-            .map(Decoded::Object),
+        0..=8 | 13..=27 => {
+            crate::wire_objects::decode(cas, tag, layer, space.as_ref(), reader, records)
+                .map(Decoded::Object)
+        }
         9 => {
             let value = GuardedObligation {
                 home: object(reader, records)?,
@@ -313,4 +314,12 @@ fn conclusion(
         return Err(Fault::invalid(InvalidCode::ConditionMismatch, AT));
     }
     Ok(Decoded::Conclusion(witness))
+}
+
+/// Reject every noncurrent magic before any record, manifest or replay-store allocation.
+pub(crate) fn magic(bytes: &[u8]) -> Result<(), Fault> {
+    if bytes.get(..8) != Some(b"NRZCAS03".as_slice()) {
+        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+    }
+    Ok(())
 }

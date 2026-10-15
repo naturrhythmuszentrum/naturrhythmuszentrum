@@ -119,6 +119,57 @@ fn solve_product_and_empty_tuple() -> TestResult {
     Ok(())
 }
 
+/// Every old or unknown magic refuses before even a zero-work ledger can allocate replay state.
+/// ´test:integration:solve-wire-old-magic-before-allocation´
+#[test]
+fn solve_wire_old_magic_before_allocation() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let before = fixture.cas.counts();
+    for magic in [
+        b"NRZCAS01",
+        b"NRZCAS02",
+        b"NRZCAS00",
+        b"NRZCAS04",
+        b"XXXXXXXX",
+    ] {
+        let mut ledger = Budget::new(Limits {
+            work: 0,
+            ..Limits::default()
+        })?;
+        let fault = fixture
+            .cas
+            .inspect(magic, &mut ledger)
+            .err()
+            .ok_or("old magic accepted")?;
+        assert_eq!(
+            fault.kind,
+            FaultKind::Invalid(InvalidCode::UnsupportedVersion)
+        );
+        assert_eq!(ledger.usage().work, 0);
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// An inflated record count is rejected boundedly without a partially imported graph.
+/// ´test:integration:solve-wire-count-preflight´
+#[test]
+fn solve_wire_count_preflight() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let mut bytes = b"NRZCAS03".to_vec();
+    bytes.extend_from_slice(&0_u32.to_le_bytes());
+    bytes.extend_from_slice(&u32::MAX.to_le_bytes());
+    let before = fixture.cas.counts();
+    assert!(
+        fixture
+            .cas
+            .inspect(&bytes, &mut Budget::new(Limits::default())?)
+            .is_err()
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
 /// A bound family slot is admitted while a free use of its declaration is rejected atomically.
 /// ´test:integration:solve-family-capture-refusal´
 #[test]

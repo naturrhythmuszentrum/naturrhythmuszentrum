@@ -408,7 +408,7 @@ impl<R> Neighborhood<R> {
 
 impl<R> SolveDraft<R> {
     /// Resolve all earlier typed references before publication.
-    fn resolve<S>(
+    pub(crate) fn resolve<S>(
         &self,
         write: &mut impl FnMut(&R) -> Result<S, Fault>,
     ) -> Result<SolveDraft<S>, Fault> {

@@ -209,7 +209,7 @@ impl<'a, 'b> Reader<'a, 'b> {
     }
 
     /// Decode a flat atomic sort, avoiding recursive type syntax.
-    fn atomic(&mut self) -> Result<AtomicSort, Fault> {
+    pub(crate) fn atomic(&mut self) -> Result<AtomicSort, Fault> {
         match self.byte()? {
             0 => Ok(AtomicSort::Integer),
             1 => Ok(AtomicSort::Scalar(self.field()?)),
@@ -350,6 +350,13 @@ impl<'a, 'b> Reader<'a, 'b> {
     /// Decode every represented operator without relying on Rust enum layout.
     pub(crate) fn operator(&mut self) -> Result<Operator, Fault> {
         match self.byte()? {
+            43 => Ok(Operator::Conjugate),
+            44 => Ok(Operator::RealPart),
+            45 => Ok(Operator::ImagPart),
+            46 => Ok(Operator::RootValue {
+                slot: self.index()?,
+            }),
+            47 => Ok(Operator::ExactCoefficient),
             0 => Ok(Operator::Rational(self.rational()?)),
             1 => Ok(Operator::Free(self.name()?)),
             2 => Ok(Operator::Bound {

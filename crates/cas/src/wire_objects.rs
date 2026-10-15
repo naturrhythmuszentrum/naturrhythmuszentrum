@@ -22,12 +22,15 @@ fn reference(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Referen
 }
 
 /// Read a closed coordinate-domain discriminator.
-fn ambient(reader: &mut Reader<'_, '_>) -> Result<AmbientDomain, Fault> {
+fn ambient(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<AmbientDomain, Fault> {
     Ok(match reader.byte()? {
         0 => AmbientDomain::Assignments,
         1 => AmbientDomain::Real(reader.name()?),
         2 => AmbientDomain::Integer(reader.name()?),
         3 => AmbientDomain::Opaque(reader.name()?),
+        4 => AmbientDomain::Product {
+            coordinates: object(reader, records)?,
+        },
         _ => return Err(invalid()),
     })
 }
@@ -126,52 +129,10 @@ fn syntax(
         1 => Draft::Region(RegionDraft {
             header,
             scope,
-            ambient: ambient(reader)?,
+            ambient: ambient(reader, records)?,
             expression: region(reader, records)?,
         }),
-        3 => {
-            let sort = reader.sort()?;
-            let operator = reader.operator()?;
-            let binding = reader.binding()?;
-            let operands: Vec<Reference> = objects(reader, records, BudgetKind::Edges)?
-                .into_iter()
-                .map(Reference::Existing)
-                .collect();
-            let domain = optional(reader, records)?;
-            let arms = objects(reader, records, BudgetKind::CaseArms)?;
-            if operator == crate::model::Operator::Cases {
-                if binding.is_some() || !operands.is_empty() {
-                    return Err(invalid());
-                }
-                let domain = domain.ok_or_else(invalid)?;
-                let value = admit(
-                    cas,
-                    Draft::Cases(crate::domain_model::CasesDraft {
-                        header,
-                        scope,
-                        domain: Reference::Existing(domain),
-                        arms: arms.into_iter().map(Reference::Existing).collect(),
-                    }),
-                    reader,
-                )?;
-                if cas.state.expression(cas.checked(&value)?)?.sort != sort {
-                    return Err(invalid());
-                }
-                return Ok(value);
-            }
-            if domain.is_some() || !arms.is_empty() {
-                return Err(invalid());
-            }
-            Draft::Expression(ExpressionDraft {
-                space: space.cloned().map(Reference::Existing),
-                operator,
-                sort,
-                header,
-                scope,
-                binding,
-                operands,
-            })
-        }
+        3 => return expression(cas, header, &scope, space, reader, records),
         4 => {
             let region = reference(reader, records)?;
             let value = reference(reader, records)?;
@@ -194,7 +155,7 @@ fn syntax(
         5 => Draft::Boundary(BoundaryDraft {
             header,
             scope,
-            ambient: ambient(reader)?,
+            ambient: ambient(reader, records)?,
             location: reference(reader, records)?,
         }),
         6 => return source(cas, header, scope, reader, records),
@@ -330,6 +291,12 @@ pub(crate) fn decode(
             )?
         }
         8 => context(cas, reader, records)?,
+        13..=27 => {
+            if layer != Layer::Logic || space.is_some() {
+                return Err(invalid());
+            }
+            crate::solving::wire::decode_object(cas, tag, reader, records)?
+        }
         _ => syntax(cas, tag, space, reader, records)?,
     };
     if tag == 1 && reader.budget.usage().region_nodes == previous.region_nodes {
@@ -356,6 +323,100 @@ pub(crate) fn decode(
         _ => (Layer::Logic, None),
     };
     if layer != expected_layer || space != expected_space.as_ref() {
+        return Err(invalid());
+    }
+    Ok(value)
+}
+
+/// Read a literal attachment only when its operator explicitly requires that exact kind.
+fn read_attachment(
+    header: &Reference,
+    operator: &crate::model::Operator,
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<Option<Draft>, Fault> {
+    Ok(match reader.byte()? {
+        0 => None,
+        1 => {
+            let crate::model::Operator::RootValue { slot } = operator else {
+                return Err(invalid());
+            };
+            Some(Draft::RootValue {
+                header: header.clone(),
+                selection: reference(reader, records)?,
+                slot: *slot,
+            })
+        }
+        2 => {
+            if *operator != crate::model::Operator::ExactCoefficient {
+                return Err(invalid());
+            }
+            Some(Draft::ExactCoefficient {
+                header: header.clone(),
+                value: reference(reader, records)?,
+                map: reference(reader, records)?,
+            })
+        }
+        _ => return Err(invalid()),
+    })
+}
+
+/// Rebuild scalar, attached-literal or native-case syntax through ordinary admission.
+fn expression(
+    cas: &mut Cas,
+    header: Reference,
+    scope: &crate::model::Scope,
+    space: Option<&Handle>,
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<Handle, Fault> {
+    let sort = reader.sort()?;
+    let operator = reader.operator()?;
+    let binding = reader.binding()?;
+    let operands: Vec<Reference> = objects(reader, records, BudgetKind::Edges)?
+        .into_iter()
+        .map(Reference::Existing)
+        .collect();
+    let attached = read_attachment(&header, &operator, reader, records)?;
+    let domain = optional(reader, records)?;
+    let arms = objects(reader, records, BudgetKind::CaseArms)?;
+    let draft = if let Some(attached) = attached {
+        if binding.is_some()
+            || !operands.is_empty()
+            || domain.is_some()
+            || !arms.is_empty()
+            || space.is_some()
+        {
+            return Err(invalid());
+        }
+        attached
+    } else if operator == crate::model::Operator::Cases {
+        if binding.is_some() || !operands.is_empty() {
+            return Err(invalid());
+        }
+        Draft::Cases(crate::domain_model::CasesDraft {
+            header,
+            scope: scope.clone(),
+            domain: Reference::Existing(domain.ok_or_else(invalid)?),
+            arms: arms.into_iter().map(Reference::Existing).collect(),
+        })
+    } else {
+        if domain.is_some() || !arms.is_empty() {
+            return Err(invalid());
+        }
+        Draft::Expression(ExpressionDraft {
+            space: space.cloned().map(Reference::Existing),
+            operator,
+            sort: sort.clone(),
+            header,
+            scope: scope.clone(),
+            binding,
+            operands,
+        })
+    };
+    let value = admit(cas, draft, reader)?;
+    let actual = cas.state.expression(cas.checked(&value)?)?;
+    if actual.sort != sort || actual.scope != *scope {
         return Err(invalid());
     }
     Ok(value)

@@ -391,6 +391,7 @@ impl Cas {
     /// # Errors
     /// Refuses malformed or noncanonical records, false rules and exhausted resources.
     pub fn inspect(&mut self, bytes: &[u8], budget: &mut Budget) -> Result<VerifiedWitness, Fault> {
+        crate::wire_decode::magic(bytes)?;
         self.proof_limits(budget, |cas, budget| {
             crate::proof_check::replay_budget(budget, |budget| {
                 let mut candidate = cas.fork(budget)?;
@@ -411,6 +412,7 @@ impl Cas {
         expected: &Judgment,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
+        crate::wire_decode::magic(bytes)?;
         self.proof_limits(budget, |cas, budget| {
             crate::proof_check::replay_budget(budget, |budget| {
                 crate::proof_view::validate_judgment(cas, expected, budget)?;
