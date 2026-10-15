@@ -128,3 +128,15 @@ pub use companions::{CompanionRef, CompanionSetDraft, StatisticalView, TargetMap
 pub use sources::{
     CovarianceBlock, JointError, JointLimits, JointModel, ModelId, Source, SourceFactor, SourceId,
 };
+
+pub use sources::{CovarianceRepresentation, DenseCovariance, PsdCertificate};
+
+pub use companions::{CovarianceParameterView, ParameterErrorView};
+
+pub use companions::CrossLineage;
+
+pub use companions::MeanParameters;
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/joint_twins.rs"]
+mod joint_twins;

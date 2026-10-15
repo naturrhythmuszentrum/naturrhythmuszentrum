@@ -18,6 +18,8 @@ use std::{marker::PhantomData, rc::Rc};
 pub struct CompanionSetDraft<P: Scalar> {
     /// Immutable admitted joint model.
     model: JointModel<P>,
+    /// Optional declared mathematical means with parameter error regions.
+    means: Option<super::MeanParameters<P>>,
     /// Covariance row and column target maps.
     targets: [TargetMap<P>; 2],
     /// Corresponding ordered source coordinates.
@@ -35,7 +37,31 @@ impl<P: Scalar> CompanionSetDraft<P> {
             model,
             targets,
             selections,
+            means: None,
         }
+    }
+}
+impl<P: Scalar + 'static> CompanionSetDraft<P> {
+    /// Declare mathematical mean parameters separately from the represented centers.
+    ///
+    /// # Errors
+    /// Refuses stale targets, mismatched lengths, unsupported radius descriptors,
+    /// exhausted work or nonfinite outward center-parameter displacement.
+    pub fn with_means(
+        mut self,
+        heap: &Heap,
+        means: [Vec<nrz_scalar::Enclosure<P>>; 2],
+        context: &nrz_scalar::ArithmeticContext,
+        limits: JointLimits,
+    ) -> Result<Self, JointError> {
+        self.means = Some(super::means::prepare(
+            heap,
+            &self.targets,
+            means,
+            context,
+            limits,
+        )?);
+        Ok(self)
     }
 }
 impl Heap {
@@ -65,14 +91,19 @@ impl Heap {
             .records
             .try_reserve(1)
             .map_err(|_| JointError::ResourceLimit)?;
-        let prepared = prepare_regions(self, draft.model.factor())?;
+        let evaluation = evaluation_descriptors(&draft.model)?;
+        let prepared = prepare_regions(self, draft.model.representation(), draft.means.as_ref())?;
         let [row_target, column_target] = draft.targets;
         let record = JointRecord {
             targets: [row_target.target, column_target.target],
             selections: draft.selections,
             model: Rc::new(draft.model),
+            means: draft
+                .means
+                .map(|value| Rc::new(value) as Rc<dyn std::any::Any>),
             regions: prepared.keys,
             pairings,
+            evaluation,
         };
         self.storage.publish(prepared.storage);
         self.schemas.extend(prepared.schemas);
@@ -165,38 +196,55 @@ struct PreparedRegions {
     /// Fully bound descriptor slots.
     records: crate::heap::slots::PreparedSlots<Record>,
     /// Future factor and weight locators.
-    keys: [Key; 2],
+    keys: Vec<Key>,
 }
 /// Prepare every allocation before the metadata publication step.
 fn prepare_regions<P: Scalar + 'static>(
     heap: &mut Heap,
-    factor: &crate::SourceFactor<P>,
+    covariance: &crate::CovarianceRepresentation<P>,
+    means: Option<&super::MeanParameters<P>>,
 ) -> Result<PreparedRegions, JointError> {
-    let extents = [
-        Extent::new(factor.rows(), factor.columns())?,
-        Extent::new(factor.columns(), 1)?,
-    ];
+    let (extents, payloads) = match covariance {
+        crate::CovarianceRepresentation::Factor(factor) => (
+            [
+                Extent::new(factor.rows(), factor.columns())?,
+                Extent::new(factor.columns(), 1)?,
+            ],
+            [factor.coefficients(), factor.weights()],
+        ),
+        crate::CovarianceRepresentation::Dense(dense) => (
+            [Extent::new(dense.order(), dense.order())?; 2],
+            [dense.centers(), dense.errors()],
+        ),
+    };
+    let mut extents = extents.to_vec();
+    let mut payloads = payloads.to_vec();
+    let mut quantities = vec![Descriptor::ratio(); 2];
+    if let Some(means) = means {
+        for (errors, descriptor) in means.errors.iter().zip(&means.descriptors) {
+            extents.push(Extent::new(errors.len(), 1)?);
+            payloads.push(errors.as_slice());
+            quantities.push(descriptor.clone());
+        }
+    }
     let mut schemas = Vec::new();
     let mut indices = Vec::new();
-    for extent in extents {
+    for (&extent, quantity) in extents.iter().zip(quantities) {
         indices.push(intern(
             &heap.schemas,
             &mut schemas,
-            Schema {
-                extent,
-                quantity: Descriptor::ratio(),
-            },
+            Schema { extent, quantity },
             heap.limits.schemas,
         )?);
     }
     heap.schemas
         .try_reserve(schemas.len())
         .map_err(|_| JointError::ResourceLimit)?;
-    let plan = heap.descriptors.prepare(2, heap.limits.descriptors)?;
-    let keys: [Key; 2] = plan.keys().try_into().map_err(|_| HeapError::Capacity)?;
-    let storage =
-        heap.storage
-            .prepare(&[factor.coefficients(), factor.weights()], &[], heap.limits)?;
+    let plan = heap
+        .descriptors
+        .prepare(payloads.len(), heap.limits.descriptors)?;
+    let keys = plan.keys().to_vec();
+    let storage = heap.storage.prepare(&payloads, &[], heap.limits)?;
     let records = region_records::<P>(&indices, &extents, storage.keys(), storage.epoch())?;
     let records = plan.bind(records)?;
     Ok(PreparedRegions {
@@ -205,6 +253,31 @@ fn prepare_regions<P: Scalar + 'static>(
         records,
         keys,
     })
+}
+
+/// Parameter errors retain the full covariance product meaning, never a source radius.
+fn evaluation_descriptors<P: Scalar>(
+    model: &JointModel<P>,
+) -> Result<Vec<nrz_units::EvaluationDescriptor>, JointError> {
+    if matches!(
+        model.representation(),
+        crate::CovarianceRepresentation::Factor(_)
+    ) {
+        return Ok(Vec::new());
+    }
+    let mut descriptors = Vec::new();
+    for column in model.sources() {
+        for row in model.sources() {
+            let pairing = PairingWitness::uncertainty(
+                UncertaintyMode::Covariance,
+                row.descriptor(),
+                Some(column.descriptor()),
+                None,
+            )?;
+            descriptors.push(nrz_units::EvaluationDescriptor::new(&pairing));
+        }
+    }
+    Ok(descriptors)
 }
 
 /// Validate one declared selection, including repeated base coordinates.
@@ -238,7 +311,7 @@ fn validate_selection<P: Scalar + 'static>(
     }
     Ok(())
 }
-/// An existing target version cannot acquire another source declaration.
+/// An existing target version cannot acquire another source or mean declaration.
 fn validate_existing<P: Scalar + 'static>(
     heap: &Heap,
     draft: &CompanionSetDraft<P>,
@@ -246,12 +319,26 @@ fn validate_existing<P: Scalar + 'static>(
 ) -> Result<(), JointError> {
     let target = &draft.targets[side];
     for old in &heap.joint.records {
-        for (previous, map) in old.targets.iter().zip(&old.selections) {
+        for (old_side, (previous, map)) in old.targets.iter().zip(&old.selections).enumerate() {
             if previous.stamp == target.stamp() {
                 let model = old
                     .model
                     .downcast_ref::<JointModel<P>>()
                     .ok_or(JointError::SourceConflict)?;
+                let old_means = old
+                    .means
+                    .as_ref()
+                    .map(|value| {
+                        value
+                            .downcast_ref::<super::MeanParameters<P>>()
+                            .ok_or(JointError::SourceConflict)
+                    })
+                    .transpose()?;
+                if old_means.map(|means| &means.enclosures[old_side])
+                    != draft.means.as_ref().map(|means| &means.enclosures[side])
+                {
+                    return Err(JointError::SourceConflict);
+                }
                 if model.id() != draft.model.id()
                     || previous.layout != target.target.layout
                     || map != &draft.selections[side]

@@ -14,3 +14,5 @@ mod binding;
 mod transactions;
 
 mod joint_companions;
+
+mod joint_dense;

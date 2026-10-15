@@ -32,6 +32,14 @@ pub struct StatisticalView<'h, P: Scalar> {
     stamps: [ValueStamp; 2],
     /// Logical selections of the common ordered source vector.
     selections: &'h [Vec<usize>; 2],
+    /// Declared mathematical mean parameters, absent for nominal operating points.
+    means: Option<&'h super::MeanParameters<P>>,
+    /// Independent numerical mean-error regions in row/column target order.
+    mean_errors: Vec<RegionView<'h, P>>,
+    /// Independent error descriptors on full source-covariance parameters.
+    evaluation: &'h [nrz_units::EvaluationDescriptor],
+    /// Companion identity, distinct from every physical value target.
+    identity: CompanionRef<P>,
     /// Independent paired uncertainty descriptors.
     pairings: &'h [nrz_units::PairingWitness],
 }
@@ -43,13 +51,56 @@ impl<P: Scalar> StatisticalView<'_, P> {
     }
     /// Factor coefficients in normalized source coordinates.
     #[must_use]
-    pub const fn factor_region(&self) -> &RegionView<'_, P> {
-        &self.factor
+    pub fn factor_region(&self) -> Option<&RegionView<'_, P>> {
+        matches!(
+            self.model.representation(),
+            crate::CovarianceRepresentation::Factor(_)
+        )
+        .then_some(&self.factor)
     }
     /// Nonnegative exact represented weights.
     #[must_use]
-    pub const fn weight_region(&self) -> &RegionView<'_, P> {
-        &self.weights
+    pub fn weight_region(&self) -> Option<&RegionView<'_, P>> {
+        matches!(
+            self.model.representation(),
+            crate::CovarianceRepresentation::Factor(_)
+        )
+        .then_some(&self.weights)
+    }
+    /// Dense covariance parameters, when the model has a dense witness.
+    #[must_use]
+    pub fn covariance_region(&self) -> Option<super::CovarianceParameterView<'_, P>> {
+        matches!(
+            self.model.representation(),
+            crate::CovarianceRepresentation::Dense(_)
+        )
+        .then_some(super::CovarianceParameterView {
+            region: &self.factor,
+            descriptors: self.evaluation,
+        })
+    }
+    /// Numerical errors target the covariance parameters themselves.
+    #[must_use]
+    pub fn parameter_errors(&self) -> Option<super::ParameterErrorView<'_, P>> {
+        matches!(
+            self.model.representation(),
+            crate::CovarianceRepresentation::Dense(_)
+        )
+        .then_some(super::ParameterErrorView {
+            region: &self.weights,
+            target: self.identity,
+            descriptors: self.evaluation,
+        })
+    }
+    /// Declared means; `None` means the centers are only operating points.
+    #[must_use]
+    pub const fn means(&self) -> Option<&super::MeanParameters<P>> {
+        self.means
+    }
+    /// Numerical mean-parameter errors, never bounds on physical source excursions.
+    #[must_use]
+    pub fn mean_error_regions(&self) -> &[RegionView<'_, P>] {
+        &self.mean_errors
     }
     /// Both target identities and versions in row/column order.
     #[must_use]
@@ -95,13 +146,32 @@ impl Heap {
         let weights = self.region_view(
             self.record(Handle::<Companion, P>::new(self.scope, record.regions[1]))?,
         )?;
+        let means = record
+            .means
+            .as_ref()
+            .map(|value| {
+                value
+                    .downcast_ref::<super::MeanParameters<P>>()
+                    .ok_or(HeapError::PrecisionMismatch)
+            })
+            .transpose()?;
+        let mut mean_errors = Vec::new();
+        for &key in record.regions.iter().skip(2) {
+            mean_errors.push(
+                self.region_view(self.record(Handle::<Companion, P>::new(self.scope, key))?)?,
+            );
+        }
         Ok(StatisticalView {
             model,
             factor,
             weights,
+            means,
+            mean_errors,
             stamps: [record.targets[0].stamp, record.targets[1].stamp],
             selections: &record.selections,
             pairings: &record.pairings,
+            evaluation: &record.evaluation,
+            identity: handle,
         })
     }
     /// Explicit statistical coverage inventory for this current base version.
@@ -169,7 +239,7 @@ fn validate_record(heap: &Heap, record: &JointRecord) -> Result<(), HeapError> {
     for target in &record.targets {
         target.validate(heap)?;
     }
-    for key in record.regions {
+    for &key in &record.regions {
         let region = heap.descriptors.get(key)?;
         if !matches!(region.meaning, Meaning::Statistical) {
             return Err(HeapError::CategoryMismatch);

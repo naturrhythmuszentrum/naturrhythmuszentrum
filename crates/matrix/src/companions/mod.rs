@@ -36,7 +36,20 @@ pub(crate) struct JointRecord {
     /// Immutable joint model, downcast only after checking sealed precision.
     pub(crate) model: Rc<dyn Any>,
     /// Independently stored represented factor and weight regions.
-    pub(crate) regions: [Key; 2],
+    pub(crate) regions: Vec<Key>,
+    /// Optional declared mathematical mean families and their parameter errors.
+    pub(crate) means: Option<Rc<dyn Any>>,
     /// Independently derived covariance entry meanings in column order.
     pub(crate) pairings: Vec<nrz_units::PairingWitness>,
+    /// Full source-covariance parameter errors, independent of selected physical targets.
+    pub(crate) evaluation: Vec<nrz_units::EvaluationDescriptor>,
 }
+
+mod parameter;
+pub use parameter::{CovarianceParameterView, ParameterErrorView};
+
+mod lineage;
+pub use lineage::CrossLineage;
+
+mod means;
+pub use means::MeanParameters;

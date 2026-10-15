@@ -12,3 +12,8 @@ pub use factor::SourceFactor;
 pub use limits::JointLimits;
 pub use model::{CovarianceBlock, JointModel, ModelId};
 pub use source::{Source, SourceId};
+
+mod dense;
+mod representation;
+pub use dense::{DenseCovariance, PsdCertificate};
+pub use representation::CovarianceRepresentation;

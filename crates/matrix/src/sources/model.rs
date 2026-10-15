@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete explicit block tables and immutable joint definitions.
 
-use super::{JointError, JointLimits, Source, SourceFactor, SourceId};
+use super::{
+    CovarianceRepresentation, DenseCovariance, JointError, JointLimits, Source, SourceFactor,
+    SourceId,
+};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 use std::rc::Rc;
 
@@ -27,7 +30,7 @@ pub(crate) struct Definition<P: Scalar> {
     /// Exact ordered source identities.
     ids: Vec<SourceId>,
     /// Mathematical PSD witness, independent of displayed covariance rounding.
-    factor: SourceFactor<P>,
+    covariance: CovarianceRepresentation<P>,
     /// Complete column-ordered knowledge table.
     blocks: Vec<CovarianceBlock>,
 }
@@ -55,15 +58,46 @@ impl<P: Scalar> JointModel<P> {
         blocks: &[CovarianceBlock],
         limits: JointLimits,
     ) -> Result<Self, JointError> {
+        Self::admit(
+            sources,
+            CovarianceRepresentation::Factor(factor),
+            blocks,
+            limits,
+        )
+    }
+    /// Admit a dense covariance whose whole family already has a sufficient PSD proof.
+    ///
+    /// # Errors
+    /// Refuses invalid source/block relations, conflicting definitions or resource limits.
+    pub fn from_dense(
+        sources: &[Source<P>],
+        covariance: DenseCovariance<P>,
+        blocks: &[CovarianceBlock],
+        limits: JointLimits,
+    ) -> Result<Self, JointError> {
+        Self::admit(
+            sources,
+            CovarianceRepresentation::Dense(covariance),
+            blocks,
+            limits,
+        )
+    }
+    /// Share common global-definition and complete-table admission.
+    fn admit(
+        sources: &[Source<P>],
+        covariance: CovarianceRepresentation<P>,
+        blocks: &[CovarianceBlock],
+        limits: JointLimits,
+    ) -> Result<Self, JointError> {
         let count = limits.matrix(sources.len(), sources.len())?;
         let work = count
-            .checked_mul(factor.columns().max(1))
+            .checked_mul(covariance.terms())
             .ok_or(JointError::ResourceLimit)?;
         limits.check_work(work)?;
-        if factor.rows() != sources.len() || blocks.len() != count {
+        if covariance.order() != sources.len() || blocks.len() != count {
             return Err(JointError::LengthMismatch);
         }
-        check_table(&factor, blocks)?;
+        check_table(&covariance, blocks)?;
         let ids: Vec<_> = sources.iter().map(Source::id).collect();
         for (index, id) in ids.iter().enumerate() {
             if ids[..index].contains(id) {
@@ -73,7 +107,7 @@ impl<P: Scalar> JointModel<P> {
         let proposed = Definition {
             id: ModelId(crate::heap::identity::identity()?),
             ids,
-            factor,
+            covariance,
             blocks: blocks.to_vec(),
         };
         let definition = shared_definition(sources, proposed)?;
@@ -97,10 +131,10 @@ impl<P: Scalar> JointModel<P> {
     pub fn sources(&self) -> &[Source<P>] {
         &self.sources
     }
-    /// Exact represented factor defining the covariance.
+    /// Admitted mathematical representation and whole-family witness.
     #[must_use]
-    pub fn factor(&self) -> &SourceFactor<P> {
-        &self.definition.factor
+    pub fn representation(&self) -> &CovarianceRepresentation<P> {
+        &self.definition.covariance
     }
     /// Complete column-ordered knowledge inventory.
     #[must_use]
@@ -159,16 +193,16 @@ impl<P: Scalar> JointModel<P> {
         match self.block(row, column)? {
             CovarianceBlock::Unknown => Err(JointError::MissingCrossBlock),
             CovarianceBlock::DeclaredZero(_) => Ok(Enclosure::singleton(Finite::ZERO)),
-            CovarianceBlock::Known => self.factor().entry(row, column, context, limits),
+            CovarianceBlock::Known => self.representation().entry(row, column, context, limits),
         }
     }
 }
 /// Check symmetry and require a structural proof for each explicitly declared zero.
 fn check_table<P: Scalar>(
-    factor: &SourceFactor<P>,
+    covariance: &CovarianceRepresentation<P>,
     blocks: &[CovarianceBlock],
 ) -> Result<(), JointError> {
-    let order = factor.rows();
+    let order = covariance.order();
     for column in 0..order {
         for row in 0..order {
             let block = &blocks[row + order * column];
@@ -176,7 +210,7 @@ fn check_table<P: Scalar>(
                 return Err(JointError::Asymmetric);
             }
             if let CovarianceBlock::DeclaredZero(reason) = block
-                && (reason.trim().is_empty() || !factor.zero(row, column))
+                && (reason.trim().is_empty() || !covariance.zero(row, column))
             {
                 return Err(JointError::InvalidZero);
             }
@@ -193,7 +227,7 @@ fn shared_definition<P: Scalar>(
     for source in sources {
         if let Some(old) = source.definition.borrow().as_ref() {
             if old.ids != proposed.ids
-                || old.factor != proposed.factor
+                || old.covariance != proposed.covariance
                 || old.blocks != proposed.blocks
             {
                 return Err(JointError::SourceConflict);

@@ -222,3 +222,114 @@ fn joint_factor_limit_boundaries() {
         Err(JointError::InvalidWeight)
     ));
 }
+
+/// Dense sufficient proofs cover positive definite and diagonally dominant singular cases.
+fn dense_oracles<P: Scalar>() -> TestResult {
+    let context = ArithmeticContext::new()?;
+    let limits = JointLimits::default();
+    // Exact determinants: 1*5 - 2*2 = 1 and 1*1 - (-1)*(-1) = 0.
+    let positive = [P::ONE, P::from_u8(2), P::from_u8(2), P::from_u8(5)];
+    let dense = nrz_matrix::DenseCovariance::new(2, &positive, &context, limits)?;
+    assert_eq!(
+        dense.certificate(),
+        nrz_matrix::PsdCertificate::PositivePivots
+    );
+    for (index, numerator) in [1, 2, 2, 5].into_iter().enumerate() {
+        contains(dense.family()[index], numerator, 1)?;
+    }
+    let singular = [P::ONE, -P::ONE, -P::ONE, P::ONE];
+    let admitted = nrz_matrix::DenseCovariance::new(2, &singular, &context, limits)?;
+    assert_eq!(
+        admitted.certificate(),
+        nrz_matrix::PsdCertificate::DiagonalDominance
+    );
+    for (index, numerator) in [1, -1, -1, 1].into_iter().enumerate() {
+        contains(admitted.family()[index], numerator, 1)?;
+    }
+    Ok(())
+}
+/// Both dense certificate paths admit genuine PSD examples in both precisions.
+/// ´test:integration:dense-covariance-rational-oracles´
+#[test]
+fn dense_covariance_rational_oracles() -> TestResult {
+    dense_oracles::<f32>()?;
+    dense_oracles::<f64>()
+}
+
+/// Failure of a sufficient test is not a claim that a covariance is indefinite.
+/// ´test:integration:dense-asymmetry-and-unprovable-psd-refuse´
+#[test]
+fn dense_asymmetry_and_unprovable_psd_refuse() -> TestResult {
+    let context = ArithmeticContext::new()?;
+    let limits = JointLimits::default();
+    assert!(matches!(
+        nrz_matrix::DenseCovariance::new(2, &[1.0_f64, 0.0, 1.0, 2.0], &context, limits),
+        Err(JointError::Asymmetric)
+    ));
+    // Exact rank-one outer product (1,2)(1,2)^T: determinant zero, first row not dominant.
+    assert!(matches!(
+        nrz_matrix::DenseCovariance::new(2, &[1.0_f64, 2.0, 2.0, 4.0], &context, limits),
+        Err(JointError::CannotValidateCovariance)
+    ));
+    SourceFactor::new(2, &[1.0_f64, 2.0], &[1.0], limits)?;
+    Ok(())
+}
+
+/// A PSD center cannot authorize an enclosure family containing an indefinite member.
+/// ´test:integration:dense-parameter-family-is-covered´
+#[test]
+fn dense_parameter_family_is_covered() -> TestResult {
+    use nrz_matrix::DenseCovariance;
+    use nrz_scalar::Enclosure;
+    let context = ArithmeticContext::new()?;
+    let limits = JointLimits::default();
+    let centers = [2.0_f64, 0.25, 0.25, 1.0];
+    let family = [
+        Enclosure::new(1.875, 2.125)?,
+        Enclosure::new(0.1875, 0.3125)?,
+        Enclosure::new(0.1875, 0.3125)?,
+        Enclosure::new(0.875, 1.125)?,
+    ];
+    let dense = DenseCovariance::with_enclosures(2, &centers, &family, &context, limits)?;
+    for (index, expected) in [2_i128, 1, 1, 2].into_iter().enumerate() {
+        let (numerator, denominator) = fraction(dense.errors()[index])?;
+        assert!(numerator * 16 >= expected * denominator);
+    }
+    let bad = [
+        Enclosure::new(0.5, 1.5)?,
+        Enclosure::new(-2.0, 2.0)?,
+        Enclosure::new(-2.0, 2.0)?,
+        Enclosure::new(0.5, 1.5)?,
+    ];
+    assert!(matches!(
+        DenseCovariance::with_enclosures(2, &[1.0, 0.0, 0.0, 1.0], &bad, &context, limits),
+        Err(JointError::CannotValidateCovariance)
+    ));
+    Ok(())
+}
+
+/// Dense admission budgets both quadratic scans and a cubic sufficient-check envelope.
+/// ´test:integration:dense-limit-boundaries´
+#[test]
+fn dense_limit_boundaries() -> TestResult {
+    let context = ArithmeticContext::new()?;
+    for work in [11, 12, 13] {
+        let result = nrz_matrix::DenseCovariance::new(
+            2,
+            &[2.0_f32, 0.0, 0.0, 2.0],
+            &context,
+            JointLimits::new(2, 4, work),
+        );
+        assert_eq!(result.is_ok(), work >= 12);
+    }
+    for entries in [3, 4, 5] {
+        let result = nrz_matrix::DenseCovariance::new(
+            2,
+            &[2.0_f64, 0.0, 0.0, 2.0],
+            &context,
+            JointLimits::new(2, entries, 12),
+        );
+        assert_eq!(result.is_ok(), entries >= 4);
+    }
+    Ok(())
+}

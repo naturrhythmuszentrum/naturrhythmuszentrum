@@ -49,7 +49,10 @@ fn joint_targets_survive_compaction_and_refuse_staleness() -> TestResult {
     ));
     heap.compact()?;
     assert_eq!(
-        heap.statistical(companion)?.factor_region().export()?,
+        heap.statistical(companion)?
+            .factor_region()
+            .ok_or("missing factor")?
+            .export()?,
         [1.0, 2.0]
     );
     let version = heap.value(first.value())?.stamp().version();
