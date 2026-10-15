@@ -144,7 +144,7 @@ pub(crate) mod solve_numeric;
 )]
 pub(crate) mod solve_graph;
 
-#[path = "solve_coefficients.rs"]
+#[path = "solve_coefficients_public.rs"]
 #[expect(
     clippy::redundant_pub_crate,
     reason = "shared solving fixtures remain crate-visible"

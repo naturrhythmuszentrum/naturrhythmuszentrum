@@ -1,9 +1,66 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Unavailable coefficients capability, reserved for its owning lane.
+//! Sealed exact coefficient arithmetic and guarded finite specialization.
 
-/// This leaf has no checker or producer until its supplied-certificate tests land.
+#![expect(
+    dead_code,
+    reason = "the independent identity checker consumes the arithmetic interface in the next lane commit"
+)]
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod arithmetic;
+mod evaluation;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod fraction;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod gcd;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod interface;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient maps stay within the crate"
+)]
+pub(crate) mod maps;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod polynomial;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod read;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod scalar;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient arithmetic stays within the crate"
+)]
+pub(crate) mod storage;
+
+/// Arithmetic availability does not enable an unchecked theorem schema.
 pub(crate) const fn availability() -> super::Availability {
-    super::Availability::Unavailable
+    super::Availability::Available
 }
 
 /// Per-subtype capability permits independently green checker slices in this leaf.
@@ -28,36 +85,18 @@ pub(crate) fn check(
     ))
 }
 
-/// The coefficient lane supplies normalized multivariate coprimality checking here.
+/// Independently verify coprimality and the monic denominator during graph admission.
 pub(crate) fn canonical_fraction(
-    _state: &crate::graph::State,
-    _numerator: &crate::graph::Handle,
-    _denominator: &crate::graph::Handle,
+    state: &crate::graph::State,
+    numerator: &crate::graph::Handle,
+    denominator: &crate::graph::Handle,
     budget: &mut crate::budget::Budget,
 ) -> Result<(), crate::error::Fault> {
-    let at = crate::error::Location::new("unavailable fraction normalization");
-    budget.work(1, at)?;
-    Err(crate::error::Fault::invalid(
-        crate::error::InvalidCode::UnsupportedFragment,
-        at,
-    ))
+    read::canonical_fraction(state, numerator, denominator, budget)
 }
 
-#[cfg(test)]
-mod tests {
-    /// The placeholder cannot advertise an executable capability.
-    /// ´test:unit:coefficients-unavailable´
-    #[test]
-    fn coefficients_unavailable() {
-        assert_eq!(
-            super::availability(),
-            crate::solving::Availability::Unavailable
-        );
-        for tag in 0..18 {
-            assert_eq!(
-                super::schema_availability(tag),
-                crate::solving::Availability::Unavailable
-            );
-        }
-    }
-}
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scoped nonzero evidence stays within the crate"
+)]
+pub(crate) mod nonvanishing;
