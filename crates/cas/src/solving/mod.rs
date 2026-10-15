@@ -62,7 +62,7 @@ pub(crate) mod numeric;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod orbits;
+pub(crate) mod orbits;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
@@ -82,7 +82,7 @@ mod solve_search;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod symmetric;
+pub(crate) mod symmetric;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"

@@ -35,3 +35,17 @@ pub(crate) fn check(
 ) -> Result<crate::proof_model::ScopedConditions, crate::error::Fault> {
     replay::check(cas, draft, premises, budget)
 }
+
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "the next solving lane consumes generic orbit production"
+    )
+)]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "generic orbit production stays within the crate"
+)]
+pub(crate) mod produce;
+pub(crate) use action::permutation;
