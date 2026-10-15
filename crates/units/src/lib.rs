@@ -24,6 +24,12 @@ mod error;
     reason = "items shared across private modules stay crate-visible because the workspace denies \
         unreachable_pub"
 )]
+mod evidence;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies \
+        unreachable_pub"
+)]
 mod exact;
 mod kind;
 mod measure;
@@ -41,6 +47,10 @@ pub use descriptor::{Descriptor, Role, uncertainty};
 pub use diagnostic::{Diagnostic, Expectation, Failure, Location};
 pub use dimension::{BaseDimension, Dimension, ExponentPolicy};
 pub use error::UnitError;
+pub use evidence::{CheckedDeclarations, SnapshotError, SnapshotId};
 pub use kind::{CountDomain, Kind, UncertaintyMode};
 pub use measure::{Conversion, Measure, Scale};
 pub use registry::{BinaryOp, Registry};
+
+#[cfg(test)]
+mod tests;

@@ -56,6 +56,7 @@ impl Context {
             semantic,
             registry,
             limits,
+            revision: 0,
             declarations: std::collections::BTreeMap::new(),
             functions: std::collections::BTreeMap::new(),
         })
@@ -96,13 +97,19 @@ impl Context {
     /// Physical declarations supply no additional mathematical assumptions.
     ///
     /// # Errors
-    /// Refuses foreign inputs, incomplete coverage or exhausted request construction.
+    /// Refuses foreign or stale checks, incomplete coverage or exhausted request construction.
     pub fn prove_equal(
         &self,
         checked: &CheckedExpression,
         target: &OriginalForm,
         limits: LimitsOverride,
     ) -> Result<Outcome, Fault> {
+        self.validate_checked(checked).map_err(|_| {
+            Fault::invalid(
+                InvalidCode::Context,
+                CasLocation::new("units checking snapshot"),
+            )
+        })?;
         let mut cas = self.engine()?;
         let request = checked.equality_request(&mut cas, &self.semantic, target, limits)?;
         Ok(cas.run(&request))

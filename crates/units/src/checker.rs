@@ -41,6 +41,7 @@ impl Context {
         let (value, _) = state.walk(expression, 1)?;
         let coordinates = state.publish(&value.coordinates)?;
         Ok(CheckedExpression {
+            snapshot: self.snapshot_id(),
             original: expression.clone(),
             descriptor: value.descriptor,
             nodes: state.nodes,

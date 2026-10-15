@@ -155,8 +155,6 @@ pub struct FunctionSignature {
 /// A reusable declaration environment; checks own snapshots of all evidence they use.
 ///
 /// TODO ´todo:code:retain-shape-and-value-identity-snapshots´: retain shape and value identity snapshots independently of later declarations or batch reuse under dec:nrz:shape-descriptor-ownership.
-///
-/// TODO ´todo:code:expose-stable-declaration-snapshot-identities-for´: expose stable declaration snapshot identities for client binding reuse under rule:nrz:binding-validation.
 #[derive(Debug)]
 pub struct Context {
     /// The engine owns all original occurrences and generated coordinates.
@@ -169,6 +167,8 @@ pub struct Context {
     pub(super) declarations: BTreeMap<String, Declaration>,
     /// Client-defined fixed function signatures in a separate namespace.
     pub(super) functions: BTreeMap<String, FunctionSignature>,
+    /// Complete physical semantic revision, advanced only by successful mutations.
+    pub(super) revision: u64,
     /// Expression, expansion and work limits for each independent check.
     pub(super) limits: Limits,
 }
@@ -178,10 +178,8 @@ impl Context {
     ///
     /// TODO ´todo:code:validate-shape-declarations-and-companion-target´: validate shape declarations and companion target maps atomically at the context boundary under rule:nrz:shape-data-time-evidence.
     ///
-    /// TODO ´todo:code:invalidate-client-binding-checks-after-successful´: invalidate client binding checks after successful declaration environment changes under rule:nrz:computation-cache-validity.
-    ///
     /// # Errors
-    /// Refuses duplicate names, inconsistent kinds and invalid exact count imports.
+    /// Refuses duplicate names, invalid kinds/counts or an exhausted semantic revision.
     pub fn declare(&mut self, name: String, declaration: Declaration) -> Result<(), Diagnostic> {
         if self.declarations.contains_key(&name) {
             return Err(Diagnostic::declaration(Failure::Duplicate(name)));
@@ -218,8 +216,10 @@ impl Context {
                     .map_err(|error| Diagnostic::declaration(error.into()))?;
             }
         }
+        let revision = crate::evidence::next_revision(self.revision)?;
         self.registry = registry;
         self.declarations.insert(name, declaration);
+        self.revision = revision;
         Ok(())
     }
 
@@ -227,10 +227,8 @@ impl Context {
     ///
     /// TODO ´todo:code:validate-function-contraction-and-output-axes´: validate function contraction and output axes alongside the declared scalar signatures under rule:nrz:shape-data-time-evidence.
     ///
-    /// TODO ´todo:code:invalidate-dependent-plan-checks-when-function´: invalidate dependent plan checks when function declaration snapshots change under rule:nrz:plan-validation.
-    ///
     /// # Errors
-    /// Refuses inconsistent descriptors and duplicate or builtin function names.
+    /// Refuses invalid descriptors, duplicate/builtin names or an exhausted semantic revision.
     pub fn declare_function(
         &mut self,
         name: String,
@@ -266,8 +264,10 @@ impl Context {
                 .admit(descriptor)
                 .map_err(|error| Diagnostic::declaration(error.into()))?;
         }
+        let revision = crate::evidence::next_revision(self.revision)?;
         self.registry = registry;
         self.functions.insert(name, signature);
+        self.revision = revision;
         Ok(())
     }
 }

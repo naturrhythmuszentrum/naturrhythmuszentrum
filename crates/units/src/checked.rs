@@ -8,7 +8,9 @@ use nrz_cas::proof::DomainContract;
 use nrz_cas::request::{CoveredInput, Request, Task};
 use nrz_cas::{Cas, Fault, Handle, limits::LimitsOverride, source::OriginalForm};
 
-use crate::{Companion, Conversion, Declaration, Descriptor, Location, UncertaintyMode};
+use crate::{
+    Companion, Conversion, Declaration, Descriptor, Location, SnapshotId, UncertaintyMode,
+};
 
 /// How a checked uncertainty expression acquires its declared value relationship.
 ///
@@ -72,11 +74,11 @@ pub struct NodeEvidence {
 ///
 /// TODO ´todo:code:own-checked-logical-shapes-and-indexed´: own checked logical shapes and indexed companion evidence before coordinate normalization under rule:nrz:shape-data-time-evidence.
 ///
-/// TODO ´todo:code:associate-reusable-checks-with-immutable-declaration´: associate reusable checks with immutable declaration and operation snapshots under rule:nrz:plan-validation.
-///
 /// TODO ´todo:code:retain-checked-schema-admission-witnesses-for´: retain checked schema admission witnesses for descriptor publication under rule:nrz:descriptor-publication-validation.
 #[derive(Clone, Debug)]
 pub struct CheckedExpression {
+    /// Exact physical semantic state captured before checking original operations.
+    pub(super) snapshot: SnapshotId,
     /// Original source operations, including those that a normal form would erase.
     pub(super) original: OriginalForm,
     /// Root descriptor with its semantic identity and affine role.
@@ -94,6 +96,12 @@ pub struct CheckedExpression {
 }
 
 impl CheckedExpression {
+    /// Captured semantic identity; validate it before reuse against another owner.
+    #[must_use]
+    pub const fn snapshot_id(&self) -> &SnapshotId {
+        &self.snapshot
+    }
+
     /// Value and reference names carried by established or explicitly propagated evidence.
     ///
     /// TODO ´todo:code:expose-companion-entry-targets-and-versions´: expose companion entry targets and versions without collapsing them to equal descriptors under def:nrz:companion-shape.

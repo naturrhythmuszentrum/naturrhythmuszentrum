@@ -3,7 +3,7 @@
 
 use nrz_cas::{Fault, syntax::Span};
 
-use crate::{Descriptor, UnitError};
+use crate::{Descriptor, SnapshotError, UnitError};
 
 /// An original operation's position, including any expanded declaration chain.
 ///
@@ -36,10 +36,11 @@ pub enum Expectation {
 /// The reason a check could not establish its contract.
 ///
 /// TODO ´todo:code:distinguish-malformed-extents-from-incompatible-axes´: distinguish malformed extents from incompatible axes and stale companion targets under rule:nrz:shape-data-time-evidence.
-///
-/// TODO ´todo:code:distinguish-stale-checking-snapshots-from-physical´: distinguish stale checking snapshots from physical descriptor refusals at client boundaries under rule:nrz:binding-validation.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum Failure {
+    /// Reusable checking evidence or its semantic revision is unavailable.
+    #[error(transparent)]
+    Snapshot(#[from] SnapshotError),
     /// Descriptor algebra refused the operation.
     #[error(transparent)]
     Units(#[from] UnitError),
