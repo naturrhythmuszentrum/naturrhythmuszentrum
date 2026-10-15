@@ -1982,7 +1982,7 @@ impl CoordinateSpaceData<Handle> {
             coordinates: decode_vector(
                 reader,
                 records,
-                BudgetKind::PolynomialVariables,
+                BudgetKind::Edges,
                 6,
                 256,
                 Coordinate::decode,
@@ -2018,7 +2018,7 @@ impl SolutionSetData<Handle> {
             branches: decode_vector(
                 reader,
                 records,
-                BudgetKind::CaseArms,
+                BudgetKind::SolutionBranches,
                 4,
                 64,
                 crate::wire_decode::object,
@@ -2080,7 +2080,7 @@ impl CoefficientMapData<Handle> {
             denominators: decode_vector(
                 reader,
                 records,
-                BudgetKind::ConditionAtoms,
+                BudgetKind::DenominatorFactors,
                 4,
                 64,
                 crate::wire_decode::object,
@@ -2125,7 +2125,7 @@ impl RootSelectionData<Handle> {
             relations: decode_vector(
                 reader,
                 records,
-                BudgetKind::PolynomialVariables,
+                BudgetKind::SelectionSlots,
                 4,
                 64,
                 crate::wire_decode::object,
@@ -2200,7 +2200,7 @@ impl SolveProblemData<Handle> {
             denominators: decode_vector(
                 reader,
                 records,
-                BudgetKind::ConditionAtoms,
+                BudgetKind::DenominatorFactors,
                 4,
                 64,
                 crate::wire_decode::object,
@@ -2503,7 +2503,7 @@ impl StatementOrbit<Handle> {
             members: decode_vector(
                 reader,
                 records,
-                BudgetKind::Edges,
+                BudgetKind::OrbitMembers,
                 4,
                 64,
                 crate::wire_decode::object,
@@ -2615,7 +2615,7 @@ impl CertificateCoefficientIdentity<Handle> {
             denominators: decode_vector(
                 reader,
                 records,
-                BudgetKind::ConditionAtoms,
+                BudgetKind::DenominatorFactors,
                 4,
                 64,
                 crate::wire_decode::object,
@@ -2798,7 +2798,7 @@ impl CertificateTotalPredicateSplit<Handle> {
             branches: decode_vector(
                 reader,
                 records,
-                BudgetKind::CaseArms,
+                BudgetKind::SolutionBranches,
                 4,
                 4,
                 |reader, _records| reader.index(),
@@ -3005,7 +3005,7 @@ impl CertificateConjugationTransport<Handle> {
             relations: decode_vector(
                 reader,
                 records,
-                BudgetKind::PolynomialVariables,
+                BudgetKind::SelectionSlots,
                 4,
                 4,
                 |reader, _records| reader.index(),
@@ -3085,7 +3085,7 @@ impl CertificatePermutationOrbitCoverage<Handle> {
             members: decode_vector(
                 reader,
                 records,
-                BudgetKind::Edges,
+                BudgetKind::OrbitMembers,
                 4,
                 64,
                 crate::wire_decode::object,

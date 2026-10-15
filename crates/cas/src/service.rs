@@ -29,23 +29,23 @@ impl Cas {
     pub fn run_with_policy(&mut self, request: &Request, policy: &SearchPolicy) -> Outcome {
         let resolved = match self.limits.resolve(&request.limits) {
             Ok(value) => value,
-            Err(fault) => return failure(fault, BudgetUsage::default()),
+            Err(fault) => return failure(fault, &BudgetUsage::default()),
         };
         let mut generation = match Budget::new(resolved.clone()) {
             Ok(value) => value,
-            Err(fault) => return failure(fault, BudgetUsage::default()),
+            Err(fault) => return failure(fault, &BudgetUsage::default()),
         };
         generation.restrict_storage(&self.limits);
         let mut replay_limits = generation.limits().clone();
         replay_limits.work = replay_limits.replay_work;
         let mut checker = match Budget::new(replay_limits) {
             Ok(value) => value,
-            Err(fault) => return failure(fault, generation.usage()),
+            Err(fault) => return failure(fault, &generation.usage()),
         };
         let prepared = self.prepare_execution(request, policy, &resolved, &mut generation);
         let (mut candidate, record, unsupported) = match prepared {
             Ok(value) => value,
-            Err(fault) => return failure(fault, generation.usage()),
+            Err(fault) => return failure(fault, &generation.usage()),
         };
         if unsupported {
             self.state = candidate.state;
@@ -71,12 +71,13 @@ impl Cas {
         let mut execution = candidate.execute(request, policy, &mut generation, &mut checker);
         if let Some(result) = &mut execution.result {
             result.replay_usage = checker.usage();
-            result.response = envelope(result, &resolved, generation.usage(), &mut generation).ok();
+            result.response =
+                envelope(result, &resolved, &generation.usage(), &mut generation).ok();
         }
         // Only complete expression/proof batches live in this candidate; the failed proposal
         // has already been dropped by its transaction boundary.
         self.state = candidate.state;
-        outcome(record, execution, generation.usage(), checker.usage())
+        outcome(record, execution, &generation.usage(), &checker.usage())
     }
 
     /// Validate policy and original receipts before publishing any operation work.
@@ -453,12 +454,13 @@ impl Cas {
 fn envelope(
     result: &SearchResult,
     limits: &Limits,
-    generation_usage: BudgetUsage,
+    generation_usage: &BudgetUsage,
     budget: &mut Budget,
 ) -> Result<Vec<u8>, Fault> {
     let mut out = Encoder::output(budget, AT);
     out.raw(b"NRZRUN03")?;
     result.policy.encode(&mut out)?;
+    crate::wire::index(crate::solving::active_schema_bitmap(), &mut out)?;
     for kind in crate::budget::ALL_KINDS {
         out.unsigned(limits.get(kind))?;
     }
@@ -471,41 +473,11 @@ fn envelope(
         result.statistics.transitions,
         result.statistics.dominated,
         result.statistics.visits,
-        generation_usage.work,
-        generation_usage.arithmetic_steps,
-        generation_usage.condition_steps,
-        generation_usage.case_arms,
-        generation_usage.region_nodes,
-        generation_usage.region_cells,
-        generation_usage.refinement_pairs,
-        generation_usage.local_contexts,
-        generation_usage.hypothesis_depth,
-        generation_usage.boundary_nodes,
-        generation_usage.jet_order,
-        generation_usage.jet_entries,
-        generation_usage.delta_order,
-        generation_usage.test_nodes,
-        generation_usage.pairing_steps,
-        generation_usage.pullback_zeros,
-        result.replay_usage.work,
-        result.replay_usage.arithmetic_steps,
-        result.replay_usage.condition_steps,
-        result.replay_usage.case_arms,
-        result.replay_usage.region_nodes,
-        result.replay_usage.region_cells,
-        result.replay_usage.refinement_pairs,
-        result.replay_usage.local_contexts,
-        result.replay_usage.hypothesis_depth,
-        result.replay_usage.boundary_nodes,
-        result.replay_usage.jet_order,
-        result.replay_usage.jet_entries,
-        result.replay_usage.delta_order,
-        result.replay_usage.test_nodes,
-        result.replay_usage.pairing_steps,
-        result.replay_usage.pullback_zeros,
     ] {
         out.unsigned(value)?;
     }
+    generation_usage.encode(&mut out)?;
+    result.replay_usage.encode(&mut out)?;
     out.count(result.trace.len())?;
     for endpoint in &result.trace {
         encode_id(endpoint.logical_id(), &mut out)?;
@@ -523,8 +495,8 @@ fn envelope(
 fn outcome(
     record: Handle,
     execution: Execution,
-    usage: BudgetUsage,
-    replay_usage: BudgetUsage,
+    usage: &BudgetUsage,
+    replay_usage: &BudgetUsage,
 ) -> Outcome {
     if let Some(fault) = execution.fault {
         return match fault.kind {
@@ -544,33 +516,33 @@ fn outcome(
                 reason: crate::distribution_search::refusal(fault),
                 request: record,
                 fault,
-                usage,
+                usage: *usage,
             },
             FaultKind::Exhausted { .. } => Outcome::Exhausted {
                 solve_best: None,
                 fault,
-                usage,
-                replay_usage,
-                best: execution.result,
+                usage: *usage,
+                replay_usage: *replay_usage,
+                best: execution.result.map(Box::new),
             },
             FaultKind::Invalid(InvalidCode::UnknownTotality) => Outcome::UnknownTotality {
                 partial: execution.result.map(Box::new),
                 request: record,
                 blocker: fault,
-                usage,
+                usage: *usage,
             },
             FaultKind::Invalid(InvalidCode::PendingPremise) => Outcome::PendingPremise {
                 partial: execution.result.map(Box::new),
                 request: record,
                 blocker: fault,
-                usage,
+                usage: *usage,
             },
             FaultKind::Invalid(InvalidCode::UnsupportedFragment) => Outcome::Unresolved {
                 solve_reason: None,
                 request: record,
                 consistency: ContextConsistency::Unknown,
                 blocker: Some(fault),
-                usage,
+                usage: *usage,
             },
             FaultKind::Invalid(
                 code @ (InvalidCode::PolynomialFragment
@@ -586,17 +558,20 @@ fn outcome(
                     request: record,
                     reason,
                     consistency: ContextConsistency::Unknown,
-                    usage,
+                    usage: *usage,
                 }
             }
-            FaultKind::Invalid(_) => Outcome::Invalid { fault, usage },
+            FaultKind::Invalid(_) => Outcome::Invalid {
+                fault,
+                usage: *usage,
+            },
         };
     }
     completed_outcome(record, execution.result, usage)
 }
 
 /// Completion classification uses every retained component, including partial maps.
-fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: BudgetUsage) -> Outcome {
+fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: &BudgetUsage) -> Outcome {
     match result {
         Some(result)
             if result
@@ -607,7 +582,7 @@ fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: Budget
             Outcome::Partial {
                 request: record,
                 result,
-                usage,
+                usage: *usage,
             }
         }
         Some(result)
@@ -619,7 +594,7 @@ fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: Budget
             Outcome::Nonexistent {
                 request: record,
                 result,
-                usage,
+                usage: *usage,
             }
         }
         Some(result)
@@ -632,20 +607,20 @@ fn completed_outcome(record: Handle, result: Option<SearchResult>, usage: Budget
             Outcome::Proved {
                 request: record,
                 result,
-                usage,
+                usage: *usage,
             }
         }
         Some(result) => Outcome::Conditional {
             request: record,
             result,
-            usage,
+            usage: *usage,
         },
         None => Outcome::Unresolved {
             solve_reason: None,
             request: record,
             consistency: ContextConsistency::Unknown,
             blocker: None,
-            usage,
+            usage: *usage,
         },
     }
 }

@@ -32,6 +32,9 @@ fn preflight(cas: &Cas, steps: &[ApplicationDraft], budget: &mut Budget) -> Resu
             continue;
         }
         let step = steps.get(index).ok_or_else(invalid)?;
+        if !step.rule.specification().available {
+            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+        }
         crate::proof_view::measure(cas, step, budget)?;
         pending
             .try_reserve(step.premises.len())
@@ -104,11 +107,9 @@ fn rule_conditions(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(ScopedConditions, Option<crate::scalar_model::CheckedStep>), Fault> {
-    if matches!(&draft.certificate, Certificate::Solve(_)) {
-        return Ok((crate::solving::check(cas, draft, premises, budget)?, None));
-    }
     let mut scalar_view = None;
     let conditions = match draft.rule {
+        Primitive::Solve(_) => crate::solving::check(cas, draft, premises, budget)?,
         Primitive::LimitCaseRestrict | Primitive::SeriesCaseRestrict => {
             crate::germ_check::check(cas, draft, premises, budget)?
         }

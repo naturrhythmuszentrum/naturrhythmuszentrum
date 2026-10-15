@@ -113,6 +113,67 @@ fn solve_wire_kind_namespace() -> TestResult {
     Ok(())
 }
 
+/// Policy identity lookup charges the same work after unrelated graph growth and refuses conflicts.
+/// ´test:crate:solve-policy-index-is-independent´
+#[test]
+fn solve_policy_index_is_independent() -> TestResult {
+    use crate::limits::{Budget, Limits};
+    let mut cas = crate::Cas::new(Limits::default())?;
+    let mut policy = crate::cost::CostPolicy {
+        key: "indexed-fixture".into(),
+        version: 1,
+        ..crate::cost::CostPolicy::default()
+    };
+    let mut ledger = Budget::new(Limits::default())?;
+    let first = cas.pin_policy(&policy, &mut ledger)?;
+    let mut before = Budget::new(Limits::default())?;
+    assert_eq!(cas.pin_policy(&policy, &mut before)?, first);
+    let drafts: Vec<_> = (0..32)
+        .map(|index| crate::syntax::Draft::Source {
+            key: format!("padding-{index}"),
+            text: "unrelated".into(),
+        })
+        .collect();
+    cas.admit(&drafts, &mut ledger)?;
+    let mut after = Budget::new(Limits::default())?;
+    assert_eq!(cas.pin_policy(&policy, &mut after)?, first);
+    assert_eq!(before.usage(), after.usage());
+    let counts = cas.counts();
+    *policy.weights.first_mut().ok_or("weight missing")? += 1;
+    let fault = cas
+        .pin_policy(&policy, &mut ledger)
+        .err()
+        .ok_or("conflicting policy accepted")?;
+    assert_eq!(
+        fault.kind,
+        crate::FaultKind::Invalid(crate::InvalidCode::Policy)
+    );
+    assert_eq!(cas.counts(), counts);
+    assert_eq!(cas.state.policies.len(), 1);
+    Ok(())
+}
+
+/// Logical identities below nine and changed v9 contents cannot be pinned.
+/// ´test:crate:solve-logical-policy-is-pinned´
+#[test]
+fn solve_logical_policy_is_pinned() -> TestResult {
+    let mut cas = crate::Cas::new(crate::limits::Limits::default())?;
+    let mut ledger = crate::limits::Budget::new(crate::limits::Limits::default())?;
+    for version in 0..9 {
+        let policy = crate::cost::CostPolicy {
+            version,
+            ..crate::cost::CostPolicy::default()
+        };
+        assert!(cas.pin_policy(&policy, &mut ledger).is_err());
+    }
+    assert_eq!(cas.counts().vertices, 0);
+    let mut policy = crate::cost::CostPolicy::default();
+    *policy.weights.first_mut().ok_or("weight missing")? += 1;
+    assert!(cas.pin_policy(&policy, &mut ledger).is_err());
+    assert_eq!(cas.counts().vertices, 0);
+    Ok(())
+}
+
 /// A complete generated receipt cannot replace the required original-source receipt.
 /// ´test:crate:solve-requires-original-receipt´
 #[test]

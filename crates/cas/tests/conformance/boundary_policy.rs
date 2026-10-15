@@ -5,13 +5,15 @@ use crate::testing::common::TestResult;
 use nrz_cas::proof::PRIMITIVES;
 use nrz_cas::request::CostPolicy;
 
-/// Complete independent expected weights for all active semantic-version-one checkers.
-const EXPECTED: [(&str, u64); 59] = [
+/// Complete independent expected weights for all registered semantic-version-one schemas.
+const EXPECTED: [(&str, u64); 77] = [
     ("case.congruence", 4),
     ("case.domain", 2),
     ("case.eliminate", 4),
     ("case.ordered", 4),
     ("case.select", 2),
+    ("coeff.identity", 4),
+    ("complex.conjugate", 4),
     ("ctx.close", 2),
     ("ctx.hypothesis", 1),
     ("ctx.weaken", 1),
@@ -56,31 +58,50 @@ const EXPECTED: [(&str, u64); 59] = [
     ("eq.sym", 1),
     ("eq.trans", 1),
     ("exact.rational", 1),
+    ("extension.adjoin", 8),
+    ("extension.split", 12),
+    ("extension.unit", 8),
     ("integral.case-split", 8),
     ("jet.polynomial", 4),
     ("limit.case-restrict", 2),
+    ("linear.equivalent", 8),
+    ("orbit.cover", 8),
     ("poly.jets-equal", 4),
     ("poly.rational-equal", 4),
     ("poly.square-free", 8),
     ("region.construct", 2),
     ("region.decide", 4),
+    ("root.binomial", 8),
+    ("root.isolate", 12),
+    ("root.select", 8),
     ("series.case-restrict", 4),
+    ("solve.family", 8),
+    ("solve.local-branch", 16),
+    ("solve.member", 4),
+    ("solve.multiplicity", 8),
+    ("solve.product", 8),
+    ("solve.real-restrict", 8),
+    ("solve.split", 4),
+    ("solve.substitute", 4),
     ("sum.case-split", 4),
 ];
 
-/// The current logical policy includes exactly the executable schemas and no recipe keys.
+/// The current logical policy includes the closed registered schemas, with availability separate.
 /// ´test:integration:active-policy-complete-manifest´
 #[test]
 fn active_policy_complete_manifest() -> TestResult {
     let policy = CostPolicy::default();
-    assert_eq!(policy.version, 8);
+    assert_eq!(policy.version, 9);
     assert_eq!(PRIMITIVES.len(), EXPECTED.len());
     let actual: Vec<_> = PRIMITIVES
         .iter()
         .map(|primitive| {
             let rule = primitive.specification();
             assert_eq!(rule.version, 1);
-            assert!(rule.available);
+            assert_eq!(
+                rule.available,
+                !matches!(primitive, nrz_cas::proof::Primitive::Solve(_))
+            );
             (rule.key, rule.weight)
         })
         .collect();

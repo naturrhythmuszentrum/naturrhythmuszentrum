@@ -1386,11 +1386,7 @@ fn check_coordinates(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let environment = &state.header(value.header.logical_id())?.environment;
-    budget.check(
-        BudgetKind::PolynomialVariables,
-        size(value.coordinates.len(), AT)?,
-        AT,
-    )?;
+    budget.check(BudgetKind::Edges, size(value.coordinates.len(), AT)?, AT)?;
     let mut seen = std::collections::BTreeSet::new();
     for coordinate in &value.coordinates {
         budget.work(
@@ -1447,6 +1443,11 @@ fn check_family(
     coordinate_role(state, &value.family, &value.header, CoordinateRole::Family)?;
     coordinate_role(state, &value.target, &value.header, CoordinateRole::Unknown)?;
     let family = coordinates(state, value.family.logical_id())?;
+    budget.solving(
+        BudgetKind::FamilyParameters,
+        size(family.coordinates.len(), AT)?,
+        AT,
+    )?;
     let mut scope = value.scope.clone();
     scope.push(
         family
@@ -1739,7 +1740,37 @@ fn check_level(
     {
         return Err(invalid());
     }
+    tower_limits(state, value, budget)?;
     crate::validation::scope_limit(&vec![value.generator.clone()], budget)
+}
+
+/// Observe extension depth and degree product before constructing a new tower level.
+fn tower_limits(
+    state: &State,
+    value: &ExtensionLevelData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let mut depth = 1_u64;
+    let mut product = u64::from(degree(state, &value.polynomial)?);
+    let mut parent = &value.parent;
+    loop {
+        budget.solving(BudgetKind::TowerLevels, depth, AT)?;
+        budget.solving(BudgetKind::TowerDegree, product, AT)?;
+        let CoefficientDomainData::Quotient { level: extension } =
+            coefficient_domain(state, parent)?
+        else {
+            break;
+        };
+        let ancestor = level(state, extension)?;
+        depth = depth
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::TowerLevels, AT))?;
+        product = product
+            .checked_mul(u64::from(degree(state, &ancestor.polynomial)?))
+            .ok_or_else(|| Fault::capacity(BudgetKind::TowerDegree, AT))?;
+        parent = &ancestor.parent;
+    }
+    Ok(())
 }
 
 /// Values have the exact representation belonging to their declared algebra.
@@ -2321,7 +2352,6 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        preflight(draft, budget)?;
         let mut value = draft
             .resolve(&mut |reference| Ok(self.handle(self.resolve(state, reference, locals)?)))?;
         budget.check(BudgetKind::Edges, size(value.objects().len(), AT)?, AT)?;
@@ -3092,13 +3122,20 @@ fn statement_presentation(_cas: &Cas, value: &StatementPresentation) -> Result<(
 }
 
 /// Check semantic collection ceilings before resolving or cloning a caller's payload.
-fn preflight<R>(value: &SolveDraft<R>, budget: &Budget) -> Result<(), Fault> {
+pub(crate) fn preflight<R>(value: &SolveDraft<R>, budget: &mut Budget) -> Result<(), Fault> {
+    staged_resources(value, budget)?;
     let (kind, count) = match value {
         SolveDraft::CoordinateSpace(value) => {
-            (BudgetKind::PolynomialVariables, value.coordinates.len())
+            let family = value
+                .coordinates
+                .iter()
+                .filter(|coordinate| coordinate.role == CoordinateRole::Family)
+                .count();
+            budget.solving(BudgetKind::FamilyParameters, size(family, AT)?, AT)?;
+            (BudgetKind::Edges, value.coordinates.len())
         }
         SolveDraft::Tuple(value) => (BudgetKind::MatrixEntries, value.entries.len()),
-        SolveDraft::SolutionSet(value) => (BudgetKind::CaseArms, value.branches.len()),
+        SolveDraft::SolutionSet(value) => (BudgetKind::SolutionBranches, value.branches.len()),
         SolveDraft::Polynomial(value) => {
             budget.check(
                 BudgetKind::PolynomialVariables,
@@ -3115,17 +3152,27 @@ fn preflight<R>(value: &SolveDraft<R>, budget: &Budget) -> Result<(), Fault> {
             (BudgetKind::PolynomialTerms, value.terms.len())
         }
         SolveDraft::RootSelection(value) => {
-            (BudgetKind::PolynomialVariables, value.relations.len())
+            return budget.solving(
+                BudgetKind::SelectionSlots,
+                size(value.relations.len(), AT)?,
+                AT,
+            );
         }
         SolveDraft::CoefficientMap(value) => {
-            budget.check(
-                BudgetKind::ConditionAtoms,
+            budget.solving(
+                BudgetKind::DenominatorFactors,
                 size(value.denominators.len(), AT)?,
                 AT,
             )?;
             (BudgetKind::Edges, value.images.len())
         }
-        SolveDraft::SolveProblem(value) => (BudgetKind::ConditionAtoms, value.denominators.len()),
+        SolveDraft::SolveProblem(value) => {
+            return budget.solving(
+                BudgetKind::DenominatorFactors,
+                size(value.denominators.len(), AT)?,
+                AT,
+            );
+        }
         SolveDraft::CoefficientValue(CoefficientValueObject {
             value: CoefficientValueData::Tower { coefficients },
             ..
@@ -3138,6 +3185,20 @@ fn preflight<R>(value: &SolveDraft<R>, budget: &Budget) -> Result<(), Fault> {
     };
     budget.check(kind, size(count, AT)?, AT)
 }
+/// Charge every attempted construction before draft encoding or reference cloning.
+fn staged_resources<R>(value: &SolveDraft<R>, budget: &mut Budget) -> Result<(), Fault> {
+    match value {
+        SolveDraft::CoefficientMap(_) => budget.solving(BudgetKind::CoefficientMaps, 1, AT),
+        SolveDraft::ComponentSplit(_) => {
+            budget.solving(BudgetKind::ComponentSplits, 1, AT)?;
+            budget.solving(BudgetKind::SolutionBranches, 2, AT)
+        }
+        SolveDraft::SolutionBranch(_) => budget.solving(BudgetKind::SolutionBranches, 1, AT),
+        SolveDraft::LocalBranch(_) => budget.solving(BudgetKind::LocalBranches, 1, AT),
+        _ => Ok(()),
+    }
+}
+
 /// Retain all syntactic denominator occurrences, even under a later cancellation or zero factor.
 fn original_denominators(
     state: &State,
@@ -3159,11 +3220,11 @@ fn original_denominators(
             _ => None,
         };
         if let Some(denominator) = denominator {
-            budget.check(
-                BudgetKind::ConditionAtoms,
+            budget.solving(
+                BudgetKind::DenominatorFactors,
                 size(denominators.len(), AT)?
                     .checked_add(1)
-                    .ok_or_else(|| Fault::capacity(BudgetKind::ConditionAtoms, AT))?,
+                    .ok_or_else(|| Fault::capacity(BudgetKind::DenominatorFactors, AT))?,
                 AT,
             )?;
             denominators

@@ -83,7 +83,7 @@ impl<'a> Plan<'a> {
         self,
         witness: VerifiedWitness,
         trace: Vec<Handle>,
-        usage: crate::budget::BudgetUsage,
+        usage: &crate::budget::BudgetUsage,
     ) -> SearchResult {
         SearchResult {
             payload: None,
@@ -100,7 +100,7 @@ impl<'a> Plan<'a> {
                 visits: self.visits,
                 dominated: 0,
             },
-            replay_usage: usage,
+            replay_usage: *usage,
             response: None,
         }
     }

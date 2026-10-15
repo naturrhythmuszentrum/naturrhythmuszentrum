@@ -83,7 +83,7 @@ pub(crate) fn execute(
         }
         let mut result = runner
             .plan
-            .finish_retained(witness, trace, runner.checker.usage());
+            .finish_retained(witness, trace, &runner.checker.usage());
         result.payload = Some(Box::new(payload));
         result
     });

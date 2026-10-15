@@ -32,6 +32,25 @@ impl Default for SearchPolicy {
     }
 }
 
+impl SearchPolicy {
+    /// Exact executable solving capability included in service audit and cache identity.
+    #[must_use]
+    pub const fn active_schema_bitmap(&self) -> u32 {
+        crate::solving::active_schema_bitmap()
+    }
+
+    /// Keep policy, capability and mathematical state together in a search cache key.
+    fn state_key(&self, claim: &[u8], budget: &mut Budget) -> Result<Vec<u8>, Fault> {
+        let mut out = crate::encoding::Encoder::new(budget, Location::new("search capability key"));
+        out.name(&self.costs.key)?;
+        crate::wire::index(self.costs.version, &mut out)?;
+        crate::wire::index(self.active_schema_bitmap(), &mut out)?;
+        out.byte(u8::from(self.allow_conditional))?;
+        out.raw(claim)?;
+        Ok(out.finish())
+    }
+}
+
 /// Fixed-size search counters, independent of mathematical truth.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SearchStatistics {
@@ -305,7 +324,8 @@ impl Search {
     ) -> Result<(), Fault> {
         let endpoint = cas.checked(&witness.claim.right)?;
         let rank = rank(cas, endpoint, self.target, budget)?;
-        let key = crate::wire::claim_key(cas, &witness.claim, budget)?;
+        let claim = crate::wire::claim_key(cas, &witness.claim, budget)?;
+        let key = self.policy.state_key(&claim, budget)?;
         let id = self.labels.len();
         if !self
             .frontier

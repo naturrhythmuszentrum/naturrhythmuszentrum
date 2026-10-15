@@ -90,6 +90,7 @@ mod symmetric;
 mod towers;
 
 pub(crate) use registry::check;
+pub use registry::{SOLVE_SCHEMAS, SolveSchema, active_schema_bitmap};
 
 pub use model::{
     AdjunctionMode, BinomialMode, CertificateBinomialCoverage, CertificateCoefficientIdentity,

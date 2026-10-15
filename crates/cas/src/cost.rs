@@ -35,7 +35,7 @@ impl Default for CostPolicy {
     fn default() -> Self {
         Self {
             key: "logical".into(),
-            version: 8,
+            version: 9,
             weights: PRIMITIVES
                 .iter()
                 .map(|primitive| primitive.specification().weight)
@@ -68,7 +68,7 @@ impl CostPolicy {
             return Err(Fault::invalid(InvalidCode::Policy, AT));
         }
         if self.key == "logical"
-            && (self.version < 8 || (self.version == 8 && *self != Self::default()))
+            && (self.version < 9 || (self.version == 9 && *self != Self::default()))
         {
             return Err(Fault::invalid(InvalidCode::Policy, AT));
         }
@@ -108,25 +108,28 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         policy.validate(budget)?;
-        for id in self.state.indices.keys() {
-            budget.work(
-                size(policy.key.len(), AT)?
-                    .checked_add(256)
-                    .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
-                AT,
-            )?;
-            if let Vertex::Policy(previous) = self.state.node(*id)?
-                && previous.key == policy.key
-                && previous.version == policy.version
-            {
-                if *previous == *policy {
-                    return Ok(*id);
-                }
+        let key_bytes = size(policy.key.len(), AT)?;
+        budget.work(
+            key_bytes
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
+            AT,
+        )?;
+        let identity = (policy.key.clone(), policy.version);
+        if let Some(id) = self.state.policies.get(&identity) {
+            let Vertex::Policy(previous) = self.state.node(*id)? else {
                 return Err(Fault::invalid(InvalidCode::Policy, AT));
+            };
+            if *previous == *policy {
+                return Ok(*id);
             }
+            return Err(Fault::invalid(InvalidCode::Policy, AT));
         }
         let mut state = std::mem::replace(&mut self.state, State::new());
         let result = self.insert(&mut state, Vertex::Policy(policy.clone()), &[], 0, budget);
+        if let Ok(id) = &result {
+            state.policies.insert(identity, *id);
+        }
         self.state = state;
         result
     }

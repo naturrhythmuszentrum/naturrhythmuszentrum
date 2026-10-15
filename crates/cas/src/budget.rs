@@ -106,6 +106,48 @@ pub enum BudgetKind {
     PairingSteps,
     /// Reserved bound for proposed zero certificates.
     PullbackZeros,
+    /// Cumulative sealed coefficient calls, including copies and tests.
+    CoefficientOps,
+    /// Peak denominator factors before deduplication.
+    DenominatorFactors,
+    /// Cumulative staged coefficient maps, including failed attempts.
+    CoefficientMaps,
+    /// Maximum extension depth along a dependency path.
+    TowerLevels,
+    /// Maximum product of defining degrees along a path.
+    TowerDegree,
+    /// Cumulative cancellations against defining relations.
+    TowerReductions,
+    /// Cumulative Euclidean remainder iterations.
+    GcdSteps,
+    /// Cumulative binary component splits.
+    ComponentSplits,
+    /// Cumulative permutation actions, including duplicate images.
+    OrbitPermutations,
+    /// Peak distinct members of one orbit.
+    OrbitMembers,
+    /// Cumulative monomial visits during orbit operations.
+    OrbitTerms,
+    /// Cumulative leading monomial subtractions in symmetric reduction.
+    SymmetricSteps,
+    /// Maximum nested strictly decreasing resolvent depth.
+    ResolventDepth,
+    /// Maximum degree of a recursively solved smaller resolvent.
+    ResolventDegree,
+    /// Peak root slots in one joint selection.
+    SelectionSlots,
+    /// Cumulative staged solution branches, including failed candidates.
+    SolutionBranches,
+    /// Maximum free family coordinates per family.
+    FamilyParameters,
+    /// Cumulative identity obligations submitted by solve recipes.
+    SolveIdentities,
+    /// Cumulative attempted pivot inversions.
+    LinearPivots,
+    /// Cumulative Sturm steps and interval refinements.
+    IsolationSteps,
+    /// Cumulative local branch constructions.
+    LocalBranches,
 }
 
 /// Effective finite ceilings for one service call.
@@ -211,6 +253,48 @@ pub struct Limits {
     pub pairing_steps: u64,
     /// Reserved bound for proposed zero certificates.
     pub pullback_zeros: u64,
+    /// Cumulative sealed coefficient calls, including copies and tests.
+    pub coefficient_ops: u64,
+    /// Peak denominator factors before deduplication.
+    pub denominator_factors: u64,
+    /// Cumulative staged coefficient maps, including failed attempts.
+    pub coefficient_maps: u64,
+    /// Maximum extension depth along a dependency path.
+    pub tower_levels: u64,
+    /// Maximum product of defining degrees along a path.
+    pub tower_degree: u64,
+    /// Cumulative cancellations against defining relations.
+    pub tower_reductions: u64,
+    /// Cumulative Euclidean remainder iterations.
+    pub gcd_steps: u64,
+    /// Cumulative binary component splits.
+    pub component_splits: u64,
+    /// Cumulative permutation actions, including duplicate images.
+    pub orbit_permutations: u64,
+    /// Peak distinct members of one orbit.
+    pub orbit_members: u64,
+    /// Cumulative monomial visits during orbit operations.
+    pub orbit_terms: u64,
+    /// Cumulative leading monomial subtractions in symmetric reduction.
+    pub symmetric_steps: u64,
+    /// Maximum nested strictly decreasing resolvent depth.
+    pub resolvent_depth: u64,
+    /// Maximum degree of a recursively solved smaller resolvent.
+    pub resolvent_degree: u64,
+    /// Peak root slots in one joint selection.
+    pub selection_slots: u64,
+    /// Cumulative staged solution branches, including failed candidates.
+    pub solution_branches: u64,
+    /// Maximum free family coordinates per family.
+    pub family_parameters: u64,
+    /// Cumulative identity obligations submitted by solve recipes.
+    pub solve_identities: u64,
+    /// Cumulative attempted pivot inversions.
+    pub linear_pivots: u64,
+    /// Cumulative Sturm steps and interval refinements.
+    pub isolation_steps: u64,
+    /// Cumulative local branch constructions.
+    pub local_branches: u64,
 }
 
 impl Default for Limits {
@@ -266,6 +350,27 @@ impl Default for Limits {
             test_nodes: 256,
             pairing_steps: 4096,
             pullback_zeros: 64,
+            coefficient_ops: 2_000_000,
+            denominator_factors: 256,
+            coefficient_maps: 256,
+            tower_levels: 8,
+            tower_degree: 256,
+            tower_reductions: 100_000,
+            gcd_steps: 100_000,
+            component_splits: 128,
+            orbit_permutations: 40_320,
+            orbit_members: 256,
+            orbit_terms: 262_144,
+            symmetric_steps: 4_096,
+            resolvent_depth: 8,
+            resolvent_degree: 32,
+            selection_slots: 64,
+            solution_branches: 256,
+            family_parameters: 64,
+            solve_identities: 8_192,
+            linear_pivots: 256,
+            isolation_steps: 100_000,
+            local_branches: 64,
         }
     }
 }
@@ -373,9 +478,81 @@ pub struct LimitsOverride {
     pub pairing_steps: Option<u64>,
     /// Override for `pullback_zeros`.
     pub pullback_zeros: Option<u64>,
+    /// Override for `coefficient_ops`.
+    pub coefficient_ops: Option<u64>,
+    /// Override for `denominator_factors`.
+    pub denominator_factors: Option<u64>,
+    /// Override for `coefficient_maps`.
+    pub coefficient_maps: Option<u64>,
+    /// Override for `tower_levels`.
+    pub tower_levels: Option<u64>,
+    /// Override for `tower_degree`.
+    pub tower_degree: Option<u64>,
+    /// Override for `tower_reductions`.
+    pub tower_reductions: Option<u64>,
+    /// Override for `gcd_steps`.
+    pub gcd_steps: Option<u64>,
+    /// Override for `component_splits`.
+    pub component_splits: Option<u64>,
+    /// Override for `orbit_permutations`.
+    pub orbit_permutations: Option<u64>,
+    /// Override for `orbit_members`.
+    pub orbit_members: Option<u64>,
+    /// Override for `orbit_terms`.
+    pub orbit_terms: Option<u64>,
+    /// Override for `symmetric_steps`.
+    pub symmetric_steps: Option<u64>,
+    /// Override for `resolvent_depth`.
+    pub resolvent_depth: Option<u64>,
+    /// Override for `resolvent_degree`.
+    pub resolvent_degree: Option<u64>,
+    /// Override for `selection_slots`.
+    pub selection_slots: Option<u64>,
+    /// Override for `solution_branches`.
+    pub solution_branches: Option<u64>,
+    /// Override for `family_parameters`.
+    pub family_parameters: Option<u64>,
+    /// Override for `solve_identities`.
+    pub solve_identities: Option<u64>,
+    /// Override for `linear_pivots`.
+    pub linear_pivots: Option<u64>,
+    /// Override for `isolation_steps`.
+    pub isolation_steps: Option<u64>,
+    /// Override for `local_branches`.
+    pub local_branches: Option<u64>,
 }
 
 impl Limits {
+    /// The exact finite blind cubic acceptance profile; all other limits keep their defaults.
+    #[must_use]
+    pub fn blind_cubic() -> Self {
+        Self {
+            arithmetic_steps: 1_534_599_168,
+            work: 2_843_222_016,
+            replay_work: 2_843_222_016,
+            component_bits: 64,
+            intermediate_bits: 256,
+            coefficient_ops: 4_472_832,
+            gcd_steps: 82_982_016,
+            tower_reductions: 124_992,
+            orbit_permutations: 3_840,
+            orbit_terms: 196_608,
+            symmetric_steps: 864,
+            tower_levels: 4,
+            tower_degree: 16,
+            orbit_members: 16,
+            resolvent_depth: 4,
+            resolvent_degree: 3,
+            selection_slots: 16,
+            solution_branches: 256,
+            witness_bytes: 4_194_304,
+            output_bytes: 4_194_304,
+            condition_atoms: 1_024,
+            condition_steps: 1_000_000,
+            ..Self::default()
+        }
+    }
+
     /// Validate relationships needed by all service operations.
     ///
     /// # Errors
@@ -446,6 +623,27 @@ impl Limits {
             BudgetKind::TestNodes => self.test_nodes,
             BudgetKind::PairingSteps => self.pairing_steps,
             BudgetKind::PullbackZeros => self.pullback_zeros,
+            BudgetKind::CoefficientOps => self.coefficient_ops,
+            BudgetKind::DenominatorFactors => self.denominator_factors,
+            BudgetKind::CoefficientMaps => self.coefficient_maps,
+            BudgetKind::TowerLevels => self.tower_levels,
+            BudgetKind::TowerDegree => self.tower_degree,
+            BudgetKind::TowerReductions => self.tower_reductions,
+            BudgetKind::GcdSteps => self.gcd_steps,
+            BudgetKind::ComponentSplits => self.component_splits,
+            BudgetKind::OrbitPermutations => self.orbit_permutations,
+            BudgetKind::OrbitMembers => self.orbit_members,
+            BudgetKind::OrbitTerms => self.orbit_terms,
+            BudgetKind::SymmetricSteps => self.symmetric_steps,
+            BudgetKind::ResolventDepth => self.resolvent_depth,
+            BudgetKind::ResolventDegree => self.resolvent_degree,
+            BudgetKind::SelectionSlots => self.selection_slots,
+            BudgetKind::SolutionBranches => self.solution_branches,
+            BudgetKind::FamilyParameters => self.family_parameters,
+            BudgetKind::SolveIdentities => self.solve_identities,
+            BudgetKind::LinearPivots => self.linear_pivots,
+            BudgetKind::IsolationSteps => self.isolation_steps,
+            BudgetKind::LocalBranches => self.local_branches,
         }
     }
 
@@ -455,95 +653,119 @@ impl Limits {
     /// Returns an invalid-policy fault for inconsistent resolved values.
     pub fn resolve(&self, overrides: &LimitsOverride) -> Result<Self, Fault> {
         let mut resolved = Self::default();
-        resolved.source_bytes = overrides.source_bytes.unwrap_or(resolved.source_bytes);
-        resolved.name_bytes = overrides.name_bytes.unwrap_or(resolved.name_bytes);
-        resolved.original_occurrences = overrides
-            .original_occurrences
-            .unwrap_or(resolved.original_occurrences);
-        resolved.depth = overrides.depth.unwrap_or(resolved.depth);
-        resolved.vertices = overrides.vertices.unwrap_or(resolved.vertices);
-        resolved.edges = overrides.edges.unwrap_or(resolved.edges);
-        resolved.staged_vertices = overrides
-            .staged_vertices
-            .unwrap_or(resolved.staged_vertices);
-        resolved.staged_edges = overrides.staged_edges.unwrap_or(resolved.staged_edges);
-        resolved.payload_bytes = overrides.payload_bytes.unwrap_or(resolved.payload_bytes);
-        resolved.staged_payload_bytes = overrides
-            .staged_payload_bytes
-            .unwrap_or(resolved.staged_payload_bytes);
-        resolved.work = overrides.work.unwrap_or(resolved.work);
-        resolved.arithmetic_steps = overrides
-            .arithmetic_steps
-            .unwrap_or(resolved.arithmetic_steps);
-        resolved.component_bits = overrides.component_bits.unwrap_or(resolved.component_bits);
-        resolved.intermediate_bits = overrides
-            .intermediate_bits
-            .unwrap_or(resolved.intermediate_bits);
-        resolved.literal_bytes = overrides.literal_bytes.unwrap_or(resolved.literal_bytes);
-        resolved.decimal_exponent = overrides
-            .decimal_exponent
-            .unwrap_or(resolved.decimal_exponent);
-        resolved.integer_exponent = overrides
-            .integer_exponent
-            .unwrap_or(resolved.integer_exponent);
-        resolved.polynomial_degree = overrides
-            .polynomial_degree
-            .unwrap_or(resolved.polynomial_degree);
-        resolved.polynomial_variables = overrides
-            .polynomial_variables
-            .unwrap_or(resolved.polynomial_variables);
-        resolved.polynomial_terms = overrides
-            .polynomial_terms
-            .unwrap_or(resolved.polynomial_terms);
-        resolved.matrix_entries = overrides.matrix_entries.unwrap_or(resolved.matrix_entries);
-        resolved.condition_atoms = overrides
-            .condition_atoms
-            .unwrap_or(resolved.condition_atoms);
-        resolved.condition_steps = overrides
-            .condition_steps
-            .unwrap_or(resolved.condition_steps);
-        resolved.match_attempts = overrides.match_attempts.unwrap_or(resolved.match_attempts);
-        resolved.match_batch = overrides.match_batch.unwrap_or(resolved.match_batch);
-        resolved.frontier_labels = overrides
-            .frontier_labels
-            .unwrap_or(resolved.frontier_labels);
-        resolved.queue_entries = overrides.queue_entries.unwrap_or(resolved.queue_entries);
-        resolved.transitions = overrides.transitions.unwrap_or(resolved.transitions);
-        resolved.expansion_credits = overrides
-            .expansion_credits
-            .unwrap_or(resolved.expansion_credits);
-        resolved.peak_expression_size = overrides
-            .peak_expression_size
-            .unwrap_or(resolved.peak_expression_size);
-        resolved.proof_nodes = overrides.proof_nodes.unwrap_or(resolved.proof_nodes);
-        resolved.witness_bytes = overrides.witness_bytes.unwrap_or(resolved.witness_bytes);
-        resolved.output_bytes = overrides.output_bytes.unwrap_or(resolved.output_bytes);
-        resolved.diagnostic_records = overrides
-            .diagnostic_records
-            .unwrap_or(resolved.diagnostic_records);
-        resolved.replay_work = overrides.replay_work.unwrap_or(resolved.replay_work);
-        resolved.cost_quota = overrides.cost_quota.unwrap_or(resolved.cost_quota);
-        resolved.progress_quota = overrides.progress_quota.unwrap_or(resolved.progress_quota);
-        resolved.case_arms = overrides.case_arms.unwrap_or(resolved.case_arms);
-        resolved.region_nodes = overrides.region_nodes.unwrap_or(resolved.region_nodes);
-        resolved.region_cells = overrides.region_cells.unwrap_or(resolved.region_cells);
-        resolved.refinement_pairs = overrides
-            .refinement_pairs
-            .unwrap_or(resolved.refinement_pairs);
-        resolved.local_contexts = overrides.local_contexts.unwrap_or(resolved.local_contexts);
-        resolved.hypothesis_depth = overrides
-            .hypothesis_depth
-            .unwrap_or(resolved.hypothesis_depth);
-        resolved.boundary_nodes = overrides.boundary_nodes.unwrap_or(resolved.boundary_nodes);
-        resolved.jet_order = overrides.jet_order.unwrap_or(resolved.jet_order);
-        resolved.jet_entries = overrides.jet_entries.unwrap_or(resolved.jet_entries);
-        resolved.delta_order = overrides.delta_order.unwrap_or(resolved.delta_order);
-        resolved.test_nodes = overrides.test_nodes.unwrap_or(resolved.test_nodes);
-        resolved.pairing_steps = overrides.pairing_steps.unwrap_or(resolved.pairing_steps);
-        resolved.pullback_zeros = overrides.pullback_zeros.unwrap_or(resolved.pullback_zeros);
+        resolved.apply_base_overrides(overrides);
+        resolved.apply_extended_overrides(overrides);
+        resolved.apply_solving_overrides(overrides);
         resolved.intersect(self);
         resolved.validate()?;
         Ok(resolved)
+    }
+
+    /// Resolve the original scalar and graph ceiling options.
+    fn apply_base_overrides(&mut self, overrides: &LimitsOverride) {
+        self.source_bytes = overrides.source_bytes.unwrap_or(self.source_bytes);
+        self.name_bytes = overrides.name_bytes.unwrap_or(self.name_bytes);
+        self.original_occurrences = overrides
+            .original_occurrences
+            .unwrap_or(self.original_occurrences);
+        self.depth = overrides.depth.unwrap_or(self.depth);
+        self.vertices = overrides.vertices.unwrap_or(self.vertices);
+        self.edges = overrides.edges.unwrap_or(self.edges);
+        self.staged_vertices = overrides.staged_vertices.unwrap_or(self.staged_vertices);
+        self.staged_edges = overrides.staged_edges.unwrap_or(self.staged_edges);
+        self.payload_bytes = overrides.payload_bytes.unwrap_or(self.payload_bytes);
+        self.staged_payload_bytes = overrides
+            .staged_payload_bytes
+            .unwrap_or(self.staged_payload_bytes);
+        self.work = overrides.work.unwrap_or(self.work);
+        self.arithmetic_steps = overrides.arithmetic_steps.unwrap_or(self.arithmetic_steps);
+        self.component_bits = overrides.component_bits.unwrap_or(self.component_bits);
+        self.intermediate_bits = overrides
+            .intermediate_bits
+            .unwrap_or(self.intermediate_bits);
+        self.literal_bytes = overrides.literal_bytes.unwrap_or(self.literal_bytes);
+        self.decimal_exponent = overrides.decimal_exponent.unwrap_or(self.decimal_exponent);
+        self.integer_exponent = overrides.integer_exponent.unwrap_or(self.integer_exponent);
+        self.polynomial_degree = overrides
+            .polynomial_degree
+            .unwrap_or(self.polynomial_degree);
+        self.polynomial_variables = overrides
+            .polynomial_variables
+            .unwrap_or(self.polynomial_variables);
+        self.polynomial_terms = overrides.polynomial_terms.unwrap_or(self.polynomial_terms);
+        self.matrix_entries = overrides.matrix_entries.unwrap_or(self.matrix_entries);
+        self.condition_atoms = overrides.condition_atoms.unwrap_or(self.condition_atoms);
+        self.condition_steps = overrides.condition_steps.unwrap_or(self.condition_steps);
+        self.match_attempts = overrides.match_attempts.unwrap_or(self.match_attempts);
+        self.match_batch = overrides.match_batch.unwrap_or(self.match_batch);
+        self.frontier_labels = overrides.frontier_labels.unwrap_or(self.frontier_labels);
+        self.queue_entries = overrides.queue_entries.unwrap_or(self.queue_entries);
+        self.transitions = overrides.transitions.unwrap_or(self.transitions);
+    }
+
+    /// Resolve the search, piecewise and calculus ceiling options.
+    fn apply_extended_overrides(&mut self, overrides: &LimitsOverride) {
+        self.expansion_credits = overrides
+            .expansion_credits
+            .unwrap_or(self.expansion_credits);
+        self.peak_expression_size = overrides
+            .peak_expression_size
+            .unwrap_or(self.peak_expression_size);
+        self.proof_nodes = overrides.proof_nodes.unwrap_or(self.proof_nodes);
+        self.witness_bytes = overrides.witness_bytes.unwrap_or(self.witness_bytes);
+        self.output_bytes = overrides.output_bytes.unwrap_or(self.output_bytes);
+        self.diagnostic_records = overrides
+            .diagnostic_records
+            .unwrap_or(self.diagnostic_records);
+        self.replay_work = overrides.replay_work.unwrap_or(self.replay_work);
+        self.cost_quota = overrides.cost_quota.unwrap_or(self.cost_quota);
+        self.progress_quota = overrides.progress_quota.unwrap_or(self.progress_quota);
+        self.case_arms = overrides.case_arms.unwrap_or(self.case_arms);
+        self.region_nodes = overrides.region_nodes.unwrap_or(self.region_nodes);
+        self.region_cells = overrides.region_cells.unwrap_or(self.region_cells);
+        self.refinement_pairs = overrides.refinement_pairs.unwrap_or(self.refinement_pairs);
+        self.local_contexts = overrides.local_contexts.unwrap_or(self.local_contexts);
+        self.hypothesis_depth = overrides.hypothesis_depth.unwrap_or(self.hypothesis_depth);
+        self.boundary_nodes = overrides.boundary_nodes.unwrap_or(self.boundary_nodes);
+        self.jet_order = overrides.jet_order.unwrap_or(self.jet_order);
+        self.jet_entries = overrides.jet_entries.unwrap_or(self.jet_entries);
+        self.delta_order = overrides.delta_order.unwrap_or(self.delta_order);
+        self.test_nodes = overrides.test_nodes.unwrap_or(self.test_nodes);
+        self.pairing_steps = overrides.pairing_steps.unwrap_or(self.pairing_steps);
+        self.pullback_zeros = overrides.pullback_zeros.unwrap_or(self.pullback_zeros);
+    }
+
+    /// Resolve all solving ceilings before intersecting with the store.
+    fn apply_solving_overrides(&mut self, overrides: &LimitsOverride) {
+        self.coefficient_ops = overrides.coefficient_ops.unwrap_or(self.coefficient_ops);
+        self.denominator_factors = overrides
+            .denominator_factors
+            .unwrap_or(self.denominator_factors);
+        self.coefficient_maps = overrides.coefficient_maps.unwrap_or(self.coefficient_maps);
+        self.tower_levels = overrides.tower_levels.unwrap_or(self.tower_levels);
+        self.tower_degree = overrides.tower_degree.unwrap_or(self.tower_degree);
+        self.tower_reductions = overrides.tower_reductions.unwrap_or(self.tower_reductions);
+        self.gcd_steps = overrides.gcd_steps.unwrap_or(self.gcd_steps);
+        self.component_splits = overrides.component_splits.unwrap_or(self.component_splits);
+        self.orbit_permutations = overrides
+            .orbit_permutations
+            .unwrap_or(self.orbit_permutations);
+        self.orbit_members = overrides.orbit_members.unwrap_or(self.orbit_members);
+        self.orbit_terms = overrides.orbit_terms.unwrap_or(self.orbit_terms);
+        self.symmetric_steps = overrides.symmetric_steps.unwrap_or(self.symmetric_steps);
+        self.resolvent_depth = overrides.resolvent_depth.unwrap_or(self.resolvent_depth);
+        self.resolvent_degree = overrides.resolvent_degree.unwrap_or(self.resolvent_degree);
+        self.selection_slots = overrides.selection_slots.unwrap_or(self.selection_slots);
+        self.solution_branches = overrides
+            .solution_branches
+            .unwrap_or(self.solution_branches);
+        self.family_parameters = overrides
+            .family_parameters
+            .unwrap_or(self.family_parameters);
+        self.solve_identities = overrides.solve_identities.unwrap_or(self.solve_identities);
+        self.linear_pivots = overrides.linear_pivots.unwrap_or(self.linear_pivots);
+        self.isolation_steps = overrides.isolation_steps.unwrap_or(self.isolation_steps);
+        self.local_branches = overrides.local_branches.unwrap_or(self.local_branches);
     }
 
     /// Intersect every component with the permanent store ceiling.
@@ -598,6 +820,32 @@ impl Limits {
         self.test_nodes = self.test_nodes.min(store.test_nodes);
         self.pairing_steps = self.pairing_steps.min(store.pairing_steps);
         self.pullback_zeros = self.pullback_zeros.min(store.pullback_zeros);
+        self.intersect_solving(store);
+    }
+
+    /// Intersect the independently named solving ceilings.
+    fn intersect_solving(&mut self, store: &Self) {
+        self.coefficient_ops = self.coefficient_ops.min(store.coefficient_ops);
+        self.denominator_factors = self.denominator_factors.min(store.denominator_factors);
+        self.coefficient_maps = self.coefficient_maps.min(store.coefficient_maps);
+        self.tower_levels = self.tower_levels.min(store.tower_levels);
+        self.tower_degree = self.tower_degree.min(store.tower_degree);
+        self.tower_reductions = self.tower_reductions.min(store.tower_reductions);
+        self.gcd_steps = self.gcd_steps.min(store.gcd_steps);
+        self.component_splits = self.component_splits.min(store.component_splits);
+        self.orbit_permutations = self.orbit_permutations.min(store.orbit_permutations);
+        self.orbit_members = self.orbit_members.min(store.orbit_members);
+        self.orbit_terms = self.orbit_terms.min(store.orbit_terms);
+        self.symmetric_steps = self.symmetric_steps.min(store.symmetric_steps);
+        self.resolvent_depth = self.resolvent_depth.min(store.resolvent_depth);
+        self.resolvent_degree = self.resolvent_degree.min(store.resolvent_degree);
+        self.selection_slots = self.selection_slots.min(store.selection_slots);
+        self.solution_branches = self.solution_branches.min(store.solution_branches);
+        self.family_parameters = self.family_parameters.min(store.family_parameters);
+        self.solve_identities = self.solve_identities.min(store.solve_identities);
+        self.linear_pivots = self.linear_pivots.min(store.linear_pivots);
+        self.isolation_steps = self.isolation_steps.min(store.isolation_steps);
+        self.local_branches = self.local_branches.min(store.local_branches);
     }
 }
 
@@ -636,6 +884,154 @@ pub struct BudgetUsage {
     pub pairing_steps: u64,
     /// Reserved bound for proposed zero certificates.
     pub pullback_zeros: u64,
+    /// Cumulative sealed coefficient calls, including copies and tests.
+    pub coefficient_ops: u64,
+    /// Peak denominator factors before deduplication.
+    pub denominator_factors: u64,
+    /// Cumulative staged coefficient maps, including failed attempts.
+    pub coefficient_maps: u64,
+    /// Maximum extension depth along a dependency path.
+    pub tower_levels: u64,
+    /// Maximum product of defining degrees along a path.
+    pub tower_degree: u64,
+    /// Cumulative cancellations against defining relations.
+    pub tower_reductions: u64,
+    /// Cumulative Euclidean remainder iterations.
+    pub gcd_steps: u64,
+    /// Cumulative binary component splits.
+    pub component_splits: u64,
+    /// Cumulative permutation actions, including duplicate images.
+    pub orbit_permutations: u64,
+    /// Peak distinct members of one orbit.
+    pub orbit_members: u64,
+    /// Cumulative monomial visits during orbit operations.
+    pub orbit_terms: u64,
+    /// Cumulative leading monomial subtractions in symmetric reduction.
+    pub symmetric_steps: u64,
+    /// Maximum nested strictly decreasing resolvent depth.
+    pub resolvent_depth: u64,
+    /// Maximum degree of a recursively solved smaller resolvent.
+    pub resolvent_degree: u64,
+    /// Peak root slots in one joint selection.
+    pub selection_slots: u64,
+    /// Cumulative staged solution branches, including failed candidates.
+    pub solution_branches: u64,
+    /// Maximum free family coordinates per family.
+    pub family_parameters: u64,
+    /// Cumulative identity obligations submitted by solve recipes.
+    pub solve_identities: u64,
+    /// Cumulative attempted pivot inversions.
+    pub linear_pivots: u64,
+    /// Cumulative Sturm steps and interval refinements.
+    pub isolation_steps: u64,
+    /// Cumulative local branch constructions.
+    pub local_branches: u64,
+}
+
+impl BudgetKind {
+    /// The fixed counting rule for a solving resource, independent of the caller.
+    pub(crate) const fn solving_cumulative(self) -> Option<bool> {
+        match self {
+            Self::CoefficientOps
+            | Self::CoefficientMaps
+            | Self::TowerReductions
+            | Self::GcdSteps
+            | Self::ComponentSplits
+            | Self::OrbitPermutations
+            | Self::OrbitTerms
+            | Self::SymmetricSteps
+            | Self::SolutionBranches
+            | Self::SolveIdentities
+            | Self::LinearPivots
+            | Self::IsolationSteps
+            | Self::LocalBranches => Some(true),
+            Self::DenominatorFactors
+            | Self::TowerLevels
+            | Self::TowerDegree
+            | Self::OrbitMembers
+            | Self::ResolventDepth
+            | Self::ResolventDegree
+            | Self::SelectionSlots
+            | Self::FamilyParameters => Some(false),
+            _ => None,
+        }
+    }
+}
+
+impl BudgetUsage {
+    /// Borrow a solving counter without accepting unrelated resource kinds.
+    const fn solving_counter(&mut self, kind: BudgetKind) -> Option<&mut u64> {
+        match kind {
+            BudgetKind::CoefficientOps => Some(&mut self.coefficient_ops),
+            BudgetKind::DenominatorFactors => Some(&mut self.denominator_factors),
+            BudgetKind::CoefficientMaps => Some(&mut self.coefficient_maps),
+            BudgetKind::TowerLevels => Some(&mut self.tower_levels),
+            BudgetKind::TowerDegree => Some(&mut self.tower_degree),
+            BudgetKind::TowerReductions => Some(&mut self.tower_reductions),
+            BudgetKind::GcdSteps => Some(&mut self.gcd_steps),
+            BudgetKind::ComponentSplits => Some(&mut self.component_splits),
+            BudgetKind::OrbitPermutations => Some(&mut self.orbit_permutations),
+            BudgetKind::OrbitMembers => Some(&mut self.orbit_members),
+            BudgetKind::OrbitTerms => Some(&mut self.orbit_terms),
+            BudgetKind::SymmetricSteps => Some(&mut self.symmetric_steps),
+            BudgetKind::ResolventDepth => Some(&mut self.resolvent_depth),
+            BudgetKind::ResolventDegree => Some(&mut self.resolvent_degree),
+            BudgetKind::SelectionSlots => Some(&mut self.selection_slots),
+            BudgetKind::SolutionBranches => Some(&mut self.solution_branches),
+            BudgetKind::FamilyParameters => Some(&mut self.family_parameters),
+            BudgetKind::SolveIdentities => Some(&mut self.solve_identities),
+            BudgetKind::LinearPivots => Some(&mut self.linear_pivots),
+            BudgetKind::IsolationSteps => Some(&mut self.isolation_steps),
+            BudgetKind::LocalBranches => Some(&mut self.local_branches),
+            _ => None,
+        }
+    }
+
+    /// Encode every usage counter in the stable audit order.
+    pub(crate) fn encode(&self, out: &mut crate::encoding::Encoder<'_>) -> Result<(), Fault> {
+        for value in [
+            self.work,
+            self.arithmetic_steps,
+            self.condition_steps,
+            self.case_arms,
+            self.region_nodes,
+            self.region_cells,
+            self.refinement_pairs,
+            self.local_contexts,
+            self.hypothesis_depth,
+            self.boundary_nodes,
+            self.jet_order,
+            self.jet_entries,
+            self.delta_order,
+            self.test_nodes,
+            self.pairing_steps,
+            self.pullback_zeros,
+            self.coefficient_ops,
+            self.denominator_factors,
+            self.coefficient_maps,
+            self.tower_levels,
+            self.tower_degree,
+            self.tower_reductions,
+            self.gcd_steps,
+            self.component_splits,
+            self.orbit_permutations,
+            self.orbit_members,
+            self.orbit_terms,
+            self.symmetric_steps,
+            self.resolvent_depth,
+            self.resolvent_degree,
+            self.selection_slots,
+            self.solution_branches,
+            self.family_parameters,
+            self.solve_identities,
+            self.linear_pivots,
+            self.isolation_steps,
+            self.local_branches,
+        ] {
+            out.unsigned(value)?;
+        }
+        Ok(())
+    }
 }
 
 /// A finite work ledger, shared by all operations in a call.
@@ -747,6 +1143,31 @@ impl Budget {
         Ok(())
     }
 
+    /// Charge a solving operation or observe an attempted peak using its fixed counting rule.
+    /// Failed operations retain their attempted usage; no transaction refunds these counters.
+    ///
+    /// # Errors
+    /// Refuses non-solving kinds, arithmetic overflow, and exhausted semantic or work limits.
+    pub fn solving(&mut self, kind: BudgetKind, amount: u64, at: Location) -> Result<(), Fault> {
+        let cumulative = kind
+            .solving_cumulative()
+            .ok_or_else(|| Fault::invalid(InvalidCode::Policy, at))?;
+        let counter = self
+            .usage
+            .solving_counter(kind)
+            .ok_or_else(|| Fault::invalid(InvalidCode::Policy, at))?;
+        let next = if cumulative {
+            counter
+                .checked_add(amount)
+                .ok_or_else(|| Fault::capacity(kind, at))?
+        } else {
+            (*counter).max(amount)
+        };
+        *counter = next;
+        self.check(kind, next, at)?;
+        self.work(1, at)
+    }
+
     /// Prepay a specialized resource, counting cumulative work or observing a peak.
     pub(crate) fn specialized(
         &mut self,
@@ -833,7 +1254,7 @@ impl Budget {
 }
 
 /// Complete stable order for effective-limit records.
-pub(crate) const ALL_KINDS: [BudgetKind; 50] = [
+pub(crate) const ALL_KINDS: [BudgetKind; 71] = [
     BudgetKind::SourceBytes,
     BudgetKind::NameBytes,
     BudgetKind::OriginalOccurrences,
@@ -884,4 +1305,25 @@ pub(crate) const ALL_KINDS: [BudgetKind; 50] = [
     BudgetKind::TestNodes,
     BudgetKind::PairingSteps,
     BudgetKind::PullbackZeros,
+    BudgetKind::CoefficientOps,
+    BudgetKind::DenominatorFactors,
+    BudgetKind::CoefficientMaps,
+    BudgetKind::TowerLevels,
+    BudgetKind::TowerDegree,
+    BudgetKind::TowerReductions,
+    BudgetKind::GcdSteps,
+    BudgetKind::ComponentSplits,
+    BudgetKind::OrbitPermutations,
+    BudgetKind::OrbitMembers,
+    BudgetKind::OrbitTerms,
+    BudgetKind::SymmetricSteps,
+    BudgetKind::ResolventDepth,
+    BudgetKind::ResolventDegree,
+    BudgetKind::SelectionSlots,
+    BudgetKind::SolutionBranches,
+    BudgetKind::FamilyParameters,
+    BudgetKind::SolveIdentities,
+    BudgetKind::LinearPivots,
+    BudgetKind::IsolationSteps,
+    BudgetKind::LocalBranches,
 ];

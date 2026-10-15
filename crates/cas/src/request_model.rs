@@ -212,7 +212,7 @@ pub enum Outcome {
         /// Previously replayed solving facts, if any.
         solve_best: Option<Box<crate::solving::SolveAnswer>>,
         /// Only a previously checked result may survive later exhaustion.
-        best: Option<crate::search::SearchResult>,
+        best: Option<Box<crate::search::SearchResult>>,
         /// Independent checker work consumed before refusal.
         replay_usage: BudgetUsage,
         /// Exact limit/range failure.
@@ -305,13 +305,16 @@ impl Cas {
 }
 
 /// Classify a typed failure without trusting a searcher's success flag.
-pub(crate) const fn failure(fault: Fault, usage: BudgetUsage) -> Outcome {
+pub(crate) const fn failure(fault: Fault, usage: &BudgetUsage) -> Outcome {
     match fault.kind {
-        FaultKind::Invalid(_) => Outcome::Invalid { fault, usage },
+        FaultKind::Invalid(_) => Outcome::Invalid {
+            fault,
+            usage: *usage,
+        },
         FaultKind::Exhausted { .. } => Outcome::Exhausted {
             solve_best: None,
             fault,
-            usage,
+            usage: *usage,
             best: None,
             replay_usage: BudgetUsage {
                 work: 0,
@@ -330,6 +333,27 @@ pub(crate) const fn failure(fault: Fault, usage: BudgetUsage) -> Outcome {
                 test_nodes: 0,
                 pairing_steps: 0,
                 pullback_zeros: 0,
+                coefficient_ops: 0,
+                denominator_factors: 0,
+                coefficient_maps: 0,
+                tower_levels: 0,
+                tower_degree: 0,
+                tower_reductions: 0,
+                gcd_steps: 0,
+                component_splits: 0,
+                orbit_permutations: 0,
+                orbit_members: 0,
+                orbit_terms: 0,
+                symmetric_steps: 0,
+                resolvent_depth: 0,
+                resolvent_degree: 0,
+                selection_slots: 0,
+                solution_branches: 0,
+                family_parameters: 0,
+                solve_identities: 0,
+                linear_pivots: 0,
+                isolation_steps: 0,
+                local_branches: 0,
             },
         },
     }

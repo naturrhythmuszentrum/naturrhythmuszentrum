@@ -686,6 +686,8 @@ pub(crate) struct State {
     pub(crate) indices: BTreeMap<LogicalId, NodeIndex<u32>>,
     /// Exact canonical syntax/context/condition keys.
     pub(crate) intern: BTreeMap<Vec<u8>, LogicalId>,
+    /// Immutable policy identity lookup, independent of unrelated graph records.
+    pub(crate) policies: BTreeMap<(String, u32), LogicalId>,
     /// Next serial per kind, independent of graph indices.
     next: BTreeMap<VertexKind, u64>,
     /// Source key lookup used to reject conflicting source bytes.
@@ -709,6 +711,7 @@ impl State {
             graph: DiGraph::new(),
             indices: BTreeMap::new(),
             intern: BTreeMap::new(),
+            policies: BTreeMap::new(),
             next: BTreeMap::new(),
             sources: BTreeMap::new(),
             parents: BTreeMap::new(),
@@ -1075,6 +1078,11 @@ impl Cas {
             return Ok(Vec::new());
         }
         let at = Location::new("transaction");
+        for draft in drafts {
+            if let Draft::Solve(value) = draft {
+                crate::solving::graph::preflight(value, budget)?;
+            }
+        }
         let pending = crate::validation::draft_payload(drafts, budget)?;
         let reserved = size(self.state.next.len(), at)?
             .checked_mul(64)

@@ -4,6 +4,8 @@
 /// A compiled checker whose mathematical meaning is fixed by semantic version one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
+    /// One registered solving schema, available only when its owning checker is enabled.
+    Solve(crate::solving::SolveSchema),
     /// Affine delta pullback with both spaces, inverse and absolute Jacobian.
     DistAffinePullback,
     /// Complete rational-root factorization with nonzero slopes at every zero.
@@ -127,6 +129,8 @@ pub enum Primitive {
 /// Typed conclusion family selected by an executable checker.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ConclusionKind {
+    /// Native typed solution, coefficient, root, family or local fact.
+    Solve,
     /// Finite limit or polynomial series on an explicit approach.
     Germ,
     /// Finite split integral or sum.
@@ -156,6 +160,8 @@ pub enum ConclusionKind {
 /// Premise shape is explicit independently of certificate representation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PremiseShape {
+    /// Ordered solving evidence consumed by the exact certificate subtype and mode.
+    SolveEvidence,
     /// Ordered analytic and distribution facts consumed by the closed schema.
     DistributionEvidence,
     /// Exactly the ordered premises consumed by the closed boundary mode.
@@ -173,6 +179,8 @@ pub enum PremiseShape {
 /// The sole auxiliary schema admitted by one primitive.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CertificateSchema {
+    /// One exact typed solving certificate subtype.
+    Solve,
     /// Finite factorization, zero and inverse-Jacobian evidence.
     Pullback,
     /// Exact polynomial side remainders.
@@ -216,7 +224,7 @@ pub struct RuleSpec {
     pub premises: PremiseShape,
     /// Exact auxiliary-data schema; an absent producer cannot register a placeholder.
     pub certificate: CertificateSchema,
-    /// Every listed primitive has an executable independent checker.
+    /// Whether this build has an executable independent checker for this registered schema.
     pub available: bool,
 }
 
@@ -225,7 +233,8 @@ impl Primitive {
     pub(crate) const fn native(self) -> bool {
         matches!(
             self,
-            Self::DistAffinePullback
+            Self::Solve(_)
+                | Self::DistAffinePullback
                 | Self::DistSimpleZeroPullback
                 | Self::DistPrimitiveUnique
                 | Self::LimitCaseRestrict
@@ -261,6 +270,7 @@ impl Primitive {
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
+            Self::Solve(schema) => return schema.specification(),
             Self::DistAffinePullback => ("dist.affine-pullback", 12),
             Self::DistSimpleZeroPullback => ("dist.simple-zero-pullback", 12),
             Self::DistPrimitiveUnique => ("dist.primitive-unique", 8),
@@ -336,6 +346,7 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
+            Self::Solve(_) => ConclusionKind::Solve,
             Self::LimitCaseRestrict | Self::SeriesCaseRestrict => ConclusionKind::Germ,
             Self::IntegralCaseSplit | Self::SumCaseSplit => ConclusionKind::Split,
             Self::DistAffinePullback
@@ -378,6 +389,7 @@ impl Primitive {
     /// Fixed and dependent ordered-premise arities remain visible in the registry.
     const fn premise_shape(self) -> PremiseShape {
         match self {
+            Self::Solve(_) => PremiseShape::SolveEvidence,
             Self::DistPrimitiveUnique
             | Self::DistRegular
             | Self::DistAe
@@ -419,6 +431,7 @@ impl Primitive {
     /// Certificate meaning is independent of a statement's wire representation.
     const fn certificate_schema(self) -> CertificateSchema {
         match self {
+            Self::Solve(_) => CertificateSchema::Solve,
             Self::DistAffinePullback | Self::DistSimpleZeroPullback => CertificateSchema::Pullback,
             Self::SeriesCaseRestrict => CertificateSchema::Germ,
             Self::IntegralCaseSplit | Self::SumCaseSplit => CertificateSchema::Split,
@@ -449,13 +462,15 @@ impl Primitive {
     }
 }
 
-/// Every admitted primitive, in lexical key order.
-pub const PRIMITIVES: [Primitive; 59] = [
+/// Every registered primitive, in ASCII key order; availability is separate metadata.
+pub const PRIMITIVES: [Primitive; 77] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
     Primitive::CaseOrdered,
     Primitive::CaseSelect,
+    Primitive::Solve(crate::solving::SolveSchema::CoefficientIdentity),
+    Primitive::Solve(crate::solving::SolveSchema::ConjugationTransport),
     Primitive::ContextClose,
     Primitive::ContextHypothesis,
     Primitive::ContextWeaken,
@@ -500,14 +515,30 @@ pub const PRIMITIVES: [Primitive; 59] = [
     Primitive::Symmetry,
     Primitive::Transitivity,
     Primitive::Exact,
+    Primitive::Solve(crate::solving::SolveSchema::RootAdjunction),
+    Primitive::Solve(crate::solving::SolveSchema::ComponentSplit),
+    Primitive::Solve(crate::solving::SolveSchema::ExtensionUnit),
     Primitive::IntegralCaseSplit,
     Primitive::JetPolynomial,
     Primitive::LimitCaseRestrict,
+    Primitive::Solve(crate::solving::SolveSchema::ExactLinearEquivalence),
+    Primitive::Solve(crate::solving::SolveSchema::PermutationOrbitCoverage),
     Primitive::Jets,
     Primitive::RationalIdentity,
     Primitive::SquareFree,
     Primitive::RegionConstruct,
     Primitive::RegionDecide,
+    Primitive::Solve(crate::solving::SolveSchema::BinomialCoverage),
+    Primitive::Solve(crate::solving::SolveSchema::RealIsolationAndOrder),
+    Primitive::Solve(crate::solving::SolveSchema::RootSelectionRefinement),
     Primitive::SeriesCaseRestrict,
+    Primitive::Solve(crate::solving::SolveSchema::ParameterImageCoverage),
+    Primitive::Solve(crate::solving::SolveSchema::ImplicitFunctionBranch),
+    Primitive::Solve(crate::solving::SolveSchema::Membership),
+    Primitive::Solve(crate::solving::SolveSchema::MultiplicityTransfer),
+    Primitive::Solve(crate::solving::SolveSchema::ProductCompleteness),
+    Primitive::Solve(crate::solving::SolveSchema::RealRestriction),
+    Primitive::Solve(crate::solving::SolveSchema::TotalPredicateSplit),
+    Primitive::Solve(crate::solving::SolveSchema::SolutionTransport),
     Primitive::SumCaseSplit,
 ];

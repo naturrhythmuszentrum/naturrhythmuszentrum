@@ -104,7 +104,11 @@ impl<'a, 'b> Reader<'a, 'b> {
         item_bytes: u64,
     ) -> Result<usize, Fault> {
         let count = u64::from(self.index()?);
-        self.budget.check(kind, count, AT)?;
+        if kind.solving_cumulative() == Some(false) {
+            self.budget.solving(kind, count, AT)?;
+        } else {
+            self.budget.check(kind, count, AT)?;
+        }
         let needed = count.checked_mul(minimum).ok_or_else(invalid)?;
         let remaining = self
             .bytes
