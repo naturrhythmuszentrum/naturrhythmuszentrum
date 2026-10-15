@@ -114,3 +114,86 @@ fn coefficient_gaussian_fresh_replay() -> TestResult {
     );
     Ok(())
 }
+
+/// Linked algebraic values, exact units and a reducible-level cover replay together in both components.
+/// ´test:integration:linked-adjunction-component-lifecycle´
+#[test]
+fn linked_adjunction_component_lifecycle() -> TestResult {
+    use crate::testing::solve_coefficients::SplitFixture;
+    let mut source = SplitFixture::linked()?;
+    linked_component_domains(&source)?;
+    let witness = source.unit.base.cas.check_proof(
+        &source.unit.base.context,
+        &source.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let bytes = source
+        .unit
+        .base
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let mut target = SplitFixture::linked()?;
+    let expected = target.unit.base.cas.check_proof(
+        &target.unit.base.context,
+        &target.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let checked = target.unit.base.cas.replay(
+        &bytes,
+        expected.judgment(),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.judgment(), expected.judgment());
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals, []);
+    assert_eq!(
+        target
+            .unit
+            .base
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    assert_eq!(nrz_cas::solving::active_schema_bitmap() & 15, 15);
+    Ok(())
+}
+
+/// Each projected v-u relation really has the corresponding child quotient as its coefficient domain.
+fn linked_component_domains(
+    fixture: &crate::testing::solve_coefficients::SplitFixture,
+) -> TestResult {
+    use nrz_cas::proof::Statement;
+    use nrz_cas::solving::{SolveStatement, SolveView};
+    let mut domains = Vec::new();
+    let children = fixture.children()?;
+    for step in &fixture.steps {
+        let Statement::Solve(statement) = &step.conclusion else {
+            continue;
+        };
+        let SolveStatement::RootExistence(existence) = statement.as_ref() else {
+            continue;
+        };
+        let SolveView::RootSelection(selection) =
+            fixture.unit.base.cas.solve_view(&existence.relation)?
+        else {
+            return Err("missing exact root selection".into());
+        };
+        let relation = selection
+            .relations
+            .first()
+            .ok_or("missing linked relation")?;
+        let SolveView::RootRelation(relation) = fixture.unit.base.cas.solve_view(relation)? else {
+            return Err("wrong linked relation".into());
+        };
+        let SolveView::Polynomial(polynomial) =
+            fixture.unit.base.cas.solve_view(&relation.polynomial)?
+        else {
+            return Err("wrong linked polynomial".into());
+        };
+        if children.contains(&polynomial.domain) {
+            domains.push(polynomial.domain.clone());
+        }
+    }
+    assert_eq!(domains.as_slice(), children.as_slice());
+    Ok(())
+}

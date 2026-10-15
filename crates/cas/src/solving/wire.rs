@@ -3613,7 +3613,12 @@ impl<R> SolveCertificate<R> {
                 value.mode != IdentityMode::Normalize || value.combinations.is_empty()
             }
             Self::RootAdjunction(value) => {
-                (value.mode == AdjunctionMode::PrimitiveUnity) == value.order.is_some()
+                matches!(
+                    value.mode,
+                    AdjunctionMode::PrimitiveUnity
+                        | AdjunctionMode::RealOddRoot
+                        | AdjunctionMode::PositiveRealSquareRoot
+                ) == value.order.is_some()
                     && value.order != Some(0)
             }
             Self::TotalPredicateSplit(value) => {

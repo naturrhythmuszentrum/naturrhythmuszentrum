@@ -295,6 +295,291 @@ fn coefficient_identity_mutation() -> TestResult {
     Ok(())
 }
 
+/// FTA, primitive unity and the named real-root subcases check their exact existence hypotheses.
+/// ´test:integration:root-adjunction-subcases´
+#[test]
+fn root_adjunction_subcases() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    use nrz_cas::proof::Statement;
+    use nrz_cas::solving::{AdjunctionMode, SolveStatement};
+    use nrz_cas::syntax::Field;
+    let cases = [
+        (
+            vec![(vec![2], 1), (vec![0], 1)],
+            Field::Complex,
+            AdjunctionMode::ComplexFTA,
+            None,
+        ),
+        (
+            vec![(vec![2], 1), (vec![0], 1)],
+            Field::Complex,
+            AdjunctionMode::AlgebraicClosure,
+            None,
+        ),
+        (
+            vec![(vec![2], 1), (vec![1], 1), (vec![0], 1)],
+            Field::Complex,
+            AdjunctionMode::PrimitiveUnity,
+            Some(3),
+        ),
+        (
+            vec![(vec![6], 1), (vec![3], 1), (vec![0], 1)],
+            Field::Complex,
+            AdjunctionMode::PrimitiveUnity,
+            Some(9),
+        ),
+        (
+            vec![(vec![3], 1), (vec![0], -2)],
+            Field::Real,
+            AdjunctionMode::RealOddRoot,
+            Some(3),
+        ),
+        (
+            vec![(vec![3], 1), (vec![0], 8)],
+            Field::Real,
+            AdjunctionMode::RealOddRoot,
+            Some(3),
+        ),
+        (
+            vec![(vec![2], 1), (vec![0], -2)],
+            Field::Real,
+            AdjunctionMode::PositiveRealSquareRoot,
+            Some(2),
+        ),
+    ];
+    for (polynomial, field, mode, order) in cases {
+        let mut fixture = AdjunctionFixture::new(&polynomial, &field, mode, order)?;
+        let checked = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+        let Statement::Solve(statement) = &checked.judgment().statement else {
+            return Err("wrong root statement".into());
+        };
+        let SolveStatement::RootExistence(existence) = statement.as_ref() else {
+            return Err("existence was strengthened".into());
+        };
+        assert_eq!(existence.relation, fixture.selection);
+        assert_ne!(fixture.relation, fixture.selection);
+    }
+    Ok(())
+}
+
+/// Changed primitive order, missing leading evidence, real sign and uniqueness claims are independently rejected.
+/// ´test:integration:root-adjunction-mutations´
+#[test]
+fn root_adjunction_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    use nrz_cas::proof::{Certificate, Statement};
+    use nrz_cas::solving::{
+        AdjunctionMode, SolveCertificate, SolveStatement, StatementSelectionUnique,
+    };
+    use nrz_cas::syntax::Field;
+    let mut fixture = AdjunctionFixture::new(
+        &[(vec![2], 1), (vec![1], 1), (vec![0], 1)],
+        &Field::Complex,
+        AdjunctionMode::PrimitiveUnity,
+        Some(3),
+    )?;
+    for mutation in 0..3 {
+        let mut steps = fixture.steps.clone();
+        let step = steps.last_mut().ok_or("missing root step")?;
+        if mutation == 2 {
+            step.conclusion = Statement::Solve(Box::new(SolveStatement::SelectionUnique(
+                StatementSelectionUnique {
+                    selection: fixture.selection.clone(),
+                    region: fixture.base.region.clone(),
+                },
+            )));
+        } else {
+            let Certificate::Solve(certificate) = &mut step.certificate else {
+                return Err("wrong root certificate".into());
+            };
+            let SolveCertificate::RootAdjunction(adjunction) = certificate.as_mut() else {
+                return Err("wrong root variant".into());
+            };
+            if mutation == 0 {
+                adjunction.order = Some(4);
+            } else {
+                adjunction.leading_unit = 1;
+            }
+        }
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    let mut negative = AdjunctionFixture::new(
+        &[(vec![2], 1), (vec![0], 1)],
+        &Field::Real,
+        AdjunctionMode::PositiveRealSquareRoot,
+        Some(2),
+    )?;
+    let before = negative.base.cas.counts();
+    assert!(
+        negative
+            .base
+            .cas
+            .check_proof(
+                &negative.base.context,
+                &negative.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(negative.base.cas.counts(), before);
+    Ok(())
+}
+
+/// Primitive-unity construction and proof admission share an exact measured arithmetic boundary.
+/// ´test:integration:root-adjunction-arithmetic-boundary´
+#[test]
+fn root_adjunction_arithmetic_boundary() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    use nrz_cas::solving::AdjunctionMode;
+    use nrz_cas::syntax::Field;
+    let polynomial = [(vec![2], 1), (vec![1], 1), (vec![0], 1)];
+    let mut fixture = AdjunctionFixture::new(
+        &polynomial,
+        &Field::Complex,
+        AdjunctionMode::PrimitiveUnity,
+        Some(3),
+    )?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    fixture
+        .base
+        .cas
+        .check_proof(&fixture.base.context, &fixture.steps, &mut measured)?;
+    let count = measured.usage().arithmetic_steps;
+    assert!(count > 0);
+    for (limit, succeeds) in [(count, true), (count - 1, false)] {
+        let mut fresh = AdjunctionFixture::new(
+            &polynomial,
+            &Field::Complex,
+            AdjunctionMode::PrimitiveUnity,
+            Some(3),
+        )?;
+        let before = fresh.base.cas.counts();
+        let result = fresh.base.cas.check_proof(
+            &fresh.base.context,
+            &fresh.steps,
+            &mut Budget::new(Limits {
+                arithmetic_steps: limit,
+                ..Limits::blind_cubic()
+            })?,
+        );
+        if succeeds {
+            assert!(result.is_ok());
+        } else {
+            let failure = result.err().ok_or("short root budget accepted")?;
+            assert!(matches!(
+                failure.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::ArithmeticSteps,
+                    ..
+                }
+            ));
+            assert_eq!(fresh.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Zero has a nonnegative real square root, while strict positivity and principal metadata require their own evidence.
+/// ´test:integration:real-root-zero-and-principal-refusal´
+#[test]
+fn real_root_zero_and_principal_refusal() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    use crate::testing::solve_graph::admit;
+    use nrz_cas::Reference;
+    use nrz_cas::solving::{
+        AdjunctionMode, RootSelectionData, SelectionMode, SolveDraft, SolveView,
+    };
+    use nrz_cas::syntax::{Draft, Field};
+    let mut fixture = AdjunctionFixture::new(
+        &[(vec![2], 1)],
+        &Field::Real,
+        AdjunctionMode::PositiveRealSquareRoot,
+        Some(2),
+    )?;
+    let before = fixture.base.cas.counts();
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.base.cas.counts(), before);
+    let selected = fixture.base.positive_selection(&fixture.relation, false)?;
+    let root = fixture.base.adjunction(
+        &fixture.relation,
+        Some(&selected),
+        AdjunctionMode::PositiveRealSquareRoot,
+        Some(2),
+    );
+    let unit = fixture.steps.first().ok_or("missing unit")?.clone();
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &[unit.clone(), root],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let SolveView::RootSelection(data) = fixture.base.cas.solve_view(&selected)? else {
+        return Err("wrong selection".into());
+    };
+    let draft = Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+        header: Reference::Existing(data.header.clone()),
+        scope: data.scope.clone(),
+        relations: data
+            .relations
+            .iter()
+            .cloned()
+            .map(Reference::Existing)
+            .collect(),
+        predicate: Reference::Existing(data.predicate.clone()),
+        mode: SelectionMode::Principal,
+        convention: Some("positive-root".into()),
+        interval: None,
+    }));
+    let principal = admit(&mut fixture.base.cas, &draft)?;
+    let proposed = fixture.base.adjunction(
+        &fixture.relation,
+        Some(&principal),
+        AdjunctionMode::PositiveRealSquareRoot,
+        Some(2),
+    );
+    let before = fixture.base.cas.counts();
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &[unit, proposed],
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.base.cas.counts(), before);
+    Ok(())
+}
+
 /// A formal nonzero denominator is guarded until the exact scoped parameter hypothesis is replayed.
 /// ´test:integration:fraction-regional-definedness´
 #[test]
@@ -413,6 +698,64 @@ fn tower_constrained_selection_transport() -> TestResult {
     Ok(())
 }
 
+/// An optional splitting chain reconstructs each factor over its actual parent quotient.
+/// ´test:integration:root-adjunction-splitting-chain´
+#[test]
+fn root_adjunction_splitting_chain() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    for (sign, succeeds) in [(1, true), (-1, false)] {
+        let mut fixture = AdjunctionFixture::splitting_chain(sign)?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if succeeds {
+            let checked = result?;
+            assert_eq!(checked.hypotheses(), []);
+        } else {
+            assert!(result.is_err());
+            assert_eq!(fixture.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// A symbolic radicand keeps its exact sign hypothesis; omitting it cannot certify existence.
+/// ´test:integration:real-root-symbolic-sign-premise´
+#[test]
+fn real_root_symbolic_sign_premise() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    let mut fixture = AdjunctionFixture::parameter_square_root()?;
+    let checked = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses().len(), 1);
+    assert_eq!(checked.judgment().residuals, []);
+    fixture
+        .steps
+        .last_mut()
+        .ok_or("missing adjunction")?
+        .premises = vec![1];
+    let before = fixture.base.cas.counts();
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.base.cas.counts(), before);
+    Ok(())
+}
+
 /// Exact rational identities use independent expected fractions and reject changed numerators.
 /// ´test:integration:coefficient-rational-identity-oracle´
 #[test]
@@ -474,6 +817,50 @@ fn coefficient_fraction_identity_oracle() -> TestResult {
         } else {
             assert!(result.is_err());
             assert_eq!(fixture.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Real-root orders survive decoding, while missing, zero and wrong orders refuse atomically.
+/// ´test:integration:real-root-order-mutations´
+#[test]
+fn real_root_order_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::AdjunctionFixture;
+    use nrz_cas::proof::Certificate;
+    use nrz_cas::solving::{AdjunctionMode, SolveCertificate};
+    use nrz_cas::syntax::Field;
+    for (mode, degree) in [
+        (AdjunctionMode::RealOddRoot, 3),
+        (AdjunctionMode::PositiveRealSquareRoot, 2),
+    ] {
+        let polynomial = [(vec![degree], 1), (vec![0], -2)];
+        let mut fixture = AdjunctionFixture::new(&polynomial, &Field::Real, mode, Some(degree))?;
+        let checked = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+        for order in [None, Some(0), Some(degree + 1)] {
+            let mut steps = fixture.steps.clone();
+            let step = steps.last_mut().ok_or("missing real-root step")?;
+            let Certificate::Solve(certificate) = &mut step.certificate else {
+                return Err("wrong certificate".into());
+            };
+            let SolveCertificate::RootAdjunction(adjunction) = certificate.as_mut() else {
+                return Err("wrong root certificate".into());
+            };
+            adjunction.order = order;
+            let before = fixture.base.cas.counts();
+            let result = fixture.base.cas.check_proof(
+                &fixture.base.context,
+                &steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            );
+            assert!(result.is_err());
+            assert_eq!(fixture.base.cas.counts(), before);
         }
     }
     Ok(())

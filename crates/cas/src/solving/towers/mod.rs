@@ -55,7 +55,7 @@ pub(crate) const fn availability() -> super::Availability {
 
 /// Per-subtype capability permits independently green checker slices in this leaf.
 pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
-    if matches!(tag, 2 | 3) {
+    if matches!(tag, 1..=3) {
         super::Availability::Available
     } else {
         super::Availability::Unavailable
@@ -76,6 +76,10 @@ pub(crate) fn check(
         return Err(crate::solving::coefficients::storage::invalid());
     };
     match (draft.rule, certificate.as_ref()) {
+        (
+            crate::rule::Primitive::Solve(SolveSchema::RootAdjunction),
+            SolveCertificate::RootAdjunction(value),
+        ) => adjoin::check(cas, draft, value, premises, budget)?,
         (
             crate::rule::Primitive::Solve(SolveSchema::ExtensionUnit),
             SolveCertificate::ExtensionUnit(value),
@@ -106,6 +110,30 @@ pub(crate) mod check_split;
     reason = "independent tower replay stays within the crate"
 )]
 pub(crate) mod selection;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "root existence replay stays within the crate"
+)]
+pub(crate) mod cyclotomic;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "root existence replay stays within the crate"
+)]
+pub(crate) mod splitting;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "root existence replay stays within the crate"
+)]
+pub(crate) mod real_roots;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "root existence replay stays within the crate"
+)]
+pub(crate) mod adjoin;
 
 #[expect(
     clippy::redundant_pub_crate,
