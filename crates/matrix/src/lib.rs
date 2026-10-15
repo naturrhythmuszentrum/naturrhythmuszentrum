@@ -5,6 +5,12 @@
     reason = "faer and units carry duplicate transitive dependency versions"
 )]
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "transaction evidence is shared across private matrix modules"
+)]
+mod binding;
+
 #[path = "coordinates/schema.rs"]
 mod coordinate_schema;
 #[expect(
@@ -27,6 +33,12 @@ mod shape;
     reason = "the storage facade is shared only inside the crate"
 )]
 mod storage;
+
+pub use binding::{
+    Binding, Bound, CheckedOperation, CompanionSnapshot, CopyContract, ExecutionId,
+    ExecutionLimits, InputSnapshot, NormalizedInputs, NormalizedView, OperationDraft,
+    OperationError, OutputReservation, PhysicalView,
+};
 
 pub use layout::{Layout, PackedRegion};
 
@@ -58,3 +70,18 @@ mod shape_twins;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/binding_twins.rs"]
+mod binding_twins;
+
+#[cfg(test)]
+use crate as test_api;
+
+#[cfg(test)]
+#[path = "testing/binding.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "fixtures are shared across private test modules"
+)]
+mod binding_testing;

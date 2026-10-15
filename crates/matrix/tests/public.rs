@@ -17,3 +17,12 @@ mod shape_testing;
 
 mod conformance;
 mod integration;
+
+use nrz_matrix as test_api;
+
+#[path = "../src/testing/binding.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "fixtures are shared across public test modules"
+)]
+mod binding_testing;

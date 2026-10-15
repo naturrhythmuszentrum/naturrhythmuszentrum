@@ -1,0 +1,175 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Concrete dependency snapshots are independent of storage addresses and relocation.
+
+use nrz_scalar::Scalar;
+
+use super::{CopyContract, OperationError};
+use crate::{Companion, Handle, Heap, Layout, SchemaId, StructureScope, Value, ValueStamp};
+
+/// Captured companion occupation, interpretation and exact target version.
+#[derive(Clone, Debug)]
+pub struct CompanionSnapshot<P: Scalar> {
+    /// Current companion locator, including its occupation generation.
+    handle: Handle<Companion, P>,
+    /// Whole-base target locator.
+    target: Handle<Value, P>,
+    /// Target identity and content version.
+    stamp: ValueStamp,
+    /// Independent companion interpretation.
+    schema: SchemaId,
+}
+
+impl<P: Scalar> CompanionSnapshot<P> {
+    /// Companion locator; access must still resolve it through its owner.
+    #[must_use]
+    pub const fn handle(&self) -> Handle<Companion, P> {
+        self.handle
+    }
+    /// Whole-base target, before applying the input snapshot's entry map.
+    #[must_use]
+    pub const fn target(&self) -> Handle<Value, P> {
+        self.target
+    }
+    /// Actual target identity and version captured during binding.
+    #[must_use]
+    pub const fn stamp(&self) -> ValueStamp {
+        self.stamp
+    }
+    /// Immutable independently derived radius schema.
+    #[must_use]
+    pub const fn schema(&self) -> SchemaId {
+        self.schema
+    }
+}
+
+/// One operation-ordered input dependency, retaining its selected logical map.
+#[derive(Clone, Debug)]
+pub struct InputSnapshot<P: Scalar> {
+    /// Selected value occupation, possibly an alias.
+    handle: Handle<Value, P>,
+    /// Actual base value identity and content version.
+    stamp: ValueStamp,
+    /// Exact homogeneous schema identity, before selection.
+    schema: SchemaId,
+    /// Selection of base entries in operation order.
+    layout: Layout,
+    /// Complete supported companion dependency.
+    companion: Option<CompanionSnapshot<P>>,
+}
+
+impl<P: Scalar> InputSnapshot<P> {
+    /// Selected value occupation.
+    #[must_use]
+    pub const fn handle(&self) -> Handle<Value, P> {
+        self.handle
+    }
+    /// Actual base identity and content version.
+    #[must_use]
+    pub const fn stamp(&self) -> ValueStamp {
+        self.stamp
+    }
+    /// Exact owning schema identity.
+    #[must_use]
+    pub const fn schema(&self) -> SchemaId {
+        self.schema
+    }
+    /// Logical input map into the base value and its companion.
+    #[must_use]
+    pub const fn layout(&self) -> &Layout {
+        &self.layout
+    }
+    /// Captured bound target and schema, when declared coverage is present.
+    #[must_use]
+    pub const fn companion(&self) -> Option<&CompanionSnapshot<P>> {
+        self.companion.as_ref()
+    }
+}
+
+impl<P: Scalar + 'static> InputSnapshot<P> {
+    /// Resolve the complete dependency set before numerical validation.
+    pub(crate) fn capture(heap: &Heap, handle: Handle<Value, P>) -> Result<Self, OperationError> {
+        let value = heap.value(handle)?;
+        let companion = value
+            .bound()
+            .map(|bound| {
+                let view = heap.companion(bound)?;
+                Ok::<_, crate::HeapError>(CompanionSnapshot {
+                    handle: bound,
+                    target: view.target(),
+                    stamp: view.target_stamp(),
+                    schema: view.region().schema_id(),
+                })
+            })
+            .transpose()?;
+        Ok(Self {
+            handle,
+            stamp: value.stamp(),
+            schema: value.region().schema_id(),
+            layout: value.region().layout().clone(),
+            companion,
+        })
+    }
+
+    /// Recheck concrete schema, finite payloads and structural obligations for this slot.
+    pub(crate) fn validate(
+        &self,
+        heap: &Heap,
+        contract: &CopyContract,
+        slot: usize,
+    ) -> Result<(), OperationError> {
+        let value = heap.value(self.handle)?;
+        let region = value.region();
+        if value.stamp() != self.stamp
+            || region.schema_id() != self.schema
+            || region.layout() != &self.layout
+            || region.extent() != contract.shape().extent()
+            || region.descriptor() != contract.descriptor()
+        {
+            return Err(OperationError::InputMismatch { slot });
+        }
+        let bounds = heap.selected_bound(self.handle)?;
+        for (entry, meaning) in contract.shape().entries().iter().enumerate() {
+            let row = entry % region.extent().rows();
+            let column = entry / region.extent().rows();
+            let center = region.get(row, column)?;
+            let radius = bounds
+                .as_ref()
+                .map(|bound| bound.region().get(row, column))
+                .transpose()?;
+            check_entry(
+                center,
+                radius,
+                meaning.is_zero(),
+                contract.shape().structure_scope(),
+                slot,
+                entry,
+            )?;
+        }
+        Ok(())
+    }
+}
+
+/// Identity normalization has no rounding; structural zeros still need numerical proof.
+fn check_entry<P: Scalar>(
+    center: P,
+    radius: Option<P>,
+    zero: bool,
+    scope: StructureScope,
+    slot: usize,
+    entry: usize,
+) -> Result<(), OperationError> {
+    if !center.is_finite() {
+        return Err(crate::HeapError::NonFinite { index: entry }.into());
+    }
+    if radius.is_some_and(|value| !value.is_finite() || value < P::ZERO) {
+        return Err(crate::HeapError::InvalidBound { index: entry }.into());
+    }
+    if zero
+        && (center != P::ZERO
+            || (scope == StructureScope::WholeFamily
+                && radius.is_some_and(|value| value != P::ZERO)))
+    {
+        return Err(OperationError::StructureMismatch { slot, entry });
+    }
+    Ok(())
+}

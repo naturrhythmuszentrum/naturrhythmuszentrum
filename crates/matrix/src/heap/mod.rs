@@ -7,11 +7,11 @@ mod extent;
 pub(crate) mod identity;
 mod lifecycle;
 mod limits;
-mod publication;
-mod records;
+pub(crate) mod publication;
+pub(crate) mod records;
 mod relocation;
 mod scatter;
-mod schema;
+pub(crate) mod schema;
 pub(crate) mod slots;
 mod views;
 
@@ -37,15 +37,15 @@ use slots::Slots;
 #[derive(Debug)]
 pub struct Heap {
     /// Unique process-local scope; a foreign handle is refused before indexing.
-    scope: u64,
+    pub(crate) scope: u64,
     /// Recoverable resource policy.
-    limits: HeapLimits,
+    pub(crate) limits: HeapLimits,
     /// Typed owned numerical allocations.
-    storage: Storage,
+    pub(crate) storage: Storage,
     /// Category-bearing descriptor occupations.
-    descriptors: Slots<Record>,
+    pub(crate) descriptors: Slots<Record>,
     /// Immutable schemas interned using exact descriptor equality.
-    schemas: Vec<Schema>,
+    pub(crate) schemas: Vec<Schema>,
 }
 
 impl Heap {

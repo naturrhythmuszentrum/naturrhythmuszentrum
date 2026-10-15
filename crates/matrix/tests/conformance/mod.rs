@@ -9,3 +9,5 @@ mod layouts;
 mod lifecycle;
 mod outputs;
 mod shapes;
+
+mod binding;

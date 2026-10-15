@@ -35,7 +35,7 @@ pub(crate) struct PreparedSlots<T> {
     /// Checked locations and generations.
     plan: SlotPlan,
     /// Fully prepared records in key order.
-    values: Vec<T>,
+    pub(crate) values: Vec<T>,
 }
 
 impl<T> PreparedSlots<T> {

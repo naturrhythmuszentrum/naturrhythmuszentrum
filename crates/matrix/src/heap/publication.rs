@@ -29,13 +29,13 @@ struct PreparedImport<P: Scalar> {
 
 /// Schema indices and any new immutable records, still private to preparation.
 #[derive(Debug)]
-struct SchemaPlan {
+pub(crate) struct SchemaPlan {
     /// Exact schemas not already in the heap.
-    pending: Vec<Schema>,
+    pub(crate) pending: Vec<Schema>,
     /// Value interpretation.
-    value: usize,
+    pub(crate) value: usize,
     /// Independently derived radius interpretation.
-    bound: Option<usize>,
+    pub(crate) bound: Option<usize>,
 }
 
 impl Heap {
@@ -249,7 +249,7 @@ pub(crate) fn scan<P: Scalar>(
 }
 
 /// Prepare exact forward/reverse target edges and future external locators.
-fn prepare_records<P: Scalar + 'static>(
+pub(crate) fn prepare_records<P: Scalar + 'static>(
     scope: u64,
     extent: Extent,
     keys: &[Key],
