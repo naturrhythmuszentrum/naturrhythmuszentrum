@@ -57,6 +57,24 @@ allowances = []
 [SCALAR."owners.reach-conform"]
 allowances = []
 
+[ACCURACY."labels.mints-well-formed"]
+allowances = []
+
+[ACCURACY."labels.mints-kind-conform"]
+allowances = []
+
+[ACCURACY."labels.mints-unique"]
+allowances = []
+
+[ACCURACY."labels.heads-conform"]
+allowances = []
+
+[ACCURACY."labels.citations-local-resolve"]
+allowances = []
+
+[ACCURACY."owners.reach-conform"]
+allowances = []
+
 [MATRIX."labels.mints-well-formed"]
 allowances = []
 

@@ -1,0 +1,24 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# nrz-accuracy · `guide:accuracy:overview`
+
+`nrz-accuracy` supplies dimension-neutral nonnegative bounds and numerical policies over `nrz-scalar`'s sealed binary32/binary64 formats. It owns no heap, value ledger, physical assurance token, source model or provenance store. A magnitude acquires physical meaning only when its caller validates the target, coordinates, coverage and versions. See the matrix-core design for the matrix owner's responsibilities.
+
+`Nonnegative<P>::new` admits finite nonnegative magnitudes and canonicalizes signed zero. Its private state proves that numerical invariant, not that a caller-supplied magnitude bounds a physical error. `add` returns an outward upper sum and `scale` an outward upper product, including underflow. Each delegates to scalar enclosures under an explicit `ArithmeticContext`; an unavailable finite endpoint returns the scalar error through `AccuracyFailure`. No fallible arithmetic is hidden behind operator traits.
+
+`BoundVectorRef` validates and borrows a plain immutable slice without allocating or changing its bytes. `sum` and `dot` use increasing-index left folds starting at zero; each dot product encloses multiplication before addition. Unequal lengths refuse. Overflowing intermediates refuse even if another evaluation order might succeed. Empty reductions are exactly zero.
+
+`norm` returns a `NormSummary` retaining `NormKind`, logical entry count and a nonnegative upper bound. `One` is the sum of entries and `Infinity` their maximum; these are entry norms, not induced matrix norms. `Euclidean` and `Frobenius` use scalar's enclosed power-of-two scaling, squared sum, square root and outward restoration. All empty norms are zero. The caller supplies every logical entry and structural multiplicity, including both copies of a symmetric off-diagonal entry, in the intended coordinates. This crate checks neither matrix shape nor a physical metric.
+
+```rust
+use nrz_accuracy::{BoundVectorRef, NormKind};
+use nrz_scalar::ArithmeticContext;
+
+let context = ArithmeticContext::new()?;
+let entries = [3.0_f64, 4.0];
+let summary = BoundVectorRef::new(&entries)?.norm(NormKind::Euclidean, &context)?;
+assert!(summary.upper().get() >= 5.0);
+# Ok::<(), nrz_accuracy::AccuracyFailure>(())
+```
+
+Public conformance tests independently decode binary values into exact rationals for addition, scaling, contractions and all named norms. Root-norm tests compare squared returned bounds with exact sums of squares. Both formats cover small successes, halfway contributions, subnormals, underflow, huge/tiny mixtures, zero identities and explicit overflow. Public lifecycles compose contributions and preserve logical multiplicity; compile twins reject forged nonnegative and borrowed-vector state. Production depends only on `nrz-scalar`; the rational libraries are development-only oracles.

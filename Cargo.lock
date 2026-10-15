@@ -607,6 +607,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrz-accuracy"
+version = "0.1.0"
+dependencies = [
+ "nrz-scalar",
+ "num-bigint",
+ "num-rational",
+ "num-traits",
+]
+
+[[package]]
 name = "nrz-cas"
 version = "0.1.0"
 dependencies = [

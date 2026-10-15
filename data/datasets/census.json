@@ -11,6 +11,7 @@
     "Cargo.toml",
     "tools/docgen/Cargo.toml",
     "crates/scalar/Cargo.toml",
+    "crates/accuracy/Cargo.toml",
     "crates/matrix/Cargo.toml",
     "crates/units/Cargo.toml",
     "crates/cas/Cargo.toml"
@@ -30,6 +31,12 @@
       "has_readme_template": true,
       "name": "nrz-scalar",
       "path": "crates/scalar"
+    },
+    {
+      "description": "Dimension-neutral nonnegative bounds and conservative accuracy policies",
+      "has_readme_template": true,
+      "name": "nrz-accuracy",
+      "path": "crates/accuracy"
     },
     {
       "description": "Typed descriptor heap with owned numerical regions and bound companions",

@@ -39,6 +39,10 @@ output = "crates/scalar/README.md"
 requires = []
 
 [[document]]
+output = "crates/accuracy/README.md"
+requires = []
+
+[[document]]
 output = "crates/matrix/README.md"
 requires = []
 
