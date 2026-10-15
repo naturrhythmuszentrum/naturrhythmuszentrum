@@ -1440,8 +1440,17 @@ fn check_family(
         &value.header,
         CoordinateRole::Coefficient,
     )?;
-    coordinate_role(state, &value.family, &value.header, CoordinateRole::Family)?;
-    coordinate_role(state, &value.target, &value.header, CoordinateRole::Unknown)?;
+    let source_role = coordinates(state, value.family.logical_id())?
+        .coordinates
+        .first()
+        .map_or(CoordinateRole::Family, |entry| entry.role);
+    let target_role = match source_role {
+        CoordinateRole::Family => CoordinateRole::Unknown,
+        CoordinateRole::Unknown => CoordinateRole::Family,
+        CoordinateRole::Coefficient => return Err(invalid()),
+    };
+    coordinate_role(state, &value.family, &value.header, source_role)?;
+    coordinate_role(state, &value.target, &value.header, target_role)?;
     let family = coordinates(state, value.family.logical_id())?;
     budget.solving(
         BudgetKind::FamilyParameters,
@@ -2960,11 +2969,46 @@ fn statement_family_membership(_cas: &Cas, value: &StatementFamilyMembership) ->
 }
 
 /// Validate the object categories of a `FamilyCoverage` proposition.
-fn statement_family_coverage(_cas: &Cas, value: &StatementFamilyCoverage) -> Result<(), Fault> {
+fn statement_family_coverage(cas: &Cas, value: &StatementFamilyCoverage) -> Result<(), Fault> {
     require_kind(&value.problem, VertexKind::SolveProblem)?;
     require_kind(&value.family, VertexKind::FamilyMap)?;
     require_kind(&value.recovery, VertexKind::FamilyMap)?;
     require_kind(&value.region, VertexKind::Region)?;
+    let SolveDraft::FamilyMap(parameterization) = object(&cas.state, value.family.logical_id())?
+    else {
+        return Err(invalid());
+    };
+    let SolveDraft::FamilyMap(recovery) = object(&cas.state, value.recovery.logical_id())? else {
+        return Err(invalid());
+    };
+    if (&recovery.family, &recovery.target) != (&parameterization.target, &parameterization.family)
+    {
+        return Err(invalid());
+    }
+    coordinate_role(
+        &cas.state,
+        &parameterization.family,
+        &parameterization.header,
+        CoordinateRole::Family,
+    )?;
+    coordinate_role(
+        &cas.state,
+        &parameterization.target,
+        &parameterization.header,
+        CoordinateRole::Unknown,
+    )?;
+    coordinate_role(
+        &cas.state,
+        &recovery.family,
+        &recovery.header,
+        CoordinateRole::Unknown,
+    )?;
+    coordinate_role(
+        &cas.state,
+        &recovery.target,
+        &recovery.header,
+        CoordinateRole::Family,
+    )?;
     Ok(())
 }
 

@@ -349,7 +349,7 @@ fn covered(
 }
 
 /// Every value has a proved equal image, without assuming syntactic set order.
-fn same_values(
+pub(crate) fn same_values(
     evaluation: &Evaluation<'_>,
     left: &[Value],
     right: &[Value],

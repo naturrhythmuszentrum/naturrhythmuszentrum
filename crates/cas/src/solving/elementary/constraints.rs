@@ -49,7 +49,7 @@ impl Constraints {
     }
 
     /// Extract every conjunct, including each expression's strict denominator domain.
-    fn predicate(
+    pub(crate) fn predicate(
         &mut self,
         evaluation: &Evaluation<'_>,
         root: LogicalId,

@@ -102,7 +102,7 @@ impl Evaluation<'_> {
     }
 
     /// A selected root is usable only with existence of that exact joint selection.
-    fn existence(&self, selection: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
+    pub(crate) fn existence(&self, selection: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
         for premise in self.premises {
             budget.work(1, AT)?;
             if let crate::proof_model::Statement::Solve(statement) = &premise.judgment.statement

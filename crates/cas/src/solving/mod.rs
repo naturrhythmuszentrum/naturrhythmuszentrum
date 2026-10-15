@@ -32,7 +32,7 @@ pub(crate) mod elementary;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod family_check;
+pub(crate) mod family_check;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
@@ -42,7 +42,7 @@ mod isolation;
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"
 )]
-mod linear_check;
+pub(crate) mod linear_check;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "leaf availability is shared only within the crate"

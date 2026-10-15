@@ -73,7 +73,7 @@ pub(crate) fn check(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     if certificate.mode == RefinementMode::Presentation {
-        return Err(invalid());
+        return super::presentation::check(cas, draft, certificate, premises, budget);
     }
     if certificate.target_kind != RefinementTargetKind::Selection || certificate.form.is_some() {
         return Err(invalid());

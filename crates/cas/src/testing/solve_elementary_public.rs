@@ -273,6 +273,16 @@ impl Fixture {
 
     /// An affine map binds its source coordinate explicitly and targets the exact unknown product.
     pub(crate) fn affine(&mut self, target: &Handle, offset: i64) -> TestResult<Handle> {
+        self.affine_named(target, offset, "t")
+    }
+
+    /// A distinct family coordinate product remains distinct even with the same scalar field.
+    pub(crate) fn affine_named(
+        &mut self,
+        target: &Handle,
+        offset: i64,
+        key: &str,
+    ) -> TestResult<Handle> {
         let SolveView::SolveProblem(problem) = self.cas.solve_view(target)? else {
             return Err("missing target".into());
         };
@@ -280,7 +290,7 @@ impl Fixture {
         let family = coordinate_product(
             &mut self.cas,
             &self.header,
-            &["t"],
+            &[key],
             CoordinateRole::Family,
             &self.field,
         )?;
@@ -1229,4 +1239,910 @@ fn finite_entries(cas: &Cas, set: &Handle) -> TestResult<Vec<Handle>> {
         }
     }
     Ok(entries)
+}
+
+impl Fixture {
+    /// A reverse map binds the exact unknown product and returns the original family product.
+    pub(crate) fn recovery(&mut self, family: &Handle, offset: i64) -> TestResult<Handle> {
+        let SolveView::FamilyMap(map) = self.cas.solve_view(family)? else {
+            return Err("missing family".into());
+        };
+        let source = map.target.clone();
+        let target = map.family.clone();
+        let scope = vec![vec![AtomicSort::Scalar(self.field.clone())]];
+        let region = product(&mut self.cas, &self.header, &source, scope.clone())?;
+        let bound = self.expression(Operator::Bound { depth: 0, slot: 0 }, &[], true)?;
+        let constant = self.integer(offset, true)?;
+        let value = self.expression(Operator::Add, &[bound, constant], true)?;
+        let body = admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::Tuple(TupleData {
+                header: Reference::Existing(self.header.clone()),
+                scope,
+                coordinates: Reference::Existing(target.clone()),
+                entries: vec![Reference::Existing(value)],
+            })),
+        )?;
+        admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::FamilyMap(FamilyMapData {
+                header: Reference::Existing(self.header.clone()),
+                scope: Vec::new(),
+                coefficients: Reference::Existing(self.coefficients.clone()),
+                family: Reference::Existing(source),
+                region: Reference::Existing(region),
+                target: Reference::Existing(target),
+                body: Reference::Existing(body),
+            })),
+        )
+    }
+
+    /// An image branch records a proposal, without conferring membership or coverage.
+    pub(crate) fn image(&mut self, problem: &Handle, family: &Handle) -> TestResult<Handle> {
+        use crate::test_api::solving::{SolutionBranchData, SolutionBranchKind, SolutionSetData};
+        let SolveView::SolveProblem(original) = self.cas.solve_view(problem)? else {
+            return Err("missing problem".into());
+        };
+        let domain = original.domain.clone();
+        let branch = admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::SolutionBranch(SolutionBranchData {
+                problem: Reference::Existing(problem.clone()),
+                region: Reference::Existing(self.region.clone()),
+                domain: Reference::Existing(domain),
+                kind: SolutionBranchKind::Image {
+                    family: Reference::Existing(family.clone()),
+                },
+            })),
+        )?;
+        admit(
+            &mut self.cas,
+            &Draft::Solve(SolveDraft::SolutionSet(SolutionSetData {
+                problem: Reference::Existing(problem.clone()),
+                branches: vec![Reference::Existing(branch)],
+            })),
+        )
+    }
+
+    /// An explicit matrix has its own exact row-major scalar sort.
+    pub(crate) fn matrix(
+        &mut self,
+        rows: u32,
+        columns: u32,
+        entries: &[Handle],
+    ) -> TestResult<Handle> {
+        use crate::test_api::syntax::Extent;
+        admit(
+            &mut self.cas,
+            &Draft::Expression(ExpressionDraft {
+                header: Reference::Existing(self.header.clone()),
+                scope: Vec::new(),
+                operator: Operator::Matrix { rows, columns },
+                sort: Sort::Value(AtomicSort::Matrix {
+                    field: self.field.clone(),
+                    rows: Extent::Literal(rows),
+                    columns: Extent::Literal(columns),
+                }),
+                operands: entries.iter().cloned().map(Reference::Existing).collect(),
+                space: None,
+                binding: None,
+            }),
+        )
+    }
+}
+
+/// Identity family for the zero polynomial, with independent universal membership and recovery.
+pub(crate) fn identity_family(offset: i64) -> TestResult<(Fixture, Vec<ApplicationDraft>)> {
+    use crate::test_api::solving::{
+        CertificateParameterImageCoverage, SolveCertificate, SolveSchema, SolveStatement,
+        StatementCoverage, StatementFamilyCoverage, StatementFamilyMembership,
+    };
+    let mut base = Fixture::new()?;
+    let zero = base.integer(0, false)?;
+    let predicate = base.equation(&zero, &zero)?;
+    let problem = base.problem("x", &predicate, &[])?;
+    let family = base.affine(&problem, 0)?;
+    let recovery = base.recovery(&family, offset)?;
+    let set = base.image(&problem, &family)?;
+    let mut certificate = CertificateParameterImageCoverage {
+        problem: problem.clone(),
+        family: family.clone(),
+        recovery: None,
+        region: base.region.clone(),
+        membership: Vec::new(),
+        recovery_proofs: Vec::new(),
+        domain: Vec::new(),
+        scope: Vec::new(),
+    };
+    let member = base.step(
+        SolveSchema::ParameterImageCoverage,
+        SolveStatement::FamilyMembership(StatementFamilyMembership {
+            problem: problem.clone(),
+            family: family.clone(),
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ParameterImageCoverage(certificate.clone()),
+    );
+    certificate.recovery = Some(recovery.clone());
+    certificate.membership = vec![0];
+    let mut covered = base.step(
+        SolveSchema::ParameterImageCoverage,
+        SolveStatement::FamilyCoverage(StatementFamilyCoverage {
+            problem: problem.clone(),
+            family,
+            recovery,
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ParameterImageCoverage(certificate.clone()),
+    );
+    covered.premises = vec![0];
+    let mut complete = base.step(
+        SolveSchema::ParameterImageCoverage,
+        SolveStatement::Coverage(StatementCoverage {
+            problem,
+            set,
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ParameterImageCoverage(certificate),
+    );
+    complete.premises = vec![0, 1];
+    Ok((base, vec![member, covered, complete]))
+}
+
+/// Build a map draft even when source/target roles intentionally violate admission.
+pub(crate) fn role_map(
+    source: &[CoordinateRole],
+    target: &[CoordinateRole],
+) -> TestResult<(Fixture, Draft)> {
+    let mut base = Fixture::new()?;
+    let spaces = [source, target]
+        .into_iter()
+        .zip([["t", "y"], ["x", "y"]])
+        .map(|(roles, keys)| CoordinateSpaceData {
+            header: Reference::Existing(base.header.clone()),
+            coordinates: roles
+                .iter()
+                .zip(keys)
+                .map(|(role, key)| Coordinate {
+                    key: key.into(),
+                    field: Field::Real,
+                    role: *role,
+                })
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+    let input = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::CoordinateSpace(
+            spaces.first().ok_or("missing source")?.clone(),
+        )),
+    )?;
+    let output = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::CoordinateSpace(
+            spaces.get(1).ok_or("missing target")?.clone(),
+        )),
+    )?;
+    let scope = vec![vec![AtomicSort::Scalar(Field::Real); source.len()]];
+    let region = product(&mut base.cas, &base.header, &input, scope.clone())?;
+    let expression = admit(
+        &mut base.cas,
+        &Draft::Expression(ExpressionDraft {
+            header: Reference::Existing(base.header.clone()),
+            scope: scope.clone(),
+            operator: Operator::Bound { depth: 0, slot: 0 },
+            sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+            operands: Vec::new(),
+            space: None,
+            binding: None,
+        }),
+    )?;
+    let body = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::Tuple(TupleData {
+            header: Reference::Existing(base.header.clone()),
+            scope,
+            coordinates: Reference::Existing(output.clone()),
+            entries: vec![Reference::Existing(expression); target.len()],
+        })),
+    )?;
+    let draft = Draft::Solve(SolveDraft::FamilyMap(FamilyMapData {
+        header: Reference::Existing(base.header.clone()),
+        scope: Vec::new(),
+        coefficients: Reference::Existing(base.coefficients.clone()),
+        family: Reference::Existing(input),
+        region: Reference::Existing(region),
+        target: Reference::Existing(output),
+        body: Reference::Existing(body),
+    }));
+    Ok((base, draft))
+}
+
+/// The two-character transform has an exact inverse and a nonzero triangular minor.
+pub(crate) fn character_rank() -> TestResult<(Fixture, ApplicationDraft)> {
+    use crate::test_api::solving::{
+        CertificateExactLinearEquivalence, RowOperation, SolveCertificate, SolveSchema,
+        SolveStatement, StatementRank,
+    };
+    let mut base = Fixture::new()?;
+    let one = base.integer(1, false)?;
+    let negative = base.integer(-1, false)?;
+    let zero = base.integer(0, false)?;
+    let minor = base.integer(-2, false)?;
+    let matrix = base.matrix(
+        2,
+        2,
+        &[one.clone(), one.clone(), one.clone(), negative.clone()],
+    )?;
+    let reduced = base.matrix(2, 2, &[one.clone(), one, zero, minor.clone()])?;
+    let claim = SolveStatement::Rank(StatementRank {
+        matrix: matrix.clone(),
+        domain: base.algebra.clone(),
+        rank: 2,
+        pivots: vec![0, 1],
+        minor: minor.clone(),
+        elimination: reduced.clone(),
+    });
+    let certificate = SolveCertificate::ExactLinearEquivalence(CertificateExactLinearEquivalence {
+        matrix,
+        augmented_columns: 0,
+        operations: vec![RowOperation::AddMultiple {
+            destination: 1,
+            source: 0,
+            value: negative,
+        }],
+        pivots: vec![0, 1],
+        minor,
+        reduced,
+        region: base.region.clone(),
+    });
+    let step = base.step(SolveSchema::ExactLinearEquivalence, claim, certificate);
+    Ok((base, step))
+}
+
+/// Conjugation fixes z+conjugate(z), while an unconstrained complex z need not be real.
+pub(crate) fn conjugate_real(symmetric: bool) -> TestResult<(Fixture, ApplicationDraft)> {
+    use crate::test_api::solving::{
+        CertificateConjugationTransport, SolveCertificate, SolveSchema, SolveStatement,
+        StatementRealValues,
+    };
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    let value = base.free("a")?;
+    let conjugate = base.expression(Operator::Conjugate, std::slice::from_ref(&value), false)?;
+    let result = if symmetric {
+        base.expression(Operator::Add, &[value, conjugate], false)?
+    } else {
+        value
+    };
+    let algebra = base.algebra.clone();
+    let map = base.scalar_map(&algebra, &[])?;
+    let step = base.step(
+        SolveSchema::ConjugationTransport,
+        SolveStatement::RealValues(StatementRealValues {
+            values: vec![result.clone()],
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ConjugationTransport(CertificateConjugationTransport {
+            map: map.clone(),
+            conjugate_map: map,
+            images: Vec::new(),
+            values: vec![result],
+            relations: Vec::new(),
+            fixed_field: Vec::new(),
+            region: base.region.clone(),
+        }),
+    );
+    Ok((base, step))
+}
+
+impl BinomialFixture {
+    /// A presentation inspects every nested binomial and root-of-unity dependency.
+    pub(crate) fn presentation() -> TestResult<Self> {
+        use crate::test_api::solving::{
+            CertificateRootSelectionRefinement, RefinementMode, RefinementTargetKind,
+            SolveCertificate, SolveForm, SolveSchema, SolveStatement, StatementPresentation,
+        };
+        let mut fixture = Self::new(2, 2)?;
+        let Statement::Solve(statement) =
+            &fixture.steps.last().ok_or("missing coverage")?.conclusion
+        else {
+            return Err("wrong conclusion".into());
+        };
+        let SolveStatement::Coverage(coverage) = statement.as_ref() else {
+            return Err("wrong coverage".into());
+        };
+        let set = coverage.set.clone();
+        let mut step = fixture.base.step(
+            SolveSchema::RootSelectionRefinement,
+            SolveStatement::Presentation(StatementPresentation {
+                set: set.clone(),
+                form: SolveForm::Radicals,
+                region: fixture.base.region.clone(),
+            }),
+            SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+                mode: RefinementMode::Presentation,
+                target_kind: RefinementTargetKind::SolutionSet,
+                target: set,
+                witnesses: Vec::new(),
+                compatibility: Vec::new(),
+                form: Some(SolveForm::Radicals),
+            }),
+        );
+        step.premises = vec![7, 1, 4, 2];
+        fixture.steps.push(step);
+        Ok(fixture)
+    }
+
+    /// Derivatives of x² at the exact selected zero certify multiplicity two independently of set syntax.
+    pub(crate) fn multiplicity() -> TestResult<Self> {
+        use crate::test_api::solving::{
+            CertificateMultiplicityTransfer, CertificateRootSelectionRefinement, MultiplicityMode,
+            RefinementMode, RefinementTargetKind, SolveCertificate, SolveSchema, SolveStatement,
+            StatementMultiplicity, StatementRootExistence,
+        };
+        let mut fixture = Self::zero(2)?;
+        let Statement::Solve(statement) =
+            &fixture.steps.last().ok_or("missing coverage")?.conclusion
+        else {
+            return Err("wrong conclusion".into());
+        };
+        let SolveStatement::Coverage(coverage) = statement.as_ref() else {
+            return Err("wrong coverage".into());
+        };
+        let problem = coverage.problem.clone();
+        let algebra = fixture.base.algebra.clone();
+        let one = fixture.base.coefficient(1)?;
+        let polynomial = fixture.base.polynomial(&algebra, &[(1, one)])?;
+        let map = fixture.base.scalar_map(&algebra, &[])?;
+        let (_, selection, _) = fixture.base.root(&polynomial, &map)?;
+        let zero = fixture.base.integer(0, false)?;
+        let two = fixture.base.integer(2, false)?;
+        let existence = fixture.base.step(
+            SolveSchema::RootSelectionRefinement,
+            SolveStatement::RootExistence(StatementRootExistence {
+                relation: selection.clone(),
+                region: fixture.base.region.clone(),
+            }),
+            SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+                mode: RefinementMode::Existence,
+                target_kind: RefinementTargetKind::Selection,
+                target: selection.clone(),
+                witnesses: vec![zero.clone()],
+                compatibility: Vec::new(),
+                form: None,
+            }),
+        );
+        fixture.steps.push(existence);
+        let mut step = fixture.base.step(
+            SolveSchema::MultiplicityTransfer,
+            SolveStatement::Multiplicity(StatementMultiplicity {
+                problem: problem.clone(),
+                selection: selection.clone(),
+                multiplicities: vec![2],
+                region: fixture.base.region.clone(),
+            }),
+            SolveCertificate::MultiplicityTransfer(CertificateMultiplicityTransfer {
+                mode: MultiplicityMode::Derivatives,
+                problem,
+                selection,
+                multiplicities: vec![2],
+                values: vec![zero.clone(), zero, two],
+                product: 0,
+                nonzero: Vec::new(),
+                region: fixture.base.region.clone(),
+            }),
+        );
+        step.premises = vec![4, 5];
+        fixture.steps.push(step);
+        Ok(fixture)
+    }
+}
+
+impl Fixture {
+    /// Build a distinct real header in this store; source theorem contexts remain distinct.
+    fn enter_real(&mut self) -> TestResult {
+        self.field = Field::Real;
+        let declarations = ["a", "b", "c", "t", "x", "y"]
+            .into_iter()
+            .map(|key| Declaration {
+                key: key.into(),
+                display_name: key.into(),
+                sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+            })
+            .collect();
+        self.header = admit(
+            &mut self.cas,
+            &Draft::Header(HeaderDraft::Core(Environment {
+                field: Field::Real,
+                branch: Branch::StrictReal,
+                declarations,
+            })),
+        )?;
+        self.coefficients = coordinate_product(
+            &mut self.cas,
+            &self.header,
+            &["a", "b", "c"],
+            CoordinateRole::Coefficient,
+            &self.field,
+        )?;
+        self.region = product(&mut self.cas, &self.header, &self.coefficients, Vec::new())?;
+        self.context = admit(
+            &mut self.cas,
+            &Draft::Context(ContextDraft::Root {
+                header: Reference::Existing(self.header.clone()),
+                admissible: Reference::Existing(self.region.clone()),
+                assumptions: Vec::new(),
+            }),
+        )?;
+        Ok(())
+    }
+
+    /// Exact ground quadratic x²-r is reconstructed in the current explicit ambient.
+    fn quadratic(&mut self, radicand: i64) -> TestResult<(Handle, Handle)> {
+        let unknown = self.free("x")?;
+        let squared = self.expression(Operator::IntegerPower(2), &[unknown], false)?;
+        let constant = self.integer(radicand, false)?;
+        let polynomial = self.expression(Operator::Sub, &[squared, constant], false)?;
+        let zero = self.integer(0, false)?;
+        let predicate = self.equation(&polynomial, &zero)?;
+        Ok((self.problem("x", &predicate, &[])?, polynomial))
+    }
+}
+
+/// Exact complete complex coverage of x²-1, with independently supplied product reconstruction.
+fn ground_complex_cover() -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{
+        CertificateProductCompleteness, RootFactor, SolveCertificate, SolveSchema, SolveStatement,
+        StatementCoverage,
+    };
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    let (problem, polynomial) = base.quadratic(1)?;
+    let positive = base.integer(1, false)?;
+    let negative = base.integer(-1, false)?;
+    let unknown = base.free("x")?;
+    let first = base.expression(Operator::Sub, &[unknown.clone(), positive.clone()], false)?;
+    let second = base.expression(Operator::Sub, &[unknown, negative.clone()], false)?;
+    let product = base.expression(Operator::Mul, &[first, second], false)?;
+    let algebra = base.algebra.clone();
+    let map = base.scalar_map(&algebra, &[])?;
+    let identity = base.identity(&polynomial, &product, &map);
+    let set = base.finite(&problem, &[positive.clone(), negative.clone()])?;
+    let mut coverage = base.step(
+        SolveSchema::ProductCompleteness,
+        SolveStatement::Coverage(StatementCoverage {
+            problem: problem.clone(),
+            set: set.clone(),
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ProductCompleteness(CertificateProductCompleteness {
+            problem,
+            set,
+            scalar: positive.clone(),
+            factors: vec![
+                RootFactor {
+                    root: positive,
+                    multiplicity: 1,
+                },
+                RootFactor {
+                    root: negative,
+                    multiplicity: 1,
+                },
+            ],
+            product: 0,
+            existence: Vec::new(),
+            region: base.region.clone(),
+        }),
+    );
+    coverage.premises = vec![0];
+    Ok(BinomialFixture {
+        base,
+        steps: vec![identity, coverage],
+    })
+}
+
+/// Real restriction explicitly rebuilds the ground problem under a separate header.
+pub(crate) fn real_restriction(nonreal: bool) -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{
+        CertificateRealRestriction, SolveCertificate, SolveSchema, SolveStatement,
+        StatementCoverage,
+    };
+    let mut fixture = if nonreal {
+        BinomialFixture::new(2, -1)?
+    } else {
+        ground_complex_cover()?
+    };
+    let covered_index = u32::try_from(fixture.steps.len().checked_sub(1).ok_or("no coverage")?)?;
+    let Statement::Solve(statement) = &fixture.steps.last().ok_or("missing coverage")?.conclusion
+    else {
+        return Err("wrong statement".into());
+    };
+    let SolveStatement::Coverage(coverage) = statement.as_ref() else {
+        return Err("wrong coverage".into());
+    };
+    let SolveView::SolutionSet(set) = fixture.base.cas.solve_view(&coverage.set)? else {
+        return Err("missing set".into());
+    };
+    let branches = set.branches.clone();
+    let zero = fixture.base.integer(0, false)?;
+    let partition = fixture.base.split(&zero)?;
+    let partition_index = u32::try_from(fixture.steps.len())?;
+    fixture.steps.push(partition);
+    fixture.base.enter_real()?;
+    let (problem, _) = fixture.base.quadratic(if nonreal { -1 } else { 1 })?;
+    let values = if nonreal {
+        Vec::new()
+    } else {
+        vec![
+            fixture.base.integer(1, false)?,
+            fixture.base.integer(-1, false)?,
+        ]
+    };
+    let set = fixture.base.finite(&problem, &values)?;
+    let mut step = fixture.base.step(
+        SolveSchema::RealRestriction,
+        SolveStatement::Coverage(StatementCoverage {
+            problem: problem.clone(),
+            set: set.clone(),
+            region: fixture.base.region.clone(),
+        }),
+        SolveCertificate::RealRestriction(CertificateRealRestriction {
+            coverage: 0,
+            problem,
+            set,
+            retained: if nonreal {
+                Vec::new()
+            } else {
+                branches.clone()
+            },
+            rejected: if nonreal { branches } else { Vec::new() },
+            classification: Vec::new(),
+            cover: 1,
+        }),
+    );
+    step.premises = vec![covered_index, partition_index];
+    if nonreal {
+        step.premises.extend([1, 4]);
+    }
+    fixture.steps.push(step);
+    Ok(fixture)
+}
+
+/// One regional branch of a*x=0 uses either the complete identity family or the singleton zero.
+fn partition_branch(
+    base: &mut Fixture,
+    problem: &Handle,
+    polynomial: &Handle,
+    zero_side: bool,
+) -> TestResult<Vec<ApplicationDraft>> {
+    use crate::test_api::solving::{
+        CertificateParameterImageCoverage, CertificateProductCompleteness, RootFactor,
+        SolveCertificate, SolveSchema, SolveStatement, StatementCoverage,
+    };
+    if zero_side {
+        let family = base.affine(problem, 0)?;
+        let recovery = base.recovery(&family, 0)?;
+        let set = base.image(problem, &family)?;
+        let step = base.step(
+            SolveSchema::ParameterImageCoverage,
+            SolveStatement::Coverage(StatementCoverage {
+                problem: problem.clone(),
+                set,
+                region: base.region.clone(),
+            }),
+            SolveCertificate::ParameterImageCoverage(CertificateParameterImageCoverage {
+                problem: problem.clone(),
+                family,
+                recovery: Some(recovery),
+                region: base.region.clone(),
+                membership: Vec::new(),
+                recovery_proofs: Vec::new(),
+                domain: Vec::new(),
+                scope: Vec::new(),
+            }),
+        );
+        return Ok(vec![step]);
+    }
+    let zero = base.integer(0, false)?;
+    let scalar = base.free("a")?;
+    let set = base.finite(problem, std::slice::from_ref(&zero))?;
+    let algebra = base.algebra.clone();
+    let map = base.scalar_map(&algebra, &[])?;
+    let identity = base.identity(polynomial, polynomial, &map);
+    let mut step = base.step(
+        SolveSchema::ProductCompleteness,
+        SolveStatement::Coverage(StatementCoverage {
+            problem: problem.clone(),
+            set: set.clone(),
+            region: base.region.clone(),
+        }),
+        SolveCertificate::ProductCompleteness(CertificateProductCompleteness {
+            problem: problem.clone(),
+            set,
+            scalar,
+            factors: vec![RootFactor {
+                root: zero,
+                multiplicity: 1,
+            }],
+            product: 0,
+            existence: Vec::new(),
+            region: base.region.clone(),
+        }),
+    );
+    step.premises = vec![0];
+    Ok(vec![identity, step])
+}
+
+/// A child proof closes only its own frame and keeps the exact meet region in the conclusion.
+fn close_partition_branch(
+    base: &mut Fixture,
+    problem: &Handle,
+    polynomial: &Handle,
+    child: &Handle,
+    zero_side: bool,
+    steps: &mut Vec<ApplicationDraft>,
+) -> TestResult<(Handle, u32)> {
+    let parent = base.context.clone();
+    let domain = base.region.clone();
+    let region = admit(
+        &mut base.cas,
+        &Draft::Region(RegionDraft {
+            header: Reference::Existing(base.header.clone()),
+            scope: Vec::new(),
+            ambient: AmbientDomain::Product {
+                coordinates: base.coefficients.clone(),
+            },
+            expression: RegionExpr::Meet(vec![
+                Reference::Existing(domain.clone()),
+                Reference::Existing(child.clone()),
+            ]),
+        }),
+    )?;
+    let frame = admit(
+        &mut base.cas,
+        &Draft::Context(ContextDraft::Local {
+            parent: Reference::Existing(parent.clone()),
+            region: Reference::Existing(child.clone()),
+            hypotheses: Vec::new(),
+        }),
+    )?;
+    base.context.clone_from(&frame);
+    base.region.clone_from(&region);
+    let mut branch = partition_branch(base, problem, polynomial, zero_side)?;
+    let start = u32::try_from(steps.len())?;
+    for step in &mut branch {
+        for previous in &mut step.premises {
+            *previous = previous.checked_add(start).ok_or("proof index overflow")?;
+        }
+    }
+    let conclusion = branch.last().ok_or("missing branch")?.conclusion.clone();
+    let Statement::Solve(statement) = &conclusion else {
+        return Err("wrong branch statement".into());
+    };
+    let crate::test_api::solving::SolveStatement::Coverage(coverage) = statement.as_ref() else {
+        return Err("missing branch coverage".into());
+    };
+    let SolveView::SolutionSet(set) = base.cas.solve_view(&coverage.set)? else {
+        return Err("missing branch set".into());
+    };
+    let handle = set.branches.first().ok_or("missing branch")?.clone();
+    steps.extend(branch);
+    let covered = u32::try_from(steps.len().checked_sub(1).ok_or("missing proof")?)?;
+    base.context = parent;
+    base.region = domain;
+    let construction = u32::try_from(steps.len())?;
+    steps.push(ApplicationDraft {
+        rule: Primitive::RegionConstruct,
+        context: base.context.clone(),
+        conclusion: Statement::Constructor {
+            region,
+            law: crate::test_api::proof::ConstructorLaw::Membership,
+        },
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: Certificate::None,
+    });
+    let closed = u32::try_from(steps.len())?;
+    steps.push(ApplicationDraft {
+        rule: Primitive::ContextClose,
+        context: base.context.clone(),
+        conclusion,
+        premises: vec![covered, construction],
+        substitutions: Vec::new(),
+        certificate: Certificate::Close { frame },
+    });
+    Ok((handle, closed))
+}
+
+/// Degree/pivot zero keeps the full family while its complement keeps exactly the zero singleton.
+pub(crate) fn degree_drop_cover() -> TestResult<BinomialFixture> {
+    use crate::test_api::solving::{
+        CertificateTotalPredicateSplit, PredicateSplitMode, SolutionSetData, SolveCertificate,
+        SolveSchema, SolveStatement, StatementCoverage,
+    };
+    let mut base = Fixture::new()?;
+    let coefficient = base.free("a")?;
+    let unknown = base.free("x")?;
+    let polynomial = base.expression(Operator::Mul, &[coefficient.clone(), unknown], false)?;
+    let zero = base.integer(0, false)?;
+    let predicate = base.equation(&polynomial, &zero)?;
+    let problem = base.problem("x", &predicate, &[])?;
+    let partition = base.split(&coefficient)?;
+    let Statement::Cover { members, .. } = &partition.conclusion else {
+        return Err("missing partition".into());
+    };
+    let children = members.clone();
+    let mut steps = vec![partition];
+    let mut branches = Vec::new();
+    let mut proofs = vec![0];
+    for (index, child) in children.iter().enumerate() {
+        let (branch, proof) = close_partition_branch(
+            &mut base,
+            &problem,
+            &polynomial,
+            child,
+            index == 0,
+            &mut steps,
+        )?;
+        branches.push(Reference::Existing(branch));
+        proofs.push(proof);
+    }
+    let set = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::SolutionSet(SolutionSetData {
+            problem: Reference::Existing(problem.clone()),
+            branches,
+        })),
+    )?;
+    let mut step = base.step(
+        SolveSchema::TotalPredicateSplit,
+        SolveStatement::Coverage(StatementCoverage {
+            problem,
+            set,
+            region: base.region.clone(),
+        }),
+        SolveCertificate::TotalPredicateSplit(CertificateTotalPredicateSplit {
+            mode: PredicateSplitMode::EliminateCover,
+            expression: coefficient,
+            region: base.region.clone(),
+            children,
+            branches: vec![1, 2],
+            cover: Some(0),
+        }),
+    );
+    step.premises = proofs;
+    steps.push(step);
+    Ok(BinomialFixture { base, steps })
+}
+
+/// An affine system retains both original conjuncts, including a contradictory augmented row.
+pub(crate) fn linear_system(inconsistent: bool) -> TestResult<(Fixture, ApplicationDraft)> {
+    use crate::test_api::solving::{
+        CertificateExactLinearEquivalence, RowOperation, SolveCertificate, SolveSchema,
+        SolveStatement, StatementLinearSystem,
+    };
+    let mut base = Fixture::new()?;
+    let unknown = base.free("x")?;
+    let one = base.integer(1, false)?;
+    let two = base.integer(2, false)?;
+    let right = base.integer(if inconsistent { 3 } else { 2 }, false)?;
+    let twice = base.expression(Operator::Mul, &[two.clone(), unknown.clone()], false)?;
+    let equation = |base: &mut Fixture, children: &[Handle]| {
+        admit(
+            &mut base.cas,
+            &Draft::Expression(ExpressionDraft {
+                header: Reference::Existing(base.header.clone()),
+                scope: Vec::new(),
+                operator: Operator::Predicate(PredicateKind::Equal),
+                sort: Sort::Value(AtomicSort::Boolean),
+                operands: children.iter().cloned().map(Reference::Existing).collect(),
+                space: None,
+                binding: None,
+            }),
+        )
+    };
+    let first = equation(&mut base, &[unknown, one.clone()])?;
+    let second = equation(&mut base, &[twice, right.clone()])?;
+    let predicate = admit(
+        &mut base.cas,
+        &Draft::Condition {
+            header: Reference::Existing(base.header.clone()),
+            scope: Vec::new(),
+            kind: PredicateKind::And,
+            arguments: vec![Reference::Existing(first), Reference::Existing(second)],
+        },
+    )?;
+    let problem = base.problem("x", &predicate, &[])?;
+    let zero = base.integer(0, false)?;
+    let negative = base.integer(-2, false)?;
+    let bottom = if inconsistent {
+        one.clone()
+    } else {
+        zero.clone()
+    };
+    let matrix = base.matrix(2, 2, &[one.clone(), one.clone(), two, right])?;
+    let reduced = base.matrix(2, 2, &[one.clone(), one.clone(), zero, bottom])?;
+    let pivots = if inconsistent { vec![0, 1] } else { vec![0] };
+    let claim = SolveStatement::LinearSystem(StatementLinearSystem {
+        problem,
+        reduced: reduced.clone(),
+        rank: 1,
+        augmented_rank: if inconsistent { 2 } else { 1 },
+        region: base.region.clone(),
+        free_columns: Vec::new(),
+    });
+    let step = base.step(
+        SolveSchema::ExactLinearEquivalence,
+        claim,
+        SolveCertificate::ExactLinearEquivalence(CertificateExactLinearEquivalence {
+            matrix,
+            augmented_columns: 1,
+            operations: vec![RowOperation::AddMultiple {
+                destination: 1,
+                source: 0,
+                value: negative,
+            }],
+            pivots,
+            minor: one,
+            reduced,
+            region: base.region.clone(),
+        }),
+    );
+    Ok((base, step))
+}
+
+/// A constant map is universally a member of the zero equation but covers only one point.
+pub(crate) fn sampled_family() -> TestResult<(Fixture, Vec<ApplicationDraft>)> {
+    use crate::test_api::solving::{SolveCertificate, SolveStatement};
+    let (mut base, mut steps) = identity_family(0)?;
+    steps.pop();
+    let Statement::Solve(statement) = &steps.first().ok_or("missing membership")?.conclusion else {
+        return Err("wrong statement".into());
+    };
+    let SolveStatement::FamilyMembership(member) = statement.as_ref() else {
+        return Err("wrong membership".into());
+    };
+    let SolveView::FamilyMap(map) = base.cas.solve_view(&member.family)? else {
+        return Err("missing map".into());
+    };
+    let map = map.clone();
+    let zero = base.integer(0, true)?;
+    let body = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::Tuple(TupleData {
+            header: Reference::Existing(base.header.clone()),
+            scope: vec![vec![AtomicSort::Scalar(base.field.clone())]],
+            coordinates: Reference::Existing(map.target.clone()),
+            entries: vec![Reference::Existing(zero)],
+        })),
+    )?;
+    let constant = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::FamilyMap(FamilyMapData {
+            header: Reference::Existing(map.header),
+            scope: map.scope,
+            coefficients: Reference::Existing(map.coefficients),
+            family: Reference::Existing(map.family),
+            region: Reference::Existing(map.region),
+            target: Reference::Existing(map.target),
+            body: Reference::Existing(body),
+        })),
+    )?;
+    for step in &mut steps {
+        let Statement::Solve(statement) = &mut step.conclusion else {
+            return Err("wrong statement".into());
+        };
+        match statement.as_mut() {
+            SolveStatement::FamilyMembership(value) => value.family.clone_from(&constant),
+            SolveStatement::FamilyCoverage(value) => value.family.clone_from(&constant),
+            _ => return Err("wrong family statement".into()),
+        }
+        let Certificate::Solve(certificate) = &mut step.certificate else {
+            return Err("wrong certificate".into());
+        };
+        let SolveCertificate::ParameterImageCoverage(value) = certificate.as_mut() else {
+            return Err("wrong family certificate".into());
+        };
+        value.family.clone_from(&constant);
+    }
+    Ok((base, steps))
 }

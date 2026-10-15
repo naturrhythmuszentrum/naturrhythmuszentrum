@@ -148,3 +148,82 @@ fn root_refinement_fresh_replay() -> TestResult {
     }
     Ok(())
 }
+
+/// Each supplied case is reconstructed without importing producer state or an old witness handle.
+fn final_case(case: u8) -> TestResult<crate::testing::solve_elementary::BinomialFixture> {
+    use crate::testing::solve_elementary::{
+        BinomialFixture, character_rank, conjugate_real, identity_family, real_restriction,
+    };
+    match case {
+        0 => {
+            let (base, steps) = identity_family(0)?;
+            Ok(BinomialFixture { base, steps })
+        }
+        1 => {
+            let (base, step) = character_rank()?;
+            Ok(BinomialFixture {
+                base,
+                steps: vec![step],
+            })
+        }
+        2 => {
+            let (base, step) = conjugate_real(true)?;
+            Ok(BinomialFixture {
+                base,
+                steps: vec![step],
+            })
+        }
+        3 => BinomialFixture::multiplicity(),
+        4 => BinomialFixture::presentation(),
+        5 => real_restriction(false),
+        6 => real_restriction(true),
+        7 => crate::testing::solve_elementary::degree_drop_cover(),
+        _ => {
+            let (base, step) = crate::testing::solve_elementary::linear_system(true)?;
+            Ok(BinomialFixture {
+                base,
+                steps: vec![step],
+            })
+        }
+    }
+}
+
+/// Universal families, linear recovery metadata, multiplicity, realness and presentation replay byte for byte.
+/// ´test:integration:elementary-final-schemas-fresh-replay´
+#[test]
+fn elementary_final_schemas_fresh_replay() -> TestResult {
+    for case in 0..9 {
+        let mut source = final_case(case)?;
+        let checked = source.base.cas.check_proof(
+            &source.base.context,
+            &source.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let bytes = source
+            .base
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut target = final_case(case)?;
+        let expected = target.base.cas.check_proof(
+            &target.base.context,
+            &target.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let replayed = target.base.cas.replay(
+            &bytes,
+            expected.judgment(),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(replayed.judgment(), expected.judgment());
+        assert_eq!(replayed.hypotheses(), []);
+        assert_eq!(replayed.judgment().residuals, []);
+        assert_eq!(
+            target
+                .base
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}
