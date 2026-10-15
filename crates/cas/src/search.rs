@@ -253,63 +253,68 @@ impl Search {
         if !action.plausible(cas)? {
             return Ok(());
         }
-        let previous = self.labels.get(id).ok_or_else(invalid)?;
-        let mut candidate = cas.fork(generation)?;
-        let proposal = crate::rewrite::propose(
-            &mut candidate,
-            previous.endpoint,
-            self.original,
-            &previous.plan,
-            action,
-            generation,
-        );
-        let plan = match proposal {
-            Ok(Some(plan)) => plan,
-            Ok(None)
-            | Err(Fault {
-                kind: FaultKind::Invalid(InvalidCode::UnsupportedFragment),
-                ..
-            }) => return Ok(()),
-            Err(fault) => return Err(fault),
-        };
-        self.statistics.transitions = increment(
-            self.statistics.transitions,
-            BudgetKind::Transitions,
-            generation,
-        )?;
-        let endpoint = candidate.checked(&plan.steps.last().ok_or_else(invalid)?.right)?;
-        let unfolded = candidate.state.expression(endpoint)?.unfolded;
-        let earlier_size = candidate.state.expression(previous.endpoint)?.unfolded;
-        let growth = unfolded.saturating_sub(earlier_size);
-        let credits = previous
-            .metrics
-            .credits
-            .checked_add(growth)
-            .ok_or_else(|| Fault::capacity(BudgetKind::ExpansionCredits, AT))?;
-        let peak = previous.metrics.peak.max(unfolded);
-        generation.check(BudgetKind::ExpansionCredits, credits, AT)?;
-        generation.check(BudgetKind::PeakExpressionSize, peak, AT)?;
-        let cost = previous
-            .metrics
-            .cost
-            .checked_add(action.known.map_or_else(
-                || self.policy.costs.weight(action.primitive),
-                |known| Ok(known.cost),
-            )?)
-            .ok_or_else(|| Fault::capacity(BudgetKind::Transitions, AT))?;
-        let witness = plan.check(&mut candidate, self.context, checker)?;
-        if self.target.is_none_or(|target| target == endpoint) {
-            candidate
-                .recheck_witness(&witness, checker)
-                .map_err(crate::producer::replay_fault)?;
-        }
-        let measured = metrics(&candidate, &witness, cost, peak, credits, generation)?;
-        let mut trace = previous.trace.clone();
-        trace.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
-        trace.push(candidate.handle(endpoint));
-        self.insert(&candidate, plan, witness, measured, trace, generation)?;
-        cas.state = candidate.state;
-        Ok(())
+        let mut skipped = false;
+        let result = cas.transaction(generation, |candidate, generation| {
+            let previous = self.labels.get(id).ok_or_else(invalid)?;
+            let proposal = crate::rewrite::propose(
+                candidate,
+                previous.endpoint,
+                self.original,
+                &previous.plan,
+                action,
+                generation,
+            );
+            let plan = match proposal {
+                Ok(Some(plan)) => plan,
+                Ok(None)
+                | Err(Fault {
+                    kind: FaultKind::Invalid(InvalidCode::UnsupportedFragment),
+                    ..
+                }) => {
+                    skipped = true;
+                    return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+                }
+                Err(fault) => return Err(fault),
+            };
+            self.statistics.transitions = increment(
+                self.statistics.transitions,
+                BudgetKind::Transitions,
+                generation,
+            )?;
+            let endpoint = candidate.checked(&plan.steps.last().ok_or_else(invalid)?.right)?;
+            let unfolded = candidate.state.expression(endpoint)?.unfolded;
+            let earlier_size = candidate.state.expression(previous.endpoint)?.unfolded;
+            let growth = unfolded.saturating_sub(earlier_size);
+            let credits = previous
+                .metrics
+                .credits
+                .checked_add(growth)
+                .ok_or_else(|| Fault::capacity(BudgetKind::ExpansionCredits, AT))?;
+            let peak = previous.metrics.peak.max(unfolded);
+            generation.check(BudgetKind::ExpansionCredits, credits, AT)?;
+            generation.check(BudgetKind::PeakExpressionSize, peak, AT)?;
+            let cost = previous
+                .metrics
+                .cost
+                .checked_add(action.known.map_or_else(
+                    || self.policy.costs.weight(action.primitive),
+                    |known| Ok(known.cost),
+                )?)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Transitions, AT))?;
+            let witness = plan.check(candidate, self.context, checker)?;
+            if self.target.is_none_or(|target| target == endpoint) {
+                candidate
+                    .recheck_witness(&witness, checker)
+                    .map_err(crate::producer::replay_fault)?;
+            }
+            let measured = metrics(candidate, &witness, cost, peak, credits, generation)?;
+            let mut trace = previous.trace.clone();
+            trace.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+            trace.push(candidate.handle(endpoint));
+            self.insert(candidate, plan, witness, measured, trace, generation)?;
+            Ok(())
+        });
+        if skipped { Ok(()) } else { result }
     }
 
     /// Keep separate theorem classes and admit only labels surviving all resource dimensions.

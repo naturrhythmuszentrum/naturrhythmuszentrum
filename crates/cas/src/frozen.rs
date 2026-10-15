@@ -91,18 +91,18 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<FrozenCertificate, Fault> {
         self.proof_limits(budget, |cas, budget| {
-            let mut candidate = cas.fork(budget)?;
-            candidate.pin_policy(policy, budget)?;
-            let (arcs, manifest) = snapshot(&candidate, claim, policy, budget)?;
-            let start = candidate.checked(&claim.left)?;
-            let target = candidate.checked(&claim.right)?;
-            let (shortest_cost, settled) = dijkstra(&arcs, start, target, budget)?;
-            cas.state = candidate.state;
-            Ok(FrozenCertificate {
-                manifest,
-                policy: policy.clone(),
-                shortest_cost,
-                settled,
+            cas.transaction(budget, |candidate, budget| {
+                candidate.pin_policy(policy, budget)?;
+                let (arcs, manifest) = snapshot(candidate, claim, policy, budget)?;
+                let start = candidate.checked(&claim.left)?;
+                let target = candidate.checked(&claim.right)?;
+                let (shortest_cost, settled) = dijkstra(&arcs, start, target, budget)?;
+                Ok(FrozenCertificate {
+                    manifest,
+                    policy: policy.clone(),
+                    shortest_cost,
+                    settled,
+                })
             })
         })
     }
@@ -358,17 +358,17 @@ impl Cas {
         else {
             return Err(invalid());
         };
-        let mut candidate = self.fork(budget)?;
-        candidate.pin_policy(policy, budget)?;
-        let (arcs, manifest) = typed_snapshot(&candidate, judgment, policy, budget)?;
-        let (shortest_cost, settled) =
-            dijkstra(&arcs, left.logical_id(), right.logical_id(), budget)?;
-        self.state = candidate.state;
-        Ok(FrozenCertificate {
-            manifest,
-            policy: policy.clone(),
-            shortest_cost,
-            settled,
+        self.transaction(budget, |candidate, budget| {
+            candidate.pin_policy(policy, budget)?;
+            let (arcs, manifest) = typed_snapshot(candidate, judgment, policy, budget)?;
+            let (shortest_cost, settled) =
+                dijkstra(&arcs, left.logical_id(), right.logical_id(), budget)?;
+            Ok(FrozenCertificate {
+                manifest,
+                policy: policy.clone(),
+                shortest_cost,
+                settled,
+            })
         })
     }
 }

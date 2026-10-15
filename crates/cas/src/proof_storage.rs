@@ -4,9 +4,7 @@
 use crate::budget::{Budget, BudgetKind};
 use crate::encoding::Encoder;
 use crate::error::{Fault, InvalidCode, Location};
-use crate::graph::{
-    Cas, Condition, Edge, Handle, LogicalId, State, Vertex, VertexKind, encode_id, size,
-};
+use crate::graph::{Cas, Condition, Edge, Handle, LogicalId, State, Vertex, encode_id, size};
 use crate::rule_check::mismatch;
 use crate::scalar_model::{CheckedStep, Claim, Compiled, VerifiedWitness};
 
@@ -115,69 +113,59 @@ impl Cas {
             .checked_add(pending)
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
         budget.check(BudgetKind::StagedPayloadBytes, peak, AT)?;
-        let mut staged = std::mem::replace(&mut self.state, State::new());
-        let mut proofs = Vec::new();
-        proofs
-            .try_reserve_exact(compiled.steps.len())
-            .map_err(|_| Fault::allocation(AT))?;
-        for (step, local_premises) in compiled.steps.iter().zip(&compiled.premises) {
-            let mut out = Encoder::new(budget, AT);
-            encode_application(step, &mut out)?;
-            let payload = size(out.finish().len(), AT)?;
-            budget.work(payload, AT)?;
-            let mut value = step.clone();
-            let mut edges = vec![
-                (value.context, Edge::InContext),
-                (value.left, Edge::ConclusionLeft),
-                (value.right, Edge::ConclusionRight),
-            ];
-            edges
-                .try_reserve(
-                    local_premises
-                        .len()
-                        .checked_add(value.conditions.requirements.len())
-                        .ok_or_else(|| Fault::capacity(BudgetKind::Edges, AT))?,
-                )
+        self.with_state(|cas, staged| {
+            let mut proofs = Vec::new();
+            proofs
+                .try_reserve_exact(compiled.steps.len())
                 .map_err(|_| Fault::allocation(AT))?;
-            for (index, previous) in local_premises.iter().enumerate() {
-                let id = usize::try_from(*previous)
-                    .ok()
-                    .and_then(|index| proofs.get(index))
-                    .copied()
-                    .ok_or_else(mismatch)?;
-                value
-                    .premises
-                    .try_reserve(1)
+            for (step, local_premises) in compiled.steps.iter().zip(&compiled.premises) {
+                let mut out = Encoder::new(budget, AT);
+                encode_application(step, &mut out)?;
+                let payload = size(out.finish().len(), AT)?;
+                budget.work(payload, AT)?;
+                let mut value = step.clone();
+                let mut edges = vec![
+                    (value.context, Edge::InContext),
+                    (value.left, Edge::ConclusionLeft),
+                    (value.right, Edge::ConclusionRight),
+                ];
+                edges
+                    .try_reserve(
+                        local_premises
+                            .len()
+                            .checked_add(value.conditions.requirements.len())
+                            .ok_or_else(|| Fault::capacity(BudgetKind::Edges, AT))?,
+                    )
                     .map_err(|_| Fault::allocation(AT))?;
-                value.premises.push(id);
-                edges.push((id, Edge::Premise(position(index)?)));
+                for (index, previous) in local_premises.iter().enumerate() {
+                    let id = usize::try_from(*previous)
+                        .ok()
+                        .and_then(|index| proofs.get(index))
+                        .copied()
+                        .ok_or_else(mismatch)?;
+                    value
+                        .premises
+                        .try_reserve(1)
+                        .map_err(|_| Fault::allocation(AT))?;
+                    value.premises.push(id);
+                    edges.push((id, Edge::Premise(position(index)?)));
+                }
+                cas.publish_conditions(staged, &value, &mut edges, pending, budget)?;
+                let application =
+                    cas.insert(staged, Vertex::Application(value), &edges, pending, budget)?;
+                let proof = cas.insert(
+                    staged,
+                    Vertex::Proof(application),
+                    &[(application, Edge::Justifies)],
+                    pending,
+                    budget,
+                )?;
+                proofs.push(proof);
             }
-            self.publish_conditions(&mut staged, &value, &mut edges, pending, budget)?;
-            let application = self.insert(
-                &mut staged,
-                Vertex::Application(value),
-                &edges,
-                pending,
-                budget,
-            )?;
-            let proof = self.insert(
-                &mut staged,
-                Vertex::Proof(application),
-                &[(application, Edge::Justifies)],
-                pending,
-                budget,
-            )?;
-            proofs.push(proof);
-        }
-        let total = staged
-            .indices
-            .keys()
-            .filter(|id| id.kind == VertexKind::Proof)
-            .count();
-        budget.check(BudgetKind::ProofNodes, size(total, AT)?, AT)?;
-        let root = proofs.last().copied().ok_or_else(mismatch)?;
-        self.state = staged;
-        Ok(self.handle(root))
+            budget.check(BudgetKind::ProofNodes, staged.proof_count(), AT)?;
+            let root = proofs.last().copied().ok_or_else(mismatch)?;
+            Ok(cas.handle(root))
+        })
     }
 
     /// Retain every scalar domain predicate as an explicit application dependency.
@@ -269,22 +257,23 @@ impl Cas {
             let context = checked.context;
             let left = checked.left;
             let right = checked.right;
-            let candidate = cas.fork(budget)?;
-            let mut staged = candidate.state;
-            let id = cas.insert(
-                &mut staged,
-                Vertex::Shortcut { proof, cost },
-                &[
-                    (proof, Edge::DependsOn),
-                    (context, Edge::InContext),
-                    (left, Edge::ConclusionLeft),
-                    (right, Edge::ConclusionRight),
-                ],
-                0,
-                budget,
-            )?;
-            cas.state = staged;
-            Ok(cas.handle(id))
+            cas.transaction(budget, |candidate, budget| {
+                candidate.with_state(|store, staged| {
+                    let id = store.insert(
+                        staged,
+                        Vertex::Shortcut { proof, cost },
+                        &[
+                            (proof, Edge::DependsOn),
+                            (context, Edge::InContext),
+                            (left, Edge::ConclusionLeft),
+                            (right, Edge::ConclusionRight),
+                        ],
+                        0,
+                        budget,
+                    )?;
+                    Ok(store.handle(id))
+                })
+            })
         })
     }
 }

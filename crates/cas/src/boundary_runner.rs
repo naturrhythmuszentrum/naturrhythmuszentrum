@@ -59,36 +59,36 @@ pub(crate) fn execute(
     generation: &mut Budget,
     checker: &mut Budget,
 ) -> Result<Execution, Fault> {
-    let mut candidate = cas.fork(generation)?;
-    let function = candidate.handle(*inputs.first().ok_or_else(invalid)?);
-    let mut runner = Runner {
-        cas: &mut candidate,
-        request,
-        plan: Plan::new(policy),
-        generation,
-        checker,
-        facts: Vec::new(),
-        deferred: None,
-    };
-    let (payload, mut fault) = runner.run(&function);
-    if !policy.allow_conditional && !payload.discharged() {
-        fault = Some(pending());
-    }
-    let result = payload.facts().last().cloned().map(|witness| {
-        let mut trace = vec![function];
-        match &witness.judgment().statement {
-            Statement::CaseDerivative(value) => trace.push(value.derivative.clone()),
-            Statement::DerivativeAt(value) => trace.push(value.value.clone()),
-            _ => {}
+    cas.transaction(generation, |candidate, generation| {
+        let function = candidate.handle(*inputs.first().ok_or_else(invalid)?);
+        let mut runner = Runner {
+            cas: candidate,
+            request,
+            plan: Plan::new(policy),
+            generation,
+            checker,
+            facts: Vec::new(),
+            deferred: None,
+        };
+        let (payload, mut fault) = runner.run(&function);
+        if !policy.allow_conditional && !payload.discharged() {
+            fault = Some(pending());
         }
-        let mut result = runner
-            .plan
-            .finish_retained(witness, trace, &runner.checker.usage());
-        result.payload = Some(Box::new(payload));
-        result
-    });
-    cas.state = candidate.state;
-    Ok(Execution { result, fault })
+        let result = payload.facts().last().cloned().map(|witness| {
+            let mut trace = vec![function];
+            match &witness.judgment().statement {
+                Statement::CaseDerivative(value) => trace.push(value.derivative.clone()),
+                Statement::DerivativeAt(value) => trace.push(value.value.clone()),
+                _ => {}
+            }
+            let mut result = runner
+                .plan
+                .finish_retained(witness, trace, &runner.checker.usage());
+            result.payload = Some(Box::new(payload));
+            result
+        });
+        Ok(Execution { result, fault })
+    })
 }
 
 impl Runner<'_> {

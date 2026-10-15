@@ -43,12 +43,11 @@ impl Cas {
             Err(fault) => return failure(fault, &generation.usage()),
         };
         let prepared = self.prepare_execution(request, policy, &resolved, &mut generation);
-        let (mut candidate, record, unsupported) = match prepared {
+        let (record, unsupported) = match prepared {
             Ok(value) => value,
             Err(fault) => return failure(fault, &generation.usage()),
         };
         if unsupported {
-            self.state = candidate.state;
             return Outcome::Unsupported {
                 request: record,
                 reason: UnsupportedReason::Field,
@@ -57,43 +56,37 @@ impl Cas {
             };
         }
         if matches!(request.task, crate::task::Task::Solve(_)) {
-            let outcome = crate::solving::execute(
-                &mut candidate,
+            return crate::solving::execute(
+                self,
                 request,
                 &record,
                 policy,
                 &mut generation,
                 &mut checker,
             );
-            self.state = candidate.state;
-            return outcome;
         }
-        let mut execution = candidate.execute(request, policy, &mut generation, &mut checker);
+        let mut execution = self.execute(request, policy, &mut generation, &mut checker);
         if let Some(result) = &mut execution.result {
             result.replay_usage = checker.usage();
             result.response =
                 envelope(result, &resolved, &generation.usage(), &mut generation).ok();
         }
-        // Only complete expression/proof batches live in this candidate; the failed proposal
-        // has already been dropped by its transaction boundary.
-        self.state = candidate.state;
         outcome(record, execution, &generation.usage(), &checker.usage())
     }
 
     /// Validate policy and original receipts before publishing any operation work.
     fn prepare_execution(
-        &self,
+        &mut self,
         request: &Request,
         policy: &SearchPolicy,
         limits: &Limits,
         generation: &mut Budget,
-    ) -> Result<(Self, Handle, bool), Fault> {
+    ) -> Result<(Handle, bool), Fault> {
         policy.costs.validate(generation)?;
-        let mut candidate = self.fork(generation)?;
-        candidate.pin_policy(&policy.costs, generation)?;
-        let (record, unsupported) =
-            candidate.prepare_request(request, limits.clone(), generation)?;
-        Ok((candidate, record, unsupported))
+        self.transaction(generation, |candidate, generation| {
+            candidate.pin_policy(&policy.costs, generation)?;
+            candidate.prepare_request(request, limits.clone(), generation)
+        })
     }
 
     /// Dispatch a prepared operation, retaining a checked search prefix on later exhaustion.
@@ -221,17 +214,9 @@ impl Cas {
                 } else {
                     None
                 };
-                let mut initial = self.fork(generation)?;
-                let mut search = Search::new(
-                    &mut initial,
-                    context,
-                    first,
-                    target,
-                    policy,
-                    generation,
-                    checker,
-                )?;
-                self.state = initial.state;
+                let mut search = self.transaction(generation, |initial, generation| {
+                    Search::new(initial, context, first, target, policy, generation, checker)
+                })?;
                 let fault = search.explore(self, generation, checker).err();
                 Ok(Execution {
                     result: search.result(self, checker)?,
@@ -303,45 +288,45 @@ impl Cas {
         generation: &mut Budget,
         checker: &mut Budget,
     ) -> Result<SearchResult, Fault> {
-        let mut candidate = self.fork(generation)?;
-        let output = crate::polynomial::normalize(&mut candidate, input, generation)?;
-        let before = candidate.state.expression(input)?.unfolded;
-        let after = candidate.state.expression(output)?.unfolded;
-        let growth = after.saturating_sub(before);
-        generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
-        let mut plan = crate::producer::Plan::default();
-        plan.push(
-            crate::producer::step(
-                &candidate,
-                crate::rule::Primitive::Jets,
-                crate::scalar_model::Relation::EqualOnDomain,
-                input,
-                output,
-                Vec::new(),
-            ),
-            generation,
-        )?;
-        let witness = plan.verify(&mut candidate, context, checker)?;
-        if !policy.allow_conditional && !witness.is_discharged() {
-            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
-        }
-        let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
-        let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
-        let result = SearchResult {
-            payload: None,
-            witness,
-            cost: policy.costs.weight(crate::rule::Primitive::Jets)?,
-            peak: before.max(after),
-            expansion_credits: growth,
-            primitive_steps: 1,
-            trace,
-            policy: policy.costs.clone(),
-            statistics: SearchStatistics::default(),
-            replay_usage: checker.usage(),
-            response: None,
-        };
-        self.state = candidate.state;
-        Ok(result)
+        self.transaction(generation, |candidate, generation| {
+            let output = crate::polynomial::normalize(candidate, input, generation)?;
+            let before = candidate.state.expression(input)?.unfolded;
+            let after = candidate.state.expression(output)?.unfolded;
+            let growth = after.saturating_sub(before);
+            generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
+            let mut plan = crate::producer::Plan::default();
+            plan.push(
+                crate::producer::step(
+                    candidate,
+                    crate::rule::Primitive::Jets,
+                    crate::scalar_model::Relation::EqualOnDomain,
+                    input,
+                    output,
+                    Vec::new(),
+                ),
+                generation,
+            )?;
+            let witness = plan.verify(candidate, context, checker)?;
+            if !policy.allow_conditional && !witness.is_discharged() {
+                return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+            }
+            let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+            let witness = crate::proof_view::native_witness(candidate, witness, checker)?;
+            let result = SearchResult {
+                payload: None,
+                witness,
+                cost: policy.costs.weight(crate::rule::Primitive::Jets)?,
+                peak: before.max(after),
+                expansion_credits: growth,
+                primitive_steps: 1,
+                trace,
+                policy: policy.costs.clone(),
+                statistics: SearchStatistics::default(),
+                replay_usage: checker.usage(),
+                response: None,
+            };
+            Ok(result)
+        })
     }
 
     /// Polynomial evidence and its displayed factors are published as one checked transaction.
@@ -354,36 +339,36 @@ impl Cas {
         generation: &mut Budget,
         checker: &mut Budget,
     ) -> Result<SearchResult, Fault> {
-        let mut candidate = self.fork(generation)?;
-        let plan =
-            crate::square_free::produce(&mut candidate, context, input, variable, generation)?;
-        let proposal = plan.steps.last().ok_or_else(invalid)?;
-        let output = candidate.checked(&proposal.right)?;
-        let before = candidate.state.expression(input)?.unfolded;
-        let after = candidate.state.expression(output)?.unfolded;
-        let growth = after.saturating_sub(before);
-        generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
-        let witness = plan.verify(&mut candidate, context, checker)?;
-        if !policy.allow_conditional && !witness.is_discharged() {
-            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
-        }
-        let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
-        let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
-        let result = SearchResult {
-            payload: None,
-            witness,
-            cost: policy.costs.weight(crate::rule::Primitive::SquareFree)?,
-            peak: before.max(after),
-            expansion_credits: growth,
-            primitive_steps: 1,
-            trace,
-            policy: policy.costs.clone(),
-            statistics: SearchStatistics::default(),
-            replay_usage: checker.usage(),
-            response: None,
-        };
-        self.state = candidate.state;
-        Ok(result)
+        self.transaction(generation, |candidate, generation| {
+            let plan =
+                crate::square_free::produce(candidate, context, input, variable, generation)?;
+            let proposal = plan.steps.last().ok_or_else(invalid)?;
+            let output = candidate.checked(&proposal.right)?;
+            let before = candidate.state.expression(input)?.unfolded;
+            let after = candidate.state.expression(output)?.unfolded;
+            let growth = after.saturating_sub(before);
+            generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
+            let witness = plan.verify(candidate, context, checker)?;
+            if !policy.allow_conditional && !witness.is_discharged() {
+                return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+            }
+            let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+            let witness = crate::proof_view::native_witness(candidate, witness, checker)?;
+            let result = SearchResult {
+                payload: None,
+                witness,
+                cost: policy.costs.weight(crate::rule::Primitive::SquareFree)?,
+                peak: before.max(after),
+                expansion_credits: growth,
+                primitive_steps: 1,
+                trace,
+                policy: policy.costs.clone(),
+                statistics: SearchStatistics::default(),
+                replay_usage: checker.usage(),
+                response: None,
+            };
+            Ok(result)
+        })
     }
 
     /// Derivative generation is one transaction; no partial output matrix is published.
@@ -396,57 +381,57 @@ impl Cas {
         generation: &mut Budget,
         checker: &mut Budget,
     ) -> Result<SearchResult, Fault> {
-        let mut candidate = self.fork(generation)?;
-        let mut deriver = Deriver::default();
-        let root = match operation {
-            Operation::Differentiate(variable) => {
-                let input = inputs.first().copied().ok_or_else(invalid)?;
-                deriver
-                    .derive(&mut candidate, context, input, variable, generation)?
-                    .1
+        self.transaction(generation, |candidate, generation| {
+            let mut deriver = Deriver::default();
+            let root = match operation {
+                Operation::Differentiate(variable) => {
+                    let input = inputs.first().copied().ok_or_else(invalid)?;
+                    deriver
+                        .derive(candidate, context, input, variable, generation)?
+                        .1
+                }
+                Operation::Jacobian(variables) => {
+                    deriver.jacobian(candidate, context, inputs, variables, generation)?
+                }
+                _ => return Err(invalid()),
+            };
+            let plan = deriver.plan.selected(root, generation)?;
+            let witness = plan.verify(candidate, context, checker)?;
+            if !policy.allow_conditional && !witness.is_discharged() {
+                return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
             }
-            Operation::Jacobian(variables) => {
-                deriver.jacobian(&mut candidate, context, inputs, variables, generation)?
+            let cost = policy
+                .costs
+                .weight(plan.steps.last().ok_or_else(invalid)?.primitive)?;
+            let mut peak = 0_u64;
+            for proposal in &plan.steps {
+                generation.work(1, AT)?;
+                for endpoint in [&proposal.left, &proposal.right] {
+                    peak = peak.max(
+                        candidate
+                            .state
+                            .expression(candidate.checked(endpoint)?)?
+                            .unfolded,
+                    );
+                }
             }
-            _ => return Err(invalid()),
-        };
-        let plan = deriver.plan.selected(root, generation)?;
-        let witness = plan.verify(&mut candidate, context, checker)?;
-        if !policy.allow_conditional && !witness.is_discharged() {
-            return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
-        }
-        let cost = policy
-            .costs
-            .weight(plan.steps.last().ok_or_else(invalid)?.primitive)?;
-        let mut peak = 0_u64;
-        for proposal in &plan.steps {
-            generation.work(1, AT)?;
-            for endpoint in [&proposal.left, &proposal.right] {
-                peak = peak.max(
-                    candidate
-                        .state
-                        .expression(candidate.checked(endpoint)?)?
-                        .unfolded,
-                );
-            }
-        }
-        let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
-        let witness = crate::proof_view::native_witness(&candidate, witness, checker)?;
-        let result = SearchResult {
-            payload: None,
-            witness,
-            cost,
-            peak,
-            expansion_credits: 0,
-            primitive_steps: size(plan.steps.len(), AT)?,
-            trace,
-            policy: policy.costs.clone(),
-            statistics: SearchStatistics::default(),
-            replay_usage: checker.usage(),
-            response: None,
-        };
-        self.state = candidate.state;
-        Ok(result)
+            let trace = vec![witness.claim.left.clone(), witness.claim.right.clone()];
+            let witness = crate::proof_view::native_witness(candidate, witness, checker)?;
+            let result = SearchResult {
+                payload: None,
+                witness,
+                cost,
+                peak,
+                expansion_credits: 0,
+                primitive_steps: size(plan.steps.len(), AT)?,
+                trace,
+                policy: policy.costs.clone(),
+                statistics: SearchStatistics::default(),
+                replay_usage: checker.usage(),
+                response: None,
+            };
+            Ok(result)
+        })
     }
 }
 

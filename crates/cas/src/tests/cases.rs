@@ -187,7 +187,7 @@ fn case_elimination_frame_identity() -> TestResult {
         substitutions: Vec::new(),
         certificate: elimination.certificate,
     };
-    let mut candidate = f.cas.fork(&mut budget()?)?;
+    let mut candidate = f.cas.full_copy_for_test();
     assert!(
         crate::scoped_check::check_application(&mut candidate, &draft, &earlier, &mut budget()?)
             .is_err()

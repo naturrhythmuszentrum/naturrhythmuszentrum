@@ -22,17 +22,17 @@ impl Cas {
         name: &NamedCase,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let mut candidate = self.fork(budget)?;
-        let expanded = definition(&mut candidate, domain, name, budget)?;
-        let result = syntax::term(
-            &mut candidate,
-            domain,
-            Operator::NamedCase(Box::new(name.clone())),
-            &[expanded],
-            budget,
-        )?;
-        self.state = candidate.state;
-        Ok(result)
+        self.transaction(budget, |candidate, budget| {
+            let expanded = definition(candidate, domain, name, budget)?;
+            let result = syntax::term(
+                candidate,
+                domain,
+                Operator::NamedCase(Box::new(name.clone())),
+                &[expanded],
+                budget,
+            )?;
+            Ok(result)
+        })
     }
 }
 

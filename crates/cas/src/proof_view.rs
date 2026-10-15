@@ -283,10 +283,11 @@ pub(crate) fn application(
     };
     match cas.state.node(*id)? {
         Vertex::ScopedApplication(value) => {
-            budget.work(cas.counts().payload_bytes, AT)?;
+            prepay_scoped_copy(value, budget)?;
             Ok(value.as_ref().clone())
         }
         Vertex::Application(value) => {
+            prepay_scalar_copy(value, budget)?;
             let claim = crate::proof_check::claim(cas, value, budget)?;
             let judgment = typed_claim(cas, &claim, budget)?;
             let mut conditions = ScopedConditions {
@@ -359,6 +360,45 @@ pub(crate) fn application(
         }
         _ => Err(invalid()),
     }
+}
+
+/// Reserve only the scalar application being copied, including its owned certificate.
+fn prepay_scalar_copy(
+    value: &crate::scalar_model::CheckedStep,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
+    let bytes = crate::proof_storage::pending_bytes(value, value.premises.len(), budget)?;
+    budget.work(bytes, AT)?;
+    Ok(bytes)
+}
+
+/// Native payload and its optional scalar cache are bounded before either is cloned.
+fn prepay_scoped_copy(value: &CheckedApplication, budget: &mut Budget) -> Result<(), Fault> {
+    let mut out = crate::encoding::Encoder::new(budget, AT);
+    crate::statement::application(value, &mut out)?;
+    let bytes = size(out.finish().len(), AT)?
+        .checked_mul(4)
+        .and_then(|n| n.checked_add(256))
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+    let scalar = value
+        .scalar
+        .as_ref()
+        .map_or_else(|| Ok(0), |value| prepay_scalar_copy(value, budget))?;
+    let retained = match &value.certificate {
+        Certificate::SquareFree(value) => value.payload(budget)?,
+        _ => 0,
+    };
+    let total = bytes
+        .checked_add(scalar)
+        .and_then(|n| n.checked_add(retained))
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+    budget.check(BudgetKind::StagedPayloadBytes, total, AT)?;
+    budget.work(
+        bytes
+            .checked_add(retained)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
+        AT,
+    )
 }
 
 /// Bound the number and payload of a typed application before caller-owned copies.
@@ -499,7 +539,7 @@ pub(crate) fn scalar_application(
         }
     }
     if let Some(checked) = &value.scalar {
-        budget.work(cas.counts().payload_bytes, AT)?;
+        prepay_scalar_copy(checked, budget)?;
         return Ok(checked.clone());
     }
     let claim = scalar_claim(cas, &value.judgment)?;

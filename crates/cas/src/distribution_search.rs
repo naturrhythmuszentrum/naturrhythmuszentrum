@@ -80,35 +80,35 @@ pub(crate) fn route(
     checker: &mut Budget,
 ) -> Result<crate::search::SearchResult, Fault> {
     let space = request_space(cas, &request.task, inputs)?.ok_or_else(invalid)?;
-    let mut candidate = cas.fork(generation)?;
-    let header = candidate.context_header(&request.context)?;
-    let roots: Vec<_> = inputs.iter().map(|id| candidate.handle(*id)).collect();
-    let mut runner = Runner {
-        cas: &mut candidate,
-        context: request.context.clone(),
-        header,
-        space,
-        plan: Plan::new(policy),
-        generation,
-        checker,
-        regular: BTreeMap::new(),
-        derivatives: BTreeMap::new(),
-        premises: request
-            .premises
-            .iter()
-            .map(|value| value.proof().clone())
-            .collect(),
-    };
-    let (output, proof) =
-        run(&mut runner, &request.task, &roots, named, known).map_err(|mut fault| {
-            if crate::case_obligations::unknown(&fault) {
-                fault.kind = FaultKind::Invalid(InvalidCode::PendingPremise);
-            }
-            fault
-        })?;
-    let result = finish(runner, &roots, &output, &proof)?;
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(generation, |candidate, generation| {
+        let header = candidate.context_header(&request.context)?;
+        let roots: Vec<_> = inputs.iter().map(|id| candidate.handle(*id)).collect();
+        let mut runner = Runner {
+            cas: candidate,
+            context: request.context.clone(),
+            header,
+            space,
+            plan: Plan::new(policy),
+            generation,
+            checker,
+            regular: BTreeMap::new(),
+            derivatives: BTreeMap::new(),
+            premises: request
+                .premises
+                .iter()
+                .map(|value| value.proof().clone())
+                .collect(),
+        };
+        let (output, proof) =
+            run(&mut runner, &request.task, &roots, named, known).map_err(|mut fault| {
+                if crate::case_obligations::unknown(&fault) {
+                    fault.kind = FaultKind::Invalid(InvalidCode::PendingPremise);
+                }
+                fault
+            })?;
+        let result = finish(runner, &roots, &output, &proof)?;
+        Ok(result)
+    })
 }
 
 /// Seal and independently replay one complete typed route before publishing its result.

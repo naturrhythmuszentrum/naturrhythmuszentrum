@@ -1147,3 +1147,170 @@ fn square_free_checker_remains_unregistered() -> TestResult {
     assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
     Ok(())
 }
+
+/// Scalar and native proof checks charge the same touched work in a padded store.
+/// ´test:integration:proof-transaction-work-locality´
+#[test]
+fn proof_transaction_work_locality() -> TestResult {
+    let (mut small, _, scalar) = cancellation()?;
+    let (mut large, _, padded_scalar) = cancellation()?;
+    let unrelated: Vec<_> = (0..256)
+        .map(|index| Draft::Source {
+            key: format!("unrelated-{index}"),
+            text: "x".repeat(128),
+        })
+        .collect();
+    large.cas.admit(&unrelated, &mut budget()?)?;
+    let native = native_region_step(&small);
+    let padded_native = native_region_step(&large);
+    for (first, second) in [(scalar, padded_scalar), (native, padded_native)] {
+        let mut baseline = budget()?;
+        let mut padded = budget()?;
+        let expected = small
+            .cas
+            .check_proof(&small.context, &[first], &mut baseline)?;
+        let actual = large
+            .cas
+            .check_proof(&large.context, &[second], &mut padded)?;
+        assert_eq!(baseline.usage(), padded.usage());
+        assert_eq!(expected.is_discharged(), actual.is_discharged());
+        assert_eq!(
+            small.cas.export_witness(&expected, &mut budget()?)?,
+            large.cas.export_witness(&actual, &mut budget()?)?
+        );
+    }
+    Ok(())
+}
+
+/// Structural region reflexivity selects the native publisher without arithmetic dependencies.
+fn native_region_step(fixture: &Fixture) -> nrz_cas::proof::ApplicationDraft {
+    nrz_cas::proof::ApplicationDraft {
+        context: fixture.context.clone(),
+        rule: Primitive::RegionConstruct,
+        conclusion: Statement::Subset {
+            subset: fixture.domain.clone(),
+            superset: fixture.domain.clone(),
+        },
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: nrz_cas::proof::Certificate::None,
+    }
+}
+
+/// Exhaustion one work unit before completion cannot retain either proof publisher's prefix.
+/// ´test:integration:proof-transaction-exact-work-boundary´
+#[test]
+fn proof_transaction_exact_work_boundary() -> TestResult {
+    for native in [false, true] {
+        let (mut control, _, scalar) = cancellation()?;
+        let (mut fixture, _, other_scalar) = cancellation()?;
+        let step = if native {
+            native_region_step(&control)
+        } else {
+            scalar
+        };
+        let proposal = if native {
+            native_region_step(&fixture)
+        } else {
+            other_scalar
+        };
+        let mut measured = budget()?;
+        let expected = control
+            .cas
+            .check_proof(&control.context, &[step], &mut measured)?;
+        let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
+        let counts = fixture.cas.counts();
+        let mut short = Budget::new(Limits {
+            work: measured
+                .usage()
+                .work
+                .checked_sub(1)
+                .ok_or("empty proof work")?,
+            ..budget()?.limits().clone()
+        })?;
+        let fault = fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                std::slice::from_ref(&proposal),
+                &mut short,
+            )
+            .err()
+            .ok_or("accepted short proof budget")?;
+        assert!(matches!(
+            fault.kind,
+            FaultKind::Exhausted {
+                budget: BudgetKind::Work,
+                ..
+            }
+        ));
+        assert_eq!(fixture.cas.counts(), counts);
+        assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
+        let mut exact = Budget::new(Limits {
+            work: measured.usage().work,
+            ..budget()?.limits().clone()
+        })?;
+        let actual = fixture
+            .cas
+            .check_proof(&fixture.context, &[proposal], &mut exact)?;
+        assert_eq!(actual.proof().logical_id(), expected.proof().logical_id());
+        assert_eq!(
+            fixture.cas.export_witness(&actual, &mut budget()?)?,
+            control.cas.export_witness(&expected, &mut budget()?)?
+        );
+    }
+    Ok(())
+}
+
+/// Substituting a checked guarded theorem reads only reached syntax, even in a padded store.
+/// ´test:integration:substituted-proof-work-locality´
+#[test]
+fn substituted_proof_work_locality() -> TestResult {
+    let (mut small, _, first) = cancellation()?;
+    let (mut large, _, second) = cancellation()?;
+    let original = substitution_steps(&mut small, first)?;
+    let padded = substitution_steps(&mut large, second)?;
+    let unrelated: Vec<_> = (0..256)
+        .map(|index| Draft::Source {
+            key: format!("substitution-padding-{index}"),
+            text: "x".repeat(128),
+        })
+        .collect();
+    large.cas.admit(&unrelated, &mut budget()?)?;
+    let mut baseline = budget()?;
+    let mut ledger = budget()?;
+    let expected = small
+        .cas
+        .check_proof(&small.context, &original, &mut baseline)?;
+    let actual = large
+        .cas
+        .check_proof(&large.context, &padded, &mut ledger)?;
+    assert!(expected.is_discharged() && actual.is_discharged());
+    assert_eq!(baseline.usage(), ledger.usage());
+    assert_eq!(
+        small.cas.export_witness(&expected, &mut budget()?)?,
+        large.cas.export_witness(&actual, &mut budget()?)?
+    );
+    Ok(())
+}
+
+/// The nonzero replacement discharges the original cancellation guard through explicit substitution.
+fn substitution_steps(
+    fixture: &mut Fixture,
+    first: nrz_cas::proof::ApplicationDraft,
+) -> TestResult<[nrz_cas::proof::ApplicationDraft; 2]> {
+    let quotient = fixture.term(Operator::Div, &[fixture.two.clone(), fixture.two.clone()])?;
+    let mut second = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Substitute,
+        &quotient,
+        &fixture.one,
+    );
+    second.premises = vec![0];
+    second.substitutions = vec![Substitution {
+        key: "x".into(),
+        replacement: fixture.two.clone(),
+    }];
+    Ok([first, second])
+}

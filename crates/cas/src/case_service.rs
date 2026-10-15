@@ -51,38 +51,38 @@ pub(crate) fn execute(
     generation: &mut Budget,
     checker: &mut Budget,
 ) -> Result<SearchResult, Fault> {
-    let mut candidate = cas.fork(generation)?;
-    let mut runner = Runner {
-        cas: &mut candidate,
-        request,
-        plan: Plan::new(policy),
-        generation,
-        checker,
-    };
-    let proof = match runner.run(inputs) {
-        Ok(proof) => proof,
-        Err(fault) => {
-            return Err(classify_context(
-                runner.cas,
-                request,
-                fault,
-                runner.generation,
-            )?);
+    cas.transaction(generation, |candidate, generation| {
+        let mut runner = Runner {
+            cas: candidate,
+            request,
+            plan: Plan::new(policy),
+            generation,
+            checker,
+        };
+        let proof = match runner.run(inputs) {
+            Ok(proof) => proof,
+            Err(fault) => {
+                return Err(classify_context(
+                    runner.cas,
+                    request,
+                    fault,
+                    runner.generation,
+                )?);
+            }
+        };
+        let mut trace: Vec<_> = inputs.iter().map(|id| runner.cas.handle(*id)).collect();
+        if let Statement::Equality { right, .. } | Statement::Elaboration { result: right, .. } =
+            &crate::proof_view::application(runner.cas, proof.logical_id(), runner.checker)?
+                .judgment
+                .statement
+        {
+            trace.push(right.clone());
         }
-    };
-    let mut trace: Vec<_> = inputs.iter().map(|id| runner.cas.handle(*id)).collect();
-    if let Statement::Equality { right, .. } | Statement::Elaboration { result: right, .. } =
-        &crate::proof_view::application(runner.cas, proof.logical_id(), runner.checker)?
-            .judgment
-            .statement
-    {
-        trace.push(right.clone());
-    }
-    let result = runner
-        .plan
-        .finish(runner.cas, &proof, trace, runner.checker)?;
-    cas.state = candidate.state;
-    Ok(result)
+        let result = runner
+            .plan
+            .finish(runner.cas, &proof, trace, runner.checker)?;
+        Ok(result)
+    })
 }
 
 /// One recipe shares the request's generation ledger, checker ledger and positive cost ledger.

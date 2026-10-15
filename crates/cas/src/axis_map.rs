@@ -47,10 +47,10 @@ impl Cas {
         let root = self.checked(root)?;
         crate::descriptor::metadata(&self.state, root)?;
         let mapping = Mapping::validate(self, map, budget)?;
-        let mut candidate = self.fork(budget)?;
-        let output = mapping.transform(&mut candidate, root, budget)?;
-        self.state = candidate.state;
-        Ok(output)
+        self.transaction(budget, |candidate, budget| {
+            let output = mapping.transform(candidate, root, budget)?;
+            Ok(output)
+        })
     }
 }
 

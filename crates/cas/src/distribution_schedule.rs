@@ -58,10 +58,10 @@ pub(crate) fn execute(
             generation,
         )?;
     }
-    let mut candidate = cas.fork(generation)?;
-    let result = explore(&mut candidate, &routes, &mut queue, generation, checker);
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(generation, |candidate, generation| {
+        let result = explore(candidate, &routes, &mut queue, generation, checker);
+        Ok(result)
+    })
 }
 
 /// A failure after a complete replay never erases the already accepted best result.

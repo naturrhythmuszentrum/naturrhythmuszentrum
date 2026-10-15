@@ -193,7 +193,7 @@ pub(crate) fn replay_boundary(
     Ok(())
 }
 
-/// Generation includes optional response bytes, so locate the actual complete-proof boundary.
+/// Locate the shared construction and generation work boundary of the complete schedule.
 pub(crate) fn generation_boundary(
     lower: impl Fn(&LimitsOverride) -> TestResult<CheckedSensitivity>,
 ) -> TestResult {
@@ -210,21 +210,54 @@ pub(crate) fn generation_boundary(
         baseline.construction <= GENERATION_WORK / 2,
         "construction headroom: {baseline:?}"
     );
-    assert!(baseline.generation > baseline.replay && baseline.generation > baseline.construction);
-    let threshold = generation_limit(&lower, baseline.construction, baseline.generation)?;
+    // Construction is deterministic and supplies the minimum feasible shared cap.
+    // Search at or above it for any larger generation requirement; replay keeps its own cap.
+    let ceiling = baseline.generation.max(baseline.construction);
+    let threshold = generation_limit(&lower, baseline.construction, ceiling)?;
     let mut limits = request_limits();
     limits.work = Some(threshold);
     let exact = lower(&limits)?;
     assert_eq!(exact.jacobian().work().requests, baseline.requests);
     assert!(exact.jacobian().work().generation <= threshold);
-    let below = threshold.checked_sub(1).ok_or("empty generation ledger")?;
+    assert!(exact.jacobian().work().construction <= threshold);
+    limits.work = Some(
+        threshold
+            .checked_add(1)
+            .ok_or("shared work boundary overflow")?,
+    );
+    let above = lower(&limits)?;
+    assert_eq!(above.jacobian().work().requests, baseline.requests);
+    let below = threshold.checked_sub(1).ok_or("empty shared work ledger")?;
     limits.work = Some(below);
-    generation_exhausted(
-        lower(&limits)
-            .err()
-            .ok_or("one-below generation request succeeded")?,
-        below,
-    )
+    let error = lower(&limits)
+        .err()
+        .ok_or("one-below shared work request succeeded")?;
+    let (phase, fault) = match error.downcast_ref::<SensitivityError>() {
+        Some(SensitivityError::Algebra(fault)) => ("construction", fault),
+        Some(SensitivityError::Evidence(outcome)) => {
+            let nrz_cas::request::Outcome::Exhausted {
+                fault,
+                usage,
+                replay_usage,
+                ..
+            } = outcome.as_ref()
+            else {
+                return Err("one-below schedule did not exhaust".into());
+            };
+            assert!(usage.work <= below);
+            assert!(replay_usage.work <= REPLAY_WORK);
+            ("generation", fault)
+        }
+        _ => return Err(error),
+    };
+    // A replay Work refusal would carry REPLAY_WORK, never this smaller shared limit.
+    assert_ne!(below, REPLAY_WORK);
+    assert!(
+        matches!(fault.kind, nrz_cas::FaultKind::Exhausted { budget: nrz_cas::limits::BudgetKind::Work, limit, .. } if limit == below),
+        "{phase} refused outside the shared work cap: {fault:?}"
+    );
+    assert!(matches!(phase, "construction" | "generation"));
+    Ok(())
 }
 
 /// Fresh deterministic schedules find the success/refusal boundary in at most 64 bounded trials.

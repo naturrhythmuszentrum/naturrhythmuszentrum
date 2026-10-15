@@ -659,6 +659,8 @@ enum Undo {
         id: LogicalId,
         /// Only interned vertex kinds insert a structural key.
         key: Option<Vec<u8>>,
+        /// Policy identity indexed by this insertion, if present.
+        policy: Option<(String, u32)>,
     },
     /// A newly claimed source name.
     Source(String),
@@ -666,19 +668,22 @@ enum Undo {
     Parent(LogicalId),
 }
 
-/// Constant-sized counters and an insertion log, without copying old graph records.
+/// Bounded counter checkpoint and a position in the shared insertion log.
 #[derive(Clone, Debug)]
 struct Journal {
     /// Every occupancy counter before the first mutation.
     counts: GraphCounts,
     /// At most one next serial per fixed vertex kind.
     next: BTreeMap<VertexKind, u64>,
-    /// Only successful insertions are undone, in reverse order.
-    undo: Vec<Undo>,
+    /// First undo entry owned by this checkpoint.
+    start: usize,
+    /// A parent checkpoint retains committed inner edits.
+    nested: bool,
 }
 
 /// Append-only storage plus derived lookup maps; the graph owns every weight.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
+#[cfg_attr(test, derive(Clone))]
 pub(crate) struct State {
     /// Authoritative heterogeneous graph.
     pub(crate) graph: DiGraph<Vertex, Edge, u32>,
@@ -700,8 +705,8 @@ pub(crate) struct State {
     originals: u64,
     /// Conservative logical payload bytes, including owned interning keys.
     payload: u64,
-    /// Undo records are present only during a public admission.
-    journal: Option<Journal>,
+    /// Shared insertion log for all active transaction checkpoints.
+    journal: Option<Vec<Undo>>,
 }
 
 impl State {
@@ -723,8 +728,8 @@ impl State {
     }
 
     /// Capture the bounded counter inventory before any new record is inserted.
-    fn begin(&mut self) {
-        self.journal = Some(Journal {
+    fn begin(&mut self) -> Journal {
+        let checkpoint = Journal {
             counts: GraphCounts {
                 vertices: self.graph.node_count(),
                 edges: self.graph.edge_count(),
@@ -733,55 +738,85 @@ impl State {
                 payload_bytes: self.payload,
             },
             next: self.next.clone(),
-            undo: Vec::new(),
-        });
+            start: self.journal.as_ref().map_or(0, Vec::len),
+            nested: self.journal.is_some(),
+        };
+        self.journal.get_or_insert_with(Vec::new);
+        checkpoint
     }
 
     /// Reserve the undo entry before performing the corresponding mutation.
     fn record(&mut self, entry: Undo) -> Result<(), Fault> {
         if let Some(journal) = &mut self.journal {
             journal
-                .undo
                 .try_reserve(1)
                 .map_err(|_| Fault::allocation(Location::new("admission journal")))?;
-            journal.undo.push(entry);
+            journal.push(entry);
         }
         Ok(())
     }
 
-    /// Restore exact graph indices, maps and counters without fallible validation or copying.
-    fn rollback(&mut self) {
-        let Some(journal) = self.journal.take() else {
-            return;
-        };
-        for entry in journal.undo.into_iter().rev() {
-            match entry {
-                Undo::Vertex { id, key } => {
-                    self.indices.remove(&id);
-                    if let Some(key) = key {
-                        self.intern.remove(&key);
-                    }
-                }
-                Undo::Source(key) => {
-                    self.sources.remove(&key);
-                }
-                Undo::Parent(child) => {
-                    self.parents.remove(&child);
-                }
-            }
+    /// Commit inner edits into the parent log, or reverse only this checkpoint's edits.
+    fn finish(&mut self, checkpoint: Journal, commit: bool) {
+        let nested = checkpoint.nested;
+        if !commit {
+            self.rollback(checkpoint);
         }
-        while self.graph.edge_count() > journal.counts.edges {
+        if !nested {
+            self.journal = None;
+        }
+    }
+
+    /// Restore exact graph indices, maps and counters without fallible validation or copying.
+    fn rollback(&mut self, checkpoint: Journal) {
+        while self
+            .journal
+            .as_ref()
+            .is_some_and(|log| log.len() > checkpoint.start)
+        {
+            let Some(entry) = self.journal.as_mut().and_then(Vec::pop) else {
+                break;
+            };
+            self.undo(entry);
+        }
+        while self.graph.edge_count() > checkpoint.counts.edges {
             let index = EdgeIndex::new(self.graph.edge_count() - 1);
             let _removed = self.graph.remove_edge(index);
         }
-        while self.graph.node_count() > journal.counts.vertices {
+        while self.graph.node_count() > checkpoint.counts.vertices {
             let index = NodeIndex::new(self.graph.node_count() - 1);
             let _removed = self.graph.remove_node(index);
         }
-        self.next = journal.next;
-        self.payload = journal.counts.payload_bytes;
-        self.source_bytes = journal.counts.source_bytes;
-        self.originals = journal.counts.original_occurrences;
+        self.next = checkpoint.next;
+        self.payload = checkpoint.counts.payload_bytes;
+        self.source_bytes = checkpoint.counts.source_bytes;
+        self.originals = checkpoint.counts.original_occurrences;
+    }
+
+    /// Remove the derived index entries reserved before each graph mutation.
+    fn undo(&mut self, entry: Undo) {
+        match entry {
+            Undo::Vertex { id, key, policy } => {
+                self.indices.remove(&id);
+                if let Some(key) = key {
+                    self.intern.remove(&key);
+                }
+                if let Some(identity) = policy {
+                    self.policies.remove(&identity);
+                }
+            }
+            Undo::Source(key) => {
+                self.sources.remove(&key);
+            }
+            Undo::Parent(child) => {
+                self.parents.remove(&child);
+            }
+        }
+    }
+
+    /// Append-only proof serials count retained proofs without walking unrelated objects.
+    pub(crate) fn proof_count(&self) -> u64 {
+        self.next.get(&VertexKind::Proof).copied().unwrap_or(0)
     }
 
     /// Meter one structural-key probe by its own bytes, independent of retained payload.
@@ -950,28 +985,46 @@ impl Cas {
         })
     }
 
-    /// Copy a private transaction candidate after charging its full retained storage.
-    pub(crate) fn fork(&self, budget: &mut Budget) -> Result<Self, Fault> {
+    /// Journal touched records, retaining spent budget on both commit and rollback.
+    /// Inner commits remain reversible by an enclosing transaction.
+    pub(crate) fn transaction<T>(
+        &mut self,
+        budget: &mut Budget,
+        f: impl FnOnce(&mut Self, &mut Budget) -> Result<T, Fault>,
+    ) -> Result<T, Fault> {
+        // Only the fixed vertex-kind counter inventory is copied at a checkpoint.
         let at = Location::new("proof transaction");
-        for (kind, needed) in [
-            (
-                BudgetKind::StagedVertices,
-                size(self.state.graph.node_count(), at)?,
-            ),
-            (
-                BudgetKind::StagedEdges,
-                size(self.state.graph.edge_count(), at)?,
-            ),
-            (BudgetKind::StagedPayloadBytes, self.state.payload),
-        ] {
-            storage_check(&self.limits, budget, kind, needed, at)?;
-        }
-        budget.work(self.state.payload, at)?;
-        Ok(Self {
+        budget.work(256, at)?;
+        let bytes = size(self.state.next.len(), at)?
+            .checked_mul(64)
+            .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
+        let previous = budget.reserve_temporary(bytes, at)?;
+        let checkpoint = self.state.begin();
+        let result = f(self, budget);
+        self.state.finish(checkpoint, result.is_ok());
+        budget.restore_limits(previous);
+        result
+    }
+
+    /// Temporarily separate the store identity from its state, restoring it on every result.
+    pub(crate) fn with_state<T>(
+        &mut self,
+        f: impl FnOnce(&Self, &mut State) -> Result<T, Fault>,
+    ) -> Result<T, Fault> {
+        let mut state = std::mem::replace(&mut self.state, State::new());
+        let result = f(self, &mut state);
+        self.state = state;
+        result
+    }
+
+    /// Unmetered full copy for tests requiring an untouched control store.
+    #[cfg(test)]
+    pub(crate) fn full_copy_for_test(&self) -> Self {
+        Self {
             token: Arc::clone(&self.token),
             limits: self.limits.clone(),
             state: self.state.clone(),
-        })
+        }
     }
 
     /// Read current occupancy without exposing a physical graph index.
@@ -1110,13 +1163,9 @@ impl Cas {
         // The fixed vertex-kind inventory bounds checkpoint counter copying.
         budget.work(256, at)?;
         let mut staged = std::mem::replace(&mut self.state, State::new());
-        staged.begin();
+        let checkpoint = staged.begin();
         let result = self.admit_staged(&mut staged, drafts, reserved, budget);
-        if result.is_err() {
-            staged.rollback();
-        } else {
-            staged.journal = None;
-        }
+        staged.finish(checkpoint, result.is_ok());
         self.state = staged;
         result
     }
@@ -1148,7 +1197,7 @@ impl Cas {
     }
 
     /// Append generated closed syntax inside a private producer transaction.
-    /// The outer producer owns rollback and must discard this candidate on any failure.
+    /// The enclosing transaction owns rollback on any failure.
     pub(crate) fn generated(
         &mut self,
         context: LogicalId,
@@ -1640,6 +1689,10 @@ impl Cas {
         state.record(Undo::Vertex {
             id,
             key: interned.then(|| key.clone()),
+            policy: match &vertex {
+                Vertex::Policy(value) => Some((value.key.clone(), value.version)),
+                _ => None,
+            },
         })?;
         let index = state.graph.add_node(vertex);
         for (target, role) in targets {

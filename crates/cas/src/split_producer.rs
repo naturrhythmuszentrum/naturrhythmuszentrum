@@ -34,47 +34,47 @@ pub(crate) fn execute(
     if !request.premises.is_empty() {
         return Err(invalid());
     }
-    let mut candidate = cas.fork(generation)?;
-    let basis = candidate.handle(
-        candidate
-            .state
-            .context(candidate.checked(&request.context)?)?
-            .admissible,
-    );
-    let domain = crate::split_geometry::domain(&mut candidate, &basis, range, generation)?;
-    let mut value = SplitValue {
-        kind,
-        function: candidate.handle(*input),
-        domain,
-        range: range.as_ref().clone(),
-        value: Rational::zero(),
-    };
-    let mut evidence = crate::split_geometry::reconstruct(&mut candidate, &value, generation)?;
-    value.value = endpoints(&mut evidence, kind, generation)?;
-    if range.lower.compare(&range.upper, generation)?.is_gt() {
-        value.value = value.value.negated(generation)?;
-    }
-    let mut plan = Plan::new(policy);
-    let size = candidate.state.expression(*input)?.unfolded;
-    plan.expansion(size, size, generation)?;
-    let rule = match kind {
-        SplitKind::Integral => Primitive::IntegralCaseSplit,
-        SplitKind::Sum => Primitive::SumCaseSplit,
-    };
-    let trace = vec![value.function.clone()];
-    let proof = plan.push(
-        &mut candidate,
-        &request.context,
-        rule,
-        Statement::Split(Box::new(value)),
-        &[],
-        Certificate::Split(Box::new(evidence)),
-        generation,
-        checker,
-    )?;
-    let result = plan.finish(&candidate, &proof, trace, checker)?;
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(generation, |candidate, generation| {
+        let basis = candidate.handle(
+            candidate
+                .state
+                .context(candidate.checked(&request.context)?)?
+                .admissible,
+        );
+        let domain = crate::split_geometry::domain(candidate, &basis, range, generation)?;
+        let mut value = SplitValue {
+            kind,
+            function: candidate.handle(*input),
+            domain,
+            range: range.as_ref().clone(),
+            value: Rational::zero(),
+        };
+        let mut evidence = crate::split_geometry::reconstruct(candidate, &value, generation)?;
+        value.value = endpoints(&mut evidence, kind, generation)?;
+        if range.lower.compare(&range.upper, generation)?.is_gt() {
+            value.value = value.value.negated(generation)?;
+        }
+        let mut plan = Plan::new(policy);
+        let size = candidate.state.expression(*input)?.unfolded;
+        plan.expansion(size, size, generation)?;
+        let rule = match kind {
+            SplitKind::Integral => Primitive::IntegralCaseSplit,
+            SplitKind::Sum => Primitive::SumCaseSplit,
+        };
+        let trace = vec![value.function.clone()];
+        let proof = plan.push(
+            candidate,
+            &request.context,
+            rule,
+            Statement::Split(Box::new(value)),
+            &[],
+            Certificate::Split(Box::new(evidence)),
+            generation,
+            checker,
+        )?;
+        let result = plan.finish(candidate, &proof, trace, checker)?;
+        Ok(result)
+    })
 }
 
 /// Produce antiderivative or antidifference coefficients and Horner endpoint evaluations.

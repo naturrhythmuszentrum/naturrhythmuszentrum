@@ -182,36 +182,36 @@ pub(crate) fn stage(
     {
         return Err(invalid());
     }
-    let mut candidate = cas.fork(budget)?;
-    let left = child(
-        &mut candidate,
-        source,
-        proposal,
-        &proposal.left,
-        region,
-        localization,
-        budget,
-    )?;
-    let right = child(
-        &mut candidate,
-        source,
-        proposal,
-        &proposal.right,
-        region,
-        localization,
-        budget,
-    )?;
-    let result = finish(
-        &mut candidate,
-        source,
-        proposal,
-        handles,
-        region,
-        [left, right],
-        budget,
-    )?;
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(budget, |candidate, budget| {
+        let left = child(
+            candidate,
+            source,
+            proposal,
+            &proposal.left,
+            region,
+            localization,
+            budget,
+        )?;
+        let right = child(
+            candidate,
+            source,
+            proposal,
+            &proposal.right,
+            region,
+            localization,
+            budget,
+        )?;
+        let result = finish(
+            candidate,
+            source,
+            proposal,
+            handles,
+            region,
+            [left, right],
+            budget,
+        )?;
+        Ok(result)
+    })
 }
 
 /// Package only graph syntax; certificates and selected-root transport remain explicitly untrusted.

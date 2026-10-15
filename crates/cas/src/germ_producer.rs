@@ -32,24 +32,24 @@ pub(crate) fn execute(
     if !request.premises.is_empty() {
         return Err(invalid());
     }
-    let mut candidate = cas.fork(generation)?;
-    let function = candidate.handle(*input);
-    let mut runner = Runner {
-        cas: &mut candidate,
-        request,
-        plan: Plan::new(policy),
-        generation,
-        checker,
-        facts: Vec::new(),
-        deferred: Some(Vec::new()),
-    };
-    let claim = proposal(&function, &request.task)?;
-    let proof = produce(&mut runner, claim)?;
-    let result = runner
-        .plan
-        .finish(runner.cas, &proof, vec![function], runner.checker)?;
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(generation, |candidate, generation| {
+        let function = candidate.handle(*input);
+        let mut runner = Runner {
+            cas: candidate,
+            request,
+            plan: Plan::new(policy),
+            generation,
+            checker,
+            facts: Vec::new(),
+            deferred: Some(Vec::new()),
+        };
+        let claim = proposal(&function, &request.task)?;
+        let proof = produce(&mut runner, claim)?;
+        let result = runner
+            .plan
+            .finish(runner.cas, &proof, vec![function], runner.checker)?;
+        Ok(result)
+    })
 }
 
 /// Preserve the exact requested mode and approach; the result is still untrusted data.

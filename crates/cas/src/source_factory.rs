@@ -50,9 +50,9 @@ fn build(
     source: &Handle,
     budget: &mut Budget,
 ) -> Result<OriginalForm, Fault> {
-    let mut candidate = cas.fork(budget)?;
-    let syntax = crate::case_syntax::admit(&mut candidate, Draft::SourceForm(draft), budget)?;
-    let root = candidate.materialize_original(&syntax, source, budget)?;
-    cas.state = candidate.state;
-    Ok(OriginalForm { syntax, root })
+    cas.transaction(budget, |candidate, budget| {
+        let syntax = crate::case_syntax::admit(candidate, Draft::SourceForm(draft), budget)?;
+        let root = candidate.materialize_original(&syntax, source, budget)?;
+        Ok(OriginalForm { syntax, root })
+    })
 }

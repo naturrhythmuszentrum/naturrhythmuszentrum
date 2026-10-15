@@ -94,16 +94,17 @@ impl Cas {
         substitutions: &[Substitution],
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        self.prepay_transform(budget)?;
         let root = self.checked(root)?;
+        let mut workspace = self.prepay_transform(root, None, 0, budget)?;
         let initial = crate::descriptor::metadata(&self.state, root)?.1.clone();
-        let replacements = self.free_replacements(root, substitutions, budget)?;
+        let replacements = self.free_replacements(root, substitutions, &mut workspace, budget)?;
         self.transform_root(
             root,
             &Mode::Free {
                 initial,
                 replacements,
             },
+            workspace,
             budget,
         )
     }
@@ -118,28 +119,60 @@ impl Cas {
         replacements: &[Handle],
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        self.prepay_transform(budget)?;
         let root = self.checked(root)?;
-        let (outer, replacements) = self.bound_replacements(root, replacements, budget)?;
+        let mut workspace = self.prepay_transform(root, None, 0, budget)?;
+        let (outer, replacements) =
+            self.bound_replacements(root, replacements, &mut workspace, budget)?;
         self.transform_root(
             root,
             &Mode::Bound {
                 outer,
                 replacements,
             },
+            workspace,
             budget,
         )
     }
 
-    /// Reserve graph-owned payload before any descriptor or scope cloning.
-    fn prepay_transform(&self, budget: &mut Budget) -> Result<(), Fault> {
-        let bytes = self
-            .counts()
-            .payload_bytes
-            .checked_mul(4)
+    /// Prepay one reached payload and scope before cloning descriptors, memo keys or drafts.
+    fn prepay_transform(
+        &self,
+        id: LogicalId,
+        scope: Option<&Scope>,
+        retained: u64,
+        budget: &mut Budget,
+    ) -> Result<u64, Fault> {
+        let previous = budget.reserve_temporary(retained, AT)?;
+        let measured = self.transform_payload(id, scope, budget);
+        budget.restore_limits(previous);
+        retained
+            .checked_add(measured?)
+            .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))
+    }
+
+    /// Encode and charge only this record under the remaining live-workspace allowance.
+    fn transform_payload(
+        &self,
+        id: LogicalId,
+        scope: Option<&Scope>,
+        budget: &mut Budget,
+    ) -> Result<u64, Fault> {
+        let vertex = self.state.node(id)?;
+        let (_, key) = crate::graph::vertex_key(vertex, &self.state, budget)?;
+        let payload = crate::graph::vertex_payload(vertex, key.len(), 0, budget)?;
+        drop(key);
+        let mut out = crate::encoding::Encoder::new(budget, AT);
+        if let Some(scope) = scope {
+            crate::encoding::scope(scope, &mut out)?;
+        }
+        let bytes = size(out.finish().len(), AT)?
+            .checked_mul(3)
+            .and_then(|n| n.checked_add(payload))
+            .and_then(|n| n.checked_mul(4))
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
-        budget.work(bytes, AT)
+        budget.work(bytes, AT)?;
+        Ok(bytes)
     }
 
     /// Publish all rebuilt syntax only after the complete dependency walk succeeds.
@@ -147,24 +180,25 @@ impl Cas {
         &mut self,
         root: LogicalId,
         mode: &Mode,
+        workspace: u64,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
         let mut plan = Plan {
             drafts: Vec::new(),
-            bytes: 0,
+            bytes: workspace,
             spaces: Vec::new(),
         };
         let output = self.transform(root, mode, &mut plan, budget)?;
-        let mut candidate = self.fork(budget)?;
-        let admitted = candidate.admit(&plan.drafts, budget)?;
-        for (original, transformed) in &plan.spaces {
-            if resolve(transformed, &admitted)?.logical_id() != *original {
-                return Err(invalid());
+        self.transaction(budget, |candidate, budget| {
+            let admitted = candidate.admit(&plan.drafts, budget)?;
+            for (original, transformed) in &plan.spaces {
+                if resolve(transformed, &admitted)?.logical_id() != *original {
+                    return Err(invalid());
+                }
             }
-        }
-        let result = resolve(&output, &admitted)?;
-        self.state = candidate.state;
-        Ok(result)
+            let result = resolve(&output, &admitted)?;
+            Ok(result)
+        })
     }
 
     /// Transform a DAG iteratively; nested calls only lift replacements without substitution.
@@ -179,6 +213,8 @@ impl Cas {
         let mut pending = vec![(root, false)];
         while let Some((id, expanded)) = pending.pop() {
             budget.work(size(mapped.len(), AT)?.saturating_add(1), AT)?;
+            plan.bytes =
+                self.prepay_transform(id, Some(mode.copied_scope()), plan.bytes, budget)?;
             let key = memo_key(self, id, mode)?;
             if mapped.contains_key(&key) {
                 continue;
@@ -321,6 +357,7 @@ impl Cas {
         &self,
         root: LogicalId,
         substitutions: &[Substitution],
+        workspace: &mut u64,
         budget: &mut Budget,
     ) -> Result<BTreeMap<String, LogicalId>, Fault> {
         let (header_id, scope) = crate::descriptor::metadata(&self.state, root)?;
@@ -329,6 +366,7 @@ impl Cas {
         for substitution in substitutions {
             budget.work(size(header.bytes.len(), AT)?, AT)?;
             let id = self.checked(&substitution.replacement)?;
+            *workspace = self.prepay_transform(id, None, *workspace, budget)?;
             let value = self.state.expression(id)?;
             let declared = header
                 .environment
@@ -362,6 +400,7 @@ impl Cas {
         &self,
         root: LogicalId,
         replacements: &[Handle],
+        workspace: &mut u64,
         budget: &mut Budget,
     ) -> Result<(Scope, Vec<LogicalId>), Fault> {
         let (header, scope) = crate::descriptor::metadata(&self.state, root)?;
@@ -379,6 +418,7 @@ impl Cas {
         for (handle, sort) in replacements.iter().zip(frame) {
             budget.work(size(header_bytes.len(), AT)?, AT)?;
             let id = self.checked(handle)?;
+            *workspace = self.prepay_transform(id, None, *workspace, budget)?;
             let value = self.state.expression(id)?;
             if value.scope != outer
                 || value.sort != Sort::Value(sort.clone())
@@ -393,6 +433,15 @@ impl Cas {
 }
 
 impl Mode {
+    /// The retained outer scope can enlarge every lifted result and memo workspace.
+    const fn copied_scope(&self) -> &Scope {
+        match self {
+            Self::Free { initial, .. } => initial,
+            Self::Bound { outer, .. } => outer,
+            Self::Lift { target, .. } => target,
+        }
+    }
+
     /// Count local binders inside the root frame.
     fn depth(&self, scope: &Scope) -> Result<u32, Fault> {
         let prefix = match self {

@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
-use crate::graph::{Cas, Edge, Handle, State, Vertex, size};
+use crate::graph::{Cas, Edge, Handle, Vertex, size};
 use crate::proof_model::{
     ApplicationDraft, Certificate, CheckedApplication, Judgment, ScopedConditions, Statement,
     VerifiedWitness,
@@ -278,29 +278,24 @@ impl Cas {
                 Edge::Obligation(u32::try_from(index).map_err(|_| invalid())?),
             ));
         }
-        let mut state = std::mem::replace(&mut self.state, State::new());
-        let id = self.insert(
-            &mut state,
-            Vertex::ScopedApplication(Box::new(application)),
-            &edges,
-            0,
-            budget,
-        )?;
-        let proof = self.insert(
-            &mut state,
-            Vertex::Proof(id),
-            &[(id, Edge::Justifies)],
-            0,
-            budget,
-        )?;
-        let total = state
-            .indices
-            .keys()
-            .filter(|id| id.kind == crate::graph::VertexKind::Proof)
-            .count();
-        budget.check(BudgetKind::ProofNodes, size(total, AT)?, AT)?;
-        self.state = state;
-        Ok(self.handle(proof))
+        self.with_state(|cas, state| {
+            let id = cas.insert(
+                state,
+                Vertex::ScopedApplication(Box::new(application)),
+                &edges,
+                0,
+                budget,
+            )?;
+            let proof = cas.insert(
+                state,
+                Vertex::Proof(id),
+                &[(id, Edge::Justifies)],
+                0,
+                budget,
+            )?;
+            budget.check(BudgetKind::ProofNodes, state.proof_count(), AT)?;
+            Ok(cas.handle(proof))
+        })
     }
 
     /// Check a complete typed proof and publish only its fully checked dependency closure.
@@ -318,56 +313,55 @@ impl Cas {
             if steps.last().ok_or_else(invalid)?.context != *context {
                 return Err(invalid());
             }
-            let mut candidate = cas.fork(budget)?;
-            if steps
-                .iter()
-                .all(|step| step.context == *context && !step.rule.native())
-            {
-                let mut scalar = Vec::new();
-                scalar
+            cas.transaction(budget, |candidate, budget| {
+                if steps
+                    .iter()
+                    .all(|step| step.context == *context && !step.rule.native())
+                {
+                    let mut scalar = Vec::new();
+                    scalar
+                        .try_reserve_exact(steps.len())
+                        .map_err(|_| Fault::allocation(AT))?;
+                    for step in steps {
+                        scalar.push(crate::proof_view::scalar_step(candidate, step)?);
+                    }
+                    let context_id = candidate.checked(context)?;
+                    let compiled =
+                        crate::proof_check::compile(candidate, context_id, &scalar, budget)?;
+                    let witness = candidate.finish_proof(&compiled, budget)?;
+                    let witness = crate::proof_view::native_witness(candidate, witness, budget)?;
+                    return Ok(witness);
+                }
+                let mut proofs: Vec<Handle> = Vec::new();
+                proofs
                     .try_reserve_exact(steps.len())
                     .map_err(|_| Fault::allocation(AT))?;
                 for step in steps {
-                    scalar.push(crate::proof_view::scalar_step(&candidate, step)?);
+                    let mut premises = Vec::new();
+                    premises
+                        .try_reserve_exact(step.premises.len())
+                        .map_err(|_| Fault::allocation(AT))?;
+                    let mut ids = Vec::new();
+                    ids.try_reserve_exact(step.premises.len())
+                        .map_err(|_| Fault::allocation(AT))?;
+                    for index in &step.premises {
+                        let proof = proofs
+                            .get(usize::try_from(*index).map_err(|_| invalid())?)
+                            .ok_or_else(invalid)?;
+                        ids.push(proof.logical_id());
+                        premises.push(crate::proof_view::application(
+                            candidate,
+                            proof.logical_id(),
+                            budget,
+                        )?);
+                    }
+                    let mut application = check_application(candidate, step, &premises, budget)?;
+                    application.premises = ids;
+                    proofs.push(candidate.publish_scoped(application, budget)?);
                 }
-                let context_id = candidate.checked(context)?;
-                let compiled =
-                    crate::proof_check::compile(&mut candidate, context_id, &scalar, budget)?;
-                let witness = candidate.finish_proof(&compiled, budget)?;
-                let witness = crate::proof_view::native_witness(&candidate, witness, budget)?;
-                cas.state = candidate.state;
-                return Ok(witness);
-            }
-            let mut proofs: Vec<Handle> = Vec::new();
-            proofs
-                .try_reserve_exact(steps.len())
-                .map_err(|_| Fault::allocation(AT))?;
-            for step in steps {
-                let mut premises = Vec::new();
-                premises
-                    .try_reserve_exact(step.premises.len())
-                    .map_err(|_| Fault::allocation(AT))?;
-                let mut ids = Vec::new();
-                ids.try_reserve_exact(step.premises.len())
-                    .map_err(|_| Fault::allocation(AT))?;
-                for index in &step.premises {
-                    let proof = proofs
-                        .get(usize::try_from(*index).map_err(|_| invalid())?)
-                        .ok_or_else(invalid)?;
-                    ids.push(proof.logical_id());
-                    premises.push(crate::proof_view::application(
-                        &candidate,
-                        proof.logical_id(),
-                        budget,
-                    )?);
-                }
-                let mut application = check_application(&mut candidate, step, &premises, budget)?;
-                application.premises = ids;
-                proofs.push(candidate.publish_scoped(application, budget)?);
-            }
-            let witness = candidate.seal_scoped(proofs.last().ok_or_else(invalid)?, budget)?;
-            cas.state = candidate.state;
-            Ok(witness)
+                let witness = candidate.seal_scoped(proofs.last().ok_or_else(invalid)?, budget)?;
+                Ok(witness)
+            })
         })
     }
 
@@ -395,10 +389,10 @@ impl Cas {
         crate::wire_decode::magic(bytes)?;
         self.proof_limits(budget, |cas, budget| {
             crate::proof_check::replay_budget(budget, |budget| {
-                let mut candidate = cas.fork(budget)?;
-                let witness = crate::wire_decode::inspect(&mut candidate, bytes, budget)?;
-                cas.state = candidate.state;
-                Ok(witness)
+                cas.transaction(budget, |candidate, budget| {
+                    let witness = crate::wire_decode::inspect(candidate, bytes, budget)?;
+                    Ok(witness)
+                })
             })
         })
     }
@@ -418,15 +412,15 @@ impl Cas {
             crate::proof_check::replay_budget(budget, |budget| {
                 crate::proof_view::validate_judgment(cas, expected, budget)?;
                 let expected = crate::wire_build::judgment_key(cas, expected, budget)?;
-                let mut candidate = cas.fork(budget)?;
-                let witness = crate::wire_decode::inspect(&mut candidate, bytes, budget)?;
-                let actual =
-                    crate::wire_build::judgment_key(&candidate, &witness.judgment, budget)?;
-                if actual != expected {
-                    return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
-                }
-                cas.state = candidate.state;
-                Ok(witness)
+                cas.transaction(budget, |candidate, budget| {
+                    let witness = crate::wire_decode::inspect(candidate, bytes, budget)?;
+                    let actual =
+                        crate::wire_build::judgment_key(candidate, &witness.judgment, budget)?;
+                    if actual != expected {
+                        return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
+                    }
+                    Ok(witness)
+                })
             })
         })
     }

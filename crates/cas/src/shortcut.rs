@@ -40,37 +40,39 @@ impl Cas {
                 return Err(Fault::invalid(InvalidCode::EndpointMismatch, at));
             }
             cas.recheck_witness(witness, budget)?;
-            let mut candidate = cas.fork(budget)?;
-            let identity = candidate.pin_policy(policy, budget)?;
-            let (arcs, baseline) = crate::frozen::snapshot(&candidate, expected, policy, budget)?;
-            let left = candidate.checked(&expected.left)?;
-            let right = candidate.checked(&expected.right)?;
-            let (incumbent, _) = crate::frozen::dijkstra(&arcs, left, right, budget)?;
-            if incumbent.is_some_and(|previous| cost >= previous) {
-                return Err(Fault::invalid(InvalidCode::Policy, at));
-            }
-            let context = candidate.checked(&expected.context)?;
-            let mut state = candidate.state;
-            let id = cas.insert(
-                &mut state,
-                Vertex::PolicyShortcut {
-                    proof,
-                    cost,
-                    policy: identity,
-                    baseline,
-                },
-                &[
-                    (proof, Edge::DependsOn),
-                    (identity, Edge::CostPolicy),
-                    (context, Edge::InContext),
-                    (left, Edge::ConclusionLeft),
-                    (right, Edge::ConclusionRight),
-                ],
-                0,
-                budget,
-            )?;
-            cas.state = state;
-            Ok(cas.handle(id))
+            cas.transaction(budget, |candidate, budget| {
+                let identity = candidate.pin_policy(policy, budget)?;
+                let (arcs, baseline) =
+                    crate::frozen::snapshot(candidate, expected, policy, budget)?;
+                let left = candidate.checked(&expected.left)?;
+                let right = candidate.checked(&expected.right)?;
+                let (incumbent, _) = crate::frozen::dijkstra(&arcs, left, right, budget)?;
+                if incumbent.is_some_and(|previous| cost >= previous) {
+                    return Err(Fault::invalid(InvalidCode::Policy, at));
+                }
+                let context = candidate.checked(&expected.context)?;
+                candidate.with_state(|store, state| {
+                    let id = store.insert(
+                        state,
+                        Vertex::PolicyShortcut {
+                            proof,
+                            cost,
+                            policy: identity,
+                            baseline,
+                        },
+                        &[
+                            (proof, Edge::DependsOn),
+                            (identity, Edge::CostPolicy),
+                            (context, Edge::InContext),
+                            (left, Edge::ConclusionLeft),
+                            (right, Edge::ConclusionRight),
+                        ],
+                        0,
+                        budget,
+                    )?;
+                    Ok(store.handle(id))
+                })
+            })
         })
     }
 }
@@ -112,29 +114,30 @@ impl Cas {
                 return Err(Fault::invalid(InvalidCode::Policy, at));
             }
             crate::case_producer::replay(cas, witness, budget)?;
-            let mut candidate = cas.fork(budget)?;
-            let identity = candidate.pin_policy(policy, budget)?;
-            let mut state = candidate.state;
-            let id = cas.insert(
-                &mut state,
-                Vertex::PolicyShortcut {
-                    proof,
-                    cost,
-                    policy: identity,
-                    baseline,
-                },
-                &[
-                    (proof, Edge::DependsOn),
-                    (identity, Edge::CostPolicy),
-                    (expected.context.logical_id(), Edge::InContext),
-                    (left.logical_id(), Edge::ConclusionLeft),
-                    (right.logical_id(), Edge::ConclusionRight),
-                ],
-                0,
-                budget,
-            )?;
-            cas.state = state;
-            Ok(cas.handle(id))
+            cas.transaction(budget, |candidate, budget| {
+                let identity = candidate.pin_policy(policy, budget)?;
+                candidate.with_state(|store, state| {
+                    let id = store.insert(
+                        state,
+                        Vertex::PolicyShortcut {
+                            proof,
+                            cost,
+                            policy: identity,
+                            baseline,
+                        },
+                        &[
+                            (proof, Edge::DependsOn),
+                            (identity, Edge::CostPolicy),
+                            (expected.context.logical_id(), Edge::InContext),
+                            (left.logical_id(), Edge::ConclusionLeft),
+                            (right.logical_id(), Edge::ConclusionRight),
+                        ],
+                        0,
+                        budget,
+                    )?;
+                    Ok(store.handle(id))
+                })
+            })
         })
     }
 }

@@ -198,15 +198,8 @@ pub(crate) fn certify(
     budget: &mut Budget,
     checker: &mut Budget,
 ) -> Result<CertifiedReduction, Fault> {
-    let mut candidate = cas.fork(budget)?;
-    let result = prepare(
-        &mut candidate,
-        reduction,
-        images,
-        evaluation,
-        budget,
-        checker,
-    )?;
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(budget, |candidate, budget| {
+        let result = prepare(candidate, reduction, images, evaluation, budget, checker)?;
+        Ok(result)
+    })
 }

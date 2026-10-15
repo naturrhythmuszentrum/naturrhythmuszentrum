@@ -42,34 +42,34 @@ pub(crate) fn execute(
     if !request.premises.is_empty() {
         return Err(invalid());
     }
-    let mut candidate = cas.fork(generation)?;
-    let mut claim = PullbackValue {
-        source: candidate.handle(*source),
-        result: candidate.handle(*source),
-        map: candidate.handle(*map),
-        inverse: None,
-        source_space: source_space.clone(),
-        target_space: target_space.clone(),
-        mode: match map_kind {
-            PullbackKind::Affine => PullbackMode::Affine,
-            PullbackKind::SimpleZeros(_) => PullbackMode::SimpleZeros,
-        },
-    };
-    let certificate = produce(&mut candidate, &mut claim, map_kind, generation)?;
-    let header = candidate.context_header(&request.context)?;
-    claim.result =
-        crate::pullback_output::build(&mut candidate, &header, &claim, &certificate, generation)?;
-    let result = seal(
-        &mut candidate,
-        request,
-        claim,
-        certificate,
-        policy,
-        generation,
-        checker,
-    )?;
-    cas.state = candidate.state;
-    Ok(result)
+    cas.transaction(generation, |candidate, generation| {
+        let mut claim = PullbackValue {
+            source: candidate.handle(*source),
+            result: candidate.handle(*source),
+            map: candidate.handle(*map),
+            inverse: None,
+            source_space: source_space.clone(),
+            target_space: target_space.clone(),
+            mode: match map_kind {
+                PullbackKind::Affine => PullbackMode::Affine,
+                PullbackKind::SimpleZeros(_) => PullbackMode::SimpleZeros,
+            },
+        };
+        let certificate = produce(candidate, &mut claim, map_kind, generation)?;
+        let header = candidate.context_header(&request.context)?;
+        claim.result =
+            crate::pullback_output::build(candidate, &header, &claim, &certificate, generation)?;
+        let result = seal(
+            candidate,
+            request,
+            claim,
+            certificate,
+            policy,
+            generation,
+            checker,
+        )?;
+        Ok(result)
+    })
 }
 
 /// Check the entire proposal and its portable closure before returning any pullback claim.
