@@ -235,3 +235,73 @@ fn mutate_scope(fixture: &mut BinomialFixture, mutation: u8, one: &Handle) -> Te
     }
     Ok(())
 }
+
+/// A formal polynomial equality cannot name a binary scalar inverse product.
+fn polynomial_identity(
+    base: &mut Fixture,
+    scalar: &ApplicationDraft,
+) -> TestResult<ApplicationDraft> {
+    let crate::test_api::proof::Certificate::Solve(certificate) = &scalar.certificate else {
+        return Err("missing scalar certificate".into());
+    };
+    let SolveCertificate::CoefficientIdentity(identity) = certificate.as_ref() else {
+        return Err("missing scalar identity".into());
+    };
+    let SolveView::CoefficientDomain(crate::test_api::solving::CoefficientDomainData::Quotient {
+        level,
+    }) = base.cas.solve_view(&base.algebra)?
+    else {
+        return Err("missing quotient".into());
+    };
+    let SolveView::ExtensionLevel(extension) = base.cas.solve_view(level)? else {
+        return Err("missing extension".into());
+    };
+    let parent = extension.parent.clone();
+    let unit = admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::CoefficientValue(CoefficientValueObject {
+            domain: Reference::Existing(parent),
+            value: CoefficientValueData::Rational {
+                value: Rational::one(),
+            },
+        })),
+    )?;
+    let domain = base.algebra.clone();
+    let one = base.tower_value(&domain, &[unit])?;
+    let polynomial = base.polynomial(&domain, &[(1, one)])?;
+    let mut step = base.identity(&polynomial, &polynomial, &identity.map);
+    step.premises = vec![0, 1, 2];
+    Ok(step)
+}
+
+/// Compare one rank claim with and without an earlier unrelated polynomial identity.
+pub(crate) fn inverse_pivot_scan(
+    with_scalar: bool,
+) -> TestResult<(BinomialFixture, Vec<ApplicationDraft>)> {
+    let mut fixture = inverse_pivot(false)?;
+    let mut rank = fixture.steps.pop().ok_or("missing rank")?;
+    let mut scalar = fixture.steps.pop().ok_or("missing scalar inverse")?;
+    let mut baseline = fixture.steps.clone();
+    if with_scalar {
+        baseline.push(scalar.clone());
+    }
+    rank.premises = if with_scalar {
+        vec![3, 1, 2]
+    } else {
+        vec![1, 2]
+    };
+    baseline.push(rank.clone());
+    let polynomial = polynomial_identity(&mut fixture.base, &scalar)?;
+    fixture.steps.push(polynomial);
+    if with_scalar {
+        scalar.premises.push(3);
+        fixture.steps.push(scalar);
+    }
+    rank.premises = if with_scalar {
+        vec![3, 4, 1, 2]
+    } else {
+        vec![3, 1, 2]
+    };
+    fixture.steps.push(rank);
+    Ok((fixture, baseline))
+}

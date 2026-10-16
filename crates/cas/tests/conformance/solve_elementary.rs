@@ -1289,3 +1289,40 @@ fn closed_strata_presentation_mutations() -> TestResult {
     }
     Ok(())
 }
+
+/// Polynomial equality neither blocks a scalar inverse nor supplies a missing one.
+/// ´test:integration:inverse-pivot-skips-polynomial-identities´
+#[test]
+fn inverse_pivot_skips_polynomial_identities() -> TestResult {
+    for with_scalar in [true, false] {
+        let (mut fixture, baseline) =
+            crate::testing::solve_elementary::inverse_pivot_scan(with_scalar)?;
+        let original = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &baseline,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        if with_scalar {
+            assert_eq!(result?.judgment(), original?.judgment());
+        } else {
+            let expected = original.err().ok_or("missing inverse accepted")?;
+            let actual = result
+                .err()
+                .ok_or("polynomial identity accepted as an inverse")?;
+            assert!(matches!(
+                actual.kind,
+                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Rule)
+            ));
+            assert_eq!(actual.kind, expected.kind);
+            assert_eq!(actual.location, expected.location);
+            assert_eq!(fixture.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}

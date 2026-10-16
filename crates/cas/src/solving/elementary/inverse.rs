@@ -6,7 +6,7 @@ use super::proof::{AT, invalid};
 use super::value::Value;
 use crate::budget::Budget;
 use crate::error::Fault;
-use crate::graph::Handle;
+use crate::graph::{Handle, Vertex};
 use crate::model::Operator;
 use crate::proof_model::{Certificate, CheckedApplication, DomainContract, Statement};
 use crate::solving::{
@@ -49,6 +49,15 @@ fn equality<'a>(
     };
     if endpoints != (&identity.left, &identity.right) {
         return Err(invalid());
+    }
+    for endpoint in <[_; 2]>::from(endpoints) {
+        budget.work(1, AT)?;
+        if !matches!(
+            evaluation.cas.state.node(endpoint.logical_id())?,
+            Vertex::Expression(_)
+        ) {
+            return Ok(None);
+        }
     }
     let SolveDraft::CoefficientMap(map) =
         crate::solving::graph::object(&evaluation.cas.state, identity.map.logical_id())?

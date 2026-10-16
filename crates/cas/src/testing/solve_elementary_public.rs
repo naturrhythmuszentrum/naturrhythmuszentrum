@@ -19,6 +19,7 @@ pub(crate) use restriction::{
 mod pivots;
 pub(crate) use pivots::{
     embedded_fraction, embedded_tower_one, inverse_pivot, inverse_pivot_mutation,
+    inverse_pivot_scan,
 };
 
 #[path = "solve_elementary_presentations_public.rs"]
