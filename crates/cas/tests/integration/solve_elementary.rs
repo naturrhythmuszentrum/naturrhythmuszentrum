@@ -567,3 +567,87 @@ fn conjugation_product_evidence_imported_once() -> TestResult {
     }
     Ok(())
 }
+
+/// Positive cancellation retains exact assumptions and its ordinary downstream consumer on fresh replay.
+/// ´test:integration:positive-cofactor-fresh-replay´
+#[test]
+fn positive_cofactor_fresh_replay() -> TestResult {
+    for norm in [false, true] {
+        let mut source = if norm {
+            crate::testing::solve_elementary::positive_norm_cancellation(0)?
+        } else {
+            crate::testing::solve_elementary::positive_cancellation(
+                crate::testing::solve_elementary::PositiveMutation::Valid,
+            )?
+        };
+        let witness = source.base.cas.check_proof(
+            &source.base.context,
+            &source.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(witness.hypotheses().len(), if norm { 0 } else { 3 });
+        assert_eq!(witness.judgment().residuals, []);
+        let bytes = source
+            .base
+            .cas
+            .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut fresh = nrz_cas::Cas::new(Limits::blind_cubic())?;
+        let replayed = fresh.inspect(&bytes, &mut Budget::new(Limits::blind_cubic())?)?;
+        assert_eq!(replayed.hypotheses().len(), witness.hypotheses().len());
+        assert_eq!(
+            fresh.export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}
+
+/// The complete public cancellation proof has a measured exact Work boundary and atomic refusal one below.
+/// ´test:integration:positive-cofactor-work-boundary´
+#[test]
+fn positive_cofactor_work_boundary() -> TestResult {
+    use crate::testing::solve_elementary::{PositiveMutation, positive_cancellation};
+    let mut baseline = positive_cancellation(PositiveMutation::Valid)?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    baseline
+        .base
+        .cas
+        .check_proof(&baseline.base.context, &baseline.steps, &mut measured)?;
+    let required = measured.usage().work;
+    assert_eq!(required, 285_530);
+    for cap in [
+        required,
+        required.checked_sub(1).ok_or("empty positive ledger")?,
+    ] {
+        let mut fixture = positive_cancellation(PositiveMutation::Valid)?;
+        let mut limits = Limits::blind_cubic();
+        limits.work = cap;
+        let mut budget = Budget::new(limits)?;
+        let before = fixture.base.cas.counts();
+        let result =
+            fixture
+                .base
+                .cas
+                .check_proof(&fixture.base.context, &fixture.steps, &mut budget);
+        if cap == required {
+            result?;
+            assert_eq!(budget.usage().work, required);
+        } else {
+            let error = result
+                .err()
+                .ok_or("positive cancellation accepted one below")?;
+            assert!(
+                matches!(error.kind, nrz_cas::FaultKind::Exhausted { budget: nrz_cas::limits::BudgetKind::Work, limit, needed, .. } if limit == cap && needed > cap)
+            );
+            assert_eq!(fixture.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}
+
+/// Every prefix of the actual selected-root norm proof replays independently.
+/// ´test:integration:positive-cofactor-norm-prefix´
+#[test]
+fn positive_cofactor_norm_prefix() -> TestResult {
+    crate::testing::solve_elementary::positive_norm_prefix()
+}

@@ -852,3 +852,576 @@ pub(crate) fn cubic_product_reference(duplicate: bool) -> TestResult<BinomialFix
     }
     Ok(fixture)
 }
+
+/// Each refusal changes one checked cancellation input while keeping ordinary graph syntax.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PositiveMutation {
+    /// Complete ordered-real certificate.
+    Valid,
+    /// The strictly positive leaf is only nonnegative.
+    WeakSign,
+    /// The mixed product has no nonnegative premise.
+    MissingSign,
+    /// A proposed factorization is false.
+    Factorization,
+    /// The claimed factor differs from the checked product's factor.
+    UnrelatedFactor,
+    /// The application names another coefficient region.
+    Region,
+    /// Cited evidence belongs to an ancestor rather than this exact context.
+    Context,
+    /// Complex expressions cannot be ordered-real cofactors.
+    Complex,
+    /// Earlier evidence is not imported implicitly.
+    MissingReference,
+    /// Explicit premise slots are checked.
+    Reference,
+    /// A displayed positive term has changed sign.
+    NegativeTerm,
+}
+
+/// Real projections remain explicitly typed even when their containing header is complex.
+fn real_projection(base: &mut Fixture, value: &Handle) -> TestResult<Handle> {
+    admit(
+        &mut base.cas,
+        &Draft::Expression(ExpressionDraft {
+            header: Reference::Existing(base.header.clone()),
+            scope: Vec::new(),
+            operator: Operator::RealPart,
+            sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+            operands: vec![Reference::Existing(value.clone())],
+            space: None,
+            binding: None,
+        }),
+    )
+}
+
+/// Arbitrary real expressions display the factorization of a difference of third powers.
+fn positive_expressions(
+    base: &mut Fixture,
+    first: &Handle,
+    second: &Handle,
+    mutation: PositiveMutation,
+) -> TestResult<[Handle; 3]> {
+    let first_cube = base.expression(
+        Operator::IntegerPower(3),
+        std::slice::from_ref(first),
+        false,
+    )?;
+    let second_cube = base.expression(
+        Operator::IntegerPower(3),
+        std::slice::from_ref(second),
+        false,
+    )?;
+    let source = base.expression(Operator::Sub, &[first_cube, second_cube], false)?;
+    let factor = base.expression(Operator::Sub, &[first.clone(), second.clone()], false)?;
+    let first_square = base.expression(
+        Operator::IntegerPower(2),
+        std::slice::from_ref(first),
+        false,
+    )?;
+    let mixed = base.expression(Operator::Mul, &[first.clone(), second.clone()], false)?;
+    let second_square = base.expression(
+        Operator::IntegerPower(2),
+        std::slice::from_ref(second),
+        false,
+    )?;
+    let tail = base.expression(
+        if mutation == PositiveMutation::NegativeTerm {
+            Operator::Sub
+        } else {
+            Operator::Add
+        },
+        &[mixed, second_square],
+        false,
+    )?;
+    let cofactor = base.expression(Operator::Add, &[first_square, tail], false)?;
+    Ok([source, factor, cofactor])
+}
+
+/// Root hypotheses remain qualified assumptions; cancellation does not discharge any of them.
+fn positive_hypotheses(
+    base: &mut Fixture,
+    source: &Handle,
+    first: &Handle,
+    second: &Handle,
+    mutation: PositiveMutation,
+) -> TestResult<Vec<ApplicationDraft>> {
+    use crate::test_api::domain::{AssumptionDraft, ContextDraft, HypothesisRef};
+    use crate::test_api::proof::{Primitive, Statement};
+    let zero = base.integer(0, false)?;
+    let mut predicates = vec![base.equation(source, &zero)?];
+    for (index, value) in [first, second].into_iter().enumerate() {
+        let argument = if mutation == PositiveMutation::Complex {
+            real_projection(base, value)?
+        } else {
+            value.clone()
+        };
+        let kind = if index == 0 || mutation == PositiveMutation::WeakSign {
+            PredicateKind::NonNegative
+        } else {
+            PredicateKind::Positive
+        };
+        predicates.push(admit(
+            &mut base.cas,
+            &Draft::Condition {
+                header: Reference::Existing(base.header.clone()),
+                scope: Vec::new(),
+                kind,
+                arguments: vec![Reference::Existing(argument)],
+            },
+        )?);
+    }
+    let assumptions = predicates
+        .iter()
+        .enumerate()
+        .map(|(index, predicate)| AssumptionDraft {
+            key: format!("positive-{index}"),
+            condition: Reference::Existing(predicate.clone()),
+        })
+        .collect();
+    base.context = admit(
+        &mut base.cas,
+        &Draft::Context(ContextDraft::Root {
+            header: Reference::Existing(base.header.clone()),
+            admissible: Reference::Existing(base.region.clone()),
+            assumptions,
+        }),
+    )?;
+    predicates
+        .into_iter()
+        .enumerate()
+        .map(|(index, predicate)| {
+            Ok(ApplicationDraft {
+                rule: Primitive::ContextHypothesis,
+                context: base.context.clone(),
+                premises: Vec::new(),
+                substitutions: Vec::new(),
+                conclusion: Statement::PredicateFact {
+                    predicate,
+                    region: base.region.clone(),
+                },
+                certificate: Certificate::Hypothesis(HypothesisRef {
+                    context: base.context.clone(),
+                    slot: u32::try_from(index)?,
+                }),
+            })
+        })
+        .collect()
+}
+
+/// An exact coefficient claim uses the ordinary conjugation vocabulary and explicit references.
+fn positive_equality(
+    base: &Fixture,
+    map: &Handle,
+    left: &Handle,
+    right: &Handle,
+    references: &[u32],
+    signs: &[u32],
+) -> TestResult<ApplicationDraft> {
+    let mut step = conjugation(
+        base,
+        map,
+        &[],
+        SolveStatement::CoefficientEquality(StatementCoefficientEquality {
+            left: left.clone(),
+            right: right.clone(),
+            map: map.clone(),
+            region: base.region.clone(),
+        }),
+    );
+    references_for(&mut step, references, signs)?;
+    Ok(step)
+}
+
+/// Public supplied-certificate fixture exercises cancellation without a polynomial-root oracle.
+pub(crate) fn positive_cancellation(mutation: PositiveMutation) -> TestResult<BinomialFixture> {
+    let mut base = Fixture::in_field(if mutation == PositiveMutation::Complex {
+        &Field::Complex
+    } else {
+        &Field::Real
+    })?;
+    let first = base.free("a")?;
+    let second = base.free("b")?;
+    let [source, factor, cofactor] = positive_expressions(&mut base, &first, &second, mutation)?;
+    let steps = positive_hypotheses(&mut base, &source, &first, &second, mutation)?;
+    let mut fixture = BinomialFixture { base, steps };
+    let domain = fixture.base.algebra.clone();
+    let map = fixture.base.scalar_map(&domain, &[])?;
+    let zero = fixture.base.integer(0, false)?;
+    let source_step = positive_equality(&fixture.base, &map, &source, &zero, &[0], &[])?;
+    push(&mut fixture, source_step)?;
+    let product = fixture
+        .base
+        .expression(Operator::Mul, &[factor.clone(), cofactor], false)?;
+    let factorization = if mutation == PositiveMutation::Factorization {
+        fixture.base.identity(&source, &factor, &map)
+    } else {
+        fixture.base.identity(&source, &product, &map)
+    };
+    push(&mut fixture, factorization)?;
+    let target = if mutation == PositiveMutation::UnrelatedFactor {
+        fixture
+            .base
+            .expression(Operator::Add, &[first, second], false)?
+    } else {
+        factor
+    };
+    let references: &[u32] = if mutation == PositiveMutation::MissingReference {
+        &[3]
+    } else if mutation == PositiveMutation::Reference {
+        &[3, 99]
+    } else {
+        &[3, 4]
+    };
+    let signs: &[u32] = if mutation == PositiveMutation::MissingSign {
+        &[2]
+    } else {
+        &[1, 2]
+    };
+    let mut cancellation =
+        positive_equality(&fixture.base, &map, &target, &zero, references, signs)?;
+    positive_location(&mut fixture, &mut cancellation, mutation)?;
+    push(&mut fixture, cancellation)?;
+    Ok(fixture)
+}
+
+/// Exact provenance changes remain well-formed so the checker must refuse them.
+fn positive_location(
+    fixture: &mut BinomialFixture,
+    step: &mut ApplicationDraft,
+    mutation: PositiveMutation,
+) -> TestResult {
+    use crate::test_api::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
+    if mutation == PositiveMutation::Context {
+        fixture.base.context = admit(
+            &mut fixture.base.cas,
+            &Draft::Context(ContextDraft::Local {
+                parent: Reference::Existing(fixture.base.context.clone()),
+                region: Reference::Existing(fixture.base.region.clone()),
+                hypotheses: Vec::new(),
+            }),
+        )?;
+        step.context.clone_from(&fixture.base.context);
+    }
+    if mutation == PositiveMutation::Region {
+        let region = admit(
+            &mut fixture.base.cas,
+            &Draft::Region(RegionDraft {
+                header: Reference::Existing(fixture.base.header.clone()),
+                scope: Vec::new(),
+                ambient: AmbientDomain::Product {
+                    coordinates: fixture.base.coefficients.clone(),
+                },
+                expression: RegionExpr::Empty,
+            }),
+        )?;
+        let crate::test_api::proof::Statement::Solve(statement) = &mut step.conclusion else {
+            return Err("positive statement".into());
+        };
+        let SolveStatement::CoefficientEquality(claim) = statement.as_mut() else {
+            return Err("positive claim".into());
+        };
+        claim.region.clone_from(&region);
+        let Certificate::Solve(certificate) = &mut step.certificate else {
+            return Err("positive certificate".into());
+        };
+        let SolveCertificate::ConjugationTransport(certificate) = certificate.as_mut() else {
+            return Err("positive transport".into());
+        };
+        certificate.region = region;
+    }
+    Ok(())
+}
+
+/// An actual unconstrained selected root supplies its equation before any norm cancellation.
+fn positive_norm_root() -> TestResult<(BinomialFixture, Handle, Handle)> {
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    let domain = base.algebra.clone();
+    let map = base.scalar_map(&domain, &[])?;
+    let one = base.coefficient(1)?;
+    let constant = base.coefficient(-8)?;
+    let polynomial = base.polynomial(&domain, &[(3, one), (0, constant)])?;
+    let (relation, selection, root) = base.root(&polynomial, &map)?;
+    let unit = base.ground_unit()?;
+    let mut fixture = BinomialFixture {
+        base,
+        steps: vec![unit],
+    };
+    let existence = fixture.base.adjoin(&relation, &selection, 0);
+    push(&mut fixture, existence)?;
+    Ok((fixture, map, root))
+}
+
+/// The two-slot predicate links the second slot to the actual conjugate of the first.
+fn norm_joint_predicate(fixture: &mut BinomialFixture) -> TestResult<Handle> {
+    let scope = vec![vec![AtomicSort::Scalar(Field::Complex); 2]];
+    let mut bound = Vec::new();
+    for slot in 0..2 {
+        bound.push(admit(
+            &mut fixture.base.cas,
+            &Draft::Expression(ExpressionDraft {
+                header: Reference::Existing(fixture.base.header.clone()),
+                scope: scope.clone(),
+                operator: Operator::Bound { depth: 0, slot },
+                sort: Sort::Value(AtomicSort::Scalar(Field::Complex)),
+                operands: Vec::new(),
+                space: None,
+                binding: None,
+            }),
+        )?);
+    }
+    let image = admit(
+        &mut fixture.base.cas,
+        &Draft::Expression(ExpressionDraft {
+            header: Reference::Existing(fixture.base.header.clone()),
+            scope: scope.clone(),
+            operator: Operator::Conjugate,
+            sort: Sort::Value(AtomicSort::Scalar(Field::Complex)),
+            operands: vec![Reference::Existing(
+                bound.first().ok_or("norm first bound")?.clone(),
+            )],
+            space: None,
+            binding: None,
+        }),
+    )?;
+    let predicate = admit(
+        &mut fixture.base.cas,
+        &Draft::Condition {
+            header: Reference::Existing(fixture.base.header.clone()),
+            scope,
+            kind: PredicateKind::Equal,
+            arguments: vec![
+                Reference::Existing(bound.get(1).ok_or("norm second bound")?.clone()),
+                Reference::Existing(image),
+            ],
+        },
+    )?;
+    Ok(predicate)
+}
+
+/// The actual conjugate is a supplied witness for a linked two-slot choice, never an independent root.
+fn norm_joint_roots(
+    fixture: &mut BinomialFixture,
+    map: &Handle,
+    root: &Handle,
+    mutation: u8,
+) -> TestResult<[Handle; 2]> {
+    let conjugate =
+        fixture
+            .base
+            .expression(Operator::Conjugate, std::slice::from_ref(root), false)?;
+    let domain = fixture.base.algebra.clone();
+    let one = fixture.base.coefficient(1)?;
+    let negative = fixture.base.coefficient(-8)?;
+    let polynomial = fixture
+        .base
+        .polynomial(&domain, &[(3, one), (0, negative)])?;
+    let (relation, _, _) = fixture.base.root(&polynomial, map)?;
+    let predicate = norm_joint_predicate(fixture)?;
+    let selection = admit(
+        &mut fixture.base.cas,
+        &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            header: Reference::Existing(fixture.base.header.clone()),
+            scope: Vec::new(),
+            relations: vec![
+                Reference::Existing(relation.clone()),
+                Reference::Existing(relation),
+            ],
+            predicate: Reference::Existing(predicate),
+            mode: SelectionMode::Constrained,
+            convention: None,
+            interval: None,
+        })),
+    )?;
+    let step = fixture.base.step(
+        SolveSchema::RootSelectionRefinement,
+        SolveStatement::RootExistence(StatementRootExistence {
+            relation: selection.clone(),
+            region: fixture.base.region.clone(),
+        }),
+        SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+            mode: RefinementMode::Existence,
+            target_kind: RefinementTargetKind::Selection,
+            target: selection.clone(),
+            witnesses: vec![root.clone(), conjugate],
+            compatibility: Vec::new(),
+            form: None,
+        }),
+    );
+    let index = push(fixture, step)?;
+    if mutation == 1 {
+        fixture
+            .steps
+            .get_mut(usize::try_from(index)?)
+            .ok_or("joint norm step")?
+            .premises = vec![0];
+    }
+    let mut roots = Vec::new();
+    for slot in 0..2 {
+        roots.push(admit(
+            &mut fixture.base.cas,
+            &Draft::RootValue {
+                header: Reference::Existing(fixture.base.header.clone()),
+                selection: Reference::Existing(selection.clone()),
+                slot,
+            },
+        )?);
+    }
+    roots.try_into().map_err(|_| "joint root count".into())
+}
+
+/// Both root equations are explicitly cited, and their finite ideal combination proves the product power.
+fn norm_product_power(
+    fixture: &mut BinomialFixture,
+    map: &Handle,
+    roots: &[Handle; 2],
+) -> TestResult<u32> {
+    use crate::test_api::solving::{IdentityMode, RelationMultiple};
+    let eight = fixture.base.integer(8, false)?;
+    let zero = fixture.base.integer(0, false)?;
+    let mut cubes = Vec::new();
+    let mut relations = Vec::new();
+    for root in roots {
+        let cube = fixture.base.expression(
+            Operator::IntegerPower(3),
+            std::slice::from_ref(root),
+            false,
+        )?;
+        let difference =
+            fixture
+                .base
+                .expression(Operator::Sub, &[cube.clone(), eight.clone()], false)?;
+        let equation = positive_equality(&fixture.base, map, &difference, &zero, &[], &[])?;
+        push(fixture, equation)?;
+        cubes.push(cube);
+        relations.push(difference);
+    }
+    let product = fixture.base.expression(Operator::Mul, roots, false)?;
+    let left = fixture
+        .base
+        .expression(Operator::IntegerPower(3), &[product], false)?;
+    let right = fixture.base.integer(64, false)?;
+    let mut step = fixture.base.identity(&left, &right, map);
+    let Certificate::Solve(certificate) = &mut step.certificate else {
+        return Err("norm identity".into());
+    };
+    let SolveCertificate::CoefficientIdentity(certificate) = certificate.as_mut() else {
+        return Err("norm combination".into());
+    };
+    certificate.mode = IdentityMode::RelationCombination;
+    certificate.combinations = vec![
+        RelationMultiple {
+            multiplier: cubes.get(1).ok_or("second cube")?.clone(),
+            relation: relations.first().ok_or("first relation")?.clone(),
+            hypothesis: None,
+        },
+        RelationMultiple {
+            multiplier: eight,
+            relation: relations.get(1).ok_or("second relation")?.clone(),
+            hypothesis: None,
+        },
+    ];
+    push(fixture, step)
+}
+
+/// A real norm retains the exact complex selection and has no independently chosen conjugate slot.
+pub(crate) fn positive_norm_cancellation(mutation: u8) -> TestResult<BinomialFixture> {
+    let (mut fixture, map, mut root) = positive_norm_root()?;
+    if mutation == 2 {
+        let one = fixture.base.integer(1, false)?;
+        let zero = fixture.base.integer(0, false)?;
+        root = fixture
+            .base
+            .expression(Operator::Div, &[one, zero], false)?;
+    }
+    let roots = norm_joint_roots(&mut fixture, &map, &root, mutation)?;
+    let bridge = norm_product_power(&mut fixture, &map, &roots)?;
+    let root = roots.first().ok_or("first linked root")?.clone();
+    let conjugate =
+        fixture
+            .base
+            .expression(Operator::Conjugate, std::slice::from_ref(&root), false)?;
+    let norm = fixture
+        .base
+        .expression(Operator::Mul, &[root, conjugate], false)?;
+    let norm = real_projection(&mut fixture.base, &norm)?;
+    fixture.base.field = Field::Real;
+    let four = fixture.base.integer(4, false)?;
+    let [source, factor, _] =
+        positive_expressions(&mut fixture.base, &norm, &four, PositiveMutation::Valid)?;
+    let square = fixture.base.expression(
+        Operator::IntegerPower(2),
+        std::slice::from_ref(&norm),
+        false,
+    )?;
+    let mixed = fixture
+        .base
+        .expression(Operator::Mul, &[four.clone(), norm.clone()], false)?;
+    let sixteen = fixture.base.integer(16, false)?;
+    let tail = fixture
+        .base
+        .expression(Operator::Add, &[mixed, sixteen], false)?;
+    let cofactor = fixture
+        .base
+        .expression(Operator::Add, &[square, tail], false)?;
+    let zero = fixture.base.integer(0, false)?;
+    let source_step = positive_equality(&fixture.base, &map, &source, &zero, &[bridge], &[])?;
+    let source_index = push(&mut fixture, source_step)?;
+    let product = fixture
+        .base
+        .expression(Operator::Mul, &[factor.clone(), cofactor], false)?;
+    let expansion = positive_equality(&fixture.base, &map, &source, &product, &[], &[])?;
+    let expansion_index = push(&mut fixture, expansion)?;
+    let target = if mutation == 3 {
+        fixture.base.field = Field::Complex;
+        let second = roots.get(1).ok_or("changed norm slot")?.clone();
+        let conjugate =
+            fixture
+                .base
+                .expression(Operator::Conjugate, std::slice::from_ref(&second), false)?;
+        let product = fixture
+            .base
+            .expression(Operator::Mul, &[second, conjugate], false)?;
+        let norm = real_projection(&mut fixture.base, &product)?;
+        fixture.base.field = Field::Real;
+        fixture
+            .base
+            .expression(Operator::Sub, &[norm, four.clone()], false)?
+    } else {
+        factor
+    };
+    let cancellation = positive_equality(
+        &fixture.base,
+        &map,
+        &target,
+        &zero,
+        &[source_index, expansion_index],
+        &[],
+    )?;
+    let cancellation_index = push(&mut fixture, cancellation)?;
+    let consumer = positive_equality(
+        &fixture.base,
+        &map,
+        &norm,
+        &four,
+        &[cancellation_index],
+        &[],
+    )?;
+    push(&mut fixture, consumer)?;
+    Ok(fixture)
+}
+
+/// Test-only prefix replay returns the precise first refusal without printing or weakening it.
+pub(crate) fn positive_norm_prefix() -> TestResult {
+    let mut fixture = positive_norm_cancellation(0)?;
+    for index in 0..fixture.steps.len() {
+        let prefix = fixture.steps.get(..=index).ok_or("norm prefix")?;
+        let current = fixture.steps.get(index).ok_or("norm step")?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        fixture.base.cas.check_proof(&current.context, prefix, &mut budget).map_err(|error| {
+            format!("norm prefix index={index} rule={:?} conclusion={:?} fault={error:?} usage={:?}", current.rule, current.conclusion, budget.usage())
+        })?;
+    }
+    Ok(())
+}

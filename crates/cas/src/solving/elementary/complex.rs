@@ -22,6 +22,12 @@ pub(crate) mod parts;
 )]
 pub(crate) mod selection;
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the conjugation checker uses bounded positive cancellation"
+)]
+mod positive;
+
 use super::evaluate::Evaluation;
 use super::proof::{AT, invalid};
 use super::value::Value;

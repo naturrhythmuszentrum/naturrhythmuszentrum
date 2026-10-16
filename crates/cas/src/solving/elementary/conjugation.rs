@@ -136,12 +136,18 @@ pub(crate) fn check(
             }
             Ok(())
         }
-        SolveStatement::CoefficientEquality(value) => components.equal(
-            value.left.logical_id(),
-            value.right.logical_id(),
-            false,
-            budget,
-        ),
+        SolveStatement::CoefficientEquality(value) => {
+            if super::product::decides(components.equal(
+                value.left.logical_id(),
+                value.right.logical_id(),
+                false,
+                budget,
+            ))? {
+                Ok(())
+            } else {
+                components.cancel(draft, certificate, value, budget)
+            }
+        }
         _ => Err(invalid()),
     }
 }

@@ -1450,3 +1450,49 @@ fn conjugation_rejects_unreferenced_evidence() -> TestResult {
     );
     Ok(())
 }
+
+/// Missing positivity, wrong factorization, ambient, region or explicit evidence cannot license cancellation.
+/// ´test:integration:positive-cofactor-refusal-mutations´
+#[test]
+fn positive_cofactor_refusal_mutations() -> TestResult {
+    use crate::testing::solve_elementary::PositiveMutation;
+    for mutation in [
+        PositiveMutation::WeakSign,
+        PositiveMutation::MissingSign,
+        PositiveMutation::Factorization,
+        PositiveMutation::UnrelatedFactor,
+        PositiveMutation::Region,
+        PositiveMutation::Context,
+        PositiveMutation::Complex,
+        PositiveMutation::MissingReference,
+        PositiveMutation::Reference,
+        PositiveMutation::NegativeTerm,
+    ] {
+        let mut fixture = crate::testing::solve_elementary::positive_cancellation(mutation)?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        assert!(result.is_err(), "{mutation:?}");
+        assert_eq!(fixture.base.cas.counts(), before, "{mutation:?}");
+    }
+    for mutation in [1, 2, 3] {
+        let mut fixture = crate::testing::solve_elementary::positive_norm_cancellation(mutation)?;
+        let before = fixture.base.cas.counts();
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &fixture.steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.base.cas.counts(), before);
+    }
+    Ok(())
+}

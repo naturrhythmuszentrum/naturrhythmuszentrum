@@ -39,8 +39,9 @@ pub(crate) use presentations::{
 )]
 mod realness;
 pub(crate) use realness::{
-    choice_wrong_ambient, cubic_product_reference, fraction_realness, linked_cubic,
-    linked_cubic_restriction, partial_power_realness, referenced_realness,
+    PositiveMutation, choice_wrong_ambient, cubic_product_reference, fraction_realness,
+    linked_cubic, linked_cubic_restriction, partial_power_realness, positive_cancellation,
+    positive_norm_cancellation, positive_norm_prefix, referenced_realness,
 };
 
 use super::common::TestResult;
