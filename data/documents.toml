@@ -105,3 +105,7 @@ requires = []
 [[document]]
 output = "docs/design/matrix-core-design.md"
 requires = []
+
+[[document]]
+output = "docs/records/matrix-core-acceptance.md"
+requires = []
