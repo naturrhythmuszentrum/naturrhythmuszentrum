@@ -52,6 +52,8 @@ impl SolveBudget {
 pub struct SolvePolicy {
     /// Absence is retained as `NotRequested`, never relabeled as a met budget.
     budget: Option<SolveBudget>,
+    /// Explicit finite refinement and cumulative solve-work policy.
+    recovery: Option<(nrz_accuracy::RecoveryPolicy, nrz_accuracy::Limits)>,
 }
 
 impl SolvePolicy {
@@ -60,6 +62,7 @@ impl SolvePolicy {
     pub const fn with_budget(budget: SolveBudget) -> Self {
         Self {
             budget: Some(budget),
+            recovery: None,
         }
     }
     /// Requested local budget, if any.
@@ -86,5 +89,23 @@ impl SolvePolicy {
             upper,
             &context,
         )?)
+    }
+}
+
+impl SolvePolicy {
+    /// Authorize finite refinement and optional fresh f64 retry under cumulative limits.
+    #[must_use]
+    pub const fn with_recovery(
+        mut self,
+        policy: nrz_accuracy::RecoveryPolicy,
+        limits: nrz_accuracy::Limits,
+    ) -> Self {
+        self.recovery = Some((policy, limits));
+        self
+    }
+    /// Bounded recovery settings; absence preserves single-attempt solve behavior.
+    #[must_use]
+    pub const fn recovery(&self) -> Option<(nrz_accuracy::RecoveryPolicy, nrz_accuracy::Limits)> {
+        self.recovery
     }
 }

@@ -35,6 +35,8 @@ pub struct SolveEvidence {
     inverse_output: bool,
     /// Independent certificates of every logical differential solve, before restoration.
     pub(crate) sensitivities: Vec<super::SensitivityEvidence>,
+    /// Complete bounded attempt history, including the explicit stopping reason.
+    pub(crate) recovery: Option<super::SolveRecoveryEvidence>,
 }
 
 impl SolveEvidence {
@@ -69,6 +71,7 @@ impl SolveEvidence {
             restoration: None,
             inverse_output: contract.identity.is_some(),
             sensitivities: Vec::new(),
+            recovery: None,
         }
     }
     /// Add the complete selected input scope only after its strict common-operator theorem succeeds.
@@ -215,5 +218,13 @@ impl SolveEvidence {
     #[must_use]
     pub fn sensitivities(&self) -> &[super::SensitivityEvidence] {
         &self.sensitivities
+    }
+}
+
+impl SolveEvidence {
+    /// Bounded recovery attempts and stop; absent for the ordinary single-attempt policy.
+    #[must_use]
+    pub const fn recovery(&self) -> Option<&super::SolveRecoveryEvidence> {
+        self.recovery.as_ref()
     }
 }

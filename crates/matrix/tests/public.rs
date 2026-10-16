@@ -86,3 +86,10 @@ mod statistics_oracle;
     reason = "solve source fixtures are shared across test modules"
 )]
 mod solve_statistics_testing;
+
+#[path = "../src/testing/recovery.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "bounded solve policy fixtures are shared across test modules"
+)]
+mod recovery_testing;

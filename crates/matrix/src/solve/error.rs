@@ -46,6 +46,12 @@ pub enum SolveError {
     /// A factor belongs to a different validated execution.
     #[error("factor belongs to another execution")]
     ForeignFactor,
+    /// The authorized correction count ended without meeting the requested certificate budget.
+    #[error("solve refinement limit reached without meeting the budget")]
+    RefinementLimit,
+    /// No smaller certified output radius appeared within the authorized stagnation window.
+    #[error("solve certified radius stagnated")]
+    Stagnation,
     /// Independent contraction work exhausted its checked allowance.
     #[error("solve verification work exhausted")]
     ResourceLimit,

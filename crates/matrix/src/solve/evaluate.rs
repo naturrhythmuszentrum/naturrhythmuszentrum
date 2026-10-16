@@ -57,6 +57,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         token: u64,
         evidence: &mut Vec<RecipeEvidence>,
     ) -> Result<Candidate<Q>, OperationError> {
+        super::recovery::preflight(contract, self.statistics.work)?;
         let operator = views.first().ok_or(OperationError::InputCount)?;
         let stamp = self
             .dependencies
@@ -89,7 +90,18 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         {
             return Err(SolveError::Contract.into());
         }
-        let (restored, decision) = evaluate(contract, views, factor, reservation, evidence)?;
+        let (restored, decision) = if contract.policy.recovery().is_some() {
+            super::recovery::evaluate(
+                contract,
+                views,
+                factor,
+                reservation,
+                self.statistics.work,
+                evidence,
+            )?
+        } else {
+            evaluate(contract, views, factor, reservation, evidence)?
+        };
         match decision {
             BudgetDecision::Exceeded => return Err(SolveError::BudgetExceeded.into()),
             BudgetDecision::Unresolved => return Err(SolveError::BudgetUnresolved.into()),
@@ -118,6 +130,34 @@ fn evaluate<P: Scalar + 'static>(
     reservation: crate::OutputReservation,
     evidence: &mut Vec<RecipeEvidence>,
 ) -> Result<(Restored<P>, BudgetDecision), OperationError> {
+    let centers = initial(contract, views, factor)?;
+    certify(contract, views, factor, centers, reservation, evidence)
+}
+
+/// Generate one finite initial candidate, independently of any budget acceptance.
+pub(crate) fn initial<P: Scalar + 'static>(
+    contract: &SolveContract,
+    views: &[NormalizedView<'_, P>],
+    factor: &FactorRef<P>,
+) -> Result<Vec<P>, OperationError> {
+    if let Some(identity) = &contract.identity {
+        factor.backend.inverse(identity.extent().rows())
+    } else {
+        factor
+            .backend
+            .solve(views.get(1).ok_or(OperationError::InputCount)?)
+    }
+}
+
+/// Recompute every proof stage after each correction; residual improvement alone never accepts.
+pub(crate) fn certify<P: Scalar + 'static>(
+    contract: &SolveContract,
+    views: &[NormalizedView<'_, P>],
+    factor: &FactorRef<P>,
+    centers: Vec<P>,
+    reservation: crate::OutputReservation,
+    evidence: &mut Vec<RecipeEvidence>,
+) -> Result<(Restored<P>, BudgetDecision), OperationError> {
     let operator = views.first().ok_or(OperationError::InputCount)?;
     let rhs = if let Some(identity) = &contract.identity {
         RightHandSide::Identity(identity)
@@ -125,10 +165,6 @@ fn evaluate<P: Scalar + 'static>(
         RightHandSide::Physical(views.get(1).ok_or(OperationError::InputCount)?)
     };
     let context = ArithmeticContext::new().map_err(SolveError::from)?;
-    let centers = match &rhs {
-        RightHandSide::Physical(view) => factor.backend.solve(view)?,
-        RightHandSide::Identity(identity) => factor.backend.inverse(identity.extent().rows())?,
-    };
     let certificate = crate::solve_verification::center(
         operator,
         &rhs,

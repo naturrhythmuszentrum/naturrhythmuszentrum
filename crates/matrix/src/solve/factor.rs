@@ -66,6 +66,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let crate::binding::NativeRecipe::Solve(contract) = &self.operation.recipe else {
             return Err(SolveError::Contract.into());
         };
+        super::recovery::preflight(contract, self.statistics.work)?;
         let inputs = self.normalized_inputs()?;
         let operator = inputs.views().first().ok_or(OperationError::InputCount)?;
         let stamp = self

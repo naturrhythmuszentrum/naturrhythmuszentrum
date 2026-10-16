@@ -4,12 +4,16 @@
 mod backend;
 mod contract;
 mod error;
-mod evaluate;
+pub(crate) mod evaluate;
 mod evidence;
 mod factor;
 mod inputs;
 mod policy;
+pub(crate) mod recovery;
 mod restoration;
+mod retry;
+pub use recovery::{SolveAttempt, SolveRecoveryEvidence, SolveStop};
+pub use retry::{RecoveredSolve, RecoveryFailure};
 pub(crate) mod sensitivity;
 pub(crate) use inputs::RightHandSide;
 pub use policy::{SolveBudget, SolvePolicy};

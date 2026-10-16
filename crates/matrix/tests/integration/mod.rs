@@ -53,3 +53,5 @@ mod statistics_precision;
 mod statistics_structured;
 
 mod solve_sensitivity;
+
+mod solve_mixed_precision;

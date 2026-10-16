@@ -24,3 +24,5 @@ mod solve;
 mod statistics;
 
 mod solve_sensitivity;
+
+mod solve_recovery;

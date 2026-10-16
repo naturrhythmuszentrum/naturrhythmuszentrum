@@ -55,3 +55,5 @@ mod statistics_refusals;
 mod statistics_nonlinear;
 
 mod statistics_conversion;
+
+mod solve_recovery;

@@ -217,7 +217,8 @@ mod contractions;
 )]
 mod solve;
 pub use solve::{
-    FactorRef, SensitivityEvidence, SolveBudget, SolveError, SolveEvidence, SolvePolicy,
+    FactorRef, RecoveredSolve, RecoveryFailure, SensitivityEvidence, SolveAttempt, SolveBudget,
+    SolveError, SolveEvidence, SolvePolicy, SolveRecoveryEvidence, SolveStop,
 };
 
 #[path = "verification/solve.rs"]
@@ -252,3 +253,11 @@ pub use statistics::{MomentAssurance, MomentRef, MomentView, ParameterView, Stat
     reason = "solve source fixtures are shared across test modules"
 )]
 mod solve_statistics_testing;
+
+#[cfg(test)]
+#[path = "testing/recovery.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "bounded solve policy fixtures are shared across test modules"
+)]
+mod recovery_testing;
