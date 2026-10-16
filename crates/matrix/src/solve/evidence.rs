@@ -37,6 +37,8 @@ pub struct SolveEvidence {
     pub(crate) sensitivities: Vec<super::SensitivityEvidence>,
     /// Complete bounded attempt history, including the explicit stopping reason.
     pub(crate) recovery: Option<super::SolveRecoveryEvidence>,
+    /// Origin and checked reuse key, independent of the current RHS proof.
+    pub(crate) factor: Option<super::FactorUse>,
 }
 
 impl SolveEvidence {
@@ -72,6 +74,7 @@ impl SolveEvidence {
             inverse_output: contract.identity.is_some(),
             sensitivities: Vec::new(),
             recovery: None,
+            factor: None,
         }
     }
     /// Add the complete selected input scope only after its strict common-operator theorem succeeds.
@@ -226,5 +229,13 @@ impl SolveEvidence {
     #[must_use]
     pub const fn recovery(&self) -> Option<&super::SolveRecoveryEvidence> {
         self.recovery.as_ref()
+    }
+}
+
+impl SolveEvidence {
+    /// Factor origin and dependency-specific reuse decision for this exact solve execution.
+    #[must_use]
+    pub const fn factor_use(&self) -> Option<&super::FactorUse> {
+        self.factor.as_ref()
     }
 }

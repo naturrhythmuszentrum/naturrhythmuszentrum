@@ -43,8 +43,8 @@ pub enum SolveError {
     /// The independent inverse defect did not establish a strict Neumann margin.
     #[error("inverse defect did not establish q < 1")]
     CannotCertifyInverse,
-    /// A factor belongs to a different validated execution.
-    #[error("factor belongs to another execution")]
+    /// A factor belongs to a different operator version, selection or checked recipe revision.
+    #[error("factor operator dependency key does not match this execution")]
     ForeignFactor,
     /// The authorized correction count ended without meeting the requested certificate budget.
     #[error("solve refinement limit reached without meeting the budget")]

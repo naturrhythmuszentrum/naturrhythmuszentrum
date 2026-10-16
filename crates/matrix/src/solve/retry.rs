@@ -15,7 +15,7 @@ pub struct RecoveredSolve {
     /// Exactly one published typed outcome.
     result: PrecisionResult,
     /// Original binary32 numerical refusal, when a wider solve was needed.
-    initial: Option<Box<Failure<f32>>>,
+    initial: Option<crate::SolveFailure<f32>>,
     /// Separate atomic input conversion record, absent without promotion.
     conversion: Option<RecordId>,
 }
@@ -55,7 +55,9 @@ impl RecoveredSolve {
     /// Historical numerical failure that motivated promotion.
     #[must_use]
     pub fn initial_failure(&self) -> Option<&Failure<f32>> {
-        self.initial.as_deref()
+        self.initial
+            .as_ref()
+            .and_then(|failure| failure.record().numerical())
     }
     /// Original-to-widened dependency and error-companion record.
     #[must_use]
@@ -69,11 +71,11 @@ pub struct RecoveryFailure {
     /// Exact final refusal; an unavailable bound never asserts actual inaccuracy.
     cause: OperationError,
     /// Original attempt's available certificates.
-    initial: Option<Box<Failure<f32>>>,
+    initial: Option<crate::SolveFailure<f32>>,
     /// Conversion refusal, if widening could not publish its complete bundle.
     conversion_failure: Option<Box<Failure<f32>>>,
     /// Promoted attempt's available certificates.
-    promoted: Option<Box<Failure<f64>>>,
+    promoted: Option<crate::SolveFailure<f64>>,
     /// Successful conversion remains an independently valid historical operation.
     conversion: Option<RecordId>,
 }
@@ -96,7 +98,9 @@ impl RecoveryFailure {
     /// Original binary32 failure, absent for a binding refusal.
     #[must_use]
     pub fn initial_failure(&self) -> Option<&Failure<f32>> {
-        self.initial.as_deref()
+        self.initial
+            .as_ref()
+            .and_then(|failure| failure.record().numerical())
     }
     /// Failed widening transaction, if any.
     #[must_use]
@@ -106,7 +110,9 @@ impl RecoveryFailure {
     /// Failed binary64 execution, if promotion reached evaluation.
     #[must_use]
     pub fn promoted_failure(&self) -> Option<&Failure<f64>> {
-        self.promoted.as_deref()
+        self.promoted
+            .as_ref()
+            .and_then(|failure| failure.record().numerical())
     }
     /// Successful input conversion, when a later solve failed.
     #[must_use]
@@ -125,51 +131,12 @@ impl RecoveryFailure {
     }
 }
 
-/// Internal execution failure distinguishes validation from an actual numerical attempt.
-struct AttemptFailure<P: Scalar> {
-    /// Exact failure including any available solve certificate.
-    cause: OperationError,
-    /// Absent if binding never succeeded.
-    numerical: Option<Box<Failure<P>>>,
-    /// Conservative cost captured before candidate arithmetic.
-    cost: u64,
-}
-/// Execute one complete checked transaction and retain both refusal boundaries.
+/// Every retry uses the complete recorded solve lifecycle, including binding refusals.
 fn execute<P: Scalar + 'static>(
     heap: &mut Heap,
     binding: Binding<P>,
-) -> Result<Outcome<Vec<PublishedBundle<P>>>, AttemptFailure<P>> {
-    let bound = binding.validate(heap).map_err(|cause| AttemptFailure {
-        cause,
-        numerical: None,
-        cost: 0,
-    })?;
-    let cost = bound
-        .operation()
-        .solve_work()
-        .unwrap_or(0)
-        .checked_add(bound.statistical_work())
-        .and_then(|value| u64::try_from(value).ok())
-        .ok_or_else(|| AttemptFailure {
-            cause: SolveError::ResourceLimit.into(),
-            numerical: None,
-            cost: 0,
-        })?;
-    let inputs = bound.normalized_inputs().map_err(|cause| AttemptFailure {
-        cause,
-        numerical: None,
-        cost,
-    })?;
-    let candidate = bound.evaluate(inputs).map_err(|failure| AttemptFailure {
-        cause: failure.cause().clone(),
-        numerical: Some(Box::new(failure)),
-        cost,
-    })?;
-    bound.publish(candidate).map_err(|failure| AttemptFailure {
-        cause: failure.cause().clone(),
-        numerical: Some(Box::new(failure)),
-        cost,
-    })
+) -> Result<Outcome<Vec<PublishedBundle<P>>>, crate::SolveFailure<P>> {
+    heap.solve_recorded(binding)
 }
 impl Heap {
     /// Run a binary32 solve, optionally widening its complete inputs and retrying in binary64.
@@ -189,10 +156,10 @@ impl Heap {
         let operation = binding.operation.clone();
         let inputs = binding.inputs.clone();
         let execution_limits = binding.limits;
-        let NativeRecipe::Solve(contract) = &operation.recipe else {
-            return Err(RecoveryFailure::binding(SolveError::Contract.into()));
+        let settings = match &operation.recipe {
+            NativeRecipe::Solve(contract) => contract.policy.recovery(),
+            _ => None,
         };
-        let settings = contract.policy.recovery();
         let failed = match execute(self, binding) {
             Ok(result) => {
                 return Ok(RecoveredSolve {
@@ -204,13 +171,13 @@ impl Heap {
             Err(failed) => failed,
         };
         let used = usage(&failed);
-        let mut failure = RecoveryFailure::binding(failed.cause);
-        failure.initial = failed.numerical;
+        let mut failure = RecoveryFailure::binding(failed.cause().clone());
+        failure.initial = Some(failed);
         let Some((policy, limits)) = settings else {
             return Err(failure);
         };
         if policy.promotion() != Promotion::F32ToF64
-            || failure.initial.is_none()
+            || failure.initial_failure().is_none()
             || !retryable(&failure.cause)
         {
             return Err(failure);
@@ -227,8 +194,8 @@ impl Heap {
     }
 }
 /// Read charged counters rather than inferring successful progress from the last iterate.
-fn usage(failed: &AttemptFailure<f32>) -> (u32, u64) {
-    if let Some(failure) = &failed.numerical {
+fn usage(failed: &crate::SolveFailure<f32>) -> (u32, u64) {
+    if let Some(failure) = failed.record().numerical() {
         for claim in failure.record().historical_evidence() {
             if let RecipeEvidence::Solve(solve) = claim
                 && let Some(recovery) = solve.recovery()
@@ -236,7 +203,7 @@ fn usage(failed: &AttemptFailure<f32>) -> (u32, u64) {
                 return (recovery.reserved_attempts(), recovery.work());
             }
         }
-        return (1, failed.cost);
+        return (1, failed.record().attempt_work());
     }
     (0, 0)
 }
@@ -301,8 +268,8 @@ fn promote(
             conversion: Some(record),
         }),
         Err(failed) => {
-            failure.cause = failed.cause;
-            failure.promoted = failed.numerical;
+            failure.cause = failed.cause().clone();
+            failure.promoted = Some(failed);
             Err(failure)
         }
     }
@@ -384,3 +351,22 @@ fn widen_checked(
 type WidenedInputs = (Vec<crate::Handle<crate::Value, f64>>, RecordId, u64);
 /// Exact widening cause and its numerical record when evaluation began.
 type WideningFailure = (OperationError, Option<Box<Failure<f32>>>);
+impl RecoveredSolve {
+    /// Complete original request and failed phase, retained even after successful promotion.
+    #[must_use]
+    pub fn initial_record(&self) -> Option<&crate::SolveFailureRecord<f32>> {
+        self.initial.as_ref().map(crate::SolveFailure::record)
+    }
+}
+impl RecoveryFailure {
+    /// Complete original request, including a binding refusal with unresolved operand locators.
+    #[must_use]
+    pub fn initial_record(&self) -> Option<&crate::SolveFailureRecord<f32>> {
+        self.initial.as_ref().map(crate::SolveFailure::record)
+    }
+    /// Complete promoted request and final phase, even when its binding refused.
+    #[must_use]
+    pub fn promoted_record(&self) -> Option<&crate::SolveFailureRecord<f64>> {
+        self.promoted.as_ref().map(crate::SolveFailure::record)
+    }
+}

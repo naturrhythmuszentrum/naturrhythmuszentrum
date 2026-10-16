@@ -54,6 +54,8 @@ pub struct SolvePolicy {
     budget: Option<SolveBudget>,
     /// Explicit finite refinement and cumulative solve-work policy.
     recovery: Option<(nrz_accuracy::RecoveryPolicy, nrz_accuracy::Limits)>,
+    /// Optional bounded external record identities, without numerical authority.
+    keys: Option<super::SolveRecordKeys>,
 }
 
 impl SolvePolicy {
@@ -63,6 +65,7 @@ impl SolvePolicy {
         Self {
             budget: Some(budget),
             recovery: None,
+            keys: None,
         }
     }
     /// Requested local budget, if any.
@@ -107,5 +110,19 @@ impl SolvePolicy {
     #[must_use]
     pub const fn recovery(&self) -> Option<(nrz_accuracy::RecoveryPolicy, nrz_accuracy::Limits)> {
         self.recovery
+    }
+}
+
+impl SolvePolicy {
+    /// Retain optional external plan/binding/point/node identities in this operation's record.
+    #[must_use]
+    pub fn with_record_keys(mut self, keys: super::SolveRecordKeys) -> Self {
+        self.keys = Some(keys);
+        self
+    }
+    /// External request identities, independently of heap and execution identities.
+    #[must_use]
+    pub const fn record_keys(&self) -> Option<&super::SolveRecordKeys> {
+        self.keys.as_ref()
     }
 }

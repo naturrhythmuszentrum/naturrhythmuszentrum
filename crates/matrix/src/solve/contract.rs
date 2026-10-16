@@ -13,6 +13,8 @@ use std::rc::Rc;
 /// Closed operation with independently checked result axes and scalar meaning.
 #[derive(Clone, Debug)]
 pub(crate) struct SolveContract {
+    /// Immutable checked operator recipe, shape, declarations and coordinate-map revision.
+    pub(crate) operator_revision: u64,
     /// Operator followed by physical right-hand sides.
     pub(crate) inputs: Rc<[RegionContract]>,
     /// Concrete scalar admission of the derived solution envelope.
@@ -54,6 +56,7 @@ impl OperationDraft {
         .into();
         Ok(Self {
             solve: Some(Box::new(SolveContract {
+                operator_revision: crate::heap::identity::identity()?,
                 inputs,
                 solution: output.clone(),
                 output,
@@ -198,6 +201,7 @@ impl OperationDraft {
         let inputs = vec![RegionContract::check(operator)?].into();
         Ok(Self {
             solve: Some(Box::new(SolveContract {
+                operator_revision: crate::heap::identity::identity()?,
                 inputs,
                 solution: output.clone(),
                 output,

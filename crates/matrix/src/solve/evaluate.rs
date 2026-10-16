@@ -12,7 +12,7 @@ use nrz_accuracy::BudgetDecision;
 use nrz_scalar::{ArithmeticContext, Scalar};
 
 impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
-    /// Evaluate with an opaque factor belonging to this same validated execution.
+    /// Evaluate with an opaque factor whose exact operator dependencies still match.
     /// # Errors
     /// Refuses foreign factors or inputs, repeated evaluation, failed residual proof
     /// or any incomplete result. No candidate or output handle escapes on failure.
@@ -39,12 +39,15 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         if self.issued.get().is_some() {
             return Err(OperationError::AlreadyEvaluated);
         }
-        if factor.execution != self.execution {
-            return Err(SolveError::ForeignFactor.into());
-        }
         let crate::binding::NativeRecipe::Solve(contract) = &self.operation.recipe else {
             return Err(SolveError::Contract.into());
         };
+        factor.validate(
+            self.dependencies
+                .first()
+                .ok_or(OperationError::InputCount)?,
+            contract,
+        )?;
         let token = crate::heap::identity::identity()?;
         self.finish_solve(contract, inputs.views(), factor, token, evidence)
     }
@@ -59,12 +62,11 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     ) -> Result<Candidate<Q>, OperationError> {
         super::recovery::preflight(contract, self.statistics.work)?;
         let operator = views.first().ok_or(OperationError::InputCount)?;
-        let stamp = self
+        let input = self
             .dependencies
             .first()
-            .ok_or(OperationError::InputCount)?
-            .stamp();
-        let factor = super::factor::build(operator, self.execution, stamp, contract.work)?;
+            .ok_or(OperationError::InputCount)?;
+        let factor = super::factor::build(operator, self.execution, input, contract)?;
         self.finish_solve(contract, views, &factor, token, evidence)
     }
 
@@ -90,7 +92,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         {
             return Err(SolveError::Contract.into());
         }
-        let (restored, decision) = if contract.policy.recovery().is_some() {
+        let evaluated = if contract.policy.recovery().is_some() {
             super::recovery::evaluate(
                 contract,
                 views,
@@ -98,10 +100,14 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 reservation,
                 self.statistics.work,
                 evidence,
-            )?
+            )
         } else {
-            evaluate(contract, views, factor, reservation, evidence)?
+            evaluate(contract, views, factor, reservation, evidence)
         };
+        if let Some(RecipeEvidence::Solve(claim)) = evidence.last_mut() {
+            claim.factor = Some(factor.used_by(self.execution));
+        }
+        let (restored, decision) = evaluated?;
         match decision {
             BudgetDecision::Exceeded => return Err(SolveError::BudgetExceeded.into()),
             BudgetDecision::Unresolved => return Err(SolveError::BudgetUnresolved.into()),
@@ -217,6 +223,10 @@ impl SolveContract {
             || claim.work() != self.work
             || claim.is_inverse() != self.identity.is_some()
             || !claim.is_complete()
+            || claim.factor_use().is_none_or(|usage| {
+                usage.dependency().operator_revision() != self.operator_revision
+                    || usage.dependency().precision() != Q::PRECISION
+            })
             || !matches!(
                 claim.budget().map(nrz_accuracy::BudgetAssessment::decision),
                 Some(BudgetDecision::Met | BudgetDecision::NotRequested)

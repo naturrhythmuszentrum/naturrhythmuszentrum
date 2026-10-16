@@ -8,6 +8,8 @@ pub(crate) mod evaluate;
 mod evidence;
 mod factor;
 mod inputs;
+mod lifecycle;
+pub use lifecycle::{SolveFailure, SolveFailureRecord, SolveRecordKeys, SolveStage};
 mod policy;
 pub(crate) mod recovery;
 mod restoration;
@@ -22,7 +24,7 @@ pub use sensitivity::SensitivityEvidence;
 pub(crate) use contract::SolveContract;
 pub use error::SolveError;
 pub use evidence::SolveEvidence;
-pub use factor::FactorRef;
+pub use factor::{FactorDependency, FactorRef, FactorUse};
 
 #[cfg(test)]
 mod tests {

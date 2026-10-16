@@ -57,3 +57,7 @@ mod statistics_nonlinear;
 mod statistics_conversion;
 
 mod solve_recovery;
+
+mod solve_factor_reuse;
+
+mod solve_records;
