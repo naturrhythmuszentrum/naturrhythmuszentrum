@@ -62,6 +62,61 @@ fn statistical_reservations_preserve_the_value_prefix() -> TestResult {
     Ok(())
 }
 
+/// Covariance and Jacobian evaluation errors have distinct parameter targets and neither targets the value.
+/// ´test:crate:nonlinear-parameter-errors-keep-independent-targets´
+#[test]
+fn nonlinear_parameter_errors_keep_independent_targets() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let input = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[3.0_f64])?;
+    let target = TargetMap::capture(&heap, input.value())?;
+    let limits = JointLimits::default();
+    let source = Source::new(&Descriptor::ratio(), 1)?;
+    let model = JointModel::from_factor(
+        &[source],
+        SourceFactor::new(1, &[1.0], &[0.25], limits)?,
+        &[CovarianceBlock::Known],
+        limits,
+    )?;
+    heap.publish_joint(
+        CompanionSetDraft::new(model, [target.clone(), target], [vec![0], vec![0]]),
+        limits,
+    )?;
+    let result = output(&execute(
+        &mut heap,
+        OperationDraft::map_elementwise(
+            contract.clone(),
+            contract,
+            crate::Elementwise::Reciprocal,
+        )?,
+        vec![input.value()],
+    )?)?;
+    let reference = heap.moment_companion(result.value())?;
+    let record = heap
+        .statistics
+        .records
+        .get(reference.index)
+        .ok_or("moment record")?;
+    let jacobian = record.jacobian.as_ref().ok_or("Jacobian record")?;
+    assert_ne!(jacobian.regions[0], record.covariance.regions[0]);
+    assert_ne!(jacobian.regions[1], record.covariance.regions[1]);
+    assert!(record.derivative.is_some());
+    let view = heap.moments(reference)?;
+    let derivative = view.jacobian().ok_or("Jacobian")?;
+    assert!(
+        crate::kernel_oracle::Rational::new(-1, 9)?
+            .covered(derivative.get(0, 0)?, derivative.error(0, 0)?)?
+    );
+    assert!(
+        crate::kernel_oracle::Rational::new(1, 324)?
+            .covered(view.covariance().get(0, 0)?, view.covariance().error(0, 0)?)?
+    );
+    assert_ne!(derivative.error_target().key, result.value().key);
+    Ok(())
+}
+
 /// Hundreds of real publications traverse one bounded graph without recursive reentry.
 /// ´test:crate:deep-statistical-provenance-obeys-inspection-budget´
 #[test]

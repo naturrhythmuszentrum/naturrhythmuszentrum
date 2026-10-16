@@ -3,9 +3,7 @@
 
 use crate::kernel_testing::{TestResult, axis, owner, shape};
 use nrz_matrix::{
-    Binding, CompanionSetDraft, CovarianceBlock, ExecutionLimits, Extent, Heap, HeapError,
-    HeapLimits, JointLimits, JointModel, OperationDraft, OperationError, ShapeLimits, Source,
-    SourceFactor, TargetMap,
+    Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError, ShapeLimits,
 };
 use nrz_units::Descriptor;
 
@@ -60,69 +58,112 @@ fn statistical_sum_refuses_missing_source() -> TestResult {
     Ok(())
 }
 
-/// A product cannot drop statistics while propagating only its deterministic bounds.
-/// ´test:integration:deterministic-product-refuses-carried-statistics´
+/// Both variable product operands retain their common source in the local model.
+/// ´test:integration:deterministic-product-propagates-carried-statistics´
 #[test]
-fn deterministic_product_refuses_carried_statistics() -> TestResult {
+fn deterministic_product_propagates_carried_statistics() -> TestResult {
     let declarations = owner()?;
     let coordinate = axis(1)?;
     let contract = shape(&declarations, &coordinate, &coordinate)?;
-    refuse_statistics(
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let source = crate::statistics_testing::scalar::<f64>(&mut heap)?;
+    let result = crate::kernel_testing::execute(
+        &mut heap,
         OperationDraft::matmul(contract.clone(), contract, ShapeLimits::default())?,
-        2.0,
-        2,
+        vec![source.value(); 2],
+    )?;
+    let output = crate::kernel_testing::output(&result)?;
+    let view = heap.moments(heap.moment_companion(output.value())?)?;
+    assert_eq!(
+        view.assurance(),
+        nrz_matrix::MomentAssurance::LinearizedMoments
+    );
+    crate::statistics_testing::check(
+        view.covariance(),
+        &[crate::kernel_oracle::Rational::new(4, 1)?],
     )
 }
 
-/// Attach one current statistical relation, then demand the same typed refusal from a recipe.
-fn refuse_statistics(draft: OperationDraft, center: f64, operands: usize) -> TestResult {
-    let quantity = Descriptor::ratio();
-    let mut heap = Heap::new(HeapLimits::default())?;
-    let input = heap.import_represented(Extent::new(1, 1)?, &quantity, &[center])?;
-    let target = TargetMap::capture(&heap, input.value())?;
-    let source = Source::new(&quantity, 1)?;
-    let joint_limits = JointLimits::default();
-    let model = JointModel::from_factor(
-        std::slice::from_ref(&source),
-        SourceFactor::new(1, &[1.0], &[0.25], joint_limits)?,
-        &[CovarianceBlock::Known],
-        joint_limits,
-    )?;
-    let companion = heap.publish_joint(
-        CompanionSetDraft::new(model, [target.clone(), target], [vec![0], vec![0]]),
-        joint_limits,
-    )?;
-    let operation = draft.check(ExecutionLimits::default())?;
-    assert!(matches!(
-        Binding::new(
-            operation,
-            vec![input.value(); operands],
-            ExecutionLimits::default()
-        )
-        .validate(&mut heap),
-        Err(OperationError::Heap(HeapError::MissingCoverage))
-    ));
-    assert!(heap.statistical(companion).is_ok());
-    Ok(())
-}
-
-/// Nonlinear operations, including square root at zero, never discard a statistical operand.
-/// ´test:integration:native-nonlinear-kernels-refuse-carried-statistics´
+/// A represented factor without source coverage cannot silently become fixed.
+/// ´test:integration:statistical-product-refuses-missing-source´
 #[test]
-fn native_nonlinear_kernels_refuse_carried_statistics() -> TestResult {
+fn statistical_product_refuses_missing_source() -> TestResult {
     let declarations = owner()?;
     let coordinate = axis(1)?;
     let contract = shape(&declarations, &coordinate, &coordinate)?;
-    for (function, center) in [
-        (nrz_matrix::Elementwise::Square, 2.0),
-        (nrz_matrix::Elementwise::Reciprocal, 2.0),
-        (nrz_matrix::Elementwise::SquareRoot, 0.0),
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let source = crate::statistics_testing::scalar::<f64>(&mut heap)?;
+    let unmodeled = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[2.0])?;
+    let operation = OperationDraft::matmul(contract.clone(), contract, ShapeLimits::default())?
+        .check(ExecutionLimits::default())?;
+    assert!(matches!(
+        Binding::new(
+            operation,
+            vec![source.value(), unmodeled.value()],
+            ExecutionLimits::default()
+        )
+        .validate(&mut heap),
+        Err(OperationError::Statistics(
+            nrz_matrix::StatisticsError::MissingSource { slot: 1, entry: 0 }
+        ))
+    ));
+    Ok(())
+}
+
+/// Smooth native recipes retain separate derivative evidence and local covariance.
+/// ´test:integration:native-nonlinear-kernels-propagate-carried-statistics´
+#[test]
+fn native_nonlinear_kernels_propagate_carried_statistics() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    for (function, numerator, denominator) in [
+        (nrz_matrix::Elementwise::Square, 4, 1),
+        (nrz_matrix::Elementwise::Reciprocal, 1, 64),
     ] {
-        refuse_statistics(
+        let mut heap = Heap::new(HeapLimits::default())?;
+        let source = crate::statistics_testing::scalar::<f64>(&mut heap)?;
+        let result = crate::kernel_testing::execute(
+            &mut heap,
             OperationDraft::map_elementwise(contract.clone(), contract.clone(), function)?,
-            center,
-            1,
+            vec![source.value()],
+        )?;
+        let output = crate::kernel_testing::output(&result)?;
+        let view = heap.moments(heap.moment_companion(output.value())?)?;
+        assert_eq!(
+            view.assurance(),
+            nrz_matrix::MomentAssurance::LinearizedMoments
+        );
+        crate::statistics_testing::check(
+            view.covariance(),
+            &[crate::kernel_oracle::Rational::new(numerator, denominator)?],
         )?;
     }
+    Ok(())
+}
+
+/// A deterministic interval containing zero cannot discharge reciprocal smoothness.
+/// ´test:integration:native-statistical-reciprocal-refuses-zero-neighborhood´
+#[test]
+fn native_statistical_reciprocal_refuses_zero_neighborhood() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let source =
+        heap.import_declared_bounds(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64], &[2.0])?;
+    crate::statistics_testing::attach(&mut heap, source.value(), &[0.25], false)?;
+    let operation = OperationDraft::map_elementwise(
+        contract.clone(),
+        contract,
+        nrz_matrix::Elementwise::Reciprocal,
+    )?
+    .check(ExecutionLimits::default())?;
+    let bound = Binding::new(operation, vec![source.value()], ExecutionLimits::default())
+        .validate(&mut heap)?;
+    assert!(bound.evaluate(bound.normalized_inputs()?).is_err());
+    drop(bound);
+    assert_eq!(heap.provenance_usage().records(), 0);
+    assert!(heap.value(source.value()).is_ok());
     Ok(())
 }

@@ -27,10 +27,20 @@ impl<P: Scalar + 'static> Plan<P> {
         let covariance = lineage
             .model
             .covariance(&lineage.columns, &context, self.limits)?;
-        let means = self.means::<Q>()?;
+        let means = if lineage.assurance == super::MomentAssurance::AffineMoments {
+            self.means::<Q>()?
+        } else {
+            None
+        };
         let mut result = crate::binding::buffer(operation.outputs().len())?;
         for slot in 0..operation.outputs().len() {
-            let affine = super::affine::map(operation, slot, &context)?;
+            let affine = super::nonlinear::map(
+                operation,
+                slot,
+                &self.points,
+                self.derivative.as_deref(),
+                &context,
+            )?;
             let sensitivity = multiply(&affine.jacobian, &inputs, &context, &mut work)?;
             let first = multiply(&sensitivity, &covariance, &context, &mut work)?;
             let output = multiply(&first, &sensitivity.transpose()?, &context, &mut work)?;
@@ -62,6 +72,7 @@ impl<P: Scalar + 'static> Plan<P> {
                 sensitivity,
                 covariance: output,
                 jacobian: affine.jacobian,
+                derivative: self.derivative.clone(),
                 means: mean,
             });
         }

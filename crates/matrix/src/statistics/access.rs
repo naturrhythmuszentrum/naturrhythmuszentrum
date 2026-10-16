@@ -135,6 +135,11 @@ impl<P: Scalar> MomentView<'_, P> {
     pub const fn jacobian(&self) -> Option<&ParameterView<'_, P>> {
         self.jacobian.as_ref()
     }
+    /// Replayed native symbolic derivative identity, distinct from its numerical evaluation.
+    #[must_use]
+    pub fn checked_sensitivity(&self) -> Option<&nrz_units::CheckedSensitivity> {
+        self.record.derivative.as_deref()
+    }
     /// Mathematical mean parameters; nominal centers never create this declaration.
     #[must_use]
     pub const fn means(&self) -> Option<&ParameterView<'_, P>> {

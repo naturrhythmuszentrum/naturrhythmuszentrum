@@ -198,9 +198,27 @@ pub(crate) fn covered(truth: Rational, center: f64, radius: f64) -> TestResult<b
         && fraction_order(&upper, truth, 1074)? != Ordering::Less)
 }
 
+/// Check a nonnegative derivative interval against its exact rational square.
+pub(crate) fn squared_bracket(truth: Rational, center: f64, radius: f64) -> TestResult<bool> {
+    if !radius.is_finite() || radius.is_sign_negative() {
+        return Err("invalid statistical oracle radius".into());
+    }
+    let nominal = Integer::binary(center)?;
+    let error = Integer::binary(radius)?;
+    let lower = nominal.add(&error.negated())?;
+    let upper = nominal.add(&error)?;
+    if lower.negative {
+        return Ok(false);
+    }
+    Ok(
+        fraction_order(&lower.multiply(&lower)?, truth, 2148)? != Ordering::Greater
+            && fraction_order(&upper.multiply(&upper)?, truth, 2148)? != Ordering::Less,
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::covered;
+    use super::{covered, squared_bracket};
     use crate::kernel_oracle::Rational;
     use crate::kernel_testing::TestResult;
 
@@ -220,6 +238,19 @@ mod tests {
         assert!(covered(zero, f64::INFINITY, 1.0).is_err());
         assert!(covered(zero, 0.0, -smallest).is_err());
         assert!(covered(zero, 0.0, -0.0).is_err());
+        Ok(())
+    }
+    /// Exact endpoint squares retain bits far beyond a bounded integer fraction.
+    /// ´test:unit:statistical-oracle-squares-long-dyadic-endpoints´
+    #[test]
+    fn statistical_oracle_squares_long_dyadic_endpoints() -> TestResult {
+        let quarter = Rational::new(1, 4)?;
+        assert!(squared_bracket(quarter, 0.5, f64::from_bits(1))?);
+        assert!(squared_bracket(quarter, 0.5, 0.0)?);
+        assert!(!squared_bracket(Rational::new(1, 8)?, 0.5, 0.0)?);
+        assert!(squared_bracket(quarter, f64::MAX, f64::MAX)?);
+        assert!(!squared_bracket(quarter, -0.5, 0.0)?);
+        assert!(squared_bracket(quarter, 0.5, -0.0).is_err());
         Ok(())
     }
 }

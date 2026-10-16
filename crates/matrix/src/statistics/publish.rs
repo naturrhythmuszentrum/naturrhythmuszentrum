@@ -37,6 +37,8 @@ struct PendingMoment {
     sensitivity: PendingParameter,
     /// Local Jacobian.
     jacobian: PendingParameter,
+    /// Retained checked derivative identity for the local native recipe.
+    derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
     /// Explicit mean parameters, if declared.
     means: Option<PendingParameter>,
 }
@@ -113,6 +115,7 @@ fn moment<P: Scalar + 'static, Q: Scalar + 'static>(
         .ok_or(StatisticsError::Contract)?;
     validate_payload(payload, lineage, &target)?;
     super::structure::output(output.shape(), payload, slot)?;
+    validate_recipe(bound, payload)?;
     let quantity = output.descriptor();
     let covariance = parameter(
         &payload.covariance,
@@ -146,6 +149,7 @@ fn moment<P: Scalar + 'static, Q: Scalar + 'static>(
         covariance,
         sensitivity,
         jacobian,
+        derivative: payload.derivative.clone(),
         means,
     })
 }
@@ -164,6 +168,45 @@ fn validate_payload<P: Scalar>(
         || payload.sensitivity.extent.rows() != payload.covariance.extent.rows()
         || payload.sensitivity.extent.columns() != lineage.columns.len()
     {
+        return Err(StatisticsError::Contract.into());
+    }
+    Ok(())
+}
+
+/// The local derivative owner, complete operand columns and mean coverage are part of the sealed recipe.
+fn validate_recipe<P: Scalar, Q: Scalar>(
+    bound: &Bound<'_, P, Q>,
+    payload: &super::MomentPayload<Q>,
+) -> Result<(), OperationError> {
+    let columns = bound
+        .operation
+        .inputs()
+        .iter()
+        .try_fold(0_usize, |sum, input| {
+            sum.checked_add(input.shape().extent().entries())
+                .ok_or(StatisticsError::ResourceLimit)
+        })?;
+    let same_derivative = match (&payload.derivative, &bound.statistics.derivative) {
+        (Some(actual), Some(expected)) => std::rc::Rc::ptr_eq(actual, expected),
+        (None, None) => true,
+        _ => false,
+    };
+    let needs_means = payload.lineage.assurance == super::MomentAssurance::AffineMoments
+        && bound
+            .statistics
+            .inputs
+            .iter()
+            .all(|input| input.means.is_some());
+    if !same_derivative
+        || payload.jacobian.extent.rows() != payload.covariance.extent.rows()
+        || payload.jacobian.extent.columns() != columns
+        || payload.means.is_some() != needs_means
+    {
+        return Err(StatisticsError::Contract.into());
+    }
+    if payload.means.as_ref().is_some_and(|means| {
+        means.extent.rows() != payload.covariance.extent.rows() || means.extent.columns() != 1
+    }) {
         return Err(StatisticsError::Contract.into());
     }
     Ok(())
@@ -257,6 +300,7 @@ fn finish(draft: PendingMoment, keys: &[Key]) -> Result<Record, OperationError> 
         covariance: bind(draft.covariance, keys)?,
         sensitivity: Some(bind(draft.sensitivity, keys)?),
         jacobian: Some(bind(draft.jacobian, keys)?),
+        derivative: draft.derivative,
         means: draft.means.map(|means| bind(means, keys)).transpose()?,
     })
 }

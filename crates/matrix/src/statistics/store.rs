@@ -12,6 +12,8 @@ use std::marker::PhantomData;
 pub enum MomentAssurance {
     /// Exact affine finite-second-moment identity conditional on the declared model.
     AffineMoments,
+    /// Covariance of the local linear model; neither actual nonlinear means nor moments are claimed.
+    LinearizedMoments,
 }
 /// Opaque owner-scoped locator for an immutable moment companion.
 #[derive(Clone, Copy, Debug)]
@@ -62,6 +64,8 @@ pub(crate) struct Record {
     pub(crate) sensitivity: Option<Parameter>,
     /// Local derivative and its numerical evaluation error.
     pub(crate) jacobian: Option<Parameter>,
+    /// Retained replayed native derivative evidence, when this is an elementwise output.
+    pub(crate) derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
     /// Declared means; absent for nominal operating points.
     pub(crate) means: Option<Parameter>,
 }
@@ -76,6 +80,8 @@ pub(crate) struct MomentPayload<P: Scalar> {
     pub(crate) covariance: Matrix<P>,
     /// Checked local derivative.
     pub(crate) jacobian: Matrix<P>,
+    /// Symbolic native derivative identity retained independently of numerical errors.
+    pub(crate) derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
     /// Exact affine mean family, when declared for every input.
     pub(crate) means: Option<Matrix<P>>,
 }

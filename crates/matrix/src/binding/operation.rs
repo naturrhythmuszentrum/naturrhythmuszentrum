@@ -97,7 +97,7 @@ impl CheckedOperation {
     ///
     /// Only recipes with complete source-preserving propagation report this capability.
     #[must_use]
-    pub fn carries_statistics(&self) -> bool {
+    pub const fn carries_statistics(&self) -> bool {
         self.statistical_recipe()
     }
 

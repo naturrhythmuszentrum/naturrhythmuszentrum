@@ -17,6 +17,10 @@ pub(crate) struct Plan<P: Scalar> {
     pub(crate) work: usize,
     /// Numerical model access limits derived from the execution policy.
     pub(crate) limits: JointLimits,
+    /// Captured represented operating points and their complete deterministic boxes.
+    pub(crate) points: Vec<super::matrix::Matrix<P>>,
+    /// Replayed units-owned native derivative relation, when required.
+    pub(crate) derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
 }
 impl<P: Scalar + 'static> Plan<P> {
     /// Replace unconditional refusal with complete source, recipe and work validation.
@@ -32,6 +36,8 @@ impl<P: Scalar + 'static> Plan<P> {
             lineage: None,
             work: 0,
             limits: joint,
+            points: Vec::new(),
+            derivative: None,
         };
         let mut present = false;
         for &handle in handles {
@@ -54,6 +60,9 @@ impl<P: Scalar + 'static> Plan<P> {
         limits.check(handles.len(), result.work)?;
         lineage.model.require::<P>(&lineage.columns, joint)?;
         super::structure::inputs(operation, &result.inputs, &context, joint)?;
+        result.points = super::operating::capture(heap, handles, &context)?;
+        result.derivative = super::derivative::check(operation)?;
+        result.classify(operation, &context)?;
         Ok(result)
     }
     /// Require one model; union ordered source indices without inferring independence.
@@ -68,6 +77,9 @@ impl<P: Scalar + 'static> Plan<P> {
             lineage.roots.extend_from_slice(&incoming.roots);
             lineage.roots.sort_unstable();
             lineage.roots.dedup();
+            if incoming.assurance == super::MomentAssurance::LinearizedMoments {
+                lineage.assurance = super::MomentAssurance::LinearizedMoments;
+            }
         } else {
             self.lineage = Some(incoming.clone());
         }
@@ -110,16 +122,9 @@ fn product(factors: &[usize]) -> Result<usize, OperationError> {
 
 impl CheckedOperation {
     /// Capability of the currently implemented closed statistical recipes.
-    pub(crate) fn statistical_recipe(&self) -> bool {
+    pub(crate) const fn statistical_recipe(&self) -> bool {
         match &self.recipe {
-            NativeRecipe::Copy => true,
-            NativeRecipe::Kernel(contract) => matches!(
-                contract.kind(),
-                crate::KernelKind::Add
-                    | crate::KernelKind::Subtract
-                    | crate::KernelKind::LinearMap
-                    | crate::KernelKind::TransformEntries
-            ),
+            NativeRecipe::Copy | NativeRecipe::Kernel(_) => true,
             NativeRecipe::Affine(_) | NativeRecipe::Precision { .. } | NativeRecipe::Solve(_) => {
                 false
             }

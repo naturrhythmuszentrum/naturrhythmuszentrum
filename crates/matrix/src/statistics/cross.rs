@@ -38,6 +38,9 @@ impl Heap {
         lineage.roots.extend_from_slice(&second.lineage.roots);
         lineage.roots.sort_unstable();
         lineage.roots.dedup();
+        if second.lineage.assurance == super::MomentAssurance::LinearizedMoments {
+            lineage.assurance = super::MomentAssurance::LinearizedMoments;
+        }
         let work = preflight(&first, &second, lineage.columns.len(), limits)?;
         let mut work = Work::new(work);
         let source = lineage
@@ -97,6 +100,7 @@ fn publish<P: Scalar + 'static>(
         },
         sensitivity: None,
         jacobian: None,
+        derivative: None,
         means: None,
     };
     let handle = MomentRef {

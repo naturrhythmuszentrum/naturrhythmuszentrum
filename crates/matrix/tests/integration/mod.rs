@@ -41,3 +41,8 @@ mod solve_adversarial;
 
 mod solve_physical;
 mod statistics_affine;
+
+mod statistics_nonlinear;
+mod statistics_physical;
+
+mod statistics_product;

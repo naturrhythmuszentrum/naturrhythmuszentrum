@@ -4,6 +4,17 @@
 /// A refused statistical propagation or covariance materialization.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum StatisticsError {
+    /// Units could not establish a complete native derivative identity.
+    #[error("statistical derivative: {0}")]
+    Sensitivity(std::rc::Rc<nrz_units::SensitivityError>),
+    /// The complete declared numerical box does not establish a smooth derivative domain.
+    #[error("statistical derivative domain for {function:?} at entry {entry}")]
+    Domain {
+        /// Closed native function.
+        function: crate::Elementwise,
+        /// Logical column-order coordinate.
+        entry: usize,
+    },
     /// A source model or its checked target relation refused.
     #[error("statistical source: {0}")]
     Joint(#[from] crate::JointError),
