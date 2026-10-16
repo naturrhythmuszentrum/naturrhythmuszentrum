@@ -41,7 +41,7 @@ mod realness;
 pub(crate) use realness::{
     PositiveMutation, choice_wrong_ambient, cubic_product_reference, fraction_realness,
     linked_cubic, linked_cubic_restriction, partial_power_realness, positive_cancellation,
-    positive_norm_cancellation, positive_norm_prefix, referenced_realness,
+    positive_norm_cancellation, positive_norm_prefix, real_witness_selection, referenced_realness,
 };
 
 use super::common::TestResult;

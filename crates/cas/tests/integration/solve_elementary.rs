@@ -651,3 +651,68 @@ fn positive_cofactor_work_boundary() -> TestResult {
 fn positive_cofactor_norm_prefix() -> TestResult {
     crate::testing::solve_elementary::positive_norm_prefix()
 }
+
+/// A real odd root witnesses a complex selection with zero imaginary part, including fresh replay.
+/// ´test:integration:real-witness-complex-selection´
+#[test]
+fn real_witness_complex_selection() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::real_witness_selection(0)?;
+    let witness = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert!(witness.is_discharged());
+    let bytes = fixture
+        .base
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let mut fresh = nrz_cas::Cas::new(Limits::blind_cubic())?;
+    let replayed = fresh.inspect(&bytes, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert!(replayed.is_discharged());
+    assert_eq!(
+        fresh.export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}
+
+/// Witness inclusion retains the exact public Work boundary and refuses atomically one below.
+/// ´test:integration:real-witness-work-boundary´
+#[test]
+fn real_witness_work_boundary() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::real_witness_selection(0)?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    fixture
+        .base
+        .cas
+        .check_proof(&fixture.base.context, &fixture.steps, &mut measured)?;
+    let required = measured.usage().work;
+    assert_eq!(required, 121_314);
+    for cap in [
+        required,
+        required.checked_sub(1).ok_or("empty inclusion ledger")?,
+    ] {
+        let mut fixture = crate::testing::solve_elementary::real_witness_selection(0)?;
+        let mut limits = Limits::blind_cubic();
+        limits.work = cap;
+        let mut budget = Budget::new(limits)?;
+        let before = fixture.base.cas.counts();
+        let result =
+            fixture
+                .base
+                .cas
+                .check_proof(&fixture.base.context, &fixture.steps, &mut budget);
+        if cap == required {
+            result?;
+            assert_eq!(budget.usage().work, required);
+        } else {
+            let fault = result.err().ok_or("inclusion accepted one below")?;
+            assert!(
+                matches!(fault.kind, nrz_cas::FaultKind::Exhausted { budget: nrz_cas::limits::BudgetKind::Work, limit, needed, .. } if limit == cap && needed > cap)
+            );
+            assert_eq!(fixture.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}

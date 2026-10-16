@@ -1496,3 +1496,52 @@ fn positive_cofactor_refusal_mutations() -> TestResult {
     }
     Ok(())
 }
+
+/// Inclusion retains the actual equation, existence, metadata and full predicate, and is directional.
+/// ´test:integration:real-witness-refusal-mutations´
+#[test]
+fn real_witness_refusal_mutations() -> TestResult {
+    for mutation in 1..=7 {
+        let fixture = crate::testing::solve_elementary::real_witness_selection(mutation);
+        if mutation == 3 {
+            let error = fixture
+                .err()
+                .ok_or("wrong guard declaration sort admitted")?;
+            let fault = error
+                .downcast_ref::<nrz_cas::Fault>()
+                .ok_or("missing draft fault")?;
+            assert_eq!(
+                fault.kind,
+                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Sort)
+            );
+            assert_eq!(fault.location.operation, "draft validation");
+            continue;
+        }
+        let mut fixture = fixture?;
+        let before = fixture.base.cas.counts();
+        let result = fixture.base.cas.check_proof(
+            &fixture.base.context,
+            &fixture.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        );
+        let fault = result
+            .err()
+            .ok_or_else(|| format!("mutation {mutation} accepted"))?;
+        if mutation == 4 {
+            // The new root context cannot consume premises from the original independent header.
+            assert_eq!(
+                fault.kind,
+                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::UnsupportedFragment)
+            );
+            assert_eq!(fault.location.operation, "exact coefficients");
+        } else {
+            assert_eq!(
+                fault.kind,
+                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Rule),
+                "mutation {mutation}"
+            );
+        }
+        assert_eq!(fixture.base.cas.counts(), before, "mutation {mutation}");
+    }
+    Ok(())
+}

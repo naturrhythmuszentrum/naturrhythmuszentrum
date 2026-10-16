@@ -1425,3 +1425,134 @@ pub(crate) fn positive_norm_prefix() -> TestResult {
     }
     Ok(())
 }
+
+/// The source is a named real odd root; the reverse mutation keeps a complex source instead.
+fn included_root(mutation: u8) -> TestResult<(BinomialFixture, Handle)> {
+    let mut base = Fixture::in_field(&Field::Complex)?;
+    base.field = if mutation == 5 {
+        Field::Complex
+    } else {
+        Field::Real
+    };
+    let domain = base.algebra.clone();
+    let map = base.scalar_map(&domain, &[])?;
+    let leading = base.coefficient(1)?;
+    let constant = base.coefficient(-8)?;
+    let polynomial = base.polynomial(&domain, &[(3, leading), (0, constant)])?;
+    let (relation, selection, root) = base.root(&polynomial, &map)?;
+    let unit = base.ground_unit()?;
+    let mut existence = base.adjoin(&relation, &selection, 0);
+    if mutation != 5 {
+        let Certificate::Solve(certificate) = &mut existence.certificate else {
+            return Err("real witness certificate".into());
+        };
+        let SolveCertificate::RootAdjunction(certificate) = certificate.as_mut() else {
+            return Err("real witness adjunction".into());
+        };
+        certificate.mode = crate::test_api::solving::AdjunctionMode::RealOddRoot;
+        certificate.order = Some(3);
+    }
+    Ok((
+        BinomialFixture {
+            base,
+            steps: vec![unit, existence],
+        },
+        root,
+    ))
+}
+
+/// A zero imaginary part is checked after inclusion; the false mutation asks for the root itself to vanish.
+fn included_constraint(base: &mut Fixture, mutation: u8) -> TestResult<Handle> {
+    let root = base.expression(Operator::Bound { depth: 0, slot: 0 }, &[], true)?;
+    if mutation == 5 {
+        return admit(
+            &mut base.cas,
+            &Draft::Condition {
+                header: Reference::Existing(base.header.clone()),
+                scope: vec![vec![AtomicSort::Scalar(Field::Real)]],
+                kind: PredicateKind::Equal,
+                arguments: vec![Reference::Existing(root.clone()), Reference::Existing(root)],
+            },
+        );
+    }
+    if mutation == 6 {
+        let zero = base.integer(0, true)?;
+        return predicate(base, PredicateKind::Equal, &[root, zero]);
+    }
+    let imaginary = real_expression(base, Operator::ImagPart, &[root])?;
+    let zero = real_expression(base, Operator::Rational(Rational::zero()), &[])?;
+    predicate(base, PredicateKind::Equal, &[imaginary, zero])
+}
+
+/// The target relation retains its own polynomial, ambient, region, and complete joint predicate.
+fn included_selection(base: &mut Fixture, mutation: u8) -> TestResult<Handle> {
+    base.field = if mutation == 5 {
+        Field::Real
+    } else {
+        Field::Complex
+    };
+    let domain = base.algebra.clone();
+    let map = base.scalar_map(&domain, &[])?;
+    let leading = base.coefficient(1)?;
+    let constant = base.coefficient(if mutation == 1 { -9 } else { -8 })?;
+    let polynomial = base.polynomial(&domain, &[(3, leading), (0, constant)])?;
+    let (relation, _, _) = base.root(&polynomial, &map)?;
+    let constraint = included_constraint(base, mutation)?;
+    admit(
+        &mut base.cas,
+        &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            header: Reference::Existing(base.header.clone()),
+            scope: Vec::new(),
+            relations: vec![Reference::Existing(relation)],
+            predicate: Reference::Existing(constraint),
+            mode: SelectionMode::Constrained,
+            convention: None,
+            interval: None,
+        })),
+    )
+}
+
+/// Public proof uses a checked real odd root as the actual complex binomial witness.
+pub(crate) fn real_witness_selection(mutation: u8) -> TestResult<BinomialFixture> {
+    let (mut fixture, root) = included_root(mutation)?;
+    if mutation == 3 || mutation == 7 {
+        if mutation == 7 {
+            fixture.base.field = Field::Complex;
+        }
+        let region = fixture.base.coefficient_guard(true)?;
+        if mutation == 7 {
+            fixture.base.region = region;
+        } else {
+            fixture.base.enter_region(region)?;
+        }
+    }
+    if mutation == 4 {
+        fixture.base.enter_real()?;
+    }
+    let selected = included_selection(&mut fixture.base, mutation)?;
+    let step = fixture.base.step(
+        SolveSchema::RootSelectionRefinement,
+        SolveStatement::RootExistence(StatementRootExistence {
+            relation: selected.clone(),
+            region: fixture.base.region.clone(),
+        }),
+        SolveCertificate::RootSelectionRefinement(CertificateRootSelectionRefinement {
+            mode: RefinementMode::Existence,
+            target_kind: RefinementTargetKind::Selection,
+            target: selected,
+            witnesses: vec![root],
+            compatibility: Vec::new(),
+            form: None,
+        }),
+    );
+    push(&mut fixture, step)?;
+    if mutation == 2 {
+        fixture.steps.remove(1);
+        fixture
+            .steps
+            .last_mut()
+            .ok_or("real witness target")?
+            .premises = vec![0];
+    }
+    Ok(fixture)
+}

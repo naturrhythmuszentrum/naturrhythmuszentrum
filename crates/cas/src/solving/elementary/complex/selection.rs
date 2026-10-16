@@ -309,15 +309,25 @@ impl Components<'_, '_> {
         for (witness, handle) in witnesses.iter().zip(&selection.relations) {
             let value = self.expression(witness.logical_id(), &[], budget)?;
             let relation = super::super::selected::relation(self.evaluation.cas, handle)?;
-            if self
-                .evaluation
-                .cas
-                .state
-                .expression(witness.logical_id())?
-                .sort
-                != crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
-                    relation.ambient.clone(),
-                ))
+            let expression = self.evaluation.cas.state.expression(witness.logical_id())?;
+            let expected = crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
+                relation.ambient.clone(),
+            ));
+            let real_root = expression.sort
+                == crate::model::Sort::Value(crate::model::AtomicSort::Scalar(Field::Real))
+                && relation.ambient == Field::Complex
+                && matches!(
+                    (&expression.operator, &expression.attachment),
+                    (
+                        crate::model::Operator::RootValue { .. },
+                        Some(crate::graph::ExpressionAttachment::SelectedRoot(_))
+                    )
+                );
+            budget.work(crate::graph::size(expression.scope.len(), AT)?.max(1), AT)?;
+            if expression.sort != expected
+                && (!real_root
+                    || (expression.header, &expression.scope)
+                        != (relation.header.logical_id(), &relation.scope))
             {
                 return Err(invalid());
             }
