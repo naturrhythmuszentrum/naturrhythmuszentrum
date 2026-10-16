@@ -35,3 +35,7 @@ mod kernel_products;
 
 mod kernel_domains;
 mod kernel_nonlinear;
+
+mod solve;
+
+mod solve_statistics;

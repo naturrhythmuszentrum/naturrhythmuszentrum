@@ -109,7 +109,8 @@ impl OperationRecord {
                 "finite binary64 bit copy; no floating arithmetic"
             }
             (
-                crate::binding::NativeRecipe::Kernel(_)
+                crate::binding::NativeRecipe::Solve(_)
+                | crate::binding::NativeRecipe::Kernel(_)
                 | crate::binding::NativeRecipe::Affine(_)
                 | crate::binding::NativeRecipe::Precision { .. },
                 _,

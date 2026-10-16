@@ -52,3 +52,17 @@ mod kernel_oracle;
     reason = "kernel fixtures are shared across public test modules"
 )]
 mod kernel_testing;
+
+#[path = "../src/testing/solve.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "solve fixtures are shared across the corresponding test layers"
+)]
+mod solve_testing;
+
+#[path = "../src/testing/solve_public.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact elimination and independent backend checks are shared by public solve tests"
+)]
+mod solve_public;

@@ -9,6 +9,8 @@ use crate::{Axis, CheckedShape, CoordinateMap};
 /// Proposed closed native operation, with one fresh output per ordered input.
 #[derive(Clone, Debug)]
 pub struct OperationDraft {
+    /// Optional square solve with an independent represented-center certificate.
+    pub(crate) solve: Option<crate::solve::SolveContract>,
     /// Optional deterministic kernel, checked independently of representation conversions.
     pub(crate) kernel: Option<crate::kernels::KernelContract>,
     /// Original checked shapes; numerical structural obligations remain pending.
@@ -32,6 +34,7 @@ impl OperationDraft {
             conversions: None,
             precision: None,
             kernel: None,
+            solve: None,
         }
     }
 
@@ -42,6 +45,9 @@ impl OperationDraft {
     /// # Errors
     /// Refuses empty recipes, nonhomogeneous or formal entry schemas, points and limits.
     pub fn check(self, limits: ExecutionLimits) -> Result<CheckedOperation, OperationError> {
+        if let Some(solve) = self.solve {
+            return solve.check(limits);
+        }
         if let Some(kernel) = self.kernel {
             return kernel.check(limits);
         }
@@ -192,6 +198,8 @@ fn unit_coordinates(axis: &Axis) -> Result<CoordinateMap, OperationError> {
 /// Closed supported recipe schedule; external code cannot install a numerical callback.
 #[derive(Clone, Debug)]
 pub(crate) enum NativeRecipe {
+    /// Square solve under an independent inverse-defect and residual theorem.
+    Solve(Box<crate::solve::SolveContract>),
     /// Checked deterministic multi-input region operation.
     Kernel(Box<crate::kernels::KernelContract>),
     /// Bit-preserving copy with independent equality verification.

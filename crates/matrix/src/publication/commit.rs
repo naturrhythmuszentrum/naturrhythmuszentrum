@@ -87,6 +87,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         evidence: Option<&crate::RecipeEvidence>,
     ) -> Result<(), OperationError> {
         match &self.operation.recipe {
+            crate::binding::NativeRecipe::Solve(contract) => contract.verify::<Q>(evidence)?,
             crate::binding::NativeRecipe::Kernel(contract) => {
                 let Some(crate::RecipeEvidence::Kernel(claim)) = evidence else {
                     return Err(OperationError::CandidateContract);

@@ -65,7 +65,10 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         match self.operation.recipe {
             NativeRecipe::Precision { source, target }
                 if source == P::PRECISION && target == Q::PRECISION => {}
-            NativeRecipe::Copy | NativeRecipe::Affine(_) | NativeRecipe::Kernel(_)
+            NativeRecipe::Copy
+            | NativeRecipe::Affine(_)
+            | NativeRecipe::Kernel(_)
+            | NativeRecipe::Solve(_)
                 if P::PRECISION == Q::PRECISION => {}
             _ => return Err(HeapError::PrecisionMismatch.into()),
         }
@@ -73,6 +76,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             return Err(OperationError::InputCount);
         }
         self.limits.check(self.inputs.len(), 0)?;
+        if let NativeRecipe::Solve(contract) = &self.operation.recipe {
+            contract.preflight(heap, &self.inputs, self.limits)?;
+        }
         let dependencies = capture(heap, &self.inputs)?;
         let entries = payload_entries(&dependencies)?;
         if let NativeRecipe::Kernel(contract) = &self.operation.recipe {

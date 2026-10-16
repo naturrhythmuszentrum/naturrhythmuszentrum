@@ -120,5 +120,6 @@ pub(crate) const fn kernel(contract: KernelContract) -> OperationDraft {
         conversions: None,
         precision: None,
         kernel: Some(contract),
+        solve: None,
     }
 }

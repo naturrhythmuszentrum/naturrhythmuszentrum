@@ -26,3 +26,5 @@ mod kernel_lifecycle;
 mod kernel_product;
 
 mod kernel_nonlinear;
+
+mod solve;

@@ -193,7 +193,9 @@ fn specifications<P: Scalar>(
     for (slot, output) in operation.outputs.iter().enumerate() {
         let input = inputs.get(slot).ok_or(OperationError::InputCount)?;
         let numerical = !matches!(operation.recipe, super::NativeRecipe::Copy);
-        let coverage = if let super::NativeRecipe::Kernel(contract) = &operation.recipe {
+        let coverage = if let super::NativeRecipe::Solve(contract) = &operation.recipe {
+            contract.coverage(inputs)?
+        } else if let super::NativeRecipe::Kernel(contract) = &operation.recipe {
             contract.coverage(inputs)?
         } else {
             input.coverage
@@ -210,7 +212,9 @@ fn specifications<P: Scalar>(
                         || (contract.kind() == crate::KernelKind::TransformEntries
                             && input.contributions.is_some())
                 }
-                super::NativeRecipe::Affine(_) | super::NativeRecipe::Precision { .. } => false,
+                super::NativeRecipe::Solve(_)
+                | super::NativeRecipe::Affine(_)
+                | super::NativeRecipe::Precision { .. } => false,
             },
         });
     }

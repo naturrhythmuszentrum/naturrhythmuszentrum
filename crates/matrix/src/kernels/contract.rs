@@ -168,7 +168,10 @@ impl CheckedOperation {
         if slot >= self.outputs.len() {
             return Err(crate::HeapError::InvalidLayout);
         }
-        if matches!(self.recipe, NativeRecipe::Kernel(_)) {
+        if matches!(
+            self.recipe,
+            NativeRecipe::Kernel(_) | NativeRecipe::Solve(_)
+        ) {
             return Ok(0..self.inputs.len());
         }
         let end = slot.checked_add(1).ok_or(crate::HeapError::Capacity)?;

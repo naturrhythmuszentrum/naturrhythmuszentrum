@@ -111,6 +111,8 @@ impl ConversionEvidence {
 /// Independently established evidence for a sealed native recipe.
 #[derive(Clone, Debug, PartialEq)]
 pub enum RecipeEvidence {
+    /// Independent inverse-defect and residual certificate for a square solve.
+    Solve(crate::SolveEvidence),
     /// Complete deterministic propagation and independently checked numerical error.
     Kernel(crate::KernelEvidence),
     /// Exact represented-bit identity and retention of the complete companion set.
@@ -126,7 +128,7 @@ impl RecipeEvidence {
     #[must_use]
     pub const fn slot(&self) -> usize {
         match self {
-            Self::Kernel(_) => 0,
+            Self::Solve(_) | Self::Kernel(_) => 0,
             Self::Copy(claim) => claim.slot(),
             Self::Conversion(claim) => claim.slot,
             Self::Precision(claim) => claim.slot,
@@ -136,6 +138,7 @@ impl RecipeEvidence {
     #[must_use]
     pub const fn entries(&self) -> usize {
         match self {
+            Self::Solve(claim) => claim.extent.entries(),
             Self::Kernel(claim) => claim.entries,
             Self::Copy(claim) => claim.entries(),
             Self::Conversion(claim) => claim.entries,
@@ -146,6 +149,7 @@ impl RecipeEvidence {
     #[must_use]
     pub const fn coverage(&self) -> Coverage {
         match self {
+            Self::Solve(claim) => claim.coverage,
             Self::Kernel(claim) => claim.coverage,
             Self::Copy(claim) => claim.coverage(),
             Self::Conversion(claim) => claim.coverage,

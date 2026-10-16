@@ -4,6 +4,9 @@
 /// A refused operation contract, binding, evaluation or publication.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum OperationError {
+    /// Square solve admission, candidate generation or independent certification failed.
+    #[error("solve: {0}")]
+    Solve(#[from] crate::SolveError),
     /// Deterministic kernel arithmetic, domain or coverage refused.
     #[error("kernel: {0}")]
     Kernel(#[from] crate::KernelError),

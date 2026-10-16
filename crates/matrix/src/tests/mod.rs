@@ -19,3 +19,5 @@ mod kernel_linear;
 mod kernel_product;
 
 mod kernel_nonlinear;
+
+mod solve;

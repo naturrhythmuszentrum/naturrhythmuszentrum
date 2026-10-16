@@ -83,6 +83,7 @@ impl OperationDraft {
         Self {
             inputs: Vec::new(),
             kernel: None,
+            solve: None,
             conversions: Some(conversions),
             precision: None,
         }

@@ -210,3 +210,29 @@ mod kernel_twins;
     reason = "independent contraction evidence is consumed by deterministic kernels"
 )]
 mod contractions;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "solve contracts and numerical proofs are shared across private transaction modules"
+)]
+mod solve;
+pub use solve::{FactorRef, SolveError, SolveEvidence};
+
+#[path = "verification/solve.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent inverse and residual proofs are consumed only by solve evaluation"
+)]
+mod solve_verification;
+
+#[cfg(test)]
+#[path = "testing/solve.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "solve fixtures are shared across the corresponding test layers"
+)]
+mod solve_testing;
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/solve_twins.rs"]
+mod solve_twins;
