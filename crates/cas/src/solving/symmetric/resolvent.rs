@@ -3,7 +3,7 @@
 
 use super::AT;
 use super::algebra::Polynomial;
-use super::reduction::{Reduction, reduce};
+use super::reduction::{Reduction, reduce_observed};
 use crate::budget::{Budget, BudgetKind};
 use crate::error::Fault;
 use crate::graph::{State, size};
@@ -56,6 +56,20 @@ pub(crate) fn smaller(
     state: &State,
     budget: &mut Budget,
 ) -> Result<Option<Resolvent>, Fault> {
+    smaller_observed(orbit, original_degree, depth, state, budget, |_, _, _| {
+        Ok(())
+    })
+}
+
+/// Observe existing factor and reduction boundaries without changing arithmetic or retaining a log.
+pub(crate) fn smaller_observed(
+    orbit: &Orbit,
+    original_degree: u32,
+    depth: u64,
+    state: &State,
+    budget: &mut Budget,
+    mut observe: impl FnMut(&'static str, usize, &mut Budget) -> Result<(), Fault>,
+) -> Result<Option<Resolvent>, Fault> {
     let seed = orbit.members.first().ok_or_else(invalid)?;
     let degree = size(orbit.members.len(), AT)?;
     if u64::from(original_degree) != size(seed.variables.len(), AT)? {
@@ -74,12 +88,16 @@ pub(crate) fn smaller(
     }
     let mut coefficients = vector(1, budget)?;
     coefficients.push(seed.identity(true, state, budget)?);
-    for member in &orbit.members {
+    for (index, member) in orbit.members.iter().enumerate() {
+        observe("resolvent-factor-start", index, budget)?;
         coefficients = factor(&coefficients, member, state, budget)?;
+        observe("resolvent-factor-end", index, budget)?;
     }
     let mut reduced = vector(coefficients.len(), budget)?;
-    for coefficient in coefficients {
-        reduced.push(reduce(&coefficient, state, budget)?);
+    for (index, coefficient) in coefficients.into_iter().enumerate() {
+        observe("resolvent-coefficient-start", index, budget)?;
+        reduced.push(reduce_observed(&coefficient, state, budget, &mut observe)?);
+        observe("resolvent-coefficient-end", index, budget)?;
     }
     Ok(Some(Resolvent {
         coefficients: reduced,

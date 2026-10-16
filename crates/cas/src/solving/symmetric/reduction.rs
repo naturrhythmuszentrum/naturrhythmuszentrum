@@ -133,14 +133,32 @@ pub(crate) fn reduce(
     state: &State,
     budget: &mut Budget,
 ) -> Result<Reduction, Fault> {
+    reduce_observed(source, state, budget, |_, _, _| Ok(()))
+}
+
+/// Generic callbacks observe existing arithmetic boundaries and allocate nothing on the no-op path.
+pub(crate) fn reduce_observed(
+    source: &Polynomial,
+    state: &State,
+    budget: &mut Budget,
+    mut observe: impl FnMut(&'static str, usize, &mut Budget) -> Result<(), Fault>,
+) -> Result<Reduction, Fault> {
+    observe("symmetric-invariance-start", 0, budget)?;
     invariant(source, state, budget)?;
+    observe("symmetric-invariance-end", 0, budget)?;
+    observe("elementary-basis-start", 0, budget)?;
     let basis = elementary(source, state, budget)?;
+    observe("elementary-basis-end", 0, budget)?;
     let mut remainder = source.copy(state, budget)?;
     let mut expression = source.identity(false, state, budget)?;
+    let mut index = 0;
     while !remainder.form.terms.is_empty() {
+        observe("leading-subtraction-start", index, budget)?;
         let (next, term) = subtract(&remainder, &basis, state, budget)?;
         expression = expression.add(&term, state, budget)?;
         remainder = next;
+        observe("leading-subtraction-end", index, budget)?;
+        index = index.checked_add(1).ok_or_else(invalid)?;
     }
     Ok(Reduction {
         source: source.copy(state, budget)?,
