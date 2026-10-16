@@ -45,3 +45,9 @@ mod solve_family;
 mod solve_budget;
 
 mod solve_capacity;
+mod statistics_affine;
+mod statistics_structure;
+
+mod statistics_limits;
+
+mod statistics_refusals;

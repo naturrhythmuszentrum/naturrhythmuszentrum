@@ -217,20 +217,19 @@ impl Heap {
         }
         Ok(())
     }
-    /// Existing recipes cannot silently discard a carried statistical relation.
+    /// Solve retains a typed refusal for initial and propagated statistical operands.
     pub(crate) fn refuse_joint_operation<P: Scalar + 'static>(
         &self,
         handle: Handle<Value, P>,
     ) -> Result<(), crate::OperationError> {
-        let stamp = self.value(handle)?.stamp();
-        if self
-            .joint
-            .records
-            .iter()
-            .any(|record| record.targets.iter().any(|target| target.stamp == stamp))
-        {
-            return Err(HeapError::MissingCoverage.into());
-        }
+        Ok(crate::statistics::refuse(self, handle)?)
+    }
+    /// Check current statistical targets before the operation-specific propagation plan.
+    pub(crate) fn capture_joint_operation<P: Scalar + 'static>(
+        &self,
+        handle: Handle<Value, P>,
+    ) -> Result<(), crate::OperationError> {
+        self.validate_statistical_roots(self.value(handle)?.stamp())?;
         Ok(())
     }
 }

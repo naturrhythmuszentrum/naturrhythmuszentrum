@@ -72,6 +72,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             evidence.push(claim);
             outputs.push(payload);
         }
+        let statistics = self.statistics.evaluate(&self.operation)?;
         self.issued.set(Some(token));
         Ok(Candidate {
             execution: self.execution,
@@ -79,6 +80,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             revision: self.operation.revision(),
             outputs,
             evidence: evidence.clone(),
+            statistics,
         })
     }
 

@@ -50,6 +50,8 @@ pub struct Heap {
     pub(crate) provenance: crate::provenance::Provenance,
     /// Immutable source relations and independent statistical companion regions.
     pub(crate) joint: crate::companions::JointStore,
+    /// Source-preserving propagated statistical parameter relations.
+    pub(crate) statistics: crate::statistics::Store,
 }
 
 impl Heap {
@@ -66,6 +68,7 @@ impl Heap {
             schemas: Vec::new(),
             provenance: crate::provenance::Provenance::new(),
             joint: crate::companions::JointStore::default(),
+            statistics: crate::statistics::Store::default(),
         })
     }
 }

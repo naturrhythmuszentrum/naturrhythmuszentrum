@@ -206,6 +206,7 @@ impl Heap {
         let record = self.record(handle)?;
         self.validate_provenance(handle)?;
         self.validate_joint_value(handle)?;
+        self.validate_statistical_roots(self.value_stamp_raw(handle)?)?;
         let base = self.base_handle(handle)?;
         let Meaning::Value {
             stamp,

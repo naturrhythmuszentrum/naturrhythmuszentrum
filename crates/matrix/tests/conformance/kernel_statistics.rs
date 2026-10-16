@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Every deterministic kernel refuses a carried statistical relation before arithmetic.
+//! Supported kernels propagate statistics; unfinished modes retain explicit refusals.
 
 use crate::kernel_testing::{TestResult, axis, owner, shape};
 use nrz_matrix::{
@@ -9,18 +9,55 @@ use nrz_matrix::{
 };
 use nrz_units::Descriptor;
 
-/// Statistical coverage is never silently replaced by the represented-only center problem.
-/// ´test:integration:deterministic-sum-refuses-carried-statistics´
+/// A repeated operand propagates its complete dependence rather than discarding statistics.
+/// ´test:integration:deterministic-sum-propagates-carried-statistics´
 #[test]
-fn deterministic_sum_refuses_carried_statistics() -> TestResult {
+fn deterministic_sum_propagates_carried_statistics() -> TestResult {
     let declarations = owner()?;
     let coordinate = axis(1)?;
     let contract = shape(&declarations, &coordinate, &coordinate)?;
-    refuse_statistics(
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let source = crate::statistics_testing::scalar::<f64>(&mut heap)?;
+    let result = crate::kernel_testing::execute(
+        &mut heap,
         OperationDraft::add(contract.clone(), contract, ShapeLimits::default())?,
-        2.0,
-        2,
-    )
+        vec![source.value(); 2],
+    )?;
+    let output = crate::kernel_testing::output(&result)?;
+    let view = heap.moments(heap.moment_companion(output.value())?)?;
+    crate::statistics_testing::check(
+        view.covariance(),
+        &[crate::kernel_oracle::Rational::new(1, 1)?],
+    )?;
+    assert_eq!(view.targets(), [heap.value(output.value())?.stamp(); 2]);
+    assert_eq!(view.source_indices(), [0]);
+    Ok(())
+}
+
+/// A statistical operand cannot make an operand with no declared source mathematically fixed.
+/// ´test:integration:statistical-sum-refuses-missing-source´
+#[test]
+fn statistical_sum_refuses_missing_source() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let source = crate::statistics_testing::scalar::<f64>(&mut heap)?;
+    let unmodeled = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[2.0])?;
+    let operation = OperationDraft::add(contract.clone(), contract, ShapeLimits::default())?
+        .check(ExecutionLimits::default())?;
+    assert!(matches!(
+        Binding::new(
+            operation,
+            vec![source.value(), unmodeled.value()],
+            ExecutionLimits::default()
+        )
+        .validate(&mut heap),
+        Err(OperationError::Statistics(
+            nrz_matrix::StatisticsError::MissingSource { slot: 1, entry: 0 }
+        ))
+    ));
+    Ok(())
 }
 
 /// A product cannot drop statistics while propagating only its deterministic bounds.

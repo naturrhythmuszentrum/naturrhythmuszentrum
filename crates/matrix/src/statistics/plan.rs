@@ -1,0 +1,136 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Preflight the complete statistical phase before borrowing numerical views.
+
+use super::{StatisticsError, capture::Input, store::Lineage};
+use crate::binding::NativeRecipe;
+use crate::{CheckedOperation, ExecutionLimits, Handle, Heap, JointLimits, OperationError, Value};
+use nrz_scalar::{ArithmeticContext, Scalar};
+
+/// Frozen statistical inputs and checked work allowance for one execution.
+#[derive(Debug)]
+pub(crate) struct Plan<P: Scalar> {
+    /// Empty only when no operand carries statistics.
+    pub(crate) inputs: Vec<Input<P>>,
+    /// Complete shared lineage, retaining model and source identities.
+    pub(crate) lineage: Option<Lineage>,
+    /// Conservative complete-phase scalar work and scratch admission count.
+    pub(crate) work: usize,
+    /// Numerical model access limits derived from the execution policy.
+    pub(crate) limits: JointLimits,
+}
+impl<P: Scalar + 'static> Plan<P> {
+    /// Replace unconditional refusal with complete source, recipe and work validation.
+    pub(crate) fn capture(
+        heap: &Heap,
+        operation: &CheckedOperation,
+        handles: &[Handle<Value, P>],
+        limits: ExecutionLimits,
+    ) -> Result<Self, OperationError> {
+        let joint = JointLimits::new(limits.scratch, limits.scratch, limits.work);
+        let mut result = Self {
+            inputs: Vec::new(),
+            lineage: None,
+            work: 0,
+            limits: joint,
+        };
+        let mut present = false;
+        for &handle in handles {
+            present |= super::capture::present(heap, handle)?;
+        }
+        if !present {
+            return Ok(result);
+        }
+        if !operation.carries_statistics() {
+            return Err(crate::HeapError::MissingCoverage.into());
+        }
+        let context = ArithmeticContext::new()?;
+        for (slot, &handle) in handles.iter().enumerate() {
+            let input = super::capture::input(heap, handle, slot, joint, &context)?;
+            result.merge(&input.lineage)?;
+            result.inputs.push(input);
+        }
+        let lineage = result.lineage.as_ref().ok_or(StatisticsError::Contract)?;
+        result.work = phase_work(operation, lineage)?;
+        limits.check(handles.len(), result.work)?;
+        lineage.model.require::<P>(&lineage.columns, joint)?;
+        super::structure::inputs(operation, &result.inputs, &context, joint)?;
+        Ok(result)
+    }
+    /// Require one model; union ordered source indices without inferring independence.
+    fn merge(&mut self, incoming: &Lineage) -> Result<(), OperationError> {
+        if let Some(lineage) = &mut self.lineage {
+            if lineage.model.id != incoming.model.id {
+                return Err(StatisticsError::MissingJointModel.into());
+            }
+            lineage.columns.extend_from_slice(&incoming.columns);
+            lineage.columns.sort_unstable();
+            lineage.columns.dedup();
+            lineage.roots.extend_from_slice(&incoming.roots);
+            lineage.roots.sort_unstable();
+            lineage.roots.dedup();
+        } else {
+            self.lineage = Some(incoming.clone());
+        }
+        Ok(())
+    }
+}
+
+/// Account both contraction stages, derivative composition, means and all retained regions.
+fn phase_work(operation: &CheckedOperation, lineage: &Lineage) -> Result<usize, OperationError> {
+    let sources = lineage.columns.len();
+    let inputs = operation.inputs().iter().try_fold(0_usize, |sum, region| {
+        add(sum, region.shape().extent().entries())
+    })?;
+    let mut total = product(&[sources, sources, lineage.model.terms, 8])?;
+    for output in operation.outputs() {
+        let entries = output.shape().extent().entries();
+        total = add(total, product(&[entries, inputs, sources, 8])?)?;
+        total = add(total, product(&[entries, sources, sources, 8])?)?;
+        total = add(total, product(&[entries, entries, sources, 8])?)?;
+        total = add(total, product(&[entries, inputs, 16])?)?;
+        total = add(total, product(&[entries, entries, 8])?)?;
+        total = add(total, product(&[entries, sources, 8])?)?;
+        total = add(total, product(&[entries, 16])?)?;
+    }
+    Ok(total)
+}
+/// Checked phase addition cannot wrap into a smaller allowance.
+fn add(left: usize, right: usize) -> Result<usize, OperationError> {
+    left.checked_add(right)
+        .ok_or_else(|| StatisticsError::ResourceLimit.into())
+}
+/// Check every dimension factor before any matrix allocation.
+fn product(factors: &[usize]) -> Result<usize, OperationError> {
+    factors.iter().try_fold(1_usize, |value, factor| {
+        value
+            .checked_mul(*factor)
+            .ok_or_else(|| StatisticsError::ResourceLimit.into())
+    })
+}
+
+impl CheckedOperation {
+    /// Capability of the currently implemented closed statistical recipes.
+    pub(crate) fn statistical_recipe(&self) -> bool {
+        match &self.recipe {
+            NativeRecipe::Copy => true,
+            NativeRecipe::Kernel(contract) => matches!(
+                contract.kind(),
+                crate::KernelKind::Add
+                    | crate::KernelKind::Subtract
+                    | crate::KernelKind::LinearMap
+                    | crate::KernelKind::TransformEntries
+            ),
+            NativeRecipe::Affine(_) | NativeRecipe::Precision { .. } | NativeRecipe::Solve(_) => {
+                false
+            }
+        }
+    }
+}
+
+impl<P: Scalar, Q: Scalar> crate::Bound<'_, P, Q> {
+    /// Conservative scalar work and scratch allowance charged for complete statistical propagation.
+    #[must_use]
+    pub const fn statistical_work(&self) -> usize {
+        self.statistics.work
+    }
+}

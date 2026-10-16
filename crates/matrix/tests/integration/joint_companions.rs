@@ -43,10 +43,21 @@ fn joint_targets_survive_compaction_and_refuse_staleness() -> TestResult {
         vec![first.value()],
         nrz_matrix::ExecutionLimits::default(),
     );
-    assert!(matches!(
-        binding.validate(&mut heap),
-        Err(nrz_matrix::OperationError::Heap(HeapError::MissingCoverage))
-    ));
+    let bound = binding.validate(&mut heap)?;
+    let candidate = bound.evaluate(bound.normalized_inputs()?)?;
+    let outcome = bound.publish(candidate)?;
+    let result = outcome.output().first().ok_or("copied moments")?;
+    let moments = heap.moments(heap.moment_companion(result.value())?)?;
+    crate::statistics_testing::check(
+        moments.covariance(),
+        &[
+            crate::kernel_oracle::Rational::new(1, 4)?,
+            crate::kernel_oracle::Rational::new(1, 2)?,
+            crate::kernel_oracle::Rational::new(1, 2)?,
+            crate::kernel_oracle::Rational::new(1, 1)?,
+        ],
+    )?;
+    assert_eq!(moments.source_indices(), [0, 1]);
     heap.compact()?;
     assert_eq!(
         heap.statistical(companion)?

@@ -94,7 +94,7 @@ impl<P: Scalar> InputSnapshot<P> {
 impl<P: Scalar + 'static> InputSnapshot<P> {
     /// Resolve the complete dependency set before numerical validation.
     pub(crate) fn capture(heap: &Heap, handle: Handle<Value, P>) -> Result<Self, OperationError> {
-        heap.refuse_joint_operation(handle)?;
+        heap.capture_joint_operation(handle)?;
         let value = heap.value(handle)?;
         let companion = value
             .bound()

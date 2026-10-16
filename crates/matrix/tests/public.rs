@@ -66,3 +66,16 @@ mod solve_testing;
     reason = "exact elimination and independent backend checks are shared by public solve tests"
 )]
 mod solve_public;
+#[path = "../src/testing/statistics.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "statistical fixtures and rational oracles are shared across test modules"
+)]
+mod statistics_testing;
+
+#[path = "../src/testing/statistics_oracle.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent statistical integer comparisons are shared across public tests"
+)]
+mod statistics_oracle;

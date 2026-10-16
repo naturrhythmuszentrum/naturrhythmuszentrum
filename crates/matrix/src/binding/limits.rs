@@ -9,9 +9,9 @@ pub struct ExecutionLimits {
     /// Maximum operation-ordered inputs and outputs.
     slots: usize,
     /// Maximum scalar entries inspected in one complete scan or copy phase.
-    work: usize,
+    pub(crate) work: usize,
     /// Maximum scalar entries in each complete private payload set.
-    scratch: usize,
+    pub(crate) scratch: usize,
 }
 
 impl ExecutionLimits {

@@ -21,3 +21,4 @@ mod kernel_product;
 mod kernel_nonlinear;
 
 mod solve;
+mod statistics;

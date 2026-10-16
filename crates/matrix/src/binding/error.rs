@@ -7,6 +7,9 @@ pub enum OperationError {
     /// Square solve admission, candidate generation or independent certification failed.
     #[error("solve: {0}")]
     Solve(#[from] crate::SolveError),
+    /// Statistical source, parameter, domain or propagation refused.
+    #[error("statistics: {0}")]
+    Statistics(#[from] crate::StatisticsError),
     /// Deterministic kernel arithmetic, domain or coverage refused.
     #[error("kernel: {0}")]
     Kernel(#[from] crate::KernelError),

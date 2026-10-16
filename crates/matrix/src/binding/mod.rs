@@ -95,6 +95,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             dependency.validate(heap, contract, slot)?;
             heap.validate_bound_shape(dependency.handle(), contract, slot)?;
         }
+        let statistics =
+            crate::statistics::Plan::capture(heap, &self.operation, &self.inputs, self.limits)?;
         let execution = ExecutionId(identity()?);
         let reservations = Reservations::prepare(heap, &dependencies, &self.operation)?;
         reservations.validate(heap)?;
@@ -102,6 +104,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             heap,
             operation: self.operation,
             dependencies,
+            statistics,
             execution,
             reservations,
             issued: std::cell::Cell::new(None),
@@ -118,6 +121,8 @@ pub struct Bound<'h, P: Scalar, Q: Scalar = P> {
     pub(crate) operation: CheckedOperation,
     /// Actual ordered input versions, schemas, selections and companion targets.
     pub(crate) dependencies: Vec<InputSnapshot<P>>,
+    /// Complete source model and checked statistical execution allowance.
+    pub(crate) statistics: crate::statistics::Plan<P>,
     /// Unforgeable association between a binding and its borrowed numerical inputs.
     pub(crate) execution: ExecutionId,
     /// Fully private output storage and descriptor occupations.

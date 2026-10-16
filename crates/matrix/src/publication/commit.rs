@@ -27,7 +27,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let prepared = self.prepare_publication(&candidate, &mut evidence);
         drop(candidate);
         match prepared {
-            Ok(graph) => Ok(self.commit(graph)),
+            Ok((graph, moments)) => Ok(self.commit(graph, moments)),
             Err(cause) => Err(self.failure(cause, evidence)),
         }
     }
@@ -37,7 +37,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         &mut self,
         candidate: &Candidate<Q>,
         evidence: &mut Vec<crate::RecipeEvidence>,
-    ) -> Result<PreparedGraph, OperationError> {
+    ) -> Result<(PreparedGraph, crate::statistics::PreparedMoments), OperationError> {
         if candidate.execution != self.execution || self.issued.get() != Some(candidate.token) {
             return Err(OperationError::ForeignCandidate);
         }
@@ -76,7 +76,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         }
         let record = self.prepare_record(candidate.token, evidence)?;
         super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
-        self.heap.provenance.prepare(record)
+        let moments = crate::statistics::prepare(self, candidate, &record.outputs)?;
+        Ok((self.heap.provenance.prepare(record)?, moments))
     }
 
     /// Match the private proof to the exact closed operation before committing any output.
@@ -373,12 +374,17 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     }
 
     /// Link only already prepared objects; no fallible allocation, callback or kernel remains.
-    fn commit(self, graph: PreparedGraph) -> Outcome<Vec<PublishedBundle<Q>>> {
+    fn commit(
+        self,
+        graph: PreparedGraph,
+        moments: crate::statistics::PreparedMoments,
+    ) -> Outcome<Vec<PublishedBundle<Q>>> {
         let record = graph.record_id();
         self.heap.storage.publish(self.reservations.storage);
         self.heap.schemas.extend(self.reservations.schemas);
         self.heap.descriptors.publish(self.reservations.records);
         self.heap.provenance.publish(graph);
+        self.heap.statistics.records.extend(moments.records);
         Outcome {
             output: self.reservations.bundles,
             record,

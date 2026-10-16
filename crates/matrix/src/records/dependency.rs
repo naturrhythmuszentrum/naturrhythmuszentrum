@@ -144,6 +144,7 @@ impl Dependency {
         {
             return Err(HeapError::StaleEvidence);
         }
+        heap.validate_statistical_roots(self.stamp)?;
         validate_region(heap, owner, self.precision)?;
         self.layout
             .validate(heap.owning_region(owner)?.length, heap.limits.layout_work)?;

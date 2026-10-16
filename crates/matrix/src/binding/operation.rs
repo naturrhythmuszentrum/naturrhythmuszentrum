@@ -95,11 +95,10 @@ pub struct CheckedOperation {
 impl CheckedOperation {
     /// Whether this sealed recipe propagates statistical coverage.
     ///
-    /// Copy and deterministic conversions refuse statistical companions until a
-    /// joint-model propagation recipe explicitly declares that capability.
+    /// Only recipes with complete source-preserving propagation report this capability.
     #[must_use]
-    pub const fn carries_statistics(&self) -> bool {
-        false
+    pub fn carries_statistics(&self) -> bool {
+        self.statistical_recipe()
     }
 
     /// Ordered input contracts, independently checked against each bound value.

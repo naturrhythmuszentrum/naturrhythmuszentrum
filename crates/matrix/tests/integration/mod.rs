@@ -40,3 +40,4 @@ mod solve_coverage;
 mod solve_adversarial;
 
 mod solve_physical;
+mod statistics_affine;

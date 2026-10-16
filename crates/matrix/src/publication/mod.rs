@@ -24,6 +24,8 @@ pub struct Candidate<P: Scalar> {
     pub(crate) outputs: Vec<Payload<P>>,
     /// Independently established per-output recipe evidence.
     pub(crate) evidence: Vec<crate::RecipeEvidence>,
+    /// Complete private statistical parameters, published in the same transaction.
+    pub(crate) statistics: Vec<crate::statistics::MomentPayload<P>>,
 }
 
 impl<P: Scalar> Candidate<P> {

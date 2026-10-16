@@ -104,6 +104,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             revision: self.operation.revision(),
             outputs,
             evidence: evidence.clone(),
+            statistics: Vec::new(),
         })
     }
 }

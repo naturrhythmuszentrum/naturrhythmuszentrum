@@ -236,3 +236,9 @@ mod solve_testing;
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/solve_twins.rs"]
 mod solve_twins;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "statistical transaction evidence is shared across private matrix modules"
+)]
+mod statistics;
+pub use statistics::{MomentAssurance, MomentRef, MomentView, ParameterView, StatisticsError};

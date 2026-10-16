@@ -3,13 +3,13 @@
 
 mod arithmetic;
 mod backend_product;
-mod contract;
+pub(crate) mod contract;
 mod contributions;
 mod draft;
 mod evaluate;
 mod linear;
 mod linear_evaluate;
-mod lowering;
+pub(crate) mod lowering;
 mod nonlinear;
 mod product;
 
