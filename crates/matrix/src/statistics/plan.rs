@@ -112,6 +112,9 @@ fn phase_work(operation: &CheckedOperation, lineage: &Lineage) -> Result<usize, 
         total = add(total, product(&[entries, sources, 8])?)?;
         total = add(total, product(&[entries, 16])?)?;
     }
+    if let NativeRecipe::Solve(contract) = &operation.recipe {
+        total = add(total, crate::solve::sensitivity::work(contract)?)?;
+    }
     Ok(total)
 }
 /// Checked phase addition cannot wrap into a smaller allowance.
@@ -134,6 +137,7 @@ impl CheckedOperation {
         matches!(
             self.recipe,
             NativeRecipe::Copy
+                | NativeRecipe::Solve(_)
                 | NativeRecipe::Kernel(_)
                 | NativeRecipe::Affine(_)
                 | NativeRecipe::Precision { .. }

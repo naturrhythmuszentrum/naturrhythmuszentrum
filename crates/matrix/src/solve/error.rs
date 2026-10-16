@@ -13,12 +13,6 @@ pub enum SolveError {
     /// A checked view or fallible allocation could not be resolved.
     #[error("solve storage: {0}")]
     Heap(#[from] crate::HeapError),
-    /// Actual statistical coverage requires the later solve sensitivity law.
-    #[error("statistical solve input at slot {slot} is unsupported")]
-    StatisticalInput {
-        /// Operation-ordered input position.
-        slot: usize,
-    },
     /// Mixed deterministic scopes cannot be silently promoted to declared-input coverage.
     #[error("solve inputs require compatible deterministic coverage")]
     CoverageMismatch,

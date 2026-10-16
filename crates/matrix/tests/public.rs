@@ -79,3 +79,10 @@ mod statistics_testing;
     reason = "independent statistical integer comparisons are shared across public tests"
 )]
 mod statistics_oracle;
+
+#[path = "../src/testing/solve_statistics.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "solve source fixtures are shared across test modules"
+)]
+mod solve_statistics_testing;

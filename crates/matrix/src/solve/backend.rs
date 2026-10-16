@@ -129,3 +129,52 @@ macro_rules! adapter {
 }
 adapter!(pack_single, copy_single, check_single, f32);
 adapter!(pack_double, copy_double, check_double, f64);
+
+impl Lu {
+    /// Reuse the same factors for finite private differential or correction columns.
+    pub(crate) fn solve_entries<P: Scalar + 'static>(
+        &self,
+        extent: crate::Extent,
+        entries: &[P],
+    ) -> Result<Vec<P>, OperationError> {
+        if entries.len() != extent.entries() || extent.columns() == 0 {
+            return Err(SolveError::Contract.into());
+        }
+        match self {
+            Self::Single(factor) => {
+                check_single(factor, extent.rows())?;
+                copy_single(&factor.solve(&entries_single(extent, entries)?))
+            }
+            Self::Double(factor) => {
+                check_double(factor, extent.rows())?;
+                copy_double(&factor.solve(&entries_double(extent, entries)?))
+            }
+        }
+    }
+}
+/// Pack private finite entries without allowing a backend assertion to validate their shape.
+macro_rules! entries_adapter {
+    ($name:ident, $format:ty) => {
+        /// Preserve the admitted scalar format through checked column-order indexing.
+        fn $name<P: Scalar + 'static>(
+            extent: crate::Extent,
+            entries: &[P],
+        ) -> Result<faer::Mat<$format>, OperationError> {
+            let mut result = faer::Mat::<$format>::zeros(extent.rows(), extent.columns());
+            for column in 0..extent.columns() {
+                for row in 0..extent.rows() {
+                    let value = *entries
+                        .get(extent.index(row, column)?)
+                        .ok_or(SolveError::Contract)?;
+                    if !value.is_finite() {
+                        return Err(SolveError::CandidateFailure.into());
+                    }
+                    result[(row, column)] = crate::conversion::same_format(value)?;
+                }
+            }
+            Ok(result)
+        }
+    };
+}
+entries_adapter!(entries_single, f32);
+entries_adapter!(entries_double, f64);

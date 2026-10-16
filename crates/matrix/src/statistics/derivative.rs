@@ -12,6 +12,9 @@ use std::rc::Rc;
 pub(crate) fn check(
     operation: &CheckedOperation,
 ) -> Result<Option<Rc<CheckedSensitivity>>, OperationError> {
+    if let NativeRecipe::Solve(contract) = &operation.recipe {
+        return crate::solve::sensitivity::check(contract).map(Some);
+    }
     let NativeRecipe::Kernel(contract) = &operation.recipe else {
         return Ok(None);
     };

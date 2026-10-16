@@ -13,6 +13,16 @@ use nrz_cas::{Cas, Handle, Location, Rational, Reference};
 use super::{SensitivityError, SensitivityWork};
 use crate::{CheckedExpression, Context};
 
+/// One immutable expression/provenance pair and its already completed occurrence coverage.
+struct CoveredRecord {
+    /// Exact graph expression identity in this graph owner.
+    expression: Handle,
+    /// Exact original provenance used when constructing the derived occurrence root.
+    provenance: Handle,
+    /// Sealed receipt for that root; requests still validate it independently.
+    input: CoveredInput,
+}
+
 /// A private construction lease with one bounded graph inspection ledger.
 pub(crate) struct Graph<'a> {
     /// Actual owning CAS, borrowed fallibly from the units builder.
@@ -29,6 +39,8 @@ pub(crate) struct Graph<'a> {
     pub(crate) work: SensitivityWork,
     /// Each CAS request retains the caller's explicit service limits.
     limits: LimitsOverride,
+    /// Completed coverage shared only within this immutable graph owner and construction phase.
+    covered: Vec<CoveredRecord>,
 }
 
 impl<'a> Graph<'a> {
@@ -46,6 +58,7 @@ impl<'a> Graph<'a> {
             budget: Budget::new(builder.cas_limits.resolve(limits)?)?,
             limits: limits.clone(),
             work: SensitivityWork::default(),
+            covered: Vec::new(),
         })
     }
 
@@ -146,6 +159,13 @@ impl<'a> Graph<'a> {
         expression: &Handle,
         provenance: &Handle,
     ) -> Result<CoveredInput, SensitivityError> {
+        for record in &self.covered {
+            self.budget
+                .work(1, Location::new("sensitivity coverage lookup"))?;
+            if &record.expression == expression && &record.provenance == provenance {
+                return Ok(record.input.clone());
+            }
+        }
         let root = self
             .cas
             .materialize_derived(expression, provenance, &mut self.budget)?;
@@ -154,7 +174,13 @@ impl<'a> Graph<'a> {
             .walk_derived(&root, &mut self.budget)
             .map_err(|error| error.fault)?
             .receipt;
-        Ok(CoveredInput { root, receipt })
+        let input = CoveredInput { root, receipt };
+        self.covered.push(CoveredRecord {
+            expression: expression.clone(),
+            provenance: provenance.clone(),
+            input: input.clone(),
+        });
+        Ok(input)
     }
 
     /// Request the public row-ordered assembly on this context's explicit domain.
@@ -313,6 +339,35 @@ mod tests {
             return Err("CAS outcome not retained".into());
         };
         assert!(matches!(*outcome, Outcome::Exhausted { .. }));
+        Ok(())
+    }
+    /// Exact expression/provenance coverage is shared, while every cache comparison remains bounded.
+    /// ´test:unit:sensitivity-coverage-sharing-preserves-provenance-and-work-limits´
+    #[test]
+    fn sensitivity_coverage_sharing_preserves_provenance_and_work_limits()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let builder = fixture()?;
+        let original = builder.parse("first source", "x^2")?;
+        let checked = builder.check(&original)?;
+        let other = builder.parse("second source", "x + 1")?;
+        let mut graph = Graph::new(&builder, &LimitsOverride::default())?;
+        let first = graph.cover(&checked.coordinates, &original.syntax)?;
+        let previous = graph.budget.usage().work;
+        let repeated = graph.cover(&checked.coordinates, &original.syntax)?;
+        assert_eq!(repeated.root, first.root);
+        assert_eq!(graph.budget.usage().work, previous + 1);
+        let separate = graph.cover(&checked.coordinates, &other.syntax)?;
+        assert_ne!(separate.root, first.root);
+        for work in [0, 1, 2] {
+            graph.budget = nrz_cas::limits::Budget::new(Limits {
+                work,
+                ..Limits::default()
+            })?;
+            assert_eq!(
+                graph.cover(&checked.coordinates, &original.syntax).is_ok(),
+                work >= 1
+            );
+        }
         Ok(())
     }
 }

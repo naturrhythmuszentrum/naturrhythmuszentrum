@@ -216,7 +216,9 @@ mod contractions;
     reason = "solve contracts and numerical proofs are shared across private transaction modules"
 )]
 mod solve;
-pub use solve::{FactorRef, SolveBudget, SolveError, SolveEvidence, SolvePolicy};
+pub use solve::{
+    FactorRef, SensitivityEvidence, SolveBudget, SolveError, SolveEvidence, SolvePolicy,
+};
 
 #[path = "verification/solve.rs"]
 #[expect(
@@ -242,3 +244,11 @@ mod solve_twins;
 )]
 mod statistics;
 pub use statistics::{MomentAssurance, MomentRef, MomentView, ParameterView, StatisticsError};
+
+#[cfg(test)]
+#[path = "testing/solve_statistics.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "solve source fixtures are shared across test modules"
+)]
+mod solve_statistics_testing;

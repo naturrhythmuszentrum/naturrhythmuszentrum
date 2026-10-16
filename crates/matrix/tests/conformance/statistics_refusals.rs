@@ -96,32 +96,36 @@ fn statistical_affine_map_refuses_unknown_cross_block() -> TestResult {
     Ok(())
 }
 
-/// V retains its explicit statistical solve boundary after P has propagated lineage.
-/// ´test:integration:solve-refuses-propagated-statistical-lineage´
+/// An already propagated source reaches a solve with its original common-source cancellation intact.
+/// ´test:integration:solve-propagates-existing-statistical-lineage´
 #[test]
-fn solve_refuses_propagated_statistical_lineage() -> crate::kernel_testing::TestResult {
-    let declarations = crate::kernel_testing::owner()?;
-    let coordinate = crate::kernel_testing::axis(1)?;
-    let shape = crate::kernel_testing::shape(&declarations, &coordinate, &coordinate)?;
-    let mut heap = nrz_matrix::Heap::new(nrz_matrix::HeapLimits::default())?;
-    let source = crate::statistics_testing::scalar::<f64>(&mut heap)?;
-    let value = crate::kernel_testing::output(&crate::kernel_testing::execute(
+fn solve_propagates_existing_statistical_lineage() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let input = shape(&declarations, &coordinate, &coordinate)?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let source = scalar::<f64>(&mut heap)?;
+    let copied = crate::kernel_testing::execute(
         &mut heap,
-        nrz_matrix::OperationDraft::copy(vec![shape]),
+        OperationDraft::copy(vec![input.clone()]),
         vec![source.value()],
-    )?)?;
-    let limits = nrz_matrix::ExecutionLimits::default();
-    assert!(matches!(
-        nrz_matrix::Binding::new(
-            crate::solve_testing::draft(1, 1)?.check(limits)?,
-            vec![value.value(); 2],
-            limits
-        )
-        .validate(&mut heap),
-        Err(nrz_matrix::OperationError::Solve(
-            nrz_matrix::SolveError::StatisticalInput { slot: 0 }
-        ))
-    ));
+    )?;
+    let value = crate::kernel_testing::output(&copied)?;
+    let outcome = crate::kernel_testing::execute(
+        &mut heap,
+        OperationDraft::solve(input.clone(), input.clone(), input, ShapeLimits::default())?,
+        vec![value.value(); 2],
+    )?;
+    let result = crate::kernel_testing::output(&outcome)?;
+    crate::solve_public::check(&heap, result, &[2.0], &[2.0], 1)?;
+    let moments = heap.moments(heap.moment_companion(result.value())?)?;
+    let zero = [crate::kernel_oracle::Rational::new(0, 1)?];
+    crate::statistics_testing::check(moments.covariance(), &zero)?;
+    crate::statistics_testing::check(moments.sensitivity().ok_or("source sensitivity")?, &zero)?;
+    assert_eq!(
+        moments.assurance(),
+        nrz_matrix::MomentAssurance::LinearizedMoments
+    );
     assert!(heap.moments(heap.moment_companion(value.value())?).is_ok());
     Ok(())
 }

@@ -95,6 +95,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             BudgetDecision::Unresolved => return Err(SolveError::BudgetUnresolved.into()),
             BudgetDecision::Met | BudgetDecision::NotRequested => {}
         }
+        let statistics = super::sensitivity::evaluate(self, contract, views, factor, evidence)?;
         let mut outputs = buffer(1)?;
         outputs.push(restored.payload(reservation)?);
         self.issued.set(Some(token));
@@ -104,7 +105,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             revision: self.operation.revision(),
             outputs,
             evidence: evidence.clone(),
-            statistics: Vec::new(),
+            statistics,
         })
     }
 }

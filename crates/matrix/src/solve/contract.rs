@@ -86,7 +86,7 @@ impl SolveContract {
         })
     }
 
-    /// Refuse statistical coverage explicitly before the generic snapshot capture.
+    /// Admit carried statistics at the former refusal site; the joint plan checks every source.
     pub(crate) fn preflight<P: Scalar + 'static>(
         &self,
         heap: &Heap,
@@ -94,13 +94,12 @@ impl SolveContract {
         limits: ExecutionLimits,
     ) -> Result<(), OperationError> {
         limits.check(inputs.len(), self.work)?;
-        for (slot, &handle) in inputs.iter().enumerate() {
+        for &handle in inputs {
             match heap.refuse_joint_operation(handle) {
-                Ok(()) => {}
                 Err(OperationError::Heap(crate::HeapError::MissingCoverage)) => {
-                    return Err(SolveError::StatisticalInput { slot }.into());
+                    heap.capture_joint_operation(handle)?;
                 }
-                Err(cause) => return Err(cause),
+                result => result?,
             }
         }
         Ok(())

@@ -33,6 +33,8 @@ pub struct SolveEvidence {
     restoration: Option<Box<crate::ConversionEvidence>>,
     /// Explicit inverse output has independently checked identity RHS semantics.
     inverse_output: bool,
+    /// Independent certificates of every logical differential solve, before restoration.
+    pub(crate) sensitivities: Vec<super::SensitivityEvidence>,
 }
 
 impl SolveEvidence {
@@ -66,6 +68,7 @@ impl SolveEvidence {
             budget: None,
             restoration: None,
             inverse_output: contract.identity.is_some(),
+            sensitivities: Vec::new(),
         }
     }
     /// Add the complete selected input scope only after its strict common-operator theorem succeeds.
@@ -204,5 +207,13 @@ impl SolveEvidence {
     #[must_use]
     pub const fn is_inverse(&self) -> bool {
         self.inverse_output
+    }
+}
+
+impl SolveEvidence {
+    /// Per-direction residual and forward bounds for the exact nominal differential.
+    #[must_use]
+    pub fn sensitivities(&self) -> &[super::SensitivityEvidence] {
+        &self.sensitivities
     }
 }

@@ -140,3 +140,58 @@ impl<P: Scalar + 'static> Plan<P> {
         Ok(Some(result))
     }
 }
+
+impl<P: Scalar + 'static> Plan<P> {
+    /// Contract a certified solve differential using the same complete joint source relation.
+    pub(crate) fn solve_moments<Q: Scalar + 'static>(
+        &self,
+        affine: super::Affine<Q>,
+        context: &ArithmeticContext,
+    ) -> Result<Vec<MomentPayload<Q>>, OperationError> {
+        let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
+        let mut work = Work::new(self.work);
+        let inputs = self.stacked::<Q>(context)?;
+        let covariance = lineage
+            .model
+            .covariance(&lineage.columns, context, self.limits)?;
+        let sensitivity = multiply(&affine.jacobian, &inputs, context, &mut work)?;
+        let first = multiply(&sensitivity, &covariance, context, &mut work)?;
+        let output = multiply(&first, &sensitivity.transpose()?, context, &mut work)?;
+        let means = if lineage.assurance == super::MomentAssurance::AffineMoments {
+            self.means::<Q>(context)?
+        } else {
+            None
+        };
+        let means = means
+            .as_ref()
+            .map(|means| {
+                let mut output = multiply(&affine.jacobian, means, context, &mut work)?;
+                for row in 0..output.extent.rows() {
+                    let center = *output.centers.get(row).ok_or(StatisticsError::Contract)?
+                        + *affine
+                            .offsets
+                            .centers
+                            .get(row)
+                            .ok_or(StatisticsError::Contract)?;
+                    output.set(
+                        row,
+                        0,
+                        center,
+                        output
+                            .entry(row, 0)?
+                            .add(affine.offsets.entry(row, 0)?, context)?,
+                    )?;
+                }
+                Ok::<_, OperationError>(output)
+            })
+            .transpose()?;
+        Ok(vec![MomentPayload {
+            lineage: lineage.clone(),
+            sensitivity,
+            covariance: output,
+            jacobian: affine.jacobian,
+            derivative: self.derivative.clone(),
+            means,
+        }])
+    }
+}

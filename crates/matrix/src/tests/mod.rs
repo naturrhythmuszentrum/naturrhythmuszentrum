@@ -22,3 +22,5 @@ mod kernel_nonlinear;
 
 mod solve;
 mod statistics;
+
+mod solve_sensitivity;

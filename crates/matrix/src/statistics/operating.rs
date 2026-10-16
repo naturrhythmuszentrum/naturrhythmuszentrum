@@ -42,6 +42,15 @@ impl<P: Scalar + 'static> Plan<P> {
         operation: &CheckedOperation,
         context: &ArithmeticContext,
     ) -> Result<(), OperationError> {
+        if matches!(operation.recipe, NativeRecipe::Solve(_)) {
+            if !self.fixed(0, context)? {
+                self.lineage
+                    .as_mut()
+                    .ok_or(StatisticsError::Contract)?
+                    .assurance = MomentAssurance::LinearizedMoments;
+            }
+            return Ok(());
+        }
         let NativeRecipe::Kernel(contract) = &operation.recipe else {
             return Ok(());
         };
@@ -59,7 +68,11 @@ impl<P: Scalar + 'static> Plan<P> {
         Ok(())
     }
     /// A modeled factor is mathematically fixed only with zero variation and an exact mean at c.
-    fn fixed(&self, slot: usize, context: &ArithmeticContext) -> Result<bool, OperationError> {
+    pub(crate) fn fixed(
+        &self,
+        slot: usize,
+        context: &ArithmeticContext,
+    ) -> Result<bool, OperationError> {
         let input = self.inputs.get(slot).ok_or(StatisticsError::Contract)?;
         let point = self.points.get(slot).ok_or(StatisticsError::Contract)?;
         let Some(means) = &input.means else {
