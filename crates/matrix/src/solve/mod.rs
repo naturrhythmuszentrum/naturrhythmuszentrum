@@ -7,6 +7,11 @@ mod error;
 mod evaluate;
 mod evidence;
 mod factor;
+mod inputs;
+mod policy;
+mod restoration;
+pub(crate) use inputs::RightHandSide;
+pub use policy::{SolveBudget, SolvePolicy};
 
 pub(crate) use contract::SolveContract;
 pub use error::SolveError;

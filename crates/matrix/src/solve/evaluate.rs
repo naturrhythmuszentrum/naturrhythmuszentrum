@@ -2,12 +2,13 @@
 //! Solve evaluation feeds the existing private candidate and atomic publication protocol.
 
 use super::{FactorRef, SolveContract, SolveError, SolveEvidence};
+use super::{RightHandSide, restoration::Restored};
 use crate::binding::buffer;
-use crate::publication::Payload;
 use crate::solve_verification::SolveWork;
 use crate::{
     Bound, Candidate, Failure, NormalizedInputs, NormalizedView, OperationError, RecipeEvidence,
 };
+use nrz_accuracy::BudgetDecision;
 use nrz_scalar::{ArithmeticContext, Scalar};
 
 impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
@@ -66,7 +67,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         self.finish_solve(contract, views, &factor, token, evidence)
     }
 
-    /// Finish the independent center proof before issuing the one private candidate.
+    /// Preserve a valid over-budget proof in the failure record without issuing a candidate.
     fn finish_solve(
         &self,
         contract: &SolveContract,
@@ -80,7 +81,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .outputs
             .first()
             .ok_or(OperationError::CandidateContract)?;
-        if views.len() != 2
+        if views.len() != contract.inputs.len()
             || P::PRECISION != Q::PRECISION
             || !reservation.bounded
             || !reservation.evaluation
@@ -88,33 +89,14 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         {
             return Err(SolveError::Contract.into());
         }
-        let operator = views.first().ok_or(OperationError::InputCount)?;
-        let rhs = views.get(1).ok_or(OperationError::InputCount)?;
-        let context = ArithmeticContext::new().map_err(SolveError::from)?;
-        let centers = factor.backend.solve(rhs)?;
-        let certificate = crate::solve_verification::center(
-            operator,
-            rhs,
-            &centers,
-            &factor.witness,
-            &mut SolveWork::new(contract.work),
-            &context,
-        )?;
-        let claim = SolveEvidence::new(
-            reservation.extent(),
-            reservation.coverage(),
-            contract.work,
-            &factor.witness,
-            &certificate,
-            context.revision(),
-        );
-        let payload = payload(&centers, certificate.radius, reservation)?;
-        evidence
-            .try_reserve(1)
-            .map_err(|_| crate::HeapError::Capacity)?;
-        evidence.push(RecipeEvidence::Solve(claim));
+        let (restored, decision) = evaluate(contract, views, factor, reservation, evidence)?;
+        match decision {
+            BudgetDecision::Exceeded => return Err(SolveError::BudgetExceeded.into()),
+            BudgetDecision::Unresolved => return Err(SolveError::BudgetUnresolved.into()),
+            BudgetDecision::Met | BudgetDecision::NotRequested => {}
+        }
         let mut outputs = buffer(1)?;
-        outputs.push(payload);
+        outputs.push(restored.payload(reservation)?);
         self.issued.set(Some(token));
         Ok(Candidate {
             execution: self.execution,
@@ -126,31 +108,60 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     }
 }
 
-/// Restore coherent unit-reference coordinates exactly and expand a norm radius per entry.
-fn payload<P: Scalar + 'static, Q: Scalar + 'static>(
-    centers: &[P],
-    radius: P,
+/// The same operator perturbation acts on every physical or typed-identity RHS column.
+fn evaluate<P: Scalar + 'static>(
+    contract: &SolveContract,
+    views: &[NormalizedView<'_, P>],
+    factor: &FactorRef<P>,
     reservation: crate::OutputReservation,
-) -> Result<Payload<Q>, OperationError> {
-    if centers.len() != reservation.extent().entries() {
-        return Err(SolveError::Contract.into());
-    }
-    let mut values = buffer(centers.len())?;
-    let mut bounds = buffer(centers.len())?;
-    let mut evaluation = buffer(centers.len())?;
-    for &center in centers {
-        values.push(crate::conversion::same_format(center)?);
-        bounds.push(crate::conversion::same_format(radius)?);
-        evaluation.push(crate::conversion::same_format(radius)?);
-    }
-    Ok(Payload {
-        extent: reservation.extent(),
-        target: reservation.stamp(),
-        centers: values,
-        bounds: Some(bounds),
-        evaluation: Some(evaluation),
-        contributions: None,
-    })
+    evidence: &mut Vec<RecipeEvidence>,
+) -> Result<(Restored<P>, BudgetDecision), OperationError> {
+    let operator = views.first().ok_or(OperationError::InputCount)?;
+    let rhs = if let Some(identity) = &contract.identity {
+        RightHandSide::Identity(identity)
+    } else {
+        RightHandSide::Physical(views.get(1).ok_or(OperationError::InputCount)?)
+    };
+    let context = ArithmeticContext::new().map_err(SolveError::from)?;
+    let centers = match &rhs {
+        RightHandSide::Physical(view) => factor.backend.solve(view)?,
+        RightHandSide::Identity(identity) => factor.backend.inverse(identity.extent().rows())?,
+    };
+    let certificate = crate::solve_verification::center(
+        operator,
+        &rhs,
+        &centers,
+        &factor.witness,
+        &mut SolveWork::new(contract.work),
+        &context,
+    )?;
+    evidence
+        .try_reserve(1)
+        .map_err(|_| crate::HeapError::Capacity)?;
+    evidence.push(RecipeEvidence::Solve(Box::new(SolveEvidence::represented(
+        contract,
+        reservation,
+        &factor.witness,
+        &certificate,
+        context.revision(),
+    ))));
+    let Some(RecipeEvidence::Solve(claim)) = evidence.last_mut() else {
+        return Err(OperationError::CandidateContract);
+    };
+    let family =
+        crate::solve_verification::family(operator, &rhs, &factor.witness, &certificate, &context)?;
+    claim.include_family(&family, reservation.coverage());
+    let restored = super::restoration::restore(
+        contract,
+        centers,
+        family.radius,
+        certificate.radius,
+        reservation,
+        &context,
+    )?;
+    let budget = contract.policy.assess(restored.total_norm)?;
+    claim.complete(&restored, budget);
+    Ok((restored, budget.decision()))
 }
 
 impl SolveContract {
@@ -166,6 +177,17 @@ impl SolveContract {
             || claim.precision() != Q::PRECISION
             || claim.arithmetic_revision() != 1
             || claim.work() != self.work
+            || claim.is_inverse() != self.identity.is_some()
+            || !claim.is_complete()
+            || !matches!(
+                claim.budget().map(nrz_accuracy::BudgetAssessment::decision),
+                Some(BudgetDecision::Met | BudgetDecision::NotRequested)
+            )
+            || claim.restoration().map(crate::ConversionEvidence::map)
+                != self
+                    .restoration
+                    .as_ref()
+                    .map(crate::ConversionContract::map)
         {
             return Err(OperationError::CandidateContract);
         }

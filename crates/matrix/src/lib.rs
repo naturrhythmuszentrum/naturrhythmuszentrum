@@ -216,7 +216,7 @@ mod contractions;
     reason = "solve contracts and numerical proofs are shared across private transaction modules"
 )]
 mod solve;
-pub use solve::{FactorRef, SolveError, SolveEvidence};
+pub use solve::{FactorRef, SolveBudget, SolveError, SolveEvidence, SolvePolicy};
 
 #[path = "verification/solve.rs"]
 #[expect(

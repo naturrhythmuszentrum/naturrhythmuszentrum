@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Semantic square solve admission precedes packing and backend arithmetic.
 
-use super::SolveError;
+use super::{SolveError, SolvePolicy};
 use crate::binding::NativeRecipe;
 use crate::{
     CheckedOperation, CheckedShape, Coverage, ExecutionLimits, Handle, Heap, InputSnapshot,
@@ -17,6 +17,14 @@ pub(crate) struct SolveContract {
     pub(crate) inputs: Rc<[RegionContract]>,
     /// Concrete scalar admission of the derived solution envelope.
     pub(crate) output: RegionContract,
+    /// Original homogeneous solution coordinates before optional numerical restoration.
+    pub(crate) solution: RegionContract,
+    /// Typed identity on the equation axis for explicit inverse publication.
+    pub(crate) identity: Option<CheckedShape>,
+    /// Optional exact affine restoration with its own evaluation-error region.
+    pub(crate) restoration: Option<crate::ConversionContract>,
+    /// Named output-norm budget, checked before backend entry.
+    pub(crate) policy: SolvePolicy,
     /// Conservative bound on numerical work and simultaneous scalar scratch.
     pub(crate) work: usize,
 }
@@ -45,11 +53,15 @@ impl OperationDraft {
         ]
         .into();
         Ok(Self {
-            solve: Some(SolveContract {
+            solve: Some(Box::new(SolveContract {
                 inputs,
+                solution: output.clone(),
                 output,
                 work,
-            }),
+                identity: None,
+                restoration: None,
+                policy: SolvePolicy::default(),
+            })),
             inputs: Vec::new(),
             kernel: None,
             conversions: None,
@@ -60,12 +72,16 @@ impl OperationDraft {
 
 impl SolveContract {
     /// Seal the numerical schedule only after its complete work count is admitted.
-    pub(crate) fn check(self, limits: ExecutionLimits) -> Result<CheckedOperation, OperationError> {
+    pub(crate) fn check(
+        self: Box<Self>,
+        limits: ExecutionLimits,
+    ) -> Result<CheckedOperation, OperationError> {
+        self.policy.validate(&self.output)?;
         limits.check(self.inputs.len(), self.work)?;
         Ok(CheckedOperation {
             inputs: Rc::clone(&self.inputs),
             outputs: vec![self.output.clone()].into(),
-            recipe: NativeRecipe::Solve(Box::new(self)),
+            recipe: NativeRecipe::Solve(self),
             revision: 1,
         })
     }
@@ -90,7 +106,7 @@ impl SolveContract {
         Ok(())
     }
 
-    /// The first usable subset accepts only exact represented input coordinates.
+    /// Compatible input totals cover both measurement and previous computational contributions once.
     pub(crate) fn coverage<P: Scalar>(
         &self,
         inputs: &[InputSnapshot<P>],
@@ -98,12 +114,16 @@ impl SolveContract {
         if inputs.len() != self.inputs.len() {
             return Err(OperationError::InputCount);
         }
-        if inputs.iter().any(|input| {
-            input.coverage != Coverage::RepresentedInputs || input.companion().is_some()
-        }) {
-            return Err(SolveError::BoundedInputsUnsupported.into());
+        let coverage = inputs.first().ok_or(OperationError::InputCount)?.coverage;
+        for (slot, input) in inputs.iter().enumerate() {
+            if input.coverage != coverage {
+                return Err(SolveError::CoverageMismatch.into());
+            }
+            if coverage == Coverage::DeclaredBounds && input.companion().is_none() {
+                return Err(SolveError::MissingCoverage { slot }.into());
+            }
         }
-        Ok(Coverage::RepresentedInputs)
+        Ok(coverage)
     }
 }
 
@@ -153,5 +173,85 @@ impl CheckedOperation {
             NativeRecipe::Solve(contract) => Some(contract.work),
             _ => None,
         }
+    }
+}
+
+impl OperationDraft {
+    /// Propose an explicit inverse `A^-1: Y -> X` using a source-free typed identity on Y.
+    ///
+    /// Its published inverse has its own residual and total certificate. The private
+    /// inverse used only to certify another solve never becomes this output.
+    /// # Errors
+    /// Refuses nonpositive or rectangular operators, incompatible output axes/kinds or limits.
+    pub fn inverse(
+        operator: CheckedShape,
+        output: CheckedShape,
+        limits: ShapeLimits,
+    ) -> Result<Self, OperationError> {
+        let derived = operator.inverse(limits)?;
+        let output = result_contract(derived, output)?;
+        let order = operator.extent().rows();
+        let identity = CheckedShape::identity(
+            operator.codomain(),
+            Rc::clone(&operator.declarations),
+            limits,
+        )?;
+        let inputs = vec![RegionContract::check(operator)?].into();
+        Ok(Self {
+            solve: Some(Box::new(SolveContract {
+                inputs,
+                solution: output.clone(),
+                output,
+                work: estimate_work(order, order)?,
+                identity: Some(identity),
+                restoration: None,
+                policy: SolvePolicy::default(),
+            })),
+            inputs: Vec::new(),
+            kernel: None,
+            conversions: None,
+            precision: None,
+        })
+    }
+
+    /// Attach a local output-norm budget to this solve or inverse draft.
+    /// # Errors
+    /// Refuses a different recipe or incompatible output budget coordinates.
+    pub fn with_solve_policy(mut self, policy: SolvePolicy) -> Result<Self, OperationError> {
+        let contract = self.solve.as_mut().ok_or(SolveError::Contract)?;
+        policy.validate(&contract.output)?;
+        contract.policy = policy;
+        Ok(self)
+    }
+
+    /// Restore the solution with a checked affine map in the same atomic publication.
+    ///
+    /// Bounds use only the absolute scale; an affine origin shifts centers only.
+    /// Coefficient and evaluation errors are retained in both overlapping output views.
+    /// # Errors
+    /// Refuses a different recipe, repeated restoration, wrong source axes/descriptor,
+    /// snapshot mismatch or a budget that no longer names the output coordinates.
+    pub fn restore_solution(
+        mut self,
+        conversion: crate::ConversionContract,
+    ) -> Result<Self, OperationError> {
+        let contract = self.solve.as_mut().ok_or(SolveError::Contract)?;
+        if contract.restoration.is_some()
+            || conversion.input.descriptor() != contract.solution.descriptor()
+        {
+            return Err(SolveError::Contract.into());
+        }
+        let original = contract.solution.shape();
+        original.same_snapshot(conversion.input.shape())?;
+        original
+            .domain()
+            .same_coordinates(conversion.input.shape().domain())?;
+        original
+            .codomain()
+            .same_coordinates(conversion.input.shape().codomain())?;
+        contract.policy.validate(&conversion.output)?;
+        contract.output = conversion.output.clone();
+        contract.restoration = Some(conversion);
+        Ok(self)
     }
 }

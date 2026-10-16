@@ -28,3 +28,15 @@ mod kernel_product;
 mod kernel_nonlinear;
 
 mod solve;
+
+mod solve_bounded;
+
+mod solve_inverse;
+
+mod solve_restoration;
+
+mod solve_coverage;
+
+mod solve_adversarial;
+
+mod solve_physical;

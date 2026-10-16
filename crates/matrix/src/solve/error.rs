@@ -19,9 +19,27 @@ pub enum SolveError {
         /// Operation-ordered input position.
         slot: usize,
     },
-    /// The represented-center subset cannot yet propagate a nonzero input radius.
-    #[error("bounded solve inputs require the perturbation theorem")]
-    BoundedInputsUnsupported,
+    /// Mixed deterministic scopes cannot be silently promoted to declared-input coverage.
+    #[error("solve inputs require compatible deterministic coverage")]
+    CoverageMismatch,
+    /// Declared physical coverage lacks its complete componentwise total.
+    #[error("solve input {slot} lacks declared deterministic coverage")]
+    MissingCoverage {
+        /// Operation-ordered input position with missing coverage.
+        slot: usize,
+    },
+    /// The common operator family has no established strict invertibility margin.
+    #[error("solve perturbation margin does not establish g r_A < 1")]
+    PerturbationMargin,
+    /// Budget coordinates differ from the restored output difference coordinates.
+    #[error("solve budget kind, role or coordinates do not match the output")]
+    BudgetContract,
+    /// The available certified bound exceeds the requested threshold, not necessarily the actual error.
+    #[error("available solve certificate exceeds the requested budget")]
+    BudgetExceeded,
+    /// The certified upper radius overlaps the tolerance enclosure's acceptance boundary.
+    #[error("solve budget comparison is unresolved")]
+    BudgetUnresolved,
     /// Supplied scalar output descriptors disagree with the derived solve axes.
     #[error("solve input or result contract mismatch")]
     Contract,

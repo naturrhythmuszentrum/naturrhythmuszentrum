@@ -112,7 +112,7 @@ impl ConversionEvidence {
 #[derive(Clone, Debug, PartialEq)]
 pub enum RecipeEvidence {
     /// Independent inverse-defect and residual certificate for a square solve.
-    Solve(crate::SolveEvidence),
+    Solve(Box<crate::SolveEvidence>),
     /// Complete deterministic propagation and independently checked numerical error.
     Kernel(crate::KernelEvidence),
     /// Exact represented-bit identity and retention of the complete companion set.

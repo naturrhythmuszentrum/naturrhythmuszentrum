@@ -39,3 +39,9 @@ mod kernel_nonlinear;
 mod solve;
 
 mod solve_statistics;
+
+mod solve_family;
+
+mod solve_budget;
+
+mod solve_capacity;

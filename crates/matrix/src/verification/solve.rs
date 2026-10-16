@@ -2,6 +2,7 @@
 //! Independent heap-view residual and inverse-defect enclosures, never LU reconstruction claims.
 
 use crate::binding::buffer;
+use crate::solve::RightHandSide;
 use crate::{Extent, NormalizedView, SolveError};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
@@ -119,7 +120,7 @@ fn inverse_dot<P: Scalar + 'static>(
 /// Enclose the residual over saved heap views, separately from inverse identity columns.
 pub(crate) fn center<P: Scalar + 'static>(
     operator: &NormalizedView<'_, P>,
-    rhs: &NormalizedView<'_, P>,
+    rhs: &RightHandSide<'_, '_, P>,
     candidate: &[P],
     witness: &InverseWitness<P>,
     work: &mut SolveWork,
@@ -201,4 +202,88 @@ mod tests {
         assert!(matches!(work.charge(), Err(SolveError::ResourceLimit)));
         assert_eq!(work.remaining, 0);
     }
+}
+
+/// Normwise common-operator perturbation proof, including its interaction denominator.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FamilyCertificate<P: Scalar> {
+    /// Outward Frobenius radius of all selected operator total entries.
+    pub(crate) operator_radius: P,
+    /// Outward joint Frobenius radius of all RHS total entries.
+    pub(crate) rhs_radius: P,
+    /// Upper bound on `g r_A`, strictly below one.
+    pub(crate) product: P,
+    /// Positive lower bound on `1 - g r_A`.
+    pub(crate) margin: P,
+    /// Normalized total radius including the represented-center error once.
+    pub(crate) radius: P,
+}
+
+/// Collect only chosen total regions; evaluation and derivation regions overlap them.
+pub(crate) fn family<P: Scalar + 'static>(
+    operator: &NormalizedView<'_, P>,
+    rhs: &RightHandSide<'_, '_, P>,
+    witness: &InverseWitness<P>,
+    certificate: &CenterCertificate<P>,
+    context: &ArithmeticContext,
+) -> Result<FamilyCertificate<P>, SolveError> {
+    let mut operator_bounds = buffer(operator.extent().entries())?;
+    for column in 0..operator.extent().columns() {
+        for row in 0..operator.extent().rows() {
+            operator_bounds.push(operator.bound(row, column)?.unwrap_or(P::ZERO));
+        }
+    }
+    let mut rhs_bounds = buffer(rhs.extent().entries())?;
+    for column in 0..rhs.extent().columns() {
+        for row in 0..rhs.extent().rows() {
+            rhs_bounds.push(rhs.bound(row, column)?);
+        }
+    }
+    perturbation(
+        witness.inverse,
+        certificate,
+        nrz_scalar::norm_upper(&operator_bounds, context)?.get(),
+        nrz_scalar::norm_upper(&rhs_bounds, context)?.get(),
+        context,
+    )
+}
+
+/// Apply the full common-RHS theorem with an outward numerator and a lower denominator.
+pub(crate) fn perturbation<P: Scalar>(
+    inverse: P,
+    certificate: &CenterCertificate<P>,
+    operator_radius: P,
+    rhs_radius: P,
+    context: &ArithmeticContext,
+) -> Result<FamilyCertificate<P>, SolveError> {
+    let product = point(inverse)?
+        .mul(point(operator_radius)?, context)?
+        .upper()
+        .get();
+    if product >= P::ONE {
+        return Err(SolveError::PerturbationMargin);
+    }
+    let margin = point(P::ONE)?.sub(point(product)?, context)?.lower().get();
+    if margin <= P::ZERO {
+        return Err(SolveError::PerturbationMargin);
+    }
+    let interaction = point(operator_radius)?.mul(point(certificate.magnitude)?, context)?;
+    let numerator = point(certificate.residual)?
+        .add(point(rhs_radius)?, context)?
+        .add(interaction, context)?
+        .mul(point(inverse)?, context)?;
+    let total = numerator.div(point(margin)?, context)?.upper().get();
+    // The numerical view is already included analytically; retain monotone coverage explicitly.
+    let radius = if total < certificate.radius {
+        certificate.radius
+    } else {
+        total
+    };
+    Ok(FamilyCertificate {
+        operator_radius,
+        rhs_radius,
+        product,
+        margin,
+        radius,
+    })
 }

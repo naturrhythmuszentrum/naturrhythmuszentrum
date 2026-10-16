@@ -10,7 +10,7 @@ use crate::{Axis, CheckedShape, CoordinateMap};
 #[derive(Clone, Debug)]
 pub struct OperationDraft {
     /// Optional square solve with an independent represented-center certificate.
-    pub(crate) solve: Option<crate::solve::SolveContract>,
+    pub(crate) solve: Option<Box<crate::solve::SolveContract>>,
     /// Optional deterministic kernel, checked independently of representation conversions.
     pub(crate) kernel: Option<crate::kernels::KernelContract>,
     /// Original checked shapes; numerical structural obligations remain pending.

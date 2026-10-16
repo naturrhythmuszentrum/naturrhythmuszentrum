@@ -81,9 +81,63 @@ pub(crate) fn check<P: Scalar + 'static>(
     let independent = backend_operator.full_piv_lu().solve(&backend_rhs);
     for (index, expected) in truth.into_iter().enumerate() {
         let (center, total, error) = entry(heap, bundle, index)?;
-        assert!(expected.covered(center, total)?);
-        assert!(expected.covered(center, error)?);
-        assert!(expected.covered(independent[(index % order, index / order)], 1.0e-10)?);
+        assert!(covers(expected, center, total)?);
+        assert!(covers(expected, center, error)?);
+        assert!(covers(
+            expected,
+            independent[(index % order, index / order)],
+            1.0e-10
+        )?);
     }
     Ok(())
+}
+
+/// Compare the exact displacement without multiplying large unrelated denominators.
+fn covers(target: Rational, center: f64, radius: f64) -> TestResult<bool> {
+    let difference = target.subtract(Rational::binary(center)?)?;
+    let bound = Rational::binary(radius)?;
+    if bound.numerator < 0 {
+        return Ok(false);
+    }
+    Ok(nonnegative_order(
+        difference.numerator.abs(),
+        difference.denominator,
+        bound.numerator,
+        bound.denominator,
+    ))
+}
+
+/// Euclidean continued-fraction comparison uses integer divisions only, so it cannot overflow.
+const fn nonnegative_order(
+    mut left: i128,
+    mut left_denominator: i128,
+    mut right: i128,
+    mut right_denominator: i128,
+) -> bool {
+    let mut reversed = false;
+    loop {
+        let first = left / left_denominator;
+        let second = right / right_denominator;
+        if first != second {
+            return if reversed {
+                first > second
+            } else {
+                first < second
+            };
+        }
+        let first_remainder = left % left_denominator;
+        let second_remainder = right % right_denominator;
+        if first_remainder == 0 || second_remainder == 0 {
+            return if reversed {
+                second_remainder == 0
+            } else {
+                first_remainder == 0
+            };
+        }
+        left = left_denominator;
+        left_denominator = first_remainder;
+        right = right_denominator;
+        right_denominator = second_remainder;
+        reversed = !reversed;
+    }
 }
