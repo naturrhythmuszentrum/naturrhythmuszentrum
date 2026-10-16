@@ -25,6 +25,121 @@ pub(crate) struct Polynomial {
     pub(crate) form: Form,
 }
 
+/// A transformed exponent key borrows its coefficient until the final single copy.
+struct Permuted<'a> {
+    /// Total degree is unchanged by the validated variable bijection.
+    degree: u64,
+    /// Full exponent vector gives the exact graded-lex key.
+    powers: Vec<u32>,
+    /// Scratch normal forms retain their complete coefficient algebra.
+    coefficient: &'a Element,
+}
+
+/// Variable permutation moves exponents and performs no coefficient arithmetic.
+fn permuted_key<'a>(
+    term: &'a Term,
+    image: &[u32],
+    budget: &mut Budget,
+) -> Result<Permuted<'a>, Fault> {
+    let mut powers = vector(image.len(), budget)?;
+    powers.resize(image.len(), 0);
+    let mut degree = 0_u64;
+    for (variable, exponent) in &term.powers {
+        budget.work(1, AT)?;
+        budget.check(BudgetKind::IntegerExponent, u64::from(*exponent), AT)?;
+        let Variable::Slot(slot) = variable else {
+            return Err(invalid());
+        };
+        let destination = *image
+            .get(usize::try_from(*slot).map_err(|_| invalid())?)
+            .ok_or_else(invalid)?;
+        *powers
+            .get_mut(usize::try_from(destination).map_err(|_| invalid())?)
+            .ok_or_else(invalid)? = *exponent;
+        degree = degree
+            .checked_add(u64::from(*exponent))
+            .ok_or_else(invalid)?;
+    }
+    budget.check(BudgetKind::PolynomialDegree, degree, AT)?;
+    Ok(Permuted {
+        degree,
+        powers,
+        coefficient: &term.coefficient,
+    })
+}
+
+/// Charge the degree comparison and every exponent actually compared.
+fn permutation_order(
+    left: &Permuted<'_>,
+    right: &Permuted<'_>,
+    budget: &mut Budget,
+) -> Result<std::cmp::Ordering, Fault> {
+    budget.work(1, AT)?;
+    let order = left.degree.cmp(&right.degree);
+    if order != std::cmp::Ordering::Equal {
+        return Ok(order);
+    }
+    for (first, second) in left.powers.iter().zip(&right.powers) {
+        budget.work(1, AT)?;
+        let order = first.cmp(second);
+        if order != std::cmp::Ordering::Equal {
+            return Ok(order);
+        }
+    }
+    Ok(std::cmp::Ordering::Equal)
+}
+
+/// A bijection preserves distinct keys; bounded insertion restores decreasing graded-lex order.
+fn ordered_permutation<'a>(
+    terms: &'a [Term],
+    image: &[u32],
+    budget: &mut Budget,
+) -> Result<Vec<Permuted<'a>>, Fault> {
+    budget.check(BudgetKind::PolynomialTerms, size(terms.len(), AT)?, AT)?;
+    let mut ordered = vector(terms.len(), budget)?;
+    for term in terms {
+        budget.solving(BudgetKind::OrbitTerms, 1, AT)?;
+        let transformed = permuted_key(term, image, budget)?;
+        let mut position = 0;
+        while let Some(previous) = ordered.get(position) {
+            match permutation_order(&transformed, previous, budget)? {
+                std::cmp::Ordering::Greater => break,
+                std::cmp::Ordering::Equal => return Err(invalid()),
+                std::cmp::Ordering::Less => position += 1,
+            }
+        }
+        budget.work(size(ordered.len() - position, AT)?, AT)?;
+        ordered.insert(position, transformed);
+    }
+    Ok(ordered)
+}
+
+/// Reconstruct the sparse ordered key and copy each exact coefficient exactly once.
+fn permutation_form(
+    ordered: Vec<Permuted<'_>>,
+    engine: &Engine<'_>,
+    budget: &mut Budget,
+) -> Result<Form, Fault> {
+    let mut terms = vector(ordered.len(), budget)?;
+    for term in ordered {
+        let mut powers = vector(term.powers.len(), budget)?;
+        for (slot, exponent) in term.powers.into_iter().enumerate() {
+            budget.work(1, AT)?;
+            if exponent != 0 {
+                powers.push((
+                    Variable::Slot(u32::try_from(slot).map_err(|_| invalid())?),
+                    exponent,
+                ));
+            }
+        }
+        terms.push(Term {
+            powers,
+            coefficient: checked(engine.copy(term.coefficient, budget))?,
+        });
+    }
+    Ok(Form { terms })
+}
+
 /// Convert arithmetic faults without losing the exact failing ledger location.
 fn checked<T>(result: Result<T, CoefficientFailure>) -> Result<T, Fault> {
     result.map_err(|error| fault(&error))
@@ -279,7 +394,7 @@ impl Polynomial {
         )
     }
 
-    /// Permute slots and renormalize; every action and monomial visit is counted, including duplicates.
+    /// Permute exponent keys directly; every action, term visit and key comparison remains charged.
     pub(crate) fn permute(
         &self,
         image: &[u32],
@@ -292,34 +407,8 @@ impl Polynomial {
             state,
             domain: &self.domain,
         };
-        let mut result = self.identity(false, state, budget)?;
-        for term in &self.form.terms {
-            budget.solving(BudgetKind::OrbitTerms, 1, AT)?;
-            let mut product = Self::constant(
-                &self.domain,
-                &self.variables,
-                checked(engine.copy(&term.coefficient, budget))?,
-                state,
-                budget,
-            )?;
-            for (variable, exponent) in &term.powers {
-                let Variable::Slot(slot) = variable else {
-                    return Err(invalid());
-                };
-                let target = *image
-                    .get(usize::try_from(*slot).map_err(|_| invalid())?)
-                    .ok_or_else(invalid)?;
-                product = product.mul(
-                    &self
-                        .variable(target, state, budget)?
-                        .pow(*exponent, state, budget)?,
-                    state,
-                    budget,
-                )?;
-            }
-            result = result.add(&product, state, budget)?;
-        }
-        Ok(result)
+        let ordered = ordered_permutation(&self.form.terms, image, budget)?;
+        self.with_form(permutation_form(ordered, &engine, budget)?, budget)
     }
 
     /// Simultaneous formal substitution retains every image, including zero specializations.

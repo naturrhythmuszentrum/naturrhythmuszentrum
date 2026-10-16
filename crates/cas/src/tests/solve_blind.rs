@@ -60,3 +60,64 @@ fn blind_resolvent_observer_equivalence() -> crate::testing::common::TestResult 
     }
     Ok(())
 }
+
+/// Algebraic substitution reconstructs the action independently of exponent permutation.
+fn permutation_matches(
+    fixture: &mut crate::testing::solve_orbits::Fixture,
+    source: &crate::solving::symmetric::algebra::Polynomial,
+    permutation: &[u32],
+) -> crate::testing::common::TestResult {
+    let mut budget = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let transformed = source.permute(permutation, &fixture.base.cas.state, &mut budget)?;
+    let mut images = Vec::new();
+    for slot in permutation {
+        images.push(source.variable(*slot, &fixture.base.cas.state, &mut budget)?);
+    }
+    let expected = source.compose(&images, &fixture.base.cas.state, &mut budget)?;
+    assert!(transformed.equals(&expected, &fixture.base.cas.state, &mut budget)?);
+    let actual = transformed.stage(&mut fixture.base.cas, &mut budget)?;
+    let expected = expected.stage(&mut fixture.base.cas, &mut budget)?;
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
+/// Every actual cyclic power and both unity orientations preserve exact permutation substitution.
+/// ´test:crate:blind-permutation-substitution-equivalence´
+#[test]
+fn blind_permutation_substitution_equivalence() -> crate::testing::common::TestResult {
+    let mut fixture = crate::testing::solve_orbits::Fixture::new(3)?;
+    let mut budget = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let engine = crate::solving::coefficients::arithmetic::Engine {
+        state: &fixture.base.cas.state,
+        domain: &fixture.frame.domain,
+    };
+    let reversed = engine.pow(&fixture.unity, 2, &mut budget)?;
+    let permutations = crate::solving::orbits::produce::adjacent(3, &mut budget)?;
+    for reverse in [false, true] {
+        for power in 1..=3 {
+            let unity = if reverse { &reversed } else { &fixture.unity };
+            let source = crate::solving::symmetric::seeds::generate(
+                &fixture.frame,
+                &crate::solving::symmetric::cursor::Seed::Cyclic { index: 1, power },
+                Some(unity),
+                &fixture.base.cas.state,
+                &mut budget,
+            )?;
+            for permutation in &permutations {
+                permutation_matches(&mut fixture, &source, permutation)?;
+            }
+        }
+    }
+    let first = fixture
+        .frame
+        .variable(0, &fixture.base.cas.state, &mut budget)?;
+    let second = fixture
+        .frame
+        .variable(1, &fixture.base.cas.state, &mut budget)?
+        .pow(2, &fixture.base.cas.state, &mut budget)?;
+    let mixed = first.add(&second, &fixture.base.cas.state, &mut budget)?;
+    for permutation in &permutations {
+        permutation_matches(&mut fixture, &mixed, permutation)?;
+    }
+    Ok(())
+}
