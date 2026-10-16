@@ -1,6 +1,127 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Empty-cache generic discovery interaction tests, independent of the public solve lifecycle.
 
+/// Algebraic substitution reconstructs the action independently of exponent permutation.
+fn permutation_matches(
+    fixture: &mut crate::testing::solve_orbits::Fixture,
+    source: &crate::solving::symmetric::algebra::Polynomial,
+    permutation: &[u32],
+) -> crate::testing::common::TestResult {
+    let mut budget = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let transformed = source.permute(permutation, &fixture.base.cas.state, &mut budget)?;
+    let mut images = Vec::new();
+    for slot in permutation {
+        images.push(source.variable(*slot, &fixture.base.cas.state, &mut budget)?);
+    }
+    let expected = source.compose(&images, &fixture.base.cas.state, &mut budget)?;
+    assert!(transformed.equals(&expected, &fixture.base.cas.state, &mut budget)?);
+    let actual = transformed.stage(&mut fixture.base.cas, &mut budget)?;
+    let expected = expected.stage(&mut fixture.base.cas, &mut budget)?;
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
+/// Every actual cyclic power and both unity orientations preserve exact permutation substitution.
+/// ´test:crate:blind-permutation-substitution-equivalence´
+#[test]
+fn blind_permutation_substitution_equivalence() -> crate::testing::common::TestResult {
+    let mut fixture = crate::testing::solve_orbits::Fixture::new(3)?;
+    let mut budget = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let engine = crate::solving::coefficients::arithmetic::Engine {
+        state: &fixture.base.cas.state,
+        domain: &fixture.frame.domain,
+    };
+    let reversed = engine.pow(&fixture.unity, 2, &mut budget)?;
+    let permutations = crate::solving::orbits::produce::adjacent(3, &mut budget)?;
+    for reverse in [false, true] {
+        for power in 1..=3 {
+            let unity = if reverse { &reversed } else { &fixture.unity };
+            let source = crate::solving::symmetric::seeds::generate(
+                &fixture.frame,
+                &crate::solving::symmetric::cursor::Seed::Cyclic { index: 1, power },
+                Some(unity),
+                &fixture.base.cas.state,
+                &mut budget,
+            )?;
+            for permutation in &permutations {
+                permutation_matches(&mut fixture, &source, permutation)?;
+            }
+        }
+    }
+    let first = fixture
+        .frame
+        .variable(0, &fixture.base.cas.state, &mut budget)?;
+    let second = fixture
+        .frame
+        .variable(1, &fixture.base.cas.state, &mut budget)?
+        .pow(2, &fixture.base.cas.state, &mut budget)?;
+    let mixed = first.add(&second, &fixture.base.cas.state, &mut budget)?;
+    for permutation in &permutations {
+        permutation_matches(&mut fixture, &mixed, permutation)?;
+    }
+    Ok(())
+}
+
+/// Recording generic observer events changes neither the candidate nor non-observer work.
+/// ´test:crate:blind-resolvent-observer-equivalence´
+#[test]
+fn blind_resolvent_observer_equivalence() -> crate::testing::common::TestResult {
+    let fixture = crate::testing::solve_orbits::Fixture::new(3)?;
+    let state = &fixture.base.cas.state;
+    let mut setup = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let seed = crate::solving::symmetric::cursor::Seed::Cyclic { index: 1, power: 3 };
+    let polynomial = crate::solving::symmetric::seeds::generate(
+        &fixture.frame,
+        &seed,
+        Some(&fixture.unity),
+        state,
+        &mut setup,
+    )?;
+    let orbit = crate::solving::orbits::produce::enumerate(&polynomial, state, &mut setup)?;
+    let mut plain = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let first = crate::solving::symmetric::resolvent::smaller(&orbit, 3, 0, state, &mut plain)?
+        .ok_or("plain descent")?;
+    let mut observed = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
+    let mut events = Vec::new();
+    let second = crate::solving::symmetric::resolvent::smaller_observed(
+        &orbit,
+        3,
+        0,
+        state,
+        &mut observed,
+        |phase, index, budget| {
+            crate::solving::coefficients::storage::reserve(&mut events, 1, budget)?;
+            events.push((phase, index));
+            Ok(())
+        },
+    )?
+    .ok_or("observed descent")?;
+    let expected_events = 2 * orbit.members.len()
+        + 6 * first.coefficients.len()
+        + 2 * usize::try_from(plain.usage().symmetric_steps)?;
+    assert_eq!(events.len(), expected_events);
+    let mut actual = observed.usage();
+    actual.work = actual
+        .work
+        .checked_sub(u64::try_from(events.len())?)
+        .ok_or("observer work")?;
+    assert_eq!(actual, plain.usage());
+    assert_eq!(first.depth, second.depth);
+    assert_eq!(first.coefficients.len(), second.coefficients.len());
+    for (left, right) in first.coefficients.iter().zip(&second.coefficients) {
+        assert!(left.source.equals(&right.source, state, &mut setup)?);
+        assert!(
+            left.expression
+                .equals(&right.expression, state, &mut setup)?
+        );
+        assert_eq!(left.basis.len(), right.basis.len());
+        for (left, right) in left.basis.iter().zip(&right.basis) {
+            assert!(left.equals(right, state, &mut setup)?);
+        }
+    }
+    Ok(())
+}
+
 use crate::limits::{Budget, Limits};
 use crate::solving::radicals::discovery::Discovery;
 use crate::solving::symmetric::cursor::Seed;
@@ -21,6 +142,7 @@ fn blind_discovery_reachable_prefix() -> TestResult {
             &fixture.unity,
             &fixture.base.cas.state,
             &mut budget,
+            |_, _, _| Ok(()),
         )?
         .ok_or("no strict descent")?;
     assert_eq!(candidate.resolvent.coefficients.len(), 3);
@@ -62,6 +184,7 @@ fn blind_reversed_primitive_orientation() -> TestResult {
             &fixture.unity,
             &fixture.base.cas.state,
             &mut budget,
+            |_, _, _| Ok(()),
         )?
         .ok_or("forward descent missing")?;
     let second = backward
@@ -70,6 +193,7 @@ fn blind_reversed_primitive_orientation() -> TestResult {
             &reversed,
             &fixture.base.cas.state,
             &mut budget,
+            |_, _, _| Ok(()),
         )?
         .ok_or("reverse descent missing")?;
     for (left, right) in first
@@ -202,20 +326,22 @@ fn blind_zero_pairing_independent_oracle() -> TestResult {
     Ok(())
 }
 
-/// Independent source parameters require exact regional guards; no formal-nonzero assumption is inferred.
+/// Pending coefficient-map interpretation design restores complete symbolic source coverage.
+/// Both declaration namings currently assert the exact coefficient refusal.
 /// ´test:crate:blind-symbolic-source-retains-parameters´
 #[test]
 fn blind_symbolic_source_retains_parameters() -> TestResult {
     for names in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
         let (mut fixture, request) = crate::testing::solve_blind::symbolic(&names)?;
         let outcome = fixture.cas.run(&request);
-        assert!(matches!(
-            outcome,
-            crate::request::Outcome::Unresolved {
-                solve_reason: Some(crate::solving::SolveReason::SpecializationGuardPending),
-                ..
-            }
-        ));
+        let crate::request::Outcome::Invalid { fault, .. } = outcome else {
+            return Err(format!("symbolic source boundary moved: {outcome:?}").into());
+        };
+        assert_eq!(
+            fault.kind,
+            crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
+        );
+        assert_eq!(fault.location.operation, "exact coefficients");
     }
     Ok(())
 }
@@ -234,7 +360,8 @@ fn blind_complete_cyclic_prefix() -> TestResult {
                     &fixture.frame,
                     &fixture.unity,
                     &fixture.base.cas.state,
-                    &mut budget
+                    &mut budget,
+                    |_, _, _| Ok(())
                 )?
                 .is_some()
         );
@@ -308,123 +435,164 @@ fn blind_incremental_proof_replay() -> TestResult {
     crate::testing::solve_blind::prefixes(&[-4, -15, 0, 1])
 }
 
-/// Recording generic observer events changes neither the candidate nor non-observer work.
-/// ´test:crate:blind-resolvent-observer-equivalence´
+/// Pending coefficient-map interpretation design restores symbolic acceptance and its witness audit.
+/// Today the exact refusal retains measured phase and interning evidence.
+/// ´test:crate:blind-symbolic-acceptance-audit´
 #[test]
-fn blind_resolvent_observer_equivalence() -> crate::testing::common::TestResult {
-    let fixture = crate::testing::solve_orbits::Fixture::new(3)?;
-    let state = &fixture.base.cas.state;
-    let mut setup = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
-    let seed = crate::solving::symmetric::cursor::Seed::Cyclic { index: 1, power: 3 };
-    let polynomial = crate::solving::symmetric::seeds::generate(
-        &fixture.frame,
-        &seed,
-        Some(&fixture.unity),
-        state,
-        &mut setup,
-    )?;
-    let orbit = crate::solving::orbits::produce::enumerate(&polynomial, state, &mut setup)?;
-    let mut plain = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
-    let first = crate::solving::symmetric::resolvent::smaller(&orbit, 3, 0, state, &mut plain)?
-        .ok_or("plain descent")?;
-    let mut observed = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
-    let mut events = Vec::new();
-    let second = crate::solving::symmetric::resolvent::smaller_observed(
-        &orbit,
-        3,
-        0,
-        state,
-        &mut observed,
-        |phase, index, budget| {
-            crate::solving::coefficients::storage::reserve(&mut events, 1, budget)?;
-            events.push((phase, index));
-            Ok(())
-        },
-    )?
-    .ok_or("observed descent")?;
-    let expected_events = 2 * orbit.members.len()
-        + 6 * first.coefficients.len()
-        + 2 * usize::try_from(plain.usage().symmetric_steps)?;
-    assert_eq!(events.len(), expected_events);
-    let mut actual = observed.usage();
-    actual.work = actual
-        .work
-        .checked_sub(u64::try_from(events.len())?)
-        .ok_or("observer work")?;
-    assert_eq!(actual, plain.usage());
-    assert_eq!(first.depth, second.depth);
-    assert_eq!(first.coefficients.len(), second.coefficients.len());
-    for (left, right) in first.coefficients.iter().zip(&second.coefficients) {
-        assert!(left.source.equals(&right.source, state, &mut setup)?);
-        assert!(
-            left.expression
-                .equals(&right.expression, state, &mut setup)?
-        );
-        assert_eq!(left.basis.len(), right.basis.len());
-        for (left, right) in left.basis.iter().zip(&right.basis) {
-            assert!(left.equals(right, state, &mut setup)?);
-        }
-    }
+#[expect(
+    clippy::print_stderr,
+    reason = "the refusal record is audit evidence read under --nocapture"
+)]
+fn blind_symbolic_acceptance_audit() -> TestResult {
+    let revision = "blind-cubic-audit-fixture-revision";
+    let record = crate::testing::solve_blind::symbolic_audit(revision)?;
+    assert!(record.starts_with(&format!("source_revision={revision}\n")));
+    assert!(record.contains("policy=logical-v9"));
+    assert!(record.contains("refusal=Fault"));
+    assert!(record.contains("interning_comparisons="));
+    assert!(record.contains("phases="));
+    eprintln!("{record}");
     Ok(())
 }
 
-/// Algebraic substitution reconstructs the action independently of exponent permutation.
-fn permutation_matches(
-    fixture: &mut crate::testing::solve_orbits::Fixture,
-    source: &crate::solving::symmetric::algebra::Polynomial,
-    permutation: &[u32],
-) -> crate::testing::common::TestResult {
-    let mut budget = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
-    let transformed = source.permute(permutation, &fixture.base.cas.state, &mut budget)?;
-    let mut images = Vec::new();
-    for slot in permutation {
-        images.push(source.variable(*slot, &fixture.base.cas.state, &mut budget)?);
-    }
-    let expected = source.compose(&images, &fixture.base.cas.state, &mut budget)?;
-    assert!(transformed.equals(&expected, &fixture.base.cas.state, &mut budget)?);
-    let actual = transformed.stage(&mut fixture.base.cas, &mut budget)?;
-    let expected = expected.stage(&mut fixture.base.cas, &mut budget)?;
-    assert_eq!(actual, expected);
-    Ok(())
+/// Replay exhaustion after coverage preserves its valid graph handles and portable theorem.
+/// ´test:crate:blind-retained-coverage-replay-boundary´
+#[test]
+fn blind_retained_coverage_replay_boundary() -> TestResult {
+    crate::testing::solve_blind::retained_replay_boundary()
 }
 
-/// Every actual cyclic power and both unity orientations preserve exact permutation substitution.
-/// ´test:crate:blind-permutation-substitution-equivalence´
+/// Original full-factor coverage rejects missing, replaced and wrongly powered factors.
+/// ´test:crate:blind-false-factor-certificates´
 #[test]
-fn blind_permutation_substitution_equivalence() -> crate::testing::common::TestResult {
-    let mut fixture = crate::testing::solve_orbits::Fixture::new(3)?;
-    let mut budget = crate::limits::Budget::new(crate::limits::Limits::blind_cubic())?;
-    let engine = crate::solving::coefficients::arithmetic::Engine {
-        state: &fixture.base.cas.state,
-        domain: &fixture.frame.domain,
-    };
-    let reversed = engine.pow(&fixture.unity, 2, &mut budget)?;
-    let permutations = crate::solving::orbits::produce::adjacent(3, &mut budget)?;
-    for reverse in [false, true] {
-        for power in 1..=3 {
-            let unity = if reverse { &reversed } else { &fixture.unity };
-            let source = crate::solving::symmetric::seeds::generate(
-                &fixture.frame,
-                &crate::solving::symmetric::cursor::Seed::Cyclic { index: 1, power },
-                Some(unity),
-                &fixture.base.cas.state,
-                &mut budget,
-            )?;
-            for permutation in &permutations {
-                permutation_matches(&mut fixture, &source, permutation)?;
+fn blind_false_factor_certificates() -> TestResult {
+    crate::testing::solve_blind::false_factors(&[8, 0, 0, 1])
+}
+
+/// Repeated-root factor occurrences remain necessary even when set members coincide.
+/// ´test:crate:blind-repeated-factor-mutations´
+#[test]
+fn blind_repeated_factor_mutations() -> TestResult {
+    crate::testing::solve_blind::false_factors(&[2, -3, 0, 1])
+}
+
+/// Pending coefficient-map interpretation design restores complete-cover stratum deletion mutations.
+/// The current baseline instead asserts its exact coefficient refusal.
+/// ´test:crate:blind-missing-stratum-mutations´
+#[test]
+fn blind_missing_stratum_mutations() -> TestResult {
+    crate::testing::solve_blind::false_strata()
+}
+
+/// Inverting the primitive orientation transports the full checked recovered set.
+/// ´test:crate:blind-recovered-orientation-transport´
+#[test]
+fn blind_recovered_orientation_transport() -> TestResult {
+    crate::testing::solve_blind::transported_choices(true, 0)
+}
+
+/// A compatible alternative lifted radical choice permutes the full checked recovered set.
+/// ´test:crate:blind-recovered-choice-transport´
+#[test]
+fn blind_recovered_choice_transport() -> TestResult {
+    crate::testing::solve_blind::transported_choices(false, 1)
+}
+
+/// Pending coefficient-map interpretation design restores transport of every renamed root and stratum.
+/// Both namings currently assert the same exact coefficient refusal.
+/// ´test:crate:blind-complete-coefficient-renaming´
+#[test]
+fn blind_complete_coefficient_renaming() -> TestResult {
+    crate::testing::solve_blind::renamed_complete_set()
+}
+
+/// Exercised tower, orbit, gcd, identity and recovery counters have isolated exact boundaries.
+/// ´test:crate:blind-measured-resource-boundaries´
+#[test]
+fn blind_measured_resource_boundaries() -> TestResult {
+    crate::testing::solve_blind::measured_boundaries()
+}
+
+/// Actual normalized graph members distinguish polynomial powers from cyclic rotations.
+/// ´test:crate:blind-distinct-seed-power-orbits´
+#[test]
+fn blind_distinct_seed_power_orbits() -> TestResult {
+    let mut fixture = Fixture::new(3)?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let mut previous = Vec::new();
+    for (power, cardinality) in [(1, 6), (2, 6), (3, 2)] {
+        let polynomial = crate::solving::symmetric::seeds::generate(
+            &fixture.frame,
+            &Seed::Cyclic { index: 1, power },
+            Some(&fixture.unity),
+            &fixture.base.cas.state,
+            &mut budget,
+        )?;
+        let orbit = crate::solving::orbits::produce::enumerate(
+            &polynomial,
+            &fixture.base.cas.state,
+            &mut budget,
+        )?;
+        assert_eq!(orbit.members.len(), cardinality);
+        let mut current = Vec::new();
+        for member in &orbit.members {
+            assert!(!member.form.terms.is_empty());
+            for term in &member.form.terms {
+                let degree: u64 = term
+                    .powers
+                    .iter()
+                    .map(|(_, exponent)| u64::from(*exponent))
+                    .sum();
+                assert_eq!(degree, u64::from(power));
             }
+            let handle = member.stage(&mut fixture.base.cas, &mut budget)?;
+            assert!(!previous.contains(&handle));
+            assert!(!current.contains(&handle));
+            current.push(handle);
+        }
+        previous.extend(current);
+        if cardinality >= 3 {
+            let before = budget.usage().coefficient_ops;
+            assert!(
+                crate::solving::symmetric::resolvent::smaller(
+                    &orbit,
+                    3,
+                    0,
+                    &fixture.base.cas.state,
+                    &mut budget
+                )?
+                .is_none()
+            );
+            assert_eq!(budget.usage().coefficient_ops, before);
         }
     }
-    let first = fixture
-        .frame
-        .variable(0, &fixture.base.cas.state, &mut budget)?;
-    let second = fixture
-        .frame
-        .variable(1, &fixture.base.cas.state, &mut budget)?
-        .pow(2, &fixture.base.cas.state, &mut budget)?;
-    let mixed = first.add(&second, &fixture.base.cas.state, &mut budget)?;
-    for permutation in &permutations {
-        permutation_matches(&mut fixture, &mixed, permutation)?;
-    }
     Ok(())
+}
+
+/// The symbolic linear denominator baseline identifies its actual first refused scoped rule.
+/// ´test:crate:blind-symbolic-linear-prefix-replay´
+#[test]
+fn blind_symbolic_linear_prefix_replay() -> TestResult {
+    crate::testing::solve_blind::symbolic_prefixes(&["b", "a"])
+}
+
+/// Individual radical powers remain valid when an incompatible character rotation destroys the product.
+/// ´test:crate:blind-independent-character-choice-refused´
+#[test]
+fn blind_independent_character_choice_refused() -> TestResult {
+    crate::testing::solve_blind::unlinked_choices()
+}
+
+/// The blind radical path consumes its scoped expansion only after exact parent closure and fresh replay.
+/// ´test:crate:blind-formal-root-consumer´
+#[test]
+fn blind_formal_root_consumer() -> TestResult {
+    crate::testing::solve_blind::formal_consumer()
+}
+
+/// The actual blind producer uses a checked real odd root and then proves its complex selection.
+/// ´test:crate:blind-constructive-real-choice´
+#[test]
+fn blind_constructive_real_choice() -> TestResult {
+    crate::testing::solve_blind::real_choice_consumer()
 }

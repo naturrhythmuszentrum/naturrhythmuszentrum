@@ -7,6 +7,99 @@ use nrz_cas::limits::{Budget, Limits};
 use nrz_cas::request::Outcome;
 use nrz_cas::solving::{SolveForm, SolveStatement};
 
+/// Compare imported coverage with a freshly constructed original request, preserving the exact region.
+fn replay_coverage(
+    fixture: &mut crate::testing::solve_blind::Fixture,
+    request: &nrz_cas::request::Request,
+    bytes: &[u8],
+) -> TestResult<nrz_cas::Handle> {
+    let nrz_cas::request::Task::Solve(original) = &request.task else {
+        return Err("expected solve request".into());
+    };
+    let imported = fixture
+        .cas
+        .inspect(bytes, &mut Budget::new(Limits::blind_cubic())?)?;
+    let nrz_cas::proof::Statement::Solve(statement) = &imported.judgment().statement else {
+        return Err("imported solve claim".into());
+    };
+    let SolveStatement::Coverage(claim) = statement.as_ref() else {
+        return Err("imported coverage claim".into());
+    };
+    let expected = nrz_cas::proof::Judgment {
+        context: fixture.context.clone(),
+        layer: nrz_cas::domain::Layer::Logic,
+        space: None,
+        residuals: Vec::new(),
+        statement: nrz_cas::proof::Statement::Solve(Box::new(SolveStatement::Coverage(
+            nrz_cas::solving::StatementCoverage {
+                problem: original.problem.clone(),
+                set: claim.set.clone(),
+                region: fixture.region.clone(),
+            },
+        ))),
+    };
+    let replayed =
+        fixture
+            .cas
+            .replay(bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert_eq!(replayed.hypotheses(), []);
+    assert!(replayed.is_discharged());
+    assert_eq!(
+        fixture
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(claim.set.clone())
+}
+
+/// Coverage and requested presentation are independent expected claims in the fresh original store.
+fn replay_complete(
+    cas: &nrz_cas::Cas,
+    answer: &nrz_cas::solving::SolveAnswer,
+    fresh: (
+        crate::testing::solve_blind::Fixture,
+        nrz_cas::request::Request,
+    ),
+) -> TestResult {
+    let coverage = answer.coverage.as_ref().ok_or("complete coverage")?;
+    assert!(coverage.is_discharged());
+    assert_eq!(coverage.hypotheses(), []);
+    let bytes = cas.export_witness(coverage, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut fixture, request) = fresh;
+    let set = replay_coverage(&mut fixture, &request, &bytes)?;
+    let presentation = answer.facts.last().ok_or("radical presentation")?;
+    assert!(presentation.is_discharged());
+    assert_eq!(presentation.hypotheses(), []);
+    let bytes = cas.export_witness(presentation, &mut Budget::new(Limits::blind_cubic())?)?;
+    let expected = nrz_cas::proof::Judgment {
+        context: fixture.context.clone(),
+        layer: nrz_cas::domain::Layer::Logic,
+        space: None,
+        residuals: Vec::new(),
+        statement: nrz_cas::proof::Statement::Solve(Box::new(SolveStatement::Presentation(
+            nrz_cas::solving::StatementPresentation {
+                set,
+                form: SolveForm::Radicals,
+                region: fixture.region.clone(),
+            },
+        ))),
+    };
+    let replayed =
+        fixture
+            .cas
+            .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert!(replayed.is_discharged());
+    assert_eq!(replayed.hypotheses(), []);
+    assert_eq!(
+        fixture
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}
+
 /// Complete factor coverage and radical provenance must independently replay without hidden lemmas.
 /// ´test:integration:blind-binomial-coverage-replay´
 #[test]
@@ -18,26 +111,7 @@ fn blind_binomial_coverage_replay() -> TestResult {
     };
     assert_eq!(answer.form, SolveForm::Radicals);
     assert_eq!(answer.unresolved_regions, []);
-    let coverage = answer.coverage.ok_or("coverage missing")?;
-    assert!(coverage.is_discharged());
-    assert_eq!(coverage.hypotheses(), []);
-    assert!(
-        matches!(&coverage.judgment().statement, nrz_cas::proof::Statement::Solve(statement) if matches!(statement.as_ref(), SolveStatement::Coverage(_)))
-    );
-    let bytes = fixture
-        .cas
-        .export_witness(&coverage, &mut Budget::new(Limits::blind_cubic())?)?;
-    let mut fresh = nrz_cas::Cas::new(Limits::blind_cubic())?;
-    let imported = fresh.inspect(&bytes, &mut Budget::new(Limits::blind_cubic())?)?;
-    let expected = imported.judgment().clone();
-    let replayed = fresh.replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
-    assert_eq!(
-        fresh.export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
-        bytes
-    );
-    for fact in &answer.facts {
-        assert!(fact.is_discharged());
-    }
+    replay_complete(&fixture.cas, &answer, polynomial(&[8, 0, 0, 1])?)?;
     Ok(())
 }
 
@@ -52,12 +126,8 @@ fn blind_general_ground_cubic() -> TestResult {
             return Err(format!("{coefficients:?}: {outcome:?}").into());
         };
         assert_eq!(answer.unresolved_regions, []);
-        assert!(
-            answer
-                .coverage
-                .ok_or("missing complete coverage")?
-                .is_discharged()
-        );
+        assert_eq!(answer.form, SolveForm::Radicals);
+        replay_complete(&fixture.cas, &answer, polynomial(&coefficients)?)?;
     }
     Ok(())
 }
@@ -129,5 +199,43 @@ fn blind_zero_polynomial_family() -> TestResult {
         branch.kind,
         nrz_cas::solving::SolutionBranchKind::Image { .. }
     ));
+    Ok(())
+}
+
+/// Pending coefficient-map interpretation design restores all complex symbolic coverage strata.
+/// The current exact unsupported-fragment boundary remains an executable regression.
+/// ´test:integration:blind-symbolic-complex-complete´
+#[test]
+fn blind_symbolic_complex_complete() -> TestResult {
+    let (mut fixture, request) = crate::testing::solve_blind::symbolic(&["d", "c", "b", "a"])?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Invalid { fault, .. } = outcome else {
+        return Err(format!("complex symbolic boundary moved: {outcome:?}").into());
+    };
+    assert_eq!(
+        fault.kind,
+        nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fault.location.operation, "exact coefficients");
+    Ok(())
+}
+
+/// Pending scalar-inclusion/coefficient-interpretation design restores complete real symbolic coverage.
+/// Both discriminant signs and lower-degree families remain blocked by the named real-isolation boundary.
+/// ´test:integration:blind-symbolic-real-complete´
+#[test]
+fn blind_symbolic_real_complete() -> TestResult {
+    let (mut fixture, request) = crate::testing::solve_blind::symbolic_in_field(
+        &["d", "c", "b", "a"],
+        &nrz_cas::syntax::Field::Real,
+    )?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Unresolved { solve_reason, .. } = outcome else {
+        return Err(format!("real symbolic boundary moved: {outcome:?}").into());
+    };
+    assert_eq!(
+        solve_reason,
+        Some(nrz_cas::solving::SolveReason::RealIsolationUnavailable)
+    );
     Ok(())
 }

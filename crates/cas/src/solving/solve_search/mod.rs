@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded degree-generic discovery with independent coverage and presentation replay.
 
+mod guard;
+mod presentation;
 mod read;
+mod regional;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "generic radical cursors share the deterministic scheduler"
@@ -12,7 +15,7 @@ use crate::budget::Budget;
 use crate::error::{Fault, FaultKind, Location};
 use crate::graph::{Cas, Handle};
 use crate::request_model::{ContextConsistency, Outcome, Request};
-use crate::solving::coefficients::model::{CoefficientFailure, EvaluationScope};
+use crate::solving::coefficients::model::CoefficientFailure;
 use crate::solving::elementary::proof::problem;
 use crate::solving::radicals::{construction::Construction, route::Audit};
 use crate::solving::{SolveAnswer, SolveForm, SolveReason};
@@ -44,14 +47,25 @@ fn pending(record: &Handle, reason: SolveReason, budget: &Budget) -> Outcome {
     }
 }
 
+/// An unsealed candidate retains its exact proposed DAG and deferred presentation.
+pub(crate) struct Proposed {
+    /// Diagnostic consumers may independently replay each reachable prefix.
+    pub(crate) construction: Construction,
+    /// Proposed complete set, with no authority until replay succeeds.
+    set: Handle,
+    /// Requested representation strength.
+    form: SolveForm,
+    /// Postorder representation work is deferred until coverage checks.
+    presentations: presentation::Docket,
+}
+
 /// The original region, domain and complete request premises govern every coefficient inversion.
-fn produce(
+pub(crate) fn propose(
     cas: &mut Cas,
     request: &Request,
     audit: &mut Audit,
     budget: &mut Budget,
-    checker: &mut Budget,
-) -> Result<SolveAnswer, CoefficientFailure> {
+) -> Result<Proposed, CoefficientFailure> {
     let crate::task::Task::Solve(specification) = &request.task else {
         return Err(crate::solving::coefficients::storage::invalid().into());
     };
@@ -69,65 +83,66 @@ fn produce(
             SolveReason::CoveragePending,
         ));
     }
+    audit.mark("source-polynomial", &original.region, 0, budget)?;
     let polynomial = read::polynomial(cas, original, budget)?;
-    let domain = original.coefficient_domain.clone();
-    let region = original.region.clone();
     let mut construction = Construction {
         header: original.header.clone(),
         context: request.context.clone(),
-        region: region.clone(),
+        region: original.region.clone(),
         steps: Vec::new(),
     };
-    if polynomial.coefficients.is_empty() {
-        let original = problem(cas, &specification.problem)?;
-        if !original.denominators.is_empty()
-            || !matches!(
-                cas.state.region(original.domain.logical_id())?.expression,
-                crate::domain_model::RegionExpr::Ambient
-            )
-        {
-            return Err(CoefficientFailure::Unsupported(
-                SolveReason::CoveragePending,
-            ));
-        }
-        return Ok(crate::solving::radicals::family::finish(
+    let (proposal, presentations) = {
+        let mut search = regional::Regional {
             cas,
-            &mut construction,
-            &specification.problem,
-            specification.form,
+            construction: &mut construction,
+            request,
+            problem: &specification.problem,
+            original: &polynomial,
+            audit,
             budget,
-            checker,
-        )?);
-    }
-    let images = coefficient_images(cas, &construction, &domain, budget)?;
-    let map = construction.mapping(cas, &domain, &images, budget)?;
-    let scope = EvaluationScope {
-        context: &request.context,
-        region: &region,
-        premises: &request.premises,
-        localization: &[],
+            guards: Vec::new(),
+            presentations: presentation::Docket::default(),
+        };
+        let proposal = search.solve()?;
+        (proposal, search.presentations)
     };
-    let values = crate::solving::radicals::route::Route {
-        cas,
-        construction: &mut construction,
-        scope: &scope,
-        audit,
-        budget,
-    }
-    .derive(&polynomial, &map, 0)?;
-    let proposal = crate::solving::radicals::proof::Proposal {
-        problem: &specification.problem,
-        polynomial: &polynomial,
-        values: &values,
+    Ok(Proposed {
+        construction,
+        set: proposal.set,
         form: specification.form,
-    };
+        presentations,
+    })
+}
+
+/// Independently seal coverage before preparing or checking the requested representation.
+pub(crate) fn produce(
+    cas: &mut Cas,
+    request: &Request,
+    audit: &mut Audit,
+    budget: &mut Budget,
+    checker: &mut Budget,
+) -> Result<crate::solving::radicals::proof::Produced, CoefficientFailure> {
+    let Proposed {
+        mut construction,
+        set,
+        form,
+        presentations,
+    } = propose(cas, request, audit, budget)?;
+    audit.mark("coverage-replay", &construction.region, 0, budget)?;
+    let coverage = cas.check_proof(&construction.context, &construction.steps, checker)?;
+    let (context, region) = (construction.context.clone(), construction.region.clone());
+    let prepared = presentations.emit(&mut construction, form, budget);
+    construction.context = context;
+    construction.region = region;
     Ok(crate::solving::radicals::proof::finish(
         cas,
-        &mut construction,
-        &proposal,
-        budget,
+        &construction,
+        set,
+        form,
+        coverage,
+        prepared,
         checker,
-    )?)
+    ))
 }
 
 /// Independent checking is the only route to a solved answer; unsupported work rolls back its syntax.
@@ -154,12 +169,22 @@ fn execute(
         })
     });
     Some(match result {
-        Ok(answer) if answer.unresolved_regions.is_empty() => Outcome::Solved {
+        Ok(crate::solving::radicals::proof::Produced {
+            answer,
+            fault: Some(error),
+        }) => failure(error, Some(answer), generation, checker),
+        Ok(crate::solving::radicals::proof::Produced {
+            answer,
+            fault: None,
+        }) if answer.unresolved_regions.is_empty() => Outcome::Solved {
             request: record.clone(),
             answer,
             usage: generation.usage(),
         },
-        Ok(answer) => {
+        Ok(crate::solving::radicals::proof::Produced {
+            answer,
+            fault: None,
+        }) => {
             let reason = if answer.facts.is_empty() {
                 SolveReason::RadicalFormUnavailable
             } else {
@@ -177,15 +202,20 @@ fn execute(
             reason.unwrap_or(SolveReason::CoveragePending),
             generation,
         ),
-        Err(error) => failure(error, generation, checker),
+        Err(error) => failure(error, None, generation, checker),
     })
 }
 
-/// Preserve the first failing ledger and its exact location, with no unverified best answer.
-const fn failure(fault: Fault, generation: &Budget, checker: &Budget) -> Outcome {
+/// Preserve the first failing ledger and any coverage already independently checked before it.
+fn failure(
+    fault: Fault,
+    best: Option<SolveAnswer>,
+    generation: &Budget,
+    checker: &Budget,
+) -> Outcome {
     match fault.kind {
         FaultKind::Exhausted { .. } => Outcome::Exhausted {
-            solve_best: None,
+            solve_best: best.map(Box::new),
             best: None,
             replay_usage: checker.usage(),
             fault,

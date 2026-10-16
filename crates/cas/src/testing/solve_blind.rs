@@ -55,4 +55,32 @@ pub(crate) use source::{polynomial, symbolic};
 
 #[path = "solve_blind/trace.rs"]
 mod trace;
-pub(crate) use trace::prefixes;
+pub(crate) use trace::{prefixes, symbolic_prefixes};
+
+#[path = "solve_blind/audit.rs"]
+mod audit;
+pub(crate) use audit::symbolic as symbolic_audit;
+
+pub(crate) use audit::retained_replay_boundary;
+
+#[path = "solve_blind/mutations.rs"]
+mod mutations;
+pub(crate) use mutations::{factors as false_factors, strata as false_strata};
+
+pub(crate) use trace::transported_choices;
+
+#[path = "solve_blind/rename.rs"]
+mod rename;
+pub(crate) use rename::complete as renamed_complete_set;
+
+#[path = "solve_blind/boundaries.rs"]
+mod boundaries;
+pub(crate) use boundaries::measured as measured_boundaries;
+
+#[path = "solve_blind/unlinked.rs"]
+mod unlinked;
+pub(crate) use unlinked::refuses as unlinked_choices;
+
+pub(crate) use audit::formal_consumer;
+
+pub(crate) use audit::real_choice_consumer;

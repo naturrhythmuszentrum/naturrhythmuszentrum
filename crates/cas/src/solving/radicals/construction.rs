@@ -55,7 +55,7 @@ pub(crate) fn admit(cas: &mut Cas, draft: &Draft, budget: &mut Budget) -> Result
 }
 
 impl Construction {
-    /// All earlier dependencies are explicit and reachable; no proof can borrow a hidden cache.
+    /// Earlier applications in this exact context are explicit premises; sibling frames never leak.
     pub(crate) fn push(
         &mut self,
         rule: SolveSchema,
@@ -63,17 +63,38 @@ impl Construction {
         certificate: SolveCertificate,
         budget: &mut Budget,
     ) -> Result<u32, Fault> {
-        let index = u32::try_from(self.steps.len()).map_err(|_| invalid())?;
+        self.append(
+            crate::rule::Primitive::Solve(rule),
+            Statement::Solve(Box::new(conclusion)),
+            Certificate::Solve(Box::new(certificate)),
+            budget,
+        )
+    }
+
+    /// A shared scoped step builder also supports ordinary cover judgments.
+    pub(crate) fn append(
+        &mut self,
+        rule: crate::rule::Primitive,
+        conclusion: Statement,
+        certificate: Certificate,
+        budget: &mut Budget,
+    ) -> Result<u32, Fault> {
         let mut premises = vector(self.steps.len(), budget)?;
-        premises.extend(0..index);
+        for (index, step) in self.steps.iter().enumerate() {
+            budget.work(1, super::AT)?;
+            if step.context == self.context {
+                premises.push(u32::try_from(index).map_err(|_| invalid())?);
+            }
+        }
+        let index = u32::try_from(premises.len()).map_err(|_| invalid())?;
         reserve(&mut self.steps, 1, budget)?;
         self.steps.push(ApplicationDraft {
-            rule: crate::rule::Primitive::Solve(rule),
+            rule,
             context: self.context.clone(),
-            conclusion: Statement::Solve(Box::new(conclusion)),
+            conclusion,
             premises,
             substitutions: Vec::new(),
-            certificate: Certificate::Solve(Box::new(certificate)),
+            certificate,
         });
         Ok(index)
     }
@@ -251,7 +272,12 @@ impl Construction {
     }
 
     /// The one-unit theorem reconstructs the complete Bezout identity in the actual parent algebra.
-    fn unit(&mut self, cas: &mut Cas, domain: &Handle, budget: &mut Budget) -> Result<u32, Fault> {
+    pub(crate) fn unit(
+        &mut self,
+        cas: &mut Cas,
+        domain: &Handle,
+        budget: &mut Budget,
+    ) -> Result<u32, Fault> {
         let engine = Engine {
             state: &cas.state,
             domain,
@@ -311,18 +337,24 @@ impl Construction {
         )
     }
 
-    /// Adjoin a root of a computed monic polynomial and retain its exact generator evaluation.
-    pub(crate) fn adjoin(
+    /// Constructive real witnesses precede the generic complex existence fallback.
+    fn root_choice(
         &mut self,
         cas: &mut Cas,
         polynomial: &Dense,
-        map: &Handle,
+        interpretation: [&Handle; 2],
         order: Option<u32>,
         budget: &mut Budget,
-    ) -> Result<Extension, Fault> {
+    ) -> Result<(Handle, Handle), Fault> {
+        let (relation, selection, root) =
+            self.selection(cas, interpretation[0], interpretation[1], budget)?;
+        if order.is_none()
+            && let Some(real) =
+                super::real_choice::choose(cas, self, polynomial, &relation, budget)?
+        {
+            return Ok(real);
+        }
         let unit = self.unit(cas, &polynomial.domain, budget)?;
-        let stored = materialize::polynomial(cas, polynomial, &[Field::Complex], budget)?;
-        let (relation, selection, root) = self.selection(cas, &stored, map, budget)?;
         self.push(
             SolveSchema::RootAdjunction,
             SolveStatement::RootExistence(StatementRootExistence {
@@ -343,6 +375,20 @@ impl Construction {
             }),
             budget,
         )?;
+        Ok((selection, root))
+    }
+
+    /// Adjoin a root of a computed monic polynomial and retain its exact generator evaluation.
+    pub(crate) fn adjoin(
+        &mut self,
+        cas: &mut Cas,
+        polynomial: &Dense,
+        map: &Handle,
+        order: Option<u32>,
+        budget: &mut Budget,
+    ) -> Result<Extension, Fault> {
+        let stored = materialize::polynomial(cas, polynomial, &[Field::Complex], budget)?;
+        let (selection, root) = self.root_choice(cas, polynomial, [&stored, map], order, budget)?;
         let domain = Self::quotient(cas, &polynomial.domain, &stored, budget)?;
         let engine = Engine {
             state: &cas.state,

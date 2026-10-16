@@ -2,7 +2,7 @@
 //! Strictly degree-decreasing radical discovery, linked choices and inverse character recovery.
 
 use super::construction::Construction;
-use super::discovery::{Attempt, Discovery};
+use super::discovery::{Attempt, Candidate, Discovery};
 use super::roots::{Values, inverse};
 use crate::budget::{Budget, BudgetKind};
 use crate::graph::{Cas, Handle};
@@ -15,14 +15,7 @@ use crate::solving::elementary::recipes::{self, GeneralRecipe, Recipe};
 use crate::solving::symmetric::algebra::Polynomial;
 use crate::solving::towers::dense::Dense;
 
-/// Diagnostic enumeration is separate from mathematical evidence and carries no completeness bit.
-#[derive(Debug, Default)]
-pub(crate) struct Audit {
-    /// All seeds visited by recursive discovery, in deterministic order.
-    pub(crate) attempts: Vec<Attempt>,
-    /// Exponents of the last discovered cross-character invariant.
-    pub(crate) pairing_powers: Vec<u32>,
-}
+pub(crate) use super::audit::Audit;
 
 /// Extract an evaluated constant only after all formal symmetric slots have been substituted.
 fn constant(
@@ -160,6 +153,15 @@ fn lift(
     Ok(construction.adjoin(cas, &defining, &values.map, None, budget)?)
 }
 
+/// Degree-generic choices preserve the defining root relations and enter the complete proof proposal.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Choices {
+    /// Replace a primitive unity by its inverse before constructing the character frame.
+    pub(crate) inverse_unity: bool,
+    /// Rotate a lifted character by powers of its compatible primitive unity.
+    pub(crate) rotation: u32,
+}
+
 /// One bounded recursive invocation shares both the graph and all arithmetic ledgers.
 pub(crate) struct Route<'a, 's> {
     /// Owning transaction candidate.
@@ -170,6 +172,8 @@ pub(crate) struct Route<'a, 's> {
     pub(crate) scope: &'a EvaluationScope<'s>,
     /// Deterministic enumeration log, without theorem authority.
     pub(crate) audit: &'a mut Audit,
+    /// Explicit root choices are semantic inputs.
+    pub(crate) choices: Choices,
     /// Caller-owned generation ledger.
     pub(crate) budget: &'a mut Budget,
 }
@@ -193,13 +197,12 @@ struct Descent {
 }
 
 impl Route<'_, '_> {
-    /// Visit generic seeds and independently retain every symmetric expansion obligation.
-    fn descend(
+    /// A reusable character frame is constructed from the actual polynomial degree.
+    fn primitive(
         &mut self,
         source: &GeneralRecipe,
         map: &Handle,
-        depth: u64,
-    ) -> Result<Descent, CoefficientFailure> {
+    ) -> Result<(Values, Polynomial, u32), CoefficientFailure> {
         let degree = u32::try_from(
             source
                 .coefficients
@@ -209,7 +212,7 @@ impl Route<'_, '_> {
                 .ok_or_else(invalid)?,
         )
         .map_err(|_| invalid())?;
-        let primitive = super::roots::unity(
+        let mut primitive = super::roots::unity(
             self.cas,
             self.construction,
             &source.coefficients.domain,
@@ -217,11 +220,41 @@ impl Route<'_, '_> {
             degree,
             self.budget,
         )?;
-        let unity = primitive.roots.first().ok_or_else(invalid)?;
+        if self.choices.inverse_unity {
+            let engine = Engine {
+                state: &self.cas.state,
+                domain: &primitive.domain,
+            };
+            let unity = primitive.roots.first_mut().ok_or_else(invalid)?;
+            *unity = engine.pow(
+                unity,
+                degree.checked_sub(1).ok_or_else(invalid)?,
+                self.budget,
+            )?;
+        }
         let frame = frame(self.cas, &primitive.domain, degree, self.budget)?;
+        Ok((primitive, frame, degree))
+    }
+
+    /// The cursor contributes its exact visited prefix and a strictly smaller candidate.
+    fn enumerate(
+        &mut self,
+        frame: &Polynomial,
+        unity: &Element,
+        degree: u32,
+        depth: u64,
+    ) -> Result<(Candidate, u32, u32), CoefficientFailure> {
         let mut discovery = Discovery::new(degree, depth, self.budget)?;
+        let audit = &mut *self.audit;
+        let region = self.scope.region;
         let candidate = discovery
-            .next(&frame, unity, &self.cas.state, self.budget)?
+            .next(
+                frame,
+                unity,
+                &self.cas.state,
+                self.budget,
+                |phase, seed, budget| audit.seed(phase, region, depth, seed, budget),
+            )?
             .ok_or(CoefficientFailure::Unsupported(
                 SolveReason::GenericRadicalRouteUnavailable,
             ))?;
@@ -244,21 +277,81 @@ impl Route<'_, '_> {
             self.budget,
         )?;
         self.audit.attempts.extend(discovery.attempts);
+        Ok((candidate, index, power))
+    }
+
+    /// Observe graph staging and each replay expansion separately from discovery arithmetic.
+    fn obligations(
+        &mut self,
+        candidate: &Candidate,
+        source: &Dense,
+        maps: [&Handle; 2],
+        depth: u64,
+    ) -> Result<(), CoefficientFailure> {
+        self.mark("orbit-proof-start", depth)?;
         let orbit =
             candidate
                 .orbit
                 .application(self.cas, &self.construction.context, self.budget)?;
         reserve(&mut self.construction.steps, 1, self.budget)?;
         self.construction.steps.push(orbit);
-        for coefficient in &candidate.resolvent.coefficients {
-            super::proof::reduction(
+        self.mark("orbit-proof-end", depth)?;
+        for (position, coefficient) in candidate.resolvent.coefficients.iter().enumerate() {
+            self.audit.indexed(
+                "reduction-proof-start",
+                position,
+                self.scope.region,
+                depth,
+                self.budget,
+            )?;
+            let mut input = super::formal::Input {
+                source,
+                maps,
+                scope: self.scope,
+                audit: self.audit,
+            };
+            super::formal::certify(
                 self.cas,
                 self.construction,
                 coefficient,
-                &primitive.map,
+                &mut input,
+                self.budget,
+            )?;
+            self.audit.indexed(
+                "reduction-proof-end",
+                position,
+                self.scope.region,
+                depth,
                 self.budget,
             )?;
         }
+        Ok(())
+    }
+
+    /// Visit generic seeds and retain every symmetric expansion obligation independently.
+    fn descend(
+        &mut self,
+        source: &GeneralRecipe,
+        map: &Handle,
+        depth: u64,
+    ) -> Result<Descent, CoefficientFailure> {
+        self.mark("primitive", depth)?;
+        let (primitive, frame, degree) = self.primitive(source, map)?;
+        self.mark("orbit-discovery", depth)?;
+        let (candidate, index, power) = self.enumerate(
+            &frame,
+            primitive.roots.first().ok_or_else(invalid)?,
+            degree,
+            depth,
+        )?;
+        self.mark("symmetric-proof", depth)?;
+        self.obligations(
+            &candidate,
+            &source.coefficients,
+            [&primitive.map, map],
+            depth,
+        )?;
+        self.mark("coefficient-images", depth)?;
         let images = super::substitute::images(
             &source.coefficients,
             &frame,
@@ -266,23 +359,15 @@ impl Route<'_, '_> {
             &self.cas.state,
             self.budget,
         )?;
-        for coefficient in &candidate.resolvent.coefficients {
-            super::proof::substitution(
-                self.cas,
-                self.construction,
-                &coefficient.expression,
-                &images,
-                &primitive.map,
-                self.budget,
-            )?;
-        }
+        self.mark("resolvent-substitution", depth)?;
         let target = super::substitute::resolvent(
             &candidate.resolvent,
             &images,
             &self.cas.state,
             self.budget,
         )?;
-        let pairing = self.pairing(&frame, &primitive, &images, degree)?;
+        self.mark("pairing", depth)?;
+        let pairing = self.pairing(&primitive, &images, &frame, &source.coefficients, map)?;
         Ok(Descent {
             target,
             primitive,
@@ -297,29 +382,34 @@ impl Route<'_, '_> {
     /// The first symmetric cross-character product is discovered by low-total-degree enumeration.
     fn pairing(
         &mut self,
-        frame: &Polynomial,
         primitive: &Values,
         images: &[Polynomial],
-        degree: u32,
+        frame: &Polynomial,
+        source: &Dense,
+        input_map: &Handle,
     ) -> Result<(Element, Vec<u32>), CoefficientFailure> {
-        let unity = primitive.roots.first().ok_or_else(invalid)?;
-        let pairing = super::pairing::discover(frame, unity, degree, &self.cas.state, self.budget)?
-            .ok_or(CoefficientFailure::Unsupported(
-                SolveReason::RootSelectionExistencePending,
-            ))?;
-        super::proof::reduction(
+        let degree = u32::try_from(frame.variables.len()).map_err(|_| invalid())?;
+        let pairing = super::pairing::discover(
+            frame,
+            primitive.roots.first().ok_or_else(invalid)?,
+            degree,
+            &self.cas.state,
+            self.budget,
+        )?
+        .ok_or(CoefficientFailure::Unsupported(
+            SolveReason::RootSelectionExistencePending,
+        ))?;
+        let mut input = super::formal::Input {
+            source,
+            maps: [&primitive.map, input_map],
+            scope: self.scope,
+            audit: self.audit,
+        };
+        super::formal::certify(
             self.cas,
             self.construction,
             &pairing.reduction,
-            &primitive.map,
-            self.budget,
-        )?;
-        super::proof::substitution(
-            self.cas,
-            self.construction,
-            &pairing.reduction.expression,
-            images,
-            &primitive.map,
+            &mut input,
             self.budget,
         )?;
         let product = pairing
@@ -353,6 +443,7 @@ impl Route<'_, '_> {
                 .ok_or_else(invalid)?,
         )
         .map_err(|_| invalid())?;
+        self.mark("inverse-transform-proof", depth)?;
         super::recovery::certify(
             self.cas,
             self.construction,
@@ -363,6 +454,7 @@ impl Route<'_, '_> {
             self.budget,
         )?;
         let smaller = self.derive(&descent.target, &descent.primitive.map, descent.depth)?;
+        self.mark("character-lift", depth)?;
         let extension = lift(
             self.cas,
             self.construction,
@@ -370,6 +462,19 @@ impl Route<'_, '_> {
             descent.power,
             self.budget,
         )?;
+        self.recovered(source, &descent, extension, width, depth)
+    }
+
+    /// Recover a complete set from one compatible character choice and the discovered product.
+    fn recovered(
+        &mut self,
+        source: &GeneralRecipe,
+        descent: &Descent,
+        extension: super::construction::Extension,
+        width: u32,
+        depth: u64,
+    ) -> Result<Values, CoefficientFailure> {
+        self.mark("linked-recovery", depth)?;
         let product = canonical(
             &self.cas.state,
             &descent.pairing,
@@ -380,21 +485,33 @@ impl Route<'_, '_> {
             state: &self.cas.state,
             domain: &extension.domain,
         };
-        let characters = linked(
-            &engine,
-            &extension.generator,
-            &product,
-            &descent.powers,
-            descent.index,
-            self.scope,
-            self.budget,
-        )?;
         let unity = canonical(
             &self.cas.state,
             descent.primitive.roots.first().ok_or_else(invalid)?,
             &extension.domain,
             self.budget,
         )?;
+        if !width.is_multiple_of(descent.power) {
+            return Err(invalid().into());
+        }
+        let exponent = (width / descent.power)
+            .checked_mul(self.choices.rotation % descent.power)
+            .ok_or_else(invalid)?;
+        let chosen = engine.mul(
+            &extension.generator,
+            &engine.pow(&unity, exponent, self.budget)?,
+            self.budget,
+        )?;
+        let characters = linked(
+            &engine,
+            &chosen,
+            &product,
+            &descent.powers,
+            descent.index,
+            self.scope,
+            self.budget,
+        )?;
+        self.mark("inverse-transform", depth)?;
         let roots = recover(
             self.cas,
             &characters,
@@ -410,6 +527,93 @@ impl Route<'_, '_> {
         })
     }
 
+    /// Exact regional decisions drive branching; a formal nonzero numerator never becomes a unit.
+    fn decide(&mut self, value: &Element) -> Result<bool, CoefficientFailure> {
+        use crate::solving::coefficients::model::{Value, ZeroDecision};
+        let engine = Engine {
+            state: &self.cas.state,
+            domain: &value.domain,
+        };
+        match engine.zero_test(value, self.scope, self.budget)? {
+            ZeroDecision::Zero(_) => Ok(true),
+            ZeroDecision::Nonzero(_) => Ok(false),
+            ZeroDecision::Split(_) => Err(CoefficientFailure::Unsupported(
+                SolveReason::ComponentChoicePending,
+            )),
+            ZeroDecision::Undetermined(obligation) => {
+                if !matches!(
+                    crate::solving::coefficients::storage::domain(
+                        &self.cas.state,
+                        &obligation.domain
+                    )?,
+                    crate::solving::CoefficientDomainData::Fraction { .. }
+                ) {
+                    return Err(CoefficientFailure::Unsupported(
+                        SolveReason::SpecializationGuardPending,
+                    ));
+                }
+                let numerator = obligation.polynomial;
+                let one = crate::solving::coefficients::scalar::Scalar::constant(
+                    numerator.ground,
+                    true,
+                    self.budget,
+                )?;
+                let denominator = crate::solving::coefficients::polynomial::Polynomial::constant(
+                    numerator.variables,
+                    one,
+                    self.budget,
+                )?;
+                let engine = Engine {
+                    state: &self.cas.state,
+                    domain: &obligation.domain,
+                };
+                self.audit.pending = Some(engine.element(Value::Fraction(
+                    crate::solving::coefficients::fraction::Fraction {
+                        numerator,
+                        denominator,
+                    },
+                )));
+                Err(CoefficientFailure::Unsupported(
+                    SolveReason::SpecializationGuardPending,
+                ))
+            }
+        }
+    }
+
+    /// Cost observations name the exact scope and actual recursive depth.
+    fn mark(&mut self, phase: &'static str, depth: u64) -> Result<(), CoefficientFailure> {
+        Ok(self
+            .audit
+            .mark(phase, self.scope.region, depth, self.budget)?)
+    }
+
+    /// Regional degree decisions precede the generic affine translation.
+    fn recipe(&mut self, polynomial: &Dense, depth: u64) -> Result<Recipe, CoefficientFailure> {
+        self.mark("degree-decisions", depth)?;
+        if polynomial.coefficients.len() <= 5 {
+            for coefficient in polynomial.coefficients.iter().rev() {
+                if !self.decide(coefficient)? {
+                    break;
+                }
+            }
+        }
+        self.mark("affine-translation", depth)?;
+        let engine = Engine {
+            state: &self.cas.state,
+            domain: &polynomial.domain,
+        };
+        match recipes::derive(&engine, polynomial, self.scope, self.budget) {
+            Err(CoefficientFailure::Unsupported(SolveReason::SpecializationGuardPending))
+                if polynomial.coefficients.len() > 5 =>
+            {
+                Err(CoefficientFailure::Unsupported(
+                    SolveReason::GenericRadicalRouteUnavailable,
+                ))
+            }
+            result => result,
+        }
+    }
+
     /// Degree drop and translation precede binomials; unavailable strategies seal no obstruction.
     pub(crate) fn derive(
         &mut self,
@@ -417,28 +621,35 @@ impl Route<'_, '_> {
         map: &Handle,
         depth: u64,
     ) -> Result<Values, CoefficientFailure> {
-        let engine = Engine {
-            state: &self.cas.state,
-            domain: &polynomial.domain,
-        };
-        let recipe = match recipes::derive(&engine, polynomial, self.scope, self.budget) {
-            Err(CoefficientFailure::Unsupported(SolveReason::SpecializationGuardPending))
-                if polynomial.coefficients.len() > 5 =>
-            {
-                return Err(CoefficientFailure::Unsupported(
-                    SolveReason::GenericRadicalRouteUnavailable,
-                ));
-            }
-            result => result?,
-        };
+        let recipe = self.recipe(polynomial, depth)?;
+        self.mark("recipe-decisions", depth)?;
         match recipe {
-            Recipe::Binomial(recipe) => {
+            Recipe::Binomial(mut recipe) => {
+                if self.decide(&recipe.radicand)? {
+                    let engine = Engine {
+                        state: &self.cas.state,
+                        domain: &recipe.radicand.domain,
+                    };
+                    recipe.radicand = engine.constant(false, self.budget)?;
+                }
+                self.mark("binomial-roots", depth)?;
                 super::roots::binomial(self.cas, self.construction, &recipe, map, self.budget)
             }
             Recipe::General(_) if polynomial.coefficients.len() > 5 => Err(
                 CoefficientFailure::Unsupported(SolveReason::GenericRadicalRouteUnavailable),
             ),
-            Recipe::General(recipe) => self.general(&recipe, map, depth),
+            Recipe::General(recipe) => {
+                for coefficient in recipe
+                    .coefficients
+                    .coefficients
+                    .iter()
+                    .skip(1)
+                    .take(recipe.coefficients.coefficients.len().saturating_sub(2))
+                {
+                    self.decide(coefficient)?;
+                }
+                self.general(&recipe, map, depth)
+            }
             Recipe::Constant(value) => Ok(Values {
                 domain: value.domain,
                 map: map.clone(),

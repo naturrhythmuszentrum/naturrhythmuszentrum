@@ -49,44 +49,6 @@ pub(crate) fn identity(
     )
 }
 
-/// The replay checker expands the discovered symmetric expression independently of the producer reduction.
-pub(crate) fn reduction(
-    cas: &mut Cas,
-    construction: &mut Construction,
-    reduction: &crate::solving::symmetric::reduction::Reduction,
-    map: &Handle,
-    budget: &mut Budget,
-) -> Result<(), Fault> {
-    let expanded = reduction
-        .expression
-        .compose(&reduction.basis, &cas.state, budget)?;
-    let left = reduction.source.stage(cas, budget)?;
-    let right = expanded.stage(cas, budget)?;
-    identity(construction, [&left, &right], map, budget)?;
-    Ok(())
-}
-
-/// Replay the actual elementary-slot replacement as a visible nested scalar expression.
-pub(crate) fn substitution(
-    cas: &mut Cas,
-    construction: &mut Construction,
-    expression: &crate::solving::symmetric::algebra::Polynomial,
-    images: &[crate::solving::symmetric::algebra::Polynomial],
-    map: &Handle,
-    budget: &mut Budget,
-) -> Result<(), Fault> {
-    let rendering = crate::solving::symmetric::render::Rendering::new(cas, map, budget)?;
-    let mut evaluated = vector(images.len(), budget)?;
-    for image in images {
-        evaluated.push(rendering.polynomial(cas, image, &[], budget)?);
-    }
-    let left = rendering.polynomial(cas, expression, &evaluated, budget)?;
-    let composed = expression.compose(images, &cas.state, budget)?;
-    let right = rendering.polynomial(cas, &composed, &[], budget)?;
-    identity(construction, [&left, &right], map, budget)?;
-    Ok(())
-}
-
 /// A complete candidate set has one exact original-domain branch and deduplicated tuple syntax.
 fn set(
     cas: &mut Cas,
@@ -222,7 +184,14 @@ pub(crate) fn coverage(
     let scalar = construction.literal(cas, &scale, &values.map, budget)?;
     let (entries, product) = factors(cas, construction, values, &scalar, &unknown, budget)?;
     let input = original(cas, construction, polynomial, values, &unknown, budget)?;
-    let product = identity(construction, [&input, &product], &values.map, budget)?;
+    // Regional zero equalities are independently reduced by ProductCompleteness against the original problem.
+    let original_region = &crate::solving::elementary::proof::problem(cas, problem)?.region;
+    let left = if *original_region == construction.region {
+        &input
+    } else {
+        &product
+    };
+    let product = identity(construction, [left, &product], &values.map, budget)?;
     let set = set(cas, construction, problem, &entries, budget)?;
     let mut factors = vector(entries.len(), budget)?;
     factors.extend(entries.into_iter().map(|root| RootFactor {
@@ -250,34 +219,14 @@ pub(crate) fn coverage(
     Ok(set)
 }
 
-/// Only sealed, discharged full coverage and presentation can become a solved answer.
-pub(crate) fn finish(
-    cas: &mut Cas,
+/// Explicit representation obligations name their independently closed child presentations.
+pub(crate) fn present(
     construction: &mut Construction,
-    proposal: &Proposal<'_>,
-    budget: &mut Budget,
-    checker: &mut Budget,
-) -> Result<SolveAnswer, Fault> {
-    let (problem, polynomial, values, form) = (
-        proposal.problem,
-        proposal.polynomial,
-        proposal.values,
-        proposal.form,
-    );
-    let set = coverage(cas, construction, problem, polynomial, values, budget)?;
-    seal(cas, construction, set, form, budget, checker)
-}
-
-/// Coverage and requested presentation are checked separately before publication.
-pub(crate) fn seal(
-    cas: &mut Cas,
-    construction: &mut Construction,
-    set: Handle,
+    set: &Handle,
     form: SolveForm,
+    compatibility: Vec<u32>,
     budget: &mut Budget,
-    checker: &mut Budget,
-) -> Result<SolveAnswer, Fault> {
-    let coverage = cas.check_proof(&construction.context, &construction.steps, checker)?;
+) -> Result<(), Fault> {
     construction.push(
         SolveSchema::RootSelectionRefinement,
         SolveStatement::Presentation(StatementPresentation {
@@ -290,51 +239,72 @@ pub(crate) fn seal(
             target_kind: RefinementTargetKind::SolutionSet,
             target: set.clone(),
             witnesses: Vec::new(),
-            compatibility: Vec::new(),
+            compatibility,
             form: Some(form),
         }),
         budget,
     )?;
-    let presentation = match cas.check_proof(&construction.context, &construction.steps, checker) {
-        Ok(presentation) => presentation,
+    Ok(())
+}
+
+/// A checked answer survives a later resource failure while the first fault remains explicit.
+pub(crate) struct Produced {
+    /// Only independently replayed facts, with the achieved representation strength.
+    pub(crate) answer: SolveAnswer,
+    /// A subsequent failed obligation does not revoke earlier checked coverage.
+    pub(crate) fault: Option<Fault>,
+}
+
+/// Retain independently checked coverage even when representation preparation or replay exhausts.
+pub(crate) fn finish(
+    cas: &mut Cas,
+    construction: &Construction,
+    set: Handle,
+    form: SolveForm,
+    coverage: crate::proof_model::VerifiedWitness,
+    preparation: Result<(), Fault>,
+    checker: &mut Budget,
+) -> Produced {
+    let representation = preparation
+        .and_then(|()| cas.check_proof(&construction.context, &construction.steps, checker));
+    let mut answer = SolveAnswer {
+        set,
+        facts: Vec::new(),
+        coverage: Some(coverage),
+        form: SolveForm::AnyExact,
+        unresolved_regions: vec![construction.region.clone()],
+    };
+    match representation {
+        Ok(presentation) => {
+            if answer
+                .coverage
+                .as_ref()
+                .is_some_and(crate::proof_model::VerifiedWitness::is_discharged)
+                && presentation.is_discharged()
+            {
+                answer.unresolved_regions.clear();
+            }
+            answer.form = form;
+            answer.facts.push(presentation);
+            Produced {
+                answer,
+                fault: None,
+            }
+        }
         Err(error)
             if matches!(
                 error.kind,
                 crate::error::FaultKind::Invalid(crate::error::InvalidCode::Rule)
             ) =>
         {
-            return Ok(SolveAnswer {
-                set,
-                facts: Vec::new(),
-                coverage: Some(coverage),
-                form: SolveForm::AnyExact,
-                unresolved_regions: vec![construction.region.clone()],
-            });
+            Produced {
+                answer,
+                fault: None,
+            }
         }
-        Err(error) => return Err(error),
-    };
-    let unresolved_regions = if coverage.is_discharged() && presentation.is_discharged() {
-        Vec::new()
-    } else {
-        vec![construction.region.clone()]
-    };
-    Ok(SolveAnswer {
-        set,
-        facts: vec![presentation],
-        coverage: Some(coverage),
-        form,
-        unresolved_regions,
-    })
-}
-
-/// A finite proposal retains the original problem and requested representation until replay.
-pub(crate) struct Proposal<'a> {
-    /// Exact original problem, including all original denominator obligations.
-    pub(crate) problem: &'a Handle,
-    /// Original polynomial coefficient vector.
-    pub(crate) polynomial: &'a Dense,
-    /// Computed roots in a shared scalar interpretation.
-    pub(crate) values: &'a Values,
-    /// Requested exact representation.
-    pub(crate) form: SolveForm,
+        Err(error) => Produced {
+            answer,
+            fault: Some(error),
+        },
+    }
 }

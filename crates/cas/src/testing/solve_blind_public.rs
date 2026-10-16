@@ -11,7 +11,8 @@ use crate::test_api::solving::{ExclusionPolicy, SolveForm, SolveGoal, SolveSpec}
 use crate::test_api::syntax::{
     AtomicSort, Draft, ExpressionDraft, Field, Operator, PredicateKind, Sort,
 };
-use input::{Fixture, admit};
+pub(crate) use input::Fixture;
+use input::admit;
 
 /// The request pins exactly the documented acceptance overrides, with ordinary defaults elsewhere.
 fn profile(limits: &Limits) -> LimitsOverride {
@@ -71,8 +72,13 @@ fn degree_limits(count: usize) -> Limits {
 
 /// Independent coefficient names enter the source exactly in ascending power order.
 pub(crate) fn symbolic(keys: &[&str]) -> TestResult<(Fixture, Request)> {
+    symbolic_in_field(keys, &Field::Complex)
+}
+
+/// Real and complex acceptance requests have separate explicit semantic headers.
+pub(crate) fn symbolic_in_field(keys: &[&str], field: &Field) -> TestResult<(Fixture, Request)> {
     let limits = degree_limits(keys.len());
-    let mut fixture = Fixture::with_parameters(&Field::Complex, keys, limits.clone())?;
+    let mut fixture = Fixture::with_parameters(field, keys, limits.clone())?;
     fixture.algebra = admit(
         &mut fixture.cas,
         &Draft::Solve(crate::test_api::solving::SolveDraft::CoefficientDomain(

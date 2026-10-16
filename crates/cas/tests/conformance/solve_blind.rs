@@ -83,3 +83,177 @@ fn blind_unrelated_store_content() -> TestResult {
     assert!(*work.get(1).ok_or("unrelated run missing")? <= baseline + 100_000);
     Ok(())
 }
+
+/// The measured generation cap succeeds exactly and refuses one below without changing the profile.
+/// ´test:integration:blind-generation-work-boundary´
+#[test]
+fn blind_generation_work_boundary() -> TestResult {
+    let (mut fixture, request) = polynomial(&[8, 0, 0, 1])?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Solved { usage, .. } = outcome else {
+        return Err(format!("baseline: {outcome:?}").into());
+    };
+    let required = usage.work;
+    for cap in [
+        required,
+        required.checked_sub(1).ok_or("empty generation ledger")?,
+    ] {
+        let (mut fixture, mut request) = polynomial(&[8, 0, 0, 1])?;
+        request.limits.work = Some(cap);
+        let outcome = fixture.cas.run(&request);
+        if cap == required {
+            let Outcome::Solved { usage, .. } = outcome else {
+                return Err(format!("exact cap: {outcome:?}").into());
+            };
+            assert_eq!(usage.work, required);
+        } else {
+            let Outcome::Exhausted { fault, usage, .. } = outcome else {
+                return Err(format!("below cap: {outcome:?}").into());
+            };
+            assert!(
+                matches!(fault.kind, nrz_cas::FaultKind::Exhausted { budget: BudgetKind::Work, limit, needed, .. } if limit == cap && needed > limit)
+            );
+            assert!(usage.work <= cap);
+            assert_eq!(fault.location, nrz_cas::Location::new("exact coefficients"));
+        }
+    }
+    Ok(())
+}
+
+/// Public fixtures provide only an original source request.
+type SourceFactory = fn() -> TestResult<(
+    crate::testing::solve_blind::Fixture,
+    nrz_cas::request::Request,
+)>;
+
+/// One public request changes only its measured selected resource ceiling.
+fn service_boundary(
+    factory: SourceFactory,
+    kind: BudgetKind,
+    usage: fn(&nrz_cas::limits::BudgetUsage) -> u64,
+    limit: fn(&mut nrz_cas::limits::LimitsOverride, u64),
+    expected_location: nrz_cas::Location,
+) -> TestResult {
+    let (mut fixture, request) = factory()?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Solved {
+        answer,
+        usage: measured,
+        ..
+    } = outcome
+    else {
+        return Err(format!("resource baseline: {outcome:?}").into());
+    };
+    let required = usage(&measured);
+    assert!(required > 0, "unexercised {kind:?}");
+    let coverage = answer.coverage.ok_or("resource baseline coverage")?;
+    let bytes = fixture
+        .cas
+        .export_witness(&coverage, &mut Budget::new(Limits::blind_cubic())?)?;
+    for cap in [required, required - 1] {
+        let (mut fixture, mut request) = factory()?;
+        limit(&mut request.limits, cap);
+        let outcome = fixture.cas.run(&request);
+        if cap == required {
+            let Outcome::Solved { answer, .. } = outcome else {
+                return Err(format!("resource exact cap: {outcome:?}").into());
+            };
+            let coverage = answer.coverage.ok_or("resource exact coverage")?;
+            assert_eq!(
+                fixture
+                    .cas
+                    .export_witness(&coverage, &mut Budget::new(Limits::blind_cubic())?)?,
+                bytes
+            );
+        } else {
+            let Outcome::Exhausted { fault, .. } = outcome else {
+                return Err(format!("resource below cap: {outcome:?}").into());
+            };
+            assert!(
+                matches!(fault.kind, nrz_cas::FaultKind::Exhausted { budget, limit, needed, .. } if budget == kind && limit == cap && needed > cap),
+                "{fault:?}"
+            );
+            assert_eq!(fault.location, expected_location);
+        }
+    }
+    Ok(())
+}
+
+/// The zero-polynomial family's actual bound-coordinate requirement has an isolated exact ceiling.
+/// ´test:integration:blind-family-parameter-boundary´
+#[test]
+fn blind_family_parameter_boundary() -> TestResult {
+    service_boundary(
+        || polynomial(&[0]),
+        BudgetKind::FamilyParameters,
+        |usage| usage.family_parameters,
+        |limits, cap| limits.family_parameters = Some(cap),
+        nrz_cas::Location::new("solving object admission"),
+    )
+}
+
+/// Regional inversion of a symbolic linear leading coefficient retains its measured denominator work.
+/// ´test:integration:blind-denominator-factor-boundary´
+#[test]
+fn blind_denominator_factor_boundary() -> TestResult {
+    service_boundary(
+        || crate::testing::solve_blind::symbolic(&["b", "a"]),
+        BudgetKind::DenominatorFactors,
+        |usage| usage.denominator_factors,
+        |limits, cap| limits.denominator_factors = Some(cap),
+        nrz_cas::Location::new("exact coefficients"),
+    )
+}
+
+/// The underlying supplied component certificate succeeds at N and atomically refuses at N-1.
+/// ´test:integration:blind-component-replay-boundary´
+#[test]
+fn blind_component_replay_boundary() -> TestResult {
+    let mut fixture = crate::testing::solve_coefficients::SplitFixture::new()?;
+    let mut baseline = Budget::new(Limits::blind_cubic())?;
+    let witness = fixture.unit.base.cas.check_proof(
+        &fixture.unit.base.context,
+        &fixture.steps,
+        &mut baseline,
+    )?;
+    assert!(witness.is_discharged());
+    let bytes = fixture
+        .unit
+        .base
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let required = baseline.usage().component_splits;
+    assert!(required > 0);
+    for cap in [required, required - 1] {
+        let mut fixture = crate::testing::solve_coefficients::SplitFixture::new()?;
+        let before = fixture.unit.base.cas.counts();
+        let mut budget = Budget::new(Limits {
+            component_splits: cap,
+            ..Limits::blind_cubic()
+        })?;
+        let result = fixture.unit.base.cas.check_proof(
+            &fixture.unit.base.context,
+            &fixture.steps,
+            &mut budget,
+        );
+        if cap == required {
+            let checked = result?;
+            assert_eq!(
+                fixture
+                    .unit
+                    .base
+                    .cas
+                    .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?,
+                bytes
+            );
+        } else {
+            let fault = result.err().ok_or("component below cap succeeded")?;
+            assert!(
+                matches!(fault.kind, nrz_cas::FaultKind::Exhausted { budget: BudgetKind::ComponentSplits, limit, needed, .. } if limit == cap && needed > cap),
+                "{fault:?}"
+            );
+            assert_eq!(fixture.unit.base.cas.counts(), before);
+        }
+    }
+    Ok(())
+}

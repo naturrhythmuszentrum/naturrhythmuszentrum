@@ -9,7 +9,7 @@ use crate::solving::coefficients::storage::{invalid, reserve, vector};
 use crate::solving::orbits::produce::{Orbit, enumerate};
 use crate::solving::symmetric::algebra::Polynomial;
 use crate::solving::symmetric::cursor::{Cursor, Seed};
-use crate::solving::symmetric::resolvent::{Resolvent, smaller};
+use crate::solving::symmetric::resolvent::{Resolvent, smaller_observed};
 use crate::solving::symmetric::seeds::generate;
 
 /// One attempted seed retains its actual orbit size, including rejected larger orbits.
@@ -57,6 +57,27 @@ impl Discovery {
         })
     }
 
+    /// Refill one quota epoch, keeping the remaining intents alive when a descent returns early.
+    fn scheduled(&mut self, budget: &mut Budget) -> Result<Option<Seed>, Fault> {
+        if let Some(seed) = self.schedule.pop(budget)? {
+            return Ok(Some(seed));
+        }
+        let count = budget
+            .limits()
+            .cost_quota
+            .checked_add(budget.limits().progress_quota)
+            .ok_or_else(invalid)?;
+        for _ in 0..count {
+            let Some(seed) = self.cursor.next(budget)? else {
+                break;
+            };
+            let key = seed_key(&seed, budget)?;
+            self.schedule
+                .push(0, [1, u64::from(self.degree), 0, 0], key, seed, budget)?;
+        }
+        self.schedule.pop(budget)
+    }
+
     /// Resume until the next strict degree descent, retaining the cursor after the returned seed.
     pub(crate) fn next(
         &mut self,
@@ -64,23 +85,34 @@ impl Discovery {
         unity: &Element,
         state: &State,
         budget: &mut Budget,
+        mut observe: impl FnMut((&'static str, Option<usize>), &Seed, &mut Budget) -> Result<(), Fault>,
     ) -> Result<Option<Candidate>, Fault> {
         if usize::try_from(self.degree).map_err(|_| invalid())? != frame.variables.len() {
             return Err(invalid());
         }
-        while let Some(seed) = self.cursor.next(budget)? {
-            let key = seed_key(&seed, budget)?;
-            self.schedule
-                .push(0, [1, u64::from(self.degree), 0, 0], key, seed, budget)?;
-            let seed = self.schedule.pop(budget)?.ok_or_else(invalid)?;
+        while let Some(seed) = self.scheduled(budget)? {
+            observe(("seed-construction-start", None), &seed, budget)?;
             let polynomial = generate(frame, &seed, Some(unity), state, budget)?;
+            observe(("seed-construction-end", None), &seed, budget)?;
+            observe(("orbit-enumeration-start", None), &seed, budget)?;
             let orbit = enumerate(&polynomial, state, budget)?;
+            observe(("orbit-enumeration-end", None), &seed, budget)?;
+            observe(("smaller-resolvent-start", None), &seed, budget)?;
             reserve(&mut self.attempts, 1, budget)?;
+            let result = smaller_observed(
+                &orbit,
+                self.degree,
+                self.depth,
+                state,
+                budget,
+                |phase, index, budget| observe((phase, Some(index)), &seed, budget),
+            )?;
+            observe(("smaller-resolvent-end", None), &seed, budget)?;
             self.attempts.push(Attempt {
                 seed,
                 cardinality: orbit.members.len(),
             });
-            if let Some(resolvent) = smaller(&orbit, self.degree, self.depth, state, budget)? {
+            if let Some(resolvent) = result {
                 return Ok(Some(Candidate { orbit, resolvent }));
             }
         }

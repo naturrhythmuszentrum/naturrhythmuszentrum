@@ -68,3 +68,15 @@ mod recovery;
     reason = "the degree-zero search branch emits its checked identity family"
 )]
 pub(crate) mod family;
+
+mod audit;
+
+mod formal;
+mod formal_base;
+mod formal_combination;
+mod formal_render;
+mod formal_scope;
+
+mod formal_compose;
+
+mod real_choice;

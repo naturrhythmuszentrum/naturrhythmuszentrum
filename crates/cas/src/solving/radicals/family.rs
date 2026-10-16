@@ -11,9 +11,9 @@ use crate::solving::coefficients::storage::invalid;
 use crate::solving::towers::materialize;
 use crate::solving::{
     CertificateParameterImageCoverage, Coordinate, CoordinateRole, CoordinateSpaceData,
-    FamilyMapData, SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveAnswer,
-    SolveCertificate, SolveDraft, SolveForm, SolveSchema, SolveStatement, StatementCoverage,
-    StatementFamilyMembership, TupleData,
+    FamilyMapData, SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveCertificate,
+    SolveDraft, SolveSchema, SolveStatement, StatementCoverage, StatementFamilyMembership,
+    TupleData,
 };
 
 /// One identity map binds its declared source product and returns its target product exactly.
@@ -139,14 +139,12 @@ fn image(
 }
 
 /// A zero polynomial has a complete coordinate family, never an empty finite root list.
-pub(crate) fn finish(
+pub(crate) fn coverage(
     cas: &mut Cas,
     construction: &mut Construction,
     problem: &Handle,
-    form: SolveForm,
     budget: &mut Budget,
-    checker: &mut Budget,
-) -> Result<SolveAnswer, Fault> {
+) -> Result<Handle, Fault> {
     let (family, recovery) = maps(cas, construction, problem, budget)?;
     let set = image(cas, construction, problem, &family, budget)?;
     let mut certificate = CertificateParameterImageCoverage {
@@ -181,5 +179,5 @@ pub(crate) fn finish(
         SolveCertificate::ParameterImageCoverage(certificate),
         budget,
     )?;
-    super::proof::seal(cas, construction, set, form, budget, checker)
+    Ok(set)
 }
