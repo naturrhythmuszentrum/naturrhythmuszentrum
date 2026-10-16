@@ -111,6 +111,8 @@ impl ConversionEvidence {
 /// Independently established evidence for a sealed native recipe.
 #[derive(Clone, Debug, PartialEq)]
 pub enum RecipeEvidence {
+    /// Complete deterministic propagation and independently checked numerical error.
+    Kernel(crate::KernelEvidence),
     /// Exact represented-bit identity and retention of the complete companion set.
     Copy(CopyEvidence),
     /// Outward affine evaluation and propagated deterministic companions.
@@ -124,6 +126,7 @@ impl RecipeEvidence {
     #[must_use]
     pub const fn slot(&self) -> usize {
         match self {
+            Self::Kernel(_) => 0,
             Self::Copy(claim) => claim.slot(),
             Self::Conversion(claim) => claim.slot,
             Self::Precision(claim) => claim.slot,
@@ -133,6 +136,7 @@ impl RecipeEvidence {
     #[must_use]
     pub const fn entries(&self) -> usize {
         match self {
+            Self::Kernel(claim) => claim.entries,
             Self::Copy(claim) => claim.entries(),
             Self::Conversion(claim) => claim.entries,
             Self::Precision(claim) => claim.entries,
@@ -142,6 +146,7 @@ impl RecipeEvidence {
     #[must_use]
     pub const fn coverage(&self) -> Coverage {
         match self {
+            Self::Kernel(claim) => claim.coverage,
             Self::Copy(claim) => claim.coverage(),
             Self::Conversion(claim) => claim.coverage,
             Self::Precision(claim) => claim.coverage,

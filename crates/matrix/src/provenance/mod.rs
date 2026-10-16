@@ -30,7 +30,7 @@ pub(crate) struct Node {
     /// Matching input/output slot in that operation.
     slot: usize,
     /// Earlier operation output, when the direct source was itself produced here.
-    parent: Option<ProvenanceId>,
+    parents: Vec<ProvenanceId>,
     /// Checked longest dependency depth, with imports at depth zero.
     depth: usize,
 }
@@ -42,6 +42,8 @@ pub(crate) struct ReverseEdge {
     source: ValueStamp,
     /// Dependent output evidence node, in topological append order.
     dependent: ProvenanceId,
+    /// Operation-ordered source slot, independent of the output position.
+    input: usize,
 }
 
 /// Heap-owned graph; immutable nodes and records have separate monotone stale flags.

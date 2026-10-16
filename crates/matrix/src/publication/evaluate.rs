@@ -37,17 +37,21 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         if self.issued.get().is_some() {
             return Err(OperationError::AlreadyEvaluated);
         }
-        if inputs.views.len() != self.reservations.outputs.len() {
+        if inputs.views.len() != self.operation.inputs.len() {
             return Err(OperationError::InputCount);
         }
         let token = allocate()?;
+        if let crate::binding::NativeRecipe::Kernel(contract) = &self.operation.recipe {
+            return self.kernel_candidate(contract, &inputs.views, token, evidence);
+        }
         let mut outputs = buffer(inputs.views.len())?;
         evidence
             .try_reserve_exact(inputs.views.len())
             .map_err(|_| crate::HeapError::Capacity)?;
         let context = match self.operation.recipe {
             crate::binding::NativeRecipe::Copy => None,
-            crate::binding::NativeRecipe::Affine(_)
+            crate::binding::NativeRecipe::Kernel(_)
+            | crate::binding::NativeRecipe::Affine(_)
             | crate::binding::NativeRecipe::Precision { .. } => {
                 Some(nrz_scalar::ArithmeticContext::new().map_err(crate::ConversionError::from)?)
             }
@@ -84,6 +88,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         context: Option<&nrz_scalar::ArithmeticContext>,
     ) -> Result<(Payload<Q>, crate::RecipeEvidence), OperationError> {
         match &self.operation.recipe {
+            crate::binding::NativeRecipe::Kernel(_) => Err(OperationError::CandidateContract),
             crate::binding::NativeRecipe::Copy => {
                 let payload = copy_view(view, reservation)?;
                 let claim = crate::RecipeEvidence::Copy(CopyEvidence {

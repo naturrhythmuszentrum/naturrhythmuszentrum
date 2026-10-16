@@ -24,3 +24,8 @@ mod joint_repeated;
 mod conversion_twins;
 
 mod precision_conversion;
+
+mod kernel_limits;
+mod kernel_linear;
+mod kernel_statistics;
+mod kernel_twins;

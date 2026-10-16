@@ -109,7 +109,8 @@ impl OperationRecord {
                 "finite binary64 bit copy; no floating arithmetic"
             }
             (
-                crate::binding::NativeRecipe::Affine(_)
+                crate::binding::NativeRecipe::Kernel(_)
+                | crate::binding::NativeRecipe::Affine(_)
                 | crate::binding::NativeRecipe::Precision { .. },
                 _,
             ) => {
@@ -176,10 +177,14 @@ impl OperationRecord {
     /// # Errors
     /// Refuses an output position outside the checked complete bundle.
     pub fn target_map(&self, slot: usize) -> Result<BundleTargetMap<'_>, crate::HeapError> {
+        let sources = self.operation.input_slots(slot)?;
+        if sources.len() != 1 {
+            return Err(crate::HeapError::InvalidLayout);
+        }
         Ok(BundleTargetMap {
             source: self
                 .inputs
-                .get(slot)
+                .get(sources.start)
                 .ok_or(crate::HeapError::InvalidLayout)?,
             target: &self
                 .outputs

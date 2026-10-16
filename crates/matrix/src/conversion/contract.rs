@@ -82,6 +82,7 @@ impl OperationDraft {
     pub const fn convert(conversions: Vec<ConversionContract>) -> Self {
         Self {
             inputs: Vec::new(),
+            kernel: None,
             conversions: Some(conversions),
             precision: None,
         }

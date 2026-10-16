@@ -4,11 +4,13 @@
 use nrz_units::{Descriptor, Role};
 
 use super::{ExecutionLimits, OperationError};
-use crate::{Axis, CheckedShape, CoordinateMap, ReferenceScale, ShapeLimits};
+use crate::{Axis, CheckedShape, CoordinateMap};
 
 /// Proposed closed native operation, with one fresh output per ordered input.
 #[derive(Clone, Debug)]
 pub struct OperationDraft {
+    /// Optional deterministic kernel, checked independently of representation conversions.
+    pub(crate) kernel: Option<crate::kernels::KernelContract>,
     /// Original checked shapes; numerical structural obligations remain pending.
     pub(crate) inputs: Vec<CheckedShape>,
     /// Optional checked numerical maps; absence selects exact copy.
@@ -29,6 +31,7 @@ impl OperationDraft {
             inputs,
             conversions: None,
             precision: None,
+            kernel: None,
         }
     }
 
@@ -39,6 +42,9 @@ impl OperationDraft {
     /// # Errors
     /// Refuses empty recipes, nonhomogeneous or formal entry schemas, points and limits.
     pub fn check(self, limits: ExecutionLimits) -> Result<CheckedOperation, OperationError> {
+        if let Some(kernel) = self.kernel {
+            return kernel.check(limits);
+        }
         if let Some((contracts, source, target)) = self.precision {
             return crate::conversion::precision::check(contracts, source, target, limits);
         }
@@ -180,24 +186,14 @@ impl RegionContract {
 
 /// Explicitly define positive coherent references; no scale is read from heap data.
 fn unit_coordinates(axis: &Axis) -> Result<CoordinateMap, OperationError> {
-    let mut references = super::buffer(axis.entries().len())?;
-    let mut origins = super::buffer(axis.entries().len())?;
-    for entry in axis.entries() {
-        let quantity = entry.quantity().ok_or(OperationError::UnsupportedShape)?;
-        references.push(ReferenceScale::new(entry.name(), &quantity.coherent())?);
-        origins.push(None);
-    }
-    Ok(CoordinateMap::check(
-        axis,
-        references,
-        origins,
-        ShapeLimits::default(),
-    )?)
+    Ok(CoordinateMap::coherent_units(axis)?)
 }
 
 /// Closed supported recipe schedule; external code cannot install a numerical callback.
 #[derive(Clone, Debug)]
 pub(crate) enum NativeRecipe {
+    /// Checked deterministic multi-input region operation.
+    Kernel(Box<crate::kernels::KernelContract>),
     /// Bit-preserving copy with independent equality verification.
     Copy,
     /// Checked exact affine descriptor maps, in output order.

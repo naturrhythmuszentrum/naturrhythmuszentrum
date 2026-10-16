@@ -69,7 +69,7 @@ fn publish_format<P: Scalar + 'static>() -> TestResult {
         .ok_or("missing output record")?
         .provenance();
     assert_eq!(heap.provenance(node)?.depth(), 1);
-    assert_eq!(heap.provenance(node)?.parent(), None);
+    assert_eq!(heap.provenance(node)?.parents(), []);
     heap.compact()?;
     assert_eq!(heap.value(output.value())?.stamp(), reserved);
     assert_eq!(heap.operation_record(outcome.record())?.evidence().len(), 1);
@@ -115,7 +115,7 @@ fn copy_lineage_survives_compaction_and_refuses_retired_source() -> TestResult {
             .first()
             .ok_or("missing output record")?
             .provenance();
-        assert_eq!(heap.provenance(id)?.parent(), parent);
+        assert_eq!(heap.provenance(id)?.parents(), parent.as_slice());
         assert_eq!(heap.provenance(id)?.depth(), depth);
         records.push(outcome.record());
         parent = Some(id);

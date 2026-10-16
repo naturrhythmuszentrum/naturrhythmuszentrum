@@ -65,7 +65,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         match self.operation.recipe {
             NativeRecipe::Precision { source, target }
                 if source == P::PRECISION && target == Q::PRECISION => {}
-            NativeRecipe::Copy | NativeRecipe::Affine(_) if P::PRECISION == Q::PRECISION => {}
+            NativeRecipe::Copy | NativeRecipe::Affine(_) | NativeRecipe::Kernel(_)
+                if P::PRECISION == Q::PRECISION => {}
             _ => return Err(HeapError::PrecisionMismatch.into()),
         }
         if self.inputs.len() != self.operation.inputs.len() {
@@ -74,21 +75,10 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         self.limits.check(self.inputs.len(), 0)?;
         let dependencies = capture(heap, &self.inputs)?;
         let entries = payload_entries(&dependencies)?;
-        let output_entries = dependencies.iter().try_fold(0_usize, |total, input| {
-            let copies = if matches!(self.operation.recipe, NativeRecipe::Copy) {
-                1 + usize::from(input.companion().is_some())
-                    + usize::from(input.evaluation.is_some())
-            } else {
-                3
-            };
-            input
-                .layout()
-                .extent()
-                .entries()
-                .checked_mul(copies)
-                .and_then(|count| total.checked_add(count))
-                .ok_or(OperationError::ResourceLimit)
-        })?;
+        if let NativeRecipe::Kernel(contract) = &self.operation.recipe {
+            self.limits.check(self.inputs.len(), contract.work)?;
+        }
+        let output_entries = Reservations::<Q>::payload_entries(&dependencies, &self.operation)?;
         self.limits.check(self.inputs.len(), output_entries)?;
         self.limits.check(self.inputs.len(), entries)?;
         for (slot, (dependency, contract)) in dependencies

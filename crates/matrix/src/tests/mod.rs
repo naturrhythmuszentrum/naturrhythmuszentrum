@@ -13,3 +13,5 @@ mod transactions;
 
 mod conversion;
 mod joint_companions;
+
+mod kernel_linear;

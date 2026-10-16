@@ -42,9 +42,13 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             return Err(OperationError::ForeignCandidate);
         }
         if candidate.revision != self.operation.revision()
-            || candidate.outputs.len() != self.dependencies.len()
+            || candidate.outputs.len() != self.reservations.outputs.len()
         {
             return Err(OperationError::CandidateContract);
+        }
+        for input in &self.dependencies {
+            Dependency::from_snapshot(input).validate(self.heap)?;
+            self.heap.validate_provenance(input.handle())?;
         }
         self.reservations.validate(self.heap)?;
         evidence
@@ -52,40 +56,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .map_err(|_| HeapError::Capacity)?;
         for (slot, payload) in candidate.outputs.iter().enumerate() {
             self.verify_payload(slot, payload)?;
-            match &self.operation.recipe {
-                crate::binding::NativeRecipe::Copy => {
-                    if !matches!(
-                        candidate.evidence.get(slot),
-                        Some(crate::RecipeEvidence::Copy(_))
-                    ) {
-                        return Err(OperationError::CandidateContract);
-                    }
-                    self.verify_copy(slot, payload)?;
-                }
-                crate::binding::NativeRecipe::Affine(contracts) => {
-                    let contract = contracts
-                        .get(slot)
-                        .ok_or(OperationError::CandidateContract)?;
-                    let Some(crate::RecipeEvidence::Conversion(claim)) =
-                        candidate.evidence.get(slot)
-                    else {
-                        return Err(OperationError::CandidateContract);
-                    };
-                    if claim.map() != contract.map() || claim.precision() != Q::PRECISION {
-                        return Err(OperationError::CandidateContract);
-                    }
-                }
-                crate::binding::NativeRecipe::Precision { source, target } => {
-                    let Some(crate::RecipeEvidence::Precision(claim)) =
-                        candidate.evidence.get(slot)
-                    else {
-                        return Err(OperationError::CandidateContract);
-                    };
-                    if claim.source_precision() != *source || claim.target_precision() != *target {
-                        return Err(OperationError::CandidateContract);
-                    }
-                }
-            }
+            self.verify_recipe(slot, payload, candidate.evidence.get(slot))?;
             let output = self
                 .reservations
                 .outputs
@@ -106,6 +77,55 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let record = self.prepare_record(candidate.token, evidence)?;
         super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
         self.heap.provenance.prepare(record)
+    }
+
+    /// Match the private proof to the exact closed operation before committing any output.
+    fn verify_recipe(
+        &self,
+        slot: usize,
+        payload: &Payload<Q>,
+        evidence: Option<&crate::RecipeEvidence>,
+    ) -> Result<(), OperationError> {
+        match &self.operation.recipe {
+            crate::binding::NativeRecipe::Kernel(contract) => {
+                let Some(crate::RecipeEvidence::Kernel(claim)) = evidence else {
+                    return Err(OperationError::CandidateContract);
+                };
+                if claim.kind() != contract.kind()
+                    || claim.precision() != Q::PRECISION
+                    || claim.arithmetic_revision() != 1
+                    || claim.work() != contract.work
+                {
+                    return Err(OperationError::CandidateContract);
+                }
+            }
+            crate::binding::NativeRecipe::Copy => {
+                if !matches!(evidence, Some(crate::RecipeEvidence::Copy(_))) {
+                    return Err(OperationError::CandidateContract);
+                }
+                self.verify_copy(slot, payload)?;
+            }
+            crate::binding::NativeRecipe::Affine(contracts) => {
+                let contract = contracts
+                    .get(slot)
+                    .ok_or(OperationError::CandidateContract)?;
+                let Some(crate::RecipeEvidence::Conversion(claim)) = evidence else {
+                    return Err(OperationError::CandidateContract);
+                };
+                if claim.map() != contract.map() || claim.precision() != Q::PRECISION {
+                    return Err(OperationError::CandidateContract);
+                }
+            }
+            crate::binding::NativeRecipe::Precision { source, target } => {
+                let Some(crate::RecipeEvidence::Precision(claim)) = evidence else {
+                    return Err(OperationError::CandidateContract);
+                };
+                if claim.source_precision() != *source || claim.target_precision() != *target {
+                    return Err(OperationError::CandidateContract);
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Check reserved targets, finite coordinates and every required companion region.

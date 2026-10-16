@@ -76,17 +76,18 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         inputs: &[InputSnapshot<P>],
         operation: &crate::CheckedOperation,
     ) -> Result<Self, OperationError> {
-        let (plans, schemas) = schema_plans(heap, inputs, operation)?;
-        let payloads = zeros::<P, Q>(inputs, &plans)?;
+        let specifications = specifications(inputs, operation)?;
+        let (plans, schemas) = schema_plans(heap, &specifications, operation)?;
+        let payloads = zeros::<Q>(&specifications, &plans)?;
         let slices = payloads.iter().map(Vec::as_slice).collect::<Vec<_>>();
         let slots = heap
             .descriptors
             .prepare(slices.len(), heap.limits.descriptors)?;
         let storage = heap.storage.prepare(&slices, &[], heap.limits)?;
         let mut records = buffer(slices.len())?;
-        let mut bundles = buffer(inputs.len())?;
-        let mut outputs = buffer(inputs.len())?;
-        for (input, plan) in inputs.iter().zip(plans) {
+        let mut bundles = buffer(specifications.len())?;
+        let mut outputs = buffer(specifications.len())?;
+        for (specification, plan) in specifications.iter().zip(plans) {
             let start = records.len();
             let count =
                 1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some());
@@ -95,7 +96,7 @@ impl<Q: Scalar + 'static> Reservations<Q> {
                 id: ValueId(identity()?),
                 version: ValueVersion(1),
             };
-            let extent = input.layout().extent();
+            let extent = specification.extent;
             let (mut prepared, bundle) = prepare_records::<Q>(
                 heap.scope,
                 extent,
@@ -108,7 +109,7 @@ impl<Q: Scalar + 'static> Reservations<Q> {
             if let Some(record) = prepared.first_mut()
                 && let crate::heap::records::Meaning::Value { coverage, .. } = &mut record.meaning
             {
-                *coverage = input.coverage;
+                *coverage = specification.coverage;
             }
             outputs.push(OutputReservation {
                 stamp,
@@ -117,7 +118,7 @@ impl<Q: Scalar + 'static> Reservations<Q> {
                     scope: heap.scope,
                     index: plan.value,
                 },
-                coverage: input.coverage,
+                coverage: specification.coverage,
                 bounded: plan.bound.is_some(),
                 evaluation: plan.evaluation.is_some(),
             });
@@ -163,17 +164,75 @@ impl<Q: Scalar + 'static> Reservations<Q> {
     }
 }
 
-/// Intern selected value and companion schemas together, reusing exact pool equality.
-fn schema_plans<P: Scalar + 'static>(
-    heap: &mut Heap,
+/// Independently derived destination extent and coverage, never inferred from input slot order.
+#[derive(Clone, Copy, Debug)]
+struct OutputSpecification {
+    /// Checked result rectangle.
+    extent: Extent,
+    /// Original deterministic scope for all actual output dependencies.
+    coverage: Coverage,
+    /// Complete total radius is required.
+    bounded: bool,
+    /// Separate overlapping numerical evaluation radius is required.
+    evaluation: bool,
+}
+
+/// Select the exact source closure for each output without assuming equal input/output counts.
+fn specifications<P: Scalar>(
     inputs: &[InputSnapshot<P>],
     operation: &crate::CheckedOperation,
+) -> Result<Vec<OutputSpecification>, OperationError> {
+    let mut result = buffer(operation.outputs.len())?;
+    for (slot, output) in operation.outputs.iter().enumerate() {
+        let input = inputs.get(slot).ok_or(OperationError::InputCount)?;
+        let numerical = !matches!(operation.recipe, super::NativeRecipe::Copy);
+        let coverage = if let super::NativeRecipe::Kernel(contract) = &operation.recipe {
+            contract.coverage(inputs)?
+        } else {
+            input.coverage
+        };
+        result.push(OutputSpecification {
+            extent: output.shape().extent(),
+            coverage,
+            bounded: numerical || input.companion().is_some(),
+            evaluation: numerical || input.evaluation.is_some(),
+        });
+    }
+    Ok(result)
+}
+
+impl<Q: Scalar + 'static> Reservations<Q> {
+    /// Preflight actual output storage before allocating any destination slab.
+    pub(crate) fn payload_entries<P: Scalar>(
+        inputs: &[InputSnapshot<P>],
+        operation: &crate::CheckedOperation,
+    ) -> Result<usize, OperationError> {
+        specifications(inputs, operation)?
+            .iter()
+            .try_fold(0_usize, |total, specification| {
+                specification
+                    .extent
+                    .entries()
+                    .checked_mul(
+                        1 + usize::from(specification.bounded)
+                            + usize::from(specification.evaluation),
+                    )
+                    .and_then(|entries| total.checked_add(entries))
+                    .ok_or(OperationError::ResourceLimit)
+            })
+    }
+}
+
+/// Intern all independently shaped result schemas and their required companion meanings.
+fn schema_plans(
+    heap: &mut Heap,
+    specifications: &[OutputSpecification],
+    operation: &crate::CheckedOperation,
 ) -> Result<(Vec<SchemaPlan>, Vec<Schema>), OperationError> {
-    let mut plans = buffer(inputs.len())?;
+    let mut plans = buffer(specifications.len())?;
     let mut pending = Vec::new();
-    let numerical = !matches!(operation.recipe, super::NativeRecipe::Copy);
-    for (input, output) in inputs.iter().zip(operation.outputs.iter()) {
-        let extent = input.layout().extent();
+    for (specification, output) in specifications.iter().zip(operation.outputs.iter()) {
+        let extent = specification.extent;
         let quantity = output.descriptor().clone();
         let value = intern(
             &heap.schemas,
@@ -184,8 +243,7 @@ fn schema_plans<P: Scalar + 'static>(
             },
             heap.limits.schemas,
         )?;
-        let bounded = numerical || input.companion().is_some();
-        let bound = if bounded {
+        let bound = if specification.bounded {
             let radius =
                 nrz_units::uncertainty(nrz_units::UncertaintyMode::Radius, &quantity, None, None)
                     .map_err(HeapError::from)?;
@@ -205,7 +263,7 @@ fn schema_plans<P: Scalar + 'static>(
             pending: Vec::new(),
             value,
             bound,
-            evaluation: if numerical || input.evaluation.is_some() {
+            evaluation: if specification.evaluation {
                 bound
             } else {
                 None
@@ -218,9 +276,9 @@ fn schema_plans<P: Scalar + 'static>(
     Ok((plans, pending))
 }
 
-/// Allocate every private value, total-bound and evaluation region before evaluation.
-fn zeros<P: Scalar, Q: Scalar>(
-    inputs: &[InputSnapshot<P>],
+/// Allocate every private value, total and evaluation region at its checked result extent.
+fn zeros<Q: Scalar>(
+    specifications: &[OutputSpecification],
     plans: &[SchemaPlan],
 ) -> Result<Vec<Vec<Q>>, HeapError> {
     let count = plans.iter().try_fold(0_usize, |total, plan| {
@@ -231,12 +289,11 @@ fn zeros<P: Scalar, Q: Scalar>(
             .ok_or(HeapError::Capacity)
     })?;
     let mut payloads = buffer(count)?;
-    for (input, plan) in inputs.iter().zip(plans) {
+    for (specification, plan) in specifications.iter().zip(plans) {
         let copies = 1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some());
         for _ in 0..copies {
-            let length = input.layout().extent().entries();
-            let mut values = buffer(length)?;
-            values.resize(length, Q::ZERO);
+            let mut values = buffer(specification.extent.entries())?;
+            values.resize(specification.extent.entries(), Q::ZERO);
             payloads.push(values);
         }
     }

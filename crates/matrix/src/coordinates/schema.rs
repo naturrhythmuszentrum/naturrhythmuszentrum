@@ -111,7 +111,7 @@ impl PointOrigin {
 pub struct CoordinateMap {
     /// Original point or difference coordinate interpretations.
     axis: Axis,
-    /// One positive exact reference per coordinate.
+    /// One positive exact reference per coordinate; formal dual unit references are reciprocal primal definitions.
     references: Vec<ReferenceScale>,
     /// An exact origin exactly where the axis has a point role.
     origins: Vec<Option<PointOrigin>>,
@@ -122,6 +122,26 @@ pub struct CoordinateMap {
 }
 
 impl CoordinateMap {
+    /// Construct exact coherent unit references, retaining formal dual coordinate identities.
+    /// For a dual coordinate the retained primal unit is interpreted reciprocally.
+    pub(crate) fn coherent_units(axis: &Axis) -> Result<Self, ShapeError> {
+        let mut references = Vec::new();
+        let mut maps = Vec::new();
+        for entry in axis.entries() {
+            let quantity = entry.primal_quantity().coherent();
+            references.push(ReferenceScale::new(entry.name(), &quantity)?);
+            let unit = Measure::coherent();
+            maps.push(unit.conversion_to(&unit, Role::Difference)?);
+        }
+        Ok(Self {
+            axis: axis.clone(),
+            origins: vec![None; references.len()],
+            references,
+            normalize: maps.clone(),
+            restore: maps,
+        })
+    }
+
     /// Validate each reference and origin against its ordered axis coordinate.
     ///
     /// # Errors

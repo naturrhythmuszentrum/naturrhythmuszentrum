@@ -72,12 +72,11 @@ impl<P: Scalar + 'static> FailureRecord<P> {
     /// Refuses invalid claim positions, foreign owners and stale source evidence.
     pub fn evidence(&self, heap: &Heap, index: usize) -> Result<&crate::RecipeEvidence, HeapError> {
         let claim = self.evidence.get(index).ok_or(HeapError::InvalidLayout)?;
-        let input = self
-            .inputs
-            .get(claim.slot())
-            .ok_or(HeapError::StaleEvidence)?;
-        super::Dependency::from_snapshot(input).validate(heap)?;
-        heap.validate_provenance(input.handle())?;
+        for slot in self.operation.input_slots(claim.slot())? {
+            let input = self.inputs.get(slot).ok_or(HeapError::StaleEvidence)?;
+            super::Dependency::from_snapshot(input).validate(heap)?;
+            heap.validate_provenance(input.handle())?;
+        }
         Ok(claim)
     }
 }

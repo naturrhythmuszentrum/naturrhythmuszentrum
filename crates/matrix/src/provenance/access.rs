@@ -15,14 +15,14 @@ use crate::{
 pub struct ProvenanceView<'h> {
     /// Current evidence node identity.
     identity: ProvenanceId,
-    /// Earlier source node, absent for a direct import dependency.
-    parent: Option<ProvenanceId>,
+    /// Every earlier source node; imports have no parent node.
+    parents: &'h [ProvenanceId],
     /// Checked longest lineage depth.
     depth: usize,
     /// Operation containing this individual claim.
     record: RecordId,
-    /// Concrete input dependency for this copy output.
-    source: &'h Dependency,
+    /// Complete ordered input dependencies for this output.
+    sources: &'h [Dependency],
     /// Concrete output dependency, including retargeted companions.
     target: &'h Dependency,
 }
@@ -33,10 +33,10 @@ impl ProvenanceView<'_> {
     pub const fn identity(&self) -> ProvenanceId {
         self.identity
     }
-    /// Ordered parent relation; the copy recipe has at most one prior operation parent.
+    /// Complete ordered parent relations, preserving repeated operand multiplicity.
     #[must_use]
-    pub const fn parent(&self) -> Option<ProvenanceId> {
-        self.parent
+    pub const fn parents(&self) -> &[ProvenanceId] {
+        self.parents
     }
     /// Longest checked operation lineage.
     #[must_use]
@@ -48,10 +48,10 @@ impl ProvenanceView<'_> {
     pub const fn record(&self) -> RecordId {
         self.record
     }
-    /// Exact source version, selection and companion target.
+    /// Every exact source version, selection and companion target.
     #[must_use]
-    pub const fn source(&self) -> &Dependency {
-        self.source
+    pub const fn sources(&self) -> &[Dependency] {
+        self.sources
     }
     /// Exact output version and companion target.
     #[must_use]
@@ -122,12 +122,12 @@ impl Heap {
         let record = self.historical_record(node.record)?;
         Ok(ProvenanceView {
             identity: id,
-            parent: node.parent,
+            parents: &node.parents,
             depth: node.depth,
             record: node.record,
-            source: record
+            sources: record
                 .inputs
-                .get(node.slot)
+                .get(record.operation.input_slots(node.slot)?)
                 .ok_or(HeapError::StaleEvidence)?,
             target: &record
                 .outputs
@@ -183,7 +183,7 @@ impl Provenance {
                 .ok_or(HeapError::StaleEvidence)?;
             let source = record
                 .inputs
-                .get(node.slot)
+                .get(edge.input)
                 .ok_or(HeapError::StaleEvidence)?;
             let target = &record
                 .outputs
@@ -191,8 +191,9 @@ impl Provenance {
                 .ok_or(HeapError::StaleEvidence)?
                 .dependency;
             let parent_stale = node
-                .parent
-                .is_some_and(|parent| self.check_current(parent).is_err());
+                .parents
+                .iter()
+                .any(|parent| self.check_current(*parent).is_err());
             if edge.source != source.stamp()
                 || source.validate(heap).is_err()
                 || target.validate(heap).is_err()

@@ -20,3 +20,5 @@ mod joint_dense;
 
 mod precision_conversion;
 mod schema_conversion;
+
+mod kernel_lifecycle;

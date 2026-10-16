@@ -4,6 +4,9 @@
 /// A refused operation contract, binding, evaluation or publication.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum OperationError {
+    /// Deterministic kernel arithmetic, domain or coverage refused.
+    #[error("kernel: {0}")]
+    Kernel(#[from] crate::KernelError),
     /// Checked numerical conversion refused before publication.
     #[error("conversion: {0}")]
     Conversion(#[from] crate::conversion::ConversionError),

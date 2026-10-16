@@ -292,8 +292,13 @@ fn operation_evidence_identities_refuse_foreign_heaps() -> TestResult {
         foreign.provenance(node),
         Err(HeapError::ForeignHandle)
     ));
+    assert_eq!(heap.provenance(node)?.sources().len(), 1);
     assert_eq!(
-        heap.provenance(node)?.source().stamp(),
+        heap.provenance(node)?
+            .sources()
+            .first()
+            .ok_or("source dependency")?
+            .stamp(),
         heap.value(source.value())?.stamp()
     );
     assert_eq!(heap.provenance_usage().records(), 2);

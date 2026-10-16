@@ -175,3 +175,28 @@ pub use conversion::{NormalizationMaps, NormalizedEntryMaps};
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/conversion_twins.rs"]
 mod conversion_twins;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "closed kernel contracts are shared by transaction modules"
+)]
+mod kernels;
+pub use kernels::{FixedCoefficient, KernelError, KernelEvidence, KernelKind, LinearMap};
+
+#[cfg(test)]
+#[path = "testing/kernel_oracle.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent rational truth is shared across deterministic kernel tests"
+)]
+mod kernel_oracle;
+#[cfg(test)]
+#[path = "testing/kernels.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "kernel fixtures are shared across private test modules"
+)]
+mod kernel_testing;
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/kernel_twins.rs"]
+mod kernel_twins;

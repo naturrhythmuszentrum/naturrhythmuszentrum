@@ -39,3 +39,16 @@ mod conversion_oracle;
     reason = "conversion fixtures are shared across public test modules"
 )]
 mod conversion_testing;
+
+#[path = "../src/testing/kernel_oracle.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent rational truth is shared across public kernel tests"
+)]
+mod kernel_oracle;
+#[path = "../src/testing/kernels.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "kernel fixtures are shared across public test modules"
+)]
+mod kernel_testing;
