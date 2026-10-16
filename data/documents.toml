@@ -99,5 +99,9 @@ output = "docs/design/cas-solving-design.md"
 requires = []
 
 [[document]]
+output = "docs/design/cas-symbol-sorts.md"
+requires = []
+
+[[document]]
 output = "docs/design/matrix-core-design.md"
 requires = []
