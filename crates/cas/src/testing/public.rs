@@ -165,7 +165,7 @@ pub(crate) mod solve_elementary;
 )]
 pub(crate) mod solve_orbits;
 
-#[path = "solve_blind.rs"]
+#[path = "solve_blind_public.rs"]
 #[expect(
     clippy::redundant_pub_crate,
     reason = "shared solving fixtures remain crate-visible"

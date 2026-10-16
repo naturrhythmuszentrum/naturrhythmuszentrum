@@ -36,13 +36,6 @@ pub(crate) fn check(
     replay::check(cas, draft, premises, budget)
 }
 
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "the next solving lane consumes generic orbit production"
-    )
-)]
 #[expect(
     clippy::redundant_pub_crate,
     reason = "generic orbit production stays within the crate"

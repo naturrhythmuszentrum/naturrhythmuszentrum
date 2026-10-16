@@ -21,12 +21,15 @@ fn solve_original_request_is_unresolved() -> TestResult {
             .visited(),
         3
     );
+    let expected =
+        if nrz_cas::solving::capabilities()[9] == nrz_cas::solving::Availability::Available {
+            SolveReason::RealIsolationUnavailable
+        } else {
+            SolveReason::CoefficientDomainUnavailable
+        };
     assert!(matches!(
         fixture.cas.run(&request),
-        Outcome::Unresolved {
-            solve_reason: Some(SolveReason::CoefficientDomainUnavailable),
-            ..
-        }
+        Outcome::Unresolved { solve_reason: Some(reason), .. } if reason == expected
     ));
     Ok(())
 }
@@ -101,12 +104,15 @@ fn solve_root_witness_v3_round_trip() -> TestResult {
 #[test]
 fn solve_original_denominators_survive() -> TestResult {
     let (mut fixture, request) = crate::testing::solve_graph::quotient_request(false)?;
+    let expected =
+        if nrz_cas::solving::capabilities()[9] == nrz_cas::solving::Availability::Available {
+            SolveReason::RealIsolationUnavailable
+        } else {
+            SolveReason::CoefficientDomainUnavailable
+        };
     assert!(matches!(
         fixture.cas.run(&request),
-        Outcome::Unresolved {
-            solve_reason: Some(SolveReason::CoefficientDomainUnavailable),
-            ..
-        }
+        Outcome::Unresolved { solve_reason: Some(reason), .. } if reason == expected
     ));
     let (mut omitted, invalid_request) = crate::testing::solve_graph::quotient_request(true)?;
     let before = omitted.cas.counts();
