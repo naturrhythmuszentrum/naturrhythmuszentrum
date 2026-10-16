@@ -193,23 +193,7 @@ pub(crate) fn check(
             )?;
         }
         if let MapTarget::CoefficientDomain { domain: target } = &current.target {
-            if current.images.is_empty() && parent_inclusion(cas, &current.source, target, budget)?
-            {
-                return Ok(());
-            }
-            if current.mode == MapMode::Embedding {
-                let engine = super::arithmetic::Engine {
-                    state: &cas.state,
-                    domain: &current.source,
-                };
-                let zero = engine
-                    .constant(false, budget)
-                    .map_err(|error| super::proof::fault(&error))?;
-                super::maps::inclusion(&cas.state, &zero, current, target, budget)
-                    .map_err(|error| super::proof::fault(&error))?;
-                return Ok(());
-            }
-            return Err(invalid());
+            return coefficient_target(cas, current, target, premises, budget);
         }
         match domain(&cas.state, &current.source)? {
             CoefficientDomainData::Rational | CoefficientDomainData::Gaussian => {
@@ -223,4 +207,38 @@ pub(crate) fn check(
             }
         }
     }
+}
+
+/// Domain specializations replay the source modulus at the explicit, defined target generator.
+fn coefficient_target(
+    cas: &Cas,
+    map: &CoefficientMapData<Handle>,
+    target: &Handle,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if map.images.is_empty() && parent_inclusion(cas, &map.source, target, budget)? {
+        return Ok(());
+    }
+    let engine = super::arithmetic::Engine {
+        state: &cas.state,
+        domain: &map.source,
+    };
+    let zero = engine
+        .constant(false, budget)
+        .map_err(|error| super::proof::fault(&error))?;
+    if map.mode == MapMode::Embedding {
+        super::maps::inclusion(&cas.state, &zero, map, target, budget)
+            .map_err(|error| super::proof::fault(&error))?;
+        return Ok(());
+    }
+    let (_, extension) = crate::solving::towers::arithmetic::level(&engine)
+        .map_err(|error| super::proof::fault(&error))?;
+    super::proof::defined(cas, &extension.polynomial, &map.region, premises, budget)?;
+    for image in &map.images {
+        super::proof::defined(cas, image, &map.region, premises, budget)?;
+    }
+    super::maps::quotient(&cas.state, &zero, map, target, budget)
+        .map_err(|error| super::proof::fault(&error))?;
+    Ok(())
 }

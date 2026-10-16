@@ -27,17 +27,45 @@ pub(crate) struct Interpretation<'a> {
 }
 
 impl Interpretation<'_> {
+    /// Borrow the exact interpretation map already checked for this application.
+    fn coefficient_map(
+        &self,
+    ) -> Result<&crate::solving::CoefficientMapData<Handle>, crate::error::Fault> {
+        let SolveDraft::CoefficientMap(map) =
+            crate::solving::graph::object(&self.cas.state, self.cas.checked(self.map)?)?
+        else {
+            return Err(invalid());
+        };
+        Ok(map)
+    }
+
+    /// Each coefficient is interpreted in the same independently checked destination algebra.
+    fn coefficient(
+        &self,
+        handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<super::model::Element, CoefficientFailure> {
+        super::transport::coefficient(
+            self.cas,
+            self.coefficient_map()?,
+            &self.engine,
+            handle,
+            budget,
+        )
+    }
+
     /// Graph polynomials retain their ordered bound slots, independent of declaration display names.
     fn polynomial(&self, handle: &Handle, budget: &mut Budget) -> Result<Form, CoefficientFailure> {
         super::proof::defined(self.cas, handle, self.region, self.premises, budget)?;
         let stored = super::storage::polynomial(&self.cas.state, handle)?;
-        if stored.domain != *self.engine.domain {
+        let map = self.coefficient_map()?;
+        if stored.domain != *self.engine.domain && stored.domain != map.source {
             return Err(invalid().into());
         }
         let mut result = Form { terms: Vec::new() };
         for term in &stored.terms {
             let mut product = Form::constant(
-                self.engine.read(&term.coefficient, budget)?,
+                self.coefficient(&term.coefficient, budget)?,
                 &self.engine,
                 budget,
             )?;
@@ -94,7 +122,7 @@ impl Interpretation<'_> {
             ) if *map == self.map.logical_id() => {
                 let handle = self.cas.handle(*value);
                 super::proof::defined(self.cas, &handle, self.region, self.premises, budget)?;
-                Form::constant(self.engine.read(&handle, budget)?, &self.engine, budget)
+                Form::constant(self.coefficient(&handle, budget)?, &self.engine, budget)
             }
             _ => Err(invalid().into()),
         }
@@ -186,7 +214,7 @@ impl Interpretation<'_> {
         match crate::solving::graph::object(&self.cas.state, id)? {
             SolveDraft::CoefficientValue(_) => {
                 super::proof::defined(self.cas, handle, self.region, self.premises, budget)?;
-                Form::constant(self.engine.read(handle, budget)?, &self.engine, budget)
+                Form::constant(self.coefficient(handle, budget)?, &self.engine, budget)
             }
             SolveDraft::Polynomial(_) => self.polynomial(handle, budget),
             _ => Err(invalid().into()),

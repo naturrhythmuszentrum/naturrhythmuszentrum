@@ -1530,3 +1530,54 @@ fn coefficient_scoped_premise_refusal() -> TestResult {
     assert_eq!(fixture.cas.counts(), before);
     Ok(())
 }
+
+/// Explicit quotient specialization checks values and polynomials in the target algebra.
+/// ´test:integration:coefficient-quotient-specialization´
+#[test]
+fn coefficient_quotient_specialization() -> TestResult {
+    use crate::testing::solve_coefficients::{SpecializationMutation, specialization_identity};
+    for polynomial in [false, true] {
+        let (mut fixture, step) =
+            specialization_identity(SpecializationMutation::Valid, polynomial)?;
+        let witness = fixture.cas.check_proof(
+            &fixture.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        assert_eq!(witness.hypotheses(), []);
+        assert_eq!(witness.judgment().residuals, []);
+    }
+    Ok(())
+}
+
+/// Wrong generators, moduli, coefficients, frames, regions and denominators never publish a proof.
+/// ´test:integration:coefficient-quotient-specialization-mutations´
+#[test]
+fn coefficient_quotient_specialization_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::{SpecializationMutation, specialization_identity};
+    for mutation in [
+        SpecializationMutation::Generator,
+        SpecializationMutation::Modulus,
+        SpecializationMutation::TargetCoefficient,
+        SpecializationMutation::Region,
+        SpecializationMutation::Frame,
+        SpecializationMutation::Denominator,
+        SpecializationMutation::UndefinedTarget,
+    ] {
+        let (mut fixture, step) = specialization_identity(mutation, true)?;
+        let before = fixture.cas.counts();
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    std::slice::from_ref(&step),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err(),
+            "{mutation:?}"
+        );
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    Ok(())
+}

@@ -389,3 +389,44 @@ fn coefficient_scoped_vieta_fresh_replay() -> TestResult {
     );
     Ok(())
 }
+
+/// Fresh replay repeats the quotient modulus and source-to-target coefficient interpretation.
+/// ´test:integration:coefficient-quotient-specialization-fresh-replay´
+#[test]
+fn coefficient_quotient_specialization_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::{SpecializationMutation, specialization_identity};
+    for polynomial in [false, true] {
+        let (mut source, step) =
+            specialization_identity(SpecializationMutation::Valid, polynomial)?;
+        let witness = source.cas.check_proof(
+            &source.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let bytes = source
+            .cas
+            .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+        let (mut target, step) =
+            specialization_identity(SpecializationMutation::Valid, polynomial)?;
+        let expected = nrz_cas::proof::Judgment {
+            context: target.context.clone(),
+            layer: nrz_cas::domain::Layer::Logic,
+            space: None,
+            statement: step.conclusion,
+            residuals: Vec::new(),
+        };
+        let replayed =
+            target
+                .cas
+                .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+        assert_eq!(replayed.judgment(), &expected);
+        assert_eq!(replayed.hypotheses(), []);
+        assert_eq!(
+            target
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}

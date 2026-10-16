@@ -57,6 +57,11 @@ pub(crate) mod scalar;
     reason = "coefficient arithmetic stays within the crate"
 )]
 pub(crate) mod storage;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient transport is shared by private replay modules"
+)]
+mod transport;
 
 /// Arithmetic availability does not enable an unchecked theorem schema.
 pub(crate) const fn availability() -> super::Availability {

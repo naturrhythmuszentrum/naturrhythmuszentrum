@@ -178,11 +178,12 @@ pub(crate) fn check(
             budget,
         )?;
     }
+    super::transport::frames(cas, map, certificate, budget)?;
     let interpreter = Interpretation {
         cas,
         engine: Engine {
             state: &cas.state,
-            domain: &map.source,
+            domain: super::transport::domain(cas, map)?,
         },
         map: &certificate.map,
         region: &certificate.region,

@@ -819,3 +819,11 @@ pub(crate) use scoped::{
     ScopedMutation, asymmetric_relation, scoped_context_mismatch, scoped_dependent_adjunction,
     scoped_identity, scoped_premise_fixture, scoped_request, scoped_scalar,
 };
+
+#[path = "solve_coefficients_transport.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coefficient specialization fixtures remain crate-visible in the public harness"
+)]
+mod transport;
+pub(crate) use transport::{SpecializationMutation, specialization_identity};
