@@ -70,6 +70,9 @@ todo = { level = "deny", priority = 0 }
 unimplemented = { level = "deny", priority = 0 }
 unwrap_used = { level = "deny", priority = 0 }
 
-[profile.release]
-lto = "thin"
-codegen-units = 1
+[profile.dev]
+opt-level = 2
+debug = "line-tables-only"
+debug-assertions = true
+overflow-checks = true
+incremental = true

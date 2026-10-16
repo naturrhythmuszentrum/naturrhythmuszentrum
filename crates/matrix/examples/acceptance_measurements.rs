@@ -33,15 +33,10 @@ fn main() -> ResultOf {
 fn write_case(output: &mut impl Write, case: &Case) -> ResultOf {
     writeln!(
         output,
-        "case={} arch={} os={} profile={} crate={}",
+        "case={} arch={} os={} profile=dev(opt-level=2) crate={}",
         case.name,
         std::env::consts::ARCH,
         std::env::consts::OS,
-        if cfg!(debug_assertions) {
-            "debug"
-        } else {
-            "release"
-        },
         env!("CARGO_PKG_VERSION")
     )?;
     writeln!(

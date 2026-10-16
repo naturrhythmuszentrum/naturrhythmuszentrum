@@ -102,15 +102,10 @@ fn transcript(case: &Case) -> ResultOf<Vec<u8>> {
     let mut output = String::new();
     writeln!(
         output,
-        "matrix-acceptance-observations-v1 {} {} {} {}",
+        "matrix-acceptance-observations-v1 {} {} {} dev(opt-level=2)",
         case.name,
         std::env::consts::ARCH,
-        std::env::consts::OS,
-        if cfg!(debug_assertions) {
-            "debug"
-        } else {
-            "release"
-        }
+        std::env::consts::OS
     )?;
     writeln!(
         output,
