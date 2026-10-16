@@ -57,6 +57,8 @@ pub struct InputSnapshot<P: Scalar> {
     companion: Option<CompanionSnapshot<P>>,
     /// Distinct numerical-error region, when carried by a derived value.
     pub(crate) evaluation: Option<CompanionSnapshot<P>>,
+    /// Captured product contribution occupations and target versions.
+    pub(crate) contributions: Option<[CompanionSnapshot<P>; 3]>,
     /// Physical-input coverage is retained independently of numerical companions.
     pub(crate) coverage: crate::Coverage,
 }
@@ -126,6 +128,7 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
             companion,
             evaluation,
             coverage: value.coverage(),
+            contributions: capture_contributions(heap, value.contributions)?,
         })
     }
 
@@ -191,4 +194,24 @@ fn check_entry<P: Scalar>(
         return Err(OperationError::StructureMismatch { slot, entry });
     }
     Ok(())
+}
+
+/// Capture all product regions as an all-or-none dependency inventory.
+fn capture_contributions<P: Scalar + 'static>(
+    heap: &Heap,
+    handles: Option<[Handle<Companion, P>; 3]>,
+) -> Result<Option<[CompanionSnapshot<P>; 3]>, OperationError> {
+    let Some(handles) = handles else {
+        return Ok(None);
+    };
+    let [first, second, interaction] = handles.map(|handle| {
+        let view = heap.companion(handle)?;
+        Ok::<_, OperationError>(CompanionSnapshot {
+            handle,
+            target: view.target(),
+            stamp: view.target_stamp(),
+            schema: view.region().schema_id(),
+        })
+    });
+    Ok(Some([first?, second?, interaction?]))
 }

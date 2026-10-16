@@ -38,6 +38,8 @@ pub(crate) struct SchemaPlan {
     pub(crate) bound: Option<usize>,
     /// Separate numerical error descriptor when the recipe creates one.
     pub(crate) evaluation: Option<usize>,
+    /// Radius schema shared by three independently stored product contributions.
+    pub(crate) contributions: Option<usize>,
 }
 
 impl Heap {
@@ -197,6 +199,7 @@ impl Heap {
             value,
             bound,
             evaluation: None,
+            contributions: None,
         })
     }
 }
@@ -285,6 +288,7 @@ pub(crate) fn prepare_records<P: Scalar + 'static>(
             stamp,
             bound: bound_key,
             evaluation: None,
+            contributions: None,
             coverage: if bound_key.is_some() {
                 super::Coverage::DeclaredBounds
             } else {
@@ -317,21 +321,21 @@ pub(crate) fn prepare_records<P: Scalar + 'static>(
         epoch,
         &mut records,
     )?;
-    if let Some(record) = records.first_mut()
-        && let Meaning::Value {
-            evaluation: edge, ..
-        } = &mut record.meaning
-    {
-        *edge = evaluation.map(|handle| handle.key);
-    }
-    Ok((
-        records,
-        PublishedBundle {
-            value: Handle::new(scope, target),
-            bound: bound_key.map(|key| Handle::new(scope, key)),
-            evaluation,
+    let bundle = crate::kernels::finish_contributions::<P>(
+        &crate::kernels::ContributionReservation {
+            scope,
+            extent,
+            keys,
+            arenas,
+            schema: schemas.contributions,
+            stamp,
+            epoch,
         },
-    ))
+        bound_key,
+        evaluation,
+        &mut records,
+    )?;
+    Ok((records, bundle))
 }
 
 /// Allocate the distinct evaluation region with the same exact converted-value target.

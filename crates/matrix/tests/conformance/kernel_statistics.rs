@@ -16,9 +16,32 @@ fn deterministic_sum_refuses_carried_statistics() -> TestResult {
     let declarations = owner()?;
     let coordinate = axis(1)?;
     let contract = shape(&declarations, &coordinate, &coordinate)?;
+    refuse_statistics(
+        OperationDraft::add(contract.clone(), contract, ShapeLimits::default())?,
+        2.0,
+        2,
+    )
+}
+
+/// A product cannot drop statistics while propagating only its deterministic bounds.
+/// ´test:integration:deterministic-product-refuses-carried-statistics´
+#[test]
+fn deterministic_product_refuses_carried_statistics() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    refuse_statistics(
+        OperationDraft::matmul(contract.clone(), contract, ShapeLimits::default())?,
+        2.0,
+        2,
+    )
+}
+
+/// Attach one current statistical relation, then demand the same typed refusal from a recipe.
+fn refuse_statistics(draft: OperationDraft, center: f64, operands: usize) -> TestResult {
     let quantity = Descriptor::ratio();
     let mut heap = Heap::new(HeapLimits::default())?;
-    let input = heap.import_represented(Extent::new(1, 1)?, &quantity, &[2.0_f64])?;
+    let input = heap.import_represented(Extent::new(1, 1)?, &quantity, &[center])?;
     let target = TargetMap::capture(&heap, input.value())?;
     let source = Source::new(&quantity, 1)?;
     let joint_limits = JointLimits::default();
@@ -32,12 +55,11 @@ fn deterministic_sum_refuses_carried_statistics() -> TestResult {
         CompanionSetDraft::new(model, [target.clone(), target], [vec![0], vec![0]]),
         joint_limits,
     )?;
-    let operation = OperationDraft::add(contract.clone(), contract, ShapeLimits::default())?
-        .check(ExecutionLimits::default())?;
+    let operation = draft.check(ExecutionLimits::default())?;
     assert!(matches!(
         Binding::new(
             operation,
-            vec![input.value(), input.value()],
+            vec![input.value(); operands],
             ExecutionLimits::default()
         )
         .validate(&mut heap),

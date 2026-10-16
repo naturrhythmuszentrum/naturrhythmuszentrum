@@ -22,3 +22,5 @@ mod precision_conversion;
 mod schema_conversion;
 
 mod kernel_lifecycle;
+
+mod kernel_product;

@@ -157,9 +157,26 @@ fn copy_view<P: Scalar + 'static, Q: Scalar + 'static>(
     } else {
         None
     };
+    let mut contributions = if reservation.contributions {
+        Some([
+            buffer(extent.entries())?,
+            buffer(extent.entries())?,
+            buffer(extent.entries())?,
+        ])
+    } else {
+        None
+    };
     for column in 0..extent.columns() {
         for row in 0..extent.rows() {
             centers.push(crate::conversion::same_format(view.get(row, column)?)?);
+            if let Some(regions) = &mut contributions {
+                for (region, term) in regions.iter_mut().zip(crate::ProductTerm::ALL) {
+                    region.push(crate::conversion::same_format(
+                        view.contribution(term, row, column)?
+                            .ok_or(OperationError::CandidateContract)?,
+                    )?);
+                }
+            }
             if let Some(values) = &mut evaluation {
                 values.push(crate::conversion::same_format(
                     view.evaluation(row, column)?
@@ -181,6 +198,7 @@ fn copy_view<P: Scalar + 'static, Q: Scalar + 'static>(
         centers,
         bounds,
         evaluation,
+        contributions,
     })
 }
 

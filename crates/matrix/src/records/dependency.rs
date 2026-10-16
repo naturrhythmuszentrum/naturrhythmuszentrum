@@ -26,6 +26,8 @@ pub struct Dependency {
     pub(crate) companion: Option<BoundDependency>,
     /// Separate numerical error occupation and exact target dependency.
     pub(crate) evaluation: Option<BoundDependency>,
+    /// All three current product contribution targets and immutable schemas.
+    pub(crate) contributions: Option<[BoundDependency; 3]>,
     /// Captured physical versus represented input coverage.
     pub(crate) coverage: crate::Coverage,
 }
@@ -58,6 +60,14 @@ impl Dependency {
                 target: bound.target().key,
                 stamp: bound.stamp(),
                 schema: bound.schema(),
+            }),
+            contributions: input.contributions.as_ref().map(|parts| {
+                parts.each_ref().map(|bound| BoundDependency {
+                    key: bound.handle().key,
+                    target: bound.target().key,
+                    stamp: bound.stamp(),
+                    schema: bound.schema(),
+                })
             }),
             coverage: input.coverage,
             companion: input.companion().map(|bound| BoundDependency {
@@ -116,6 +126,7 @@ impl Dependency {
             stamp,
             bound,
             evaluation,
+            contributions,
             coverage,
         } = owner.meaning
         else {
@@ -124,6 +135,11 @@ impl Dependency {
         if stamp != self.stamp
             || bound != self.companion.as_ref().map(|value| value.key)
             || evaluation != self.evaluation.as_ref().map(|value| value.key)
+            || contributions
+                != self
+                    .contributions
+                    .as_ref()
+                    .map(|parts| parts.each_ref().map(|part| part.key))
             || coverage != self.coverage
         {
             return Err(HeapError::StaleEvidence);
@@ -131,6 +147,11 @@ impl Dependency {
         validate_region(heap, owner, self.precision)?;
         self.layout
             .validate(heap.owning_region(owner)?.length, heap.limits.layout_work)?;
+        if let Some(parts) = &self.contributions {
+            for part in parts {
+                part.validate(heap, base, self.precision)?;
+            }
+        }
         if let Some(companion) = &self.evaluation {
             companion.validate(heap, base, self.precision)?;
         }
@@ -211,6 +232,17 @@ impl Dependency {
                 }),
                 (None, _) => None,
                 _ => return Err(crate::OperationError::CandidateContract),
+            },
+            contributions: if let Some(handles) = bundle.contributions {
+                let schema = bound_schema.ok_or(crate::OperationError::CandidateContract)?;
+                Some(handles.map(|handle| BoundDependency {
+                    key: handle.key,
+                    target: bundle.value().key,
+                    stamp: output.stamp(),
+                    schema,
+                }))
+            } else {
+                None
             },
             coverage: output.coverage(),
             companion,

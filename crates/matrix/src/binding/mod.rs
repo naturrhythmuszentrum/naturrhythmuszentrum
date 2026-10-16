@@ -164,7 +164,8 @@ fn payload_entries<P: Scalar>(inputs: &[InputSnapshot<P>]) -> Result<usize, Oper
             .entries()
             .checked_mul(
                 1 + usize::from(input.companion().is_some())
-                    + usize::from(input.evaluation.is_some()),
+                    + usize::from(input.evaluation.is_some())
+                    + 3 * usize::from(input.contributions.is_some()),
             )
             .ok_or(OperationError::ResourceLimit)?;
         total

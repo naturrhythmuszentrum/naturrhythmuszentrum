@@ -29,3 +29,6 @@ mod kernel_limits;
 mod kernel_linear;
 mod kernel_statistics;
 mod kernel_twins;
+
+mod kernel_cancellation;
+mod kernel_products;

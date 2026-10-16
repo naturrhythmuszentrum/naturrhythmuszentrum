@@ -2,15 +2,22 @@
 //! Closed deterministic region kernels under the existing transaction owner.
 
 mod arithmetic;
+mod backend_product;
 mod contract;
+mod contributions;
 mod draft;
 mod evaluate;
 mod linear;
 mod linear_evaluate;
 mod lowering;
+mod product;
 
 pub(crate) use contract::KernelContract;
 pub use contract::{KernelEvidence, KernelKind};
+pub use contributions::ProductTerm;
+pub(crate) use contributions::{
+    ContributionReservation, finish as finish_contributions, views as contribution_views,
+};
 pub use linear::{FixedCoefficient, LinearMap};
 
 /// A deterministic kernel refusal, without a partially published result.

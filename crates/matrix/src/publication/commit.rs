@@ -144,6 +144,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             || payload.extent != reservation.extent()
             || payload.bounds.is_some() != reservation.bounded
             || payload.evaluation.is_some() != reservation.evaluation
+            || payload.contributions.is_some() != reservation.contributions
         {
             return Err(OperationError::CandidateContract);
         }
@@ -164,6 +165,18 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 .any(|(error, radius)| error > radius)
             {
                 return Err(OperationError::CandidateContract);
+            }
+        }
+        if let Some(parts) = &payload.contributions {
+            let total = payload
+                .bounds
+                .as_ref()
+                .ok_or(OperationError::CandidateContract)?;
+            for part in parts {
+                crate::heap::publication::scan(payload.extent, &payload.centers, Some(part))?;
+                if part.iter().zip(total).any(|(term, radius)| term > radius) {
+                    return Err(OperationError::CandidateContract);
+                }
             }
         }
         self.verify_output_structure(slot, payload)
@@ -208,6 +221,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let source = self.heap.value(input.handle())?;
         let bound = self.heap.selected_bound(input.handle())?;
         let evaluation = self.heap.selected_evaluation(input.handle())?;
+        let contributions = crate::kernels::contribution_views(self.heap, input.handle())?;
         for (index, center) in payload.centers.iter().enumerate() {
             let row = index % payload.extent.rows();
             let column = index / payload.extent.rows();
@@ -216,6 +230,17 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 .same_bits(source.region().get(row, column)?.to_f64())
             {
                 return Err(OperationError::CandidateContract);
+            }
+            if let (Some(parts), Some(originals)) = (&payload.contributions, &contributions) {
+                for (part, original) in parts.iter().zip(originals) {
+                    let radius = part.get(index).ok_or(OperationError::CandidateContract)?;
+                    if !radius
+                        .to_f64()
+                        .same_bits(original.region().get(row, column)?.to_f64())
+                    {
+                        return Err(OperationError::CandidateContract);
+                    }
+                }
             }
             if let (Some(values), Some(original)) = (&payload.evaluation, &evaluation)
                 && !values
@@ -283,47 +308,27 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 .values
                 .get(position)
                 .ok_or(OperationError::CandidateContract)?;
-            if !matches!(record.meaning, Meaning::Value { stamp, bound, evaluation, coverage }
+            if !matches!(record.meaning, Meaning::Value { stamp, bound, evaluation, contributions, coverage }
                 if stamp == reservation.stamp() && bound == bundle.bound().map(|handle| handle.key)
-                    && evaluation == bundle.evaluation().map(|handle| handle.key) && coverage == reservation.coverage())
+                    && evaluation == bundle.evaluation().map(|handle| handle.key)
+                    && contributions == bundle.contributions.map(|handles| handles.map(|handle| handle.key)) && coverage == reservation.coverage())
                 || record.schema != reservation.schema().index
             {
                 return Err(OperationError::CandidateContract);
             }
             position = position.checked_add(1).ok_or(HeapError::Capacity)?;
-            let bound_schema = if bundle.bound().is_some() {
-                let companion = self
-                    .reservations
-                    .records
-                    .values
-                    .get(position)
-                    .ok_or(OperationError::CandidateContract)?;
-                if !matches!(companion.meaning, Meaning::Bound { target, stamp }
-                    if target == bundle.value().key && stamp == reservation.stamp())
-                {
+            let mut bound_schema = None;
+            for handle in bundle
+                .bound()
+                .into_iter()
+                .chain(bundle.evaluation())
+                .chain(bundle.contributions.into_iter().flatten())
+            {
+                let schema = self.reserved_companion(position, *bundle, *reservation, handle)?;
+                if bound_schema.is_some_and(|current| current != schema) {
                     return Err(OperationError::CandidateContract);
                 }
-                position = position.checked_add(1).ok_or(HeapError::Capacity)?;
-                Some(SchemaId {
-                    scope: self.heap.scope,
-                    index: companion.schema,
-                })
-            } else {
-                None
-            };
-            if let Some(handle) = bundle.evaluation() {
-                let companion = self
-                    .reservations
-                    .records
-                    .values
-                    .get(position)
-                    .ok_or(OperationError::CandidateContract)?;
-                if !matches!(companion.meaning, Meaning::Bound { target, stamp }
-                    if target == bundle.value().key && stamp == reservation.stamp())
-                    || self.reservations.records.keys().get(position) != Some(&handle.key)
-                {
-                    return Err(OperationError::CandidateContract);
-                }
+                bound_schema = Some(schema);
                 position = position.checked_add(1).ok_or(HeapError::Capacity)?;
             }
             outputs.push(OutputRecord {
@@ -338,6 +343,32 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             return Err(OperationError::CandidateContract);
         }
         Ok(outputs)
+    }
+
+    /// Validate one private companion's exact target, occupation and immutable schema.
+    fn reserved_companion(
+        &self,
+        position: usize,
+        bundle: PublishedBundle<Q>,
+        reservation: crate::OutputReservation,
+        handle: crate::Handle<crate::Companion, Q>,
+    ) -> Result<SchemaId, OperationError> {
+        let companion = self
+            .reservations
+            .records
+            .values
+            .get(position)
+            .ok_or(OperationError::CandidateContract)?;
+        if !matches!(companion.meaning, Meaning::Bound { target, stamp }
+            if target == bundle.value().key && stamp == reservation.stamp())
+            || self.reservations.records.keys().get(position) != Some(&handle.key)
+        {
+            return Err(OperationError::CandidateContract);
+        }
+        Ok(SchemaId {
+            scope: self.heap.scope,
+            index: companion.schema,
+        })
     }
 
     /// Link only already prepared objects; no fallible allocation, callback or kernel remains.

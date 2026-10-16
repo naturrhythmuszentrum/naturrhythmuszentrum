@@ -15,3 +15,5 @@ mod conversion;
 mod joint_companions;
 
 mod kernel_linear;
+
+mod kernel_product;

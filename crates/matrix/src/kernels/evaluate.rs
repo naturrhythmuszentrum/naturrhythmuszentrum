@@ -24,11 +24,24 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
         return Err(KernelError::Contract.into());
     }
     let context = ArithmeticContext::new().map_err(KernelError::from)?;
-    let entries = match &contract.recipe {
-        Recipe::Sum { subtract, right } => sum(views, *subtract, right, &context)?,
-        Recipe::Transform(map) => transform(views, map)?,
-        Recipe::Linear(map) => super::linear_evaluate::evaluate(map, first(views)?, &context)?,
+    let (entries, contributions) = match &contract.recipe {
+        Recipe::Sum { subtract, right } => (sum(views, *subtract, right, &context)?, None),
+        Recipe::Transform(map) => (
+            transform(views, map)?,
+            transformed_contributions(views, map)?,
+        ),
+        Recipe::Linear(map) => (
+            super::linear_evaluate::evaluate(map, first(views)?, &context)?,
+            None,
+        ),
+        Recipe::Product => {
+            let output = product(views, &context)?;
+            (output.entries, Some(output.contributions))
+        }
     };
+    if contributions.is_some() != reservation.contributions {
+        return Err(KernelError::Contract.into());
+    }
     let mut centers = buffer(entries.len())?;
     let mut totals = buffer(entries.len())?;
     let mut errors = buffer(entries.len())?;
@@ -52,6 +65,7 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
             centers,
             bounds: Some(totals),
             evaluation: Some(errors),
+            contributions,
         },
         RecipeEvidence::Kernel(evidence),
     ))
@@ -133,4 +147,63 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> crate::Bound<'_, P, Q> {
             evidence: evidence.clone(),
         })
     }
+}
+
+/// Product results remain separate from the three overlapping contribution payloads.
+#[derive(Debug)]
+struct ProductOutput<P: Scalar, Q: Scalar> {
+    /// Candidate values, complete totals and numerical evaluation bounds.
+    entries: Vec<Entry<P>>,
+    /// Right linear, left linear and interaction bound regions, in storage order.
+    contributions: [Vec<Q>; 3],
+}
+
+/// Split backend-checked product entries into three separately reserved derivation regions.
+fn product<P: Scalar + 'static, Q: Scalar + 'static>(
+    views: &[NormalizedView<'_, P>],
+    context: &ArithmeticContext,
+) -> Result<ProductOutput<P, Q>, OperationError> {
+    let products = super::product::evaluate(views, context)?;
+    let mut entries = buffer(products.len())?;
+    let mut parts = [
+        buffer(products.len())?,
+        buffer(products.len())?,
+        buffer(products.len())?,
+    ];
+    for product in products {
+        entries.push(product.result);
+        for (values, term) in parts.iter_mut().zip(product.contributions) {
+            values.push(crate::conversion::same_format(term)?);
+        }
+    }
+    Ok(ProductOutput {
+        entries,
+        contributions: parts,
+    })
+}
+
+/// Exact transformations retain each carried product term in the same selected order.
+fn transformed_contributions<P: Scalar + 'static, Q: Scalar + 'static>(
+    views: &[NormalizedView<'_, P>],
+    map: &crate::EntryMap,
+) -> Result<Option<[Vec<Q>; 3]>, OperationError> {
+    let input = first(views)?;
+    if input.contributions.is_none() {
+        return Ok(None);
+    }
+    let length = map.target().entries();
+    let mut result = [buffer(length)?, buffer(length)?, buffer(length)?];
+    for index in map.indices() {
+        for (values, term) in result.iter_mut().zip(super::ProductTerm::ALL) {
+            let value = input
+                .contribution(
+                    term,
+                    index % input.extent().rows(),
+                    index / input.extent().rows(),
+                )?
+                .ok_or(KernelError::Contract)?;
+            values.push(crate::conversion::same_format(value)?);
+        }
+    }
+    Ok(Some(result))
 }

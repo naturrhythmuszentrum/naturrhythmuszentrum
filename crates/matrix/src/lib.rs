@@ -181,7 +181,9 @@ mod conversion_twins;
     reason = "closed kernel contracts are shared by transaction modules"
 )]
 mod kernels;
-pub use kernels::{FixedCoefficient, KernelError, KernelEvidence, KernelKind, LinearMap};
+pub use kernels::{
+    FixedCoefficient, KernelError, KernelEvidence, KernelKind, LinearMap, ProductTerm,
+};
 
 #[cfg(test)]
 #[path = "testing/kernel_oracle.rs"]
@@ -200,3 +202,10 @@ mod kernel_testing;
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/kernel_twins.rs"]
 mod kernel_twins;
+
+#[path = "verification/contractions.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent contraction evidence is consumed by deterministic kernels"
+)]
+mod contractions;

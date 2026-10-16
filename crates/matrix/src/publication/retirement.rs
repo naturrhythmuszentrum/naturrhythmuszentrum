@@ -20,6 +20,7 @@ impl Heap {
             stamp,
             bound,
             evaluation,
+            contributions,
             ..
         } = record.meaning
         else {
@@ -42,6 +43,12 @@ impl Heap {
             schema: schema.clone(),
             region: self.owning_region(record)?,
             bound: companion,
+            contributions: self.contribution_regions::<P>(
+                contributions,
+                handle.key,
+                stamp,
+                view.extent(),
+            )?,
             evaluation: evaluation
                 .map(|key| self.retired_companion::<P>(key, handle.key, stamp, view.extent()))
                 .transpose()?,

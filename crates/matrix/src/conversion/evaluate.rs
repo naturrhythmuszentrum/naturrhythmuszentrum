@@ -73,5 +73,6 @@ fn region<P: Scalar + 'static, Q: Scalar + 'static>(
         centers,
         bounds: Some(totals),
         evaluation: Some(errors),
+        contributions: None,
     })
 }

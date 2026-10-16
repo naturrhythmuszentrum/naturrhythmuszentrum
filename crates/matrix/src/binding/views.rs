@@ -43,6 +43,8 @@ pub struct NormalizedView<'b, P: Scalar> {
     bound: Option<CompanionView<'b, P>>,
     /// Separately selected numerical error; it overlaps the total bound.
     evaluation: Option<CompanionView<'b, P>>,
+    /// Selected overlapping product derivation regions.
+    pub(crate) contributions: Option<[CompanionView<'b, P>; 3]>,
     /// Original shape and retained exact reference identities.
     contract: &'b RegionContract,
 }
@@ -140,6 +142,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 value: self.heap.value(input.handle())?,
                 bound: self.heap.selected_bound(input.handle())?,
                 evaluation: self.heap.selected_evaluation(input.handle())?,
+                contributions: crate::kernels::contribution_views(self.heap, input.handle())?,
                 contract,
             });
         }

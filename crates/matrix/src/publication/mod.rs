@@ -52,4 +52,6 @@ pub(crate) struct Payload<P: Scalar> {
     pub(crate) bounds: Option<Vec<P>>,
     /// Separate numerical evaluation radii, already included in total bounds.
     pub(crate) evaluation: Option<Vec<P>>,
+    /// Three overlapping product derivation regions, when carried or computed.
+    pub(crate) contributions: Option<[Vec<P>; 3]>,
 }

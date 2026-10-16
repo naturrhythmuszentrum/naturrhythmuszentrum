@@ -30,6 +30,8 @@ pub(crate) enum Meaning {
         bound: Option<Key>,
         /// Independent conversion evaluation region, overlapping the total bound.
         evaluation: Option<Key>,
+        /// Left/right linear and interaction regions, already covered by the total.
+        contributions: Option<[Key; 3]>,
         /// Physical versus represented problem covered by the total.
         coverage: Coverage,
     },
@@ -78,6 +80,8 @@ pub struct PublishedBundle<P: Scalar> {
     pub(crate) bound: Option<Handle<Companion, P>>,
     /// New evaluation error, never an independent physical uncertainty.
     pub(crate) evaluation: Option<Handle<Companion, P>>,
+    /// Independently stored product contributions, in their closed term order.
+    pub(crate) contributions: Option<[Handle<Companion, P>; 3]>,
 }
 
 impl<P: Scalar> PublishedBundle<P> {

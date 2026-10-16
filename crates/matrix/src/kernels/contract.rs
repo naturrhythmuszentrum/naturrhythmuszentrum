@@ -21,6 +21,8 @@ pub enum KernelKind {
     LinearMap,
     /// Exact logical selection, duplication, reshape or dual transpose.
     TransformEntries,
+    /// Full matrix product, including both linear terms and their interaction.
+    Product,
 }
 
 /// A private construction contract for one output and its complete ordered operands.
@@ -50,6 +52,8 @@ pub(crate) enum Recipe {
     Linear(Box<LinearMap>),
     /// Bit-preserving logical entry transformation.
     Transform(EntryMap),
+    /// Backend product with an independent outward contraction.
+    Product,
 }
 
 impl KernelContract {
@@ -73,6 +77,7 @@ impl KernelContract {
             Recipe::Sum { subtract: true, .. } => KernelKind::Subtract,
             Recipe::Linear(_) => KernelKind::LinearMap,
             Recipe::Transform(_) => KernelKind::TransformEntries,
+            Recipe::Product => KernelKind::Product,
         }
     }
 

@@ -24,6 +24,8 @@ pub(crate) struct Snapshot {
     pub(crate) bound: Option<(Key, Region)>,
     /// Additional evaluation allocation retired with its complete target bundle.
     pub(crate) evaluation: Option<(Key, Region)>,
+    /// Product contribution allocations retire with the complete target bundle.
+    pub(crate) contributions: Option<[(Key, Region); 3]>,
 }
 
 impl Snapshot {
@@ -31,23 +33,30 @@ impl Snapshot {
     pub(crate) fn regions(&self) -> Result<Vec<Region>, HeapError> {
         let mut regions = Vec::new();
         regions
-            .try_reserve_exact(3)
+            .try_reserve_exact(6)
             .map_err(|_| HeapError::Capacity)?;
         regions.push(self.region);
         regions.extend(self.bound.map(|(_, region)| region));
         regions.extend(self.evaluation.map(|(_, region)| region));
+        regions.extend(
+            self.contributions
+                .into_iter()
+                .flatten()
+                .map(|(_, region)| region),
+        );
         Ok(regions)
     }
 
     /// Retire the bound edge, and optionally the base value occupation.
     pub(crate) fn retire_keys(&self, include_value: bool) -> Result<Vec<Key>, HeapError> {
         let mut keys = Vec::new();
-        keys.try_reserve_exact(3).map_err(|_| HeapError::Capacity)?;
+        keys.try_reserve_exact(6).map_err(|_| HeapError::Capacity)?;
         if include_value {
             keys.push(self.key);
         }
         keys.extend(self.bound.map(|(key, _)| key));
         keys.extend(self.evaluation.map(|(key, _)| key));
+        keys.extend(self.contributions.into_iter().flatten().map(|(key, _)| key));
         Ok(keys)
     }
 }
@@ -151,7 +160,12 @@ impl Heap {
             });
         }
         let record = self.record(handle)?;
-        let Meaning::Value { bound, .. } = record.meaning else {
+        let Meaning::Value {
+            bound,
+            contributions,
+            ..
+        } = record.meaning
+        else {
             return Err(HeapError::CategoryMismatch);
         };
         let companion = bound
@@ -170,6 +184,12 @@ impl Heap {
             },
             region: self.owning_region(record)?,
             bound: companion,
+            contributions: self.contribution_regions::<P>(
+                contributions,
+                handle.key,
+                stamp,
+                view.region().extent(),
+            )?,
             evaluation: view
                 .evaluation()
                 .map(|handle| {

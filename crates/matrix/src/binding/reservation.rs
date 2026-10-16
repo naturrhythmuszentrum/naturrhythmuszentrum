@@ -29,6 +29,8 @@ pub struct OutputReservation {
     pub(crate) bounded: bool,
     /// Distinct evaluation companion exists for this output.
     pub(crate) evaluation: bool,
+    /// The three overlapping product contribution regions are reserved.
+    pub(crate) contributions: bool,
 }
 
 impl OutputReservation {
@@ -89,8 +91,10 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         let mut outputs = buffer(specifications.len())?;
         for (specification, plan) in specifications.iter().zip(plans) {
             let start = records.len();
-            let count =
-                1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some());
+            let count = 1
+                + usize::from(plan.bound.is_some())
+                + usize::from(plan.evaluation.is_some())
+                + 3 * usize::from(plan.contributions.is_some());
             let end = start.checked_add(count).ok_or(HeapError::Capacity)?;
             let stamp = ValueStamp {
                 id: ValueId(identity()?),
@@ -121,6 +125,7 @@ impl<Q: Scalar + 'static> Reservations<Q> {
                 coverage: specification.coverage,
                 bounded: plan.bound.is_some(),
                 evaluation: plan.evaluation.is_some(),
+                contributions: plan.contributions.is_some(),
             });
             records.extend(prepared);
             bundles.push(bundle);
@@ -175,6 +180,8 @@ struct OutputSpecification {
     bounded: bool,
     /// Separate overlapping numerical evaluation radius is required.
     evaluation: bool,
+    /// Product derivation regions are published together with their total.
+    contributions: bool,
 }
 
 /// Select the exact source closure for each output without assuming equal input/output counts.
@@ -196,6 +203,15 @@ fn specifications<P: Scalar>(
             coverage,
             bounded: numerical || input.companion().is_some(),
             evaluation: numerical || input.evaluation.is_some(),
+            contributions: match &operation.recipe {
+                super::NativeRecipe::Copy => input.contributions.is_some(),
+                super::NativeRecipe::Kernel(contract) => {
+                    contract.kind() == crate::KernelKind::Product
+                        || (contract.kind() == crate::KernelKind::TransformEntries
+                            && input.contributions.is_some())
+                }
+                super::NativeRecipe::Affine(_) | super::NativeRecipe::Precision { .. } => false,
+            },
         });
     }
     Ok(result)
@@ -215,7 +231,8 @@ impl<Q: Scalar + 'static> Reservations<Q> {
                     .entries()
                     .checked_mul(
                         1 + usize::from(specification.bounded)
-                            + usize::from(specification.evaluation),
+                            + usize::from(specification.evaluation)
+                            + 3 * usize::from(specification.contributions),
                     )
                     .and_then(|entries| total.checked_add(entries))
                     .ok_or(OperationError::ResourceLimit)
@@ -268,6 +285,11 @@ fn schema_plans(
             } else {
                 None
             },
+            contributions: if specification.contributions {
+                bound
+            } else {
+                None
+            },
         });
     }
     heap.schemas
@@ -284,13 +306,18 @@ fn zeros<Q: Scalar>(
     let count = plans.iter().try_fold(0_usize, |total, plan| {
         total
             .checked_add(
-                1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some()),
+                1 + usize::from(plan.bound.is_some())
+                    + usize::from(plan.evaluation.is_some())
+                    + 3 * usize::from(plan.contributions.is_some()),
             )
             .ok_or(HeapError::Capacity)
     })?;
     let mut payloads = buffer(count)?;
     for (specification, plan) in specifications.iter().zip(plans) {
-        let copies = 1 + usize::from(plan.bound.is_some()) + usize::from(plan.evaluation.is_some());
+        let copies = 1
+            + usize::from(plan.bound.is_some())
+            + usize::from(plan.evaluation.is_some())
+            + 3 * usize::from(plan.contributions.is_some());
         for _ in 0..copies {
             let mut values = buffer(specification.extent.entries())?;
             values.resize(specification.extent.entries(), Q::ZERO);

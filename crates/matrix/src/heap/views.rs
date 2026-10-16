@@ -114,7 +114,7 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
 #[derive(Debug)]
 pub struct ValueView<'h, P: Scalar> {
     /// Checked center region.
-    region: RegionView<'h, P>,
+    pub(crate) region: RegionView<'h, P>,
     /// Current value identity and version.
     stamp: ValueStamp,
     /// Current declared-bound relation, if any.
@@ -123,6 +123,8 @@ pub struct ValueView<'h, P: Scalar> {
     coverage: Coverage,
     /// Separate numerical evaluation companion.
     evaluation: Option<Handle<Companion, P>>,
+    /// Whole-base independently targeted product contributions.
+    pub(crate) contributions: Option<[Handle<Companion, P>; 3]>,
 }
 
 impl<P: Scalar> ValueView<'_, P> {
@@ -165,7 +167,7 @@ impl<P: Scalar> ValueView<'_, P> {
 #[derive(Debug)]
 pub struct CompanionView<'h, P: Scalar> {
     /// Bound region with its own radius descriptor.
-    region: RegionView<'h, P>,
+    pub(crate) region: RegionView<'h, P>,
     /// Validated entire-region target.
     target: Handle<Value, P>,
     /// Captured and rechecked target version.
@@ -209,6 +211,7 @@ impl Heap {
             stamp,
             bound,
             evaluation,
+            contributions,
             coverage,
         } = self.record(base)?.meaning
         else {
@@ -220,11 +223,17 @@ impl Heap {
         if let Some(key) = evaluation {
             self.companion(Handle::<Companion, P>::new(self.scope, key))?;
         }
+        if let Some(keys) = contributions {
+            for key in keys {
+                self.companion(Handle::<Companion, P>::new(self.scope, key))?;
+            }
+        }
         Ok(ValueView {
             region: self.region_view(record)?,
             stamp,
             bound: bound.map(|key| Handle::new(self.scope, key)),
             evaluation: evaluation.map(|key| Handle::new(self.scope, key)),
+            contributions: contributions.map(|keys| keys.map(|key| Handle::new(self.scope, key))),
             coverage,
         })
     }
@@ -246,8 +255,8 @@ impl Heap {
         let target_record = self
             .record(target_handle)
             .map_err(|_| HeapError::StaleEvidence)?;
-        if !matches!(target_record.meaning, Meaning::Value { stamp: current, bound, evaluation, .. }
-            if current == stamp && (bound == Some(handle.key) || evaluation == Some(handle.key)))
+        if !matches!(target_record.meaning, Meaning::Value { stamp: current, bound, evaluation, contributions, .. }
+            if current == stamp && (bound == Some(handle.key) || evaluation == Some(handle.key) || contributions.is_some_and(|keys| keys.contains(&handle.key))))
         {
             return Err(HeapError::StaleEvidence);
         }
@@ -287,7 +296,7 @@ impl Heap {
     }
 
     /// Apply a checked selection to a value or its whole-base bound region.
-    fn mapped_region<'h, P: Scalar + 'static>(
+    pub(crate) fn mapped_region<'h, P: Scalar + 'static>(
         &'h self,
         record: &'h Record,
         layout: &'h Layout,
