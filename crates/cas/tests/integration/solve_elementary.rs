@@ -370,3 +370,200 @@ fn closed_strata_presentation_fresh_replay() -> TestResult {
     );
     Ok(())
 }
+
+/// Returned tower vectors preserve real choices, norm linkage and exact conjugate identities in fresh replay.
+/// ´test:integration:linked-cubic-realness-fresh-replay´
+#[test]
+fn linked_cubic_realness_fresh_replay() -> TestResult {
+    for bombelli in [false, true] {
+        let mut source = crate::testing::solve_elementary::linked_cubic(bombelli, u8::MAX)?;
+        let mut generated = Budget::new(Limits::blind_cubic())?;
+        let checked =
+            source
+                .base
+                .cas
+                .check_proof(&source.base.context, &source.steps, &mut generated)?;
+        assert!(generated.usage().coefficient_ops < Limits::blind_cubic().coefficient_ops / 4);
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+        let bytes = source
+            .base
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut target = crate::testing::solve_elementary::linked_cubic(bombelli, u8::MAX)?;
+        let expected = target.base.cas.check_proof(
+            &target.base.context,
+            &target.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let mut replay = Budget::new(Limits::blind_cubic())?;
+        let replayed = target
+            .base
+            .cas
+            .replay(&bytes, expected.judgment(), &mut replay)?;
+        assert_eq!(
+            generated.usage().coefficient_ops,
+            replay.usage().coefficient_ops
+        );
+        assert_eq!(generated.usage().gcd_steps, replay.usage().gcd_steps);
+        assert_eq!(replayed.judgment(), expected.judgment());
+        assert_eq!(
+            target
+                .base
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}
+
+/// Real restriction checks nonrealness of the conjugate pair and transports the exact retained value.
+/// ´test:integration:linked-cubic-restriction-fresh-replay´
+#[test]
+fn linked_cubic_restriction_fresh_replay() -> TestResult {
+    let mut source = crate::testing::solve_elementary::linked_cubic_restriction()?;
+    let checked = source.base.cas.check_proof(
+        &source.base.context,
+        &source.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let bytes = source
+        .base
+        .cas
+        .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+    let mut target = crate::testing::solve_elementary::linked_cubic_restriction()?;
+    let expected = target.base.cas.check_proof(
+        &target.base.context,
+        &target.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let replayed = target.base.cas.replay(
+        &bytes,
+        expected.judgment(),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(replayed.judgment(), expected.judgment());
+    assert_eq!(replayed.hypotheses(), []);
+    assert_eq!(replayed.judgment().residuals, []);
+    assert_eq!(
+        target
+            .base
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}
+
+/// Fraction realness requires the original nonzero specialization guard and survives independent replay.
+/// ´test:integration:fraction-realness-fresh-replay´
+#[test]
+fn fraction_realness_fresh_replay() -> TestResult {
+    let mut source = crate::testing::solve_elementary::fraction_realness(true)?;
+    let checked = source.base.cas.check_proof(
+        &source.base.context,
+        &source.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let bytes = source
+        .base
+        .cas
+        .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+    let mut target = crate::testing::solve_elementary::fraction_realness(true)?;
+    let expected = target.base.cas.check_proof(
+        &target.base.context,
+        &target.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let replayed = target.base.cas.replay(
+        &bytes,
+        expected.judgment(),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(replayed.judgment(), expected.judgment());
+    assert_eq!(
+        target
+            .base
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}
+
+/// Explicit evidence replays with its hypothesis, and duplicate slots import each equality only once.
+/// ´test:integration:conjugation-referenced-evidence-fresh-replay´
+#[test]
+fn conjugation_referenced_evidence_fresh_replay() -> TestResult {
+    let mut previous = None;
+    for references in [1, 2] {
+        let mut source = crate::testing::solve_elementary::referenced_realness(references)?;
+        let mut generated = Budget::new(Limits::blind_cubic())?;
+        let checked =
+            source
+                .base
+                .cas
+                .check_proof(&source.base.context, &source.steps, &mut generated)?;
+        assert_eq!(checked.hypotheses().len(), 1);
+        let usage = (
+            generated.usage().coefficient_ops,
+            generated.usage().gcd_steps,
+        );
+        if let Some(expected) = previous {
+            assert_eq!(usage, expected);
+        }
+        previous = Some(usage);
+        let bytes = source
+            .base
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?;
+        let mut target = crate::testing::solve_elementary::referenced_realness(references)?;
+        let expected = target.base.cas.check_proof(
+            &target.base.context,
+            &target.steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )?;
+        let mut replay = Budget::new(Limits::blind_cubic())?;
+        let replayed = target
+            .base
+            .cas
+            .replay(&bytes, expected.judgment(), &mut replay)?;
+        assert_eq!(replayed.judgment(), expected.judgment());
+        assert_eq!(
+            usage,
+            (replay.usage().coefficient_ops, replay.usage().gcd_steps)
+        );
+        assert_eq!(
+            target
+                .base
+                .cas
+                .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+            bytes
+        );
+    }
+    Ok(())
+}
+
+/// A requested cubic product reconstruction is imported once across all roots and both components.
+/// ´test:integration:conjugation-product-evidence-imported-once´
+#[test]
+fn conjugation_product_evidence_imported_once() -> TestResult {
+    let mut previous = None;
+    for duplicate in [false, true] {
+        let mut fixture = crate::testing::solve_elementary::cubic_product_reference(duplicate)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let checked =
+            fixture
+                .base
+                .cas
+                .check_proof(&fixture.base.context, &fixture.steps, &mut budget)?;
+        assert_eq!(checked.hypotheses(), []);
+        let usage = (budget.usage().coefficient_ops, budget.usage().gcd_steps);
+        if let Some(expected) = previous {
+            assert_eq!(usage, expected);
+        }
+        previous = Some(usage);
+    }
+    Ok(())
+}

@@ -137,22 +137,67 @@ fn classify(
         if retained && real_fact(comparison, certificate, entry, &source.region, budget)? {
             continue;
         }
-        let components = crate::solving::elementary::complex::restricted(
+        let classification = crate::solving::elementary::complex::restricted(
             &evaluation,
             entry.logical_id(),
             &parameters,
+            retained,
+            &certificate.classification,
             budget,
         );
         if retained {
-            evaluation.zero(&components?.imaginary, budget)?;
-        } else {
-            let direct = components.and_then(|parts| evaluation.nonzero(&parts.imaginary, budget));
-            if !crate::solving::elementary::product::decides(direct)? {
-                crate::solving::elementary::nonreal::check(&evaluation, entry, budget)?;
-            }
+            classification?;
+        } else if !crate::solving::elementary::product::decides(classification)? {
+            crate::solving::elementary::nonreal::check(&evaluation, entry, budget)?;
         }
     }
     Ok(())
+}
+
+/// A checked scalar equality may change a retained expression's presentation on this exact stratum.
+fn equivalent(
+    comparison: &mut Correspondence<'_>,
+    real: &Handle,
+    complex: &Handle,
+    region: &Handle,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    if comparison.attempt(real, complex, budget)? {
+        return Ok(true);
+    }
+    for previous in comparison.premises {
+        budget.work(1, AT)?;
+        let endpoints = match &previous.judgment.statement {
+            Statement::Solve(statement) => match statement.as_ref() {
+                crate::solving::SolveStatement::CoefficientEquality(value)
+                    if &value.region == region =>
+                {
+                    Some((&value.left, &value.right))
+                }
+                _ => None,
+            },
+            Statement::Equality {
+                left,
+                right,
+                domain,
+                domain_contract: crate::proof_model::DomainContract::DefinedAndEqual,
+            } if domain == region => Some((left, right)),
+            _ => None,
+        };
+        if let Some((left, right)) = endpoints {
+            let target = if left == complex {
+                right
+            } else if right == complex {
+                left
+            } else {
+                continue;
+            };
+            if comparison.attempt(real, target, budget)? {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
 }
 
 /// Both inclusions preserve the same root correspondence across the entire stratum.
@@ -160,6 +205,7 @@ fn tuples(
     comparison: &mut Correspondence<'_>,
     real: &[Handle],
     complex: &[Handle],
+    region: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     for (left, right, reverse) in [(real, complex, false), (complex, real, true)] {
@@ -182,7 +228,7 @@ fn tuples(
                 {
                     return Err(invalid());
                 }
-                if comparison.attempt(a, b, budget)? {
+                if equivalent(comparison, a, b, region, budget)? {
                     found = true;
                     break;
                 }
@@ -223,6 +269,7 @@ fn family(
         comparison,
         std::slice::from_ref(&left.body),
         std::slice::from_ref(&right.body),
+        &right.region,
         budget,
     )
 }
@@ -265,7 +312,7 @@ fn stratum(
         }
     }
     match (real_family, complex_family) {
-        (None, None) => tuples(comparison, &real, &complex, budget),
+        (None, None) => tuples(comparison, &real, &complex, &pair.complex, budget),
         (Some(a), Some(b)) if real.is_empty() && complex.is_empty() => {
             family(comparison, a, b, budget)
         }

@@ -1326,3 +1326,127 @@ fn inverse_pivot_skips_polynomial_identities() -> TestResult {
     }
     Ok(())
 }
+
+/// Missing linkage, map/region changes, a rotated real choice and a changed radicand cannot classify roots.
+/// ´test:integration:linked-cubic-realness-mutations´
+#[test]
+fn linked_cubic_realness_mutations() -> TestResult {
+    for bombelli in [false, true] {
+        for mutation in 0..6 {
+            let mut fixture = crate::testing::solve_elementary::linked_cubic(bombelli, mutation)?;
+            let rejected = match mutation {
+                3 | 4 => fixture.steps.iter().position(|step| matches!(&step.certificate,
+                    Certificate::Solve(certificate) if matches!(certificate.as_ref(), SolveCertificate::RootSelectionRefinement(_))))
+                    .ok_or("missing choice")?,
+                0 | 5 => fixture.steps.len().checked_sub(2).ok_or("missing conjugation")?,
+                _ => fixture.steps.len().checked_sub(1).ok_or("missing classification")?,
+            };
+            let prefix = fixture
+                .steps
+                .get(..rejected)
+                .ok_or("missing valid prefix")?;
+            fixture.base.cas.check_proof(
+                &fixture.base.context,
+                prefix,
+                &mut Budget::new(Limits::blind_cubic())?,
+            )?;
+            let checked = fixture.base.cas.check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?,
+            );
+            let Err(fault) = checked else {
+                return Err("mutated realness was accepted".into());
+            };
+            assert_eq!(
+                fault.kind,
+                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Rule),
+                "Bombelli {bombelli}, mutation {mutation}"
+            );
+        }
+    }
+    Ok(())
+}
+
+/// Formal nonzero denominators cannot establish defined real values on an unguarded specialization.
+/// ´test:integration:fraction-realness-requires-denominator´
+#[test]
+fn fraction_realness_requires_denominator() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::fraction_realness(false)?;
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// An undeclared field coercion cannot supply the real root choice used by later classification.
+/// ´test:integration:real-selection-rejects-complex-witness´
+#[test]
+fn real_selection_rejects_complex_witness() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::choice_wrong_ambient()?;
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// Realness checking preserves the original refusal of an undefined zero power.
+/// ´test:integration:complex-realness-preserves-partial-powers´
+#[test]
+fn complex_realness_preserves_partial_powers() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::partial_power_realness()?;
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// An earlier checked equality cannot support transport when its evidence slot is omitted.
+/// ´test:integration:conjugation-rejects-unreferenced-evidence´
+#[test]
+fn conjugation_rejects_unreferenced_evidence() -> TestResult {
+    let mut fixture = crate::testing::solve_elementary::referenced_realness(0)?;
+    let prefix = fixture.steps.get(..2).ok_or("missing checked equality")?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        prefix,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let checked = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    );
+    let Err(fault) = checked else {
+        return Err("unreferenced evidence was consumed".into());
+    };
+    assert_eq!(
+        fault.kind,
+        nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Rule)
+    );
+    Ok(())
+}

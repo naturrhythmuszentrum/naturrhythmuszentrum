@@ -2,7 +2,7 @@
 //! Compatible standard conjugation maps and fixed-real-subfield conclusions.
 
 use super::evaluate::Evaluation;
-use super::proof::{invalid, premise};
+use super::proof::invalid;
 use crate::budget::Budget;
 use crate::error::Fault;
 use crate::graph::Cas;
@@ -14,6 +14,7 @@ use crate::solving::{CertificateConjugationTransport, SolveDraft, SolveStatement
 fn maps(
     evaluation: &Evaluation<'_>,
     certificate: &CertificateConjugationTransport,
+    components: &mut super::complex::Components<'_, '_>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let SolveDraft::CoefficientMap(map) =
@@ -28,6 +29,9 @@ fn maps(
     else {
         return Err(invalid());
     };
+    if map.region != certificate.region {
+        return Err(invalid());
+    }
     if (&map.source, &map.target, &map.region, map.images.len())
         != (
             &conjugate.source,
@@ -60,13 +64,38 @@ fn maps(
         if (original, transformed) != (&pair.original, &pair.conjugate) {
             return Err(invalid());
         }
-        let value = super::complex::expression(evaluation, original.logical_id(), budget)?;
-        let expected = super::complex::expression(evaluation, transformed.logical_id(), budget)?;
-        value
-            .conjugate(evaluation, budget)?
-            .equal(&expected, evaluation, budget)?;
+        components.equal(
+            original.logical_id(),
+            transformed.logical_id(),
+            true,
+            budget,
+        )?;
     }
     Ok(())
+}
+
+/// A supported but mismatched claim is a rule failure before coefficient-fragment dispatch.
+fn claim<'a>(
+    draft: &'a ApplicationDraft,
+    certificate: &CertificateConjugationTransport,
+) -> Result<&'a SolveStatement, Fault> {
+    let Statement::Solve(statement) = &draft.conclusion else {
+        return Err(invalid());
+    };
+    let valid = match statement.as_ref() {
+        SolveStatement::RealValues(value) => {
+            (&value.values, &value.region) == (&certificate.values, &certificate.region)
+        }
+        SolveStatement::CoefficientEquality(value) => {
+            (&value.map, &value.region) == (&certificate.map, &certificate.region)
+        }
+        _ => false,
+    };
+    if valid {
+        Ok(statement.as_ref())
+    } else {
+        Err(invalid())
+    }
 }
 
 /// Realness is exactly vanishing imaginary part under the standard conjugation theorem.
@@ -77,6 +106,7 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    let statement = claim(draft, certificate)?;
     let map = crate::solving::coefficients::proof::mapping(
         cas,
         &certificate.map,
@@ -95,33 +125,23 @@ pub(crate) fn check(
         free: &[],
         bound: &[],
     };
-    for slot in certificate.relations.iter().chain(&certificate.fixed_field) {
-        premise(premises, *slot)?;
-    }
-    maps(&evaluation, certificate, budget)?;
-    let Statement::Solve(statement) = &draft.conclusion else {
-        return Err(invalid());
-    };
-    match statement.as_ref() {
-        SolveStatement::RealValues(value)
-            if (&value.values, &value.region) == (&certificate.values, &certificate.region) =>
-        {
+    let mut components = super::complex::Components::new(&evaluation, &[], budget)?;
+    components.premises(&certificate.relations, budget)?;
+    components.premises(&certificate.fixed_field, budget)?;
+    maps(&evaluation, certificate, &mut components, budget)?;
+    match statement {
+        SolveStatement::RealValues(value) => {
             for handle in &value.values {
-                evaluation.zero(
-                    &super::complex::expression(&evaluation, handle.logical_id(), budget)?
-                        .imaginary,
-                    budget,
-                )?;
+                components.real(handle.logical_id(), budget)?;
             }
             Ok(())
         }
-        SolveStatement::CoefficientEquality(value)
-            if (&value.map, &value.region) == (&certificate.map, &certificate.region) =>
-        {
-            let left = super::complex::expression(&evaluation, value.left.logical_id(), budget)?;
-            let right = super::complex::expression(&evaluation, value.right.logical_id(), budget)?;
-            left.equal(&right, &evaluation, budget)
-        }
+        SolveStatement::CoefficientEquality(value) => components.equal(
+            value.left.logical_id(),
+            value.right.logical_id(),
+            false,
+            budget,
+        ),
         _ => Err(invalid()),
     }
 }

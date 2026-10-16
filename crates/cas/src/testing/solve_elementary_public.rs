@@ -32,6 +32,17 @@ pub(crate) use presentations::{
     closed_presentation_mutation, closed_presentations, presentation_closure,
 };
 
+#[path = "solve_elementary_realness_public.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public test fixtures stay inside the test target"
+)]
+mod realness;
+pub(crate) use realness::{
+    choice_wrong_ambient, cubic_product_reference, fraction_realness, linked_cubic,
+    linked_cubic_restriction, partial_power_realness, referenced_realness,
+};
+
 use super::common::TestResult;
 use crate::test_api::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::test_api::limits::{Budget, Limits};

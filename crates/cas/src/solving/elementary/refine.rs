@@ -28,6 +28,11 @@ fn witnesses(
     for (witness, handle) in certificate.witnesses.iter().zip(&selection.relations) {
         let value = evaluation.expression(witness.logical_id(), true, budget)?;
         let relation = super::selected::relation(evaluation.cas, handle)?;
+        if evaluation.cas.state.expression(witness.logical_id())?.sort
+            != crate::model::Sort::Value(crate::model::AtomicSort::Scalar(relation.ambient.clone()))
+        {
+            return Err(invalid());
+        }
         evaluation.zero(&evaluation.root_equation(&value, relation, budget)?, budget)?;
         values.push(value);
     }
@@ -123,7 +128,13 @@ pub(crate) fn check(
         free: &[],
         bound: &[],
     };
-    witnesses(&evaluation, certificate, selected, budget)?;
+    if first.ambient == crate::model::Field::Complex {
+        let mut components = super::complex::Components::new(&evaluation, &[], budget)?;
+        components.premises(&certificate.compatibility, budget)?;
+        components.witnesses(&certificate.witnesses, selected, budget)?;
+    } else {
+        witnesses(&evaluation, certificate, selected, budget)?;
+    }
     if certificate.mode == RefinementMode::Unique {
         unique(&evaluation, selected, budget)?;
     }
