@@ -473,3 +473,41 @@ fn coefficient_formal_close_fresh_replay() -> TestResult {
     );
     Ok(())
 }
+
+/// Fresh replay rechecks the canonical monomial denominator and preserves exact witness bytes.
+/// ´test:integration:monomial-fraction-fresh-replay´
+#[test]
+fn monomial_fraction_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::monomial_fraction_identity;
+    let (mut source, steps) = monomial_fraction_identity()?;
+    let witness = source.cas.check_proof(
+        &source.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(witness.hypotheses().len(), 1);
+    assert_eq!(witness.judgment().residuals, []);
+    let bytes = source
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut target, expected_steps) = monomial_fraction_identity()?;
+    let expected = target.cas.check_proof(
+        &target.context,
+        &expected_steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let replayed = target.cas.replay(
+        &bytes,
+        expected.judgment(),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(replayed.hypotheses().len(), 1);
+    assert_eq!(replayed.judgment().residuals, []);
+    assert_eq!(
+        target
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}

@@ -1412,3 +1412,120 @@ fn coefficient_formal_erasure_work_boundary() -> TestResult {
     }
     Ok(())
 }
+
+/// Independently supplied exact terms build the arithmetic inputs without using gcd normalization.
+fn monomial_gcd_polynomial(
+    ground: crate::solving::coefficients::scalar::Ground,
+    variables: usize,
+    entries: &[(&[u32], &str)],
+    budget: &mut Budget,
+) -> TestResult<crate::solving::coefficients::polynomial::Polynomial> {
+    use crate::solving::coefficients::{
+        polynomial::{Polynomial, Term},
+        scalar::Ground,
+    };
+    let mut terms = Vec::new();
+    for (powers, text) in entries {
+        let value = Rational::parse(text, budget)?;
+        let coefficient = if ground == Ground::Rational {
+            Scalar::Rational(value)
+        } else {
+            Scalar::Gaussian(crate::solving::numeric::Gaussian::from_parts(
+                &value,
+                &Rational::one(),
+                budget,
+            )?)
+        };
+        terms.push(Term {
+            powers: powers.to_vec(),
+            coefficient,
+        });
+    }
+    Ok(Polynomial::new(variables, ground, terms, budget)?)
+}
+
+/// Exact gcd exponents include every term, both operand orders, zeros, units and Gaussian scalars.
+/// ´test:crate:coefficient-monomial-gcd´
+#[test]
+fn coefficient_monomial_gcd() -> TestResult {
+    use crate::solving::coefficients::{gcd::gcd, scalar::Ground};
+    for ground in [Ground::Rational, Ground::Gaussian] {
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let monomial = monomial_gcd_polynomial(ground, 2, &[(&[3, 4], "2")], &mut budget)?;
+        let mixed =
+            monomial_gcd_polynomial(ground, 2, &[(&[5, 2], "3"), (&[1, 5], "-7")], &mut budget)?;
+        let coprime =
+            monomial_gcd_polynomial(ground, 2, &[(&[0, 5], "3"), (&[4, 0], "-7")], &mut budget)?;
+        let zero = monomial_gcd_polynomial(ground, 2, &[], &mut budget)?;
+        let unit = monomial_gcd_polynomial(ground, 2, &[(&[0, 0], "-5")], &mut budget)?;
+        for (other, expected) in [
+            (&mixed, [1, 2]),
+            (&coprime, [0, 0]),
+            (&zero, [3, 4]),
+            (&unit, [0, 0]),
+        ] {
+            for (left, right) in [(&monomial, other), (other, &monomial)] {
+                let result = gcd(left, right, &mut budget)?;
+                let [term] = result.terms.as_slice() else {
+                    return Err("nonmonomial gcd".into());
+                };
+                assert_eq!(term.powers, expected);
+                assert!(
+                    term.coefficient
+                        .equals(&Scalar::constant(ground, true, &mut budget)?, &mut budget)?
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The exact arithmetic regression cubes a small fraction over a monomial denominator under 64 bits.
+/// ´test:crate:coefficient-monomial-cube-range´
+#[test]
+fn coefficient_monomial_cube_range() -> TestResult {
+    use crate::solving::coefficients::{fraction::Fraction, scalar::Ground};
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let numerator = monomial_gcd_polynomial(
+        Ground::Rational,
+        4,
+        &[(&[0, 1, 0, 1], "1"), (&[0, 0, 2, 0], "-1/3")],
+        &mut budget,
+    )?;
+    let denominator =
+        monomial_gcd_polynomial(Ground::Rational, 4, &[(&[0, 0, 0, 2], "1")], &mut budget)?;
+    let input = Fraction::new(&numerator, &denominator, &mut budget)?;
+    let square = input.mul(&input, &mut budget)?;
+    let cube = input.mul(&square, &mut budget)?;
+    let expected = monomial_gcd_polynomial(
+        Ground::Rational,
+        4,
+        &[
+            (&[0, 3, 0, 3], "1"),
+            (&[0, 2, 2, 2], "-1"),
+            (&[0, 1, 4, 1], "1/3"),
+            (&[0, 0, 6, 0], "-1/27"),
+        ],
+        &mut budget,
+    )?;
+    let bottom =
+        monomial_gcd_polynomial(Ground::Rational, 4, &[(&[0, 0, 0, 6], "1")], &mut budget)?;
+    assert!(cube.numerator.equals(&expected, &mut budget)?);
+    assert!(cube.denominator.equals(&bottom, &mut budget)?);
+    assert_eq!(budget.limits().component_bits, 64);
+    Ok(())
+}
+
+/// Monomial detection follows, and never weakens, the full coefficient frame checks.
+/// ´test:crate:coefficient-monomial-frame-refusal´
+#[test]
+fn coefficient_monomial_frame_refusal() -> TestResult {
+    use crate::solving::coefficients::{gcd::gcd, scalar::Ground};
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let source = monomial_gcd_polynomial(Ground::Rational, 2, &[(&[2, 1], "1")], &mut budget)?;
+    let width = monomial_gcd_polynomial(Ground::Rational, 1, &[(&[2], "1")], &mut budget)?;
+    let field = monomial_gcd_polynomial(Ground::Gaussian, 2, &[(&[2, 1], "1")], &mut budget)?;
+    assert!(gcd(&source, &width, &mut budget).is_err());
+    assert!(gcd(&source, &field, &mut budget).is_err());
+    Ok(())
+}

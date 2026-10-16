@@ -222,6 +222,37 @@ fn recursive(
     common.mul(&first.monic(budget)?, budget)?.monic(budget)
 }
 
+/// A monomial's only nonunit factors are coordinate variables, so its gcd has exact exponent minima.
+fn monomial(
+    left: &Polynomial,
+    right: &Polynomial,
+    budget: &mut Budget,
+) -> Result<Option<Polynomial>, Fault> {
+    let (single, other) = match (left.terms.as_slice(), right.terms.as_slice()) {
+        ([term], _) => (term, right),
+        (_, [term]) => (term, left),
+        _ => return Ok(None),
+    };
+    let mut powers = super::storage::copied(&single.powers, budget)?;
+    for term in &other.terms {
+        for (minimum, exponent) in powers.iter_mut().zip(&term.powers) {
+            budget.work(1, AT)?;
+            *minimum = (*minimum).min(*exponent);
+        }
+    }
+    let mut terms = vector(1, budget)?;
+    terms.push(Term {
+        powers,
+        coefficient: Scalar::constant(left.ground, true, budget)?,
+    });
+    Ok(Some(Polynomial::new(
+        left.variables,
+        left.ground,
+        terms,
+        budget,
+    )?))
+}
+
 /// Compute a canonical gcd and independently verify both exact factor reconstructions.
 pub(crate) fn gcd(
     left: &Polynomial,
@@ -231,7 +262,11 @@ pub(crate) fn gcd(
     if left.variables != right.variables || left.ground != right.ground {
         return Err(invalid());
     }
-    let result = recursive(left, right, left.variables, budget)?;
+    let result = if let Some(result) = monomial(left, right, budget)? {
+        result
+    } else {
+        recursive(left, right, left.variables, budget)?
+    };
     if result.zero(budget)? {
         return Ok(result);
     }

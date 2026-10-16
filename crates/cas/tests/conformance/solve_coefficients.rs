@@ -1614,3 +1614,36 @@ fn coefficient_formal_close_mutations() -> TestResult {
     assert!(formal_identity(FormalMutation::RealBinder).is_err());
     Ok(())
 }
+
+/// Every exponent visit participates in the public admission work boundary, with atomic refusal.
+/// ´test:integration:monomial-fraction-work-boundary´
+#[test]
+fn monomial_fraction_work_boundary() -> TestResult {
+    use crate::testing::solve_coefficients::monomial_fraction;
+    let (mut fixture, draft) = monomial_fraction()?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    fixture
+        .cas
+        .admit(std::slice::from_ref(&draft), &mut measured)?;
+    let count = measured.usage().work;
+    assert!(count > 0);
+    for cap in [count, count - 1] {
+        let (mut peer, proposed) = monomial_fraction()?;
+        let before = peer.cas.counts();
+        let mut limits = Limits::blind_cubic();
+        limits.work = cap;
+        let mut budget = Budget::new(limits)?;
+        let result = peer.cas.admit(std::slice::from_ref(&proposed), &mut budget);
+        if cap == count {
+            result?;
+            assert_eq!(budget.usage().work, count);
+        } else {
+            let error = result.err().ok_or("short monomial work budget accepted")?;
+            assert!(
+                matches!(error.kind, FaultKind::Exhausted { budget: BudgetKind::Work, limit, needed, .. } if limit == cap && needed > cap)
+            );
+            assert_eq!(peer.cas.counts(), before);
+        }
+    }
+    Ok(())
+}

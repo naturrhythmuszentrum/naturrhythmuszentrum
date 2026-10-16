@@ -828,3 +828,35 @@ pub(crate) use scoped::{
 )]
 mod transport;
 pub(crate) use transport::{SpecializationMutation, specialization_identity};
+
+/// A supplied coprime cube numerator over a monomial denominator reaches ordinary graph admission.
+pub(crate) fn monomial_fraction() -> TestResult<(Fixture, Draft)> {
+    let mut fixture = Fixture::new()?;
+    let numerator = fixture.polynomial(
+        2,
+        &[
+            (vec![0, 6], -1),
+            (vec![1, 4], 9),
+            (vec![2, 2], -27),
+            (vec![3, 0], 27),
+        ],
+    )?;
+    let denominator = fixture.polynomial(2, &[(vec![6, 0], 1)])?;
+    let draft = fixture.fraction(&numerator, &denominator);
+    Ok((fixture, draft))
+}
+
+/// Public witness closure keeps the actual canonical fraction and its denominator hypothesis.
+pub(crate) fn monomial_fraction_identity()
+-> TestResult<(Fixture, Vec<crate::test_api::proof::ApplicationDraft>)> {
+    use crate::test_api::syntax::PredicateKind;
+    let (mut fixture, draft) = monomial_fraction()?;
+    let value = admit(&mut fixture.cas, &draft)?;
+    let map = fixture.parameter_map()?;
+    let expression = fixture.literal(&value, &map)?;
+    let parameter = fixture.free("x")?;
+    let assumption = fixture.assumption(&parameter, PredicateKind::NonZero)?;
+    let mut identity = fixture.identity(&expression, &expression, &map);
+    identity.premises = vec![0];
+    Ok((fixture, vec![assumption, identity]))
+}
