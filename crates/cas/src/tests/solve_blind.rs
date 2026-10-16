@@ -326,8 +326,8 @@ fn blind_zero_pairing_independent_oracle() -> TestResult {
     Ok(())
 }
 
-/// Pending coefficient-map interpretation design restores complete symbolic source coverage.
-/// Both declaration namings currently assert the exact coefficient refusal.
+/// Both Complex declaration namings reach regional-zero inversion in `euclid::inverse`.
+/// Their exact coefficient refusal retains the original source parameters.
 /// ´test:crate:blind-symbolic-source-retains-parameters´
 #[test]
 fn blind_symbolic_source_retains_parameters() -> TestResult {
@@ -435,14 +435,10 @@ fn blind_incremental_proof_replay() -> TestResult {
     crate::testing::solve_blind::prefixes(&[-4, -15, 0, 1])
 }
 
-/// Pending coefficient-map interpretation design restores symbolic acceptance and its witness audit.
-/// Today the exact refusal retains measured phase and interning evidence.
+/// Independent boundary inventories retain declaration fields, initial maps and original forms.
+/// Each Complex refusal names regional-zero inversion in `euclid::inverse`; the Real refusal is earlier.
 /// ´test:crate:blind-symbolic-acceptance-audit´
 #[test]
-#[expect(
-    clippy::print_stderr,
-    reason = "the refusal record is audit evidence read under --nocapture"
-)]
 fn blind_symbolic_acceptance_audit() -> TestResult {
     let revision = "blind-cubic-audit-fixture-revision";
     let record = crate::testing::solve_blind::symbolic_audit(revision)?;
@@ -451,7 +447,16 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     assert!(record.contains("refusal=Fault"));
     assert!(record.contains("interning_comparisons="));
     assert!(record.contains("phases="));
-    eprintln!("{record}");
+    assert_eq!(record.matches("declaration_field=Complex\n").count(), 7);
+    assert_eq!(record.matches("declaration_field=Real\n").count(), 1);
+    assert_eq!(record.matches("original_form=Radicals\n").count(), 8);
+    assert_eq!(
+        record
+            .matches("diagnosed_first_operation=towers::euclid::inverse")
+            .count(),
+        7
+    );
+    assert!(record.contains("initial_map=None (propose refuses Real before coefficient_images)"));
     Ok(())
 }
 
@@ -476,8 +481,8 @@ fn blind_repeated_factor_mutations() -> TestResult {
     crate::testing::solve_blind::false_factors(&[2, -3, 0, 1])
 }
 
-/// Pending coefficient-map interpretation design restores complete-cover stratum deletion mutations.
-/// The current baseline instead asserts its exact coefficient refusal.
+/// Regional-zero inversion in `euclid::inverse` prevents a complete Complex cover to mutate.
+/// The current baseline retains its exact coefficient refusal.
 /// ´test:crate:blind-missing-stratum-mutations´
 #[test]
 fn blind_missing_stratum_mutations() -> TestResult {
@@ -498,8 +503,8 @@ fn blind_recovered_choice_transport() -> TestResult {
     crate::testing::solve_blind::transported_choices(false, 1)
 }
 
-/// Pending coefficient-map interpretation design restores transport of every renamed root and stratum.
-/// Both namings currently assert the same exact coefficient refusal.
+/// Both Complex namings reach regional-zero inversion in `euclid::inverse`.
+/// The exact refusal remains in place before root and stratum transport.
 /// ´test:crate:blind-complete-coefficient-renaming´
 #[test]
 fn blind_complete_coefficient_renaming() -> TestResult {
@@ -595,4 +600,130 @@ fn blind_formal_root_consumer() -> TestResult {
 #[test]
 fn blind_constructive_real_choice() -> TestResult {
     crate::testing::solve_blind::real_choice_consumer()
+}
+
+/// One Complex parameter and its zero cell retain the original immutable declaration frame.
+fn complex_zero_scope() -> TestResult<(crate::Cas, crate::Handle, crate::Handle, crate::Handle)> {
+    use crate::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
+    use crate::graph::{Draft, Reference};
+    use crate::testing::solve_graph::admit;
+    let (mut fixture, _) = crate::testing::solve_blind::symbolic(&["a"])?;
+    let environment = &fixture
+        .cas
+        .state
+        .header(fixture.header.logical_id())?
+        .environment;
+    assert!(environment.declarations.iter().all(|declaration| {
+        declaration.sort
+            == crate::syntax::Sort::Value(crate::syntax::AtomicSort::Scalar(
+                crate::syntax::Field::Complex,
+            ))
+    }));
+    let parameter = fixture.free("a")?;
+    let zero = fixture.integer(0, false)?;
+    let predicate = fixture.equation(&parameter, &zero)?;
+    let region = admit(
+        &mut fixture.cas,
+        &Draft::Region(RegionDraft {
+            header: Reference::Existing(fixture.header.clone()),
+            scope: Vec::new(),
+            ambient: AmbientDomain::Product {
+                coordinates: fixture.coefficients,
+            },
+            expression: RegionExpr::GuardTrue {
+                base: Reference::Existing(fixture.region),
+                predicate: Reference::Existing(predicate),
+            },
+        }),
+    )?;
+    let context = admit(
+        &mut fixture.cas,
+        &Draft::Context(ContextDraft::Root {
+            header: Reference::Existing(fixture.header),
+            admissible: Reference::Existing(region.clone()),
+            assumptions: Vec::new(),
+        }),
+    )?;
+    Ok((fixture.cas, fixture.algebra, context, region))
+}
+
+/// The only fraction coordinate is the declared Complex parameter a; its denominator is one.
+fn complex_parameter(
+    engine: &crate::solving::coefficients::arithmetic::Engine<'_>,
+    budget: &mut Budget,
+) -> TestResult<crate::solving::coefficients::model::Element> {
+    use crate::solving::coefficients::{
+        fraction::Fraction,
+        model::Value,
+        polynomial::{Polynomial, Term},
+        scalar::Scalar,
+    };
+    let (ground, width, _) = engine.fraction_shape()?;
+    assert_eq!(width, 1);
+    let numerator = Polynomial::new(
+        width,
+        ground,
+        vec![Term {
+            powers: vec![1],
+            coefficient: Scalar::constant(ground, true, budget)?,
+        }],
+        budget,
+    )?;
+    let denominator = numerator.one(budget)?;
+    Ok(engine.element(Value::Fraction(Fraction::new(
+        &numerator,
+        &denominator,
+        budget,
+    )?)))
+}
+
+/// Long division of 1 by a on a=0 reaches the first symbolic Complex fault directly.
+/// A formal nonzero is a regional zero; `euclid::inverse` turns `UnitDecision::Zero` into this fault.
+/// ´test:crate:blind-complex-regional-zero-divisor´
+#[test]
+fn blind_complex_regional_zero_divisor() -> TestResult {
+    use crate::solving::coefficients::{
+        arithmetic::Engine,
+        model::{CoefficientFailure, EvaluationScope, UnitDecision, ZeroDecision},
+    };
+    use crate::solving::towers::{dense::Dense, euclid};
+    let (cas, domain, context, region) = complex_zero_scope()?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = Engine {
+        state: &cas.state,
+        domain: &domain,
+    };
+    let parameter = complex_parameter(&engine, &mut budget)?;
+    let scope = EvaluationScope {
+        context: &context,
+        region: &region,
+        premises: &[],
+        localization: &[],
+    };
+    assert!(!engine.formal_zero(&parameter, &mut budget)?);
+    assert!(matches!(
+        engine.zero_test(&parameter, &scope, &mut budget)?,
+        ZeroDecision::Zero(_)
+    ));
+    assert!(matches!(
+        engine.inverse(&parameter, &scope, &mut budget)?,
+        UnitDecision::Zero(_)
+    ));
+    let divisor = Dense::new(&engine, vec![parameter], &mut budget)?;
+    assert_eq!(divisor.coefficients.len(), 1);
+    let dividend = Dense::one(&engine, &mut budget)?;
+    let Err(CoefficientFailure::Fault(fault)) =
+        euclid::divide(&dividend, &divisor, &cas.state, &scope, &mut budget)
+    else {
+        return Err("regional zero divisor boundary moved".into());
+    };
+    assert_eq!(
+        fault.kind,
+        crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(
+        fault.location,
+        crate::error::Location::new("exact coefficients")
+    );
+    Ok(())
 }

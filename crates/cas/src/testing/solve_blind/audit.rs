@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Post-search audit records retain source identity, capabilities, ledgers and the actual checked DAG.
 
-use crate::graph::{Cas, LogicalId, Vertex};
+use crate::graph::{Cas, Handle, LogicalId, Vertex};
 use crate::limits::{Budget, Limits};
 use crate::proof_model::{ApplicationDraft, VerifiedWitness};
 use crate::solving::radicals::route::Audit;
 use crate::testing::common::TestResult;
 use std::collections::BTreeMap;
+
+/// A complete phase payload keeps the empty-ledger assertion readable.
+type Phase = (
+    (&'static str, Option<usize>),
+    Handle,
+    u64,
+    Option<crate::solving::symmetric::cursor::Seed>,
+    u64,
+    u64,
+    u64,
+);
 
 /// Reconstruct an independently checked proof's applications without using producer scratch history.
 fn visit(
@@ -56,10 +67,221 @@ pub(crate) fn applications(
     Ok(steps)
 }
 
-/// Pending coefficient-map interpretation design restores the full symbolic acceptance audit.
-/// The current refusal retains the actual phase and interning evidence without claiming a witness.
+/// Server first-fault traces and the direct regional-zero-divisor regression identify this operation.
+/// This is the diagnosed call site, not an observer or a reinterpretation of the final fault location.
+const FIRST_OPERATION: &str = "towers::euclid::inverse: UnitDecision::Zero during divide -> gcd -> towers::units::inverse -> Engine::zero_test -> Route::decide";
+
+/// Each boundary is constructed independently, including both source and renaming spellings.
+/// The Real fixture records its original `Radicals` request and the absence of an initial map.
 pub(crate) fn symbolic(source_revision: &str) -> TestResult<String> {
-    let (mut fixture, request) = super::source::symbolic(&["d", "c", "b", "a"])?;
+    use crate::model::Field;
+    let ordinary = ["d", "c", "b", "a"];
+    let renamed = ["delta", "gamma", "beta", "alpha"];
+    let mut record = format!("source_revision={source_revision}\n{}", policy_record());
+    for (name, keys) in [
+        ("blind_symbolic_complex_complete", &ordinary),
+        ("blind_symbolic_source_retains_parameters", &ordinary),
+        ("blind_symbolic_source_retains_parameters", &renamed),
+        ("blind_symbolic_acceptance_audit", &ordinary),
+        ("blind_complete_coefficient_renaming", &ordinary),
+        ("blind_complete_coefficient_renaming", &renamed),
+        ("blind_missing_stratum_mutations", &ordinary),
+    ] {
+        record.push_str(&boundary(name, keys, &Field::Complex)?);
+    }
+    record.push_str(&boundary(
+        "blind_symbolic_real_complete",
+        &ordinary,
+        &Field::Real,
+    )?);
+    Ok(record)
+}
+
+/// The runtime baseline is recorded independently of the future symbol-sorts manifest.
+fn policy_record() -> String {
+    let manifest: Vec<_> = crate::rule::PRIMITIVES
+        .iter()
+        .map(|rule| {
+            let specification = rule.specification();
+            (specification.key, specification.version)
+        })
+        .collect();
+    assert_eq!(manifest.len(), 77);
+    assert!(manifest.iter().all(|(_, version)| *version == 1));
+    assert_eq!(crate::solving::active_schema_bitmap() & 0x1_7fff, 0x1_7fff);
+    let policy = crate::cost::CostPolicy::default();
+    assert_eq!((&*policy.key, policy.version), ("logical", 9));
+    format!(
+        "policy=logical-v9\nschema_manifest={manifest:?}\nactive_bitmap={}\n",
+        crate::solving::active_schema_bitmap()
+    )
+}
+
+/// Read declarations, unknown coordinates and the original form from this fixture's actual graph.
+fn declaration_record(
+    fixture: &super::source::Fixture,
+    request: &crate::request_model::Request,
+    expected: &crate::model::Field,
+) -> TestResult<String> {
+    use crate::model::{AtomicSort, Sort};
+    let crate::task::Task::Solve(specification) = &request.task else {
+        return Err("boundary is not a solve request".into());
+    };
+    let problem = crate::solving::elementary::proof::problem(&fixture.cas, &specification.problem)?;
+    let environment = &fixture
+        .cas
+        .state
+        .header(problem.header.logical_id())?
+        .environment;
+    assert_eq!(environment.declarations.len(), 5);
+    assert!(
+        environment.declarations.iter().all(
+            |declaration| declaration.sort == Sort::Value(AtomicSort::Scalar(expected.clone()))
+        )
+    );
+    let unknowns = crate::solving::elementary::proof::coordinates(&fixture.cas, &problem.unknowns)?;
+    assert_eq!(unknowns.coordinates.len(), 1);
+    assert!(
+        unknowns
+            .coordinates
+            .iter()
+            .all(|coordinate| coordinate.field == *expected)
+    );
+    let parameters =
+        crate::solving::elementary::proof::coordinates(&fixture.cas, &problem.coefficients)?;
+    assert_eq!(parameters.coordinates.len(), 4);
+    assert!(
+        parameters
+            .coordinates
+            .iter()
+            .all(|coordinate| coordinate.field == *expected)
+    );
+    assert_eq!(problem.ambient, *expected);
+    assert_eq!(specification.form, crate::solving::SolveForm::Radicals);
+    assert_eq!(specification.goal, crate::solving::SolveGoal::Complete);
+    Ok(format!(
+        "declarations={:?}\nunknowns={:?}\ncoefficient_coordinates={:?}\ndeclaration_field={expected:?}\noriginal_form={:?}\n",
+        environment.declarations, unknowns.coordinates, parameters.coordinates, specification.form
+    ))
+}
+
+/// Reconstruct the producer's initial map from the actual ordered fraction frame, before search.
+fn initial_map(fixture: &mut super::source::Fixture) -> TestResult<String> {
+    use crate::solving::{CoefficientDomainData, MapMode, MapTarget, SolveView};
+    let CoefficientDomainData::Fraction { base, coordinates } =
+        crate::solving::coefficients::storage::domain(&fixture.cas.state, &fixture.algebra)?
+    else {
+        return Err("boundary coefficient domain is not a fraction field".into());
+    };
+    assert!(matches!(
+        crate::solving::coefficients::storage::domain(&fixture.cas.state, base)?,
+        CoefficientDomainData::Rational
+    ));
+    let frame = crate::solving::elementary::proof::coordinates(&fixture.cas, coordinates)?;
+    let keys: Vec<_> = frame
+        .coordinates
+        .iter()
+        .map(|coordinate| coordinate.key.clone())
+        .collect();
+    let mut images = Vec::new();
+    for key in &keys {
+        images.push(fixture.free(key)?);
+    }
+    let construction = crate::solving::radicals::construction::Construction {
+        header: fixture.header.clone(),
+        context: fixture.context.clone(),
+        region: fixture.region.clone(),
+        steps: Vec::new(),
+    };
+    let map = construction.mapping(
+        &mut fixture.cas,
+        &fixture.algebra,
+        &images,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let SolveView::CoefficientMap(mapping) = fixture.cas.solve_view(&map)? else {
+        return Err("initial map missing".into());
+    };
+    crate::solving::coefficients::homomorphism::check(
+        &fixture.cas,
+        mapping,
+        &[],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(mapping.source, fixture.algebra);
+    assert_eq!(mapping.mode, MapMode::Specialization);
+    assert_eq!(mapping.region, fixture.region);
+    assert_eq!(mapping.images, images);
+    assert_eq!(mapping.denominators, [] as [Handle; 0]);
+    assert_eq!(
+        mapping.target,
+        MapTarget::ScalarAmbient {
+            header: fixture.header.clone(),
+            field: crate::model::Field::Complex
+        }
+    );
+    Ok(format!(
+        "initial_map={mapping:?}\ninitial_map_source=Q({})\ninitial_map_images={keys:?}\ninitial_map_target=ScalarAmbient(Complex)\ninitial_map_check=exact-Free accepted\n",
+        keys.join(",")
+    ))
+}
+
+/// Rebuilding a fixture never infers its field, map or form from another boundary's refusal.
+fn boundary(name: &str, keys: &[&str], field: &crate::model::Field) -> TestResult<String> {
+    let (mut fixture, request) = super::source::symbolic_in_field(keys, field)?;
+    let declarations = declaration_record(&fixture, &request, field)?;
+    let mapping = if *field == crate::model::Field::Complex {
+        initial_map(&mut fixture)?
+    } else {
+        "initial_map=None (propose refuses Real before coefficient_images)\n".into()
+    };
+    let measurement = if *field == crate::model::Field::Complex {
+        complex_refusal(&mut fixture, &request)?
+    } else {
+        real_refusal(&mut fixture, &request)?
+    };
+    Ok(format!(
+        "boundary={name}\nkeys={keys:?}\n{declarations}{mapping}{measurement}"
+    ))
+}
+
+/// The genuine Real boundary precedes coefficient production and keeps its historical form.
+fn real_refusal(
+    fixture: &mut super::source::Fixture,
+    request: &crate::request_model::Request,
+) -> TestResult<String> {
+    let mut generation = Budget::new(Limits::blind_cubic())?;
+    let mut checker = Budget::new(Limits::blind_cubic())?;
+    let mut audit = Audit::default();
+    let result = crate::solving::solve_search::produce(
+        &mut fixture.cas,
+        request,
+        &mut audit,
+        &mut generation,
+        &mut checker,
+    );
+    assert!(matches!(
+        result,
+        Err(
+            crate::solving::coefficients::model::CoefficientFailure::Unsupported(
+                crate::solving::SolveReason::RealIsolationUnavailable
+            )
+        )
+    ));
+    assert_eq!(audit.phases, [] as [Phase; 0]);
+    assert_eq!(generation.usage().coefficient_ops, 0);
+    assert_eq!(checker.usage().work, 0);
+    Ok(
+        "refusal=RealIsolationUnavailable\nfirst_operation=solve_search::propose ambient check\n"
+            .into(),
+    )
+}
+
+/// Retain phase and interning evidence; no coverage or presentation replay precedes the fault.
+fn complex_refusal(
+    fixture: &mut super::source::Fixture,
+    request: &crate::request_model::Request,
+) -> TestResult<String> {
     let limits = Limits::blind_cubic();
     let mut generation = Budget::new(limits.clone())?;
     let mut checker = Budget::new(limits.clone())?;
@@ -67,7 +289,7 @@ pub(crate) fn symbolic(source_revision: &str) -> TestResult<String> {
     let before = fixture.cas.interning_snapshot();
     let result = crate::solving::solve_search::produce(
         &mut fixture.cas,
-        &request,
+        request,
         &mut audit,
         &mut generation,
         &mut checker,
@@ -91,25 +313,15 @@ pub(crate) fn symbolic(source_revision: &str) -> TestResult<String> {
         fault.kind,
         crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
     );
-    assert_eq!(fault.location.operation, "exact coefficients");
-    let manifest: Vec<_> = crate::rule::PRIMITIVES
-        .iter()
-        .map(|rule| {
-            let specification = rule.specification();
-            (specification.key, specification.version)
-        })
-        .collect();
-    assert_eq!(manifest.len(), 77);
-    assert!(manifest.iter().all(|(_, version)| *version == 1));
-    assert_eq!(crate::solving::active_schema_bitmap() & 0x1_7fff, 0x1_7fff);
+    assert_eq!(
+        fault.location,
+        crate::error::Location::new("exact coefficients")
+    );
     assert!(generation.usage().coefficient_ops > 0);
     assert!(generation.usage().work <= limits.work);
-    assert!(checker.usage().work <= limits.replay_work);
-    let policy = crate::cost::CostPolicy::default();
-    assert_eq!((&*policy.key, policy.version), ("logical", 9));
+    assert_eq!(checker.usage().work, 0);
     Ok(format!(
-        "source_revision={source_revision}\nrefusal={fault:?}\npolicy=logical-v9\nlimits={limits:?}\nschema_manifest={manifest:?}\nactive_bitmap={}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
-        crate::solving::active_schema_bitmap(),
+        "refusal={fault:?}\ndiagnosed_first_operation={FIRST_OPERATION}\ndiagnosed_first_schema=None (producer arithmetic before coverage replay)\ndiagnosed_first_operation_map=None (Euclidean inverse consumes the coefficient domain and scope)\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
         audit.phases,
         audit.components,
         audit.coefficient_terms,

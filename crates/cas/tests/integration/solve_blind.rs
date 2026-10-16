@@ -202,7 +202,7 @@ fn blind_zero_polynomial_family() -> TestResult {
     Ok(())
 }
 
-/// Pending coefficient-map interpretation design restores all complex symbolic coverage strata.
+/// The Complex fixture reaches regional-zero inversion in `euclid::inverse` during tower zero testing.
 /// The current exact unsupported-fragment boundary remains an executable regression.
 /// ´test:integration:blind-symbolic-complex-complete´
 #[test]
@@ -220,7 +220,7 @@ fn blind_symbolic_complex_complete() -> TestResult {
     Ok(())
 }
 
-/// Pending scalar-inclusion/coefficient-interpretation design restores complete real symbolic coverage.
+/// The Real fixture is refused by the producer ambient check before any initial coefficient map.
 /// Both discriminant signs and lower-degree families remain blocked by the named real-isolation boundary.
 /// ´test:integration:blind-symbolic-real-complete´
 #[test]
