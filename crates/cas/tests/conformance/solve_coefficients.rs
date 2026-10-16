@@ -1581,3 +1581,36 @@ fn coefficient_quotient_specialization_mutations() -> TestResult {
     }
     Ok(())
 }
+
+/// Closure rejects altered root scope, provenance, endpoints, regions and denominator requirements atomically.
+/// ´test:integration:coefficient-formal-close-mutations´
+#[test]
+fn coefficient_formal_close_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::{FormalMutation, formal_identity};
+    for mutation in [
+        FormalMutation::Parent,
+        FormalMutation::Region,
+        FormalMutation::Endpoint,
+        FormalMutation::Anchor,
+        FormalMutation::Hypothesis,
+        FormalMutation::RootConclusion,
+        FormalMutation::Denominator,
+    ] {
+        let (mut fixture, steps) = formal_identity(mutation)?;
+        let before = fixture.cas.counts();
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err(),
+            "{mutation:?}"
+        );
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    assert!(formal_identity(FormalMutation::RealBinder).is_err());
+    Ok(())
+}

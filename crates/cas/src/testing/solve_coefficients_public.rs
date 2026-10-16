@@ -816,8 +816,9 @@ pub(crate) fn existing_relation_identity()
 )]
 mod scoped;
 pub(crate) use scoped::{
-    ScopedMutation, asymmetric_relation, scoped_context_mismatch, scoped_dependent_adjunction,
-    scoped_identity, scoped_premise_fixture, scoped_request, scoped_scalar,
+    FormalMutation, ScopedMutation, asymmetric_relation, formal_identity, scoped_context_mismatch,
+    scoped_dependent_adjunction, scoped_identity, scoped_premise_fixture, scoped_request,
+    scoped_scalar,
 };
 
 #[path = "solve_coefficients_transport.rs"]

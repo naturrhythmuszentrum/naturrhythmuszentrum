@@ -278,7 +278,7 @@ pub(crate) fn weaken(
 
 /// Close the exact local frame while keeping its mathematical region unchanged.
 pub(crate) fn close(
-    cas: &Cas,
+    cas: &mut Cas,
     draft: &ApplicationDraft,
     premises: &[CheckedApplication],
     budget: &mut Budget,
@@ -288,6 +288,9 @@ pub(crate) fn close(
     };
     if !draft.substitutions.is_empty() {
         return Err(invalid());
+    }
+    if crate::solving::coefficients::formal_close::boundary(cas, draft, premises)? {
+        return crate::solving::coefficients::formal_close::close(cas, draft, premises, budget);
     }
     let child = premises.first().ok_or_else(invalid)?;
     let construction = premises.get(1).ok_or_else(invalid)?;

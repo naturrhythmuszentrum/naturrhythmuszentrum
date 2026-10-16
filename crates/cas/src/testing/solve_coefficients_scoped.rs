@@ -1013,3 +1013,273 @@ pub(crate) fn scoped_premise_fixture() -> TestResult<(
     };
     Ok((fixture, steps, request))
 }
+
+/// One independently changed endpoint or provenance field of formal-root closure.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum FormalMutation {
+    /// Exact original parent and scope-erased identity.
+    Valid,
+    /// Another unscoped context has the same region but different ancestry.
+    Parent,
+    /// The target theorem changes the coefficient region.
+    Region,
+    /// Scope erasure may not change an arithmetic endpoint.
+    Endpoint,
+    /// The source certificate lacks its checked existential anchor.
+    Anchor,
+    /// An ordinary relation retains all local hypotheses.
+    Hypothesis,
+    /// A formal root remains in the conclusion.
+    RootConclusion,
+    /// The introduced binder is not complex.
+    RealBinder,
+    /// The target map changes its exact denominator inventory.
+    Denominator,
+}
+
+/// Introduce the formal roots directly above the actual original unscoped context.
+fn formal_fixture() -> TestResult<ScopedFixture> {
+    let mut fixture = ScopedFixture::new(ScopedMutation::Valid)?;
+    fixture.base.region = fixture.base.cas.admissible_region(&fixture.parent)?;
+    let unscoped = admit(
+        &mut fixture.base.cas,
+        &Draft::Region(RegionDraft {
+            header: Reference::Existing(fixture.base.header.clone()),
+            scope: Vec::new(),
+            ambient: AmbientDomain::Assignments,
+            expression: RegionExpr::Ambient,
+        }),
+    )?;
+    fixture.parent = admit(
+        &mut fixture.base.cas,
+        &Draft::Context(ContextDraft::Root {
+            header: Reference::Existing(fixture.base.header.clone()),
+            admissible: Reference::Existing(unscoped),
+            assumptions: Vec::new(),
+        }),
+    )?;
+    fixture.hypotheses.clear();
+    fixture.introduce()?;
+    Ok(fixture)
+}
+
+/// Independently displayed distributivity remains visible inside the formal-root proof.
+fn formal_expansion(fixture: &mut ScopedFixture) -> TestResult<ApplicationDraft> {
+    let sum = fixture.elementary(0)?;
+    let left = fixture.expression(Operator::Mul, &[sum.clone(), sum])?;
+    let mut right = fixture.scalar(0)?;
+    for first in fixture.roots.clone() {
+        for second in fixture.roots.clone() {
+            let term = fixture.expression(Operator::Mul, &[first.clone(), second])?;
+            right = fixture.expression(Operator::Add, &[right, term])?;
+        }
+    }
+    let mut step = fixture.base.identity(&left, &right, &fixture.map);
+    step.premises = vec![2];
+    let zero = fixture.polynomial(&[])?;
+    let Certificate::Solve(certificate) = &mut step.certificate else {
+        return Err("identity certificate".into());
+    };
+    let SolveCertificate::CoefficientIdentity(identity) = certificate.as_mut() else {
+        return Err("identity kind".into());
+    };
+    identity.mode = IdentityMode::RelationCombination;
+    let (left, right) = fixture.endpoints.first().ok_or("first Vieta endpoints")?;
+    identity.combinations.push(RelationMultiple {
+        multiplier: zero,
+        relation: fixture
+            .relations
+            .first()
+            .ok_or("first Vieta relation")?
+            .clone(),
+        hypothesis: Some(ScopedCoefficientRelation {
+            premise: 0,
+            left: left.clone(),
+            right: right.clone(),
+            roots: fixture.roots.clone(),
+            vieta: None,
+        }),
+    });
+    Ok(step)
+}
+
+/// Exact unscoped endpoints are built independently from the scoped expression nodes.
+fn formal_target(
+    fixture: &mut ScopedFixture,
+    mutation: FormalMutation,
+) -> TestResult<ApplicationDraft> {
+    let child = fixture.base.context.clone();
+    fixture.base.context = fixture.parent.clone();
+    fixture.base.region = fixture.base.cas.admissible_region(&fixture.parent)?;
+    let scope = std::mem::take(&mut fixture.scope);
+    let left = fixture.scalar(if mutation == FormalMutation::Endpoint {
+        37
+    } else {
+        36
+    })?;
+    let six = fixture.scalar(6)?;
+    let right = fixture.expression(Operator::Mul, &[six.clone(), six])?;
+    fixture.scope = scope;
+    let map = admit(
+        &mut fixture.base.cas,
+        &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+            source: Reference::Existing(fixture.base.rational.clone()),
+            target: MapTarget::ScalarAmbient {
+                header: Reference::Existing(fixture.base.header.clone()),
+                field: Field::Complex,
+            },
+            mode: MapMode::Specialization,
+            region: Reference::Existing(fixture.base.region.clone()),
+            images: Vec::new(),
+            denominators: Vec::new(),
+        })),
+    )?;
+    let mut result = fixture.base.identity(&left, &right, &map);
+    result.rule = Primitive::ContextClose;
+    result.premises = vec![6];
+    result.certificate = Certificate::Close { frame: child };
+    Ok(result)
+}
+
+/// Mutate a source identity without relying on malformed public syntax.
+fn formal_source_mutation(
+    fixture: &mut ScopedFixture,
+    step: &mut ApplicationDraft,
+    mutation: FormalMutation,
+) -> TestResult {
+    if mutation == FormalMutation::RootConclusion {
+        fixture.mutation = ScopedMutation::ScalarRootConclusion;
+        fixture.conclusion_mutation(step)?;
+    }
+    let Certificate::Solve(certificate) = &mut step.certificate else {
+        return Err("source identity".into());
+    };
+    let SolveCertificate::CoefficientIdentity(identity) = certificate.as_mut() else {
+        return Err("source identity kind".into());
+    };
+    if mutation == FormalMutation::Anchor {
+        identity
+            .combinations
+            .first_mut()
+            .and_then(|row| row.hypothesis.as_mut())
+            .ok_or("source Vieta row")?
+            .vieta = None;
+    }
+    if mutation == FormalMutation::Hypothesis {
+        for row in &mut identity.combinations {
+            row.hypothesis.as_mut().ok_or("source Vieta row")?.vieta = None;
+        }
+    }
+    Ok(())
+}
+
+/// Source proof, anchored discharge, exact close and an ordinary unscoped consumer remain reachable.
+pub(crate) fn formal_identity(
+    mutation: FormalMutation,
+) -> TestResult<(Fixture, Vec<ApplicationDraft>)> {
+    if mutation == FormalMutation::RealBinder {
+        let mut fixture = formal_fixture()?;
+        let region = admit(
+            &mut fixture.base.cas,
+            &Draft::Region(RegionDraft {
+                header: Reference::Existing(fixture.base.header.clone()),
+                scope: vec![vec![AtomicSort::Scalar(Field::Real); 3]],
+                ambient: AmbientDomain::Assignments,
+                expression: RegionExpr::Ambient,
+            }),
+        )?;
+        admit(
+            &mut fixture.base.cas,
+            &Draft::Context(ContextDraft::Local {
+                parent: Reference::Existing(fixture.parent),
+                region: Reference::Existing(region),
+                hypotheses: Vec::new(),
+            }),
+        )?;
+        return Ok((fixture.base, Vec::new()));
+    }
+    let mut fixture = formal_fixture()?;
+    let anchor = fixture.anchor()?;
+    let unit = fixture.base.ground_unit()?;
+    let existence = fixture
+        .base
+        .adjunction(&anchor, None, AdjunctionMode::ComplexFTA, None);
+    let expansion = formal_expansion(&mut fixture)?;
+    let mut identity = fixture.identity(&anchor)?;
+    identity.premises.push(5);
+    formal_source_mutation(&mut fixture, &mut identity, mutation)?;
+    let mut steps = vec![unit, existence];
+    steps.extend(fixture.hypotheses.iter().cloned());
+    steps.extend([expansion, identity]);
+    let mut close = formal_target(&mut fixture, mutation)?;
+    formal_close_mutation(&mut fixture, &mut close, mutation)?;
+    let Statement::Solve(statement) = &close.conclusion else {
+        return Err("closed equality".into());
+    };
+    let crate::test_api::solving::SolveStatement::CoefficientEquality(value) = statement.as_ref()
+    else {
+        return Err("closed equality kind".into());
+    };
+    let mut consumer = fixture.base.identity(&value.left, &value.right, &value.map);
+    consumer.premises = vec![7];
+    steps.extend([close, consumer]);
+    Ok((fixture.base, steps))
+}
+
+/// Target provenance, region and denominator mutations retain well-formed graph objects.
+fn formal_close_mutation(
+    fixture: &mut ScopedFixture,
+    step: &mut ApplicationDraft,
+    mutation: FormalMutation,
+) -> TestResult {
+    if mutation == FormalMutation::Parent {
+        let other = admit(
+            &mut fixture.base.cas,
+            &Draft::Context(ContextDraft::Local {
+                parent: Reference::Existing(fixture.parent.clone()),
+                region: Reference::Existing(fixture.base.region.clone()),
+                hypotheses: Vec::new(),
+            }),
+        )?;
+        step.context = other.clone();
+        fixture.base.context = other;
+    }
+    let Statement::Solve(statement) = &mut step.conclusion else {
+        return Err("target equality".into());
+    };
+    let crate::test_api::solving::SolveStatement::CoefficientEquality(value) = statement.as_mut()
+    else {
+        return Err("target equality kind".into());
+    };
+    if mutation == FormalMutation::Region {
+        value.region = admit(
+            &mut fixture.base.cas,
+            &Draft::Region(RegionDraft {
+                header: Reference::Existing(fixture.base.header.clone()),
+                scope: Vec::new(),
+                ambient: AmbientDomain::Assignments,
+                expression: RegionExpr::Empty,
+            }),
+        )?;
+    }
+    if mutation == FormalMutation::Denominator {
+        let one = fixture.base.integer(1)?;
+        let domain = fixture.base.rational.clone();
+        let denominator = fixture.base.univariate(&domain, &[(0, one)])?;
+        value.map = admit(
+            &mut fixture.base.cas,
+            &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+                source: Reference::Existing(domain),
+                target: MapTarget::ScalarAmbient {
+                    header: Reference::Existing(fixture.base.header.clone()),
+                    field: Field::Complex,
+                },
+                mode: MapMode::Specialization,
+                region: Reference::Existing(fixture.base.region.clone()),
+                images: Vec::new(),
+                denominators: vec![Reference::Existing(denominator)],
+            })),
+        )?;
+    }
+    Ok(())
+}

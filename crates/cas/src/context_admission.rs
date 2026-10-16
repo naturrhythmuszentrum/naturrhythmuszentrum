@@ -164,6 +164,14 @@ impl Cas {
             .ok_or_else(|| Fault::capacity(BudgetKind::HypothesisDepth, AT))?;
         budget.specialized(BudgetKind::HypothesisDepth, depth, false, AT)?;
         let base = state.region(enclosing.admissible)?.clone();
+        if crate::solving::coefficients::formal_close::introduction(
+            state,
+            enclosing.admissible,
+            restriction,
+            budget,
+        )? {
+            return self.formal_context(state, parent, restriction, drafts, locals, budget);
+        }
         crate::domain_admission::region_context(
             state,
             restriction,
@@ -226,6 +234,39 @@ impl Cas {
             environment: enclosing.environment,
             header: enclosing.header,
             assumptions: enclosing.assumptions,
+            canonical_assumptions,
+        })
+    }
+
+    /// A formal-root frame retains the exact original parent and its lifted region without restriction.
+    fn formal_context(
+        &self,
+        state: &State,
+        parent: LogicalId,
+        region: LogicalId,
+        drafts: &[AssumptionDraft],
+        locals: &[LogicalId],
+        budget: &mut Budget,
+    ) -> Result<Context, Fault> {
+        let enclosing = state.context(parent)?;
+        let scope = &state.region(region)?.scope;
+        let frame =
+            self.frame_predicates(state, enclosing.header_id, scope, drafts, locals, budget)?;
+        // Ancestor assumptions retain their original qualified identities through the parent edge.
+        let canonical_assumptions = crate::context::canonical(state, scope, &frame, budget)?;
+        Ok(Context {
+            header_id: enclosing.header_id,
+            admissible: region,
+            parent: Some(parent),
+            restriction: Some(region),
+            frame,
+            depth: enclosing
+                .depth
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::HypothesisDepth, AT))?,
+            environment: enclosing.environment.clone(),
+            header: enclosing.header.clone(),
+            assumptions: enclosing.assumptions.clone(),
             canonical_assumptions,
         })
     }

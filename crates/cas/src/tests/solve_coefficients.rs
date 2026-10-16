@@ -1352,3 +1352,63 @@ fn coefficient_power_localization() -> TestResult {
     ));
     Ok(())
 }
+
+/// The exact paired erasure walk charges a reproducible work boundary without enlarging any profile.
+/// ´test:crate:coefficient-formal-erasure-work-boundary´
+#[test]
+fn coefficient_formal_erasure_work_boundary() -> TestResult {
+    use crate::domain_model::{RegionDraft, RegionExpr};
+    use crate::graph::{Draft, Reference};
+    use crate::model::{AtomicSort, Field};
+    use crate::solving::coefficients::formal_shape;
+    let mut fixture = crate::testing::solve_coefficients::Fixture::new()?;
+    let scope = vec![vec![AtomicSort::Scalar(Field::Complex); 3]];
+    let ambient = fixture
+        .cas
+        .state
+        .region(fixture.region.logical_id())?
+        .ambient
+        .clone();
+    let source = crate::testing::solve_graph::admit(
+        &mut fixture.cas,
+        &Draft::Region(RegionDraft {
+            header: Reference::Existing(fixture.header.clone()),
+            scope: scope.clone(),
+            ambient,
+            expression: RegionExpr::Ambient,
+        }),
+    )?;
+    let mut measured = Budget::new(Limits::blind_cubic())?;
+    formal_shape::paired(
+        &fixture.cas.state,
+        source.logical_id(),
+        fixture.region.logical_id(),
+        &scope,
+        &mut measured,
+    )?;
+    let required = measured.usage().work;
+    assert_eq!(required, 123);
+    for cap in [123, 122] {
+        let mut limits = Limits::blind_cubic();
+        limits.work = cap;
+        let mut budget = Budget::new(limits)?;
+        let result = formal_shape::paired(
+            &fixture.cas.state,
+            source.logical_id(),
+            fixture.region.logical_id(),
+            &scope,
+            &mut budget,
+        );
+        if cap == required {
+            result?;
+            assert_eq!(budget.usage().work, required);
+        } else {
+            let error = result.err().ok_or("erasure accepted one below")?;
+            assert!(
+                matches!(error.kind, crate::error::FaultKind::Exhausted { budget: crate::budget::BudgetKind::Work, limit, needed, .. } if limit == cap && needed > cap)
+            );
+            assert_eq!(error.location, formal_shape::AT);
+        }
+    }
+    Ok(())
+}

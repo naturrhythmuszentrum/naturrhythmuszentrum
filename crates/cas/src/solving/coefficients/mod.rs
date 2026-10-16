@@ -173,3 +173,14 @@ mod vieta;
     reason = "scoped context support is checked before native dispatch"
 )]
 pub(crate) mod scope;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "formal closure is shared with context admission and checking"
+)]
+pub(crate) mod formal_close;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "formal erasure is shared by the private context bridge"
+)]
+pub(crate) mod formal_shape;

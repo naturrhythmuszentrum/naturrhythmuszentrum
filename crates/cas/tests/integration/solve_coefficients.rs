@@ -430,3 +430,46 @@ fn coefficient_quotient_specialization_fresh_replay() -> TestResult {
     }
     Ok(())
 }
+
+/// Discharged formal roots disappear from the exact original context while their derivation remains replayable.
+/// ´test:integration:coefficient-formal-close-fresh-replay´
+#[test]
+fn coefficient_formal_close_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::{FormalMutation, formal_identity};
+    let (mut source, steps) = formal_identity(FormalMutation::Valid)?;
+    let witness = source.cas.check_proof(
+        &source.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(witness.hypotheses(), []);
+    assert_eq!(witness.judgment().residuals, []);
+    let bytes = source
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut target, target_steps) = formal_identity(FormalMutation::Valid)?;
+    let expected = nrz_cas::proof::Judgment {
+        context: target.context.clone(),
+        layer: nrz_cas::domain::Layer::Logic,
+        space: None,
+        statement: target_steps
+            .last()
+            .ok_or("missing unscoped closure")?
+            .conclusion
+            .clone(),
+        residuals: Vec::new(),
+    };
+    let replayed =
+        target
+            .cas
+            .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert_eq!(replayed.judgment(), &expected);
+    assert_eq!(replayed.hypotheses(), []);
+    assert_eq!(
+        target
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}

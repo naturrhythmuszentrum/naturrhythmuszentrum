@@ -112,6 +112,9 @@ pub(crate) fn check(
     let frame = cas.state.context(cas.checked(&draft.context)?)?;
     let scope = &cas.state.region(frame.admissible)?.scope;
     if scope.is_empty() {
+        if super::formal_close::boundary(cas, draft, earlier)? {
+            return Ok(());
+        }
         for premise in earlier {
             budget.work(1, AT)?;
             crate::context::require_closed(&cas.state, cas.checked(&premise.judgment.context)?)?;
