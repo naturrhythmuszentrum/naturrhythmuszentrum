@@ -13,7 +13,7 @@ use crate::model::{Operator, PredicateKind, Scope};
 struct Predicate<'a> {
     /// Named predicate, absent for a declared Boolean expression.
     kind: Option<&'a PredicateKind>,
-    /// Outer frames, which must be closed for an assumption.
+    /// Exact outer frames supplied by the context's admissible region.
     scope: &'a Scope,
     /// Predicate operands or one opaque Boolean identity.
     arguments: &'a [LogicalId],
@@ -80,6 +80,7 @@ fn literal_false(state: &State, value: &Predicate<'_>) -> Result<bool, Fault> {
 /// Flatten conjunctions and retain each explicit hypothesis key in the context's key.
 pub(crate) fn canonical(
     state: &State,
+    scope: &Scope,
     hypotheses: &[(String, LogicalId)],
     budget: &mut Budget,
 ) -> Result<Vec<u8>, Fault> {
@@ -98,7 +99,7 @@ pub(crate) fn canonical(
         let mut atoms = BTreeSet::new();
         while let Some(value) = pending.pop() {
             budget.condition(1, at)?;
-            if !value.scope.is_empty() {
+            if value.scope != scope {
                 return Err(Fault::invalid(InvalidCode::Scope, at));
             }
             if value.kind == Some(&PredicateKind::And) {
@@ -160,4 +161,16 @@ pub(crate) fn canonical(
         }
     }
     Ok(out.finish())
+}
+
+/// Preserve the closed-context precondition at legacy proof, service and scalar-projection boundaries.
+pub(crate) fn require_closed(state: &State, context: LogicalId) -> Result<(), Fault> {
+    let frame = state.context(context)?;
+    if state.region(frame.admissible)?.scope.is_empty() {
+        return Ok(());
+    }
+    Err(Fault::invalid(
+        InvalidCode::UnsupportedFragment,
+        Location::new("closed context required"),
+    ))
 }

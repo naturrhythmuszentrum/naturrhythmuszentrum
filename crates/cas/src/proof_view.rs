@@ -229,6 +229,7 @@ pub(crate) fn typed_claim(
     reason = "a residual's home must equal the judgment's context, not a nonexistent home field"
 )]
 pub(crate) fn scalar_claim(cas: &Cas, value: &Judgment) -> Result<Claim, Fault> {
+    crate::context::require_closed(&cas.state, cas.checked(&value.context)?)?;
     if value.layer != Layer::Pointwise || value.space.is_some() {
         return Err(invalid());
     }

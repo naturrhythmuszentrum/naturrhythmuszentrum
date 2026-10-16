@@ -144,3 +144,27 @@ pub(crate) mod regional;
     reason = "checked nonzero closure stays within the crate"
 )]
 pub(crate) mod nonzero;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scoped coefficient evidence stays within the crate"
+)]
+mod scoped;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "existential coefficient evidence stays within the crate"
+)]
+mod independent;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "existential coefficient evidence stays within the crate"
+)]
+mod vieta;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scoped context support is checked before native dispatch"
+)]
+pub(crate) mod scope;

@@ -16,14 +16,15 @@ use super::model::{
     MultiplicityMode, Neighborhood, PolynomialData, PolynomialTerm, PredicateSplitMode, PrimePower,
     RationalInterval, RealRestrictionTransport, RefinementMode, RefinementTargetKind,
     RegularityKind, RelationMultiple, RestrictionCondition, RestrictionConditionKind,
-    RestrictionPair, RootFactor, RootRelationData, RootSelectionData, RowOperation, SelectionMode,
-    SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveCertificate, SolveDraft,
-    SolveForm, SolveGoal, SolveProblemData, SolveStatement, SolveSubstitution, SquareFreeRequest,
-    StatementCoefficientEquality, StatementComponentCover, StatementCoverage, StatementEquivalent,
-    StatementFamilyCoverage, StatementFamilyMembership, StatementIsolation, StatementLinearSystem,
-    StatementLocalBranch, StatementLocalDerivative, StatementMember, StatementMultiplicity,
-    StatementOrbit, StatementPresentation, StatementRank, StatementRealValues,
-    StatementRootExistence, StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
+    RestrictionPair, RootFactor, RootRelationData, RootSelectionData, RowOperation,
+    ScopedCoefficientRelation, SelectionMode, SolutionBranchData, SolutionBranchKind,
+    SolutionSetData, SolveCertificate, SolveDraft, SolveForm, SolveGoal, SolveProblemData,
+    SolveStatement, SolveSubstitution, SquareFreeRequest, StatementCoefficientEquality,
+    StatementComponentCover, StatementCoverage, StatementEquivalent, StatementFamilyCoverage,
+    StatementFamilyMembership, StatementIsolation, StatementLinearSystem, StatementLocalBranch,
+    StatementLocalDerivative, StatementMember, StatementMultiplicity, StatementOrbit,
+    StatementPresentation, StatementRank, StatementRealValues, StatementRootExistence,
+    StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
 };
 use crate::encoding::{self, Encoder};
 use crate::error::Fault;
@@ -528,6 +529,32 @@ impl<R> RelationMultiple<R> {
     ) -> Result<(), Fault> {
         write(&self.multiplier, out)?;
         write(&self.relation, out)?;
+        out.byte(u8::from(self.hypothesis.is_some()))?;
+        if let Some(hypothesis) = &self.hypothesis {
+            hypothesis.encode(out, write)?;
+        }
+        Ok(())
+    }
+}
+
+impl<R> ScopedCoefficientRelation<R> {
+    /// Encode the exact premise slot, endpoints and ordered interpretation.
+    fn encode(
+        &self,
+        out: &mut Encoder<'_>,
+        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
+    ) -> Result<(), Fault> {
+        crate::wire::index(self.premise, out)?;
+        write(&self.left, out)?;
+        write(&self.right, out)?;
+        out.count(self.roots.len())?;
+        for root in &self.roots {
+            write(root, out)?;
+        }
+        out.byte(u8::from(self.vieta.is_some()))?;
+        if let Some(relation) = &self.vieta {
+            write(relation, out)?;
+        }
         Ok(())
     }
 }
@@ -2308,6 +2335,35 @@ impl RelationMultiple<Handle> {
         Ok(Self {
             multiplier: crate::wire_decode::object(reader, records)?,
             relation: crate::wire_decode::object(reader, records)?,
+            hypothesis: if reader.boolean()? {
+                Some(ScopedCoefficientRelation::decode(reader, records)?)
+            } else {
+                None
+            },
+        })
+    }
+}
+
+impl ScopedCoefficientRelation<Handle> {
+    /// Bound the root interpretation before allocating or reading any term handles.
+    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
+        Ok(Self {
+            premise: reader.index()?,
+            left: crate::wire_decode::object(reader, records)?,
+            right: crate::wire_decode::object(reader, records)?,
+            roots: decode_vector(
+                reader,
+                records,
+                BudgetKind::PolynomialVariables,
+                4,
+                64,
+                crate::wire_decode::object,
+            )?,
+            vieta: if reader.boolean()? {
+                Some(crate::wire_decode::object(reader, records)?)
+            } else {
+                None
+            },
         })
     }
 }
@@ -2669,7 +2725,7 @@ impl CertificateCoefficientIdentity<Handle> {
                 reader,
                 records,
                 BudgetKind::Edges,
-                8,
+                9,
                 256,
                 RelationMultiple::decode,
             )?,

@@ -228,6 +228,7 @@ pub(crate) fn compile_step(
     earlier: &[CheckedStep],
     budget: &mut Budget,
 ) -> Result<CheckedStep, Fault> {
+    crate::context::require_closed(&cas.state, context)?;
     measure_input(cas, std::slice::from_ref(step), budget)?;
     preflight_step(cas, context, step, budget)?;
     budget.work(1, AT)?;

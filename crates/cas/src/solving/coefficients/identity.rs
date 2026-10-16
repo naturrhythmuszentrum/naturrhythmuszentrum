@@ -86,6 +86,7 @@ fn relation(
 fn calculate(
     interpreter: &Interpretation<'_>,
     certificate: &CertificateCoefficientIdentity,
+    context: &crate::graph::Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let left = interpreter
@@ -103,7 +104,11 @@ fn calculate(
         )
         .map_err(|error| fault(&error))?;
     for multiple in &certificate.combinations {
-        relation(interpreter, &multiple.relation, budget)?;
+        if let Some(evidence) = &multiple.hypothesis {
+            super::scoped::relation(interpreter, context, multiple, evidence, budget)?;
+        } else {
+            relation(interpreter, &multiple.relation, budget)?;
+        }
         let multiplier = interpreter
             .endpoint(&multiple.multiplier, budget)
             .map_err(|error| fault(&error))?;
@@ -151,7 +156,7 @@ pub(crate) fn check(
     if certificate.mode == IdentityMode::Normalize && !certificate.combinations.is_empty() {
         return Err(invalid());
     }
-    let inherited = conditions(cas, draft, premises, budget)?;
+    let mut inherited = conditions(cas, draft, premises, budget)?;
     let map = mapping(
         cas,
         &certificate.map,
@@ -183,6 +188,13 @@ pub(crate) fn check(
         region: &certificate.region,
         premises,
     };
-    calculate(&interpreter, certificate, budget)?;
+    calculate(&interpreter, certificate, &draft.context, budget)?;
+    super::vieta::discharge(
+        &interpreter,
+        &draft.context,
+        certificate,
+        &mut inherited,
+        budget,
+    )?;
     Ok(inherited)
 }

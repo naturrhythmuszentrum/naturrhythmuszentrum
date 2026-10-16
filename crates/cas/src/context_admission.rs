@@ -32,19 +32,24 @@ impl Cas {
                 let header_id = self.resolve(state, header, locals)?;
                 let admissible = self.resolve(state, admissible, locals)?;
                 let region = state.region(admissible)?;
-                if !region.scope.is_empty()
-                    || !crate::header::embeds(state, region.header, header_id, budget)?
-                {
+                if !crate::header::embeds(state, region.header, header_id, budget)? {
                     return Err(Fault::invalid(InvalidCode::Context, AT));
                 }
-                let declared =
-                    self.frame_predicates(state, header_id, assumptions, locals, budget)?;
+                let declared = self.frame_predicates(
+                    state,
+                    header_id,
+                    &region.scope,
+                    assumptions,
+                    locals,
+                    budget,
+                )?;
                 let assumptions: Vec<_> = declared
                     .into_iter()
                     .collect::<BTreeMap<_, _>>()
                     .into_iter()
                     .collect();
-                let canonical_assumptions = crate::context::canonical(state, &assumptions, budget)?;
+                let canonical_assumptions =
+                    crate::context::canonical(state, &region.scope, &assumptions, budget)?;
                 let header = state.header(header_id)?;
                 Context {
                     header_id,
@@ -108,6 +113,7 @@ impl Cas {
         &self,
         state: &State,
         header: LogicalId,
+        scope: &crate::model::Scope,
         drafts: &[AssumptionDraft],
         locals: &[LogicalId],
         budget: &mut Budget,
@@ -127,8 +133,7 @@ impl Cas {
             let Vertex::Condition(value) = state.node(id)? else {
                 return Err(Fault::invalid(InvalidCode::Reference, AT));
             };
-            if !value.scope.is_empty()
-                || !crate::header::embeds(state, value.header, header, budget)?
+            if value.scope != *scope || !crate::header::embeds(state, value.header, header, budget)?
             {
                 return Err(Fault::invalid(InvalidCode::Scope, AT));
             }
@@ -167,7 +172,14 @@ impl Cas {
             &base.ambient,
             budget,
         )?;
-        let frame = self.frame_predicates(state, enclosing.header_id, drafts, locals, budget)?;
+        let frame = self.frame_predicates(
+            state,
+            enclosing.header_id,
+            &base.scope,
+            drafts,
+            locals,
+            budget,
+        )?;
         let mut hypotheses = enclosing.assumptions.clone();
         let mut ancestor = Some(parent);
         while let Some(id) = ancestor {
@@ -183,7 +195,8 @@ impl Cas {
             .try_reserve(frame.len())
             .map_err(|_| Fault::allocation(AT))?;
         hypotheses.extend_from_slice(&frame);
-        let canonical_assumptions = crate::context::canonical(state, &hypotheses, budget)?;
+        let canonical_assumptions =
+            crate::context::canonical(state, &base.scope, &hypotheses, budget)?;
         let mut members = vec![enclosing.admissible, restriction];
         members.sort_unstable();
         members.dedup();

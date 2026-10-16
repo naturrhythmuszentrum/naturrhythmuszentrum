@@ -170,6 +170,7 @@ pub(crate) fn check_application(
     budget: &mut Budget,
 ) -> Result<CheckedApplication, Fault> {
     crate::proof_view::measure(cas, draft, budget)?;
+    crate::solving::coefficients::scope::check(cas, draft, premises, budget)?;
     let (mut conditions, scalar_view) = rule_conditions(cas, draft, premises, budget)?;
     conditions.requirements = crate::statement::union(cas, &conditions.requirements, budget)?;
     conditions.residuals = crate::statement::union(cas, &conditions.residuals, budget)?;

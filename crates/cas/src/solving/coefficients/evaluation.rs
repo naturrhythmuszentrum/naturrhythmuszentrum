@@ -24,6 +24,7 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<(), CoefficientFailure> {
         begin(budget)?;
+        crate::context::require_closed(self.state, scope.context.logical_id())?;
         let context = self.state.context(scope.context.logical_id())?;
         let region = self.state.region(scope.region.logical_id())?;
         if context.header_id != region.header || context.admissible != scope.region.logical_id() {

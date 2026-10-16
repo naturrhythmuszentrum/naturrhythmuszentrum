@@ -444,6 +444,23 @@ pub struct RelationMultiple<R = Reference> {
     pub multiplier: R,
     /// Explicit relation.
     pub relation: R,
+    /// Optional independently matched scoped equality premise and ordered root interpretation.
+    pub hypothesis: Option<ScopedCoefficientRelation<R>>,
+}
+
+/// An exact scoped equality interpreted at explicitly ordered formal root slots.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScopedCoefficientRelation<R = Reference> {
+    /// Earlier application slot containing the exact equality predicate fact.
+    pub premise: u32,
+    /// Polynomial independently matched to the hypothesis's left endpoint.
+    pub left: R,
+    /// Polynomial independently matched to the hypothesis's right endpoint.
+    pub right: R,
+    /// Scalar root terms in formal polynomial slot order, without name inference.
+    pub roots: Vec<R>,
+    /// Optional exact root relation anchoring a complete existential Vieta discharge.
+    pub vieta: Option<R>,
 }
 
 /// One simultaneous declaration substitution.

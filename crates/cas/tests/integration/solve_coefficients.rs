@@ -347,3 +347,45 @@ fn coefficient_nonzero_premise_fresh_replay() -> TestResult {
     assert_eq!(target.cas.counts(), before);
     Ok(())
 }
+
+/// Fresh-store replay reconstructs all scoped relation and existential-discharge evidence.
+/// ´test:integration:coefficient-scoped-vieta-fresh-replay´
+#[test]
+fn coefficient_scoped_vieta_fresh_replay() -> TestResult {
+    use crate::testing::solve_coefficients::{ScopedMutation, scoped_identity};
+    use nrz_cas::domain::Layer;
+    use nrz_cas::proof::Judgment;
+    let (mut source, steps) = scoped_identity(ScopedMutation::Valid)?;
+    let witness = source.cas.check_proof(
+        &source.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let bytes = source
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut target, target_steps) = scoped_identity(ScopedMutation::Valid)?;
+    let expected = Judgment {
+        context: target.context.clone(),
+        layer: Layer::Logic,
+        space: None,
+        statement: target_steps
+            .last()
+            .ok_or("missing target closure")?
+            .conclusion
+            .clone(),
+        residuals: Vec::new(),
+    };
+    let checked = target
+        .cas
+        .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert_eq!(checked.judgment(), &expected);
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(
+        target
+            .cas
+            .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}

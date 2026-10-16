@@ -774,3 +774,48 @@ pub(crate) fn nonzero_fraction_power_identity()
     step.premises = vec![0];
     Ok((fixture, vec![assumption, step]))
 }
+/// The existing relation route consumes a checked polynomial equality on the exact zero cell.
+pub(crate) fn existing_relation_identity()
+-> TestResult<(Fixture, Vec<crate::test_api::proof::ApplicationDraft>)> {
+    use crate::test_api::proof::Certificate;
+    use crate::test_api::solving::{IdentityMode, RelationMultiple, SolveCertificate};
+    let mut fixture = regional_fixture(0)?;
+    let parameter = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let unit = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let value_draft = fixture.fraction(&parameter, &unit);
+    let value = admit(&mut fixture.cas, &value_draft)?;
+    let unit_draft = fixture.fraction(&unit, &unit);
+    let one = admit(&mut fixture.cas, &unit_draft)?;
+    let domain = fixture.fractions.clone();
+    let relation = fixture.univariate(&domain, &[(0, value)])?;
+    let zero = fixture.univariate(&domain, &[])?;
+    let multiplier = fixture.univariate(&domain, &[(0, one)])?;
+    let map = fixture.identity_map(&domain)?;
+    let premise = fixture.identity(&relation, &zero, &map);
+    let mut result = fixture.identity(&relation, &zero, &map);
+    result.premises = vec![0];
+    let Certificate::Solve(certificate) = &mut result.certificate else {
+        return Err("missing relation certificate".into());
+    };
+    let SolveCertificate::CoefficientIdentity(identity) = certificate.as_mut() else {
+        return Err("wrong relation certificate".into());
+    };
+    identity.mode = IdentityMode::RelationCombination;
+    identity.combinations.push(RelationMultiple {
+        multiplier,
+        relation,
+        hypothesis: None,
+    });
+    Ok((fixture, vec![premise, result]))
+}
+
+#[path = "solve_coefficients_scoped.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scoped coefficient fixtures remain crate-visible in the public harness"
+)]
+mod scoped;
+pub(crate) use scoped::{
+    ScopedMutation, asymmetric_relation, scoped_context_mismatch, scoped_dependent_adjunction,
+    scoped_identity, scoped_premise_fixture, scoped_request, scoped_scalar,
+};

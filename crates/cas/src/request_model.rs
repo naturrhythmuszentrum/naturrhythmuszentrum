@@ -237,6 +237,14 @@ impl Cas {
     ) -> Result<(Handle, bool), Fault> {
         let at = Location::new("request preparation");
         let context = self.checked(&request.context)?;
+        crate::context::require_closed(&self.state, context)?;
+        for premise in &request.premises {
+            budget.work(1, at)?;
+            crate::context::require_closed(
+                &self.state,
+                self.checked(&premise.judgment().context)?,
+            )?;
+        }
         if let Task::Pullback { map_kind, .. } = &request.task {
             crate::pullback_wire::validate_intent(map_kind, budget)?;
         }

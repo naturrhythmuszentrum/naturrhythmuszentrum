@@ -13,14 +13,14 @@ use super::model::{
     CoordinateSpaceData, ExtensionLevelData, FamilyMapData, GeneratorPair, LocalBranchData,
     MapMode, MapTarget, Neighborhood, PolynomialData, PolynomialTerm, RealRestrictionTransport,
     RelationMultiple, RestrictionCondition, RestrictionPair, RootFactor, RootRelationData,
-    RootSelectionData, RowOperation, SelectionMode, SolutionBranchData, SolutionBranchKind,
-    SolutionSetData, SolveCertificate, SolveDraft, SolveProblemData, SolveSpec, SolveStatement,
-    SolveSubstitution, SolveView, StatementCoefficientEquality, StatementComponentCover,
-    StatementCoverage, StatementEquivalent, StatementFamilyCoverage, StatementFamilyMembership,
-    StatementIsolation, StatementLinearSystem, StatementLocalBranch, StatementLocalDerivative,
-    StatementMember, StatementMultiplicity, StatementOrbit, StatementPresentation, StatementRank,
-    StatementRealValues, StatementRootExistence, StatementRootOrder, StatementSelectionUnique,
-    StatementUnit, TupleData,
+    RootSelectionData, RowOperation, ScopedCoefficientRelation, SelectionMode, SolutionBranchData,
+    SolutionBranchKind, SolutionSetData, SolveCertificate, SolveDraft, SolveProblemData, SolveSpec,
+    SolveStatement, SolveSubstitution, SolveView, StatementCoefficientEquality,
+    StatementComponentCover, StatementCoverage, StatementEquivalent, StatementFamilyCoverage,
+    StatementFamilyMembership, StatementIsolation, StatementLinearSystem, StatementLocalBranch,
+    StatementLocalDerivative, StatementMember, StatementMultiplicity, StatementOrbit,
+    StatementPresentation, StatementRank, StatementRealValues, StatementRootExistence,
+    StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
 };
 use crate::budget::{Budget, BudgetKind};
 use crate::encoding::Encoder;
@@ -599,6 +599,19 @@ impl<R> RelationMultiple<R> {
     fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
         result.push(&self.multiplier);
         result.push(&self.relation);
+        if let Some(hypothesis) = &self.hypothesis {
+            hypothesis.references(result);
+        }
+    }
+}
+
+impl<R> ScopedCoefficientRelation<R> {
+    /// Preserve both polynomial endpoints and the explicit scalar root order as dependencies.
+    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
+        result.push(&self.left);
+        result.push(&self.right);
+        result.extend(&self.roots);
+        result.extend(self.vieta.as_ref());
     }
 }
 

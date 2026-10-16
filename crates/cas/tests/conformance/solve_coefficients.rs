@@ -1225,3 +1225,308 @@ fn coefficient_power_localization_proof() -> TestResult {
     }
     Ok(())
 }
+/// An earlier coefficient equality remains the sole premise of the unchanged relation route.
+/// ´test:integration:coefficient-existing-relation-premise´
+#[test]
+fn coefficient_existing_relation_premise() -> TestResult {
+    use crate::testing::solve_coefficients::existing_relation_identity;
+    let (mut fixture, steps) = existing_relation_identity()?;
+    let checked = fixture.cas.check_proof(
+        &fixture.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals, []);
+    let mut missing = steps.last().ok_or("missing relation application")?.clone();
+    missing.premises.clear();
+    let before = fixture.cas.counts();
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                std::slice::from_ref(&missing),
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
+/// A complete cubic Vieta frame closes without residuals and allocates no computational tower.
+/// ´test:integration:coefficient-scoped-vieta-discharge´
+#[test]
+fn coefficient_scoped_vieta_discharge() -> TestResult {
+    use crate::testing::solve_coefficients::{ScopedMutation, scoped_identity};
+    for mutation in [ScopedMutation::Valid, ScopedMutation::SymmetricPermutation] {
+        let (mut fixture, steps) = scoped_identity(mutation)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let checked = fixture
+            .cas
+            .check_proof(&fixture.context, &steps, &mut budget)?;
+        assert_eq!(checked.hypotheses(), []);
+        assert_eq!(checked.judgment().residuals, []);
+        assert_eq!(budget.usage().tower_levels, 0);
+        assert_eq!(
+            checked.judgment().statement,
+            steps.last().ok_or("missing closure")?.conclusion
+        );
+    }
+    Ok(())
+}
+
+/// Every incomplete, unrelated, undefined or still-root-dependent system refuses atomic publication.
+/// ´test:integration:coefficient-scoped-vieta-mutations´
+#[test]
+fn coefficient_scoped_vieta_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::{ScopedMutation, scoped_identity};
+    for mutation in [
+        ScopedMutation::ChangedEndpoints,
+        ScopedMutation::UndefinedEndpoint,
+        ScopedMutation::SlotAtomSwap,
+        ScopedMutation::ForeignContext,
+        ScopedMutation::ForeignRegion,
+        ScopedMutation::OmittedSlot,
+        ScopedMutation::MissingHypothesis,
+        ScopedMutation::MissingRelation,
+        ScopedMutation::ExtraRelation,
+        ScopedMutation::Polynomial,
+        ScopedMutation::Degree,
+        ScopedMutation::UnprovedDegree,
+        ScopedMutation::Leading,
+        ScopedMutation::RootConclusion,
+        ScopedMutation::RealBinder,
+        ScopedMutation::ScalarRootConclusion,
+        ScopedMutation::RootRegion,
+        ScopedMutation::ParentRootAssumption,
+    ] {
+        let (mut fixture, steps) = scoped_identity(mutation)?;
+        let before = fixture.cas.counts();
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    &steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err(),
+            "{mutation:?}"
+        );
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Ordinary scoped equality use retains each undischarged hypothesis as its exact residual at closure.
+/// ´test:integration:coefficient-scoped-hypotheses-retained´
+#[test]
+fn coefficient_scoped_hypotheses_retained() -> TestResult {
+    use crate::testing::solve_coefficients::{ScopedMutation, scoped_identity};
+    use nrz_cas::proof::Statement;
+    let (mut fixture, steps) = scoped_identity(ScopedMutation::Retained)?;
+    let checked = fixture.cas.check_proof(
+        &fixture.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.hypotheses(), []);
+    assert_eq!(checked.judgment().residuals.len(), 3);
+    for step in steps.iter().skip(2).take(3) {
+        let Statement::PredicateFact { predicate, region } = &step.conclusion else {
+            return Err("missing equality fact".into());
+        };
+        assert!(
+            checked
+                .judgment()
+                .residuals
+                .iter()
+                .any(|residual| residual.predicate == *predicate && residual.region == *region)
+        );
+    }
+    Ok(())
+}
+
+/// An asymmetric relation checks the declared slot order independently and retains its hypothesis.
+/// ´test:integration:coefficient-scoped-asymmetric-order´
+#[test]
+fn coefficient_scoped_asymmetric_order() -> TestResult {
+    use crate::testing::solve_coefficients::asymmetric_relation;
+    let (mut fixture, steps) = asymmetric_relation(false)?;
+    let checked = fixture.cas.check_proof(
+        &fixture.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(checked.judgment().residuals.len(), 1);
+    let (mut fixture, steps) = asymmetric_relation(true)?;
+    let before = fixture.cas.counts();
+    assert!(
+        fixture
+            .cas
+            .check_proof(
+                &fixture.context,
+                &steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
+/// Exact predicate and restriction scopes are checked before publishing a bound context.
+/// ´test:integration:coefficient-context-scope-mutations´
+#[test]
+fn coefficient_context_scope_mutations() -> TestResult {
+    use crate::testing::solve_coefficients::scoped_context_mismatch;
+    for (local, restriction) in [(false, false), (true, false), (true, true)] {
+        let (mut fixture, draft) = scoped_context_mismatch(local, restriction)?;
+        let before = fixture.cas.counts();
+        assert!(
+            fixture
+                .cas
+                .admit(
+                    std::slice::from_ref(&draft),
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Existing scalar proof and request consumers refuse scoped contexts with their exact typed reason.
+/// ´test:integration:coefficient-scoped-consumer-refusals´
+#[test]
+fn coefficient_scoped_consumer_refusals() -> TestResult {
+    use crate::testing::solve_coefficients::{scoped_request, scoped_scalar};
+    use nrz_cas::InvalidCode;
+    use nrz_cas::request::Outcome;
+    let (mut fixture, step) = scoped_scalar(true)?;
+    let before = fixture.cas.counts();
+    let fault = fixture
+        .cas
+        .check_proof(
+            &fixture.context,
+            std::slice::from_ref(&step),
+            &mut Budget::new(Limits::blind_cubic())?,
+        )
+        .err()
+        .ok_or("scalar proof accepted scoped context")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    let (mut fixture, request) = scoped_request(true)?;
+    let before = fixture.cas.counts();
+    let Outcome::Invalid { fault, .. } = fixture.cas.run(&request) else {
+        return Err("scalar producer accepted scoped context".into());
+    };
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
+/// Empty-scope scalar consumers preserve their existing proof and request acceptance.
+/// ´test:integration:coefficient-closed-consumer-regression´
+#[test]
+fn coefficient_closed_consumer_regression() -> TestResult {
+    use crate::testing::solve_coefficients::{scoped_request, scoped_scalar};
+    use nrz_cas::request::Outcome;
+    let (mut fixture, step) = scoped_scalar(false)?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        std::slice::from_ref(&step),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert_eq!(witness.hypotheses(), []);
+    let (mut fixture, request) = scoped_request(false)?;
+    assert!(matches!(fixture.cas.run(&request), Outcome::Proved { .. }));
+    Ok(())
+}
+
+/// Root-existence support cannot carry a mathematical dependency on the formal-root binder.
+/// ´test:integration:coefficient-scoped-adjunction-refusal´
+#[test]
+fn coefficient_scoped_adjunction_refusal() -> TestResult {
+    use crate::testing::solve_coefficients::scoped_dependent_adjunction;
+    use nrz_cas::InvalidCode;
+    let (mut fixture, steps) = scoped_dependent_adjunction()?;
+    let before = fixture.cas.counts();
+    let fault = fixture
+        .cas
+        .check_proof(
+            &fixture.context,
+            &steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )
+        .err()
+        .ok_or("root-dependent supporting theorem accepted")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
+/// Both proof and producer boundaries inspect a premise's context as well as the receiving context.
+/// ´test:integration:coefficient-scoped-premise-refusal´
+#[test]
+fn coefficient_scoped_premise_refusal() -> TestResult {
+    use crate::testing::solve_coefficients::scoped_premise_fixture;
+    use nrz_cas::InvalidCode;
+    use nrz_cas::proof::{ApplicationDraft, Certificate, ConstructorLaw, Primitive, Statement};
+    use nrz_cas::request::Outcome;
+    let (mut fixture, mut steps, mut request) = scoped_premise_fixture()?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    request.premises.push(witness);
+    let before = fixture.cas.counts();
+    let Outcome::Invalid { fault, .. } = fixture.cas.run(&request) else {
+        return Err("producer consumed bound-context premise".into());
+    };
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    let previous = u32::try_from(steps.len().checked_sub(1).ok_or("missing scoped proof")?)?;
+    steps.push(ApplicationDraft {
+        rule: Primitive::RegionConstruct,
+        context: request.context.clone(),
+        conclusion: Statement::Constructor {
+            region: fixture.cas.admissible_region(&request.context)?,
+            law: ConstructorLaw::Membership,
+        },
+        premises: vec![previous],
+        substitutions: Vec::new(),
+        certificate: Certificate::None,
+    });
+    let fault = fixture
+        .cas
+        .check_proof(
+            &request.context,
+            &steps,
+            &mut Budget::new(Limits::blind_cubic())?,
+        )
+        .err()
+        .ok_or("native consumer accepted bound-context premise")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
