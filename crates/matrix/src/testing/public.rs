@@ -29,3 +29,6 @@ pub(crate) fn bound<P: Scalar>(
         .bound()
         .ok_or_else(|| std::io::Error::other("declared bound was not published"))
 }
+
+#[path = "kernel_oracle_public.rs"]
+mod kernel_oracle_public;

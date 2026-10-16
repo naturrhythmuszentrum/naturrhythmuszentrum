@@ -7,9 +7,9 @@ use crate::conversion_testing::TestResult;
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Rational {
     /// Signed numerator.
-    numerator: i128,
+    pub(crate) numerator: i128,
     /// Strictly positive denominator.
-    denominator: i128,
+    pub(crate) denominator: i128,
 }
 
 impl Rational {
@@ -128,7 +128,7 @@ impl Rational {
 }
 
 /// Euclid's integer algorithm, including the all-zero normalization case.
-fn gcd(mut left: i128, mut right: i128) -> i128 {
+pub(crate) fn gcd(mut left: i128, mut right: i128) -> i128 {
     while right != 0 {
         let remainder = left % right;
         left = right;

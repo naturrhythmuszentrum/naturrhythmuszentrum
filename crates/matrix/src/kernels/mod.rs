@@ -10,6 +10,7 @@ mod evaluate;
 mod linear;
 mod linear_evaluate;
 mod lowering;
+mod nonlinear;
 mod product;
 
 pub(crate) use contract::KernelContract;
@@ -19,10 +20,21 @@ pub(crate) use contributions::{
     ContributionReservation, finish as finish_contributions, views as contribution_views,
 };
 pub use linear::{FixedCoefficient, LinearMap};
+pub use nonlinear::{DomainReason, Elementwise};
 
 /// A deterministic kernel refusal, without a partially published result.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum KernelError {
+    /// The complete deterministic entry box does not admit a finite native image.
+    #[error("kernel {function:?} domain at entry {entry}: {reason:?}")]
+    Domain {
+        /// Native function whose full-box premise failed.
+        function: Elementwise,
+        /// Logical column-order coordinate of the failed premise.
+        entry: usize,
+        /// Specific checked domain obstruction.
+        reason: DomainReason,
+    },
     /// Finite outward arithmetic could not establish the requested enclosure.
     #[error("kernel arithmetic: {0}")]
     Arithmetic(#[from] nrz_scalar::ArithmeticFailure),

@@ -38,6 +38,10 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
             let output = product(views, &context)?;
             (output.entries, Some(output.contributions))
         }
+        Recipe::Elementwise(function) => (
+            super::nonlinear::evaluate(first(views)?, *function, &context)?,
+            None,
+        ),
     };
     if contributions.is_some() != reservation.contributions {
         return Err(KernelError::Contract.into());

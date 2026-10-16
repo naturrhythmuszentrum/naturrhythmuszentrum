@@ -32,3 +32,6 @@ mod kernel_twins;
 
 mod kernel_cancellation;
 mod kernel_products;
+
+mod kernel_domains;
+mod kernel_nonlinear;

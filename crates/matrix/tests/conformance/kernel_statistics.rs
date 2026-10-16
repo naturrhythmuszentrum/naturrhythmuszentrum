@@ -68,3 +68,24 @@ fn refuse_statistics(draft: OperationDraft, center: f64, operands: usize) -> Tes
     assert!(heap.statistical(companion).is_ok());
     Ok(())
 }
+
+/// Nonlinear operations, including square root at zero, never discard a statistical operand.
+/// ´test:integration:native-nonlinear-kernels-refuse-carried-statistics´
+#[test]
+fn native_nonlinear_kernels_refuse_carried_statistics() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    for (function, center) in [
+        (nrz_matrix::Elementwise::Square, 2.0),
+        (nrz_matrix::Elementwise::Reciprocal, 2.0),
+        (nrz_matrix::Elementwise::SquareRoot, 0.0),
+    ] {
+        refuse_statistics(
+            OperationDraft::map_elementwise(contract.clone(), contract.clone(), function)?,
+            center,
+            1,
+        )?;
+    }
+    Ok(())
+}

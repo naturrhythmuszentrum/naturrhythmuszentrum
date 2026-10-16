@@ -23,6 +23,8 @@ pub enum KernelKind {
     TransformEntries,
     /// Full matrix product, including both linear terms and their interaction.
     Product,
+    /// A direct native image of a complete deterministic box.
+    Elementwise(super::Elementwise),
 }
 
 /// A private construction contract for one output and its complete ordered operands.
@@ -54,6 +56,8 @@ pub(crate) enum Recipe {
     Transform(EntryMap),
     /// Backend product with an independent outward contraction.
     Product,
+    /// A direct native image of a complete deterministic box.
+    Elementwise(super::Elementwise),
 }
 
 impl KernelContract {
@@ -78,6 +82,7 @@ impl KernelContract {
             Recipe::Linear(_) => KernelKind::LinearMap,
             Recipe::Transform(_) => KernelKind::TransformEntries,
             Recipe::Product => KernelKind::Product,
+            Recipe::Elementwise(function) => KernelKind::Elementwise(*function),
         }
     }
 
