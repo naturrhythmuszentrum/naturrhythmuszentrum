@@ -17,6 +17,11 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::model::{Binding, Environment, Operator, PredicateKind, Scope, Sort, Span};
 use crate::source_model::{SourceForm, SourceFormDraft};
 
+mod intern;
+
+pub(crate) use intern::InterningSnapshot;
+use intern::{InternIndex, StoreToken};
+
 /// A disjoint namespace for logical identifiers.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum VertexKind {
@@ -132,10 +137,6 @@ pub struct LogicalId {
     /// Consecutive admission serial, beginning with zero in each namespace.
     pub serial: u64,
 }
-
-/// Runtime store identity; its address is never encoded or ordered.
-#[derive(Debug)]
-struct StoreToken;
 
 /// An opaque store-scoped handle; callers cannot manufacture its store token.
 #[derive(Clone)]
@@ -690,7 +691,7 @@ pub(crate) struct State {
     /// Logical-to-physical lookup, never serialized.
     pub(crate) indices: BTreeMap<LogicalId, NodeIndex<u32>>,
     /// Exact canonical syntax/context/condition keys.
-    pub(crate) intern: BTreeMap<Vec<u8>, LogicalId>,
+    pub(crate) intern: InternIndex,
     /// Immutable policy identity lookup, independent of unrelated graph records.
     pub(crate) policies: BTreeMap<(String, u32), LogicalId>,
     /// Next serial per kind, independent of graph indices.
@@ -715,7 +716,7 @@ impl State {
         Self {
             graph: DiGraph::new(),
             indices: BTreeMap::new(),
-            intern: BTreeMap::new(),
+            intern: InternIndex::default(),
             policies: BTreeMap::new(),
             next: BTreeMap::new(),
             sources: BTreeMap::new(),
@@ -799,7 +800,7 @@ impl State {
             Undo::Vertex { id, key, policy } => {
                 self.indices.remove(&id);
                 if let Some(key) = key {
-                    self.intern.remove(&key);
+                    self.intern.remove(key);
                 }
                 if let Some(identity) = policy {
                     self.policies.remove(&identity);
@@ -967,6 +968,7 @@ impl fmt::Debug for Cas {
         formatter
             .debug_struct("Cas")
             .field("counts", &self.counts())
+            .field("interning", &self.interning_snapshot())
             .finish_non_exhaustive()
     }
 }
@@ -979,10 +981,16 @@ impl Cas {
     pub fn new(limits: Limits) -> Result<Self, Fault> {
         limits.validate()?;
         Ok(Self {
-            token: Arc::new(StoreToken),
+            token: Arc::new(StoreToken::default()),
             limits,
             state: State::new(),
         })
+    }
+
+    /// Read cumulative comparator diagnostics without charging or resetting any budget.
+    /// Includes lookup, insertion and rollback removal; failed work is never refunded.
+    pub(crate) fn interning_snapshot(&self) -> InterningSnapshot {
+        self.token.snapshot()
     }
 
     /// Journal touched records, retaining spent budget on both commit and rollback.
@@ -1701,7 +1709,7 @@ impl Cas {
         state.indices.insert(id, index);
         state.next.insert(kind, next);
         if interned {
-            state.intern.insert(key, id);
+            state.intern.insert(key, id, &self.token);
         }
         state.payload = payload;
         Ok(id)

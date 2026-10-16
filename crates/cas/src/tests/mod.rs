@@ -19,6 +19,7 @@ mod parser;
 mod primitive_unique;
 
 mod admission;
+mod interning;
 
 mod solve_numeric;
 
