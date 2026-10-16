@@ -18,17 +18,14 @@ impl<P: Scalar + 'static> Plan<P> {
         let Some(lineage) = &self.lineage else {
             return Ok(Vec::new());
         };
-        if P::PRECISION != Q::PRECISION {
-            return Err(StatisticsError::Unsupported.into());
-        }
         let context = ArithmeticContext::new()?;
         let mut work = Work::new(self.work);
-        let inputs = self.stacked::<Q>()?;
+        let inputs = self.stacked::<Q>(&context)?;
         let covariance = lineage
             .model
             .covariance(&lineage.columns, &context, self.limits)?;
         let means = if lineage.assurance == super::MomentAssurance::AffineMoments {
-            self.means::<Q>()?
+            self.means::<Q>(&context)?
         } else {
             None
         };
@@ -79,7 +76,10 @@ impl<P: Scalar + 'static> Plan<P> {
         Ok(result)
     }
     /// Concatenate operand rows while remapping every column to its original joint source.
-    fn stacked<Q: Scalar + 'static>(&self) -> Result<Matrix<Q>, OperationError> {
+    fn stacked<Q: Scalar + 'static>(
+        &self,
+        context: &ArithmeticContext,
+    ) -> Result<Matrix<Q>, OperationError> {
         let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         let rows = self.inputs.iter().try_fold(0_usize, |sum, input| {
             sum.checked_add(input.sensitivity.extent.rows())
@@ -95,23 +95,16 @@ impl<P: Scalar + 'static> Plan<P> {
                     .map_err(|_| StatisticsError::Contract)?;
                 for row in 0..input.sensitivity.extent.rows() {
                     let index = input.sensitivity.extent.index(row, original)?;
-                    let center = crate::conversion::same_format(
+                    let (center, truth) = super::precision::entry(
                         *input
                             .sensitivity
                             .centers
                             .get(index)
                             .ok_or(StatisticsError::Contract)?,
+                        input.sensitivity.entry(row, original)?,
+                        context,
                     )?;
-                    let truth = input.sensitivity.entry(row, original)?;
-                    result.set(
-                        start + row,
-                        column,
-                        center,
-                        nrz_scalar::Enclosure::new(
-                            crate::conversion::same_format(truth.lower().get())?,
-                            crate::conversion::same_format(truth.upper().get())?,
-                        )?,
-                    )?;
+                    result.set(start + row, column, center, truth)?;
                 }
             }
             start += input.sensitivity.extent.rows();
@@ -119,7 +112,10 @@ impl<P: Scalar + 'static> Plan<P> {
         Ok(result)
     }
     /// A nominal operating center is never silently promoted to an expectation.
-    fn means<Q: Scalar + 'static>(&self) -> Result<Option<Matrix<Q>>, OperationError> {
+    fn means<Q: Scalar + 'static>(
+        &self,
+        context: &ArithmeticContext,
+    ) -> Result<Option<Matrix<Q>>, OperationError> {
         if self.inputs.iter().any(|input| input.means.is_none()) {
             return Ok(None);
         }
@@ -132,18 +128,12 @@ impl<P: Scalar + 'static> Plan<P> {
         for input in &self.inputs {
             let means = input.means.as_ref().ok_or(StatisticsError::Contract)?;
             for row in 0..means.extent.rows() {
-                let truth = means.entry(row, 0)?;
-                result.set(
-                    start + row,
-                    0,
-                    crate::conversion::same_format(
-                        *means.centers.get(row).ok_or(StatisticsError::Contract)?,
-                    )?,
-                    nrz_scalar::Enclosure::new(
-                        crate::conversion::same_format(truth.lower().get())?,
-                        crate::conversion::same_format(truth.upper().get())?,
-                    )?,
+                let (center, truth) = super::precision::entry(
+                    *means.centers.get(row).ok_or(StatisticsError::Contract)?,
+                    means.entry(row, 0)?,
+                    context,
                 )?;
+                result.set(start + row, 0, center, truth)?;
             }
             start += means.extent.rows();
         }

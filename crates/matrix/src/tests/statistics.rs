@@ -117,6 +117,75 @@ fn nonlinear_parameter_errors_keep_independent_targets() -> TestResult {
     Ok(())
 }
 
+/// A converted lineage retains the original model allocation and its source precision.
+/// ´test:crate:statistical-precision-keeps-original-model-allocation´
+#[test]
+fn statistical_precision_keeps_original_model_allocation() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let contract = shape(&declarations, &coordinate, &coordinate)?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let input = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[0.1_f64])?;
+    let target = TargetMap::capture(&heap, input.value())?;
+    let limits = JointLimits::default();
+    let source = Source::new(&Descriptor::ratio(), 1)?;
+    let model = JointModel::from_factor(
+        &[source],
+        SourceFactor::new(1, &[1.0], &[0.25], limits)?,
+        &[CovarianceBlock::Known],
+        limits,
+    )?;
+    heap.publish_joint(
+        CompanionSetDraft::new(model, [target.clone(), target], [vec![0], vec![0]]),
+        limits,
+    )?;
+    let original =
+        std::rc::Rc::clone(&heap.joint.records.first().ok_or("original relation")?.model);
+    let policy = crate::ExecutionLimits::default();
+    let conversion = crate::PrecisionContract::new(contract, &Descriptor::ratio())?;
+    let operation = OperationDraft::precision(
+        vec![conversion],
+        nrz_scalar::Precision::F64,
+        nrz_scalar::Precision::F32,
+    )
+    .check(policy)?;
+    let bound =
+        crate::Binding::<f64, f32>::convert_precision(operation, vec![input.value()], policy)
+            .validate(&mut heap)?;
+    let candidate = bound.evaluate(bound.normalized_inputs()?)?;
+    let result = bound.publish(candidate)?.into_output();
+    let value = result.first().ok_or("converted value")?;
+    let reference = heap.moment_companion(value.value())?;
+    let record = heap
+        .statistics
+        .records
+        .get(reference.index)
+        .ok_or("moment record")?;
+    assert!(std::rc::Rc::ptr_eq(&original, &record.lineage.model.data));
+    assert!(
+        record
+            .lineage
+            .model
+            .data
+            .downcast_ref::<JointModel<f64>>()
+            .is_some()
+    );
+    assert!(
+        record
+            .lineage
+            .model
+            .data
+            .downcast_ref::<JointModel<f32>>()
+            .is_none()
+    );
+    let error = heap
+        .companion(value.evaluation().ok_or("conversion error")?)?
+        .region()
+        .get(0, 0)?;
+    assert!(error > 0.0);
+    Ok(())
+}
+
 /// Hundreds of real publications traverse one bounded graph without recursive reentry.
 /// ´test:crate:deep-statistical-provenance-obeys-inspection-budget´
 #[test]

@@ -46,3 +46,8 @@ mod statistics_nonlinear;
 mod statistics_physical;
 
 mod statistics_product;
+
+mod statistics_conversion;
+mod statistics_precision;
+
+mod statistics_structured;

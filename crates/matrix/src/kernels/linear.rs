@@ -19,6 +19,8 @@ pub struct FixedCoefficient {
 /// Definitions cross the descriptor boundary before any numerical operand is read.
 #[derive(Clone, Debug)]
 pub(crate) enum CoefficientValue {
+    /// Checked source-free structural metadata, including signed and zero exact coefficients.
+    Expansion(Box<nrz_units::Conversion>),
     /// This finite binary64 value defines the exact mathematical coefficient.
     Represented(f64),
     /// Units-owned exact descriptor metadata, lowered under explicit limits.

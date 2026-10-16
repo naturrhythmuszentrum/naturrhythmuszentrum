@@ -24,6 +24,8 @@ pub struct ConversionContract {
     pub(crate) map: CheckedMap,
     /// Explicit bound on each coefficient's numerical decoding.
     pub(crate) literals: LiteralLimits,
+    /// Required companion coverage, retained until concrete source validation.
+    pub(crate) mode: super::ConversionMode,
     /// Shared immutable-definition lowering, never containing a stored coordinate.
     pub(crate) cache: Rc<std::cell::RefCell<super::cache::ConstantCache>>,
 }
@@ -40,7 +42,6 @@ impl ConversionContract {
         literals: LiteralLimits,
         mode: super::ConversionMode,
     ) -> Result<Self, OperationError> {
-        mode.validate()?;
         if input.extent() != output.extent() {
             return Err(ConversionError::Contract.into());
         }
@@ -65,6 +66,7 @@ impl ConversionContract {
             output,
             map,
             literals,
+            mode,
             cache: Rc::default(),
         })
     }

@@ -17,12 +17,13 @@ impl Heap {
     ///
     /// Both values must have K source-selection rows or propagated lineage under one
     /// complete model. Equal centers, schemas or distinct IDs establish no independence.
+    /// Parameters use the left target's precision; the right target keeps its own format.
     /// # Errors
     /// Refuses missing sources/models/blocks, stale targets, unsupported precision or limits.
-    pub fn materialize_cross_covariance<P: Scalar + 'static>(
+    pub fn materialize_cross_covariance<P: Scalar + 'static, Q: Scalar + 'static>(
         &mut self,
         left: Handle<Value, P>,
-        right: Handle<Value, P>,
+        right: Handle<Value, Q>,
         limits: JointLimits,
     ) -> Result<MomentRef<P>, OperationError> {
         let context = ArithmeticContext::new()?;
@@ -46,28 +47,33 @@ impl Heap {
         let source = lineage
             .model
             .covariance(&lineage.columns, &context, limits)?;
-        let first = align(&first, &lineage.columns)?;
-        let second = align(&second, &lineage.columns)?;
+        let first = align::<P, P>(&first, &lineage.columns, &context)?;
+        let second = align::<Q, P>(&second, &lineage.columns, &context)?;
         let intermediate = multiply(&first, &source, &context, &mut work)?;
         let covariance = multiply(&intermediate, &second.transpose()?, &context, &mut work)?;
-        publish(self, [left, right], lineage, &covariance, &context)
+        let targets = [
+            Dependency::from_snapshot(&crate::InputSnapshot::capture(self, left)?),
+            Dependency::from_snapshot(&crate::InputSnapshot::capture(self, right)?),
+        ];
+        let quantities = [
+            self.value(left)?.region().descriptor().clone(),
+            self.value(right)?.region().descriptor().clone(),
+        ];
+        publish(self, targets, &quantities, lineage, &covariance, &context)
     }
 }
 /// Prepare both target maps and all independent numerical regions before any visible append.
 fn publish<P: Scalar + 'static>(
     heap: &mut Heap,
-    values: [Handle<Value, P>; 2],
+    targets: [Dependency; 2],
+    quantities: &[nrz_units::Descriptor; 2],
     lineage: super::store::Lineage,
     covariance: &Matrix<P>,
     context: &ArithmeticContext,
 ) -> Result<MomentRef<P>, OperationError> {
-    let targets = [
-        Dependency::from_snapshot(&crate::InputSnapshot::capture(heap, values[0])?),
-        Dependency::from_snapshot(&crate::InputSnapshot::capture(heap, values[1])?),
-    ];
     let descriptors = super::publish::covariance_descriptors(
-        heap.value(values[0])?.region().descriptor(),
-        heap.value(values[1])?.region().descriptor(),
+        &quantities[0],
+        &quantities[1],
         covariance.extent.entries(),
     )?;
     let regions = [
@@ -115,9 +121,9 @@ fn publish<P: Scalar + 'static>(
     Ok(handle)
 }
 /// Bound complete dense storage and both matrix contractions before their allocations.
-fn preflight<P: Scalar>(
+fn preflight<P: Scalar, Q: Scalar>(
     left: &Input<P>,
-    right: &Input<P>,
+    right: &Input<Q>,
     sources: usize,
     limits: JointLimits,
 ) -> Result<usize, OperationError> {
@@ -145,7 +151,11 @@ fn preflight<P: Scalar>(
     Ok(work)
 }
 /// Remap sensitivity columns by exact source index, retaining the complete row selection.
-fn align<P: Scalar>(input: &Input<P>, sources: &[usize]) -> Result<Matrix<P>, OperationError> {
+fn align<P: Scalar + 'static, Q: Scalar + 'static>(
+    input: &Input<P>,
+    sources: &[usize],
+    context: &ArithmeticContext,
+) -> Result<Matrix<Q>, OperationError> {
     let mut result = Matrix::zeros(input.sensitivity.extent.rows(), sources.len())?;
     for (original, source) in input.lineage.columns.iter().enumerate() {
         let column = sources
@@ -153,16 +163,16 @@ fn align<P: Scalar>(input: &Input<P>, sources: &[usize]) -> Result<Matrix<P>, Op
             .map_err(|_| StatisticsError::Contract)?;
         for row in 0..result.extent.rows() {
             let index = input.sensitivity.extent.index(row, original)?;
-            result.set(
-                row,
-                column,
+            let (center, truth) = super::precision::entry(
                 *input
                     .sensitivity
                     .centers
                     .get(index)
                     .ok_or(StatisticsError::Contract)?,
                 input.sensitivity.entry(row, original)?,
+                context,
             )?;
+            result.set(row, column, center, truth)?;
         }
     }
     Ok(result)

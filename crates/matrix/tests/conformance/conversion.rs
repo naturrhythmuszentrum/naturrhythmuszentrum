@@ -3,7 +3,7 @@
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, contract, execute, measure, owner, shape};
-use nrz_matrix::{ConversionError, ConversionMode, Coverage, Extent, Heap, HeapLimits};
+use nrz_matrix::{ConversionMode, Coverage, Extent, Heap, HeapLimits};
 use nrz_scalar::Scalar;
 use nrz_units::{BaseDimension, Descriptor, Dimension, Kind, Role};
 
@@ -78,15 +78,61 @@ fn centimetres<P: Scalar + 'static>() -> TestResult {
     Ok(())
 }
 
-/// Statistical requests return a typed refusal before any approximate model is constructed.
-/// ´test:integration:statistical-conversion-refuses-explicitly´
+/// Explicit statistical conversion requires concrete checked source coverage.
+/// ´test:integration:statistical-conversion-refuses-a-missing-model´
 #[test]
-fn statistical_conversion_refuses_explicitly() {
+fn statistical_conversion_refuses_a_missing_model() -> TestResult {
+    let declarations = owner()?;
+    let quantity = Descriptor::ratio();
+    let coordinates = shape(&declarations, &quantity, 1)?;
+    let map = declarations.conversion_map(&quantity, &quantity)?;
+    let conversion = nrz_matrix::ConversionContract::new(
+        coordinates.clone(),
+        coordinates,
+        map,
+        nrz_scalar::LiteralLimits::default(),
+        ConversionMode::Statistical,
+    )?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let input = heap.import_represented(Extent::new(1, 1)?, &quantity, &[2.0_f64])?;
     assert!(matches!(
-        ConversionMode::Statistical.validate(),
-        Err(ConversionError::StatisticalUnavailable)
+        execute(&mut heap, conversion, input.value())
+            .err()
+            .and_then(|error| error.downcast::<nrz_matrix::OperationError>().ok())
+            .as_deref(),
+        Some(nrz_matrix::OperationError::Statistics(
+            nrz_matrix::StatisticsError::MissingSource { slot: 0, entry: 0 }
+        ))
     ));
-    assert!(ConversionMode::Deterministic.validate().is_ok());
+    Ok(())
+}
+
+/// A complete carried model enables the previously refused statistical conversion law.
+/// ´test:integration:statistical-conversion-propagates-a-complete-model´
+#[test]
+fn statistical_conversion_propagates_a_complete_model() -> TestResult {
+    let declarations = owner()?;
+    let quantity = Descriptor::ratio();
+    let target = Descriptor::new(
+        quantity.kind().clone(),
+        measure(1, 10, 0, 1)?,
+        Role::Difference,
+    )?;
+    let conversion = nrz_matrix::ConversionContract::new(
+        shape(&declarations, &quantity, 1)?,
+        shape(&declarations, &target, 1)?,
+        declarations.conversion_map(&quantity, &target)?,
+        nrz_scalar::LiteralLimits::default(),
+        ConversionMode::Statistical,
+    )?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let input = crate::statistics_testing::scalar::<f64>(&mut heap)?;
+    let result = execute(&mut heap, conversion, input.value())?;
+    let moments = heap.moments(heap.moment_companion(result.value())?)?;
+    crate::statistics_testing::check(
+        moments.covariance(),
+        &[crate::kernel_oracle::Rational::new(25, 1)?],
+    )
 }
 
 /// Missing point origins and nonconstant references preserve the units-owned typed refusals.

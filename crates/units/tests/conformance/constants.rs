@@ -211,3 +211,36 @@ fn descriptor_constant_export_limit() -> TestResult {
     assert_eq!(map.scale().export(&LimitsOverride::default())?, "1");
     Ok(())
 }
+
+/// Signed and zero structural coefficients export exactly, with equality and bounded refusal preserved.
+/// ´test:integration:conversion-coefficient-export-retains-signed-zero-and-limits´
+#[test]
+fn conversion_coefficient_export_retains_signed_zero_and_limits() -> TestResult {
+    let mut ledger = Budget::new(Limits::default())?;
+    for spelling in ["-7/3", "0"] {
+        let value = nrz_units::Conversion {
+            scale: Rational::parse(spelling, &mut ledger)?,
+            shift: Rational::zero(),
+        };
+        let twin = value.clone();
+        assert_eq!(value.export_scale(&LimitsOverride::default())?, spelling);
+        assert_eq!(
+            value.export_scale(&LimitsOverride::default())?,
+            twin.export_scale(&LimitsOverride::default())?
+        );
+        assert!(matches!(
+            value.export_scale(&LimitsOverride {
+                output_bytes: Some(1),
+                ..LimitsOverride::default()
+            }),
+            Err(MapError::Algebra(nrz_cas::Fault {
+                kind: nrz_cas::FaultKind::Exhausted {
+                    budget: nrz_cas::limits::BudgetKind::OutputBytes,
+                    ..
+                },
+                ..
+            }))
+        ));
+    }
+    Ok(())
+}

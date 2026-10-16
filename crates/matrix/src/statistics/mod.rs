@@ -28,3 +28,8 @@ pub use store::{MomentAssurance, MomentRef};
 pub(crate) use store::{MomentPayload, Store};
 
 pub(crate) use capture::refuse;
+mod conversion;
+mod precision;
+
+mod structured;
+pub(crate) use structured::lower_definition;

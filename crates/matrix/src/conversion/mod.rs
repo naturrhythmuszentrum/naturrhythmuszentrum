@@ -13,9 +13,6 @@ pub enum ConversionError {
     /// The supplied or computed deterministic bound was invalid.
     #[error("conversion bound: {0}")]
     Accuracy(#[from] nrz_accuracy::AccuracyFailure),
-    /// Statistical conversion requires the joint model propagation recipe.
-    #[error("statistical conversion is unavailable until joint model propagation is connected")]
-    StatisticalUnavailable,
     /// The operation's concrete input does not match the exact map source.
     #[error("conversion input or output contract does not match the checked map")]
     Contract,
@@ -39,20 +36,8 @@ pub(crate) use evaluate::evaluate;
 pub enum ConversionMode {
     /// Preserve represented or declared deterministic coverage and numerical error.
     Deterministic,
-    /// Joint statistical conversion, explicitly unavailable until its propagation recipe lands.
+    /// Require a complete carried joint source model and propagate every statistical parameter.
     Statistical,
-}
-
-impl ConversionMode {
-    /// Refuse an unsupported companion law without approximating or discarding it.
-    /// # Errors
-    /// Statistical requests return `StatisticalUnavailable`.
-    pub const fn validate(self) -> Result<(), ConversionError> {
-        match self {
-            Self::Deterministic => Ok(()),
-            Self::Statistical => Err(ConversionError::StatisticalUnavailable),
-        }
-    }
 }
 
 /// Transfer an entry only when both sealed format types are identical.

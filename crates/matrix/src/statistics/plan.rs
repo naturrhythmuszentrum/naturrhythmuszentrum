@@ -43,6 +43,14 @@ impl<P: Scalar + 'static> Plan<P> {
         for &handle in handles {
             present |= super::capture::present(heap, handle)?;
         }
+        if !present
+            && let NativeRecipe::Affine(contracts) = &operation.recipe
+            && let Some(slot) = contracts
+                .iter()
+                .position(|contract| contract.mode == crate::ConversionMode::Statistical)
+        {
+            return Err(StatisticsError::MissingSource { slot, entry: 0 }.into());
+        }
         if !present {
             return Ok(result);
         }
@@ -58,7 +66,7 @@ impl<P: Scalar + 'static> Plan<P> {
         let lineage = result.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         result.work = phase_work(operation, lineage)?;
         limits.check(handles.len(), result.work)?;
-        lineage.model.require::<P>(&lineage.columns, joint)?;
+        lineage.model.require(&lineage.columns, joint)?;
         super::structure::inputs(operation, &result.inputs, &context, joint)?;
         result.points = super::operating::capture(heap, handles, &context)?;
         result.derivative = super::derivative::check(operation)?;
@@ -123,12 +131,13 @@ fn product(factors: &[usize]) -> Result<usize, OperationError> {
 impl CheckedOperation {
     /// Capability of the currently implemented closed statistical recipes.
     pub(crate) const fn statistical_recipe(&self) -> bool {
-        match &self.recipe {
-            NativeRecipe::Copy | NativeRecipe::Kernel(_) => true,
-            NativeRecipe::Affine(_) | NativeRecipe::Precision { .. } | NativeRecipe::Solve(_) => {
-                false
-            }
-        }
+        matches!(
+            self.recipe,
+            NativeRecipe::Copy
+                | NativeRecipe::Kernel(_)
+                | NativeRecipe::Affine(_)
+                | NativeRecipe::Precision { .. }
+        )
     }
 }
 

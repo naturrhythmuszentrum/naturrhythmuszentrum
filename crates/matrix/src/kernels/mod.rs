@@ -7,7 +7,7 @@ pub(crate) mod contract;
 mod contributions;
 mod draft;
 mod evaluate;
-mod linear;
+pub(crate) mod linear;
 mod linear_evaluate;
 pub(crate) mod lowering;
 mod nonlinear;

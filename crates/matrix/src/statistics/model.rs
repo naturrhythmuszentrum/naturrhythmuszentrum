@@ -53,38 +53,54 @@ impl Model {
             terms,
         })
     }
-    /// Require the entire selected block before numerical allocation.
-    pub(crate) fn require<P: Scalar + 'static>(
+    /// Require the entire selected block in its original precision before numerical allocation.
+    pub(crate) fn require(
         &self,
         sources: &[usize],
         limits: JointLimits,
     ) -> Result<(), OperationError> {
-        let model = self
-            .data
-            .downcast_ref::<JointModel<P>>()
-            .ok_or(StatisticsError::Contract)?;
-        model.require_blocks(sources, sources, limits)?;
+        if let Some(model) = self.data.downcast_ref::<JointModel<f32>>() {
+            model.require_blocks(sources, sources, limits)?;
+        } else if let Some(model) = self.data.downcast_ref::<JointModel<f64>>() {
+            model.require_blocks(sources, sources, limits)?;
+        } else {
+            return Err(StatisticsError::Contract.into());
+        }
         Ok(())
     }
-    /// Materialize complete joint covariance; missing blocks never become zeros.
+    /// Materialize the original joint covariance, then outward-convert its parameter enclosure.
     pub(crate) fn covariance<P: Scalar + 'static>(
         &self,
         sources: &[usize],
         context: &ArithmeticContext,
         limits: JointLimits,
     ) -> Result<Matrix<P>, OperationError> {
-        self.require::<P>(sources, limits)?;
-        let model = self
-            .data
-            .downcast_ref::<JointModel<P>>()
-            .ok_or(StatisticsError::Contract)?;
-        let mut result = Matrix::zeros(sources.len(), sources.len())?;
-        for (column, &source_column) in sources.iter().enumerate() {
-            for (row, &source_row) in sources.iter().enumerate() {
-                let truth = model.covariance(source_row, source_column, context, limits)?;
-                result.set(row, column, truth.lower().get(), truth)?;
-            }
-        }
-        Ok(result)
+        self.require(sources, limits)?;
+        self.data.downcast_ref::<JointModel<f32>>().map_or_else(
+            || {
+                self.data.downcast_ref::<JointModel<f64>>().map_or_else(
+                    || Err(StatisticsError::Contract.into()),
+                    |model| materialize(model, sources, context, limits),
+                )
+            },
+            |model| materialize(model, sources, context, limits),
+        )
     }
+}
+/// Every target format evaluates the same immutable source model and retains its original IDs.
+fn materialize<P: Scalar + 'static, Q: Scalar + 'static>(
+    model: &JointModel<P>,
+    sources: &[usize],
+    context: &ArithmeticContext,
+    limits: JointLimits,
+) -> Result<Matrix<Q>, OperationError> {
+    let mut result = Matrix::zeros(sources.len(), sources.len())?;
+    for (column, &source_column) in sources.iter().enumerate() {
+        for (row, &source_row) in sources.iter().enumerate() {
+            let truth = model.covariance(source_row, source_column, context, limits)?;
+            let (center, truth) = super::precision::entry(truth.lower().get(), truth, context)?;
+            result.set(row, column, center, truth)?;
+        }
+    }
+    Ok(result)
 }

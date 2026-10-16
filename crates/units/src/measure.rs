@@ -126,6 +126,16 @@ pub struct Conversion {
 }
 
 impl Conversion {
+    /// Export a bounded exact literal for this source-free coefficient definition.
+    ///
+    /// Signed and zero factors are retained without a floating approximation.
+    /// # Errors
+    /// Refuses the same exact arithmetic, output-byte and formatting-work limits as descriptor constants.
+    pub fn export_scale(&self, limits: &crate::LimitsOverride) -> Result<String, crate::MapError> {
+        let mut ledger = nrz_cas::limits::Budget::new(crate::Limits::default().resolve(limits)?)?;
+        Ok(self.scale.exact_string(&mut ledger)?)
+    }
+
     /// Apply the map to an exact coordinate for conversion oracles and exact imports.
     ///
     /// TODO ´todo:code:apply-scalar-coordinate-maps-through-entrywise´: apply scalar coordinate maps through entrywise or paired tensor transformations at owners under def:nrz:covariance-shape and rule:nrz:shape-sensitivity-propagation.

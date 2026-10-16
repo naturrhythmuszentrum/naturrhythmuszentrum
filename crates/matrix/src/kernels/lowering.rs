@@ -28,6 +28,9 @@ pub(crate) fn lower<P: Scalar + 'static>(
     context: &ArithmeticContext,
 ) -> Result<Coefficient<P>, OperationError> {
     match &coefficient.value {
+        CoefficientValue::Expansion(value) => {
+            crate::statistics::lower_definition(value, limits, context)
+        }
         CoefficientValue::Represented(value) => represented(*value, context),
         CoefficientValue::Descriptor(value) => {
             let spelling = value.export(&Default::default())?;

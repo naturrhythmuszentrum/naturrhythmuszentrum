@@ -40,7 +40,9 @@ pub(crate) fn map<P: Scalar + 'static>(
         offsets: Matrix::zeros(rows, 1)?,
     };
     match &operation.recipe {
-        NativeRecipe::Copy => identity(operation, slot, &mut result.jacobian)?,
+        NativeRecipe::Copy | NativeRecipe::Precision { .. } => {
+            identity(operation, slot, &mut result.jacobian)?;
+        }
         NativeRecipe::Kernel(contract) => match &contract.recipe {
             Recipe::Sum { subtract, right } => {
                 for (row, &source) in right.indices().iter().enumerate() {
@@ -67,9 +69,10 @@ pub(crate) fn map<P: Scalar + 'static>(
                 return Err(StatisticsError::Unsupported.into());
             }
         },
-        NativeRecipe::Affine(_) | NativeRecipe::Precision { .. } | NativeRecipe::Solve(_) => {
-            return Err(StatisticsError::Unsupported.into());
+        NativeRecipe::Affine(contracts) => {
+            super::conversion::map(operation, contracts, slot, &mut result, context)?;
         }
+        NativeRecipe::Solve(_) => return Err(StatisticsError::Unsupported.into()),
     }
     Ok(result)
 }
