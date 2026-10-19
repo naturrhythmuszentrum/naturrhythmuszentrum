@@ -1433,6 +1433,18 @@ pub struct SolveSpec {
 /// A missing proof, rather than a mathematical contradiction.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SolveReason {
+    /// No registered direct operand placement supplies the requested ambient.
+    SpacePlacementUnavailable,
+    /// Several installed signatures require an explicit ambient choice.
+    AmbientSpaceAmbiguous,
+    /// The Real producer cannot solve a request using an original Complex declaration.
+    RealProblemHasComplexSymbol,
+    /// The original parameter strata do not yet have a complete cover.
+    BaseCoveragePending,
+    /// The exact fibre pieces do not yet have a complete cover.
+    FibreCoveragePending,
+    /// A requested Real radical presentation has no implemented construction.
+    RequestedRealRadicalsUnavailable,
     /// Missing `CoefficientDomainUnavailable` capability or evidence.
     CoefficientDomainUnavailable,
     /// Missing `PolynomialFragment` capability or evidence.

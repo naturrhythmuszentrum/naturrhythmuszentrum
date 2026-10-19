@@ -33,3 +33,11 @@ pub(crate) use projection::projection;
 
 mod arms;
 pub(crate) use arms::arm;
+
+mod ambient_resolution;
+mod routing;
+mod routing_index;
+mod routing_shapes;
+pub use ambient_resolution::{AmbientPlacement, AmbientResolution};
+pub(crate) use routing::preflight;
+pub use routing::{ScalarRoute, SortRouting};

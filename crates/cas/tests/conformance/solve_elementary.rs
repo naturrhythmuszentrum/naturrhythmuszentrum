@@ -1272,9 +1272,9 @@ fn real_witness_refusal_mutations() -> TestResult {
                 .ok_or("missing draft fault")?;
             assert_eq!(
                 fault.kind,
-                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Sort)
+                nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::SymbolSortMismatch)
             );
-            assert_eq!(fault.location.operation, "draft validation");
+            assert_eq!(fault.location.operation, "declared symbol sort");
             continue;
         }
         let mut fixture = fixture?;

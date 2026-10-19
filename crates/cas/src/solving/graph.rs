@@ -1449,13 +1449,19 @@ fn check_coordinates(
                 .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
             AT,
         )?;
-        if !seen.insert(&coordinate.key)
-            || !environment.declarations.iter().any(|declaration| {
-                declaration.key == coordinate.key
-                    && declaration.sort == Sort::Value(AtomicSort::Scalar(coordinate.field.clone()))
-            })
-        {
+        if !seen.insert(&coordinate.key) {
             return Err(invalid());
+        }
+        let declaration = environment
+            .declarations
+            .iter()
+            .find(|declaration| declaration.key == coordinate.key)
+            .ok_or_else(invalid)?;
+        if declaration.sort != Sort::Value(AtomicSort::Scalar(coordinate.field.clone())) {
+            return Err(Fault::invalid(
+                InvalidCode::SymbolSortMismatch,
+                Location::new("declared coordinate slot"),
+            ));
         }
     }
     Ok(())

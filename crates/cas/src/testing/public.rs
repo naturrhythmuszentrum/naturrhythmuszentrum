@@ -198,3 +198,9 @@ pub(crate) mod solve_local;
     reason = "shared scalar-space admission fixtures"
 )]
 pub(crate) mod sorts;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public harness shares original routing fixtures"
+)]
+pub(crate) mod sort_routing;

@@ -810,10 +810,19 @@ fn leaf_sort(
                 _ => false,
             }
         }
-        Operator::Free(key) => environment
-            .declarations
-            .iter()
-            .any(|declaration| declaration.key == *key && declaration.sort == *result),
+        Operator::Free(key) => {
+            let declaration = environment
+                .declarations
+                .iter()
+                .find(|declaration| declaration.key == *key);
+            if declaration.is_some_and(|declaration| declaration.sort != *result) {
+                return Err(Fault::invalid(
+                    InvalidCode::SymbolSortMismatch,
+                    Location::new("declared symbol sort"),
+                ));
+            }
+            declaration.is_some()
+        }
         Operator::Bound { depth, slot } => {
             let depth = usize::try_from(*depth).map_err(|_| sort_error())?;
             let slot = usize::try_from(*slot).map_err(|_| sort_error())?;
@@ -822,9 +831,14 @@ fn leaf_sort(
                 .checked_sub(depth)
                 .and_then(|n| n.checked_sub(1))
                 .and_then(|index| scope.get(index));
-            frame
-                .and_then(|frame| frame.get(slot))
-                .is_some_and(|sort| *result == Sort::Value(sort.clone()))
+            let actual = frame.and_then(|frame| frame.get(slot));
+            if actual.is_some_and(|sort| *result != Sort::Value(sort.clone())) {
+                return Err(Fault::invalid(
+                    InvalidCode::SymbolSortMismatch,
+                    Location::new("declared binder sort"),
+                ));
+            }
+            actual.is_some()
         }
         _ => false,
     })

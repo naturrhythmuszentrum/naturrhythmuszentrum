@@ -326,7 +326,7 @@ fn check_cell(
 }
 
 /// Validate complete ordered slot bindings and finite localization syntax.
-fn check_evaluation(
+pub(super) fn check_evaluation(
     state: &State,
     value: &CoefficientEvaluationData<Handle>,
     budget: &mut Budget,

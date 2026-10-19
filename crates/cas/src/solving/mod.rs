@@ -13,13 +13,14 @@ mod model;
 )]
 pub(crate) mod sorts;
 pub use sorts::{
-    CertificateCoefficientEvaluation, CertificateRealCellExists, CertificateRealRootCount,
-    CertificateRealSign, CoefficientEvaluationData, EvaluationBinding, EvaluationTarget,
-    FamilyArgument, FamilyArgumentRole, FamilyExpressionData, FibrePieceData, LiesOver,
-    ParameterBaseData, PlacementUse, RealCellData, RealEndpoint, RealSignConclusion, RealSignRule,
-    RealSignStep, ScalarPieceData, ScalarSpaceData, SpaceFamilyData, SpacePlacementData,
-    StatementCoefficientEvaluation, StatementRealCellExists, StatementRealRootCount,
-    StatementRealSign,
+    AmbientPlacement, AmbientResolution, CertificateCoefficientEvaluation,
+    CertificateRealCellExists, CertificateRealRootCount, CertificateRealSign,
+    CoefficientEvaluationData, EvaluationBinding, EvaluationTarget, FamilyArgument,
+    FamilyArgumentRole, FamilyExpressionData, FibrePieceData, LiesOver, ParameterBaseData,
+    PlacementUse, RealCellData, RealEndpoint, RealSignConclusion, RealSignRule, RealSignStep,
+    ScalarPieceData, ScalarRoute, ScalarSpaceData, SortRouting, SpaceFamilyData,
+    SpacePlacementData, StatementCoefficientEvaluation, StatementRealCellExists,
+    StatementRealRootCount, StatementRealSign,
 };
 #[expect(
     clippy::redundant_pub_crate,
@@ -180,6 +181,19 @@ pub(crate) fn execute(
     generation: &mut crate::budget::Budget,
     checker: &mut crate::budget::Budget,
 ) -> crate::request_model::Outcome {
+    let routing = match sorts::preflight(cas, request, generation) {
+        Ok(routing) => routing,
+        Err(fault) => return crate::request_model::failure(fault, &generation.usage()),
+    };
+    if let Some(reason) = routing.refusal {
+        return crate::request_model::Outcome::Unresolved {
+            solve_reason: Some(reason),
+            request: record.clone(),
+            consistency: crate::request_model::ContextConsistency::Unknown,
+            blocker: None,
+            usage: generation.usage(),
+        };
+    }
     for executor in [
         rational::executor(),
         linear_producer::executor(),
