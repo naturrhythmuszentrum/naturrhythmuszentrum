@@ -10,6 +10,16 @@ use crate::model::{Binding, Scope};
 /// Semantic role of an ordered dependency in a complete syntax descriptor.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SyntaxRole {
+    /// An exact attached or solving semantic dependency in payload order.
+    Semantic(u32),
+    /// The exact family of a projected total region.
+    Family,
+    /// The original base stratum of a projected total region.
+    BaseStratum,
+    /// An original operand retained by a placement association.
+    PlacedOperand(u32),
+    /// The placement piece paired with that same operand.
+    PlacementPiece(u32),
     /// An ordinary expression operand or predicate argument.
     Operand(u32),
     /// The stated domain of a form, case or space.
@@ -131,6 +141,7 @@ pub(crate) fn children(
     let mut out = Vec::new();
     match state.node(id)? {
         Vertex::Expression(v) => {
+            attachment_children(v.attachment.as_ref(), &mut out, budget)?;
             if let Some(domain) = v.domain {
                 push(&mut out, SyntaxRole::Domain, domain, budget)?;
             }
@@ -140,11 +151,50 @@ pub(crate) fn children(
                 push(&mut out, SyntaxRole::Space, space, budget)?;
             }
         }
+        Vertex::Solve(value) => {
+            for (position, dependency) in value.objects().iter().enumerate() {
+                if dependency.logical_id().kind != crate::graph::VertexKind::Header {
+                    push(
+                        &mut out,
+                        SyntaxRole::Semantic(crate::graph::position_u32(position)?),
+                        dependency.logical_id(),
+                        budget,
+                    )?;
+                }
+            }
+        }
+        Vertex::Header(_) => {}
         Vertex::Condition(v) => family(&mut out, &v.arguments, SyntaxRole::Operand, budget)?,
-        Vertex::Region(v) => region_children(&v.expression, &mut out, budget)?,
+        Vertex::Region(v) => {
+            region_children(&v.expression, &mut out, budget)?;
+            if let Some(projection) = &v.lies_over {
+                push(&mut out, SyntaxRole::Family, projection.family, budget)?;
+                push(
+                    &mut out,
+                    SyntaxRole::BaseStratum,
+                    projection.stratum,
+                    budget,
+                )?;
+            }
+        }
         Vertex::CaseArm(v) => {
             push(&mut out, SyntaxRole::Region, v.region, budget)?;
             push(&mut out, SyntaxRole::Value(0), v.value, budget)?;
+            for (position, pair) in v.placements.iter().enumerate() {
+                let position = crate::graph::position_u32(position)?;
+                push(
+                    &mut out,
+                    SyntaxRole::PlacedOperand(position),
+                    pair.operand,
+                    budget,
+                )?;
+                push(
+                    &mut out,
+                    SyntaxRole::PlacementPiece(position),
+                    pair.piece,
+                    budget,
+                )?;
+            }
         }
         Vertex::Boundary(v) => push(&mut out, SyntaxRole::Location, v.location, budget)?,
         Vertex::Space(v) => push(&mut out, SyntaxRole::Domain, v.domain, budget)?,
@@ -244,6 +294,7 @@ fn payload(
     budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
     budget.work(bytes, AT)?;
     Ok(match value {
+        Vertex::Solve(value) => SyntaxNode::Solve(value.clone()),
         Vertex::Expression(v) => SyntaxNode::Expression(Box::new(ExpressionSyntax {
             sort: v.sort.clone(),
             operator: v.operator.clone(),
@@ -324,4 +375,69 @@ const fn region_constructor(
         RegionExpr::Union(_) => RegionConstructor::Union,
         RegionExpr::Difference { .. } => RegionConstructor::Difference,
     }
+}
+
+/// Literal attachments participate in source completeness and substitution.
+fn attachment_children(
+    value: Option<&crate::graph::ExpressionAttachment>,
+    out: &mut Vec<(SyntaxRole, LogicalId)>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    match value {
+        None => {}
+        Some(crate::graph::ExpressionAttachment::SelectedRoot(selection)) => {
+            push(out, SyntaxRole::Semantic(0), *selection, budget)?;
+        }
+        Some(crate::graph::ExpressionAttachment::ExactCoefficient { value, map }) => {
+            push(out, SyntaxRole::Semantic(0), *value, budget)?;
+            push(out, SyntaxRole::Semantic(1), *map, budget)?;
+        }
+    }
+    Ok(())
+}
+
+/// Declaration frames and coefficient algebra records are immutable substitution axes.
+pub(crate) fn fixed_axis(state: &State, id: LogicalId) -> Result<bool, Fault> {
+    use crate::solving::SolveDraft;
+    Ok(match state.node(id)? {
+        Vertex::Header(_) => true,
+        Vertex::Solve(value) => matches!(
+            value.as_ref(),
+            SolveDraft::ScalarSpace(_)
+                | SolveDraft::SpacePlacement(_)
+                | SolveDraft::CoordinateSpace(_)
+                | SolveDraft::CoefficientDomain(_)
+                | SolveDraft::Polynomial(_)
+                | SolveDraft::ExtensionLevel(_)
+                | SolveDraft::CoefficientValue(_)
+                | SolveDraft::ParameterBase(_)
+                | SolveDraft::SpaceFamily(_)
+        ),
+        _ => false,
+    })
+}
+
+/// Original uses omit global interpretation records, which the complete graph reach still checks.
+pub(crate) fn occurrence_children(
+    state: &State,
+    id: LogicalId,
+    budget: &mut Budget,
+) -> Result<Vec<(SyntaxRole, LogicalId)>, Fault> {
+    let dependencies = children(state, id, budget)?;
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(dependencies.len())
+        .map_err(|_| Fault::allocation(AT))?;
+    for dependency in dependencies {
+        budget.work(1, AT)?;
+        let global = match state.node(dependency.1)? {
+            Vertex::Solve(value) => crate::solving::graph::metadata(state, value)?.is_none(),
+            Vertex::Header(_) => true,
+            _ => false,
+        };
+        if !global {
+            result.push(dependency);
+        }
+    }
+    Ok(result)
 }

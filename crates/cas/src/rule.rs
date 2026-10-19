@@ -463,12 +463,13 @@ impl Primitive {
 }
 
 /// Every registered primitive, in ASCII key order; availability is separate metadata.
-pub const PRIMITIVES: [Primitive; 77] = [
+pub const PRIMITIVES: [Primitive; 80] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
     Primitive::CaseOrdered,
     Primitive::CaseSelect,
+    Primitive::Solve(crate::solving::SolveSchema::CoefficientEvaluation),
     Primitive::Solve(crate::solving::SolveSchema::CoefficientIdentity),
     Primitive::Solve(crate::solving::SolveSchema::ConjugationTransport),
     Primitive::ContextClose,
@@ -526,6 +527,9 @@ pub const PRIMITIVES: [Primitive; 77] = [
     Primitive::Jets,
     Primitive::RationalIdentity,
     Primitive::SquareFree,
+    Primitive::Solve(crate::solving::SolveSchema::RealCellExists),
+    Primitive::Solve(crate::solving::SolveSchema::RealRootCount),
+    Primitive::Solve(crate::solving::SolveSchema::RealSign),
     Primitive::RegionConstruct,
     Primitive::RegionDecide,
     Primitive::Solve(crate::solving::SolveSchema::BinomialCoverage),
@@ -537,7 +541,6 @@ pub const PRIMITIVES: [Primitive; 77] = [
     Primitive::Solve(crate::solving::SolveSchema::Membership),
     Primitive::Solve(crate::solving::SolveSchema::MultiplicityTransfer),
     Primitive::Solve(crate::solving::SolveSchema::ProductCompleteness),
-    Primitive::Solve(crate::solving::SolveSchema::RealRestriction),
     Primitive::Solve(crate::solving::SolveSchema::TotalPredicateSplit),
     Primitive::Solve(crate::solving::SolveSchema::SolutionTransport),
     Primitive::SumCaseSplit,

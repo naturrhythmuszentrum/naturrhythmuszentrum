@@ -891,6 +891,7 @@ fn smaller_fraction_domain(
     let coordinates = admit(
         &mut fixture.cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(fixture.header.clone()),
             coordinates: vec![Coordinate {
                 key: "y".into(),
@@ -1190,6 +1191,7 @@ fn coefficient_regional_header_identity() -> TestResult {
     let coordinates = admit(
         &mut fixture.cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(header),
             coordinates: ["x", "y"]
                 .into_iter()
@@ -1387,8 +1389,8 @@ fn coefficient_formal_erasure_work_boundary() -> TestResult {
         &mut measured,
     )?;
     let required = measured.usage().work;
-    assert_eq!(required, 123);
-    for cap in [123, 122] {
+    assert_eq!(required, 127);
+    for cap in [127, 126] {
         let mut limits = Limits::blind_cubic();
         limits.work = cap;
         let mut budget = Budget::new(limits)?;

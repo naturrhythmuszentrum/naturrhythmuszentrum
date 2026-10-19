@@ -50,6 +50,7 @@ impl Fixture {
         let arm = admit(
             &mut cas,
             Draft::CaseArm(CaseArmDraft {
+                placements: Vec::new(),
                 header: Reference::Existing(header.clone()),
                 scope: Vec::new(),
                 region: Reference::Existing(domain.clone()),
@@ -177,6 +178,7 @@ pub(crate) fn scoped_cases(f: &mut Fixture) -> TestResult<(Handle, Handle)> {
     let arm = admit(
         &mut f.cas,
         Draft::CaseArm(CaseArmDraft {
+            placements: Vec::new(),
             header: Reference::Existing(f.header.clone()),
             scope: scope.clone(),
             region: Reference::Existing(region),

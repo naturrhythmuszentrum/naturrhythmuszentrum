@@ -49,6 +49,8 @@ pub enum RegionConstructor {
 /// Every non-edge payload needed to reconstruct original typed syntax.
 #[derive(Clone, Debug)]
 pub enum SyntaxNode {
+    /// Complete scoped solving or family payload with exact original references.
+    Solve(Box<crate::solving::SolveDraft<crate::graph::Handle>>),
     /// Expression signature and exact operator.
     Expression(Box<ExpressionSyntax>),
     /// Exact predicate constructor.

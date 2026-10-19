@@ -20,6 +20,7 @@ pub(crate) fn rebuild(
     let header = Reference::Existing(cas.handle(crate::descriptor::metadata(&cas.state, id)?.0));
     match cas.state.node(id)? {
         Vertex::Expression(v) => expression(v, header, scope, operator, resolve),
+        Vertex::Solve(value) => solve(value, scope, resolve),
         Vertex::Condition(v) => Ok(Draft::Condition {
             header,
             scope,
@@ -31,13 +32,13 @@ pub(crate) fn rebuild(
                 .map(&mut *resolve)
                 .collect::<Result<_, _>>()?,
         }),
-        Vertex::Region(v) => Ok(Draft::Region(RegionDraft {
-            header,
-            scope,
-            ambient: v.ambient.clone(),
-            expression: region(&v.expression, resolve)?,
-        })),
+        Vertex::Region(v) => region_draft(v, header, scope, resolve),
         Vertex::CaseArm(v) => Ok(Draft::CaseArm(CaseArmDraft {
+            placements: v
+                .placements
+                .iter()
+                .map(|pair| pair.resolve(&mut |id| resolve(*id)))
+                .collect::<Result<_, _>>()?,
             header,
             scope,
             region: resolve(v.region)?,
@@ -69,6 +70,9 @@ fn expression(
     operator: Option<Operator>,
     resolve: &mut impl FnMut(LogicalId) -> Result<Reference, Fault>,
 ) -> Result<Draft, Fault> {
+    if let Some(attachment) = &v.attachment {
+        return attached(attachment, &v.operator, header, resolve);
+    }
     if let Some(domain) = v.domain {
         return Ok(Draft::Cases(CasesDraft {
             header,
@@ -168,4 +172,85 @@ const fn invalid() -> Fault {
         InvalidCode::Reference,
         Location::new("typed substitution draft"),
     )
+}
+
+/// Rebuild attachments through their dedicated checked constructors.
+fn attached(
+    attachment: &crate::graph::ExpressionAttachment,
+    operator: &Operator,
+    header: Reference,
+    resolve: &mut impl FnMut(LogicalId) -> Result<Reference, Fault>,
+) -> Result<Draft, Fault> {
+    Ok(match attachment {
+        crate::graph::ExpressionAttachment::SelectedRoot(selection) => {
+            let Operator::RootValue { slot } = operator else {
+                return Err(invalid());
+            };
+            Draft::RootValue {
+                header,
+                selection: resolve(*selection)?,
+                slot: *slot,
+            }
+        }
+        crate::graph::ExpressionAttachment::ExactCoefficient { value, map } => {
+            Draft::ExactCoefficient {
+                header,
+                value: resolve(*value)?,
+                map: resolve(*map)?,
+            }
+        }
+    })
+}
+
+/// A transformed total region keeps the exact family and its transformed base stratum.
+fn region_draft(
+    value: &crate::domain_model::Region,
+    header: Reference,
+    scope: Scope,
+    resolve: &mut impl FnMut(LogicalId) -> Result<Reference, Fault>,
+) -> Result<Draft, Fault> {
+    let payload = RegionDraft {
+        header,
+        scope,
+        ambient: value.ambient.clone(),
+        expression: region(&value.expression, resolve)?,
+    };
+    if let Some(projection) = &value.lies_over {
+        Ok(Draft::FamilyRegion {
+            region: payload,
+            lies_over: crate::solving::LiesOver {
+                family: resolve(projection.family)?,
+                stratum: resolve(projection.stratum)?,
+            },
+        })
+    } else {
+        Ok(Draft::Region(payload))
+    }
+}
+
+/// Scoped solving syntax follows the same exact-sort substitution as its ordinary operands.
+fn solve(
+    value: &crate::solving::SolveDraft<crate::graph::Handle>,
+    scope: Scope,
+    resolve: &mut impl FnMut(LogicalId) -> Result<Reference, Fault>,
+) -> Result<Draft, Fault> {
+    use crate::solving::SolveDraft;
+    let mut value = value.resolve(&mut |handle| {
+        if handle.logical_id().kind == crate::graph::VertexKind::Header {
+            Ok(Reference::Existing(handle.clone()))
+        } else {
+            resolve(handle.logical_id())
+        }
+    })?;
+    match &mut value {
+        SolveDraft::Tuple(value) => value.scope = scope,
+        SolveDraft::FamilyMap(value) => value.scope = scope,
+        SolveDraft::RootRelation(value) => value.scope = scope,
+        SolveDraft::RootSelection(value) => value.scope = scope,
+        SolveDraft::SolveProblem(value) => value.scope = scope,
+        SolveDraft::RealCell(value) => value.scope = scope,
+        SolveDraft::FamilyExpression(value) => value.scope = scope,
+        _ => {}
+    }
+    Ok(Draft::Solve(value))
 }

@@ -14,8 +14,8 @@ use nrz_cas::{FaultKind, InvalidCode};
 fn case_policy_preserves_native_manifest() -> TestResult {
     let mut policy = nrz_cas::request::SearchPolicy::default();
     assert_eq!(policy.costs.key, "logical");
-    assert_eq!(policy.costs.version, 9);
-    assert_eq!(nrz_cas::proof::PRIMITIVES.len(), 77);
+    assert_eq!(policy.costs.version, 10);
+    assert_eq!(nrz_cas::proof::PRIMITIVES.len(), 80);
     let cases: Vec<_> = nrz_cas::proof::PRIMITIVES
         .iter()
         .zip(&policy.costs.weights)

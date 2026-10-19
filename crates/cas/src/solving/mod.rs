@@ -9,6 +9,20 @@ pub(crate) mod graph;
 mod model;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "scalar-space admission is shared within the crate"
+)]
+pub(crate) mod sorts;
+pub use sorts::{
+    CertificateCoefficientEvaluation, CertificateRealCellExists, CertificateRealRootCount,
+    CertificateRealSign, CoefficientEvaluationData, EvaluationBinding, EvaluationTarget,
+    FamilyArgument, FamilyArgumentRole, FamilyExpressionData, FibrePieceData, LiesOver,
+    ParameterBaseData, PlacementUse, RealCellData, RealEndpoint, RealSignConclusion, RealSignRule,
+    RealSignStep, ScalarPieceData, ScalarSpaceData, SpaceFamilyData, SpacePlacementData,
+    StatementCoefficientEvaluation, StatementRealCellExists, StatementRealRootCount,
+    StatementRealSign,
+};
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "the typed checker facade stays within the crate"
 )]
 mod registry;
@@ -98,25 +112,23 @@ pub use model::{
     CertificateExtensionUnit, CertificateImplicitFunctionBranch, CertificateMembership,
     CertificateMultiplicityTransfer, CertificateParameterImageCoverage,
     CertificatePermutationOrbitCoverage, CertificateProductCompleteness,
-    CertificateRealIsolationAndOrder, CertificateRealRestriction, CertificateRootAdjunction,
+    CertificateRealIsolationAndOrder, CertificateRootAdjunction,
     CertificateRootSelectionRefinement, CertificateSolutionTransport,
     CertificateTotalPredicateSplit, CoefficientDomainData, CoefficientMapData,
     CoefficientValueData, CoefficientValueObject, ComponentSplitData, Coordinate, CoordinateRole,
     CoordinateSpaceData, ExclusionPolicy, ExtensionLevelData, FamilyMapData, GeneratorPair,
     IdentityMode, IsolationInterval, LocalBranchData, LocalMode, MapMode, MapTarget,
     MultiplicityMode, Neighborhood, PolynomialData, PolynomialTerm, PredicateSplitMode, PrimePower,
-    RationalInterval, RealRestrictionTransport, RefinementMode, RefinementTargetKind,
-    RegularityKind, RelationMultiple, RestrictionCondition, RestrictionConditionKind,
-    RestrictionPair, RootFactor, RootRelationData, RootSelectionData, RowOperation,
-    ScopedCoefficientRelation, SelectionMode, SolutionBranchData, SolutionBranchKind,
-    SolutionSetData, SolveAnswer, SolveBlocker, SolveCertificate, SolveDraft, SolveForm, SolveGoal,
-    SolveProblemData, SolveReason, SolveSpec, SolveStatement, SolveSubstitution, SolveView,
-    SquareFreeRequest, StatementCoefficientEquality, StatementComponentCover, StatementCoverage,
-    StatementEquivalent, StatementFamilyCoverage, StatementFamilyMembership, StatementIsolation,
-    StatementLinearSystem, StatementLocalBranch, StatementLocalDerivative, StatementMember,
-    StatementMultiplicity, StatementOrbit, StatementPresentation, StatementRank,
-    StatementRealValues, StatementRootExistence, StatementRootOrder, StatementSelectionUnique,
-    StatementUnit, TupleData,
+    RationalInterval, RefinementMode, RefinementTargetKind, RegularityKind, RelationMultiple,
+    RootFactor, RootRelationData, RootSelectionData, RowOperation, ScopedCoefficientRelation,
+    SelectionMode, SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveAnswer,
+    SolveBlocker, SolveCertificate, SolveDraft, SolveForm, SolveGoal, SolveProblemData,
+    SolveReason, SolveSpec, SolveStatement, SolveSubstitution, SolveView, SquareFreeRequest,
+    StatementCoefficientEquality, StatementComponentCover, StatementCoverage, StatementEquivalent,
+    StatementFamilyCoverage, StatementFamilyMembership, StatementIsolation, StatementLinearSystem,
+    StatementLocalBranch, StatementLocalDerivative, StatementMember, StatementMultiplicity,
+    StatementOrbit, StatementPresentation, StatementRank, StatementRealValues,
+    StatementRootExistence, StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
 };
 
 /// Availability is separate from a schema's stable mathematical identity.

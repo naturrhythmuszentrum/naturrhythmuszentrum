@@ -200,6 +200,7 @@ pub(crate) fn regular_output(
         arms.push(crate::case_syntax::admit(
             cas,
             crate::graph::Draft::CaseArm(crate::domain_model::CaseArmDraft {
+                placements: Vec::new(),
                 header: crate::graph::Reference::Existing(header.clone()),
                 scope: Vec::new(),
                 region: crate::graph::Reference::Existing(cell),

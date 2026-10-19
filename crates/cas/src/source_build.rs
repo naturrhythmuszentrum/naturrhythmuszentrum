@@ -44,7 +44,7 @@ pub(crate) fn materialize(
     let mut pending = vec![(root, 1_u64, false)];
     while let Some((id, depth, expanded)) = pending.pop() {
         budget.work(1, AT)?;
-        let children = crate::descriptor::children(&cas.state, id, budget)?;
+        let children = crate::descriptor::occurrence_children(&cas.state, id, budget)?;
         if expanded {
             builder.finish(id, children.len(), budget)?;
         } else {

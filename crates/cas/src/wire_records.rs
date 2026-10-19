@@ -226,36 +226,10 @@ fn describe_object(
     out: &mut Encoder<'_>,
 ) -> Result<(), Fault> {
     match cas.state.node(id)? {
-        Vertex::Header(value) => {
-            record.tag = 0;
-            out.byte(u8::from(value.parent.is_some()))?;
-            if let Some(parent) = value.parent {
-                object(out, &mut record.references, parent)?;
-            }
-            let mut environment = value.environment.clone();
-            if value.parent.is_some() {
-                environment.declarations.clone_from(&value.declarations);
-            }
-            encoding::environment(&environment, out)?;
-            out.count(value.spaces.len())?;
-            for (key, space) in &value.spaces {
-                out.name(key)?;
-                object(out, &mut record.references, *space)?;
-            }
-        }
-        Vertex::Region(value) => {
-            record.tag = 1;
-            object(out, &mut record.references, value.header)?;
-            encoding::scope(&value.scope, out)?;
-            ambient(&value.ambient, record, out)?;
-            let start = record.references.len();
-            crate::domain_encoding::region(&value.expression, out, |id, out| {
-                object(out, &mut record.references, *id)
-            })?;
-            if matches!(value.expression, RegionExpr::Meet(_) | RegionExpr::Union(_)) {
-                record.sets.push((start..record.references.len()).collect());
-            }
-        }
+        Vertex::Header(value) => describe_header(value, record, out)?,
+
+        Vertex::Region(value) => describe_region(value, record, out)?,
+
         Vertex::Space(value) => {
             record.tag = 2;
             out.byte(0)?;
@@ -271,6 +245,10 @@ fn describe_object(
             record.space = value.space.map(Entity::Object);
             object(out, &mut record.references, value.header)?;
             encoding::scope(&value.scope, out)?;
+            out.byte(u8::from(value.ambient.is_some()))?;
+            if let Some(ambient) = value.ambient {
+                object(out, &mut record.references, ambient)?;
+            }
             encoding::sort(&value.sort, out)?;
             encoding::operator(&value.operator, out)?;
             encoding::binding(value.binding.as_ref(), out)?;
@@ -312,6 +290,11 @@ fn describe_remaining(
             object(out, &mut record.references, value.region)?;
             object(out, &mut record.references, value.value)?;
             encoding::sort(&value.sort, out)?;
+            out.count(value.placements.len())?;
+            for pair in &value.placements {
+                object(out, &mut record.references, pair.operand)?;
+                object(out, &mut record.references, pair.piece)?;
+            }
         }
         Vertex::Boundary(value) => {
             record.tag = 5;
@@ -440,5 +423,60 @@ fn describe_solve(
     if let Some(start) = set_start {
         record.sets.push((start..record.references.len()).collect());
     }
+    Ok(())
+}
+
+/// Encode all exact header dependencies in the sole current record layout.
+fn describe_header(
+    value: &crate::domain_model::Header,
+    record: &mut Record,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    record.tag = 0;
+    out.byte(u8::from(value.parent.is_some()))?;
+    if let Some(parent) = value.parent {
+        object(out, &mut record.references, parent)?;
+    }
+    let mut environment = value.environment.clone();
+    if value.parent.is_some() {
+        environment.declarations.clone_from(&value.declarations);
+    }
+    encoding::environment(&environment, out)?;
+    out.count(value.scalar_spaces.len())?;
+    for space in &value.scalar_spaces {
+        object(out, &mut record.references, *space)?;
+    }
+    out.count(value.spaces.len())?;
+    for (key, space) in &value.spaces {
+        out.name(key)?;
+        object(out, &mut record.references, *space)?;
+    }
+
+    Ok(())
+}
+
+/// Encode all exact region dependencies in the sole current record layout.
+fn describe_region(
+    value: &crate::domain_model::Region,
+    record: &mut Record,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    record.tag = 1;
+    object(out, &mut record.references, value.header)?;
+    encoding::scope(&value.scope, out)?;
+    ambient(&value.ambient, record, out)?;
+    let start = record.references.len();
+    crate::domain_encoding::region(&value.expression, out, |id, out| {
+        object(out, &mut record.references, *id)
+    })?;
+    if matches!(value.expression, RegionExpr::Meet(_) | RegionExpr::Union(_)) {
+        record.sets.push((start..record.references.len()).collect());
+    }
+    out.byte(u8::from(value.lies_over.is_some()))?;
+    if let Some(projection) = &value.lies_over {
+        object(out, &mut record.references, projection.family)?;
+        object(out, &mut record.references, projection.stratum)?;
+    }
+
     Ok(())
 }

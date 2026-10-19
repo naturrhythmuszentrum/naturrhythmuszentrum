@@ -95,6 +95,7 @@ fn maps(
     let family = materialize::admit(
         cas,
         SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(construction.header.clone()),
             coordinates: vec![coordinate],
         }),

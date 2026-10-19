@@ -193,6 +193,7 @@ fn selection_values(
     let selected = materialize::admit(
         cas,
         SolveDraft::RootSelection(RootSelectionData {
+            cell: None,
             header: Reference::Existing(construction.header.clone()),
             scope: Vec::new(),
             relations: vec![Reference::Existing(relation.clone())],

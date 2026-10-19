@@ -265,6 +265,9 @@ impl Cas {
         plan: &mut Plan,
         budget: &mut Budget,
     ) -> Result<Option<Reference>, Fault> {
+        if crate::descriptor::fixed_axis(&self.state, id)? {
+            return Ok(Some(Reference::Existing(self.handle(id))));
+        }
         let (_, scope) = crate::descriptor::metadata(&self.state, id)?;
         if let (Vertex::Space(space), Mode::Free { replacements, .. }) =
             (self.state.node(id)?, mode)
@@ -479,6 +482,9 @@ impl Mode {
 
 /// Memoize kind, original scope and lifting depth under one immutable environment.
 fn memo_key(cas: &Cas, id: LogicalId, mode: &Mode) -> Result<MemoKey, Fault> {
+    if crate::descriptor::fixed_axis(&cas.state, id)? {
+        return Ok((id, Vec::new(), 0));
+    }
     let scope = crate::descriptor::metadata(&cas.state, id)?.1;
     let depth =
         if matches!(cas.state.node(id)?, Vertex::Space(_)) || matches!(mode, Mode::Free { .. }) {

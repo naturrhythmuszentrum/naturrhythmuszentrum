@@ -129,7 +129,7 @@ pub(crate) fn check(
         bound: &[],
     };
     if first.ambient == crate::model::Field::Complex {
-        let mut components = super::complex::Components::new(&evaluation, &[], budget)?;
+        let mut components = super::complex::Components::new(&evaluation, budget)?;
         components.premises(&certificate.compatibility, budget)?;
         components.witnesses(&certificate.witnesses, selected, budget)?;
     } else {

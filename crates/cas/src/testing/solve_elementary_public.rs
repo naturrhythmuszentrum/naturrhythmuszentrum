@@ -1,16 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public elementary proof fixtures with independent, explicitly supplied mathematics.
 
-#[path = "solve_elementary_restriction_public.rs"]
-#[expect(
-    clippy::redundant_pub_crate,
-    reason = "public test fixtures stay inside the test target"
-)]
-mod restriction;
-pub(crate) use restriction::{
-    assumed_restriction, degree_restriction, mixed_restriction, symbolic_restriction,
-};
-
 #[path = "solve_elementary_pivots_public.rs"]
 #[expect(
     clippy::redundant_pub_crate,
@@ -40,8 +30,8 @@ pub(crate) use presentations::{
 mod realness;
 pub(crate) use realness::{
     PositiveMutation, choice_wrong_ambient, cubic_product_reference, fraction_realness,
-    linked_cubic, linked_cubic_restriction, partial_power_realness, positive_cancellation,
-    positive_norm_cancellation, positive_norm_prefix, real_witness_selection, referenced_realness,
+    linked_cubic, partial_power_realness, positive_cancellation, positive_norm_cancellation,
+    positive_norm_prefix, real_witness_selection, referenced_realness,
 };
 
 use super::common::TestResult;
@@ -427,6 +417,7 @@ fn coordinate_product(
     admit(
         cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(header.clone()),
             coordinates: keys
                 .iter()
@@ -606,6 +597,7 @@ impl Fixture {
         let selection = admit(
             &mut self.cas,
             &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+                cell: None,
                 header: Reference::Existing(self.header.clone()),
                 scope: Vec::new(),
                 relations: vec![Reference::Existing(relation.clone())],
@@ -1442,6 +1434,7 @@ pub(crate) fn role_map(
         .into_iter()
         .zip([["t", "y"], ["x", "y"]])
         .map(|(roles, keys)| CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(base.header.clone()),
             coordinates: roles
                 .iter()
@@ -1719,148 +1712,6 @@ impl Fixture {
         )?;
         Ok(())
     }
-
-    /// Exact ground quadratic x²-r is reconstructed in the current explicit ambient.
-    fn quadratic(&mut self, radicand: i64) -> TestResult<(Handle, Handle)> {
-        let unknown = self.free("x")?;
-        let squared = self.expression(Operator::IntegerPower(2), &[unknown], false)?;
-        let constant = self.integer(radicand, false)?;
-        let polynomial = self.expression(Operator::Sub, &[squared, constant], false)?;
-        let zero = self.integer(0, false)?;
-        let predicate = self.equation(&polynomial, &zero)?;
-        Ok((self.problem("x", &predicate, &[])?, polynomial))
-    }
-}
-
-/// Exact complete complex coverage of x²-1, with independently supplied product reconstruction.
-fn ground_complex_cover() -> TestResult<BinomialFixture> {
-    use crate::test_api::solving::{
-        CertificateProductCompleteness, RootFactor, SolveCertificate, SolveSchema, SolveStatement,
-        StatementCoverage,
-    };
-    let mut base = Fixture::in_field(&Field::Complex)?;
-    let (problem, polynomial) = base.quadratic(1)?;
-    let positive = base.integer(1, false)?;
-    let negative = base.integer(-1, false)?;
-    let unknown = base.free("x")?;
-    let first = base.expression(Operator::Sub, &[unknown.clone(), positive.clone()], false)?;
-    let second = base.expression(Operator::Sub, &[unknown, negative.clone()], false)?;
-    let product = base.expression(Operator::Mul, &[first, second], false)?;
-    let algebra = base.algebra.clone();
-    let map = base.scalar_map(&algebra, &[])?;
-    let identity = base.identity(&polynomial, &product, &map);
-    let set = base.finite(&problem, &[positive.clone(), negative.clone()])?;
-    let mut coverage = base.step(
-        SolveSchema::ProductCompleteness,
-        SolveStatement::Coverage(StatementCoverage {
-            problem: problem.clone(),
-            set: set.clone(),
-            region: base.region.clone(),
-        }),
-        SolveCertificate::ProductCompleteness(CertificateProductCompleteness {
-            problem,
-            set,
-            scalar: positive.clone(),
-            factors: vec![
-                RootFactor {
-                    root: positive,
-                    multiplicity: 1,
-                },
-                RootFactor {
-                    root: negative,
-                    multiplicity: 1,
-                },
-            ],
-            product: 0,
-            existence: Vec::new(),
-            region: base.region.clone(),
-        }),
-    );
-    coverage.premises = vec![0];
-    Ok(BinomialFixture {
-        base,
-        steps: vec![identity, coverage],
-    })
-}
-
-/// Real restriction explicitly rebuilds the ground problem under a separate header.
-pub(crate) fn real_restriction(nonreal: bool) -> TestResult<BinomialFixture> {
-    use crate::test_api::solving::{
-        CertificateRealRestriction, SolveCertificate, SolveSchema, SolveStatement,
-        StatementCoverage,
-    };
-    let mut fixture = if nonreal {
-        BinomialFixture::new(2, -1)?
-    } else {
-        ground_complex_cover()?
-    };
-    let covered_index = u32::try_from(fixture.steps.len().checked_sub(1).ok_or("no coverage")?)?;
-    let Statement::Solve(statement) = &fixture.steps.last().ok_or("missing coverage")?.conclusion
-    else {
-        return Err("wrong statement".into());
-    };
-    let SolveStatement::Coverage(coverage) = statement.as_ref() else {
-        return Err("wrong coverage".into());
-    };
-    let SolveView::SolutionSet(set) = fixture.base.cas.solve_view(&coverage.set)? else {
-        return Err("missing set".into());
-    };
-    let branches = set.branches.clone();
-    let complex_problem = coverage.problem.clone();
-    let zero = fixture.base.integer(0, false)?;
-    let partition = fixture.base.split(&zero)?;
-    let partition_index = u32::try_from(fixture.steps.len())?;
-    fixture.steps.push(partition.clone());
-    fixture.base.enter_real()?;
-    let (problem, _) = fixture.base.quadratic(if nonreal { -1 } else { 1 })?;
-    let values = if nonreal {
-        Vec::new()
-    } else {
-        vec![
-            fixture.base.integer(1, false)?,
-            fixture.base.integer(-1, false)?,
-        ]
-    };
-    let set = fixture.base.finite(&problem, &values)?;
-    let zero = fixture.base.integer(0, false)?;
-    let real_cover = fixture.base.split(&zero)?;
-    let real_cover_index = u32::try_from(fixture.steps.len())?;
-    let transport = restriction::transport(
-        &mut fixture.base,
-        &problem,
-        &complex_problem,
-        &real_cover,
-        &partition,
-    )?;
-    fixture.steps.push(real_cover);
-    let mut step = fixture.base.step(
-        SolveSchema::RealRestriction,
-        SolveStatement::Coverage(StatementCoverage {
-            problem: problem.clone(),
-            set: set.clone(),
-            region: fixture.base.region.clone(),
-        }),
-        SolveCertificate::RealRestriction(CertificateRealRestriction {
-            coverage: 0,
-            problem,
-            set,
-            transport,
-            retained: if nonreal {
-                Vec::new()
-            } else {
-                branches.clone()
-            },
-            rejected: if nonreal { branches } else { Vec::new() },
-            classification: Vec::new(),
-            cover: 1,
-        }),
-    );
-    step.premises = vec![covered_index, partition_index, real_cover_index];
-    if nonreal {
-        step.premises.extend([1, 4]);
-    }
-    fixture.steps.push(step);
-    Ok(fixture)
 }
 
 /// One regional branch of a*x=0 uses either the complete identity family or the singleton zero.
@@ -2626,6 +2477,7 @@ impl Fixture {
         let selection = admit(
             &mut self.cas,
             &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+                cell: None,
                 header: Reference::Existing(self.header.clone()),
                 scope: Vec::new(),
                 relations: vec![Reference::Existing(relation.clone())],

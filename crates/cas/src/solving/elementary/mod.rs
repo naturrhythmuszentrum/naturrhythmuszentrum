@@ -30,7 +30,6 @@ pub(crate) mod inverse;
 )]
 pub(crate) mod member;
 mod multiplicity;
-mod nonreal;
 mod presentation;
 #[expect(
     clippy::redundant_pub_crate,
@@ -56,7 +55,6 @@ pub(crate) mod proof;
 pub(crate) mod recipes;
 mod reduction;
 mod refine;
-mod restriction;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "shared exact solving checks remain crate-private"
@@ -82,7 +80,7 @@ pub(crate) const fn availability() -> super::Availability {
 
 /// Enable a schema only together with its concrete checker.
 pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
-    if matches!(tag, 4..=8 | 10..=13) {
+    if matches!(tag, 4..=8 | 10..=12) {
         super::Availability::Available
     } else {
         super::Availability::Unavailable
@@ -100,11 +98,7 @@ pub(crate) fn check(
     let crate::proof_model::Certificate::Solve(certificate) = &draft.certificate else {
         return Err(proof::invalid());
     };
-    let inherited = if matches!(certificate.as_ref(), SolveCertificate::RealRestriction(_)) {
-        restriction::conditions(cas, draft, premises, budget)?
-    } else {
-        proof::conditions(cas, draft, premises, budget)?
-    };
+    let inherited = proof::conditions(cas, draft, premises, budget)?;
     match (draft.rule, certificate.as_ref()) {
         (
             crate::rule::Primitive::Solve(SolveSchema::Membership),
@@ -138,10 +132,6 @@ pub(crate) fn check(
             crate::rule::Primitive::Solve(SolveSchema::ConjugationTransport),
             SolveCertificate::ConjugationTransport(value),
         ) => conjugation::check(cas, draft, value, premises, budget)?,
-        (
-            crate::rule::Primitive::Solve(SolveSchema::RealRestriction),
-            SolveCertificate::RealRestriction(value),
-        ) => restriction::check(cas, draft, value, premises, budget)?,
         _ => return Err(proof::invalid()),
     }
     Ok(inherited)

@@ -35,7 +35,7 @@ fn derivative_map_portable_lifecycle() -> TestResult {
         result
             .response
             .as_ref()
-            .is_some_and(|bytes| bytes.starts_with(b"NRZRUN03"))
+            .is_some_and(|bytes| bytes.starts_with(b"NRZRUN04"))
     );
     let result = match whole(&mut fixture, &function, 2)? {
         Outcome::Partial { result, .. } => result,

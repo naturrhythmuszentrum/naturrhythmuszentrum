@@ -116,6 +116,7 @@ impl Mapping {
             .transpose()?;
         if expected != new.environment
             || parent != new.parent
+            || old.scalar_spaces != new.scalar_spaces
             || old.spaces.len() != new.spaces.len()
         {
             return Err(invalid());
@@ -157,7 +158,15 @@ impl Mapping {
             if mapped.contains_key(&id) {
                 continue;
             }
-            let children = crate::descriptor::children(&cas.state, id, budget)?;
+            let mut children = crate::descriptor::children(&cas.state, id, budget)?;
+            if let Vertex::Region(region) = cas.state.node(id)?
+                && let AmbientDomain::Product { coordinates } = &region.ambient
+            {
+                children.push((
+                    crate::descriptor::SyntaxRole::Semantic(0),
+                    coordinates.logical_id(),
+                ));
+            }
             if !expanded {
                 budget.check(
                     BudgetKind::StagedVertices,
@@ -184,6 +193,10 @@ impl Mapping {
         mapped: &BTreeMap<LogicalId, Handle>,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
+        if let Vertex::Solve(value) = cas.state.node(id)? {
+            let value = value.clone();
+            return self.solve_node(cas, &value, mapped, budget);
+        }
         let (header, scope) = crate::descriptor::metadata(&cas.state, id)?;
         let header = cas.handle(*self.headers.get(&header).ok_or_else(invalid)?);
         let scope: Scope = scope
@@ -203,9 +216,72 @@ impl Mapping {
         };
         let mut draft = crate::substitution_draft::rebuild(cas, id, scope, operator, &mut resolve)?;
         self.reheader(&mut draft, &header)?;
+        if let Draft::Region(region) | Draft::FamilyRegion { region, .. } = &mut draft
+            && let AmbientDomain::Product { coordinates } = &mut region.ambient
+        {
+            *coordinates = mapped
+                .get(&coordinates.logical_id())
+                .cloned()
+                .ok_or_else(invalid)?;
+        }
         let output = crate::case_syntax::admit(cas, draft, budget)?;
         self.check_output(cas, id, output.logical_id())?;
         Ok(output)
+    }
+
+    /// Rebuild algebra and family references without manufacturing a header for registry nodes.
+    fn solve_node(
+        &self,
+        cas: &mut Cas,
+        value: &crate::solving::SolveDraft<Handle>,
+        mapped: &BTreeMap<LogicalId, Handle>,
+        budget: &mut Budget,
+    ) -> Result<Handle, Fault> {
+        let mut draft = value.resolve(&mut |handle| {
+            let id = handle.logical_id();
+            if id.kind == crate::graph::VertexKind::Header {
+                Ok(Reference::Existing(
+                    cas.handle(*self.headers.get(&id).ok_or_else(invalid)?),
+                ))
+            } else {
+                mapped
+                    .get(&id)
+                    .cloned()
+                    .map(Reference::Existing)
+                    .ok_or_else(invalid)
+            }
+        })?;
+        self.solve_axes(&mut draft);
+        crate::case_syntax::admit(cas, Draft::Solve(draft), budget)
+    }
+
+    /// Coordinate spelling changes preserve every scalar sort and local dependency role.
+    fn solve_axes(&self, value: &mut crate::solving::SolveDraft) {
+        use crate::solving::SolveDraft;
+        let scope = match value {
+            SolveDraft::CoordinateSpace(value) => {
+                for coordinate in &mut value.coordinates {
+                    coordinate.key = self.key(&coordinate.key);
+                }
+                return;
+            }
+            SolveDraft::Tuple(value) => &mut value.scope,
+            SolveDraft::FamilyMap(value) => &mut value.scope,
+            SolveDraft::RootRelation(value) => &mut value.scope,
+            SolveDraft::RootSelection(value) => &mut value.scope,
+            SolveDraft::SolveProblem(value) => &mut value.scope,
+            SolveDraft::RealCell(value) => &mut value.scope,
+            SolveDraft::FamilyExpression(value) => {
+                value.operator = self.operator(&value.operator);
+                value.result = self.sort(&value.result);
+                &mut value.scope
+            }
+            _ => return,
+        };
+        *scope = scope
+            .iter()
+            .map(|frame| frame.iter().map(|sort| self.atomic(sort)).collect())
+            .collect();
     }
 
     /// Change all semantic axis fields together with the exact header identity.
@@ -220,8 +296,10 @@ impl Mapping {
                 }
             }
             Draft::Cases(value) => value.header = target,
-            Draft::Condition { header, .. } => *header = target,
-            Draft::Region(value) => {
+            Draft::RootValue { header, .. }
+            | Draft::ExactCoefficient { header, .. }
+            | Draft::Condition { header, .. } => *header = target,
+            Draft::Region(value) | Draft::FamilyRegion { region: value, .. } => {
                 value.header = target;
                 value.ambient = self.ambient(&value.ambient);
             }

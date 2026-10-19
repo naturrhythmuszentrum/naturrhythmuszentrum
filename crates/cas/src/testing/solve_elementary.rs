@@ -125,6 +125,7 @@ impl RecipeFixture {
         let coordinates = admit(
             &mut base.cas,
             &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+                scalar_spaces: Vec::new(),
                 header: Reference::Existing(header.clone()),
                 coordinates: ["x", "y", "z"]
                     .into_iter()

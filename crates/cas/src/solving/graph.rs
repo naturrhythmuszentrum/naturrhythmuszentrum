@@ -6,21 +6,20 @@ use super::model::{
     CertificateConjugationTransport, CertificateExactLinearEquivalence, CertificateExtensionUnit,
     CertificateImplicitFunctionBranch, CertificateMembership, CertificateMultiplicityTransfer,
     CertificateParameterImageCoverage, CertificatePermutationOrbitCoverage,
-    CertificateProductCompleteness, CertificateRealIsolationAndOrder, CertificateRealRestriction,
-    CertificateRootAdjunction, CertificateRootSelectionRefinement, CertificateSolutionTransport,
+    CertificateProductCompleteness, CertificateRealIsolationAndOrder, CertificateRootAdjunction,
+    CertificateRootSelectionRefinement, CertificateSolutionTransport,
     CertificateTotalPredicateSplit, CoefficientDomainData, CoefficientMapData,
     CoefficientValueData, CoefficientValueObject, ComponentSplitData, CoordinateRole,
     CoordinateSpaceData, ExtensionLevelData, FamilyMapData, GeneratorPair, LocalBranchData,
-    MapMode, MapTarget, Neighborhood, PolynomialData, PolynomialTerm, RealRestrictionTransport,
-    RelationMultiple, RestrictionCondition, RestrictionPair, RootFactor, RootRelationData,
-    RootSelectionData, RowOperation, ScopedCoefficientRelation, SelectionMode, SolutionBranchData,
-    SolutionBranchKind, SolutionSetData, SolveCertificate, SolveDraft, SolveProblemData, SolveSpec,
-    SolveStatement, SolveSubstitution, SolveView, StatementCoefficientEquality,
-    StatementComponentCover, StatementCoverage, StatementEquivalent, StatementFamilyCoverage,
-    StatementFamilyMembership, StatementIsolation, StatementLinearSystem, StatementLocalBranch,
-    StatementLocalDerivative, StatementMember, StatementMultiplicity, StatementOrbit,
-    StatementPresentation, StatementRank, StatementRealValues, StatementRootExistence,
-    StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
+    MapMode, MapTarget, Neighborhood, PolynomialData, PolynomialTerm, RelationMultiple, RootFactor,
+    RootRelationData, RootSelectionData, RowOperation, ScopedCoefficientRelation, SelectionMode,
+    SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveCertificate, SolveDraft,
+    SolveProblemData, SolveSpec, SolveStatement, SolveSubstitution, SolveView,
+    StatementCoefficientEquality, StatementComponentCover, StatementCoverage, StatementEquivalent,
+    StatementFamilyCoverage, StatementFamilyMembership, StatementIsolation, StatementLinearSystem,
+    StatementLocalBranch, StatementLocalDerivative, StatementMember, StatementMultiplicity,
+    StatementOrbit, StatementPresentation, StatementRank, StatementRealValues,
+    StatementRootExistence, StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
 };
 use crate::budget::{Budget, BudgetKind};
 use crate::encoding::Encoder;
@@ -58,6 +57,11 @@ impl<R> CoordinateSpaceData<R> {
         write: &mut impl FnMut(&R) -> Result<S, Fault>,
     ) -> Result<CoordinateSpaceData<S>, Fault> {
         Ok(CoordinateSpaceData {
+            scalar_spaces: self
+                .scalar_spaces
+                .iter()
+                .map(|value| value.as_ref().map(&mut *write).transpose())
+                .collect::<Result<_, _>>()?,
             header: write(&self.header)?,
             coordinates: self.coordinates.clone(),
         })
@@ -195,6 +199,7 @@ impl<R> RootSelectionData<R> {
         write: &mut impl FnMut(&R) -> Result<S, Fault>,
     ) -> Result<RootSelectionData<S>, Fault> {
         Ok(RootSelectionData {
+            cell: self.cell.as_ref().map(&mut *write).transpose()?,
             header: write(&self.header)?,
             scope: self.scope.clone(),
             relations: map_vector(&self.relations, write)?,
@@ -429,6 +434,17 @@ impl<R> SolveDraft<R> {
             Self::SolutionBranch(value) => SolveDraft::SolutionBranch(value.resolve(write)?),
             Self::SolveProblem(value) => SolveDraft::SolveProblem(value.resolve(write)?),
             Self::LocalBranch(value) => SolveDraft::LocalBranch(value.resolve(write)?),
+            Self::ParameterBase(value) => SolveDraft::ParameterBase(value.resolve(write)?),
+            Self::SpaceFamily(value) => SolveDraft::SpaceFamily(value.resolve(write)?),
+            Self::FamilyExpression(value) => SolveDraft::FamilyExpression(value.resolve(write)?),
+            Self::FibrePiece(value) => SolveDraft::FibrePiece(value.resolve(write)?),
+            Self::RealCell(value) => SolveDraft::RealCell(value.resolve(write)?),
+            Self::CoefficientEvaluation(value) => {
+                SolveDraft::CoefficientEvaluation(value.resolve(write)?)
+            }
+            Self::ScalarSpace(value) => SolveDraft::ScalarSpace(value.clone()),
+            Self::SpacePlacement(value) => SolveDraft::SpacePlacement(value.resolve(write)?),
+            Self::ScalarPiece(value) => SolveDraft::ScalarPiece(value.resolve(write)?),
         })
     }
 }
@@ -437,6 +453,7 @@ impl<R> CoordinateSpaceData<R> {
     /// Enumerate every referenced object in semantic field order.
     fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
         result.push(&self.header);
+        result.extend(self.scalar_spaces.iter().filter_map(Option::as_ref));
     }
 }
 
@@ -526,6 +543,9 @@ impl<R> RootRelationData<R> {
 impl<R> RootSelectionData<R> {
     /// Enumerate every referenced object in semantic field order.
     fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
+        if let Some(cell) = &self.cell {
+            result.push(cell);
+        }
         result.push(&self.header);
         for item in &self.relations {
             result.push(item);
@@ -985,56 +1005,6 @@ impl<R> CertificateConjugationTransport<R> {
     }
 }
 
-impl<R> RestrictionPair<R> {
-    /// Preserve the ordered real and complex graph dependencies.
-    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
-        result.push(&self.real);
-        result.push(&self.complex);
-    }
-}
-
-impl<R> RestrictionCondition<R> {
-    /// Conditions retain both qualified contexts, regions and predicates.
-    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
-        self.contexts.references(result);
-        self.regions.references(result);
-        self.predicates.references(result);
-    }
-}
-
-impl<R> RealRestrictionTransport<R> {
-    /// Every transport endpoint participates in canonical reachability and replay.
-    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
-        result.push(&self.coefficient_map);
-        for pair in self
-            .coefficients
-            .iter()
-            .chain(&self.unknowns)
-            .chain(&self.regions)
-        {
-            pair.references(result);
-        }
-        for condition in &self.conditions {
-            condition.references(result);
-        }
-    }
-}
-
-impl<R> CertificateRealRestriction<R> {
-    /// Enumerate every referenced object in semantic field order.
-    fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
-        result.push(&self.problem);
-        result.push(&self.set);
-        self.transport.references(result);
-        for item in &self.retained {
-            result.push(item);
-        }
-        for item in &self.rejected {
-            result.push(item);
-        }
-    }
-}
-
 impl<R> CertificatePermutationOrbitCoverage<R> {
     /// Enumerate every referenced object in semantic field order.
     fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
@@ -1199,6 +1169,15 @@ impl<R> SolveDraft<R> {
             Self::SolutionBranch(value) => value.references(&mut result),
             Self::SolveProblem(value) => value.references(&mut result),
             Self::LocalBranch(value) => value.references(&mut result),
+            Self::ParameterBase(value) => value.references(&mut result),
+            Self::SpaceFamily(value) => value.references(&mut result),
+            Self::FamilyExpression(value) => value.references(&mut result),
+            Self::FibrePiece(value) => value.references(&mut result),
+            Self::RealCell(value) => value.references(&mut result),
+            Self::CoefficientEvaluation(value) => value.references(&mut result),
+            Self::ScalarSpace(_) => {}
+            Self::SpacePlacement(value) => value.references(&mut result),
+            Self::ScalarPiece(value) => value.references(&mut result),
         }
         result
     }
@@ -1229,6 +1208,10 @@ impl<R> SolveStatement<R> {
             Self::RealValues(value) => value.references(&mut result),
             Self::Isolation(value) => value.references(&mut result),
             Self::Presentation(value) => value.references(&mut result),
+            Self::CoefficientEvaluation(value) => value.references(&mut result),
+            Self::RealSign(value) => value.references(&mut result),
+            Self::RealRootCount(value) => value.references(&mut result),
+            Self::RealCellExists(value) => value.references(&mut result),
         }
         result
     }
@@ -1252,11 +1235,14 @@ impl<R> SolveCertificate<R> {
             Self::ProductCompleteness(value) => value.references(&mut result),
             Self::MultiplicityTransfer(value) => value.references(&mut result),
             Self::ConjugationTransport(value) => value.references(&mut result),
-            Self::RealRestriction(value) => value.references(&mut result),
             Self::PermutationOrbitCoverage(value) => value.references(&mut result),
             Self::RealIsolationAndOrder(value) => value.references(&mut result),
             Self::ParameterImageCoverage(value) => value.references(&mut result),
             Self::ImplicitFunctionBranch(value) => value.references(&mut result),
+            Self::CoefficientEvaluation(value) => value.references(&mut result),
+            Self::RealSign(value) => value.references(&mut result),
+            Self::RealRootCount(value) => value.references(&mut result),
+            Self::RealCellExists(value) => value.references(&mut result),
         }
         result
     }
@@ -1281,6 +1267,15 @@ impl SolveDraft<Handle> {
             Self::SolutionBranch(_) => VertexKind::SolutionBranch,
             Self::SolveProblem(_) => VertexKind::SolveProblem,
             Self::LocalBranch(_) => VertexKind::LocalBranch,
+            Self::ParameterBase(_) => VertexKind::ParameterBase,
+            Self::SpaceFamily(_) => VertexKind::SpaceFamily,
+            Self::FamilyExpression(_) => VertexKind::FamilyExpression,
+            Self::FibrePiece(_) => VertexKind::FibrePiece,
+            Self::RealCell(_) => VertexKind::RealCell,
+            Self::CoefficientEvaluation(_) => VertexKind::CoefficientEvaluation,
+            Self::ScalarSpace(_) => VertexKind::ScalarSpace,
+            Self::SpacePlacement(_) => VertexKind::SpacePlacement,
+            Self::ScalarPiece(_) => VertexKind::ScalarPiece,
         }
     }
 
@@ -1302,6 +1297,15 @@ impl SolveDraft<Handle> {
             Self::SolutionBranch(value) => SolveView::SolutionBranch(value),
             Self::SolveProblem(value) => SolveView::SolveProblem(value),
             Self::LocalBranch(value) => SolveView::LocalBranch(value),
+            Self::ParameterBase(value) => SolveView::ParameterBase(value),
+            Self::SpaceFamily(value) => SolveView::SpaceFamily(value),
+            Self::FamilyExpression(value) => SolveView::FamilyExpression(value),
+            Self::FibrePiece(value) => SolveView::FibrePiece(value),
+            Self::RealCell(value) => SolveView::RealCell(value),
+            Self::CoefficientEvaluation(value) => SolveView::CoefficientEvaluation(value),
+            Self::ScalarSpace(value) => SolveView::ScalarSpace(value),
+            Self::SpacePlacement(value) => SolveView::SpacePlacement(value),
+            Self::ScalarPiece(value) => SolveView::ScalarPiece(value),
         }
     }
 }
@@ -1533,7 +1537,7 @@ fn check_family(
 }
 
 /// Inspect reachable scalar dependencies, including selected roots, maps and case domains.
-fn free_keys(
+pub(crate) fn free_keys(
     state: &State,
     root: &Handle,
     keys: &std::collections::BTreeSet<&str>,
@@ -2017,11 +2021,14 @@ fn check_selection(
     scope.push(binders);
     require_kind(&value.predicate, VertexKind::Condition)?;
     metadata_matches(state, &value.predicate, &value.header, &scope)?;
+    super::sorts::selection_cell(state, value)?;
     let parameters = selection_parameters(state, value, budget)?;
     free_keys(state, &value.predicate, &parameters, true, budget)?;
     if (value.mode == SelectionMode::Principal) != value.convention.is_some()
         || value.convention.as_ref().is_some_and(String::is_empty)
-        || (value.mode == SelectionMode::Isolated) != value.interval.is_some()
+        || (value.mode == SelectionMode::Isolated)
+            != (value.interval.is_some() || value.cell.is_some())
+        || value.interval.is_some() && value.cell.is_some()
     {
         return Err(invalid());
     }
@@ -2367,6 +2374,15 @@ fn validate(state: &State, value: &SolveDraft<Handle>, budget: &mut Budget) -> R
         SolveDraft::SolutionBranch(value) => check_branch(state, value, budget),
         SolveDraft::SolveProblem(value) => check_problem(state, value, budget),
         SolveDraft::LocalBranch(value) => check_local(state, value, budget),
+        SolveDraft::ParameterBase(_)
+        | SolveDraft::SpaceFamily(_)
+        | SolveDraft::FamilyExpression(_)
+        | SolveDraft::FibrePiece(_)
+        | SolveDraft::RealCell(_)
+        | SolveDraft::CoefficientEvaluation(_)
+        | SolveDraft::ScalarSpace(_)
+        | SolveDraft::SpacePlacement(_)
+        | SolveDraft::ScalarPiece(_) => super::sorts::validate(state, value, budget),
     }
 }
 
@@ -2413,6 +2429,7 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         let mut value = draft
             .resolve(&mut |reference| Ok(self.handle(self.resolve(state, reference, locals)?)))?;
+        self.resolve_coordinate_spaces(state, &mut value)?;
         budget.check(BudgetKind::Edges, size(value.objects().len(), AT)?, AT)?;
         canonicalize(&mut value, budget)?;
         validate(state, &value, budget)?;
@@ -2465,6 +2482,15 @@ fn edges(value: &SolveDraft<Handle>) -> Result<Vec<(LogicalId, Edge)>, Fault> {
         SolveDraft::SolutionBranch(value) => edges_solution_branch(value, &mut result)?,
         SolveDraft::SolveProblem(value) => edges_solve_problem(value, &mut result)?,
         SolveDraft::LocalBranch(value) => edges_local_branch(value, &mut result)?,
+        SolveDraft::ParameterBase(_)
+        | SolveDraft::SpaceFamily(_)
+        | SolveDraft::FamilyExpression(_)
+        | SolveDraft::FibrePiece(_)
+        | SolveDraft::RealCell(_)
+        | SolveDraft::CoefficientEvaluation(_)
+        | SolveDraft::ScalarSpace(_)
+        | SolveDraft::SpacePlacement(_)
+        | SolveDraft::ScalarPiece(_) => super::sorts::edges(value, &mut result)?,
     }
     Ok(result)
 }
@@ -2475,6 +2501,17 @@ fn edges_coordinate_space(
     result: &mut Vec<(LogicalId, Edge)>,
 ) -> Result<(), Fault> {
     edge(result, &value.header, Edge::InHeader)?;
+    for (position, space) in value.scalar_spaces.iter().enumerate() {
+        if let Some(space) = space {
+            edge(
+                result,
+                space,
+                Edge::Scalar(crate::graph::ScalarEdge::DeclarationScalarSpace(
+                    crate::graph::position_u32(position)?,
+                )),
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -2591,6 +2628,13 @@ fn edges_root_selection(
     edge(result, &value.header, Edge::InHeader)?;
     edge_family(result, &value.relations, Edge::RootSlot)?;
     edge(result, &value.predicate, Edge::SelectionPredicate)?;
+    if let Some(cell) = &value.cell {
+        edge(
+            result,
+            cell,
+            Edge::Scalar(crate::graph::ScalarEdge::SelectionCell),
+        )?;
+    }
     Ok(())
 }
 
@@ -2738,10 +2782,19 @@ impl Cas {
         };
         state.header(literal.header)?;
         literal.edges.push((literal.header, Edge::InHeader));
+        let sort = Sort::Value(AtomicSort::Scalar(literal.field));
+        let ambient = super::sorts::ambient(state, literal.header, &sort)?;
+        if let Some(ambient) = ambient {
+            literal.edges.push((
+                ambient,
+                Edge::Scalar(crate::graph::ScalarEdge::CheckedAmbient),
+            ));
+        }
         let expression = crate::graph::Expression {
+            ambient,
             attachment: Some(literal.attachment),
             operator: literal.operator,
-            sort: Sort::Value(AtomicSort::Scalar(literal.field)),
+            sort,
             header: literal.header,
             layer: crate::domain_model::Layer::Pointwise,
             space: None,
@@ -2874,6 +2927,15 @@ pub(crate) fn metadata<'a>(
         | SolveDraft::Polynomial(_)
         | SolveDraft::ExtensionLevel(_)
         | SolveDraft::CoefficientValue(_) => None,
+        SolveDraft::ParameterBase(_)
+        | SolveDraft::SpaceFamily(_)
+        | SolveDraft::FamilyExpression(_)
+        | SolveDraft::FibrePiece(_)
+        | SolveDraft::RealCell(_)
+        | SolveDraft::CoefficientEvaluation(_)
+        | SolveDraft::ScalarSpace(_)
+        | SolveDraft::SpacePlacement(_)
+        | SolveDraft::ScalarPiece(_) => super::sorts::metadata(state, value)?,
     })
 }
 
@@ -2952,6 +3014,10 @@ pub(crate) fn statement(
         SolveStatement::RealValues(value) => statement_real_values(cas, value),
         SolveStatement::Isolation(value) => statement_isolation(cas, value),
         SolveStatement::Presentation(value) => statement_presentation(cas, value),
+        SolveStatement::CoefficientEvaluation(_)
+        | SolveStatement::RealSign(_)
+        | SolveStatement::RealRootCount(_)
+        | SolveStatement::RealCellExists(_) => super::sorts::statement(cas, value, budget),
     }
 }
 

@@ -45,6 +45,7 @@ fn solve_admission_rollback() -> TestResult {
             CoefficientDomainData::Gaussian,
         )),
         Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(other.header),
             coordinates: Vec::new(),
         })),
@@ -81,6 +82,7 @@ fn solve_product_and_empty_tuple() -> TestResult {
     let empty = admit(
         &mut fixture.cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(fixture.header.clone()),
             coordinates: Vec::new(),
         })),
@@ -104,6 +106,7 @@ fn solve_product_and_empty_tuple() -> TestResult {
         role: CoordinateRole::Unknown,
     };
     let duplicate = Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+        scalar_spaces: Vec::new(),
         header: Reference::Existing(fixture.header),
         coordinates: vec![coordinate.clone(), coordinate],
     }));
@@ -129,7 +132,7 @@ fn solve_wire_old_magic_before_allocation() -> TestResult {
         b"NRZCAS01",
         b"NRZCAS02",
         b"NRZCAS00",
-        b"NRZCAS04",
+        b"NRZCAS03",
         b"XXXXXXXX",
     ] {
         let mut ledger = Budget::new(Limits {
@@ -156,7 +159,7 @@ fn solve_wire_old_magic_before_allocation() -> TestResult {
 #[test]
 fn solve_wire_count_preflight() -> TestResult {
     let mut fixture = Fixture::new()?;
-    let mut bytes = b"NRZCAS03".to_vec();
+    let mut bytes = b"NRZCAS04".to_vec();
     bytes.extend_from_slice(&0_u32.to_le_bytes());
     bytes.extend_from_slice(&u32::MAX.to_le_bytes());
     let before = fixture.cas.counts();
@@ -293,7 +296,7 @@ fn solve_unavailable_schemas() -> TestResult {
     let mut expected_bitmap = 0_u32;
     for (index, schema) in SOLVE_SCHEMAS.iter().copied().enumerate() {
         let spec = schema.specification();
-        assert_eq!(usize::from(schema.tag()), index);
+        assert_eq!(usize::from(schema.tag()), index + usize::from(index >= 13));
         assert_eq!(
             spec.available,
             matches!(schema.availability(), Availability::Available)
@@ -325,7 +328,7 @@ fn solve_unavailable_schemas() -> TestResult {
             fault.kind,
             FaultKind::Invalid(InvalidCode::UnsupportedFragment)
         );
-        let mut bytes = b"NRZCAS03".to_vec();
+        let mut bytes = b"NRZCAS04".to_vec();
         bytes.extend_from_slice(&1_u32.to_le_bytes());
         bytes.extend_from_slice(&u32::try_from(spec.key.len())?.to_le_bytes());
         bytes.extend_from_slice(spec.key.as_bytes());

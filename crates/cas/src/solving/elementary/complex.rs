@@ -33,7 +33,7 @@ use super::proof::{AT, invalid};
 use super::value::Value;
 use crate::budget::{Budget, BudgetKind};
 use crate::error::Fault;
-use crate::graph::{ExpressionAttachment, Handle, LogicalId};
+use crate::graph::{ExpressionAttachment, LogicalId};
 use crate::model::{AtomicSort, Field, Operator, Sort};
 use crate::solving::coefficients::forms::{Form, Variable};
 use crate::solving::coefficients::storage::{reserve, vector};
@@ -54,8 +54,6 @@ enum Atom {
 pub(crate) struct Components<'a, 'b> {
     /// Owning graph, coefficient arithmetic, exact region and earlier checked premises.
     evaluation: &'a Evaluation<'b>,
-    /// Coefficient expressions whose real-to-complex correspondence the caller checked.
-    parameters: &'a [Handle],
     /// Shared real and imaginary components for each declaration or selected root slot.
     atoms: Vec<(Atom, Parts)>,
     /// Joint selections whose defining equations and predicates have already been recorded.
@@ -74,14 +72,9 @@ pub(crate) struct Components<'a, 'b> {
 
 impl<'a, 'b> Components<'a, 'b> {
     /// Region guards initialize the interpretation; explicit premise slots are imported separately.
-    pub(crate) fn new(
-        evaluation: &'a Evaluation<'b>,
-        parameters: &'a [Handle],
-        budget: &mut Budget,
-    ) -> Result<Self, Fault> {
+    pub(crate) fn new(evaluation: &'a Evaluation<'b>, budget: &mut Budget) -> Result<Self, Fault> {
         let mut result = Self {
             evaluation,
-            parameters,
             atoms: vector(0, budget)?,
             selections: vector(0, budget)?,
             equations: vector(0, budget)?,
@@ -139,19 +132,6 @@ impl<'a, 'b> Components<'a, 'b> {
         Ok(value)
     }
 
-    /// Only the checked caller transport supplies extra real coefficient declarations.
-    fn real_parameter(&self, id: LogicalId, budget: &mut Budget) -> Result<bool, Fault> {
-        for handle in self.parameters {
-            budget.work(1, AT)?;
-            let candidate = self.evaluation.cas.state.expression(handle.logical_id())?;
-            let actual = self.evaluation.cas.state.expression(id)?;
-            if (candidate.header, &candidate.operator) == (actual.header, &actual.operator) {
-                return Ok(true);
-            }
-        }
-        Ok(false)
-    }
-
     /// Literal maps and selected roots are checked before their components enter an identity.
     fn leaf(
         &mut self,
@@ -203,9 +183,7 @@ impl<'a, 'b> Components<'a, 'b> {
                 continue;
             }
             let index = u32::try_from(index).map_err(|_| invalid())?;
-            if expression.sort != Sort::Value(AtomicSort::Scalar(Field::Complex))
-                || self.real_parameter(id, budget)?
-            {
+            if expression.sort != Sort::Value(AtomicSort::Scalar(Field::Complex)) {
                 return Ok(Parts {
                     real: Value::variable(Variable::Slot(index), &self.evaluation.engine, budget)?,
                     imaginary: Value::integer(0, &self.evaluation.engine, budget)?,
@@ -356,12 +334,6 @@ impl<'a, 'b> Components<'a, 'b> {
         self.zero(&parts.imaginary, budget)
     }
 
-    /// Nonrealness requires a proved nonzero imaginary component.
-    pub(crate) fn nonreal(&mut self, root: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
-        let parts = self.expression(root, &[], budget)?;
-        self.nonzero(&parts.imaginary, budget)
-    }
-
     /// A conjugated equality compares actual values under a single component interpretation.
     pub(crate) fn equal(
         &mut self,
@@ -380,23 +352,5 @@ impl<'a, 'b> Components<'a, 'b> {
         let difference = transformed.sum(&expected, true, self.evaluation, budget)?;
         self.zero(&difference.real, budget)?;
         self.zero(&difference.imaginary, budget)
-    }
-}
-
-/// Real restriction supplies only coefficient parameters whose correspondence was checked first.
-pub(crate) fn restricted(
-    evaluation: &Evaluation<'_>,
-    root: LogicalId,
-    parameters: &[Handle],
-    real: bool,
-    evidence: &[u32],
-    budget: &mut Budget,
-) -> Result<(), Fault> {
-    let mut components = Components::new(evaluation, parameters, budget)?;
-    components.premises(evidence, budget)?;
-    if real {
-        components.real(root, budget)
-    } else {
-        components.nonreal(root, budget)
     }
 }

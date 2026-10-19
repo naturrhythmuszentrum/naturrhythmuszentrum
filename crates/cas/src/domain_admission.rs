@@ -3,8 +3,8 @@
 
 use crate::budget::{Budget, BudgetKind};
 use crate::domain_model::{
-    AmbientDomain, Boundary, BoundaryDraft, CaseArm, CaseArmDraft, Region, RegionDraft, RegionExpr,
-    Space, SpaceDraft,
+    AmbientDomain, Boundary, BoundaryDraft, CaseArmDraft, Region, RegionDraft, RegionExpr, Space,
+    SpaceDraft,
 };
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Edge, LogicalId, State, Vertex, position_u32, size, vertex_key};
@@ -84,6 +84,7 @@ impl Cas {
         &self,
         state: &mut State,
         draft: &RegionDraft,
+        projection: Option<&crate::solving::LiesOver<crate::graph::Reference>>,
         locals: &[LogicalId],
         pending: u64,
         budget: &mut Budget,
@@ -154,7 +155,17 @@ impl Cas {
                 RegionExpr::Difference { base, excluded }
             }
         };
+        let lies_over = crate::solving::sorts::projection(
+            self,
+            state,
+            projection,
+            header,
+            &draft.ambient,
+            locals,
+            &mut edges,
+        )?;
         let value = Region {
+            lies_over,
             header,
             scope: draft.scope.clone(),
             ambient: draft.ambient.clone(),
@@ -234,33 +245,31 @@ impl Cas {
         let header = self.resolve(state, &draft.header, locals)?;
         let region = self.resolve(state, &draft.region, locals)?;
         let value = self.resolve(state, &draft.value, locals)?;
-        let term = state.expression(value)?;
-        if !matches!(term.sort, Sort::Value(AtomicSort::Scalar(_)))
-            || term.scope != draft.scope
-            || state.region(region)?.scope != draft.scope
-            || !crate::header::embeds(state, term.header, header, budget)?
-            || !crate::header::embeds(state, state.region(region)?.header, header, budget)?
-        {
-            return Err(Fault::invalid(InvalidCode::Sort, AT));
-        }
-        let arm = CaseArm {
-            header,
-            scope: draft.scope.clone(),
-            region,
-            value,
-            sort: term.sort.clone(),
-        };
-        self.insert(
+        let arm = crate::solving::sorts::arm(
+            self,
             state,
-            Vertex::CaseArm(arm),
-            &[
-                (header, Edge::InHeader),
-                (region, Edge::ArmRegion),
-                (value, Edge::ArmValue),
-            ],
-            pending,
+            draft,
+            (header, region, value),
+            locals,
             budget,
-        )
+        )?;
+        let mut edges = vec![
+            (header, Edge::InHeader),
+            (region, Edge::ArmRegion),
+            (value, Edge::ArmValue),
+        ];
+        for (position, pair) in arm.placements.iter().enumerate() {
+            let position = position_u32(position)?;
+            edges.push((
+                pair.operand,
+                Edge::Scalar(crate::graph::ScalarEdge::PlacedOperand(position)),
+            ));
+            edges.push((
+                pair.piece,
+                Edge::Scalar(crate::graph::ScalarEdge::PlacementPiece(position)),
+            ));
+        }
+        self.insert(state, Vertex::CaseArm(arm), &edges, pending, budget)
     }
 
     /// Admit only a location, never function-specific ownership or jets.
@@ -513,9 +522,17 @@ impl Cas {
         }
         budget.check(BudgetKind::Depth, depth, at)?;
         budget.check(BudgetKind::PeakExpressionSize, unfolded, at)?;
+        let ambient = crate::solving::sorts::ambient(state, header, &sort)?;
+        if let Some(ambient) = ambient {
+            edges.push((
+                ambient,
+                Edge::Scalar(crate::graph::ScalarEdge::CheckedAmbient),
+            ));
+        }
         self.insert(
             state,
             Vertex::Expression(crate::graph::Expression {
+                ambient,
                 attachment: None,
                 header,
                 scope: draft.scope.clone(),

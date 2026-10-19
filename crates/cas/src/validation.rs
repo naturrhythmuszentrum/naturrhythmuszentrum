@@ -193,6 +193,7 @@ fn encode_draft(draft: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
         | Draft::Header(_)
         | Draft::Context(_)
         | Draft::Region(_)
+        | Draft::FamilyRegion { .. }
         | Draft::Space(_)
         | Draft::CaseArm(_)
         | Draft::Boundary(_)
@@ -1043,7 +1044,7 @@ pub(crate) fn occurrence(
     value: &Occurrence,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let dependencies = crate::descriptor::children(state, value.expression, budget)?;
+    let dependencies = crate::descriptor::occurrence_children(state, value.expression, budget)?;
     budget.work(size(value.children.len(), AT)?, AT)?;
     if value.children.len() != dependencies.len() {
         return Err(sort_error());

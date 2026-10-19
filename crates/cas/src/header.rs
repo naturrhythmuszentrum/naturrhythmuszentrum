@@ -69,28 +69,17 @@ impl Cas {
         };
         let mut out = Encoder::new(budget, AT);
         encoding::environment(&environment, &mut out)?;
+        let bytes = out.finish();
+        let scalar_spaces = self.registered_scalar_spaces(state, pending, budget)?;
         let header = Header {
+            scalar_spaces,
             environment,
-            bytes: out.finish(),
+            bytes,
             parent,
             declarations,
             spaces,
         };
-        let mut edges = Vec::new();
-        let capacity = header
-            .spaces
-            .len()
-            .checked_add(1)
-            .ok_or_else(|| Fault::capacity(BudgetKind::Edges, AT))?;
-        edges
-            .try_reserve(capacity)
-            .map_err(|_| Fault::allocation(AT))?;
-        if let Some(parent) = parent {
-            edges.push((parent, Edge::ParentHeader));
-        }
-        for (position, (_, space)) in header.spaces.iter().enumerate() {
-            edges.push((*space, Edge::DeclarationSpace(position_u32(position)?)));
-        }
+        let edges = header_edges(&header)?;
         self.insert(state, Vertex::Header(header), &edges, pending, budget)
     }
 
@@ -331,4 +320,33 @@ impl Cas {
         result.extend(value.arguments.iter().map(|id| self.handle(*id)));
         Ok(result)
     }
+}
+
+/// Retain parent, distribution-space and scalar-registry edges in their exact roles.
+fn header_edges(header: &Header) -> Result<Vec<(LogicalId, Edge)>, Fault> {
+    let mut edges = Vec::new();
+    let capacity = header
+        .spaces
+        .len()
+        .checked_add(header.scalar_spaces.len())
+        .and_then(|count| count.checked_add(1))
+        .ok_or_else(|| Fault::capacity(BudgetKind::Edges, AT))?;
+    edges
+        .try_reserve(capacity)
+        .map_err(|_| Fault::allocation(AT))?;
+    if let Some(parent) = header.parent {
+        edges.push((parent, Edge::ParentHeader));
+    }
+    for (position, (_, space)) in header.spaces.iter().enumerate() {
+        edges.push((*space, Edge::DeclarationSpace(position_u32(position)?)));
+    }
+    for (position, space) in header.scalar_spaces.iter().enumerate() {
+        edges.push((
+            *space,
+            Edge::Scalar(crate::graph::ScalarEdge::DeclarationScalarSpace(
+                position_u32(position)?,
+            )),
+        ));
+    }
+    Ok(edges)
 }

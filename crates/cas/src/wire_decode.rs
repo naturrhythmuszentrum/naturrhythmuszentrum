@@ -173,7 +173,7 @@ fn decode(
     manifest: &[Primitive],
 ) -> Result<Decoded, Fault> {
     match tag {
-        0..=8 | 13..=27 => {
+        0..=8 | 13..=36 => {
             crate::wire_objects::decode(cas, tag, layer, space.as_ref(), reader, records)
                 .map(Decoded::Object)
         }
@@ -318,7 +318,7 @@ fn conclusion(
 
 /// Reject every noncurrent magic before any record, manifest or replay-store allocation.
 pub(crate) fn magic(bytes: &[u8]) -> Result<(), Fault> {
-    if bytes.get(..8) != Some(b"NRZCAS03".as_slice()) {
+    if bytes.get(..8) != Some(b"NRZCAS04".as_slice()) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     Ok(())

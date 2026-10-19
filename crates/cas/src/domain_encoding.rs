@@ -96,6 +96,10 @@ pub(crate) fn vertex(value: &Vertex, out: &mut Encoder<'_>) -> Result<(), Fault>
                 encode_id(parent, out)?;
             }
             encoding::environment(&value.environment, out)?;
+            out.count(value.scalar_spaces.len())?;
+            for space in &value.scalar_spaces {
+                encode_id(*space, out)?;
+            }
             out.count(value.spaces.len())?;
             for (key, space) in &value.spaces {
                 out.name(key)?;
@@ -107,6 +111,11 @@ pub(crate) fn vertex(value: &Vertex, out: &mut Encoder<'_>) -> Result<(), Fault>
             encoding::scope(&value.scope, out)?;
             ambient(&value.ambient, out)?;
             region(&value.expression, out, logical)?;
+            out.byte(u8::from(value.lies_over.is_some()))?;
+            if let Some(projection) = &value.lies_over {
+                encode_id(projection.family, out)?;
+                encode_id(projection.stratum, out)?;
+            }
         }
         Vertex::Space(value) => {
             encode_id(value.header, out)?;
@@ -121,6 +130,11 @@ pub(crate) fn vertex(value: &Vertex, out: &mut Encoder<'_>) -> Result<(), Fault>
             encode_id(value.region, out)?;
             encode_id(value.value, out)?;
             encoding::sort(&value.sort, out)?;
+            out.count(value.placements.len())?;
+            for pair in &value.placements {
+                encode_id(pair.operand, out)?;
+                encode_id(pair.piece, out)?;
+            }
         }
         Vertex::Boundary(value) => {
             encode_id(value.header, out)?;
@@ -175,6 +189,17 @@ pub(crate) fn draft(value: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
         }
         Draft::Header(value) => header_draft(value, out)?,
         Draft::Context(value) => context_draft(value, out)?,
+        Draft::FamilyRegion {
+            region: value,
+            lies_over,
+        } => {
+            reference(&value.header, out)?;
+            encoding::scope(&value.scope, out)?;
+            ambient(&value.ambient, out)?;
+            region(&value.expression, out, reference)?;
+            reference(&lies_over.family, out)?;
+            reference(&lies_over.stratum, out)?;
+        }
         Draft::Region(value) => {
             reference(&value.header, out)?;
             encoding::scope(&value.scope, out)?;
@@ -193,6 +218,11 @@ pub(crate) fn draft(value: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
             encoding::scope(&value.scope, out)?;
             reference(&value.region, out)?;
             reference(&value.value, out)?;
+            out.count(value.placements.len())?;
+            for pair in &value.placements {
+                reference(&pair.operand, out)?;
+                reference(&pair.piece, out)?;
+            }
         }
         Draft::Boundary(value) => {
             reference(&value.header, out)?;

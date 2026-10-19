@@ -180,6 +180,7 @@ pub(crate) fn arm(
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
     let draft = Draft::CaseArm(CaseArmDraft {
+        placements: Vec::new(),
         header: Reference::Existing(cas.handle(header)),
         scope: scope.clone(),
         region: Reference::Existing(cas.handle(region)),

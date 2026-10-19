@@ -161,7 +161,7 @@ fn blind_discovery_reachable_prefix() -> TestResult {
         ]
     );
     assert!(budget.usage().coefficient_ops > 0);
-    assert_eq!(crate::solving::active_schema_bitmap() & 0x7fff, 0x7fff);
+    assert_eq!(crate::solving::active_schema_bitmap() & 0x5fff, 0x5fff);
     Ok(())
 }
 
@@ -443,7 +443,7 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     let revision = "blind-cubic-audit-fixture-revision";
     let record = crate::testing::solve_blind::symbolic_audit(revision)?;
     assert!(record.starts_with(&format!("source_revision={revision}\n")));
-    assert!(record.contains("policy=logical-v9"));
+    assert!(record.contains("policy=logical-v10"));
     assert!(record.contains("refusal=Fault"));
     assert!(record.contains("interning_comparisons="));
     assert!(record.contains("phases="));

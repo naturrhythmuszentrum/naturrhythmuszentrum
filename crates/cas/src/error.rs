@@ -28,6 +28,16 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// A declared scalar space has no installed specification.
+    SpaceRegistrationUnavailable,
+    /// No registered directed placement supports the requested ambient.
+    SpacePlacementUnavailable,
+    /// The operand spaces do not determine one registered ambient.
+    AmbientSpaceAmbiguous,
+    /// A declaration, binder or coordinate slot has a contradictory sort.
+    SymbolSortMismatch,
+    /// A stored scalar ambient contradicts the registered signature.
+    AmbientSpaceMismatch,
     /// The proposed delta pullback contains a repeated or nonsimple zero.
     PullbackMultipleZero,
     /// The supplied root list does not reconstruct the complete map polynomial.

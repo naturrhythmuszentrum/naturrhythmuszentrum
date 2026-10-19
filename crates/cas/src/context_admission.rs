@@ -215,6 +215,7 @@ impl Cas {
         let admissible = self.retain_region(
             state,
             Region {
+                lies_over: base.lies_over,
                 header: enclosing.header_id,
                 scope: base.scope,
                 ambient: base.ambient,

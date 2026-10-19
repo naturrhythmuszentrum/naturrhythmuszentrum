@@ -33,8 +33,6 @@ pub enum SolveSchema {
     MultiplicityTransfer,
     /// The `complex.conjugate` checker and certificate subtype 12.
     ConjugationTransport,
-    /// The `solve.real-restrict` checker and certificate subtype 13.
-    RealRestriction,
     /// The `orbit.cover` checker and certificate subtype 14.
     PermutationOrbitCoverage,
     /// The `root.isolate` checker and certificate subtype 15.
@@ -43,10 +41,18 @@ pub enum SolveSchema {
     ParameterImageCoverage,
     /// The `solve.local-branch` checker and certificate subtype 17.
     ImplicitFunctionBranch,
+    /// The `coeff.evaluate` v1 checker.
+    CoefficientEvaluation,
+    /// The `real.sign` v1 checker.
+    RealSign,
+    /// The `real.root-count` v1 checker.
+    RealRootCount,
+    /// The `real.cell-exists` v1 checker.
+    RealCellExists,
 }
 
 /// Every solving schema in its fixed certificate subtype order.
-pub const SOLVE_SCHEMAS: [SolveSchema; 18] = [
+pub const SOLVE_SCHEMAS: [SolveSchema; 21] = [
     SolveSchema::CoefficientIdentity,
     SolveSchema::RootAdjunction,
     SolveSchema::ExtensionUnit,
@@ -60,11 +66,14 @@ pub const SOLVE_SCHEMAS: [SolveSchema; 18] = [
     SolveSchema::ProductCompleteness,
     SolveSchema::MultiplicityTransfer,
     SolveSchema::ConjugationTransport,
-    SolveSchema::RealRestriction,
     SolveSchema::PermutationOrbitCoverage,
     SolveSchema::RealIsolationAndOrder,
     SolveSchema::ParameterImageCoverage,
     SolveSchema::ImplicitFunctionBranch,
+    SolveSchema::CoefficientEvaluation,
+    SolveSchema::RealSign,
+    SolveSchema::RealRootCount,
+    SolveSchema::RealCellExists,
 ];
 
 impl SolveSchema {
@@ -85,11 +94,14 @@ impl SolveSchema {
             Self::ProductCompleteness => 10,
             Self::MultiplicityTransfer => 11,
             Self::ConjugationTransport => 12,
-            Self::RealRestriction => 13,
             Self::PermutationOrbitCoverage => 14,
             Self::RealIsolationAndOrder => 15,
             Self::ParameterImageCoverage => 16,
             Self::ImplicitFunctionBranch => 17,
+            Self::CoefficientEvaluation => 18,
+            Self::RealSign => 19,
+            Self::RealRootCount => 20,
+            Self::RealCellExists => 21,
         }
     }
 
@@ -108,13 +120,16 @@ impl SolveSchema {
             | Self::RootSelectionRefinement
             | Self::ProductCompleteness
             | Self::MultiplicityTransfer
-            | Self::ConjugationTransport
-            | Self::RealRestriction => super::elementary::schema_availability(self.tag()),
+            | Self::ConjugationTransport => super::elementary::schema_availability(self.tag()),
             Self::ExactLinearEquivalence => super::linear_check::schema_availability(self.tag()),
             Self::PermutationOrbitCoverage => super::orbits::schema_availability(self.tag()),
             Self::RealIsolationAndOrder => super::isolation::schema_availability(self.tag()),
             Self::ParameterImageCoverage => super::family_check::schema_availability(self.tag()),
             Self::ImplicitFunctionBranch => super::local::schema_availability(self.tag()),
+            Self::CoefficientEvaluation
+            | Self::RealSign
+            | Self::RealRootCount
+            | Self::RealCellExists => Availability::Unavailable,
         }
     }
 
@@ -135,11 +150,14 @@ impl SolveSchema {
             Self::ProductCompleteness => ("solve.product", 8),
             Self::MultiplicityTransfer => ("solve.multiplicity", 8),
             Self::ConjugationTransport => ("complex.conjugate", 4),
-            Self::RealRestriction => ("solve.real-restrict", 8),
             Self::PermutationOrbitCoverage => ("orbit.cover", 8),
             Self::RealIsolationAndOrder => ("root.isolate", 12),
             Self::ParameterImageCoverage => ("solve.family", 8),
             Self::ImplicitFunctionBranch => ("solve.local-branch", 16),
+            Self::CoefficientEvaluation => ("coeff.evaluate", 4),
+            Self::RealSign => ("real.sign", 2),
+            Self::RealRootCount => ("real.root-count", 8),
+            Self::RealCellExists => ("real.cell-exists", 2),
         };
         RuleSpec {
             primitive: Primitive::Solve(self),
@@ -196,8 +214,9 @@ pub(crate) fn check(
         | SolveSchema::RootSelectionRefinement
         | SolveSchema::ProductCompleteness
         | SolveSchema::MultiplicityTransfer
-        | SolveSchema::ConjugationTransport
-        | SolveSchema::RealRestriction => super::elementary::check(cas, draft, premises, budget),
+        | SolveSchema::ConjugationTransport => {
+            super::elementary::check(cas, draft, premises, budget)
+        }
         SolveSchema::ExactLinearEquivalence => {
             super::linear_check::check(cas, draft, premises, budget)
         }
@@ -207,5 +226,12 @@ pub(crate) fn check(
             super::family_check::check(cas, draft, premises, budget)
         }
         SolveSchema::ImplicitFunctionBranch => super::local::check(cas, draft, premises, budget),
+        SolveSchema::CoefficientEvaluation
+        | SolveSchema::RealSign
+        | SolveSchema::RealRootCount
+        | SolveSchema::RealCellExists => Err(crate::error::Fault::invalid(
+            crate::error::InvalidCode::UnsupportedVersion,
+            crate::error::Location::new("unavailable current solving schema"),
+        )),
     }
 }

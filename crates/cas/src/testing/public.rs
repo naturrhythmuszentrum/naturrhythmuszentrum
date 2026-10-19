@@ -192,3 +192,9 @@ pub(crate) mod solve_linear;
     reason = "shared solving fixtures remain crate-visible"
 )]
 pub(crate) mod solve_local;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared scalar-space admission fixtures"
+)]
+pub(crate) mod sorts;

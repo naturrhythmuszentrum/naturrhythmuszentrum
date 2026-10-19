@@ -54,13 +54,13 @@ fn solve_request_predicate_mismatch() -> TestResult {
 }
 
 /// A fresh receiver replays a typed coefficient closure through the existing hypothesis checker.
-/// ´test:integration:solve-coefficient-witness-v3-round-trip´
+/// ´test:integration:solve-coefficient-witness-v4-round-trip´
 #[test]
-fn solve_coefficient_witness_v3_round_trip() -> TestResult {
+fn solve_coefficient_witness_v4_round_trip() -> TestResult {
     use nrz_cas::limits::{Budget, Limits};
     let (origin, witness) = crate::testing::solve_graph::coefficient_witness()?;
     let bytes = origin.export_witness(&witness, &mut Budget::new(Limits::default())?)?;
-    assert_eq!(bytes.get(..8), Some(b"NRZCAS03".as_slice()));
+    assert_eq!(bytes.get(..8), Some(b"NRZCAS04".as_slice()));
     assert_eq!(witness.hypotheses().len(), 1);
     let mut receiver = nrz_cas::Cas::new(Limits::default())?;
     let replayed = receiver.inspect(&bytes, &mut Budget::new(Limits::default())?)?;
@@ -76,9 +76,9 @@ fn solve_coefficient_witness_v3_round_trip() -> TestResult {
 }
 
 /// Root binders, polynomial order and scalar selection attachments survive fresh-store replay.
-/// ´test:integration:solve-root-witness-v3-round-trip´
+/// ´test:integration:solve-root-witness-v4-round-trip´
 #[test]
-fn solve_root_witness_v3_round_trip() -> TestResult {
+fn solve_root_witness_v4_round_trip() -> TestResult {
     use nrz_cas::limits::{Budget, Limits};
     let (origin, witness) = crate::testing::solve_graph::root_witness()?;
     let bytes = origin.export_witness(&witness, &mut Budget::new(Limits::default())?)?;

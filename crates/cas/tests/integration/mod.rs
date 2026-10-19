@@ -38,3 +38,5 @@ mod solve_rational;
 mod solve_linear;
 
 mod solve_local;
+
+mod sorts;

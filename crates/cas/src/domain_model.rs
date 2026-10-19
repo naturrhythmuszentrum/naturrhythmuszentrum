@@ -123,6 +123,8 @@ pub struct SpaceDraft {
 /// One region/value association in an unordered native case.
 #[derive(Clone, Debug)]
 pub struct CaseArmDraft {
+    /// Original local operands paired with their exact placement pieces.
+    pub placements: Vec<crate::solving::PlacementUse>,
     /// Actual semantic header.
     pub header: Reference,
     /// Outer-to-inner binder frames.
@@ -181,6 +183,8 @@ pub struct HypothesisRef {
 /// Immutable graph-owned header with its complete declaration signature.
 #[derive(Clone, Debug)]
 pub(crate) struct Header {
+    /// Installed scalar specification nodes, independent of distribution spaces.
+    pub(crate) scalar_spaces: Vec<LogicalId>,
     /// Full inherited and fresh scalar signatures.
     pub(crate) environment: Environment,
     /// Canonical complete declaration signature.
@@ -196,6 +200,8 @@ pub(crate) struct Header {
 /// Graph-owned exact region syntax.
 #[derive(Clone, Debug)]
 pub(crate) struct Region {
+    /// Exact family and base projection, when this is a total family region.
+    pub(crate) lies_over: Option<crate::solving::LiesOver<LogicalId>>,
     /// Actual header retained in the interner key.
     pub(crate) header: LogicalId,
     /// Explicit bound frames.
@@ -224,6 +230,8 @@ pub(crate) struct Space {
 /// Graph-owned unordered case association.
 #[derive(Clone, Debug)]
 pub(crate) struct CaseArm {
+    /// Original operand and placement-piece identities.
+    pub(crate) placements: Vec<crate::solving::PlacementUse<LogicalId>>,
     /// Actual header.
     pub(crate) header: LogicalId,
     /// Explicit bound frames.

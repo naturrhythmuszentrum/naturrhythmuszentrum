@@ -125,7 +125,7 @@ pub(crate) fn check(
         free: &[],
         bound: &[],
     };
-    let mut components = super::complex::Components::new(&evaluation, &[], budget)?;
+    let mut components = super::complex::Components::new(&evaluation, budget)?;
     components.premises(&certificate.relations, budget)?;
     components.premises(&certificate.fixed_field, budget)?;
     maps(&evaluation, certificate, &mut components, budget)?;

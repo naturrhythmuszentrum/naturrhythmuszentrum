@@ -864,13 +864,16 @@ fn checked_jacobian_assembly() -> TestResult {
     Ok(())
 }
 
-/// Changes to a guard, coefficient, reduced magnitude or forward reference cannot become proof.
+/// Changes to a guard, coefficient, denominator operand or forward reference cannot become proof.
 /// ´test:integration:witness-payload-tampering´
 #[test]
 fn witness_payload_tampering() -> TestResult {
     let original = canonical_fixture()?;
     let mut receiver = Cas::new(budget()?.limits().clone())?;
-    for (position, byte) in [(247, 0), (211, 2), (173, 4), (304, 255)] {
+    // NRZCAS04 records 4 and 6 are x and one; the latter is a forbidden forward operand reference.
+    for (position, prior, byte) in [(338, 1, 0), (302, 1, 2), (259, 4, 6), (395, 7, 255)] {
+        assert_eq!(original.get(position), Some(&prior));
+        assert_ne!(prior, byte);
         let mut changed = original.clone();
         *changed
             .get_mut(position)
@@ -879,13 +882,41 @@ fn witness_payload_tampering() -> TestResult {
         assert_eq!(receiver.counts().vertices, 0);
     }
     let mut unreduced = original;
-    *unreduced.get_mut(211).ok_or("missing numerator")? = 2;
-    *unreduced.get_mut(216).ok_or("missing denominator")? = 2;
+    *unreduced.get_mut(302).ok_or("missing numerator")? = 2;
+    *unreduced.get_mut(307).ok_or("missing denominator")? = 2;
     let fault = receiver
         .inspect(&unreduced, &mut budget()?)
         .err()
         .ok_or("normalized noncanonical wire")?;
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Encoding));
+    assert_eq!(receiver.counts().vertices, 0);
+    Ok(())
+}
+
+/// A well-typed earlier denominator reference reaches the cancellation checker, not a decode refusal.
+/// ´test:integration:witness-denominator-payload-tampering´
+#[test]
+fn witness_denominator_payload_tampering() -> TestResult {
+    let mut changed = canonical_fixture()?;
+    // Move the 50-byte one record ahead of the 47-byte quotient record, making one an earlier operand.
+    changed
+        .get_mut(222..319)
+        .ok_or("missing quotient and one records")?
+        .rotate_left(47);
+    // The quotient is now record 6 and one is record 5; update the operand and both statement subjects.
+    for (position, prior, replacement) in [(309, 4, 5), (415, 5, 6), (419, 6, 5)] {
+        let field = changed
+            .get_mut(position)
+            .ok_or("missing denominator mutation field")?;
+        assert_eq!(*field, prior);
+        *field = replacement;
+    }
+    let mut receiver = Cas::new(budget()?.limits().clone())?;
+    let fault = receiver
+        .inspect(&changed, &mut budget()?)
+        .expect_err("x/one = one accepted");
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
+    assert_eq!(fault.location.operation, "primitive schema");
     assert_eq!(receiver.counts().vertices, 0);
     Ok(())
 }

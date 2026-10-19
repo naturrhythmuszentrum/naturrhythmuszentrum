@@ -544,6 +544,7 @@ fn real_root_zero_and_principal_refusal() -> TestResult {
         return Err("wrong selection".into());
     };
     let draft = Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+        cell: None,
         header: Reference::Existing(data.header.clone()),
         scope: data.scope.clone(),
         relations: data

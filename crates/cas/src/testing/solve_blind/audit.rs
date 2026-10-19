@@ -106,13 +106,13 @@ fn policy_record() -> String {
             (specification.key, specification.version)
         })
         .collect();
-    assert_eq!(manifest.len(), 77);
+    assert_eq!(manifest.len(), 80);
     assert!(manifest.iter().all(|(_, version)| *version == 1));
-    assert_eq!(crate::solving::active_schema_bitmap() & 0x1_7fff, 0x1_7fff);
+    assert_eq!(crate::solving::active_schema_bitmap() & 0x1_5fff, 0x1_5fff);
     let policy = crate::cost::CostPolicy::default();
-    assert_eq!((&*policy.key, policy.version), ("logical", 9));
+    assert_eq!((&*policy.key, policy.version), ("logical", 10));
     format!(
-        "policy=logical-v9\nschema_manifest={manifest:?}\nactive_bitmap={}\n",
+        "policy=logical-v10\nschema_manifest={manifest:?}\nactive_bitmap={}\n",
         crate::solving::active_schema_bitmap()
     )
 }

@@ -220,6 +220,7 @@ fn choice(
     let selected = admit(
         &mut fixture.base.cas,
         &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            cell: None,
             header: Reference::Existing(fixture.base.header.clone()),
             scope: Vec::new(),
             relations: vec![Reference::Existing(relation.clone())],
@@ -572,56 +573,6 @@ pub(crate) fn linked_cubic(bombelli: bool, mutation: u8) -> TestResult<BinomialF
         };
         certificate.region = region;
     }
-    push(&mut cubic.fixture, step)?;
-    Ok(cubic.fixture)
-}
-
-/// Complete real restriction retains 1 and proves both remaining returned tower values nonreal.
-pub(crate) fn linked_cubic_restriction() -> TestResult<BinomialFixture> {
-    use crate::test_api::solving::{CertificateRealRestriction, StatementCoverage};
-    let mut cubic = cubic(false, u8::MAX)?;
-    let (covered, complex_problem, branches) = coverage(&mut cubic, false)?;
-    linkage(&mut cubic, false, false)?;
-    let first = cubic.roots.first().ok_or("missing real root")?.clone();
-    let one = cubic.fixture.base.integer(1, false)?;
-    equality(&mut cubic, &first, &one)?;
-    let zero = cubic.fixture.base.integer(0, false)?;
-    let complex_cover = cubic.fixture.base.split(&zero)?;
-    let cover_index = push(&mut cubic.fixture, complex_cover.clone())?;
-    let complex_count = u32::try_from(cubic.fixture.steps.len())?;
-    cubic.fixture.base.enter_real()?;
-    let (real_problem, _) = problem(&mut cubic.fixture.base, false)?;
-    let one = cubic.fixture.base.integer(1, false)?;
-    let set = cubic.fixture.base.finite(&real_problem, &[one])?;
-    let zero = cubic.fixture.base.integer(0, false)?;
-    let real_cover = cubic.fixture.base.split(&zero)?;
-    let mut transport = super::restriction::transport(
-        &mut cubic.fixture.base,
-        &real_problem,
-        &complex_problem,
-        &real_cover,
-        &complex_cover,
-    )?;
-    transport.real_cover = complex_count;
-    cubic.fixture.steps.push(real_cover);
-    let step = cubic.fixture.base.step(
-        SolveSchema::RealRestriction,
-        SolveStatement::Coverage(StatementCoverage {
-            problem: real_problem.clone(),
-            set: set.clone(),
-            region: cubic.fixture.base.region.clone(),
-        }),
-        SolveCertificate::RealRestriction(CertificateRealRestriction {
-            coverage: covered,
-            problem: real_problem,
-            set,
-            transport,
-            retained: vec![branches.first().ok_or("missing retained branch")?.clone()],
-            rejected: branches.get(1..).ok_or("missing conjugate pair")?.to_vec(),
-            classification: Vec::new(),
-            cover: cover_index,
-        }),
-    );
     push(&mut cubic.fixture, step)?;
     Ok(cubic.fixture)
 }
@@ -1222,6 +1173,7 @@ fn norm_joint_roots(
     let selection = admit(
         &mut fixture.base.cas,
         &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            cell: None,
             header: Reference::Existing(fixture.base.header.clone()),
             scope: Vec::new(),
             relations: vec![
@@ -1501,6 +1453,7 @@ fn included_selection(base: &mut Fixture, mutation: u8) -> TestResult<Handle> {
     admit(
         &mut base.cas,
         &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            cell: None,
             header: Reference::Existing(base.header.clone()),
             scope: Vec::new(),
             relations: vec![Reference::Existing(relation)],

@@ -132,6 +132,7 @@ impl Fixture {
             arms.push(Reference::Existing(admit(
                 &mut self.cas,
                 Draft::CaseArm(CaseArmDraft {
+                    placements: Vec::new(),
                     header: Reference::Existing(self.header.clone()),
                     scope: Vec::new(),
                     region: Reference::Existing(region.clone()),

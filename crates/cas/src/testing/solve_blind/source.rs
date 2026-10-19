@@ -204,6 +204,7 @@ fn coordinate_product(
     admit(
         cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(header.clone()),
             coordinates: keys
                 .iter()

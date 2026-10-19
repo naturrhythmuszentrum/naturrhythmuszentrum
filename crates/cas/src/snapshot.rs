@@ -13,6 +13,7 @@ use crate::graph::{Cas, Edge, encode_id, size, vertex_key};
 /// Encode a stable role/position pair instead of a graph edge index.
 const fn role(edge: Edge) -> (u8, u32) {
     match edge {
+        Edge::Scalar(role) => role.tag(),
         Edge::Coordinates => (42, 0),
         Edge::CoefficientCoordinates => (43, 0),
         Edge::UnknownCoordinates => (44, 0),
@@ -159,7 +160,7 @@ impl Cas {
             records.push((*id, key));
         }
         let mut out = Encoder::output(budget, at);
-        out.raw(b"NRZGRAPH02")?;
+        out.raw(b"NRZGRAPH03")?;
         out.count(records.len())?;
         for (id, key) in records {
             encode_id(id, &mut out)?;

@@ -25,6 +25,24 @@ use intern::{InternIndex, StoreToken};
 /// A disjoint namespace for logical identifiers.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum VertexKind {
+    /// Exact `ParameterBase` syntax.
+    ParameterBase,
+    /// Exact `SpaceFamily` syntax.
+    SpaceFamily,
+    /// Exact `FamilyExpression` syntax.
+    FamilyExpression,
+    /// Exact `FibrePiece` syntax.
+    FibrePiece,
+    /// Exact `RealCell` syntax.
+    RealCell,
+    /// Exact `CoefficientEvaluation` syntax.
+    CoefficientEvaluation,
+    /// Exact `ScalarSpace` syntax.
+    ScalarSpace,
+    /// Exact `SpacePlacement` syntax.
+    SpacePlacement,
+    /// Exact `ScalarPiece` syntax.
+    ScalarPiece,
     /// Exact solving `CoordinateSpace` object.
     CoordinateSpace,
     /// Exact solving `Tuple` object.
@@ -125,6 +143,15 @@ impl VertexKind {
             Self::SolutionBranch => 28,
             Self::SolveProblem => 29,
             Self::LocalBranch => 30,
+            Self::ParameterBase => 31,
+            Self::SpaceFamily => 32,
+            Self::FamilyExpression => 33,
+            Self::FibrePiece => 34,
+            Self::RealCell => 35,
+            Self::CoefficientEvaluation => 36,
+            Self::ScalarSpace => 37,
+            Self::SpacePlacement => 38,
+            Self::ScalarPiece => 39,
         }
     }
 }
@@ -262,6 +289,13 @@ pub enum Draft {
     Context(ContextDraft),
     /// Admit an exact region without proving any relation.
     Region(RegionDraft),
+    /// A total family region with an exact earlier base projection.
+    FamilyRegion {
+        /// Ordinary exact region syntax.
+        region: RegionDraft,
+        /// Earlier family and original base stratum.
+        lies_over: crate::solving::LiesOver<Reference>,
+    },
     /// Admit a declared mathematical space.
     Space(SpaceDraft),
     /// Admit one region/value association.
@@ -366,6 +400,8 @@ pub(crate) enum ExpressionAttachment {
 /// Immutable expression weight and cached, checked shape statistics.
 #[derive(Clone, Debug)]
 pub(crate) struct Expression {
+    /// Checked scalar registry identity, mandatory for registered scalar sorts.
+    pub(crate) ambient: Option<LogicalId>,
     /// Typed literal dependencies, never concealed in an operator.
     pub(crate) attachment: Option<ExpressionAttachment>,
     /// Complete operator metadata.
@@ -488,6 +524,8 @@ pub(crate) enum Vertex {
 /// Typed graph edge roles; only internal validated admission can create edges.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Edge {
+    /// Exact scalar-space and family dependency.
+    Scalar(ScalarEdge),
     /// Typed solving `Coordinates` dependency.
     Coordinates,
     /// Typed solving `CoefficientCoordinates` dependency.
@@ -649,6 +687,79 @@ pub(crate) enum Edge {
     CoverMember(u32),
     /// Typed `ArgumentRegion` relationship.
     ArgumentRegion(u32),
+}
+
+/// Typed scalar-space dependencies with a stable graph encoding.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ScalarEdge {
+    /// Exact `CheckedAmbient` dependency.
+    CheckedAmbient,
+    /// Exact `DeclarationScalarSpace` dependency.
+    DeclarationScalarSpace(u32),
+    /// Exact `PlacementSource` dependency.
+    PlacementSource,
+    /// Exact `PlacementAmbient` dependency.
+    PlacementAmbient,
+    /// Exact `PlacementDefinition` dependency.
+    PlacementDefinition,
+    /// Exact `LocalFrame` dependency.
+    LocalFrame,
+    /// Exact `Base` dependency.
+    Base,
+    /// Exact `Family` dependency.
+    Family,
+    /// Exact `BaseStratum` dependency.
+    BaseStratum,
+    /// Exact `FibreSpace` dependency.
+    FibreSpace,
+    /// Exact `LeftEndpoint` dependency.
+    LeftEndpoint,
+    /// Exact `RightEndpoint` dependency.
+    RightEndpoint,
+    /// Exact `EvaluationSlot` dependency.
+    EvaluationSlot(u32),
+    /// Exact `Localization` dependency.
+    Localization(u32),
+    /// Exact `PlacedOperand` dependency.
+    PlacedOperand(u32),
+    /// Exact `PlacementPiece` dependency.
+    PlacementPiece(u32),
+    /// Exact `BaseArgument` dependency.
+    BaseArgument(u32),
+    /// Exact `FibreArgument` dependency.
+    FibreArgument(u32),
+    /// Exact `FamilyArgument` dependency.
+    FamilyArgument(u32),
+    /// Exact `SelectionCell` dependency.
+    SelectionCell,
+}
+
+impl ScalarEdge {
+    /// Stable append-only graph role tags.
+    pub(crate) const fn tag(self) -> (u8, u32) {
+        match self {
+            Self::CheckedAmbient => (80, 0),
+            Self::DeclarationScalarSpace(position) => (81, position),
+            Self::PlacementSource => (82, 0),
+            Self::PlacementAmbient => (83, 0),
+            Self::PlacementDefinition => (84, 0),
+            Self::LocalFrame => (85, 0),
+            Self::Base => (86, 0),
+            Self::Family => (87, 0),
+            Self::BaseStratum => (88, 0),
+            Self::FibreSpace => (89, 0),
+            Self::LeftEndpoint => (90, 0),
+            Self::RightEndpoint => (91, 0),
+            Self::EvaluationSlot(position) => (92, position),
+            Self::Localization(position) => (93, position),
+            Self::PlacedOperand(position) => (94, position),
+            Self::PlacementPiece(position) => (95, position),
+            Self::BaseArgument(position) => (96, position),
+            Self::FibreArgument(position) => (97, position),
+            Self::FamilyArgument(position) => (98, position),
+            Self::SelectionCell => (99, 0),
+        }
+    }
 }
 
 /// An insertion whose key did not exist before this transaction.
@@ -1310,7 +1421,10 @@ impl Cas {
             Draft::Context(value) => {
                 self.admit_context_frame(state, value, locals, pending, budget)
             }
-            Draft::Region(value) => self.admit_region(state, value, locals, pending, budget),
+            Draft::Region(value) => self.admit_region(state, value, None, locals, pending, budget),
+            Draft::FamilyRegion { region, lies_over } => {
+                self.admit_region(state, region, Some(lies_over), locals, pending, budget)
+            }
             Draft::Space(value) => self.admit_space(state, value, locals, pending, budget),
             Draft::CaseArm(value) => self.admit_arm(state, value, locals, pending, budget),
             Draft::Boundary(value) => self.admit_boundary(state, value, locals, pending, budget),
@@ -1499,7 +1613,9 @@ impl Cas {
             &operands,
             budget,
         )?;
+        let ambient = crate::solving::sorts::ambient(state, header, &draft.sort)?;
         let expression = Vertex::Expression(Expression {
+            ambient,
             attachment: None,
             operator: draft.operator.clone(),
             sort: draft.sort.clone(),
@@ -1525,6 +1641,9 @@ impl Cas {
             return Ok(id);
         }
         let mut edges = vec![(header, Edge::InHeader)];
+        if let Some(ambient) = ambient {
+            edges.push((ambient, Edge::Scalar(ScalarEdge::CheckedAmbient)));
+        }
         if let Some(space) = space {
             edges.push((space, Edge::InSpace));
         }
@@ -1921,6 +2040,10 @@ fn context_key(context: &Context, out: &mut Encoder<'_>) -> Result<(), Fault> {
 
 /// Encode every retained expression identity field.
 fn expression_key(expression: &Expression, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    out.byte(u8::from(expression.ambient.is_some()))?;
+    if let Some(ambient) = expression.ambient {
+        encode_id(ambient, out)?;
+    }
     crate::solving::graph::attachment_key(expression.attachment.as_ref(), out)?;
     encode_id(expression.header, out)?;
     out.byte(expression.layer.tag())?;

@@ -443,7 +443,7 @@ fn envelope(
     budget: &mut Budget,
 ) -> Result<Vec<u8>, Fault> {
     let mut out = Encoder::output(budget, AT);
-    out.raw(b"NRZRUN03")?;
+    out.raw(b"NRZRUN04")?;
     result.policy.encode(&mut out)?;
     crate::wire::index(crate::solving::active_schema_bitmap(), &mut out)?;
     for kind in crate::budget::ALL_KINDS {

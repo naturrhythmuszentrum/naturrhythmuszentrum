@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact solving syntax and closed, untrusted theorem payloads.
 
+use super::sorts::{
+    CertificateCoefficientEvaluation, CertificateRealCellExists, CertificateRealRootCount,
+    CertificateRealSign, CoefficientEvaluationData, FamilyExpressionData, FibrePieceData,
+    ParameterBaseData, RealCellData, ScalarPieceData, ScalarSpaceData, SpaceFamilyData,
+    SpacePlacementData, StatementCoefficientEvaluation, StatementRealCellExists,
+    StatementRealRootCount, StatementRealSign,
+};
 use crate::graph::{Handle, Reference};
 use crate::model::{AtomicSort, Declaration, Field, Scope};
 use crate::number::Rational;
@@ -69,6 +76,8 @@ pub enum SolveForm {
     ExactFamily,
     /// A local germ with explicit neighborhood scope.
     LocalBranch,
+    /// Same-Real radical or certified-cell presentation.
+    RealExact,
 }
 
 /// `ExclusionPolicy` discriminator with a stable explicit encoding.
@@ -198,6 +207,9 @@ pub struct RationalInterval {
 /// An ordered finite product, including the empty product.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoordinateSpaceData<R = Reference> {
+    /// Ordered registered scalar nodes; an empty draft requests checked resolution.
+    /// Unregistered structural fields have no claimed scalar node.
+    pub scalar_spaces: Vec<Option<R>>,
     /// Exact semantic header.
     pub header: R,
     /// Ordered coordinate declarations or their product.
@@ -319,6 +331,8 @@ pub struct RootRelationData<R = Reference> {
 /// Ordered root slots with a jointly scoped selection predicate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RootSelectionData<R = Reference> {
+    /// Earlier symbolic Real cell, independent of the retained rational interval.
+    pub cell: Option<R>,
     /// Exact semantic header.
     pub header: R,
     /// Ordered outer binder frames.
@@ -976,83 +990,6 @@ pub struct CertificateConjugationTransport<R = Handle> {
     pub region: R,
 }
 
-/// Ordered endpoints of an explicit real-to-complex transport.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RestrictionPair<R = Handle> {
-    /// Real-header endpoint, qualified by its actual graph identity.
-    pub real: R,
-    /// Complex-header endpoint, qualified by its actual graph identity.
-    pub complex: R,
-}
-
-/// The exact source collection addressed by a condition transport row.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum RestrictionConditionKind {
-    /// A qualified used hypothesis; the index is its position in the premise's used hypotheses.
-    Hypothesis,
-    /// An original definedness or logical requirement, including discharged requirements.
-    Requirement,
-    /// An unresolved guarded obligation.
-    Residual,
-}
-
-/// Transport one actually used condition, retaining it unless explicitly discharged.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RestrictionCondition<R = Handle> {
-    /// Source application in the ordered premise vector.
-    pub premise: u32,
-    /// Source condition collection.
-    pub kind: RestrictionConditionKind,
-    /// Exact position in that collection.
-    pub index: u32,
-    /// Source and destination home contexts.
-    pub contexts: RestrictionPair<R>,
-    /// Source and destination regions.
-    pub regions: RestrictionPair<R>,
-    /// Source and destination predicates.
-    pub predicates: RestrictionPair<R>,
-    /// Optional proof of the transported predicate in the real context.
-    pub discharge: Option<u32>,
-}
-
-/// Mandatory cross-header data; none of these correspondences assert a theorem.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RealRestrictionTransport<R = Handle> {
-    /// Directed embedding from the real problem's coefficient domain to the complex domain.
-    pub coefficient_map: R,
-    /// Free expressions in the real coefficient-coordinate order.
-    pub coefficients: Vec<RestrictionPair<R>>,
-    /// Free expressions in the real unknown-coordinate order.
-    pub unknowns: Vec<RestrictionPair<R>>,
-    /// Overall region pair followed by the ordered coefficient strata.
-    pub regions: Vec<RestrictionPair<R>>,
-    /// Every used foreign hypothesis, requirement and residual has an explicit row.
-    pub conditions: Vec<RestrictionCondition<R>>,
-    /// Earlier cover of the exact real coefficient region by the listed strata.
-    pub real_cover: u32,
-}
-
-/// Typed `RealRestriction` certificate payload; its fields are untrusted until replay.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct CertificateRealRestriction<R = Handle> {
-    /// Explicit coverage.
-    pub coverage: u32,
-    /// Original solve problem.
-    pub problem: R,
-    /// Explicit set.
-    pub set: R,
-    /// Explicit ordered coefficient, declaration, region and condition transport.
-    pub transport: RealRestrictionTransport<R>,
-    /// Ordered retained entries.
-    pub retained: Vec<R>,
-    /// Ordered rejected entries.
-    pub rejected: Vec<R>,
-    /// Ordered classification entries.
-    pub classification: Vec<u32>,
-    /// Explicit cover.
-    pub cover: u32,
-}
-
 /// Typed `PermutationOrbitCoverage` certificate payload; its fields are untrusted until replay.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CertificatePermutationOrbitCoverage<R = Handle> {
@@ -1307,6 +1244,24 @@ pub enum SolveDraft<R = Reference> {
     SolveProblem(SolveProblemData<R>),
     /// Typed `LocalBranch` payload.
     LocalBranch(LocalBranchData<R>),
+    /// Exact `ParameterBase` payload.
+    ParameterBase(ParameterBaseData<R>),
+    /// Exact `SpaceFamily` payload.
+    SpaceFamily(SpaceFamilyData<R>),
+    /// Exact `FamilyExpression` payload.
+    FamilyExpression(FamilyExpressionData<R>),
+    /// Exact `FibrePiece` payload.
+    FibrePiece(FibrePieceData<R>),
+    /// Exact `RealCell` payload.
+    RealCell(RealCellData<R>),
+    /// Exact `CoefficientEvaluation` payload.
+    CoefficientEvaluation(CoefficientEvaluationData<R>),
+    /// Exact `ScalarSpace` payload.
+    ScalarSpace(ScalarSpaceData),
+    /// Exact `SpacePlacement` payload.
+    SpacePlacement(SpacePlacementData<R>),
+    /// Exact `ScalarPiece` payload.
+    ScalarPiece(ScalarPieceData<R>),
 }
 
 /// Closed typed `SolveStatement` vocabulary; construction grants no proof authority.
@@ -1352,6 +1307,14 @@ pub enum SolveStatement<R = Handle> {
     Isolation(StatementIsolation<R>),
     /// Typed `Presentation` payload.
     Presentation(StatementPresentation<R>),
+    /// Exact `CoefficientEvaluation` payload.
+    CoefficientEvaluation(StatementCoefficientEvaluation<R>),
+    /// Exact `RealSign` payload.
+    RealSign(StatementRealSign<R>),
+    /// Exact `RealRootCount` payload.
+    RealRootCount(StatementRealRootCount<R>),
+    /// Exact `RealCellExists` payload.
+    RealCellExists(StatementRealCellExists<R>),
 }
 
 /// Closed typed `SolveCertificate` vocabulary; construction grants no proof authority.
@@ -1383,8 +1346,6 @@ pub enum SolveCertificate<R = Handle> {
     MultiplicityTransfer(CertificateMultiplicityTransfer<R>),
     /// Typed `ConjugationTransport` payload.
     ConjugationTransport(CertificateConjugationTransport<R>),
-    /// Typed `RealRestriction` payload.
-    RealRestriction(CertificateRealRestriction<R>),
     /// Typed `PermutationOrbitCoverage` payload.
     PermutationOrbitCoverage(CertificatePermutationOrbitCoverage<R>),
     /// Typed `RealIsolationAndOrder` payload.
@@ -1393,6 +1354,14 @@ pub enum SolveCertificate<R = Handle> {
     ParameterImageCoverage(CertificateParameterImageCoverage<R>),
     /// Typed `ImplicitFunctionBranch` payload.
     ImplicitFunctionBranch(CertificateImplicitFunctionBranch<R>),
+    /// Exact `CoefficientEvaluation` payload.
+    CoefficientEvaluation(CertificateCoefficientEvaluation<R>),
+    /// Exact `RealSign` payload.
+    RealSign(CertificateRealSign<R>),
+    /// Exact `RealRootCount` payload.
+    RealRootCount(CertificateRealRootCount<R>),
+    /// Exact `RealCellExists` payload.
+    RealCellExists(CertificateRealCellExists<R>),
 }
 
 /// A borrowed graph-owned solving payload; all links are checked handles.
@@ -1428,6 +1397,24 @@ pub enum SolveView<'a> {
     SolveProblem(&'a SolveProblemData<Handle>),
     /// Borrowed `LocalBranch` payload.
     LocalBranch(&'a LocalBranchData<Handle>),
+    /// Exact `ParameterBase` payload.
+    ParameterBase(&'a ParameterBaseData<Handle>),
+    /// Exact `SpaceFamily` payload.
+    SpaceFamily(&'a SpaceFamilyData<Handle>),
+    /// Exact `FamilyExpression` payload.
+    FamilyExpression(&'a FamilyExpressionData<Handle>),
+    /// Exact `FibrePiece` payload.
+    FibrePiece(&'a FibrePieceData<Handle>),
+    /// Exact `RealCell` payload.
+    RealCell(&'a RealCellData<Handle>),
+    /// Exact `CoefficientEvaluation` payload.
+    CoefficientEvaluation(&'a CoefficientEvaluationData<Handle>),
+    /// Exact `ScalarSpace` payload.
+    ScalarSpace(&'a ScalarSpaceData),
+    /// Exact `SpacePlacement` payload.
+    SpacePlacement(&'a SpacePlacementData<Handle>),
+    /// Exact `ScalarPiece` payload.
+    ScalarPiece(&'a ScalarPieceData<Handle>),
 }
 
 /// A graph-owned problem and exact requested strength and presentation.

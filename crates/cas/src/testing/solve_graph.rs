@@ -79,6 +79,7 @@ impl Fixture {
         let coefficients = admit(
             &mut cas,
             &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+                scalar_spaces: Vec::new(),
                 header: Reference::Existing(header.clone()),
                 coordinates: Vec::new(),
             })),
@@ -86,6 +87,7 @@ impl Fixture {
         let unknowns = admit(
             &mut cas,
             &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+                scalar_spaces: Vec::new(),
                 header: Reference::Existing(header.clone()),
                 coordinates: vec![Coordinate {
                     key: "x".into(),
@@ -239,6 +241,7 @@ pub(crate) fn coefficient_witness() -> TestResult<(Cas, crate::test_api::proof::
     let coordinates = admit(
         &mut cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(header.clone()),
             coordinates: Vec::new(),
         })),
@@ -260,6 +263,7 @@ pub(crate) fn family_draft(fixture: &mut Fixture, escaped: bool) -> TestResult<D
     let family = admit(
         &mut fixture.cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(fixture.header.clone()),
             coordinates: vec![Coordinate {
                 key: "x".into(),
@@ -439,6 +443,7 @@ pub(crate) fn root_witness() -> TestResult<(Cas, crate::test_api::proof::Verifie
     let coordinates = admit(
         &mut cas,
         &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+            scalar_spaces: Vec::new(),
             header: Reference::Existing(header.clone()),
             coordinates: Vec::new(),
         })),
@@ -579,6 +584,7 @@ fn joint_selection(
     admit(
         cas,
         &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+            cell: None,
             header: Reference::Existing(header.clone()),
             scope: Vec::new(),
             relations: vec![Reference::Existing(relation)],

@@ -42,7 +42,7 @@ fn integrated_full_ladder_retains_symbolic_work_refusal() -> ResultOf {
     assert_eq!(fault.location.operation, "draft validation");
     assert_eq!(
         format!("{:?}", fault.kind),
-        "Exhausted { reason: Limit, budget: Work, limit: 2000000, needed: 2003865 }"
+        "Exhausted { reason: Limit, budget: Work, limit: 2000000, needed: 2000857 }"
     );
     assert_eq!(heap.provenance_usage().records(), 0);
     Ok(())

@@ -83,6 +83,7 @@ fn header(
 ) -> Result<Handle, Fault> {
     let parent = optional(reader, records)?;
     let environment = reader.environment()?;
+    let scalar_spaces = objects(reader, records, BudgetKind::Edges)?;
     let count = reader.count(BudgetKind::Vertices, 8, 96)?;
     let mut spaces = Vec::new();
     spaces
@@ -112,7 +113,16 @@ fn header(
         }
         HeaderDraft::Core(environment)
     };
-    admit(cas, Draft::Header(draft), reader)
+    let handle = admit(cas, Draft::Header(draft), reader)?;
+    let actual = &cas.state.header(cas.checked(&handle)?)?.scalar_spaces;
+    if !actual
+        .iter()
+        .copied()
+        .eq(scalar_spaces.iter().map(Handle::logical_id))
+    {
+        return Err(invalid());
+    }
+    Ok(handle)
 }
 
 /// Replay syntax records while keeping their actual header and typed links.
@@ -126,32 +136,9 @@ fn syntax(
     let header = reference(reader, records)?;
     let scope = reader.scope()?;
     let draft = match tag {
-        1 => Draft::Region(RegionDraft {
-            header,
-            scope,
-            ambient: ambient(reader, records)?,
-            expression: region(reader, records)?,
-        }),
+        1 => return region_object(cas, header, scope, reader, records),
         3 => return expression(cas, header, &scope, space, reader, records),
-        4 => {
-            let region = reference(reader, records)?;
-            let value = reference(reader, records)?;
-            let sort = reader.sort()?;
-            let handle = admit(
-                cas,
-                Draft::CaseArm(CaseArmDraft {
-                    header,
-                    scope,
-                    region,
-                    value,
-                }),
-                reader,
-            )?;
-            if cas.state.arm(cas.checked(&handle)?)?.sort != sort {
-                return Err(invalid());
-            }
-            return Ok(handle);
-        }
+        4 => return arm_object(cas, header, scope, reader, records),
         5 => Draft::Boundary(BoundaryDraft {
             header,
             scope,
@@ -291,7 +278,7 @@ pub(crate) fn decode(
             )?
         }
         8 => context(cas, reader, records)?,
-        13..=27 => {
+        13..=36 => {
             if layer != Layer::Logic || space.is_some() {
                 return Err(invalid());
             }
@@ -370,6 +357,7 @@ fn expression(
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<Handle, Fault> {
+    let claimed_ambient = optional(reader, records)?;
     let sort = reader.sort()?;
     let operator = reader.operator()?;
     let binding = reader.binding()?;
@@ -416,8 +404,81 @@ fn expression(
     };
     let value = admit(cas, draft, reader)?;
     let actual = cas.state.expression(cas.checked(&value)?)?;
+    if actual.ambient != claimed_ambient.as_ref().map(Handle::logical_id) {
+        return Err(crate::error::Fault::invalid(
+            crate::error::InvalidCode::AmbientSpaceMismatch,
+            AT,
+        ));
+    }
     if actual.sort != sort || actual.scope != *scope {
         return Err(invalid());
     }
     Ok(value)
+}
+
+/// Family projection is an explicit suffix on the sole current region record.
+fn region_object(
+    cas: &mut Cas,
+    header: Reference,
+    scope: crate::model::Scope,
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<Handle, Fault> {
+    let region = RegionDraft {
+        header,
+        scope,
+        ambient: ambient(reader, records)?,
+        expression: region(reader, records)?,
+    };
+    let draft = match reader.byte()? {
+        0 => Draft::Region(region),
+        1 => Draft::FamilyRegion {
+            region,
+            lies_over: crate::solving::LiesOver {
+                family: reference(reader, records)?,
+                stratum: reference(reader, records)?,
+            },
+        },
+        _ => return Err(invalid()),
+    };
+    admit(cas, draft, reader)
+}
+
+/// Each placement association remains paired with its original operand on replay.
+fn arm_object(
+    cas: &mut Cas,
+    header: Reference,
+    scope: crate::model::Scope,
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<Handle, Fault> {
+    let region = reference(reader, records)?;
+    let value = reference(reader, records)?;
+    let sort = reader.sort()?;
+    let count = reader.count(BudgetKind::Edges, 8, 128)?;
+    let mut placements = Vec::new();
+    placements
+        .try_reserve_exact(count)
+        .map_err(|_| Fault::allocation(AT))?;
+    for _ in 0..count {
+        placements.push(crate::solving::PlacementUse {
+            operand: reference(reader, records)?,
+            piece: reference(reader, records)?,
+        });
+    }
+    let handle = admit(
+        cas,
+        Draft::CaseArm(CaseArmDraft {
+            placements,
+            header,
+            scope,
+            region,
+            value,
+        }),
+        reader,
+    )?;
+    if cas.state.arm(cas.checked(&handle)?)?.sort != sort {
+        return Err(invalid());
+    }
+    Ok(handle)
 }

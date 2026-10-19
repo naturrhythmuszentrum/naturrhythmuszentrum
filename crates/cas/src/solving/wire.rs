@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Shared bounded payload encodings; all reference identities are supplied by the caller.
+use super::sorts::{
+    CertificateCoefficientEvaluation, CertificateRealCellExists, CertificateRealRootCount,
+    CertificateRealSign, CoefficientEvaluationData, FamilyExpressionData, FibrePieceData,
+    ParameterBaseData, RealCellData, ScalarPieceData, ScalarSpaceData, SpaceFamilyData,
+    SpacePlacementData, StatementCoefficientEvaluation, StatementRealCellExists,
+    StatementRealRootCount, StatementRealSign,
+};
 
 use super::model::{
     AdjunctionMode, BinomialMode, CertificateBinomialCoverage, CertificateCoefficientIdentity,
@@ -7,24 +14,23 @@ use super::model::{
     CertificateExtensionUnit, CertificateImplicitFunctionBranch, CertificateMembership,
     CertificateMultiplicityTransfer, CertificateParameterImageCoverage,
     CertificatePermutationOrbitCoverage, CertificateProductCompleteness,
-    CertificateRealIsolationAndOrder, CertificateRealRestriction, CertificateRootAdjunction,
+    CertificateRealIsolationAndOrder, CertificateRootAdjunction,
     CertificateRootSelectionRefinement, CertificateSolutionTransport,
     CertificateTotalPredicateSplit, CoefficientDomainData, CoefficientMapData,
     CoefficientValueData, CoefficientValueObject, ComponentSplitData, Coordinate, CoordinateRole,
     CoordinateSpaceData, ExclusionPolicy, ExtensionLevelData, FamilyMapData, GeneratorPair,
     IdentityMode, IsolationInterval, LocalBranchData, LocalMode, MapMode, MapTarget,
     MultiplicityMode, Neighborhood, PolynomialData, PolynomialTerm, PredicateSplitMode, PrimePower,
-    RationalInterval, RealRestrictionTransport, RefinementMode, RefinementTargetKind,
-    RegularityKind, RelationMultiple, RestrictionCondition, RestrictionConditionKind,
-    RestrictionPair, RootFactor, RootRelationData, RootSelectionData, RowOperation,
-    ScopedCoefficientRelation, SelectionMode, SolutionBranchData, SolutionBranchKind,
-    SolutionSetData, SolveCertificate, SolveDraft, SolveForm, SolveGoal, SolveProblemData,
-    SolveStatement, SolveSubstitution, SquareFreeRequest, StatementCoefficientEquality,
-    StatementComponentCover, StatementCoverage, StatementEquivalent, StatementFamilyCoverage,
-    StatementFamilyMembership, StatementIsolation, StatementLinearSystem, StatementLocalBranch,
-    StatementLocalDerivative, StatementMember, StatementMultiplicity, StatementOrbit,
-    StatementPresentation, StatementRank, StatementRealValues, StatementRootExistence,
-    StatementRootOrder, StatementSelectionUnique, StatementUnit, TupleData,
+    RationalInterval, RefinementMode, RefinementTargetKind, RegularityKind, RelationMultiple,
+    RootFactor, RootRelationData, RootSelectionData, RowOperation, ScopedCoefficientRelation,
+    SelectionMode, SolutionBranchData, SolutionBranchKind, SolutionSetData, SolveCertificate,
+    SolveDraft, SolveForm, SolveGoal, SolveProblemData, SolveStatement, SolveSubstitution,
+    SquareFreeRequest, StatementCoefficientEquality, StatementComponentCover, StatementCoverage,
+    StatementEquivalent, StatementFamilyCoverage, StatementFamilyMembership, StatementIsolation,
+    StatementLinearSystem, StatementLocalBranch, StatementLocalDerivative, StatementMember,
+    StatementMultiplicity, StatementOrbit, StatementPresentation, StatementRank,
+    StatementRealValues, StatementRootExistence, StatementRootOrder, StatementSelectionUnique,
+    StatementUnit, TupleData,
 };
 use crate::encoding::{self, Encoder};
 use crate::error::Fault;
@@ -91,6 +97,7 @@ impl SolveForm {
             Self::Radicals => 2,
             Self::ExactFamily => 3,
             Self::LocalBranch => 4,
+            Self::RealExact => 5,
         }
     }
 }
@@ -237,6 +244,13 @@ impl<R> CoordinateSpaceData<R> {
         write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
     ) -> Result<(), Fault> {
         write(&self.header, out)?;
+        out.count(self.scalar_spaces.len())?;
+        for space in &self.scalar_spaces {
+            out.byte(u8::from(space.is_some()))?;
+            if let Some(space) = space {
+                write(space, out)?;
+            }
+        }
         out.count(self.coordinates.len())?;
         for item0 in &self.coordinates {
             item0.encode(out, write)?;
@@ -408,6 +422,10 @@ impl<R> RootSelectionData<R> {
         out.byte(u8::from(self.interval.is_some()))?;
         if let Some(item0) = &self.interval {
             item0.encode(out, write)?;
+        }
+        out.byte(u8::from(self.cell.is_some()))?;
+        if let Some(cell) = &self.cell {
+            write(cell, out)?;
         }
         Ok(())
     }
@@ -1271,93 +1289,6 @@ impl<R> CertificateConjugationTransport<R> {
     }
 }
 
-impl<R> RestrictionPair<R> {
-    /// Ordered endpoint encoding never substitutes display names for graph identity.
-    fn encode(
-        &self,
-        out: &mut Encoder<'_>,
-        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
-    ) -> Result<(), Fault> {
-        write(&self.real, out)?;
-        write(&self.complex, out)
-    }
-}
-
-impl<R> RestrictionCondition<R> {
-    /// Encode the exact source-condition address and its transported obligation.
-    fn encode(
-        &self,
-        out: &mut Encoder<'_>,
-        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
-    ) -> Result<(), Fault> {
-        crate::wire::index(self.premise, out)?;
-        out.byte(match self.kind {
-            RestrictionConditionKind::Hypothesis => 0,
-            RestrictionConditionKind::Requirement => 1,
-            RestrictionConditionKind::Residual => 2,
-        })?;
-        crate::wire::index(self.index, out)?;
-        self.contexts.encode(out, write)?;
-        self.regions.encode(out, write)?;
-        self.predicates.encode(out, write)?;
-        out.byte(u8::from(self.discharge.is_some()))?;
-        if let Some(slot) = self.discharge {
-            crate::wire::index(slot, out)?;
-        }
-        Ok(())
-    }
-}
-
-impl<R> RealRestrictionTransport<R> {
-    /// The mandatory transport follows the problem and set in subtype thirteen.
-    fn encode(
-        &self,
-        out: &mut Encoder<'_>,
-        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
-    ) -> Result<(), Fault> {
-        write(&self.coefficient_map, out)?;
-        for pairs in [&self.coefficients, &self.unknowns, &self.regions] {
-            out.count(pairs.len())?;
-            for pair in pairs {
-                pair.encode(out, write)?;
-            }
-        }
-        out.count(self.conditions.len())?;
-        for condition in &self.conditions {
-            condition.encode(out, write)?;
-        }
-        crate::wire::index(self.real_cover, out)
-    }
-}
-
-impl<R> CertificateRealRestriction<R> {
-    /// Encode every payload field in its specified semantic order.
-    pub(crate) fn encode(
-        &self,
-        out: &mut Encoder<'_>,
-        write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
-    ) -> Result<(), Fault> {
-        crate::wire::index(self.coverage, out)?;
-        write(&self.problem, out)?;
-        write(&self.set, out)?;
-        self.transport.encode(out, write)?;
-        out.count(self.retained.len())?;
-        for item0 in &self.retained {
-            write(item0, out)?;
-        }
-        out.count(self.rejected.len())?;
-        for item0 in &self.rejected {
-            write(item0, out)?;
-        }
-        out.count(self.classification.len())?;
-        for item0 in &self.classification {
-            crate::wire::index(*item0, out)?;
-        }
-        crate::wire::index(self.cover, out)?;
-        Ok(())
-    }
-}
-
 impl<R> CertificatePermutationOrbitCoverage<R> {
     /// Encode every payload field in its specified semantic order.
     pub(crate) fn encode(
@@ -1708,6 +1639,15 @@ impl<R> SolveDraft<R> {
             Self::SolutionBranch(value) => value.encode(out, write),
             Self::SolveProblem(value) => value.encode(out, write),
             Self::LocalBranch(value) => value.encode(out, write),
+            Self::ParameterBase(value) => value.encode(out, write),
+            Self::SpaceFamily(value) => value.encode(out, write),
+            Self::FamilyExpression(value) => value.encode(out, write),
+            Self::FibrePiece(value) => value.encode(out, write),
+            Self::RealCell(value) => value.encode(out, write),
+            Self::CoefficientEvaluation(value) => value.encode(out, write),
+            Self::ScalarSpace(value) => value.encode(out, write),
+            Self::SpacePlacement(value) => value.encode(out, write),
+            Self::ScalarPiece(value) => value.encode(out, write),
         }
     }
 
@@ -1729,6 +1669,15 @@ impl<R> SolveDraft<R> {
             Self::SolutionBranch(_) => 12,
             Self::SolveProblem(_) => 13,
             Self::LocalBranch(_) => 14,
+            Self::ParameterBase(_) => 15,
+            Self::SpaceFamily(_) => 16,
+            Self::FamilyExpression(_) => 17,
+            Self::FibrePiece(_) => 18,
+            Self::RealCell(_) => 19,
+            Self::CoefficientEvaluation(_) => 20,
+            Self::ScalarSpace(_) => 21,
+            Self::SpacePlacement(_) => 22,
+            Self::ScalarPiece(_) => 23,
         }
     }
 }
@@ -1762,6 +1711,10 @@ impl<R> SolveStatement<R> {
             Self::RealValues(value) => value.encode(out, write),
             Self::Isolation(value) => value.encode(out, write),
             Self::Presentation(value) => value.encode(out, write),
+            Self::CoefficientEvaluation(value) => value.encode(out, write),
+            Self::RealSign(value) => value.encode(out, write),
+            Self::RealRootCount(value) => value.encode(out, write),
+            Self::RealCellExists(value) => value.encode(out, write),
         }
     }
 
@@ -1788,6 +1741,10 @@ impl<R> SolveStatement<R> {
             Self::RealValues(_) => 17,
             Self::Isolation(_) => 18,
             Self::Presentation(_) => 19,
+            Self::CoefficientEvaluation(_) => 20,
+            Self::RealSign(_) => 21,
+            Self::RealRootCount(_) => 22,
+            Self::RealCellExists(_) => 23,
         }
     }
 }
@@ -1815,11 +1772,14 @@ impl<R> SolveCertificate<R> {
             Self::ProductCompleteness(value) => value.encode(out, write),
             Self::MultiplicityTransfer(value) => value.encode(out, write),
             Self::ConjugationTransport(value) => value.encode(out, write),
-            Self::RealRestriction(value) => value.encode(out, write),
             Self::PermutationOrbitCoverage(value) => value.encode(out, write),
             Self::RealIsolationAndOrder(value) => value.encode(out, write),
             Self::ParameterImageCoverage(value) => value.encode(out, write),
             Self::ImplicitFunctionBranch(value) => value.encode(out, write),
+            Self::CoefficientEvaluation(value) => value.encode(out, write),
+            Self::RealSign(value) => value.encode(out, write),
+            Self::RealRootCount(value) => value.encode(out, write),
+            Self::RealCellExists(value) => value.encode(out, write),
         }
     }
 
@@ -1839,11 +1799,14 @@ impl<R> SolveCertificate<R> {
             Self::ProductCompleteness(_) => 10,
             Self::MultiplicityTransfer(_) => 11,
             Self::ConjugationTransport(_) => 12,
-            Self::RealRestriction(_) => 13,
             Self::PermutationOrbitCoverage(_) => 14,
             Self::RealIsolationAndOrder(_) => 15,
             Self::ParameterImageCoverage(_) => 16,
             Self::ImplicitFunctionBranch(_) => 17,
+            Self::CoefficientEvaluation(_) => 18,
+            Self::RealSign(_) => 19,
+            Self::RealRootCount(_) => 20,
+            Self::RealCellExists(_) => 21,
         }
     }
 }
@@ -1929,6 +1892,7 @@ impl SolveForm {
             2 => Self::Radicals,
             3 => Self::ExactFamily,
             4 => Self::LocalBranch,
+            5 => Self::RealExact,
             _ => return Err(invalid()),
         })
     }
@@ -2067,6 +2031,14 @@ impl CoordinateSpaceData<Handle> {
     fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
         Ok(Self {
             header: crate::wire_decode::object(reader, records)?,
+            scalar_spaces: decode_vector(
+                reader,
+                records,
+                BudgetKind::Edges,
+                1,
+                64,
+                crate::wire_decode::optional,
+            )?,
             coordinates: decode_vector(
                 reader,
                 records,
@@ -2230,6 +2202,7 @@ impl RootSelectionData<Handle> {
             } else {
                 None
             },
+            cell: crate::wire_decode::optional(reader, records)?,
         })
     }
 }
@@ -3140,119 +3113,6 @@ impl CertificateConjugationTransport<Handle> {
     }
 }
 
-impl RestrictionPair<Handle> {
-    /// Both endpoints must be earlier admitted graph records.
-    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
-        Ok(Self {
-            real: crate::wire_decode::object(reader, records)?,
-            complex: crate::wire_decode::object(reader, records)?,
-        })
-    }
-}
-
-impl RestrictionCondition<Handle> {
-    /// Reject unknown source kinds and malformed optional proof slots.
-    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
-        Ok(Self {
-            premise: reader.index()?,
-            kind: match reader.byte()? {
-                0 => RestrictionConditionKind::Hypothesis,
-                1 => RestrictionConditionKind::Requirement,
-                2 => RestrictionConditionKind::Residual,
-                _ => return Err(invalid()),
-            },
-            index: reader.index()?,
-            contexts: RestrictionPair::decode(reader, records)?,
-            regions: RestrictionPair::decode(reader, records)?,
-            predicates: RestrictionPair::decode(reader, records)?,
-            discharge: if reader.boolean()? {
-                Some(reader.index()?)
-            } else {
-                None
-            },
-        })
-    }
-}
-
-impl RealRestrictionTransport<Handle> {
-    /// All count and byte bounds precede allocation of transport vectors.
-    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
-        Ok(Self {
-            coefficient_map: crate::wire_decode::object(reader, records)?,
-            coefficients: decode_vector(
-                reader,
-                records,
-                BudgetKind::PolynomialVariables,
-                8,
-                128,
-                RestrictionPair::decode,
-            )?,
-            unknowns: decode_vector(
-                reader,
-                records,
-                BudgetKind::PolynomialVariables,
-                8,
-                128,
-                RestrictionPair::decode,
-            )?,
-            regions: decode_vector(
-                reader,
-                records,
-                BudgetKind::CaseArms,
-                8,
-                128,
-                RestrictionPair::decode,
-            )?,
-            conditions: decode_vector(
-                reader,
-                records,
-                BudgetKind::ConditionAtoms,
-                34,
-                448,
-                RestrictionCondition::decode,
-            )?,
-            real_cover: reader.index()?,
-        })
-    }
-}
-
-impl CertificateRealRestriction<Handle> {
-    /// Decode exactly the specified ordered payload with bounded child vectors.
-    fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
-        Ok(Self {
-            coverage: reader.index()?,
-            problem: crate::wire_decode::object(reader, records)?,
-            set: crate::wire_decode::object(reader, records)?,
-            transport: RealRestrictionTransport::decode(reader, records)?,
-            retained: decode_vector(
-                reader,
-                records,
-                BudgetKind::CaseArms,
-                4,
-                64,
-                crate::wire_decode::object,
-            )?,
-            rejected: decode_vector(
-                reader,
-                records,
-                BudgetKind::CaseArms,
-                4,
-                64,
-                crate::wire_decode::object,
-            )?,
-            classification: decode_vector(
-                reader,
-                records,
-                BudgetKind::ProofNodes,
-                4,
-                4,
-                |reader, _records| reader.index(),
-            )?,
-            cover: reader.index()?,
-        })
-    }
-}
-
 impl CertificatePermutationOrbitCoverage<Handle> {
     /// Decode exactly the specified ordered payload with bounded child vectors.
     fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
@@ -3628,6 +3488,15 @@ impl SolveDraft<Handle> {
             25 => Self::SolutionBranch(SolutionBranchData::decode(reader, records)?),
             26 => Self::SolveProblem(SolveProblemData::decode(reader, records)?),
             27 => Self::LocalBranch(LocalBranchData::decode(reader, records)?),
+            28 => Self::ParameterBase(ParameterBaseData::decode(reader, records)?),
+            29 => Self::SpaceFamily(SpaceFamilyData::decode(reader, records)?),
+            30 => Self::FamilyExpression(FamilyExpressionData::decode(reader, records)?),
+            31 => Self::FibrePiece(FibrePieceData::decode(reader, records)?),
+            32 => Self::RealCell(RealCellData::decode(reader, records)?),
+            33 => Self::CoefficientEvaluation(CoefficientEvaluationData::decode(reader, records)?),
+            34 => Self::ScalarSpace(ScalarSpaceData::decode(reader, records)?),
+            35 => Self::SpacePlacement(SpacePlacementData::decode(reader, records)?),
+            36 => Self::ScalarPiece(ScalarPieceData::decode(reader, records)?),
             _ => return Err(invalid()),
         })
     }
@@ -3657,6 +3526,12 @@ impl SolveStatement<Handle> {
             17 => Self::RealValues(StatementRealValues::decode(reader, records)?),
             18 => Self::Isolation(StatementIsolation::decode(reader, records)?),
             19 => Self::Presentation(StatementPresentation::decode(reader, records)?),
+            20 => Self::CoefficientEvaluation(StatementCoefficientEvaluation::decode(
+                reader, records,
+            )?),
+            21 => Self::RealSign(StatementRealSign::decode(reader, records)?),
+            22 => Self::RealRootCount(StatementRealRootCount::decode(reader, records)?),
+            23 => Self::RealCellExists(StatementRealCellExists::decode(reader, records)?),
             _ => return Err(invalid()),
         })
     }
@@ -3693,7 +3568,6 @@ impl SolveCertificate<Handle> {
             12 => Self::ConjugationTransport(CertificateConjugationTransport::decode(
                 reader, records,
             )?),
-            13 => Self::RealRestriction(CertificateRealRestriction::decode(reader, records)?),
             14 => Self::PermutationOrbitCoverage(CertificatePermutationOrbitCoverage::decode(
                 reader, records,
             )?),
@@ -3706,6 +3580,12 @@ impl SolveCertificate<Handle> {
             17 => Self::ImplicitFunctionBranch(CertificateImplicitFunctionBranch::decode(
                 reader, records,
             )?),
+            18 => Self::CoefficientEvaluation(CertificateCoefficientEvaluation::decode(
+                reader, records,
+            )?),
+            19 => Self::RealSign(CertificateRealSign::decode(reader, records)?),
+            20 => Self::RealRootCount(CertificateRealRootCount::decode(reader, records)?),
+            21 => Self::RealCellExists(CertificateRealCellExists::decode(reader, records)?),
             _ => return Err(invalid()),
         };
         value.validate_modes()?;
@@ -3769,6 +3649,11 @@ pub(crate) fn decode_object(
     records: &[Decoded],
 ) -> Result<Handle, Fault> {
     let value = SolveDraft::decode(tag, reader, records)?;
+    if let SolveDraft::CoordinateSpace(frame) = &value
+        && frame.scalar_spaces.len() != frame.coordinates.len()
+    {
+        return Err(invalid());
+    }
     let value = value.resolve(&mut |handle| Ok(Reference::Existing(handle.clone())))?;
     cas.admit(&[Draft::Solve(value)], reader.budget)?
         .into_iter()
@@ -3795,6 +3680,15 @@ impl<R> SolveDraft<R> {
             Self::SolutionBranch(_) => 25,
             Self::SolveProblem(_) => 26,
             Self::LocalBranch(_) => 27,
+            Self::ParameterBase(_) => 28,
+            Self::SpaceFamily(_) => 29,
+            Self::FamilyExpression(_) => 30,
+            Self::FibrePiece(_) => 31,
+            Self::RealCell(_) => 32,
+            Self::CoefficientEvaluation(_) => 33,
+            Self::ScalarSpace(_) => 34,
+            Self::SpacePlacement(_) => 35,
+            Self::ScalarPiece(_) => 36,
         }
     }
 }

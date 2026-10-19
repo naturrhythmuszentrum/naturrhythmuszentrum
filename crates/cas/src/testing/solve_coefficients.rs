@@ -54,6 +54,7 @@ impl Fixture {
         let coordinates = admit(
             &mut cas,
             &Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
+                scalar_spaces: Vec::new(),
                 header: Reference::Existing(header.clone()),
                 coordinates: ["x", "y"]
                     .into_iter()
@@ -488,6 +489,7 @@ impl Fixture {
         admit(
             &mut self.cas,
             &Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
+                cell: None,
                 header: Reference::Existing(self.header.clone()),
                 scope: Vec::new(),
                 relations: vec![Reference::Existing(relation.clone())],

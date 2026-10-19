@@ -584,6 +584,7 @@ fn native_case_admission_boundary() -> TestResult {
     let first = admit(
         &mut fixture.cas,
         Draft::CaseArm(CaseArmDraft {
+            placements: Vec::new(),
             header: Reference::Existing(fixture.header.clone()),
             scope: Vec::new(),
             region: Reference::Existing(fixture.ambient.clone()),
@@ -594,6 +595,7 @@ fn native_case_admission_boundary() -> TestResult {
     let second = admit(
         &mut fixture.cas,
         Draft::CaseArm(CaseArmDraft {
+            placements: Vec::new(),
             header: Reference::Existing(fixture.header.clone()),
             scope: Vec::new(),
             region: Reference::Existing(fixture.ambient.clone()),
