@@ -204,3 +204,9 @@ pub(crate) mod sorts;
     reason = "public harness shares original routing fixtures"
 )]
 pub(crate) mod sort_routing;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public harness shares supplied evaluation fixtures"
+)]
+pub(crate) mod coefficient_evaluation;

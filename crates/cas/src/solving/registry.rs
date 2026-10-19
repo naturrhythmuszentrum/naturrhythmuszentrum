@@ -126,10 +126,10 @@ impl SolveSchema {
             Self::RealIsolationAndOrder => super::isolation::schema_availability(self.tag()),
             Self::ParameterImageCoverage => super::family_check::schema_availability(self.tag()),
             Self::ImplicitFunctionBranch => super::local::schema_availability(self.tag()),
-            Self::CoefficientEvaluation
-            | Self::RealSign
-            | Self::RealRootCount
-            | Self::RealCellExists => Availability::Unavailable,
+            Self::CoefficientEvaluation => Availability::Available,
+            Self::RealSign | Self::RealRootCount | Self::RealCellExists => {
+                Availability::Unavailable
+            }
         }
     }
 
@@ -226,12 +226,12 @@ pub(crate) fn check(
             super::family_check::check(cas, draft, premises, budget)
         }
         SolveSchema::ImplicitFunctionBranch => super::local::check(cas, draft, premises, budget),
-        SolveSchema::CoefficientEvaluation
-        | SolveSchema::RealSign
-        | SolveSchema::RealRootCount
-        | SolveSchema::RealCellExists => Err(crate::error::Fault::invalid(
-            crate::error::InvalidCode::UnsupportedVersion,
-            crate::error::Location::new("unavailable current solving schema"),
-        )),
+        SolveSchema::CoefficientEvaluation => super::evaluate::check(cas, draft, premises, budget),
+        SolveSchema::RealSign | SolveSchema::RealRootCount | SolveSchema::RealCellExists => {
+            Err(crate::error::Fault::invalid(
+                crate::error::InvalidCode::UnsupportedVersion,
+                crate::error::Location::new("unavailable current solving schema"),
+            ))
+        }
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact solving objects and explicit capability boundaries.
 
+mod evaluate;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "typed admission helpers stay within the crate"

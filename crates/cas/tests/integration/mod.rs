@@ -40,3 +40,5 @@ mod solve_linear;
 mod solve_local;
 
 mod sorts;
+
+mod coefficient_evaluation;
