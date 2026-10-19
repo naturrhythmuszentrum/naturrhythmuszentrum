@@ -187,23 +187,6 @@ pub(crate) fn point<P: Scalar>(value: P) -> Result<Enclosure<P>, SolveError> {
     Ok(Enclosure::singleton(Finite::new(value)?))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::SolveWork;
-    use crate::SolveError;
-
-    /// Exhaustion refuses the extra term before decrementing zero.
-    /// ´test:unit:solve-work-counter-never-wraps´
-    #[test]
-    fn solve_work_counter_never_wraps() {
-        let mut work = SolveWork::new(1);
-        assert!(work.charge().is_ok());
-        assert_eq!(work.remaining, 0);
-        assert!(matches!(work.charge(), Err(SolveError::ResourceLimit)));
-        assert_eq!(work.remaining, 0);
-    }
-}
-
 /// Normwise common-operator perturbation proof, including its interaction denominator.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FamilyCertificate<P: Scalar> {
@@ -286,4 +269,21 @@ pub(crate) fn perturbation<P: Scalar>(
         margin,
         radius,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SolveWork;
+    use crate::SolveError;
+
+    /// Exhaustion refuses the extra term before decrementing zero.
+    /// ´test:unit:solve-work-counter-never-wraps´
+    #[test]
+    fn solve_work_counter_never_wraps() {
+        let mut work = SolveWork::new(1);
+        assert!(work.charge().is_ok());
+        assert_eq!(work.remaining, 0);
+        assert!(matches!(work.charge(), Err(SolveError::ResourceLimit)));
+        assert_eq!(work.remaining, 0);
+    }
 }
