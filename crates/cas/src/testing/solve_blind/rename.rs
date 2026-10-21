@@ -8,14 +8,13 @@ pub(crate) fn complete() -> TestResult {
     for names in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
         let (mut fixture, request) = super::source::symbolic(&names)?;
         let outcome = fixture.cas.run(&request);
-        let crate::request::Outcome::Invalid { fault, .. } = outcome else {
+        let crate::request::Outcome::Unresolved { solve_reason, .. } = outcome else {
             return Err(format!("renaming boundary moved: {outcome:?}").into());
         };
         assert_eq!(
-            fault.kind,
-            crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
+            solve_reason,
+            Some(crate::solving::SolveReason::SpecializationGuardPending)
         );
-        assert_eq!(fault.location.operation, "exact coefficients");
     }
     Ok(())
 }

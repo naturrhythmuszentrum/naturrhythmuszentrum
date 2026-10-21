@@ -191,22 +191,59 @@ pub(crate) fn zero(
     value: &super::model::Element,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    if interpreter
+    interpreter
         .engine
-        .formal_zero(value, budget)
-        .map_err(|error| fault(&error))?
-    {
-        return Ok(true);
+        .zero_on(value, interpreter.region, budget)
+        .map_err(|error| fault(&error))
+}
+
+impl Engine<'_> {
+    /// Recompute a zero identity on the exact region after endpoint definedness has been checked.
+    pub(crate) fn zero_on(
+        &self,
+        value: &super::model::Element,
+        region: &Handle,
+        budget: &mut Budget,
+    ) -> Result<bool, CoefficientFailure> {
+        if self.formal_zero(value, budget)? {
+            return Ok(true);
+        }
+        match &value.value {
+            super::model::Value::Fraction(fraction) => Ok(super::regional::proves(
+                self.state,
+                self.domain,
+                &fraction.numerator,
+                region,
+                true,
+                budget,
+            )?),
+            super::model::Value::Tower(coefficients) => {
+                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let parent = Self {
+                    state: self.state,
+                    domain: &extension.parent,
+                };
+                for coefficient in coefficients {
+                    if !parent.zero_on(coefficient, region, budget)? {
+                        return Ok(false);
+                    }
+                }
+                Ok(true)
+            }
+            super::model::Value::Scalar(_) => Ok(false),
+        }
     }
-    let super::model::Value::Fraction(fraction) = &value.value else {
-        return Ok(false);
-    };
-    super::regional::proves(
-        &interpreter.cas.state,
-        &value.domain,
-        &fraction.numerator,
-        interpreter.region,
-        true,
-        budget,
-    )
+
+    /// Regional equality retains the same formal subtraction and requires defined endpoints.
+    pub(crate) fn equal_on(
+        &self,
+        left: &super::model::Element,
+        right: &super::model::Element,
+        region: &Handle,
+        budget: &mut Budget,
+    ) -> Result<bool, CoefficientFailure> {
+        super::storage::begin(budget)?;
+        let difference = self.sub(left, right, budget)?;
+        self.zero_on(&difference, region, budget)
+    }
 }

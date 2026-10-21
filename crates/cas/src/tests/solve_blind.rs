@@ -326,22 +326,20 @@ fn blind_zero_pairing_independent_oracle() -> TestResult {
     Ok(())
 }
 
-/// Both Complex declaration namings reach regional-zero inversion in `euclid::inverse`.
-/// Their exact coefficient refusal retains the original source parameters.
+/// Both Complex declaration namings retain the later linked-recovery unit obligation.
 /// ´test:crate:blind-symbolic-source-retains-parameters´
 #[test]
 fn blind_symbolic_source_retains_parameters() -> TestResult {
     for names in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
         let (mut fixture, request) = crate::testing::solve_blind::symbolic(&names)?;
         let outcome = fixture.cas.run(&request);
-        let crate::request::Outcome::Invalid { fault, .. } = outcome else {
+        let crate::request::Outcome::Unresolved { solve_reason, .. } = outcome else {
             return Err(format!("symbolic source boundary moved: {outcome:?}").into());
         };
         assert_eq!(
-            fault.kind,
-            crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
+            solve_reason,
+            Some(crate::solving::SolveReason::SpecializationGuardPending)
         );
-        assert_eq!(fault.location.operation, "exact coefficients");
     }
     Ok(())
 }
@@ -436,7 +434,7 @@ fn blind_incremental_proof_replay() -> TestResult {
 }
 
 /// Independent boundary inventories retain declaration fields, initial maps and original forms.
-/// Each Complex refusal names regional-zero inversion in `euclid::inverse`; the Real refusal is earlier.
+/// Each Complex refusal records the later linked-recovery guard; the Real refusal is unchanged.
 /// ´test:crate:blind-symbolic-acceptance-audit´
 #[test]
 fn blind_symbolic_acceptance_audit() -> TestResult {
@@ -444,7 +442,7 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     let record = crate::testing::solve_blind::symbolic_audit(revision)?;
     assert!(record.starts_with(&format!("source_revision={revision}\n")));
     assert!(record.contains("policy=logical-v10"));
-    assert!(record.contains("refusal=Fault"));
+    assert!(record.contains("refusal=SpecializationGuardPending"));
     assert!(record.contains("interning_comparisons="));
     assert!(record.contains("phases="));
     assert_eq!(record.matches("declaration_field=Complex\n").count(), 7);
@@ -452,7 +450,7 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     assert_eq!(record.matches("original_form=Radicals\n").count(), 8);
     assert_eq!(
         record
-            .matches("diagnosed_first_operation=towers::euclid::inverse")
+            .matches("diagnosed_first_operation=radicals::roots::inverse")
             .count(),
         7
     );
@@ -481,8 +479,7 @@ fn blind_repeated_factor_mutations() -> TestResult {
     crate::testing::solve_blind::false_factors(&[2, -3, 0, 1])
 }
 
-/// Regional-zero inversion in `euclid::inverse` prevents a complete Complex cover to mutate.
-/// The current baseline retains its exact coefficient refusal.
+/// Linked recovery retains a nonvanishing obligation before complete stratum mutation.
 /// ´test:crate:blind-missing-stratum-mutations´
 #[test]
 fn blind_missing_stratum_mutations() -> TestResult {
@@ -503,8 +500,7 @@ fn blind_recovered_choice_transport() -> TestResult {
     crate::testing::solve_blind::transported_choices(false, 1)
 }
 
-/// Both Complex namings reach regional-zero inversion in `euclid::inverse`.
-/// The exact refusal remains in place before root and stratum transport.
+/// Both Complex namings preserve the same explicit linked-recovery unit obligation.
 /// ´test:crate:blind-complete-coefficient-renaming´
 #[test]
 fn blind_complete_coefficient_renaming() -> TestResult {
@@ -677,14 +673,13 @@ fn complex_parameter(
     )?)))
 }
 
-/// Long division of 1 by a on a=0 reaches the first symbolic Complex fault directly.
-/// A formal nonzero is a regional zero; `euclid::inverse` turns `UnitDecision::Zero` into this fault.
+/// A regionally zero divisor is refused distinctly, and the gcd terminates on its zero branch.
 /// ´test:crate:blind-complex-regional-zero-divisor´
 #[test]
 fn blind_complex_regional_zero_divisor() -> TestResult {
     use crate::solving::coefficients::{
         arithmetic::Engine,
-        model::{CoefficientFailure, EvaluationScope, UnitDecision, ZeroDecision},
+        model::{EvaluationScope, UnitDecision, ZeroDecision},
     };
     use crate::solving::towers::{dense::Dense, euclid};
     let (cas, domain, context, region) = complex_zero_scope()?;
@@ -712,18 +707,136 @@ fn blind_complex_regional_zero_divisor() -> TestResult {
     let divisor = Dense::new(&engine, vec![parameter], &mut budget)?;
     assert_eq!(divisor.coefficients.len(), 1);
     let dividend = Dense::one(&engine, &mut budget)?;
-    let Err(CoefficientFailure::Fault(fault)) =
-        euclid::divide(&dividend, &divisor, &cas.state, &scope, &mut budget)
-    else {
-        return Err("regional zero divisor boundary moved".into());
+    assert!(matches!(
+        euclid::divide(&dividend, &divisor, &cas.state, &scope, &mut budget)?,
+        Err(euclid::Pending::ZeroDivisor)
+    ));
+    let result = euclid::gcd(&dividend, &divisor, &cas.state, &scope, &mut budget)?
+        .map_err(|pending| format!("regional gcd: {pending:?}"))?;
+    assert!(result.gcd.equals(&dividend, &cas.state, &mut budget)?);
+    Ok(())
+}
+
+/// A leading zero lowers the divisor degree without erasing the original coefficient polynomial.
+/// ´test:crate:blind-complex-regional-degree-drop´
+#[test]
+fn blind_complex_regional_degree_drop() -> TestResult {
+    use crate::solving::coefficients::{arithmetic::Engine, model::EvaluationScope};
+    use crate::solving::towers::{dense::Dense, euclid};
+    let (cas, domain, context, region) = complex_zero_scope()?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = Engine {
+        state: &cas.state,
+        domain: &domain,
     };
-    assert_eq!(
-        fault.kind,
-        crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
-    );
-    assert_eq!(
-        fault.location,
-        crate::error::Location::new("exact coefficients")
+    let scope = EvaluationScope {
+        context: &context,
+        region: &region,
+        premises: &[],
+        localization: &[],
+    };
+    let dividend = Dense::new(
+        &engine,
+        vec![
+            engine.constant(true, &mut budget)?,
+            engine.constant(true, &mut budget)?,
+        ],
+        &mut budget,
+    )?;
+    let divisor = Dense::new(
+        &engine,
+        vec![
+            engine.constant(true, &mut budget)?,
+            complex_parameter(&engine, &mut budget)?,
+        ],
+        &mut budget,
+    )?;
+    let (quotient, remainder) =
+        euclid::divide(&dividend, &divisor, &cas.state, &scope, &mut budget)?
+            .map_err(|pending| format!("regional division: {pending:?}"))?;
+    assert!(quotient.equals(&dividend, &cas.state, &mut budget)?);
+    assert_eq!(remainder.coefficients.len(), 0);
+    assert_eq!(divisor.coefficients.len(), 2);
+    Ok(())
+}
+
+/// Independently supplied regional Bezout data admits its exact zero-cell unit.
+/// ´test:crate:blind-regional-unit-identity´
+#[test]
+fn blind_regional_unit_identity() -> TestResult {
+    let (mut fixture, step) = crate::testing::solve_blind::regional_unit(true)?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[step],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert!(witness.is_discharged());
+    Ok(())
+}
+
+/// ´test:crate:blind-complex-regional-cancellation´
+#[test]
+fn blind_complex_regional_cancellation() -> TestResult {
+    use crate::proof::Statement;
+    use crate::solving::{
+        SolveStatement,
+        coefficients::{arithmetic::Engine, model::EvaluationScope},
+        towers::{dense::Dense, euclid},
+    };
+    let (fixture, step) = crate::testing::solve_blind::regional_unit(true)?;
+    let Statement::Solve(statement) = step.conclusion else {
+        return Err("unit statement".into());
+    };
+    let SolveStatement::Unit(unit) = *statement else {
+        return Err("unit payload".into());
+    };
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = Engine {
+        state: &fixture.cas.state,
+        domain: &unit.domain,
+    };
+    let scope = EvaluationScope {
+        context: &fixture.context,
+        region: &fixture.region,
+        premises: &[],
+        localization: &[],
+    };
+    let dividend = Dense::new(
+        &engine,
+        vec![
+            engine.constant(false, &mut budget)?,
+            engine.constant(true, &mut budget)?,
+        ],
+        &mut budget,
+    )?;
+    let element = engine.read(&unit.value, &mut budget)?;
+    assert!(matches!(
+        engine.inverse(&element, &scope, &mut budget)?,
+        crate::solving::coefficients::model::UnitDecision::Unit {
+            certificate: crate::solving::coefficients::model::CoefficientCertificate::Regional(_),
+            ..
+        }
+    ));
+    let divisor = Dense::new(
+        &engine,
+        vec![engine.constant(true, &mut budget)?, element],
+        &mut budget,
+    )?;
+    let (quotient, remainder) =
+        euclid::divide(&dividend, &divisor, &fixture.cas.state, &scope, &mut budget)?
+            .map_err(|pending| format!("regional cancellation: {pending:?}"))?;
+    let one = Dense::one(&engine, &mut budget)?;
+    assert!(quotient.equals_on(&one, &fixture.cas.state, &fixture.region, &mut budget)?);
+    assert_eq!(remainder.coefficients.len(), 1);
+    assert!(
+        remainder
+            .sum(&one, false, &fixture.cas.state, &mut budget)?
+            .equals_on(
+                &Dense::zero(&engine, &mut budget)?,
+                &fixture.cas.state,
+                &fixture.region,
+                &mut budget
+            )?
     );
     Ok(())
 }

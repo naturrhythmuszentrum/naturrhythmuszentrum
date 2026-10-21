@@ -153,3 +153,7 @@ fn request(
     };
     Ok((fixture, request))
 }
+
+#[path = "solve_blind/regional.rs"]
+mod regional;
+pub(crate) use regional::unit as regional_unit;

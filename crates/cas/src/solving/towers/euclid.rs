@@ -13,6 +13,8 @@ use crate::solving::coefficients::storage::{AT, invalid};
 /// A parent obstruction must be resolved before continuing a child Euclidean algorithm.
 #[derive(Debug)]
 pub(crate) enum Pending {
+    /// Every divisor coefficient is zero on the exact evaluation region.
+    ZeroDivisor,
     /// An earlier level needs a component split.
     Split(Box<super::SplitCertificate>),
     /// Regional nonvanishing has not been established.
@@ -41,8 +43,49 @@ fn inverse(
         UnitDecision::Unit { inverse, .. } => Ok(inverse),
         UnitDecision::Split(certificate) => Err(Pending::Split(certificate)),
         UnitDecision::Undetermined(obligation) => Err(Pending::Guard(obligation)),
-        UnitDecision::Zero(_) => return Err(invalid().into()),
+        UnitDecision::Zero(_) => Err(Pending::ZeroDivisor),
     })
+}
+
+/// Decide the effective degree before any cancellation; zero coefficients never supply a reciprocal.
+fn leading(
+    engine: &Engine<'_>,
+    polynomial: &Dense,
+    scope: &EvaluationScope<'_>,
+    budget: &mut Budget,
+) -> Result<Result<(usize, Element), Pending>, CoefficientFailure> {
+    for (index, coefficient) in polynomial.coefficients.iter().enumerate().rev() {
+        match inverse(engine, coefficient, scope, budget)? {
+            Ok(reciprocal) => return Ok(Ok((index + 1, reciprocal))),
+            Err(Pending::ZeroDivisor) => {}
+            Err(obstruction) => return Ok(Err(obstruction)),
+        }
+    }
+    Ok(Err(Pending::ZeroDivisor))
+}
+
+/// A regional inverse may cancel a leading term only on the current cell, so replay that degree fall.
+fn cancelled(
+    polynomial: &Dense,
+    before: usize,
+    engine: &Engine<'_>,
+    scope: &EvaluationScope<'_>,
+    budget: &mut Budget,
+) -> Result<Result<Dense, Pending>, CoefficientFailure> {
+    use crate::solving::coefficients::model::ZeroDecision;
+    let mut count = polynomial.coefficients.len();
+    while count >= before {
+        let coefficient = polynomial.coefficients.get(count - 1).ok_or_else(invalid)?;
+        match engine.zero_test(coefficient, scope, budget)? {
+            ZeroDecision::Zero(_) => count -= 1,
+            ZeroDecision::Split(certificate) => return Ok(Err(Pending::Split(certificate))),
+            ZeroDecision::Undetermined(obligation) => return Ok(Err(Pending::Guard(obligation))),
+            ZeroDecision::Nonzero(_) => return Err(invalid().into()),
+        }
+    }
+    Ok(Ok(polynomial
+        .shortened(count, engine.state, budget)?
+        .ok_or_else(invalid)?))
 }
 
 /// Long division charges every leading cancellation and obtains its inverse from the parent.
@@ -60,11 +103,12 @@ pub(crate) fn divide(
         state,
         domain: &dividend.domain,
     };
-    let leading = divisor.coefficients.last().ok_or_else(invalid)?;
-    let reciprocal = match inverse(&parent, leading, scope, budget)? {
+    let (count, reciprocal) = match leading(&parent, divisor, scope, budget)? {
         Ok(value) => value,
         Err(pending) => return Ok(Err(pending)),
     };
+    let shortened = divisor.shortened(count, state, budget)?;
+    let divisor = shortened.as_ref().unwrap_or(divisor);
     let mut remainder = dividend.copy(state, budget)?;
     let mut quotient = Dense::zero(&parent, budget)?;
     while !remainder.coefficients.is_empty()
@@ -89,7 +133,10 @@ pub(crate) fn divide(
             budget,
         )?;
         if remainder.coefficients.len() >= before {
-            return Err(invalid().into());
+            remainder = match cancelled(&remainder, before, &parent, scope, budget)? {
+                Ok(value) => value,
+                Err(pending) => return Ok(Err(pending)),
+            };
         }
     }
     Ok(Ok((quotient, remainder)))
@@ -120,6 +167,7 @@ pub(crate) fn gcd(
         budget.solving(BudgetKind::GcdSteps, 1, AT)?;
         let (quotient, remainder) = match divide(&left, &right, state, scope, budget)? {
             Ok(result) => result,
+            Err(Pending::ZeroDivisor) => break,
             Err(pending) => return Ok(Err(pending)),
         };
         let next_first = first_left.sum(
@@ -141,15 +189,19 @@ pub(crate) fn gcd(
         second_left = second_right;
         second_right = next_second;
     }
-    let reciprocal = match inverse(
-        &parent,
-        left.coefficients.last().ok_or_else(invalid)?,
-        scope,
-        budget,
-    )? {
+    let (count, reciprocal) = match leading(&parent, &left, scope, budget)? {
         Ok(value) => value,
+        Err(Pending::ZeroDivisor) => {
+            return Ok(Ok(Bezout {
+                gcd: Dense::zero(&parent, budget)?,
+                first: first_left,
+                second: second_left,
+            }));
+        }
         Err(pending) => return Ok(Err(pending)),
     };
+    let shortened = left.shortened(count, state, budget)?;
+    let left = shortened.as_ref().unwrap_or(&left);
     Ok(Ok(Bezout {
         gcd: left.scaled(&reciprocal, 0, state, budget)?,
         first: first_left.scaled(&reciprocal, 0, state, budget)?,

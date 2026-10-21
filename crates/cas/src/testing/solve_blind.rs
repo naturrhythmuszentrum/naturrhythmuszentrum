@@ -51,7 +51,7 @@ pub(crate) fn derivative(coefficients: &[i64]) -> crate::testing::common::TestRe
         .collect()
 }
 
-pub(crate) use source::{polynomial, symbolic};
+pub(crate) use source::{polynomial, regional_unit, symbolic};
 
 #[path = "solve_blind/trace.rs"]
 mod trace;

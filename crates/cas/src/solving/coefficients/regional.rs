@@ -156,7 +156,7 @@ fn visit(
     }
 }
 
-/// Exact zero facts remain distinct from the multiplicative nonzero closure.
+/// A checked zero guard also annihilates its exact polynomial multiples; nonzero facts stay exact.
 pub(crate) fn proves(
     state: &State,
     source: &Handle,
@@ -169,7 +169,18 @@ pub(crate) fn proves(
         state,
         source,
         region,
-        |value, is_zero, ledger| Ok(is_zero == zero && polynomial.equals(&value, ledger)?),
+        |value, is_zero, ledger| {
+            if is_zero != zero {
+                return Ok(false);
+            }
+            if polynomial.equals(&value, ledger)? {
+                return Ok(true);
+            }
+            if !zero || value.zero(ledger)? {
+                return Ok(false);
+            }
+            Ok(super::gcd::exact(polynomial, &value, ledger)?.is_some())
+        },
         budget,
     )
 }

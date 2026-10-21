@@ -202,21 +202,19 @@ fn blind_zero_polynomial_family() -> TestResult {
     Ok(())
 }
 
-/// The Complex fixture reaches regional-zero inversion in `euclid::inverse` during tower zero testing.
-/// The current exact unsupported-fragment boundary remains an executable regression.
+/// The repaired regional degree drop reaches the next explicit linked-recovery guard.
 /// ´test:integration:blind-symbolic-complex-complete´
 #[test]
 fn blind_symbolic_complex_complete() -> TestResult {
     let (mut fixture, request) = crate::testing::solve_blind::symbolic(&["d", "c", "b", "a"])?;
     let outcome = fixture.cas.run(&request);
-    let Outcome::Invalid { fault, .. } = outcome else {
+    let Outcome::Unresolved { solve_reason, .. } = outcome else {
         return Err(format!("complex symbolic boundary moved: {outcome:?}").into());
     };
     assert_eq!(
-        fault.kind,
-        nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::UnsupportedFragment)
+        solve_reason,
+        Some(nrz_cas::solving::SolveReason::SpecializationGuardPending)
     );
-    assert_eq!(fault.location.operation, "exact coefficients");
     Ok(())
 }
 

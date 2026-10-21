@@ -87,6 +87,28 @@ impl Dense {
         Self::new(&engine, coefficients, budget)
     }
 
+    /// Copy a shorter coefficient prefix only after the caller has proved its omitted entries zero.
+    pub(crate) fn shortened(
+        &self,
+        count: usize,
+        state: &State,
+        budget: &mut Budget,
+    ) -> Result<Option<Self>, CoefficientFailure> {
+        if count == self.coefficients.len() {
+            return Ok(None);
+        }
+        let prefix = self.coefficients.get(..count).ok_or_else(invalid)?;
+        let engine = Engine {
+            state,
+            domain: &self.domain,
+        };
+        let mut coefficients = vector(count, budget)?;
+        for entry in prefix {
+            coefficients.push(engine.copy(entry, budget)?);
+        }
+        Ok(Some(Self::new(&engine, coefficients, budget)?))
+    }
+
     /// Import a canonical univariate graph polynomial without relying on its display variable.
     pub(crate) fn read(
         state: &State,
@@ -218,6 +240,27 @@ impl Dense {
                 engine.mul(entry, scalar, budget)?;
         }
         Self::new(&engine, coefficients, budget)
+    }
+
+    /// Independently reconstruct regional coefficient equalities after checking endpoint denominators.
+    pub(crate) fn equals_on(
+        &self,
+        other: &Self,
+        state: &State,
+        region: &Handle,
+        budget: &mut Budget,
+    ) -> Result<bool, CoefficientFailure> {
+        let difference = self.sum(other, true, state, budget)?;
+        let engine = Engine {
+            state,
+            domain: &self.domain,
+        };
+        for coefficient in &difference.coefficients {
+            if !engine.zero_on(coefficient, region, budget)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Canonical equality is checked recursively through the parent's subtraction and zero test.

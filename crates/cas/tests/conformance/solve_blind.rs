@@ -257,3 +257,52 @@ fn blind_component_replay_boundary() -> TestResult {
     }
     Ok(())
 }
+
+/// ´test:integration:blind-regional-unit-replay´
+#[test]
+fn blind_regional_unit_replay() -> TestResult {
+    let (mut fixture, step) = crate::testing::solve_blind::regional_unit(true)?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        std::slice::from_ref(&step),
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert!(witness.is_discharged());
+    assert_eq!(
+        witness.hypotheses(),
+        [] as [nrz_cas::domain::HypothesisRef; 0]
+    );
+    let bytes = fixture
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut fresh, expected_step) = crate::testing::solve_blind::regional_unit(true)?;
+    let expected = nrz_cas::proof::Judgment {
+        context: fresh.context.clone(),
+        layer: nrz_cas::domain::Layer::Logic,
+        space: None,
+        residuals: Vec::new(),
+        statement: expected_step.conclusion,
+    };
+    let replayed = fresh
+        .cas
+        .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert!(replayed.is_discharged());
+    assert_eq!(
+        fresh
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    let (mut sibling, changed) = crate::testing::solve_blind::regional_unit(false)?;
+    assert!(
+        sibling
+            .cas
+            .check_proof(
+                &sibling.context,
+                &[changed],
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}

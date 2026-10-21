@@ -67,9 +67,9 @@ pub(crate) fn applications(
     Ok(steps)
 }
 
-/// Server first-fault traces and the direct regional-zero-divisor regression identify this operation.
-/// This is the diagnosed call site, not an observer or a reinterpretation of the final fault location.
-const FIRST_OPERATION: &str = "towers::euclid::inverse: UnitDecision::Zero during divide -> gcd -> towers::units::inverse -> Engine::zero_test -> Route::decide";
+/// The repaired degree drop reaches this separately diagnosed linked-recovery obligation.
+const FIRST_OPERATION: &str =
+    "radicals::roots::inverse: UnitDecision::Undetermined during linked recovery";
 
 /// Each boundary is constructed independently, including both source and renaming spellings.
 /// The Real fixture records its original `Radicals` request and the absence of an initial map.
@@ -306,22 +306,17 @@ fn complex_refusal(
     let failure = result
         .err()
         .ok_or("symbolic coefficient boundary moved; restore acceptance audit")?;
-    let crate::solving::coefficients::model::CoefficientFailure::Fault(fault) = failure else {
-        return Err("symbolic boundary changed: coefficient failure is not a fault".into());
-    };
-    assert_eq!(
-        fault.kind,
-        crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
-    );
-    assert_eq!(
-        fault.location,
-        crate::error::Location::new("exact coefficients")
-    );
+    assert!(matches!(
+        failure,
+        crate::solving::coefficients::model::CoefficientFailure::Unsupported(
+            crate::solving::SolveReason::SpecializationGuardPending
+        )
+    ));
     assert!(generation.usage().coefficient_ops > 0);
     assert!(generation.usage().work <= limits.work);
     assert_eq!(checker.usage().work, 0);
     Ok(format!(
-        "refusal={fault:?}\ndiagnosed_first_operation={FIRST_OPERATION}\ndiagnosed_first_schema=None (producer arithmetic before coverage replay)\ndiagnosed_first_operation_map=None (Euclidean inverse consumes the coefficient domain and scope)\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
+        "refusal=SpecializationGuardPending\ndiagnosed_first_operation={FIRST_OPERATION}\ndiagnosed_first_schema=None (producer arithmetic before coverage replay)\ndiagnosed_first_operation_map=None (Euclidean inverse consumes the coefficient domain and scope)\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
         audit.phases,
         audit.components,
         audit.coefficient_terms,

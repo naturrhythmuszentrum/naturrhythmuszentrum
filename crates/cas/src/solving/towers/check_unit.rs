@@ -90,12 +90,12 @@ fn identities(
     if !divisor
         .mul(&first_quotient, &cas.state, budget)
         .map_err(|error| fault(&error))?
-        .equals(element, &cas.state, budget)
+        .equals_on(element, &cas.state, &certificate.region, budget)
         .map_err(|error| fault(&error))?
         || !divisor
             .mul(&second_quotient, &cas.state, budget)
             .map_err(|error| fault(&error))?
-            .equals(modulus, &cas.state, budget)
+            .equals_on(modulus, &cas.state, &certificate.region, budget)
             .map_err(|error| fault(&error))?
     {
         return Err(invalid());
@@ -116,7 +116,7 @@ fn identities(
         )
         .map_err(|error| fault(&error))?;
     if !combination
-        .equals(divisor, &cas.state, budget)
+        .equals_on(divisor, &cas.state, &certificate.region, budget)
         .map_err(|error| fault(&error))?
     {
         return Err(invalid());
@@ -165,9 +165,10 @@ fn unit(
         domain: &divisor.domain,
     };
     if !divisor
-        .equals(
+        .equals_on(
             &Dense::one(&parent, budget).map_err(|error| fault(&error))?,
             &cas.state,
+            &certificate.region,
             budget,
         )
         .map_err(|error| fault(&error))?
@@ -188,20 +189,22 @@ fn unit(
         .constant(true, budget)
         .map_err(|error| fault(&error))?;
     if !engine
-        .formal_equal(
+        .equal_on(
             &engine
                 .mul(&element, &inverse, budget)
                 .map_err(|error| fault(&error))?,
             &one,
+            &certificate.region,
             budget,
         )
         .map_err(|error| fault(&error))?
         || !engine
-            .formal_equal(
+            .equal_on(
                 &engine
                     .mul(&inverse, &element, budget)
                     .map_err(|error| fault(&error))?,
                 &one,
+                &certificate.region,
                 budget,
             )
             .map_err(|error| fault(&error))?
@@ -229,7 +232,7 @@ fn zero(
     };
     if (&equality.left, &equality.region) != (&certificate.element, &certificate.region)
         || !divisor
-            .equals(modulus, &cas.state, budget)
+            .equals_on(modulus, &cas.state, &certificate.region, budget)
             .map_err(|error| fault(&error))?
     {
         return Err(invalid());
@@ -248,10 +251,11 @@ fn zero(
     };
     for endpoint in [&equality.left, &equality.right] {
         if !engine
-            .formal_zero(
+            .zero_on(
                 &engine
                     .read(endpoint, budget)
                     .map_err(|error| fault(&error))?,
+                &certificate.region,
                 budget,
             )
             .map_err(|error| fault(&error))?

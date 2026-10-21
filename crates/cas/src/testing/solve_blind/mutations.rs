@@ -74,13 +74,12 @@ pub(crate) fn factors(coefficients: &[i64]) -> TestResult {
 pub(crate) fn strata() -> TestResult {
     let (mut fixture, request) = super::source::symbolic(&["d", "c", "b", "a"])?;
     let outcome = fixture.cas.run(&request);
-    let Outcome::Invalid { fault, .. } = outcome else {
+    let Outcome::Unresolved { solve_reason, .. } = outcome else {
         return Err(format!("stratum boundary moved: {outcome:?}").into());
     };
     assert_eq!(
-        fault.kind,
-        crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment)
+        solve_reason,
+        Some(crate::solving::SolveReason::SpecializationGuardPending)
     );
-    assert_eq!(fault.location.operation, "exact coefficients");
     Ok(())
 }
