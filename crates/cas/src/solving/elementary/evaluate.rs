@@ -38,6 +38,9 @@ impl Evaluation<'_> {
                 return value.copy(&self.engine, budget);
             }
         }
+        if let Some(value) = self.parameter(id, budget)? {
+            return Ok(value);
+        }
         let expression = self.cas.state.expression(id)?;
         let header = self.cas.state.header(expression.header)?;
         for (index, declaration) in header.environment.declarations.iter().enumerate() {

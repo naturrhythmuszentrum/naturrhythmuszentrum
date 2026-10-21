@@ -207,3 +207,30 @@ pub(crate) fn factors(
     )?;
     Ok(())
 }
+
+/// Only zero identities contained in the exact frame may reduce a queried polynomial.
+pub(crate) fn zeros(
+    state: &State,
+    source: &Handle,
+    polynomial: &Polynomial,
+    region: &Handle,
+    budget: &mut Budget,
+) -> Result<Vec<Polynomial>, Fault> {
+    let mut result = vector(0, budget)?;
+    visit(
+        state,
+        source,
+        region,
+        |value, zero, ledger| {
+            let same_ring =
+                (value.variables, value.ground) == (polynomial.variables, polynomial.ground);
+            if zero && same_ring && !value.zero(ledger)? {
+                reserve(&mut result, 1, ledger)?;
+                result.push(value);
+            }
+            Ok(false)
+        },
+        budget,
+    )?;
+    Ok(result)
+}

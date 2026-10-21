@@ -206,12 +206,16 @@ impl Evaluation<'_> {
             .copy(&self.engine, budget)
             .map_err(|e| fault(&e))?;
         while !remainder.terms.is_empty() {
+            if self.parameter_zero(&remainder.terms[0].coefficient, budget)? {
+                budget.work(crate::graph::size(remainder.terms.len(), AT)?, AT)?;
+                remainder.terms.remove(0);
+                continue;
+            }
             let mut changed = false;
             for relation in &relations {
-                if let Some(reduced) =
-                    super::reduction::reduce(&remainder, relation, &self.engine, budget)?
+                if super::reduction::reduce(&mut remainder, relation, &self.engine, budget)?
+                    .is_some()
                 {
-                    remainder = reduced;
                     changed = true;
                     break;
                 }

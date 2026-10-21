@@ -184,14 +184,14 @@ pub(crate) fn coverage(
     let scalar = construction.literal(cas, &scale, &values.map, budget)?;
     let (entries, product) = factors(cas, construction, values, &scalar, &unknown, budget)?;
     let input = original(cas, construction, polynomial, values, &unknown, budget)?;
-    // Regional zero equalities are independently reduced by ProductCompleteness against the original problem.
+    // Regional replay independently matches the original equation and every factor to this shared input.
     let original_region = &crate::solving::elementary::proof::problem(cas, problem)?.region;
-    let left = if *original_region == construction.region {
-        &input
-    } else {
+    let right = if *original_region == construction.region {
         &product
+    } else {
+        &input
     };
-    let product = identity(construction, [left, &product], &values.map, budget)?;
+    let product = identity(construction, [&input, right], &values.map, budget)?;
     let set = set(cas, construction, problem, &entries, budget)?;
     let mut factors = vector(entries.len(), budget)?;
     factors.extend(entries.into_iter().map(|root| RootFactor {
@@ -262,11 +262,13 @@ pub(crate) fn finish(
     set: Handle,
     form: SolveForm,
     coverage: crate::proof_model::VerifiedWitness,
-    preparation: Result<(), Fault>,
+    preparation: Result<Option<usize>, Fault>,
     checker: &mut Budget,
 ) -> Produced {
-    let representation = preparation
-        .and_then(|()| cas.check_proof(&construction.context, &construction.steps, checker));
+    let representation = preparation.and_then(|prefix| match prefix {
+        Some(count) => super::continuation::extend(cas, construction, count, &coverage, checker),
+        None => cas.check_proof(&construction.context, &construction.steps, checker),
+    });
     let mut answer = SolveAnswer {
         set,
         facts: Vec::new(),

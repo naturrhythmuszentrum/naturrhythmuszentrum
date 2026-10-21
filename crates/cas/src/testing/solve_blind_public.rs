@@ -156,4 +156,8 @@ fn request(
 
 #[path = "solve_blind/regional.rs"]
 mod regional;
-pub(crate) use regional::unit as regional_unit;
+pub(crate) use regional::{consequence as nonzero_consequence, unit as regional_unit};
+
+#[path = "solve_blind/gaussian.rs"]
+mod gaussian;
+pub(crate) use gaussian::polynomial as gaussian_polynomial;

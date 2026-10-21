@@ -184,3 +184,10 @@ pub(crate) mod formal_close;
     reason = "formal erasure is shared by the private context bridge"
 )]
 pub(crate) mod formal_shape;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "regional certificate production stays within the crate"
+)]
+pub(crate) mod consequence;
+mod consequence_check;

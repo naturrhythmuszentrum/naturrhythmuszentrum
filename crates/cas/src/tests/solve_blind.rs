@@ -326,22 +326,11 @@ fn blind_zero_pairing_independent_oracle() -> TestResult {
     Ok(())
 }
 
-/// Both Complex declaration namings retain the later linked-recovery unit obligation.
+/// Both original declaration namings now independently replay complete source claims.
 /// ´test:crate:blind-symbolic-source-retains-parameters´
 #[test]
 fn blind_symbolic_source_retains_parameters() -> TestResult {
-    for names in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
-        let (mut fixture, request) = crate::testing::solve_blind::symbolic(&names)?;
-        let outcome = fixture.cas.run(&request);
-        let crate::request::Outcome::Unresolved { solve_reason, .. } = outcome else {
-            return Err(format!("symbolic source boundary moved: {outcome:?}").into());
-        };
-        assert_eq!(
-            solve_reason,
-            Some(crate::solving::SolveReason::SpecializationGuardPending)
-        );
-    }
-    Ok(())
+    crate::testing::solve_blind::retained_source()
 }
 
 /// Resuming the cursor reaches the other character without restarting or caching a formula.
@@ -434,7 +423,7 @@ fn blind_incremental_proof_replay() -> TestResult {
 }
 
 /// Independent boundary inventories retain declaration fields, initial maps and original forms.
-/// Each Complex refusal records the later linked-recovery guard; the Real refusal is unchanged.
+/// The Complex boundaries now record accepted results; the separate Real refusal remains earlier.
 /// ´test:crate:blind-symbolic-acceptance-audit´
 #[test]
 fn blind_symbolic_acceptance_audit() -> TestResult {
@@ -442,18 +431,15 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     let record = crate::testing::solve_blind::symbolic_audit(revision)?;
     assert!(record.starts_with(&format!("source_revision={revision}\n")));
     assert!(record.contains("policy=logical-v10"));
-    assert!(record.contains("refusal=SpecializationGuardPending"));
+    assert_eq!(record.matches("result=Solved(Radicals)").count(), 7);
+    assert_eq!(record.matches("fresh_coverage=true").count(), 7);
+    assert_eq!(record.matches("fresh_presentation=true").count(), 7);
+    assert!(record.contains("refusal=RealIsolationUnavailable"));
     assert!(record.contains("interning_comparisons="));
     assert!(record.contains("phases="));
     assert_eq!(record.matches("declaration_field=Complex\n").count(), 7);
     assert_eq!(record.matches("declaration_field=Real\n").count(), 1);
     assert_eq!(record.matches("original_form=Radicals\n").count(), 8);
-    assert_eq!(
-        record
-            .matches("diagnosed_first_operation=radicals::roots::inverse")
-            .count(),
-        7
-    );
     assert!(record.contains("initial_map=None (propose refuses Real before coefficient_images)"));
     Ok(())
 }
@@ -479,7 +465,7 @@ fn blind_repeated_factor_mutations() -> TestResult {
     crate::testing::solve_blind::false_factors(&[2, -3, 0, 1])
 }
 
-/// Linked recovery retains a nonvanishing obligation before complete stratum mutation.
+/// Every degree case in the accepted baseline is independently sampled before mutation restoration.
 /// ´test:crate:blind-missing-stratum-mutations´
 #[test]
 fn blind_missing_stratum_mutations() -> TestResult {
@@ -500,7 +486,7 @@ fn blind_recovered_choice_transport() -> TestResult {
     crate::testing::solve_blind::transported_choices(false, 1)
 }
 
-/// Both Complex namings preserve the same explicit linked-recovery unit obligation.
+/// Independent declaration renaming preserves sampled factors and the complete stratum inventory.
 /// ´test:crate:blind-complete-coefficient-renaming´
 #[test]
 fn blind_complete_coefficient_renaming() -> TestResult {
@@ -774,6 +760,142 @@ fn blind_regional_unit_identity() -> TestResult {
     Ok(())
 }
 
+/// Construct only declared scalar guards q²+p³=0 and p≠0, with optional sibling mutations.
+fn consequence_scope(
+    relation_zero: bool,
+    parameter_nonzero: bool,
+) -> TestResult<(crate::Cas, crate::Handle, crate::Handle, crate::Handle)> {
+    use crate::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
+    use crate::graph::{Draft, Reference};
+    use crate::syntax::Operator;
+    use crate::testing::solve_graph::admit;
+    let (mut fixture, _) = crate::testing::solve_blind::symbolic(&["q", "p"])?;
+    let first = fixture.free("q")?;
+    let second = fixture.free("p")?;
+    let square = fixture.expression(Operator::IntegerPower(2), &[first], false)?;
+    let cube = fixture.expression(
+        Operator::IntegerPower(3),
+        std::slice::from_ref(&second),
+        false,
+    )?;
+    let sum = fixture.expression(Operator::Add, &[square, cube], false)?;
+    let origin = fixture.integer(0, false)?;
+    for (value, zero) in [(sum, relation_zero), (second, !parameter_nonzero)] {
+        let predicate = Reference::Existing(fixture.equation(&value, &origin)?);
+        let base = Reference::Existing(fixture.region.clone());
+        let expression = if zero {
+            RegionExpr::GuardTrue { base, predicate }
+        } else {
+            RegionExpr::GuardFalse { base, predicate }
+        };
+        fixture.region = admit(
+            &mut fixture.cas,
+            &Draft::Region(RegionDraft {
+                header: Reference::Existing(fixture.header.clone()),
+                scope: Vec::new(),
+                ambient: AmbientDomain::Product {
+                    coordinates: fixture.coefficients.clone(),
+                },
+                expression,
+            }),
+        )?;
+    }
+    fixture.context = admit(
+        &mut fixture.cas,
+        &Draft::Context(ContextDraft::Root {
+            header: Reference::Existing(fixture.header),
+            admissible: Reference::Existing(fixture.region.clone()),
+            assumptions: Vec::new(),
+        }),
+    )?;
+    Ok((
+        fixture.cas,
+        fixture.algebra,
+        fixture.context,
+        fixture.region,
+    ))
+}
+
+/// The square identity proves q nonzero only on its exact zero relation and p≠0 cell.
+/// ´test:crate:blind-regional-unit-consequence´
+#[test]
+fn blind_regional_unit_consequence() -> TestResult {
+    use crate::solving::coefficients::{
+        arithmetic::Engine,
+        fraction::Fraction,
+        model::{EvaluationScope, Value, ZeroDecision},
+        polynomial::{Polynomial, Term},
+        scalar::Scalar,
+    };
+    for (relation_zero, parameter_nonzero) in [(true, true), (false, true), (true, false)] {
+        let (mut cas, domain, context, region) =
+            consequence_scope(relation_zero, parameter_nonzero)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let engine = Engine {
+            state: &cas.state,
+            domain: &domain,
+        };
+        let (ground, width, _) = engine.fraction_shape()?;
+        assert_eq!(width, 2);
+        let numerator = Polynomial::new(
+            width,
+            ground,
+            vec![Term {
+                powers: vec![1, 0],
+                coefficient: Scalar::constant(ground, true, &mut budget)?,
+            }],
+            &mut budget,
+        )?;
+        let denominator = numerator.one(&mut budget)?;
+        let value = engine.element(Value::Fraction(Fraction::new(
+            &numerator,
+            &denominator,
+            &mut budget,
+        )?));
+        let scope = EvaluationScope {
+            context: &context,
+            region: &region,
+            premises: &[],
+            localization: &[],
+        };
+        let ZeroDecision::Undetermined(obligation) =
+            engine.zero_test(&value, &scope, &mut budget)?
+        else {
+            return Err("uncertified consequence was used".into());
+        };
+        let mut construction = crate::solving::radicals::construction::Construction {
+            header: cas.handle(cas.state.context(context.logical_id())?.header_id),
+            context: context.clone(),
+            region: region.clone(),
+            steps: Vec::new(),
+        };
+        let theorem = crate::solving::radicals::consequence::certify(
+            &mut cas,
+            &mut construction,
+            &obligation,
+            &mut budget,
+        )?;
+        assert_eq!(theorem.is_some(), relation_zero && parameter_nonzero);
+        if let Some(witness) = theorem {
+            assert!(witness.is_discharged());
+            let engine = Engine {
+                state: &cas.state,
+                domain: &domain,
+            };
+            let scope = EvaluationScope {
+                premises: std::slice::from_ref(&witness),
+                ..scope
+            };
+            assert!(matches!(
+                engine.zero_test(&value, &scope, &mut budget)?,
+                ZeroDecision::Nonzero(_)
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Long division checks the regional cancellation when the leading unit is not formally invertible.
 /// ´test:crate:blind-complex-regional-cancellation´
 #[test]
 fn blind_complex_regional_cancellation() -> TestResult {
@@ -839,4 +961,418 @@ fn blind_complex_regional_cancellation() -> TestResult {
             )?
     );
     Ok(())
+}
+
+/// Nonreal source coefficients agree with retained factors without projection to Real.
+/// ´test:crate:blind-nonreal-independent-oracle´
+#[test]
+fn blind_nonreal_independent_oracle() -> TestResult {
+    let original = [(0, 2), (-2, 1), (-1, -1), (1, 0)];
+    crate::testing::solve_blind::independent_gaussian_product(&original)?;
+    // Multiply (x-i) by (x-2)(x+1)=x²-x-2 independently.
+    let quadratic = [-2_i64, -1, 1];
+    let mut product = [(0_i64, 0_i64); 4];
+    for (power, coefficient) in quadratic.iter().enumerate() {
+        product[power].1 -= coefficient;
+        product[power + 1].0 += coefficient;
+    }
+    assert_eq!(product, original);
+    Ok(())
+}
+
+/// A supplied power identity proves its scoped fact without invoking producer search.
+/// ´test:crate:blind-supplied-nonzero-consequence´
+#[test]
+fn blind_supplied_nonzero_consequence() -> TestResult {
+    let (mut fixture, step) = crate::testing::solve_blind::nonzero_consequence(true)?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[step],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert!(witness.is_discharged());
+    Ok(())
+}
+
+/// A symbolic fraction never enters an unrelated ground field through the constant fallback.
+/// ´test:crate:blind-unrelated-fraction-is-not-ground´
+#[test]
+fn blind_unrelated_fraction_is_not_ground() -> TestResult {
+    use crate::solving::coefficients::{arithmetic::Engine, maps};
+    let (cas, domain, _, _) = complex_zero_scope()?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = Engine {
+        state: &cas.state,
+        domain: &domain,
+    };
+    let parameter = complex_parameter(&engine, &mut budget)?;
+    let crate::solving::CoefficientDomainData::Fraction { base, .. } =
+        crate::solving::coefficients::storage::domain(&cas.state, &domain)?
+    else {
+        return Err("fraction source".into());
+    };
+    assert_ne!(domain, *base);
+    assert!(maps::canonical(&cas.state, &parameter, base, &mut budget).is_err());
+    assert!(maps::constant(&cas.state, &parameter, base, &mut budget).is_err());
+    Ok(())
+}
+
+/// Projecting a Complex parameter changes its sort and cannot replace its exact-Free map image.
+/// ´test:crate:blind-complex-parameter-real-part-refused´
+#[test]
+fn blind_complex_parameter_real_part_refused() -> TestResult {
+    use crate::Reference;
+    use crate::solving::{CoefficientMapData, MapTarget, SolveView};
+    use crate::syntax::{AtomicSort, Draft, ExpressionDraft, Field, Operator, Sort};
+    let (mut fixture, step) = crate::testing::solve_blind::nonzero_consequence(true)?;
+    let crate::proof::Certificate::Solve(certificate) = &step.certificate else {
+        return Err("map source certificate".into());
+    };
+    let crate::solving::SolveCertificate::CoefficientIdentity(identity) = certificate.as_ref()
+    else {
+        return Err("map source identity".into());
+    };
+    let SolveView::CoefficientMap(original) = fixture.cas.solve_view(&identity.map)? else {
+        return Err("map source".into());
+    };
+    let original = original.clone();
+    crate::solving::coefficients::homomorphism::check(
+        &fixture.cas,
+        &original,
+        &[],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let [parameter] = original.images.as_slice() else {
+        return Err("map parameter inventory".into());
+    };
+    assert_eq!(
+        fixture.cas.expression(parameter)?.0,
+        &Operator::Free("a".into())
+    );
+    let projected = crate::testing::solve_graph::admit(
+        &mut fixture.cas,
+        &Draft::Expression(ExpressionDraft {
+            header: Reference::Existing(fixture.header.clone()),
+            scope: Vec::new(),
+            operator: Operator::RealPart,
+            sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+            operands: vec![Reference::Existing(parameter.clone())],
+            space: None,
+            binding: None,
+        }),
+    )?;
+    assert_ne!(projected, *parameter);
+    let changed = CoefficientMapData {
+        source: original.source,
+        target: MapTarget::ScalarAmbient {
+            header: fixture.header.clone(),
+            field: Field::Complex,
+        },
+        mode: original.mode,
+        region: original.region,
+        images: vec![projected],
+        denominators: original.denominators,
+    };
+    assert!(
+        crate::solving::coefficients::homomorphism::check(
+            &fixture.cas,
+            &changed,
+            &[],
+            &mut Budget::new(Limits::blind_cubic())?
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+/// Returned symbolic factors independently specialize across all degrees and to a nonreal cubic.
+/// ´test:crate:blind-symbolic-independent-specializations´
+#[test]
+fn blind_symbolic_independent_specializations() -> TestResult {
+    crate::testing::solve_blind::independent_symbolic_product()
+}
+
+/// Exact graph, region, ground algebra, stored fraction and canonical parameter map.
+type MappedDenominator = (
+    crate::Cas,
+    crate::Handle,
+    crate::Handle,
+    crate::Handle,
+    crate::Handle,
+);
+
+/// Construct 1/p² over the declared q,p frame, retaining the independently chosen p cell.
+fn mapped_denominator(nonzero: bool) -> TestResult<MappedDenominator> {
+    use crate::solving::coefficients::{
+        arithmetic::Engine,
+        fraction::Fraction,
+        model::Value,
+        polynomial::{Polynomial, Term},
+        scalar::Scalar,
+    };
+    let (mut cas, domain, context, region) = consequence_scope(false, nonzero)?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let engine = Engine {
+        state: &cas.state,
+        domain: &domain,
+    };
+    let (ground, width, base) = engine.fraction_shape()?;
+    assert_eq!(width, 2);
+    let base = base.clone();
+    let denominator = Polynomial::new(
+        width,
+        ground,
+        vec![Term {
+            powers: vec![0, 2],
+            coefficient: Scalar::constant(ground, true, &mut budget)?,
+        }],
+        &mut budget,
+    )?;
+    let numerator = denominator.one(&mut budget)?;
+    let element = engine.element(Value::Fraction(Fraction::new(
+        &numerator,
+        &denominator,
+        &mut budget,
+    )?));
+    let stored = crate::solving::towers::materialize::value(&mut cas, &element, &mut budget)?;
+    let construction = crate::solving::radicals::construction::Construction {
+        header: cas.handle(cas.state.context(context.logical_id())?.header_id),
+        context,
+        region: region.clone(),
+        steps: Vec::new(),
+    };
+    let images = crate::solving::solve_search::coefficient_images(
+        &mut cas,
+        &construction,
+        &domain,
+        &mut budget,
+    )?;
+    let map = construction.mapping(&mut cas, &domain, &images, &mut budget)?;
+    Ok((cas, region, base, stored, map))
+}
+
+/// A canonical scalar map proves a power denominator on p≠0 and refuses it on p=0.
+/// ´test:crate:blind-mapped-parameter-denominator´
+#[test]
+fn blind_mapped_parameter_denominator() -> TestResult {
+    use crate::solving::{
+        SolveDraft,
+        coefficients::{arithmetic::Engine, forms::Variable},
+    };
+    for nonzero in [true, false] {
+        let (cas, region, base, stored, map) = mapped_denominator(nonzero)?;
+        let SolveDraft::CoefficientMap(mapping) =
+            crate::solving::graph::object(&cas.state, map.logical_id())?
+        else {
+            return Err("parameter map".into());
+        };
+        for (image, name) in mapping.images.iter().zip(["q", "p"]) {
+            let crate::model::Operator::Free(key) =
+                &cas.state.expression(image.logical_id())?.operator
+            else {
+                return Err("free parameter image".into());
+            };
+            assert_eq!(key, name);
+        }
+        assert_eq!(mapping.images.len(), 2);
+        let parameter = cas.state.expression(mapping.images[1].logical_id())?;
+        let header = cas.state.header(parameter.header)?;
+        let slot = u32::try_from(
+            header
+                .environment
+                .declarations
+                .iter()
+                .position(|declaration| declaration.key == "p")
+                .ok_or("p declaration")?,
+        )?;
+        let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            cas: &cas,
+            engine: Engine {
+                state: &cas.state,
+                domain: &base,
+            },
+            region: &region,
+            premises: &[],
+            free: &[],
+            bound: &[],
+        };
+        let result = evaluation.mapped(&stored, mapping, &mut Budget::new(Limits::blind_cubic())?);
+        assert_eq!(result.is_ok(), nonzero);
+        if let Ok(value) = result {
+            assert_eq!(
+                value
+                    .denominator
+                    .terms
+                    .iter()
+                    .map(|term| term.powers.as_slice())
+                    .collect::<Vec<_>>(),
+                vec![[(Variable::Slot(slot), 2)].as_slice()]
+            );
+        }
+        if nonzero {
+            mapped_provenance(&evaluation, &stored, mapping, &map)?;
+        }
+    }
+    Ok(())
+}
+
+/// An unused parameter's explicit map provenance survives its zero exponent.
+fn mapped_provenance(
+    evaluation: &crate::solving::elementary::evaluate::Evaluation<'_>,
+    stored: &crate::Handle,
+    mapping: &crate::solving::CoefficientMapData<crate::Handle>,
+    map: &crate::Handle,
+) -> TestResult {
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let mut replacement =
+        crate::solving::elementary::value::Value::integer(2, &evaluation.engine, &mut budget)?;
+    replacement.maps.push(map.logical_id());
+    let free = [("q", replacement)];
+    let substituted = crate::solving::elementary::evaluate::Evaluation {
+        free: &free,
+        ..evaluation.unbound()
+    };
+    let mapped = substituted.mapped(stored, mapping, &mut budget)?;
+    assert_eq!(mapped.maps, [map.logical_id()]);
+    Ok(())
+}
+
+/// Canonical fractions retain their exact parameter denominator in the identical algebra after its regional proof.
+/// ´test:crate:blind-mapped-parameter-field-denominator´
+#[test]
+fn blind_mapped_parameter_field_denominator() -> TestResult {
+    use crate::solving::{
+        SolveDraft,
+        coefficients::{arithmetic::Engine, model::Value},
+    };
+    for nonzero in [true, false] {
+        let (cas, region, _, stored, map) = mapped_denominator(nonzero)?;
+        let SolveDraft::CoefficientMap(mapping) =
+            crate::solving::graph::object(&cas.state, map.logical_id())?
+        else {
+            return Err("parameter map".into());
+        };
+        let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            cas: &cas,
+            engine: Engine {
+                state: &cas.state,
+                domain: &mapping.source,
+            },
+            region: &region,
+            premises: &[],
+            free: &[],
+            bound: &[],
+        };
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let result = evaluation.mapped(&stored, mapping, &mut budget);
+        assert_eq!(result.is_ok(), nonzero);
+        if let Ok(value) = result {
+            assert_eq!(value.numerator.terms.len(), 1);
+            assert_eq!(
+                value.numerator.terms[0].powers,
+                [] as [(crate::solving::coefficients::forms::Variable, u32); 0]
+            );
+            let Value::Fraction(coefficient) = &value.numerator.terms[0].coefficient.value else {
+                return Err("retained fraction".into());
+            };
+            assert_eq!(coefficient.numerator.terms.len(), 1);
+            assert_eq!(coefficient.numerator.terms[0].powers, [0, 0]);
+            assert_eq!(coefficient.denominator.terms.len(), 1);
+            assert_eq!(coefficient.denominator.terms[0].powers, [0, 2]);
+            let unit = crate::solving::elementary::value::Value::integer(
+                1,
+                &evaluation.engine,
+                &mut budget,
+            )?;
+            assert_eq!(value.denominator.terms.len(), 1);
+            assert_eq!(
+                value.denominator.terms[0].powers,
+                [] as [(crate::solving::coefficients::forms::Variable, u32); 0]
+            );
+            assert!(evaluation.engine.formal_equal(
+                &value.denominator.terms[0].coefficient,
+                &unit.numerator.terms[0].coefficient,
+                &mut budget
+            )?);
+            assert_eq!(value.maps, [] as [crate::graph::LogicalId; 0]);
+            mapped_provenance(&evaluation, &stored, mapping, &map)?;
+        }
+    }
+    Ok(())
+}
+
+/// A zero numerator is usable only on its own zero cell with its actual denominator independently nonzero.
+/// ´test:crate:blind-parameter-fraction-cell-zero´
+#[test]
+fn blind_parameter_fraction_cell_zero() -> TestResult {
+    use crate::solving::coefficients::{
+        arithmetic::Engine,
+        fraction::Fraction,
+        model::Value,
+        polynomial::{Polynomial, Term},
+        scalar::Scalar,
+    };
+    for (relation_zero, parameter_nonzero, expected) in [
+        (true, true, true),
+        (true, false, false),
+        (false, true, false),
+    ] {
+        let (cas, domain, _, region) = consequence_scope(relation_zero, parameter_nonzero)?;
+        let mut budget = Budget::new(Limits::blind_cubic())?;
+        let engine = Engine {
+            state: &cas.state,
+            domain: &domain,
+        };
+        let (ground, width, _) = engine.fraction_shape()?;
+        assert_eq!(width, 2);
+        let numerator = Polynomial::new(
+            width,
+            ground,
+            vec![
+                Term {
+                    powers: vec![2, 0],
+                    coefficient: Scalar::constant(ground, true, &mut budget)?,
+                },
+                Term {
+                    powers: vec![0, 3],
+                    coefficient: Scalar::constant(ground, true, &mut budget)?,
+                },
+            ],
+            &mut budget,
+        )?;
+        let denominator = Polynomial::new(
+            width,
+            ground,
+            vec![Term {
+                powers: vec![0, 2],
+                coefficient: Scalar::constant(ground, true, &mut budget)?,
+            }],
+            &mut budget,
+        )?;
+        let coefficient = engine.element(Value::Fraction(Fraction::new(
+            &numerator,
+            &denominator,
+            &mut budget,
+        )?));
+        let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            cas: &cas,
+            engine,
+            region: &region,
+            premises: &[],
+            free: &[],
+            bound: &[],
+        };
+        assert_eq!(
+            evaluation.parameter_zero(&coefficient, &mut budget)?,
+            expected
+        );
+    }
+    Ok(())
+}
+
+/// Refused factor comparisons are skipped only when a different exact entry supplies the match.
+/// ´test:crate:blind-symbolic-inclusion-candidates´
+#[test]
+fn blind_symbolic_inclusion_candidates() -> TestResult {
+    crate::testing::solve_blind::inclusion_candidates()
 }

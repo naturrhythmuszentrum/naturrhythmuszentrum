@@ -103,6 +103,8 @@ pub enum IdentityMode {
     Normalize,
     /// Check a finite ideal combination.
     RelationCombination,
+    /// Prove a total parameter polynomial nonzero by one supplied positive-power identity.
+    NonzeroPower(u32),
 }
 
 /// `AdjunctionMode` discriminator with a stable explicit encoding.
@@ -768,7 +770,7 @@ pub struct CertificateCoefficientIdentity<R = Handle> {
     pub region: R,
     /// Ordered combinations entries.
     pub combinations: Vec<RelationMultiple<R>>,
-    /// Original ordered denominators, or the explicitly specified finite localization.
+    /// Ordered localization factors; in `NonzeroPower`, the explicit nonzero product factors.
     pub denominators: Vec<R>,
 }
 

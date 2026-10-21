@@ -28,22 +28,24 @@ pub(crate) fn factors(coefficients: &[i64]) -> TestResult {
         };
         match mutation {
             0 => {
+                let original = certificate.factors.len();
+                assert_eq!(original, coefficients.len() - 1);
                 certificate.factors.pop().ok_or("missing factor")?;
+                assert_ne!(certificate.factors.len(), original);
             }
             1 => {
-                certificate
-                    .factors
-                    .first_mut()
-                    .ok_or("missing factor")?
-                    .multiplicity += 1;
+                let factor = certificate.factors.first_mut().ok_or("missing factor")?;
+                let original = factor.multiplicity;
+                assert_eq!(original, 1);
+                factor.multiplicity += 1;
+                assert_ne!(factor.multiplicity, original);
             }
             _ => {
-                certificate
-                    .factors
-                    .first_mut()
-                    .ok_or("first factor")?
-                    .root
-                    .clone_from(&wrong_root);
+                let factor = certificate.factors.first_mut().ok_or("first factor")?;
+                let original = factor.root.clone();
+                assert_ne!(original, wrong_root);
+                factor.root.clone_from(&wrong_root);
+                assert_ne!(factor.root, original);
             }
         }
         let error = fixture
@@ -69,17 +71,14 @@ pub(crate) fn factors(coefficients: &[i64]) -> TestResult {
     Ok(())
 }
 
-/// Pending coefficient-map interpretation design restores complete-cover stratum deletion mutations.
-/// There is currently no complete symbolic cover to mutate, and its exact refusal stays executable.
+/// Establish the accepted sampled coverage before restoring missing-child mutation replay.
 pub(crate) fn strata() -> TestResult {
-    let (mut fixture, request) = super::source::symbolic(&["d", "c", "b", "a"])?;
-    let outcome = fixture.cas.run(&request);
-    let Outcome::Unresolved { solve_reason, .. } = outcome else {
-        return Err(format!("stratum boundary moved: {outcome:?}").into());
-    };
-    assert_eq!(
-        solve_reason,
-        Some(crate::solving::SolveReason::SpecializationGuardPending)
-    );
-    Ok(())
+    let keys = ["d", "c", "b", "a"];
+    let (fixture, _, answer) = super::acceptance::solved(&keys)?;
+    super::oracle::samples(
+        &fixture.cas,
+        answer.coverage.as_ref().ok_or("stratum coverage")?,
+        &keys,
+    )?;
+    super::acceptance::fresh(&fixture.cas, &answer, &keys)
 }

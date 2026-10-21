@@ -113,6 +113,8 @@ pub(crate) fn prefixes(coefficients: &[i64]) -> TestResult {
     };
     let mut audit = Audit::default();
     let values = Route {
+        cache: None,
+        units: Vec::new(),
         choices: crate::solving::radicals::route::Choices::default(),
         cas: &mut fixture.cas,
         construction: &mut construction,
@@ -173,6 +175,8 @@ pub(crate) fn transported_choices(reverse: bool, rotation: u32) -> TestResult {
         };
         let map = construction.mapping(&mut fixture.cas, &fixture.algebra, &[], &mut budget)?;
         let values = Route {
+            cache: None,
+            units: Vec::new(),
             choices,
             cas: &mut fixture.cas,
             construction: &mut construction,

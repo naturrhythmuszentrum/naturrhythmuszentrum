@@ -67,10 +67,6 @@ pub(crate) fn applications(
     Ok(steps)
 }
 
-/// The repaired degree drop reaches this separately diagnosed linked-recovery obligation.
-const FIRST_OPERATION: &str =
-    "radicals::roots::inverse: UnitDecision::Undetermined during linked recovery";
-
 /// Each boundary is constructed independently, including both source and renaming spellings.
 /// The Real fixture records its original `Radicals` request and the absence of an initial map.
 pub(crate) fn symbolic(source_revision: &str) -> TestResult<String> {
@@ -236,7 +232,7 @@ fn boundary(name: &str, keys: &[&str], field: &crate::model::Field) -> TestResul
         "initial_map=None (propose refuses Real before coefficient_images)\n".into()
     };
     let measurement = if *field == crate::model::Field::Complex {
-        complex_refusal(&mut fixture, &request)?
+        complex_acceptance(&mut fixture, &request, keys)?
     } else {
         real_refusal(&mut fixture, &request)?
     };
@@ -277,10 +273,11 @@ fn real_refusal(
     )
 }
 
-/// Retain phase and interning evidence; no coverage or presentation replay precedes the fault.
-fn complex_refusal(
+/// Record actual generation and fresh expected-claim replay on each accepted boundary.
+fn complex_acceptance(
     fixture: &mut super::source::Fixture,
     request: &crate::request_model::Request,
+    keys: &[&str],
 ) -> TestResult<String> {
     let limits = Limits::blind_cubic();
     let mut generation = Budget::new(limits.clone())?;
@@ -293,30 +290,26 @@ fn complex_refusal(
         &mut audit,
         &mut generation,
         &mut checker,
-    );
+    )?;
     let after = fixture.cas.interning_snapshot();
+    assert!(result.fault.is_none());
+    assert_eq!(result.answer.form, crate::solving::SolveForm::Radicals);
+    assert_eq!(result.answer.unresolved_regions, [] as [Handle; 0]);
+    let coverage = result.answer.coverage.as_ref().ok_or("audit coverage")?;
+    assert!(coverage.is_discharged());
+    super::acceptance::fresh(&fixture.cas, &result.answer, keys)?;
+    assert!(generation.usage().work <= limits.work);
+    assert!(checker.usage().work > 0);
     let comparisons = after
         .comparisons
         .checked_sub(before.comparisons)
-        .ok_or("interning comparison counter regressed")?;
+        .ok_or("comparison counter")?;
     let compared_bytes = after
         .compared_bytes
         .checked_sub(before.compared_bytes)
-        .ok_or("interning byte counter regressed")?;
-    let failure = result
-        .err()
-        .ok_or("symbolic coefficient boundary moved; restore acceptance audit")?;
-    assert!(matches!(
-        failure,
-        crate::solving::coefficients::model::CoefficientFailure::Unsupported(
-            crate::solving::SolveReason::SpecializationGuardPending
-        )
-    ));
-    assert!(generation.usage().coefficient_ops > 0);
-    assert!(generation.usage().work <= limits.work);
-    assert_eq!(checker.usage().work, 0);
+        .ok_or("byte counter")?;
     Ok(format!(
-        "refusal=SpecializationGuardPending\ndiagnosed_first_operation={FIRST_OPERATION}\ndiagnosed_first_schema=None (producer arithmetic before coverage replay)\ndiagnosed_first_operation_map=None (Euclidean inverse consumes the coefficient domain and scope)\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
+        "result=Solved(Radicals)\nfresh_coverage=true\nfresh_presentation=true\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
         audit.phases,
         audit.components,
         audit.coefficient_terms,

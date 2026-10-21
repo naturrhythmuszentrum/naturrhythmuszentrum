@@ -127,6 +127,7 @@ impl IdentityMode {
         match self {
             Self::Normalize => 0,
             Self::RelationCombination => 1,
+            Self::NonzeroPower(_) => 2,
         }
     }
 }
@@ -957,6 +958,9 @@ impl<R> CertificateCoefficientIdentity<R> {
         write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
     ) -> Result<(), Fault> {
         out.byte(self.mode.tag())?;
+        if let IdentityMode::NonzeroPower(exponent) = self.mode {
+            crate::wire::index(exponent, out)?;
+        }
         write(&self.left, out)?;
         write(&self.right, out)?;
         write(&self.map, out)?;
@@ -1915,6 +1919,7 @@ impl IdentityMode {
         Ok(match reader.byte()? {
             0 => Self::Normalize,
             1 => Self::RelationCombination,
+            2 => Self::NonzeroPower(reader.index()?),
             _ => return Err(invalid()),
         })
     }
@@ -3697,9 +3702,11 @@ impl<R> SolveCertificate<R> {
     /// Mode-specific option fields are syntax, never substitute truth flags.
     fn validate_modes(&self) -> Result<(), Fault> {
         let valid = match self {
-            Self::CoefficientIdentity(value) => {
-                value.mode != IdentityMode::Normalize || value.combinations.is_empty()
-            }
+            Self::CoefficientIdentity(value) => match value.mode {
+                IdentityMode::Normalize => value.combinations.is_empty(),
+                IdentityMode::RelationCombination => true,
+                IdentityMode::NonzeroPower(exponent) => exponent > 0,
+            },
             Self::RootAdjunction(value) => {
                 matches!(
                     value.mode,

@@ -258,6 +258,7 @@ fn blind_component_replay_boundary() -> TestResult {
     Ok(())
 }
 
+/// Regional unit replay reconstructs the supplied identity and rejects its nonzero sibling.
 /// ´test:integration:blind-regional-unit-replay´
 #[test]
 fn blind_regional_unit_replay() -> TestResult {
@@ -300,6 +301,117 @@ fn blind_regional_unit_replay() -> TestResult {
             .check_proof(
                 &sibling.context,
                 &[changed],
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// The supplied nonzero identity survives fresh current-wire expected-claim replay.
+/// ´test:integration:blind-nonzero-consequence-replay´
+#[test]
+fn blind_nonzero_consequence_replay() -> TestResult {
+    let (mut fixture, step) = crate::testing::solve_blind::nonzero_consequence(true)?;
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        &[step],
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    assert!(witness.is_discharged());
+    let bytes = fixture
+        .cas
+        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let (mut fresh, supplied) = crate::testing::solve_blind::nonzero_consequence(true)?;
+    let expected = nrz_cas::proof::Judgment {
+        context: fresh.context.clone(),
+        layer: nrz_cas::domain::Layer::Logic,
+        space: None,
+        residuals: Vec::new(),
+        statement: supplied.conclusion,
+    };
+    let replayed = fresh
+        .cas
+        .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    assert!(replayed.is_discharged());
+    assert_eq!(
+        replayed.hypotheses(),
+        [] as [nrz_cas::domain::HypothesisRef; 0]
+    );
+    assert_eq!(
+        fresh
+            .cas
+            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        bytes
+    );
+    Ok(())
+}
+
+/// Exponent, cofactor, factor inventory and exact cell are all independently checked.
+/// ´test:integration:blind-nonzero-consequence-tampering´
+#[test]
+fn blind_nonzero_consequence_tampering() -> TestResult {
+    use nrz_cas::proof::Certificate;
+    use nrz_cas::solving::{IdentityMode, SolveCertificate};
+    for mutation in 0..5 {
+        let (mut fixture, mut step) = crate::testing::solve_blind::nonzero_consequence(true)?;
+        let Certificate::Solve(payload) = &mut step.certificate else {
+            return Err("solve certificate".into());
+        };
+        let SolveCertificate::CoefficientIdentity(certificate) = payload.as_mut() else {
+            return Err("identity".into());
+        };
+        match mutation {
+            0 | 4 => {
+                assert_eq!(certificate.mode, IdentityMode::NonzeroPower(2));
+                let replacement = IdentityMode::NonzeroPower(u32::from(mutation == 0));
+                assert_ne!(certificate.mode, replacement);
+                certificate.mode = replacement;
+            }
+            1 => {
+                assert_eq!(certificate.combinations.len(), 1);
+                certificate.combinations.clear();
+                assert_ne!(certificate.combinations.len(), 1);
+            }
+            2 => {
+                let cofactor = &mut certificate
+                    .combinations
+                    .first_mut()
+                    .ok_or("cofactor")?
+                    .multiplier;
+                assert_eq!(*cofactor, certificate.right);
+                assert_ne!(*cofactor, certificate.left);
+                cofactor.clone_from(&certificate.left);
+            }
+            _ => {
+                let factor = certificate.denominators.first_mut().ok_or("factor")?;
+                assert_eq!(*factor, certificate.right);
+                assert_ne!(*factor, certificate.left);
+                factor.clone_from(&certificate.left);
+            }
+        }
+        assert!(
+            fixture
+                .cas
+                .check_proof(
+                    &fixture.context,
+                    &[step],
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+    }
+    let original = true;
+    let replacement = false;
+    assert!(original);
+    assert_ne!(original, replacement);
+    let (mut sibling, step) = crate::testing::solve_blind::nonzero_consequence(replacement)?;
+    assert!(
+        sibling
+            .cas
+            .check_proof(
+                &sibling.context,
+                &[step],
                 &mut Budget::new(Limits::blind_cubic())?
             )
             .is_err()

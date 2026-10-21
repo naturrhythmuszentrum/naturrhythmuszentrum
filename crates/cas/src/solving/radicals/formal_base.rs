@@ -14,6 +14,21 @@ use crate::solving::coefficients::storage::{copied, invalid, vector};
 use crate::solving::symmetric::{algebra::Polynomial, reduction::Reduction};
 use crate::solving::towers::dense::Dense;
 
+/// Rational invariant constants may be embedded in Q(i); a nonzero imaginary part never descends.
+fn scalar(value: &Scalar, budget: &mut Budget) -> Result<Rational, CoefficientFailure> {
+    match value {
+        Scalar::Rational(value) => Ok(rational_copy(value, budget)?),
+        Scalar::Gaussian(value) => {
+            if !value.imaginary(budget)?.is_zero() {
+                return Err(CoefficientFailure::Unsupported(
+                    SolveReason::GenericRadicalRouteUnavailable,
+                ));
+            }
+            Ok(value.real(budget)?)
+        }
+    }
+}
+
 /// Reading a ground constant never substitutes a parameter or a chosen root.
 fn ground(
     source: &crate::solving::coefficients::polynomial::Polynomial,
@@ -25,12 +40,7 @@ fn ground(
     )?;
     match source.terms.as_slice() {
         [] => Ok(Rational::zero()),
-        [term] if term.powers.iter().all(|power| *power == 0) => match &term.coefficient {
-            Scalar::Rational(value) => Ok(rational_copy(value, budget)?),
-            Scalar::Gaussian(_) => Err(CoefficientFailure::Unsupported(
-                SolveReason::GenericRadicalRouteUnavailable,
-            )),
-        },
+        [term] if term.powers.iter().all(|power| *power == 0) => scalar(&term.coefficient, budget),
         _ => Err(CoefficientFailure::Unsupported(
             SolveReason::GenericRadicalRouteUnavailable,
         )),
@@ -46,7 +56,7 @@ pub(crate) fn rational(
     loop {
         budget.work(1, super::AT)?;
         match &value.value {
-            Value::Scalar(Scalar::Rational(result)) => return Ok(rational_copy(result, budget)?),
+            Value::Scalar(result) => return scalar(result, budget),
             Value::Fraction(result) => {
                 return Ok(ground(&result.numerator, budget)?
                     .div(&ground(&result.denominator, budget)?, budget)?);
@@ -60,11 +70,6 @@ pub(crate) fn rational(
                     ));
                 }
             },
-            Value::Scalar(Scalar::Gaussian(_)) => {
-                return Err(CoefficientFailure::Unsupported(
-                    SolveReason::GenericRadicalRouteUnavailable,
-                ));
-            }
         }
     }
 }
@@ -241,4 +246,35 @@ pub(crate) fn leading(
         }),
         budget,
     )?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Only exact rational Gaussian constants descend; the imaginary coordinate is never projected.
+    /// ´test:unit:rational-gaussian-descent´
+    #[test]
+    fn rational_gaussian_descent() -> Result<(), Box<dyn std::error::Error>> {
+        let mut budget = Budget::new(crate::limits::Limits::blind_cubic())?;
+        let two = Rational::from_ratio(2, 1, &mut budget)?;
+        let real = Scalar::Gaussian(crate::solving::numeric::Gaussian::from_parts(
+            &two,
+            &Rational::zero(),
+            &mut budget,
+        )?);
+        assert_eq!(scalar(&real, &mut budget)?, two);
+        let nonreal = Scalar::Gaussian(crate::solving::numeric::Gaussian::from_parts(
+            &two,
+            &Rational::one(),
+            &mut budget,
+        )?);
+        assert!(matches!(
+            scalar(&nonreal, &mut budget),
+            Err(CoefficientFailure::Unsupported(
+                SolveReason::GenericRadicalRouteUnavailable
+            ))
+        ));
+        Ok(())
+    }
 }

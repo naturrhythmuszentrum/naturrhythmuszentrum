@@ -152,6 +152,16 @@ pub(crate) fn check(
     {
         return Err(invalid());
     }
+    if let IdentityMode::NonzeroPower(exponent) = certificate.mode {
+        return super::consequence_check::check(
+            cas,
+            draft,
+            certificate,
+            exponent,
+            premises,
+            budget,
+        );
+    }
     conclusion(draft, certificate)?;
     if certificate.mode == IdentityMode::Normalize && !certificate.combinations.is_empty() {
         return Err(invalid());

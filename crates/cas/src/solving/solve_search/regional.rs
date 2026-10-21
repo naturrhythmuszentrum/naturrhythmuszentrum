@@ -48,6 +48,8 @@ pub(crate) struct Regional<'a> {
     pub(crate) budget: &'a mut Budget,
     /// Previously requested exact guards prevent retrying an unsupported decision forever.
     pub(crate) guards: Vec<Element>,
+    /// Computed formal invariants may be reused only within this original parameter request.
+    pub(crate) cache: Option<crate::solving::radicals::cache::Cache>,
     /// Presentation is deferred until the full coverage proof has independently replayed.
     pub(crate) presentations: super::presentation::Docket,
 }
@@ -96,6 +98,8 @@ impl Regional<'_> {
             .construction
             .mapping(self.cas, &polynomial.domain, &images, self.budget)?;
         let values = Route {
+            cache: self.cache.as_mut(),
+            units: Vec::new(),
             choices: crate::solving::radicals::route::Choices::default(),
             cas: self.cas,
             construction: self.construction,

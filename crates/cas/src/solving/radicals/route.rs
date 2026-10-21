@@ -9,7 +9,9 @@ use crate::graph::{Cas, Handle};
 use crate::solving::SolveReason;
 use crate::solving::coefficients::arithmetic::Engine;
 use crate::solving::coefficients::maps::canonical;
-use crate::solving::coefficients::model::{CoefficientFailure, Element, EvaluationScope};
+use crate::solving::coefficients::model::{
+    CoefficientFailure, Element, EvaluationScope, GuardedObligation, UnitDecision,
+};
 use crate::solving::coefficients::storage::{invalid, reserve, vector};
 use crate::solving::elementary::recipes::{self, GeneralRecipe, Recipe};
 use crate::solving::symmetric::algebra::Polynomial;
@@ -67,7 +69,7 @@ fn linked(
     index: u32,
     scope: &EvaluationScope<'_>,
     budget: &mut Budget,
-) -> Result<Vec<Element>, CoefficientFailure> {
+) -> Result<Result<Vec<Element>, GuardedObligation>, CoefficientFailure> {
     let selected =
         usize::try_from(index.checked_sub(1).ok_or_else(invalid)?).map_err(|_| invalid())?;
     let mut missing = vector(powers.len(), budget)?;
@@ -88,7 +90,21 @@ fn linked(
         ));
     }
     let divisor = engine.pow(chosen, *powers.get(selected).ok_or_else(invalid)?, budget)?;
-    let recovered = engine.mul(pairing, &inverse(engine, &divisor, scope, budget)?, budget)?;
+    let reciprocal = match engine.inverse(&divisor, scope, budget)? {
+        UnitDecision::Unit { inverse, .. } => inverse,
+        UnitDecision::Undetermined(obligation) => return Ok(Err(obligation)),
+        UnitDecision::Zero(_) => {
+            return Err(CoefficientFailure::Unsupported(
+                SolveReason::MissingUnitProof,
+            ));
+        }
+        UnitDecision::Split(_) => {
+            return Err(CoefficientFailure::Unsupported(
+                SolveReason::ComponentChoicePending,
+            ));
+        }
+    };
+    let recovered = engine.mul(pairing, &reciprocal, budget)?;
     let mut values = vector(powers.len(), budget)?;
     for position in 0..powers.len() {
         values.push(if position == *slot {
@@ -97,7 +113,7 @@ fn linked(
             engine.copy(chosen, budget)?
         });
     }
-    Ok(values)
+    Ok(Ok(values))
 }
 
 /// Invert the degree-generic character transform, retaining the actual affine shift.
@@ -174,6 +190,10 @@ pub(crate) struct Route<'a, 's> {
     pub(crate) audit: &'a mut Audit,
     /// Explicit root choices are semantic inputs.
     pub(crate) choices: Choices,
+    /// Optional request-local formal discovery reuse across parameter cells.
+    pub(crate) cache: Option<&'a mut super::cache::Cache>,
+    /// Independently sealed regional consequences in this invocation's exact scope.
+    pub(crate) units: Vec<crate::proof_model::VerifiedWitness>,
     /// Caller-owned generation ledger.
     pub(crate) budget: &'a mut Budget,
 }
@@ -244,6 +264,12 @@ impl Route<'_, '_> {
         degree: u32,
         depth: u64,
     ) -> Result<(Candidate, u32, u32), CoefficientFailure> {
+        if let Some(cache) = &self.cache
+            && let Some(found) = cache.lookup(frame, unity, depth, &self.cas.state, self.budget)?
+        {
+            self.mark("reuse-discovery", depth)?;
+            return Ok(found);
+        }
         let mut discovery = Discovery::new(degree, depth, self.budget)?;
         let audit = &mut *self.audit;
         let region = self.scope.region;
@@ -277,6 +303,15 @@ impl Route<'_, '_> {
             self.budget,
         )?;
         self.audit.attempts.extend(discovery.attempts);
+        if let Some(cache) = &mut self.cache {
+            cache.remember(
+                &candidate,
+                unity,
+                (index, power),
+                &self.cas.state,
+                self.budget,
+            )?;
+        }
         Ok((candidate, index, power))
     }
 
@@ -389,13 +424,12 @@ impl Route<'_, '_> {
         input_map: &Handle,
     ) -> Result<(Element, Vec<u32>), CoefficientFailure> {
         let degree = u32::try_from(frame.variables.len()).map_err(|_| invalid())?;
-        let pairing = super::pairing::discover(
-            frame,
-            primitive.roots.first().ok_or_else(invalid)?,
-            degree,
-            &self.cas.state,
-            self.budget,
-        )?
+        let unity = primitive.roots.first().ok_or_else(invalid)?;
+        let pairing = if let Some(cache) = &mut self.cache {
+            cache.pairing(frame, unity, degree, &self.cas.state, self.budget)?
+        } else {
+            super::pairing::discover(frame, unity, degree, &self.cas.state, self.budget)?
+        }
         .ok_or(CoefficientFailure::Unsupported(
             SolveReason::RootSelectionExistencePending,
         ))?;
@@ -465,6 +499,87 @@ impl Route<'_, '_> {
         self.recovered(source, &descent, extension, width, depth)
     }
 
+    /// Preserve the original fast path when no additional regional consequence was needed.
+    fn premises(
+        &mut self,
+    ) -> Result<Option<Vec<crate::proof_model::VerifiedWitness>>, CoefficientFailure> {
+        if self.units.is_empty() {
+            return Ok(None);
+        }
+        let bytes =
+            self.scope
+                .premises
+                .iter()
+                .chain(&self.units)
+                .try_fold(0_u64, |total, witness| {
+                    crate::solving::coefficients::storage::add(
+                        total,
+                        crate::graph::size(witness.bytes.len(), super::AT)?,
+                    )
+                })?;
+        self.budget.check(
+            crate::budget::BudgetKind::StagedPayloadBytes,
+            bytes,
+            super::AT,
+        )?;
+        self.budget.work(bytes, super::AT)?;
+        let mut result =
+            crate::solving::coefficients::storage::copied(self.scope.premises, self.budget)?;
+        reserve(&mut result, self.units.len(), self.budget)?;
+        result.extend(self.units.iter().cloned());
+        Ok(Some(result))
+    }
+
+    /// A proposed identity is independently replayed before it can affect inversion.
+    fn consequence(&mut self, obligation: &GuardedObligation) -> Result<bool, CoefficientFailure> {
+        let Some(witness) =
+            super::consequence::certify(self.cas, self.construction, obligation, self.budget)?
+        else {
+            return Ok(false);
+        };
+        reserve(&mut self.units, 1, self.budget)?;
+        self.units.push(witness);
+        Ok(true)
+    }
+
+    /// Resolve a missing unit in this exact cell before retrying linked character recovery.
+    fn characters(
+        &mut self,
+        chosen: &Element,
+        product: &Element,
+        descent: &Descent,
+    ) -> Result<Vec<Element>, CoefficientFailure> {
+        loop {
+            let premises = self.premises()?;
+            let scope = EvaluationScope {
+                context: self.scope.context,
+                region: self.scope.region,
+                premises: premises.as_deref().unwrap_or(self.scope.premises),
+                localization: self.scope.localization,
+            };
+            let engine = Engine {
+                state: &self.cas.state,
+                domain: &chosen.domain,
+            };
+            match linked(
+                &engine,
+                chosen,
+                product,
+                &descent.powers,
+                descent.index,
+                &scope,
+                self.budget,
+            )? {
+                Ok(values) => return Ok(values),
+                Err(obligation) => {
+                    if !self.consequence(&obligation)? {
+                        return self.pending(obligation);
+                    }
+                }
+            }
+        }
+    }
+
     /// Recover a complete set from one compatible character choice and the discovered product.
     fn recovered(
         &mut self,
@@ -502,15 +617,7 @@ impl Route<'_, '_> {
             &engine.pow(&unity, exponent, self.budget)?,
             self.budget,
         )?;
-        let characters = linked(
-            &engine,
-            &chosen,
-            &product,
-            &descent.powers,
-            descent.index,
-            self.scope,
-            self.budget,
-        )?;
+        let characters = self.characters(&chosen, &product, descent)?;
         self.mark("inverse-transform", depth)?;
         let roots = recover(
             self.cas,
@@ -527,55 +634,59 @@ impl Route<'_, '_> {
         })
     }
 
-    /// Exact regional decisions drive branching; a formal nonzero numerator never becomes a unit.
+    /// Unresolved base polynomials preserve their full domain when offered for a regional split.
+    fn pending<T>(&mut self, obligation: GuardedObligation) -> Result<T, CoefficientFailure> {
+        use crate::solving::coefficients::model::Value;
+        if matches!(
+            crate::solving::coefficients::storage::domain(&self.cas.state, &obligation.domain)?,
+            crate::solving::CoefficientDomainData::Fraction { .. }
+        ) {
+            let numerator = obligation.polynomial;
+            let denominator = numerator.one(self.budget)?;
+            let engine = Engine {
+                state: &self.cas.state,
+                domain: &obligation.domain,
+            };
+            self.audit.pending = Some(engine.element(Value::Fraction(
+                crate::solving::coefficients::fraction::Fraction {
+                    numerator,
+                    denominator,
+                },
+            )));
+        }
+        Err(CoefficientFailure::Unsupported(
+            SolveReason::SpecializationGuardPending,
+        ))
+    }
+
+    /// Exact scoped decisions branch only after supplied unit identities have been independently checked.
     fn decide(&mut self, value: &Element) -> Result<bool, CoefficientFailure> {
-        use crate::solving::coefficients::model::{Value, ZeroDecision};
-        let engine = Engine {
-            state: &self.cas.state,
-            domain: &value.domain,
-        };
-        match engine.zero_test(value, self.scope, self.budget)? {
-            ZeroDecision::Zero(_) => Ok(true),
-            ZeroDecision::Nonzero(_) => Ok(false),
-            ZeroDecision::Split(_) => Err(CoefficientFailure::Unsupported(
-                SolveReason::ComponentChoicePending,
-            )),
-            ZeroDecision::Undetermined(obligation) => {
-                if !matches!(
-                    crate::solving::coefficients::storage::domain(
-                        &self.cas.state,
-                        &obligation.domain
-                    )?,
-                    crate::solving::CoefficientDomainData::Fraction { .. }
-                ) {
+        use crate::solving::coefficients::model::ZeroDecision;
+        loop {
+            let premises = self.premises()?;
+            let scope = EvaluationScope {
+                context: self.scope.context,
+                region: self.scope.region,
+                premises: premises.as_deref().unwrap_or(self.scope.premises),
+                localization: self.scope.localization,
+            };
+            let engine = Engine {
+                state: &self.cas.state,
+                domain: &value.domain,
+            };
+            match engine.zero_test(value, &scope, self.budget)? {
+                ZeroDecision::Zero(_) => return Ok(true),
+                ZeroDecision::Nonzero(_) => return Ok(false),
+                ZeroDecision::Split(_) => {
                     return Err(CoefficientFailure::Unsupported(
-                        SolveReason::SpecializationGuardPending,
+                        SolveReason::ComponentChoicePending,
                     ));
                 }
-                let numerator = obligation.polynomial;
-                let one = crate::solving::coefficients::scalar::Scalar::constant(
-                    numerator.ground,
-                    true,
-                    self.budget,
-                )?;
-                let denominator = crate::solving::coefficients::polynomial::Polynomial::constant(
-                    numerator.variables,
-                    one,
-                    self.budget,
-                )?;
-                let engine = Engine {
-                    state: &self.cas.state,
-                    domain: &obligation.domain,
-                };
-                self.audit.pending = Some(engine.element(Value::Fraction(
-                    crate::solving::coefficients::fraction::Fraction {
-                        numerator,
-                        denominator,
-                    },
-                )));
-                Err(CoefficientFailure::Unsupported(
-                    SolveReason::SpecializationGuardPending,
-                ))
+                ZeroDecision::Undetermined(obligation) => {
+                    if !self.consequence(&obligation)? {
+                        return self.pending(obligation);
+                    }
+                }
             }
         }
     }

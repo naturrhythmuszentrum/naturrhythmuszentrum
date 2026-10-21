@@ -1,20 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Coefficient renaming preserves the explicit pending symbolic-map boundary.
+//! Both declaration spellings now produce independently replayable complete answers.
 
 use crate::testing::common::TestResult;
 
-/// Pending coefficient-map interpretation design restores transport of complete renamed sets.
+/// Establish both accepted baselines before comparing inverse-renamed returned strata.
 pub(crate) fn complete() -> TestResult {
-    for names in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
-        let (mut fixture, request) = super::source::symbolic(&names)?;
-        let outcome = fixture.cas.run(&request);
-        let crate::request::Outcome::Unresolved { solve_reason, .. } = outcome else {
-            return Err(format!("renaming boundary moved: {outcome:?}").into());
-        };
-        assert_eq!(
-            solve_reason,
-            Some(crate::solving::SolveReason::SpecializationGuardPending)
-        );
-    }
-    Ok(())
+    super::acceptance::source()
 }

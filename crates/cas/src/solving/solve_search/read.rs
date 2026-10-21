@@ -131,12 +131,52 @@ fn operation(
     }
 }
 
+/// A ground literal retains its declared algebra and canonical scalar embedding on the original region.
+fn literal(
+    cas: &Cas,
+    engine: &Engine<'_>,
+    id: LogicalId,
+    region: &crate::graph::Handle,
+    budget: &mut Budget,
+) -> Result<Dense, CoefficientFailure> {
+    use crate::graph::ExpressionAttachment;
+    use crate::solving::{MapTarget, SolveDraft};
+    let expression = cas.state.expression(id)?;
+    let Some(ExpressionAttachment::ExactCoefficient { value, map }) = &expression.attachment else {
+        return Err(unsupported());
+    };
+    let SolveDraft::CoefficientMap(mapping) = crate::solving::graph::object(&cas.state, *map)?
+    else {
+        return Err(invalid().into());
+    };
+    let MapTarget::ScalarAmbient {
+        header,
+        field: crate::model::Field::Complex,
+    } = &mapping.target
+    else {
+        return Err(unsupported());
+    };
+    if mapping.source != *engine.domain
+        || mapping.region != *region
+        || header.logical_id() != expression.header
+    {
+        return Err(unsupported());
+    }
+    crate::solving::coefficients::proof::ground_map(cas, mapping, budget)?;
+    let handle = cas.handle(*value);
+    crate::solving::coefficients::proof::defined(cas, &handle, region, &[], budget)?;
+    let mut coefficients = vector(1, budget)?;
+    coefficients.push(engine.read(&handle, budget)?);
+    Dense::new(engine, coefficients, budget)
+}
+
 /// Visit only the original expression closure using a bounded explicit postfix stack.
 fn expression(
     cas: &Cas,
     engine: &Engine<'_>,
     root: LogicalId,
     unknown: &str,
+    region: &crate::graph::Handle,
     budget: &mut Budget,
 ) -> Result<Dense, CoefficientFailure> {
     let mut pending = vector(1, budget)?;
@@ -159,13 +199,18 @@ fn expression(
                 .len()
                 .checked_sub(current.operands.len())
                 .ok_or_else(invalid)?;
-            let value = operation(
-                engine,
-                &current.operator,
-                values.get(start..).ok_or_else(invalid)?,
-                unknown,
-                budget,
-            )?;
+            let value =
+                if current.operator == Operator::ExactCoefficient && current.operands.is_empty() {
+                    literal(cas, engine, id, region, budget)?
+                } else {
+                    operation(
+                        engine,
+                        &current.operator,
+                        values.get(start..).ok_or_else(invalid)?,
+                        unknown,
+                        budget,
+                    )?
+                };
             values.truncate(start);
             reserve(&mut values, 1, budget)?;
             values.push(value);
@@ -198,7 +243,7 @@ pub(crate) fn polynomial(
         state: &cas.state,
         domain: &problem.coefficient_domain,
     };
-    let first = expression(cas, &engine, *left, &unknown.key, budget)?;
-    let second = expression(cas, &engine, *right, &unknown.key, budget)?;
+    let first = expression(cas, &engine, *left, &unknown.key, &problem.region, budget)?;
+    let second = expression(cas, &engine, *right, &unknown.key, &problem.region, budget)?;
     first.sum(&second, true, &cas.state, budget)
 }

@@ -253,6 +253,20 @@ impl Rational {
         )
     }
 
+    /// Positive rational content: numerator gcd divided by denominator lcm.
+    /// The identity relies on the type's reduced canonical numerator and denominator.
+    /// This ground rescaling does not certify a regional polynomial unit.
+    pub(crate) fn content_gcd(&self, other: &Self, budget: &mut Budget) -> Result<Self, Fault> {
+        let at = Location::new("rational content gcd");
+        self.check(budget, at)?;
+        other.check(budget, at)?;
+        let numerator = gcd(self.numerator(), other.numerator(), budget, at)?;
+        let common = gcd(self.denominator(), other.denominator(), budget, at)?;
+        let scale = quotient(other.denominator(), &common, budget, at)?;
+        let denominator = product(self.denominator(), &scale, budget, at)?;
+        Self::new(false, &numerator, &denominator, budget)
+    }
+
     /// Compute the exact integral floor with prepaid magnitude arithmetic.
     pub(crate) fn floor(&self, budget: &mut Budget) -> Result<Self, Fault> {
         let at = Location::new("integer region rounding");

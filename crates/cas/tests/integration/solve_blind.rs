@@ -202,19 +202,22 @@ fn blind_zero_polynomial_family() -> TestResult {
     Ok(())
 }
 
-/// The repaired regional degree drop reaches the next explicit linked-recovery guard.
+/// The original Complex parameter problem has complete coverage and radical presentation on every stratum.
 /// ´test:integration:blind-symbolic-complex-complete´
 #[test]
 fn blind_symbolic_complex_complete() -> TestResult {
     let (mut fixture, request) = crate::testing::solve_blind::symbolic(&["d", "c", "b", "a"])?;
     let outcome = fixture.cas.run(&request);
-    let Outcome::Unresolved { solve_reason, .. } = outcome else {
-        return Err(format!("complex symbolic boundary moved: {outcome:?}").into());
+    let Outcome::Solved { answer, .. } = outcome else {
+        return Err(format!("complex symbolic acceptance: {outcome:?}").into());
     };
-    assert_eq!(
-        solve_reason,
-        Some(nrz_cas::solving::SolveReason::SpecializationGuardPending)
-    );
+    assert_eq!(answer.form, SolveForm::Radicals);
+    assert_eq!(answer.unresolved_regions, [] as [nrz_cas::Handle; 0]);
+    replay_complete(
+        &fixture.cas,
+        &answer,
+        crate::testing::solve_blind::symbolic(&["d", "c", "b", "a"])?,
+    )?;
     Ok(())
 }
 
@@ -236,4 +239,22 @@ fn blind_symbolic_real_complete() -> TestResult {
         Some(nrz_cas::solving::SolveReason::RealIsolationUnavailable)
     );
     Ok(())
+}
+
+/// Nonreal cubic roots retain their Gaussian embedding through both fresh expected-claim replays.
+/// ´test:integration:blind-nonreal-cubic-replay´
+#[test]
+fn blind_nonreal_cubic_replay() -> TestResult {
+    let coefficients = [(0, 2), (-2, 1), (-1, -1), (1, 0)];
+    let (mut fixture, request) = crate::testing::solve_blind::gaussian_polynomial(&coefficients)?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Solved { answer, .. } = outcome else {
+        return Err(format!("nonreal cubic: {outcome:?}").into());
+    };
+    assert_eq!(answer.form, SolveForm::Radicals);
+    replay_complete(
+        &fixture.cas,
+        &answer,
+        crate::testing::solve_blind::gaussian_polynomial(&coefficients)?,
+    )
 }

@@ -3,6 +3,7 @@
 
 use super::construction::{Construction, admit};
 use crate::budget::Budget;
+use crate::error::Fault;
 use crate::graph::{Cas, Draft, ExpressionDraft, Handle, Reference};
 use crate::model::{AtomicSort, Extent, Field, Operator, Sort};
 use crate::solving::coefficients::arithmetic::Engine;
@@ -192,6 +193,37 @@ fn unit(
     Ok(())
 }
 
+/// A regional rank proposal needs its own pivot identities and the actual selected-root existence facts.
+fn dependencies(
+    cas: &Cas,
+    construction: &mut Construction,
+    first: usize,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if matches!(
+        cas.state
+            .region(construction.region.logical_id())?
+            .expression,
+        crate::domain_model::RegionExpr::Ambient
+    ) {
+        return Ok(());
+    }
+    let rank = construction.steps.last().ok_or_else(invalid)?;
+    let mut premises = vector(rank.premises.len(), budget)?;
+    for index in &rank.premises {
+        budget.work(1, super::AT)?;
+        let position = usize::try_from(*index).map_err(|_| invalid())?;
+        let step = construction.steps.get(position).ok_or_else(invalid)?;
+        let existence = matches!(&step.conclusion, crate::proof_model::Statement::Solve(statement)
+            if matches!(statement.as_ref(), SolveStatement::RootExistence(_)));
+        if position >= first || existence {
+            premises.push(*index);
+        }
+    }
+    construction.steps.last_mut().ok_or_else(invalid)?.premises = premises;
+    Ok(())
+}
+
 /// Independently replay every row operation and both rank bounds of the actual character matrix.
 pub(crate) fn certify(
     cas: &mut Cas,
@@ -202,6 +234,7 @@ pub(crate) fn certify(
     scope: &EvaluationScope<'_>,
     budget: &mut Budget,
 ) -> Result<(), CoefficientFailure> {
+    let first = construction.steps.len();
     let mut elimination = Elimination::new(cas, unity, width, budget)?;
     let original = matrix(cas, construction, &elimination.entries, map, width, budget)?;
     let determinant = elimination.eliminate(cas, construction, map, scope, budget)?;
@@ -231,5 +264,6 @@ pub(crate) fn certify(
         }),
         budget,
     )?;
+    dependencies(cas, construction, first, budget)?;
     Ok(())
 }

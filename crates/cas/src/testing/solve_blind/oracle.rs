@@ -41,34 +41,61 @@ impl Rational {
         })
     }
 
-    /// Checked cross multiplication, retaining exact rational equality.
+    /// Independent Euclidean cancellation keeps native test arithmetic bounded before products.
+    fn gcd(left: i128, right: i128) -> TestResult<i128> {
+        let (mut first, mut second) = (left.checked_abs().ok_or("oracle gcd magnitude")?, right);
+        while second != 0 {
+            (first, second) = (second, first % second);
+        }
+        Ok(first)
+    }
+
+    /// Use the denominator lcm before addition; equality still compares canonical exact fractions.
     fn add(self, other: Self) -> TestResult<Self> {
+        let common = Self::gcd(self.denominator, other.denominator)?;
         let left = self
             .numerator
-            .checked_mul(other.denominator)
+            .checked_mul(other.denominator / common)
             .ok_or("oracle addition")?;
         let right = other
             .numerator
-            .checked_mul(self.denominator)
+            .checked_mul(self.denominator / common)
             .ok_or("oracle addition")?;
         Self::new(
             left.checked_add(right).ok_or("oracle addition")?,
             self.denominator
-                .checked_mul(other.denominator)
+                .checked_mul(other.denominator / common)
                 .ok_or("oracle denominator")?,
         )
     }
 
-    /// Checked multiplication with a canonical result.
+    /// Cross-cancel exact integer factors before bounded native multiplication.
     fn mul(self, other: Self) -> TestResult<Self> {
+        let first = Self::gcd(self.numerator, other.denominator)?;
+        let second = Self::gcd(other.numerator, self.denominator)?;
         Self::new(
-            self.numerator
-                .checked_mul(other.numerator)
+            (self.numerator / first)
+                .checked_mul(other.numerator / second)
                 .ok_or("oracle product")?,
-            self.denominator
-                .checked_mul(other.denominator)
+            (self.denominator / second)
+                .checked_mul(other.denominator / first)
                 .ok_or("oracle denominator")?,
         )
+    }
+
+    /// Exact quotient normalizes the sign and rejects a specialized zero denominator.
+    fn div(self, other: Self) -> TestResult<Self> {
+        if other.numerator == 0 {
+            return Err("oracle zero divisor".into());
+        }
+        let sign = if other.numerator < 0 { -1 } else { 1 };
+        self.mul(Self::new(
+            sign * other.denominator,
+            other
+                .numerator
+                .checked_abs()
+                .ok_or("oracle quotient magnitude")?,
+        )?)
     }
 
     /// Negation is also checked, so malformed huge fixtures fail as values.
@@ -80,64 +107,197 @@ impl Rational {
     }
 }
 
+/// Two independent exact rational coordinates; no producer Gaussian operation is used.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct Complex {
+    real: Rational,
+    imaginary: Rational,
+}
+
+impl Complex {
+    const fn integer(value: i128) -> Self {
+        Self {
+            real: Rational::integer(value),
+            imaginary: Rational::integer(0),
+        }
+    }
+    fn add(self, other: Self) -> TestResult<Self> {
+        Ok(Self {
+            real: self.real.add(other.real)?,
+            imaginary: self.imaginary.add(other.imaginary)?,
+        })
+    }
+    fn neg(self) -> TestResult<Self> {
+        Ok(Self {
+            real: self.real.neg()?,
+            imaginary: self.imaginary.neg()?,
+        })
+    }
+    fn mul(self, other: Self) -> TestResult<Self> {
+        Ok(Self {
+            real: self
+                .real
+                .mul(other.real)?
+                .add(self.imaginary.mul(other.imaginary)?.neg()?)?,
+            imaginary: self
+                .real
+                .mul(other.imaginary)?
+                .add(self.imaginary.mul(other.real)?)?,
+        })
+    }
+    fn div(self, other: Self) -> TestResult<Self> {
+        let norm = other
+            .real
+            .mul(other.real)?
+            .add(other.imaginary.mul(other.imaginary)?)?;
+        let product = self.mul(Self {
+            real: other.real,
+            imaginary: other.imaginary.neg()?,
+        })?;
+        Ok(Self {
+            real: product.real.div(norm)?,
+            imaginary: product.imaginary.div(norm)?,
+        })
+    }
+    fn pow(self, exponent: u32) -> TestResult<Self> {
+        let mut result = Self::integer(1);
+        for _ in 0..exponent {
+            result = result.mul(self)?;
+        }
+        Ok(result)
+    }
+}
+
 /// A recursively defined monic quotient, represented by a flat rational basis.
 struct Ring {
+    /// Exact graph algebra whose basis is decoded independently.
+    domain: Handle,
     /// Earlier coefficient ring, absent for the rational ground field.
     parent: Option<Box<Self>>,
     /// Coefficients of the monic defining polynomial, including its leading one.
     modulus: Vec<Vec<Rational>>,
     /// Total dimension of the flat rational basis.
     dimension: usize,
+    /// Independent coordinate samples, present only for a rational function ground field.
+    parameters: Vec<Complex>,
 }
 
 impl Ring {
     /// Decode only graph syntax; no normalization or solving routine supplies this oracle.
     fn read(cas: &Cas, domain: &Handle) -> TestResult<Self> {
+        Self::specialized(cas, domain, &[], domain)
+    }
+
+    /// Bind parameters by declaration identity and follow every actual quotient parent.
+    fn specialized(
+        cas: &Cas,
+        domain: &Handle,
+        bindings: &[(&str, Complex)],
+        original: &Handle,
+    ) -> TestResult<Self> {
         match cas.solve_view(domain)? {
             SolveView::CoefficientDomain(
-                CoefficientDomainData::Rational | CoefficientDomainData::Gaussian,
+                ground @ (CoefficientDomainData::Rational | CoefficientDomainData::Gaussian),
             ) => Ok(Self {
+                domain: domain.clone(),
                 parent: None,
+                parameters: Vec::new(),
                 modulus: Vec::new(),
-                dimension: 1,
+                dimension: if *ground == CoefficientDomainData::Gaussian {
+                    2
+                } else {
+                    1
+                },
             }),
+            SolveView::CoefficientDomain(CoefficientDomainData::Fraction { base, coordinates }) => {
+                assert_eq!(domain, original);
+                Self::fraction(cas, domain, base, coordinates, bindings)
+            }
             SolveView::CoefficientDomain(CoefficientDomainData::Quotient { level }) => {
-                let SolveView::ExtensionLevel(level) = cas.solve_view(level)? else {
-                    return Err("oracle extension".into());
-                };
-                let parent = Self::read(cas, &level.parent)?;
-                let SolveView::Polynomial(polynomial) = cas.solve_view(&level.polynomial)? else {
-                    return Err("oracle modulus".into());
-                };
-                let degree = polynomial
-                    .terms
-                    .iter()
-                    .filter_map(|term| term.exponents.first())
-                    .max()
-                    .copied()
-                    .ok_or("empty modulus")?;
-                let degree = usize::try_from(degree)?;
-                let mut modulus = vec![parent.zero(); degree + 1];
-                for term in &polynomial.terms {
-                    let [power] = term.exponents.as_slice() else {
-                        return Err("multivariate modulus".into());
-                    };
-                    modulus[usize::try_from(*power)?] = parent.value(cas, &term.coefficient)?;
-                }
-                if modulus.last() != Some(&parent.one()) {
-                    return Err("nonmonic modulus".into());
-                }
-                let dimension = degree
-                    .checked_mul(parent.dimension)
-                    .ok_or("oracle dimension")?;
-                Ok(Self {
-                    parent: Some(Box::new(parent)),
-                    modulus,
-                    dimension,
-                })
+                Self::extension(cas, domain, level, bindings, original)
             }
             _ => Err("unsupported oracle algebra".into()),
         }
+    }
+
+    /// The only specialized ground is the original parameter frame; no unrelated fraction descends.
+    fn fraction(
+        cas: &Cas,
+        domain: &Handle,
+        base: &Handle,
+        coordinates: &Handle,
+        bindings: &[(&str, Complex)],
+    ) -> TestResult<Self> {
+        assert!(matches!(
+            cas.solve_view(base)?,
+            SolveView::CoefficientDomain(CoefficientDomainData::Rational)
+        ));
+        let SolveView::CoordinateSpace(frame) = cas.solve_view(coordinates)? else {
+            return Err("oracle parameter frame".into());
+        };
+        let parameters = frame
+            .coordinates
+            .iter()
+            .map(|coordinate| {
+                bindings
+                    .iter()
+                    .find(|(key, _)| *key == coordinate.key)
+                    .map(|(_, value)| *value)
+                    .ok_or_else(|| "missing oracle parameter".into())
+            })
+            .collect::<TestResult<Vec<_>>>()?;
+        Ok(Self {
+            domain: domain.clone(),
+            parent: None,
+            parameters,
+            modulus: Vec::new(),
+            dimension: 2,
+        })
+    }
+
+    /// Decode the defining monic polynomial directly in its exact earlier parent basis.
+    fn extension(
+        cas: &Cas,
+        domain: &Handle,
+        level: &Handle,
+        bindings: &[(&str, Complex)],
+        original: &Handle,
+    ) -> TestResult<Self> {
+        let SolveView::ExtensionLevel(level) = cas.solve_view(level)? else {
+            return Err("oracle extension".into());
+        };
+        let parent = Self::specialized(cas, &level.parent, bindings, original)?;
+        let SolveView::Polynomial(polynomial) = cas.solve_view(&level.polynomial)? else {
+            return Err("oracle modulus".into());
+        };
+        let degree = polynomial
+            .terms
+            .iter()
+            .filter_map(|term| term.exponents.first())
+            .max()
+            .copied()
+            .ok_or("empty modulus")?;
+        let degree = usize::try_from(degree)?;
+        let mut modulus = vec![parent.zero(); degree + 1];
+        for term in &polynomial.terms {
+            let [power] = term.exponents.as_slice() else {
+                return Err("multivariate modulus".into());
+            };
+            modulus[usize::try_from(*power)?] = parent.value(cas, &term.coefficient)?;
+        }
+        if modulus.last() != Some(&parent.one()) {
+            return Err("nonmonic modulus".into());
+        }
+        let dimension = degree
+            .checked_mul(parent.dimension)
+            .ok_or("oracle dimension")?;
+        Ok(Self {
+            domain: domain.clone(),
+            parent: Some(Box::new(parent)),
+            parameters: Vec::new(),
+            modulus,
+            dimension,
+        })
     }
 
     /// The rational zero vector in the declared finite basis.
@@ -157,10 +317,23 @@ impl Ring {
         let SolveView::CoefficientValue(value) = cas.solve_view(handle)? else {
             return Err("oracle coefficient".into());
         };
+        assert_eq!(value.domain, self.domain);
         match (&self.parent, &value.value) {
             (None, CoefficientValueData::Rational { value }) => Ok(vec![number(value)?]),
-            (None, CoefficientValueData::Gaussian { real, imaginary }) if imaginary.is_zero() => {
-                Ok(vec![number(real)?])
+            (None, CoefficientValueData::Gaussian { real, imaginary }) => {
+                Ok(vec![number(real)?, number(imaginary)?])
+            }
+            (
+                None,
+                CoefficientValueData::Fraction {
+                    numerator,
+                    denominator,
+                },
+            ) => {
+                let value = self
+                    .evaluate(cas, numerator)?
+                    .div(self.evaluate(cas, denominator)?)?;
+                Ok(vec![value.real, value.imaginary])
             }
             (Some(parent), CoefficientValueData::Tower { coefficients }) => {
                 let mut value = self.zero();
@@ -175,6 +348,33 @@ impl Ring {
             }
             _ => Err("oracle coefficient shape".into()),
         }
+    }
+
+    /// Direct monomial substitution uses only this independent small rational arithmetic.
+    fn evaluate(&self, cas: &Cas, handle: &Handle) -> TestResult<Complex> {
+        let SolveView::Polynomial(polynomial) = cas.solve_view(handle)? else {
+            return Err("oracle polynomial".into());
+        };
+        let mut sum = Complex::integer(0);
+        for term in &polynomial.terms {
+            let SolveView::CoefficientValue(coefficient) = cas.solve_view(&term.coefficient)?
+            else {
+                return Err("oracle polynomial scalar".into());
+            };
+            let CoefficientValueData::Rational { value } = &coefficient.value else {
+                return Err("oracle rational scalar".into());
+            };
+            assert_eq!(term.exponents.len(), self.parameters.len());
+            let mut product = Complex {
+                real: number(value)?,
+                imaginary: Rational::integer(0),
+            };
+            for (exponent, image) in term.exponents.iter().zip(&self.parameters) {
+                product = product.mul(image.pow(*exponent)?)?;
+            }
+            sum = sum.add(product)?;
+        }
+        Ok(sum)
     }
 
     /// Addition is componentwise in the finite monomial basis.
@@ -194,7 +394,16 @@ impl Ring {
             return Err("oracle product shape".into());
         }
         let Some(parent) = &self.parent else {
-            return Ok(vec![left[0].mul(right[0])?]);
+            return match (left, right) {
+                ([first], [second]) => Ok(vec![first.mul(*second)?]),
+                ([real, imaginary], [other_real, other_imaginary]) => Ok(vec![
+                    real.mul(*other_real)?
+                        .add(imaginary.mul(*other_imaginary)?.neg()?)?,
+                    real.mul(*other_imaginary)?
+                        .add(imaginary.mul(*other_real)?)?,
+                ]),
+                _ => Err("oracle ground shape".into()),
+            };
         };
         let degree = self.modulus.len() - 1;
         let mut product = vec![parent.zero(); degree * 2 - 1];
@@ -233,6 +442,16 @@ pub(crate) fn product(
     cas: &Cas,
     witness: &crate::proof::VerifiedWitness,
     original: &[i64],
+) -> TestResult {
+    let coefficients: Vec<_> = original.iter().map(|value| (*value, 0)).collect();
+    gaussian_product(cas, witness, &coefficients)
+}
+
+/// Both Gaussian coordinates survive the independent finite-basis multiplication.
+pub(crate) fn gaussian_product(
+    cas: &Cas,
+    witness: &crate::proof::VerifiedWitness,
+    original: &[(i64, i64)],
 ) -> TestResult {
     use crate::graph::{ExpressionAttachment, Vertex};
     use crate::proof_model::Certificate;
@@ -273,23 +492,30 @@ pub(crate) fn product(
 }
 
 /// Compare every original coefficient and its independently differentiated counterpart.
-fn compare(ring: &Ring, polynomial: &[Vec<Rational>], original: &[i64]) -> TestResult {
+fn compare(ring: &Ring, polynomial: &[Vec<Rational>], original: &[(i64, i64)]) -> TestResult {
     if polynomial.len() != original.len() {
         return Err("oracle full degree".into());
     }
     for (power, (actual, expected)) in polynomial.iter().zip(original).enumerate() {
         let mut target = ring.zero();
-        target[0] = Rational::integer(i128::from(*expected));
+        target[0] = Rational::integer(i128::from(expected.0));
+        if expected.1 != 0 {
+            let mut ground = ring;
+            while let Some(parent) = &ground.parent {
+                ground = parent;
+            }
+            assert_eq!(ground.dimension, 2);
+            *target.get_mut(1).ok_or("oracle imaginary coordinate")? =
+                Rational::integer(i128::from(expected.1));
+        }
         assert_eq!(*actual, target);
         let derivative = actual
             .iter()
             .map(|value| value.mul(Rational::integer(i128::try_from(power)?)))
             .collect::<TestResult<Vec<_>>>()?;
-        target[0] = Rational::integer(
-            i128::from(*expected)
-                .checked_mul(i128::try_from(power)?)
-                .ok_or("oracle derivative")?,
-        );
+        for coefficient in &mut target {
+            *coefficient = coefficient.mul(Rational::integer(i128::try_from(power)?))?;
+        }
         assert_eq!(derivative, target);
     }
     Ok(())
@@ -313,3 +539,7 @@ fn multiply_factor(
     }
     Ok(product)
 }
+
+#[path = "specialize.rs"]
+mod specialize;
+pub(crate) use specialize::samples;

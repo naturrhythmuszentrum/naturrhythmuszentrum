@@ -156,10 +156,9 @@ impl Constraints {
         while !remainder.terms.is_empty() {
             let mut changed = false;
             for relation in &self.zeros {
-                if let Some(reduced) =
-                    super::reduction::reduce(&remainder, relation, &evaluation.engine, budget)?
+                if super::reduction::reduce(&mut remainder, relation, &evaluation.engine, budget)?
+                    .is_some()
                 {
-                    remainder = reduced;
                     changed = true;
                     break;
                 }

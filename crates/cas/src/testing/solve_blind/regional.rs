@@ -202,3 +202,155 @@ pub(crate) fn unit(zero: bool) -> TestResult<(Fixture, ApplicationDraft)> {
     };
     Ok((fixture, step))
 }
+
+/// The independently supplied cell is a²-1=0, or its explicitly selected nonzero sibling.
+fn root_cell(fixture: &mut Fixture, zero: bool) -> TestResult {
+    use crate::test_api::syntax::Operator;
+    let parameter = fixture.free("a")?;
+    let square = fixture.expression(Operator::IntegerPower(2), &[parameter], false)?;
+    let one = fixture.integer(1, false)?;
+    let difference = fixture.expression(Operator::Sub, &[square, one], false)?;
+    let origin = fixture.integer(0, false)?;
+    let predicate = Reference::Existing(fixture.equation(&difference, &origin)?);
+    let base = Reference::Existing(fixture.region.clone());
+    let expression = if zero {
+        RegionExpr::GuardTrue { base, predicate }
+    } else {
+        RegionExpr::GuardFalse { base, predicate }
+    };
+    fixture.region = admit(
+        &mut fixture.cas,
+        &Draft::Region(RegionDraft {
+            header: Reference::Existing(fixture.header.clone()),
+            scope: Vec::new(),
+            ambient: AmbientDomain::Product {
+                coordinates: fixture.coefficients.clone(),
+            },
+            expression,
+        }),
+    )?;
+    fixture.context = admit(
+        &mut fixture.cas,
+        &Draft::Context(ContextDraft::Root {
+            header: Reference::Existing(fixture.header.clone()),
+            admissible: Reference::Existing(fixture.region.clone()),
+            assumptions: Vec::new(),
+        }),
+    )?;
+    Ok(())
+}
+
+/// Hand-authored total coefficient a²-1 has no arithmetic normalization dependency.
+fn root_relation(fixture: &mut Fixture) -> TestResult<Handle> {
+    let SolveView::CoefficientDomain(CoefficientDomainData::Fraction { base, .. }) =
+        fixture.cas.solve_view(&fixture.algebra)?
+    else {
+        return Err("fraction domain".into());
+    };
+    let base = base.clone();
+    let one = coefficient(
+        fixture,
+        &base,
+        CoefficientValueData::Rational {
+            value: Rational::one(),
+        },
+    )?;
+    let minus = Rational::from_ratio(
+        -1,
+        1,
+        &mut crate::test_api::limits::Budget::new(crate::test_api::limits::Limits::blind_cubic())?,
+    )?;
+    let negative = coefficient(
+        fixture,
+        &base,
+        CoefficientValueData::Rational { value: minus },
+    )?;
+    let numerator = polynomial(fixture, &base, &[(0, negative), (2, one.clone())])?;
+    let denominator = polynomial(fixture, &base, &[(0, one)])?;
+    let source = fixture.algebra.clone();
+    coefficient(
+        fixture,
+        &source,
+        CoefficientValueData::Fraction {
+            numerator: Reference::Existing(numerator),
+            denominator: Reference::Existing(denominator),
+        },
+    )
+}
+
+/// The nonzero conclusion names precisely the supplied coefficient and its original interpretation.
+fn nonzero_statement(fixture: &mut Fixture, value: &Handle, map: &Handle) -> TestResult<Statement> {
+    let literal = admit(
+        &mut fixture.cas,
+        &Draft::ExactCoefficient {
+            header: Reference::Existing(fixture.header.clone()),
+            value: Reference::Existing(value.clone()),
+            map: Reference::Existing(map.clone()),
+        },
+    )?;
+    let predicate = admit(
+        &mut fixture.cas,
+        &Draft::Condition {
+            header: Reference::Existing(fixture.header.clone()),
+            scope: Vec::new(),
+            kind: crate::test_api::syntax::PredicateKind::NonZero,
+            arguments: vec![Reference::Existing(literal)],
+        },
+    )?;
+    Ok(Statement::PredicateFact {
+        predicate,
+        region: fixture.region.clone(),
+    })
+}
+
+/// Supply a²-1=1*(a²-1), with nonzero product 1, before any exponent or branch search.
+pub(crate) fn consequence(zero: bool) -> TestResult<(Fixture, ApplicationDraft)> {
+    use crate::test_api::solving::{
+        CertificateCoefficientIdentity, CoefficientMapData, IdentityMode, MapMode, MapTarget,
+        RelationMultiple,
+    };
+    let (mut fixture, _) = super::symbolic(&["a"])?;
+    root_cell(&mut fixture, zero)?;
+    let (parameter, one) = parameters(&mut fixture)?;
+    let relation = root_relation(&mut fixture)?;
+    let image = fixture.free("a")?;
+    let map = admit(
+        &mut fixture.cas,
+        &Draft::Solve(SolveDraft::CoefficientMap(CoefficientMapData {
+            source: Reference::Existing(fixture.algebra.clone()),
+            target: MapTarget::ScalarAmbient {
+                header: Reference::Existing(fixture.header.clone()),
+                field: Field::Complex,
+            },
+            mode: MapMode::Specialization,
+            region: Reference::Existing(fixture.region.clone()),
+            images: vec![Reference::Existing(image)],
+            denominators: Vec::new(),
+        })),
+    )?;
+    let conclusion = nonzero_statement(&mut fixture, &parameter, &map)?;
+    let certificate = CertificateCoefficientIdentity {
+        mode: IdentityMode::NonzeroPower(2),
+        left: parameter,
+        right: one.clone(),
+        map,
+        region: fixture.region.clone(),
+        combinations: vec![RelationMultiple {
+            multiplier: one.clone(),
+            relation,
+            hypothesis: None,
+        }],
+        denominators: vec![one],
+    };
+    let step = ApplicationDraft {
+        rule: Primitive::Solve(SolveSchema::CoefficientIdentity),
+        context: fixture.context.clone(),
+        conclusion,
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: Certificate::Solve(Box::new(SolveCertificate::CoefficientIdentity(
+            certificate,
+        ))),
+    };
+    Ok((fixture, step))
+}

@@ -201,21 +201,22 @@ impl Components<'_, '_> {
         while !remainder.terms.is_empty() {
             let mut changed = false;
             for equation in &self.equations {
-                if let Some(next) =
-                    super::super::reduction::reduce(&remainder, equation, engine, budget)?
+                if let Some(scale) =
+                    super::super::reduction::reduce(&mut remainder, equation, engine, budget)?
                 {
-                    let coefficient = engine
-                        .copy(
-                            &equation.terms.first().ok_or_else(invalid)?.coefficient,
-                            budget,
-                        )
-                        .map_err(|error| fault(&error))?;
-                    let scalar = Form::constant(coefficient, engine, budget)
-                        .map_err(|error| fault(&error))?;
-                    result = result
-                        .mul(&scalar, engine, budget)
-                        .map_err(|error| fault(&error))?;
-                    remainder = next;
+                    if scale == super::super::reduction::Scale::Leading {
+                        let coefficient = engine
+                            .copy(
+                                &equation.terms.first().ok_or_else(invalid)?.coefficient,
+                                budget,
+                            )
+                            .map_err(|error| fault(&error))?;
+                        let scalar = Form::constant(coefficient, engine, budget)
+                            .map_err(|error| fault(&error))?;
+                        result = result
+                            .mul(&scalar, engine, budget)
+                            .map_err(|error| fault(&error))?;
+                    }
                     changed = true;
                     break;
                 }
@@ -324,5 +325,69 @@ impl Components<'_, '_> {
             }
         }
         Err(invalid())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Components;
+    use crate::budget::Budget;
+    use crate::limits::Limits;
+    use crate::solving::coefficients::{
+        arithmetic::Engine,
+        forms::{Form, Variable},
+    };
+    use crate::solving::elementary::evaluate::Evaluation;
+
+    /// Field reduction preserves a previously retained term instead of applying a pseudo-scale.
+    /// ´test:unit:component-field-reduction-scale´
+    #[test]
+    fn component_field_reduction_scale() -> Result<(), Box<dyn std::error::Error>> {
+        for parameter in [false, true] {
+            let (fixture, _) = if parameter {
+                crate::testing::solve_blind::symbolic(&["p"])?
+            } else {
+                crate::testing::solve_blind::gaussian_polynomial(&[(0, 0), (1, 0)])?
+            };
+            let mut budget = Budget::new(Limits::blind_cubic())?;
+            let evaluation = Evaluation {
+                cas: &fixture.cas,
+                engine: Engine {
+                    state: &fixture.cas.state,
+                    domain: &fixture.algebra,
+                },
+                region: &fixture.region,
+                premises: &[],
+                free: &[],
+                bound: &[],
+            };
+            scale_case(&evaluation, &mut budget)?;
+        }
+        Ok(())
+    }
+    /// The independent expected remainder of x³+y² modulo 2y²-2 is x³+1.
+    fn scale_case(
+        evaluation: &Evaluation<'_>,
+        budget: &mut Budget,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let engine = &evaluation.engine;
+        let leading = Form::variable(Variable::Slot(0), engine, budget)?.pow(3, engine, budget)?;
+        let square = Form::variable(Variable::Slot(1), engine, budget)?.pow(2, engine, budget)?;
+        let one = Form::constant(engine.constant(true, budget)?, engine, budget)?;
+        let two = one.add(&one, engine, budget)?;
+        let relation = square
+            .add(&one.neg(engine, budget)?, engine, budget)?
+            .mul(&two, engine, budget)?;
+        let original = leading.add(&square, engine, budget)?;
+        let expected = leading.add(&one, engine, budget)?;
+        let mut components = Components::new(evaluation, budget)?;
+        components.equations.push(relation);
+        let actual = components.reduced(&original, budget)?;
+        assert_eq!(actual.terms.len(), expected.terms.len());
+        for (actual, expected) in actual.terms.iter().zip(&expected.terms) {
+            assert_eq!(actual.powers, expected.powers);
+            assert!(engine.formal_equal(&actual.coefficient, &expected.coefficient, budget)?);
+        }
+        Ok(())
     }
 }

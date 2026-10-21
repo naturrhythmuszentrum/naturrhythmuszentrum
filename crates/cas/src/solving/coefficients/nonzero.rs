@@ -20,6 +20,53 @@ pub(crate) struct Factors {
 }
 
 impl Factors {
+    /// Producer search begins in the exact queried polynomial ring.
+    pub(crate) const fn new(polynomial: &Polynomial) -> Self {
+        Self {
+            variables: polynomial.variables,
+            ground: polynomial.ground,
+            values: Vec::new(),
+        }
+    }
+
+    /// Retain the actual unit factors, including multiplicities and the final ground unit.
+    pub(crate) fn decompose(
+        &self,
+        polynomial: &Polynomial,
+        budget: &mut Budget,
+    ) -> Result<Option<Vec<Polynomial>>, Fault> {
+        let mut pending = vector(1, budget)?;
+        pending.push((polynomial.copy(budget)?, Vec::<usize>::new(), 0));
+        while let Some((remaining, path, start)) = pending.pop() {
+            begin(budget)?;
+            if let Some(constant) = remaining.scalar(budget)? {
+                if constant.zero(budget)? {
+                    continue;
+                }
+                let mut factors = vector(path.len().checked_add(1).ok_or_else(invalid)?, budget)?;
+                for index in path {
+                    factors.push(self.values.get(index).ok_or_else(invalid)?.copy(budget)?);
+                }
+                factors.push(remaining);
+                return Ok(Some(factors));
+            }
+            let degree = remaining.total_degree(budget)?.ok_or_else(invalid)?;
+            for (index, factor) in self.values.iter().enumerate().skip(start) {
+                if factor.total_degree(budget)?.ok_or_else(invalid)? > degree {
+                    continue;
+                }
+                if let Some(quotient) = super::gcd::exact(&remaining, factor, budget)? {
+                    let mut next = super::storage::copied(&path, budget)?;
+                    reserve(&mut next, 1, budget)?;
+                    next.push(index);
+                    reserve(&mut pending, 1, budget)?;
+                    pending.push((quotient, next, index));
+                }
+            }
+        }
+        Ok(None)
+    }
+
     /// Ground factors need no division; duplicate guards add no search choices.
     pub(crate) fn insert(&mut self, value: Polynomial, budget: &mut Budget) -> Result<(), Fault> {
         begin(budget)?;

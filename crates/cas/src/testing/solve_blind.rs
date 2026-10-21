@@ -51,7 +51,9 @@ pub(crate) fn derivative(coefficients: &[i64]) -> crate::testing::common::TestRe
         .collect()
 }
 
-pub(crate) use source::{polynomial, regional_unit, symbolic};
+pub(crate) use source::{
+    gaussian_polynomial, nonzero_consequence, polynomial, regional_unit, symbolic,
+};
 
 #[path = "solve_blind/trace.rs"]
 mod trace;
@@ -84,3 +86,37 @@ pub(crate) use unlinked::refuses as unlinked_choices;
 pub(crate) use audit::formal_consumer;
 
 pub(crate) use audit::real_choice_consumer;
+
+/// Search a nonreal source before independently multiplying the retained factors.
+pub(crate) fn independent_gaussian_product(
+    coefficients: &[(i64, i64)],
+) -> crate::testing::common::TestResult {
+    let (mut fixture, request) = gaussian_polynomial(coefficients)?;
+    let outcome = fixture.cas.run(&request);
+    let crate::request::Outcome::Solved { answer, .. } = outcome else {
+        return Err(format!("Gaussian oracle search: {outcome:?}").into());
+    };
+    oracle::gaussian_product(
+        &fixture.cas,
+        &answer.coverage.ok_or("Gaussian coverage")?,
+        coefficients,
+    )
+}
+
+#[path = "solve_blind/acceptance.rs"]
+mod acceptance;
+pub(crate) use acceptance::source as retained_source;
+
+/// Search the original symbolic problem before any independent specialization data is inspected.
+pub(crate) fn independent_symbolic_product() -> crate::testing::common::TestResult {
+    let keys = ["d", "c", "b", "a"];
+    let (fixture, _, answer) = acceptance::solved(&keys)?;
+    let coverage = answer.coverage.as_ref().ok_or("symbolic oracle coverage")?;
+    let inventory = oracle::samples(&fixture.cas, coverage, &keys)?;
+    assert_eq!(inventory.len(), 11);
+    acceptance::fresh(&fixture.cas, &answer, &keys)
+}
+
+#[path = "solve_blind/inclusion.rs"]
+mod inclusion;
+pub(crate) use inclusion::check as inclusion_candidates;

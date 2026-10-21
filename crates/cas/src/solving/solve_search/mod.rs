@@ -57,6 +57,8 @@ pub(crate) struct Proposed {
     form: SolveForm,
     /// Postorder representation work is deferred until coverage checks.
     presentations: presentation::Docket,
+    /// Parameter requests extend their own sealed coverage through checked graph premises.
+    reuse_coverage: bool,
 }
 
 /// The original region, domain and complete request premises govern every coefficient inversion.
@@ -91,7 +93,12 @@ pub(crate) fn propose(
         region: original.region.clone(),
         steps: Vec::new(),
     };
+    let reuse_coverage = matches!(
+        crate::solving::coefficients::storage::domain(&cas.state, &polynomial.domain)?,
+        super::CoefficientDomainData::Fraction { .. }
+    );
     let (proposal, presentations) = {
+        let cache = reuse_coverage.then(crate::solving::radicals::cache::Cache::default);
         let mut search = regional::Regional {
             cas,
             construction: &mut construction,
@@ -101,6 +108,7 @@ pub(crate) fn propose(
             audit,
             budget,
             guards: Vec::new(),
+            cache,
             presentations: presentation::Docket::default(),
         };
         let proposal = search.solve()?;
@@ -111,6 +119,7 @@ pub(crate) fn propose(
         set: proposal.set,
         form: specification.form,
         presentations,
+        reuse_coverage,
     })
 }
 
@@ -127,11 +136,15 @@ pub(crate) fn produce(
         set,
         form,
         presentations,
+        reuse_coverage,
     } = propose(cas, request, audit, budget)?;
     audit.mark("coverage-replay", &construction.region, 0, budget)?;
     let coverage = cas.check_proof(&construction.context, &construction.steps, checker)?;
     let (context, region) = (construction.context.clone(), construction.region.clone());
-    let prepared = presentations.emit(&mut construction, form, budget);
+    let prefix = reuse_coverage.then_some(construction.steps.len());
+    let prepared = presentations
+        .emit(&mut construction, form, budget)
+        .map(|()| prefix);
     construction.context = context;
     construction.region = region;
     Ok(crate::solving::radicals::proof::finish(
@@ -229,7 +242,7 @@ fn failure(
 }
 
 /// Coefficient interpretation follows declared keys in their ordered frame, including renamed inputs.
-fn coefficient_images(
+pub(crate) fn coefficient_images(
     cas: &mut Cas,
     construction: &Construction,
     domain: &Handle,

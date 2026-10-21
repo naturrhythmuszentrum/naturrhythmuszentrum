@@ -80,3 +80,17 @@ mod formal_scope;
 mod formal_compose;
 
 mod real_choice;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "regional consequence regressions share the producer"
+)]
+pub(crate) mod consequence;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "one regional request owns its discovery scratch"
+)]
+pub(crate) mod cache;
+
+mod continuation;
