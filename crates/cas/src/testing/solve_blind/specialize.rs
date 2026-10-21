@@ -260,3 +260,57 @@ pub(crate) fn samples(
         .map(|values| sample(cas, &claim.set, &steps, keys, values))
         .collect()
 }
+
+/// Undo the independently supplied declaration bijection in the actual split expressions.
+fn renamed_expression(cas: &Cas, id: LogicalId, keys: &[&str]) -> TestResult<String> {
+    let value = cas.state.expression(id)?;
+    let head = match &value.operator {
+        Operator::Rational(value) => format!("{:?}", number(value)?),
+        Operator::Free(key) => format!(
+            "slot{}",
+            keys.iter()
+                .position(|candidate| *candidate == key)
+                .ok_or("renaming declaration")?
+        ),
+        Operator::Neg => "neg".into(),
+        Operator::Add => "add".into(),
+        Operator::Sub => "sub".into(),
+        Operator::Mul => "mul".into(),
+        Operator::Div => "div".into(),
+        Operator::IntegerPower(power) => format!("power{power}"),
+        _ => return Err("renaming expression fragment".into()),
+    };
+    let arguments = value
+        .operands
+        .iter()
+        .map(|id| renamed_expression(cas, *id, keys))
+        .collect::<TestResult<Vec<_>>>()?;
+    Ok(format!("{head}({})", arguments.join(",")))
+}
+
+/// Every generated guard, including guards not hit by samples, has the same renamed syntax.
+pub(crate) fn guards(
+    cas: &Cas,
+    witness: &crate::proof::VerifiedWitness,
+    keys: &[&str],
+) -> TestResult<Vec<String>> {
+    let mut result = Vec::new();
+    for step in super::super::audit::applications(cas, witness)? {
+        let crate::proof::Certificate::Solve(certificate) = step.certificate else {
+            continue;
+        };
+        let SolveCertificate::TotalPredicateSplit(split) = certificate.as_ref() else {
+            continue;
+        };
+        if split.mode == crate::solving::PredicateSplitMode::ZeroNonzero {
+            assert_eq!(split.children.len(), 2);
+            result.push(renamed_expression(
+                cas,
+                split.expression.logical_id(),
+                keys,
+            )?);
+        }
+    }
+    assert!(result.len() >= 4);
+    Ok(result)
+}

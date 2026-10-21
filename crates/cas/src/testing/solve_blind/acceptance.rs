@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Fresh expected claims and independent traversal retain the original symbolic source.
 
-use crate::graph::{Cas, Handle};
+use crate::graph::{Cas, Handle, Vertex};
 use crate::limits::{Budget, Limits};
 use crate::proof_model::{Judgment, Statement};
 use crate::solving::{
     SolveAnswer, SolveForm, SolveStatement, StatementCoverage, StatementPresentation,
 };
 use crate::testing::common::TestResult;
+use petgraph::visit::EdgeRef;
+use std::collections::BTreeSet;
 
 type Solved = (super::source::Fixture, crate::request::Request, SolveAnswer);
 
@@ -93,11 +95,127 @@ fn replay(cas: &mut Cas, bytes: &[u8], expected: &Judgment) -> TestResult {
     Ok(())
 }
 
-/// Both original declaration frames now reach independent fresh expected-claim replay.
+/// Walk every dependency edge, including literal attachments and original occurrence receipts.
+fn free_keys(cas: &Cas, root: &Handle) -> TestResult<BTreeSet<String>> {
+    let mut pending = vec![
+        *cas.state
+            .indices
+            .get(&root.logical_id())
+            .ok_or("source index")?,
+    ];
+    let mut seen = BTreeSet::new();
+    let mut keys = BTreeSet::new();
+    while let Some(index) = pending.pop() {
+        if !seen.insert(index) {
+            continue;
+        }
+        if let Some(Vertex::Expression(expression)) = cas.state.graph.node_weight(index)
+            && let crate::model::Operator::Free(key) = &expression.operator
+        {
+            keys.insert(key.clone());
+        }
+        for edge in cas.state.graph.edges(index) {
+            pending.push(edge.target());
+        }
+    }
+    Ok(keys)
+}
+
+/// Rebuild a genuinely different source by changing one original coefficient occurrence.
+fn changed(
+    fixture: &mut super::source::Fixture,
+    keys: &[&str],
+    position: usize,
+) -> TestResult<Handle> {
+    use crate::model::Operator;
+    let unknown = fixture.free("x")?;
+    let mut expression = fixture.integer(0, false)?;
+    for (index, key) in keys.iter().enumerate().rev() {
+        let product = fixture.expression(Operator::Mul, &[expression, unknown.clone()], false)?;
+        let mut coefficient = fixture.free(key)?;
+        if index == position {
+            assert_eq!(
+                fixture.cas.expression(&coefficient)?.0,
+                &Operator::Free((*key).into())
+            );
+            let one = fixture.integer(1, false)?;
+            let replacement =
+                fixture.expression(Operator::Add, &[coefficient.clone(), one], false)?;
+            assert_ne!(replacement, coefficient);
+            coefficient = replacement;
+        }
+        expression = fixture.expression(Operator::Add, &[product, coefficient], false)?;
+    }
+    let zero = fixture.integer(0, false)?;
+    let predicate = fixture.equation(&expression, &zero)?;
+    fixture.problem("x", &predicate, &[])
+}
+
+/// A theorem for the old equation must reject each distinct expected equation, even on zero cells.
+fn reject_changed(cas: &Cas, answer: &SolveAnswer, keys: &[&str]) -> TestResult {
+    let coverage = answer.coverage.as_ref().ok_or("source coverage")?;
+    let bytes = cas.export_witness(coverage, &mut Budget::new(Limits::blind_cubic())?)?;
+    for position in 0..keys.len() {
+        let (mut fresh, request) = super::source::symbolic(keys)?;
+        let crate::request::Task::Solve(original) = &request.task else {
+            return Err("source expected problem".into());
+        };
+        let replacement = changed(&mut fresh, keys, position)?;
+        assert_ne!(replacement, original.problem);
+        let imported = fresh
+            .cas
+            .inspect(&bytes, &mut Budget::new(Limits::blind_cubic())?)?;
+        let Statement::Solve(statement) = &imported.judgment().statement else {
+            return Err("source imported claim".into());
+        };
+        let SolveStatement::Coverage(claim) = statement.as_ref() else {
+            return Err("source coverage claim".into());
+        };
+        assert_eq!(claim.problem, original.problem);
+        let expected = judgment(
+            &fresh,
+            SolveStatement::Coverage(StatementCoverage {
+                problem: replacement,
+                set: claim.set.clone(),
+                region: fresh.region.clone(),
+            }),
+        );
+        assert!(
+            fresh
+                .cas
+                .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)
+                .is_err()
+        );
+    }
+    Ok(())
+}
+
+/// All original parameter occurrences survive in both source and returned closure under either naming.
 pub(crate) fn source() -> TestResult {
     for keys in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
-        let (fixture, _, answer) = solved(&keys)?;
+        let (fixture, request, answer) = solved(&keys)?;
+        let expected: BTreeSet<_> = keys
+            .iter()
+            .copied()
+            .chain(std::iter::once("x"))
+            .map(str::to_owned)
+            .collect();
+        assert_eq!(
+            free_keys(
+                &fixture.cas,
+                &request.inputs.first().ok_or("source receipt")?.root
+            )?,
+            expected
+        );
+        assert_eq!(
+            free_keys(
+                &fixture.cas,
+                answer.coverage.as_ref().ok_or("source result")?.proof()
+            )?,
+            expected
+        );
         fresh(&fixture.cas, &answer, &keys)?;
+        reject_changed(&fixture.cas, &answer, &keys)?;
     }
     Ok(())
 }

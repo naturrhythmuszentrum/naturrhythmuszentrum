@@ -542,4 +542,4 @@ fn multiply_factor(
 
 #[path = "specialize.rs"]
 mod specialize;
-pub(crate) use specialize::samples;
+pub(crate) use specialize::{guards, samples};

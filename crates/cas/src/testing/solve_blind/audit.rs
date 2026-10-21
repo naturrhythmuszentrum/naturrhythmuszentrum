@@ -273,7 +273,7 @@ fn real_refusal(
     )
 }
 
-/// Record actual generation and fresh expected-claim replay on each accepted boundary.
+/// Record real generation, reconstruction, independent samples and fresh expected-claim replay.
 fn complex_acceptance(
     fixture: &mut super::source::Fixture,
     request: &crate::request_model::Request,
@@ -297,6 +297,9 @@ fn complex_acceptance(
     assert_eq!(result.answer.unresolved_regions, [] as [Handle; 0]);
     let coverage = result.answer.coverage.as_ref().ok_or("audit coverage")?;
     assert!(coverage.is_discharged());
+    let steps = applications(&fixture.cas, coverage)?;
+    reached(&steps)?;
+    let inventory = super::oracle::samples(&fixture.cas, coverage, keys)?;
     super::acceptance::fresh(&fixture.cas, &result.answer, keys)?;
     assert!(generation.usage().work <= limits.work);
     assert!(checker.usage().work > 0);
@@ -309,7 +312,8 @@ fn complex_acceptance(
         .checked_sub(before.compared_bytes)
         .ok_or("byte counter")?;
     Ok(format!(
-        "result=Solved(Radicals)\nfresh_coverage=true\nfresh_presentation=true\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
+        "result=Solved(Radicals)\nchecked_applications={}\nindependent_strata={inventory:?}\nfresh_coverage=true\nfresh_presentation=true\nlimits={limits:?}\ninterning_interval=produce\ninterning_comparisons={comparisons}\ninterning_compared_bytes={compared_bytes}\nphase_format=((phase,index),region,depth,seed,coefficient_ops,gcd_steps,work)\nphases={:#?}\ncomponents={:#?}\ncoefficient_terms={:#?}\nseeds={:?}\nfinal_generation={:?}\nreplay={:?}\n",
+        steps.len(),
         audit.phases,
         audit.components,
         audit.coefficient_terms,
@@ -317,6 +321,35 @@ fn complex_acceptance(
         generation.usage(),
         checker.usage()
     ))
+}
+
+/// Inventory comes from sealed applications, independently of observer events and producer scratch.
+fn reached(steps: &[ApplicationDraft]) -> TestResult {
+    use crate::proof_model::Certificate;
+    use crate::rule::Primitive;
+    use crate::solving::{SolveCertificate, SolveSchema};
+    for schema in [
+        SolveSchema::PermutationOrbitCoverage,
+        SolveSchema::CoefficientIdentity,
+        SolveSchema::RootAdjunction,
+        SolveSchema::ProductCompleteness,
+        SolveSchema::TotalPredicateSplit,
+    ] {
+        assert!(
+            steps
+                .iter()
+                .any(|step| step.rule == Primitive::Solve(schema))
+        );
+    }
+    assert!(
+        steps
+            .iter()
+            .any(|step| step.rule == Primitive::ContextClose)
+    );
+    assert!(steps.iter().any(|step| matches!(&step.certificate, Certificate::Solve(certificate)
+        if matches!(certificate.as_ref(), SolveCertificate::CoefficientIdentity(value)
+            if value.combinations.iter().any(|row| row.hypothesis.as_ref().is_some_and(|hypothesis| hypothesis.vieta.is_some()))))));
+    formal_steps(steps)
 }
 
 /// Measure the actual checker path, then exercise the public service at that exact replay cap.

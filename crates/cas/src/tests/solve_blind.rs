@@ -326,7 +326,7 @@ fn blind_zero_pairing_independent_oracle() -> TestResult {
     Ok(())
 }
 
-/// Both original declaration namings now independently replay complete source claims.
+/// Both declaration namings retain the original coefficient occurrences and reject changed expected sources.
 /// ´test:crate:blind-symbolic-source-retains-parameters´
 #[test]
 fn blind_symbolic_source_retains_parameters() -> TestResult {
@@ -423,7 +423,7 @@ fn blind_incremental_proof_replay() -> TestResult {
 }
 
 /// Independent boundary inventories retain declaration fields, initial maps and original forms.
-/// The Complex boundaries now record accepted results; the separate Real refusal remains earlier.
+/// The Complex boundaries reconstruct checked proof DAGs; the separate Real refusal remains earlier.
 /// ´test:crate:blind-symbolic-acceptance-audit´
 #[test]
 fn blind_symbolic_acceptance_audit() -> TestResult {
@@ -465,7 +465,7 @@ fn blind_repeated_factor_mutations() -> TestResult {
     crate::testing::solve_blind::false_factors(&[2, -3, 0, 1])
 }
 
-/// Every degree case in the accepted baseline is independently sampled before mutation restoration.
+/// Every generated zero/nonzero split of accepted coverage rejects either missing child.
 /// ´test:crate:blind-missing-stratum-mutations´
 #[test]
 fn blind_missing_stratum_mutations() -> TestResult {
