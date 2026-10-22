@@ -181,3 +181,27 @@ requires = []
 [[document]]
 output = "tools/docgen/src/engineering/README.md"
 requires = []
+
+[[document]]
+output = "docs/engineering/overview.md"
+requires = ["census"]
+
+[[document]]
+output = "docs/engineering/budgets.md"
+requires = []
+
+[[document]]
+output = "docs/engineering/measurements.md"
+requires = ["engineering"]
+
+[[document]]
+output = "docs/engineering/kernels.md"
+requires = ["engineering"]
+
+[[document]]
+output = "docs/engineering/refusals.md"
+requires = ["engineering"]
+
+[[document]]
+output = "docs/engineering/evidence.md"
+requires = []

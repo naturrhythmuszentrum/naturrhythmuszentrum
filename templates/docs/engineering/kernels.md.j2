@@ -1,0 +1,42 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+{# requires engineering v1 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Numerical laws and admitted policies · `spec:nrz:engineering-kernels`
+
+**Definition (Evidence boundary)** · `def:nrz:engineering-kernel-evidence`
+
+A catalogue row distinguishes the exact law, admitted input domain, numerical shape, enclosure or policy guarantee and named refusal boundary. A finite candidate alone supplies no error certificate; the cited executable claims describe the tested behavior rather than a universal proof (`def:nrz:descriptor-binding-kernel-law`), (`thm:nrz:descriptor-binding-kernel-enclosure`).
+
+**Table (Adopted numerical laws)** · `tab:nrz:engineering-kernel-laws`
+
+|Owner|Operation|Law|Domain|Shape|Guarantee|Refusals|Source|Evidence|
+|-----|---------|---|------|-----|---------|--------|------|--------|
+{% for row in engineering.kernels -%}
+|{{ row.owner }}|{{ row.operation }}|{{ row.law|replace("*", "\\*") }}|{{ row.domain }}|{{ row.shape }}|{{ row.guarantee }}|{{ row.refusals }}|`{{ row.source }}`|{% for claim in row.claims %}(`{{ claim }}`){% if not loop.last %} {% endif %}{% endfor %}|
+{% endfor %}
+**Argument (Primitive and reduction schedules)** · `arg:nrz:engineering-arithmetic-schedules`
+
+Outward primitive bounds, explicit fused rounding and ordered reductions have separate schedules. Intermediate finite-range refusal is observable, and reassociation cannot be silently substituted for the admitted contraction (`[SCALAR-claim:scalar:fused-rounding-is-explicit]`), (`[SCALAR-claim:scalar:fused-intermediate-range]`), (`[SCALAR-claim:scalar:reduction-order-and-empty-laws]`), (`rule:nrz:matrix-core-rounding`).
+
+**Argument (Representation and bound policies)** · `arg:nrz:engineering-representation-policies`
+
+Precision changes preserve existing coverage and account for the changed center separately. Conservative tolerance comparison retains unresolved overlap and absent requests, while recovery retains cumulative work instead of inferring success from a smaller residual (`[SCALAR-claim:scalar:literal-precision-change-lifecycle]`), (`[ACCURACY-claim:accuracy:budget-boundary-decisions]`), (`[ACCURACY-claim:accuracy:certified-radius-stagnation-window]`).
+
+**Definition (Matrix design obligations)** · `def:nrz:engineering-matrix-law-boundary`
+
+The design specifies complete-family affine propagation, product interactions, direct nonlinear domains, verified square solves and complete joint-source statistics. Those laws remain distinct from the future meaning-free heap/kernel boundary and mixed LC lowerings; this wave does not replace their source-linked evidence inventory (`tab:nrz:matrix-core-operation-propagation`), (`rule:nrz:matrix-core-solve-theorem`), (`rule:nrz:matrix-core-joint-sources`), (`rule:nrz:descriptor-binding-kernel-boundary`).
+
+## Open intents · `sec:nrz:engineering-kernel-intents`
+
+**Claim (Matrix kernel evidence adoption)** · `claim:nrz:engineering-matrix-kernel-evidence`
+
+A later matrix documentation wave will register every current kernel law, domain, shape, refusal and executable claim; numerical acceptance owns the integrated LC evidence using those registered contracts (`step:nrz:lc-resonance-numerical-acceptance`).
+
+**Claim (Meaning-free mixed numerical execution)** · `claim:nrz:engineering-lc-kernels`
+
+Region bindings will separate physical meaning from numerical contracts, and coordinate, phasor and spectral lowering will supply their original mixed restoration and closed LC operations with independent enclosure and refusal evidence (`step:nrz:lc-resonance-region-bindings`), (`step:nrz:lc-resonance-coordinate-lowering`), (`step:nrz:lc-resonance-phasor-lowering`), (`step:nrz:lc-resonance-spectral-lowering`).
+
+**Claim (Constant, phase and further domains)** · `claim:nrz:engineering-further-kernels`
+
+The quantity stage will connect exact constants to bounded numerical enclosures and branch-aware phase; the advanced-matrix bite will admit further numerical domains only with their own domain and perturbation arguments (`step:nrz:lc-resonance-quantity-bite`), (`step:nrz:bite-advanced-matrix-domains`).
