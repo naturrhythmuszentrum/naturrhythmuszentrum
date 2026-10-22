@@ -183,6 +183,10 @@ output = "tools/docgen/src/engineering/README.md"
 requires = []
 
 [[document]]
+output = "tools/docgen/src/ordinals/README.md"
+requires = []
+
+[[document]]
 output = "docs/engineering/overview.md"
 requires = ["census"]
 

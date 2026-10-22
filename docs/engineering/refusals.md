@@ -39,10 +39,12 @@ Wrappers retain their underlying numerical or symbolic cause. Recovery stop enum
 |DOCGEN|`Error`|`JsonSyntax`|failure|A committed JSON document is syntactically invalid.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`Manifest`|failure|The declared output inventory is invalid.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`Membership`|failure|Workspace membership or a supported manifest fact is invalid.|`tools/docgen/src/error.rs`|
+|DOCGEN|`Error`|`OrdinalCode`|failure|A tracked path or text line contains an ordinal schedule code; the refusal retains its path, line and exact matched spelling.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`Payload`|failure|A typed record or its semantic constraints are invalid.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`Template`|failure|A template cannot be loaded or evaluated.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`TemplateHeader`|failure|A template header violates the declared source contract.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`TomlSyntax`|failure|An input TOML document is syntactically invalid.|`tools/docgen/src/error.rs`|
+|DOCGEN|`Error`|`TrackedText`|failure|Git cannot supply the tracked-file inventory, or that inventory contains a path that is not UTF-8.|`tools/docgen/src/error.rs`|
 |SCALAR|`ArithmeticFailure`|`InvalidLiteral`|failure|Text is outside the bounded numeric grammar.|`crates/scalar/src/error.rs`|
 |SCALAR|`ArithmeticFailure`|`InvertedEndpoints`|failure|The lower endpoint exceeds the upper endpoint.|`crates/scalar/src/error.rs`|
 |SCALAR|`ArithmeticFailure`|`LengthMismatch`|failure|Dot-product slices differ in length.|`crates/scalar/src/error.rs`|

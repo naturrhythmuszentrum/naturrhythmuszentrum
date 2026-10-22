@@ -7,6 +7,22 @@ use thiserror::Error;
 /// A path-specific failure in documentation generation.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// A tracked text file or path contains an ordinal schedule code.
+    #[error("ordinal-step-code at {path}:{line}: {matched}")]
+    OrdinalCode {
+        /// Root-relative tracked path.
+        path: String,
+        /// One-based text line, or zero for the path itself.
+        line: usize,
+        /// Exact refused schedule-code spelling.
+        matched: String,
+    },
+    /// The tracked text inventory could not be obtained.
+    #[error("tracked-text inventory: {detail}")]
+    TrackedText {
+        /// Git or path-decoding diagnostic.
+        detail: String,
+    },
     /// A filesystem operation failed.
     #[error("I/O at {path}: {source}")]
     Io {

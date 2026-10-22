@@ -31,7 +31,9 @@ Inputs, the document manifest, and datasets identify themselves with `namespace`
 
 ## Guarantees and refusals · `sec:docgen:guarantees`
 
-`check` derives datasets and renders every document in memory twice from the committed inputs. Generated paths are disjoint from those inputs and templates, so the second generation reads the same sources; no generated tree is written or overlaid. It compares the generations byte for byte, then compares expected bytes and the managed file inventory with disk, reporting missing, changed, stale and unstable paths. This is documentation reproducibility, separate from the engine's numerical agreement within tracked error.
+`check` first scans Git-tracked paths and current UTF-8 text for ordinal schedule codes, then derives datasets and renders every document in memory twice from the committed inputs. Generated paths are disjoint from those inputs and templates, so the second generation reads the same sources; no generated tree is written or overlaid. It compares the generations byte for byte, then compares expected bytes and the managed file inventory with disk, reporting missing, changed, stale and unstable paths. This is documentation reproducibility, separate from the engine's numerical agreement within tracked error.
+
+The named refusal `ordinal-step-code` reports a root-relative path, a one-based line and the matched spelling; line zero identifies a filename. The guard recognizes ordering words with the recorded single-digit plan ordinals, numeric step heads, CAS slice markers and contextual LC substeps. Mathematical symbols, exponents, types, versions and multi-digit algorithm positions retain their meanings. It uses no file allowlist. Untracked files, binary payloads and symbolic-link targets are not scanned; an unavailable Git inventory refuses explicitly. Tests build forbidden examples from separate words so the tracked test sources obey the same rule.
 
 Problem and fixture schema v2 is specified in `docs/design/problem-data-schema.md`. Its strict records declare quantities, counts, metadata, independent uncertainties and executable expressions; bindings checks CAS-owned originals using semantic-header parsing, complete occurrence walks and syntax inspection. `render` reconstructs the context and compares regenerated evidence with committed validation records. Unsupported records retain named limitations and cannot become substitute inputs. Problem/fixture inputs and committed problem datasets require v2.0; v1 is refused with the migration diagnostic, and unknown minors require an explicit compatibility decision. A units check establishes declared consistency, not numerical accuracy, model validity or statistical assurance.
 
@@ -54,7 +56,7 @@ The project dataset records 9 entries in the broader engine plan. The LC impleme
 
 - `nrz-docgen data [--root DIR]` writes derived datasets.
 - `nrz-docgen render [--root DIR]` writes Markdown from the committed datasets.
-- `nrz-docgen check [--root DIR]` writes nothing and reports drift.
+- `nrz-docgen check [--root DIR]` writes nothing, refuses ordinal schedule codes and reports drift.
 - Exit status 0 means success, 1 means a runtime failure, 2 means incorrect usage, and 3 means documentation drift.
 
 The tests in `tests/fixed_point.rs` and `tests/preservation.rs` cover generation stability, drift and preservation behavior. Run `cargo test -p nrz-docgen` for the tool's tests and `cargo run -p nrz-docgen -- check` for the committed workspace fixed point. The tool's checks complement crate doctests and numerical/symbolic oracles; they do not replace them.

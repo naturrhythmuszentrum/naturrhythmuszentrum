@@ -747,6 +747,14 @@
     },
     {
       "category": "failure",
+      "meaning": "A tracked path or text line contains an ordinal schedule code; the refusal retains its path, line and exact matched spelling.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "OrdinalCode"
+    },
+    {
+      "category": "failure",
       "meaning": "A typed record or its semantic constraints are invalid.",
       "owner": "DOCGEN",
       "source": "tools/docgen/src/error.rs",
@@ -776,6 +784,14 @@
       "source": "tools/docgen/src/error.rs",
       "type_name": "Error",
       "variant": "TomlSyntax"
+    },
+    {
+      "category": "failure",
+      "meaning": "Git cannot supply the tracked-file inventory, or that inventory contains a path that is not UTF-8.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "TrackedText"
     },
     {
       "category": "failure",
@@ -912,7 +928,7 @@
       "path": "tools/docgen/src/check.rs"
     },
     {
-      "fingerprint": "0bcffd6f3190e7ac",
+      "fingerprint": "9bf70a7b3959bbc2",
       "path": "tools/docgen/src/error.rs"
     }
   ]

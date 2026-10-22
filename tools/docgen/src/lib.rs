@@ -19,6 +19,17 @@ mod check;
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
 )]
+mod ordinals;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod tracked;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
 mod engineering;
 #[expect(
     clippy::redundant_pub_crate,
@@ -111,8 +122,10 @@ pub fn render(root: &Path) -> Result<(), Error> {
 ///
 /// # Errors
 ///
-/// Returns a path-bearing failure for invalid sources, manifests, templates, or I/O.
+/// Returns a path-bearing failure for ordinal schedule codes, unavailable tracked-file
+/// inventory, invalid sources, manifests, templates, or I/O.
 pub fn check(root: &Path) -> Result<Vec<Finding>, Error> {
+    tracked::check(root)?;
     let owners = envelope::owners(root)?;
     let documents = manifest::read(root, &owners)?;
     let first = generation(root, &owners, &documents)?;
