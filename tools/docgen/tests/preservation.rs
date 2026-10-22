@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact conservation of the independent v1 reference payload during schema migration.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde_json::{Value, json};
@@ -88,7 +89,67 @@ fn project(value: &Value, original: &Value) -> Value {
     result
 }
 
+/// Index entries by their source identity without dropping duplicates or unmatched rows.
+fn entries_by_source(dataset: &Value) -> BTreeMap<&str, &Value> {
+    let sources = dataset["sources"].as_array().expect("sources");
+    let entries = dataset["entries"].as_array().expect("entries");
+    assert_eq!(sources.len(), entries.len());
+    let mut indexed = BTreeMap::new();
+    for (source, entry) in sources.iter().zip(entries) {
+        let path = source.as_str().expect("source path");
+        assert!(indexed.insert(path, entry).is_none(), "duplicate {path}");
+    }
+    indexed
+}
+
+/// Keep the complete original inventory and exact payload checks independent of additions.
+fn assert_originals_preserved(current: &Value, baseline: &Value) {
+    assert_eq!(current["version"], json!([2, 0, 0]));
+    let originals = entries_by_source(baseline);
+    assert_eq!(originals.len(), 10);
+    let entries = entries_by_source(current);
+    let mut checked = 0_u64;
+    let mut unsupported = 0_u64;
+    for (path, original) in originals {
+        let entry = entries.get(path).expect("missing original source");
+        assert_eq!(project(entry, original), *original, "{path}");
+        checked += entry["validation"]["checked_observables"]
+            .as_u64()
+            .expect("checked count");
+        unsupported += entry["validation"]["unsupported_observables"]
+            .as_u64()
+            .expect("unsupported count");
+    }
+    assert_eq!(checked, 78);
+    assert_eq!(unsupported, 12);
+}
+
+/// Read the v2 source envelope separately from its generated dataset entry.
+fn source_payload(
+    root: &Path,
+    path: &str,
+    entry: &Value,
+) -> Result<Value, Box<dyn std::error::Error>> {
+    let source: toml::Value = toml::from_str(&std::fs::read_to_string(root.join(path))?)?;
+    let mut source = serde_json::to_value(source)?;
+    let object = source.as_object_mut().expect("source object");
+    assert_eq!(object["version"], json!([2, 0, 0]));
+    assert_eq!(object["labels"], json!([entry["problem"]["register"]]));
+    for key in [
+        "namespace",
+        "version",
+        "owner",
+        "license",
+        "sources",
+        "labels",
+    ] {
+        object.remove(key);
+    }
+    Ok(source)
+}
+
 /// Every original value, magnitude, identity, citation and documentary string survives exactly.
+/// Additional entries must pass authoritative v2 validation and the generated fixed point.
 /// ´test:integration:preserves-every-reference-payload-field´
 #[test]
 fn preserves_every_reference_payload_field() -> Result<(), Box<dyn std::error::Error>> {
@@ -96,49 +157,56 @@ fn preserves_every_reference_payload_field() -> Result<(), Box<dyn std::error::E
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let current: Value =
         serde_json::from_slice(&std::fs::read(root.join("data/datasets/problems.json"))?)?;
-    assert_eq!(current["version"], json!([2, 0, 0]));
-    assert_eq!(current["sources"], baseline["sources"]);
-    let originals = baseline["entries"].as_array().expect("original entries");
-    let entries = current["entries"].as_array().expect("entries");
-    assert_eq!(entries.len(), 10);
-    assert_eq!(entries.len(), originals.len());
-    for (index, (entry, original)) in entries.iter().zip(originals).enumerate() {
-        assert_eq!(project(entry, original), *original);
-        let path = current["sources"][index].as_str().expect("source");
-        let source: toml::Value = toml::from_str(&std::fs::read_to_string(root.join(path))?)?;
-        let mut source = serde_json::to_value(source)?;
-        let object = source.as_object_mut().expect("source object");
-        assert_eq!(object["version"], json!([2, 0, 0]));
-        assert_eq!(object["labels"], json!([original["problem"]["register"]]));
-        for key in [
-            "namespace",
-            "version",
-            "owner",
-            "license",
-            "sources",
-            "labels",
-        ] {
-            object.remove(key);
+    assert_originals_preserved(&current, &baseline);
+    let originals = entries_by_source(&baseline);
+    for (path, entry) in entries_by_source(&current) {
+        let source = source_payload(&root, path, entry)?;
+        if let Some(original) = originals.get(path) {
+            assert_eq!(project(&source, original), **original, "{path}");
         }
-        assert_eq!(project(&source, original), *original);
     }
-    assert_eq!(
-        entries
-            .iter()
-            .map(|entry| entry["validation"]["checked_observables"]
-                .as_u64()
-                .expect("count"))
-            .sum::<u64>(),
-        78
-    );
-    assert_eq!(
-        entries
-            .iter()
-            .map(|entry| entry["validation"]["unsupported_observables"]
-                .as_u64()
-                .expect("count"))
-            .sum::<u64>(),
-        12
-    );
+    // Re-derive every source through the schema, including all additions, then compare bytes.
+    // This read-only public API rejects malformed additions and stale or forged dataset rows.
+    assert_eq!(nrz_docgen::check(&root)?.len(), 0);
+    let mut reordered = current;
+    reordered["sources"]
+        .as_array_mut()
+        .expect("sources")
+        .reverse();
+    reordered["entries"]
+        .as_array_mut()
+        .expect("entries")
+        .reverse();
+    assert_originals_preserved(&reordered, &baseline);
+    Ok(())
+}
+
+/// Neither removing an original source nor changing its documentary payload can pass preservation.
+/// ´test:integration:preservation-rejects-missing-or-changed-originals´
+#[test]
+fn preservation_rejects_missing_or_changed_originals() -> Result<(), Box<dyn std::error::Error>> {
+    let baseline: Value = serde_json::from_str(include_str!("support/reference-v1.json"))?;
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let current: Value =
+        serde_json::from_slice(&std::fs::read(root.join("data/datasets/problems.json"))?)?;
+    let index = current["sources"]
+        .as_array()
+        .expect("sources")
+        .iter()
+        .position(|source| source == &baseline["sources"][0])
+        .expect("original source");
+    let mut missing = current.clone();
+    missing["sources"]
+        .as_array_mut()
+        .expect("sources")
+        .remove(index);
+    missing["entries"]
+        .as_array_mut()
+        .expect("entries")
+        .remove(index);
+    assert!(std::panic::catch_unwind(|| assert_originals_preserved(&missing, &baseline)).is_err());
+    let mut changed = current;
+    changed["entries"][index]["problem"]["model"] = json!("altered reference model");
+    assert!(std::panic::catch_unwind(|| assert_originals_preserved(&changed, &baseline)).is_err());
     Ok(())
 }

@@ -1,0 +1,489 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.problems.problem"
+version = [2, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = ["prob:exemplars:lc-resonance"]
+exponent_policy = "rational"
+
+[problem]
+slug = "lc-resonance"
+title = "LC resonance"
+register = "prob:exemplars:lc-resonance"
+kind = "problem"
+model = "An ideal lossless inductor and capacitor form a series LC one-port. With passive voltage/current signs and the phasor convention Re(V_hat*exp(i*omega*t/radian)), Z=i*X and X=(omega/radian)*L-1/((omega/radian)*C). The current charges the capacitor: C*dv/dt=i and L*di/dt=-v when the source is removed. Thus x=(v,i) has the mixed-kind state operator A=[[0,1/C],[-1/L,0]], mapping voltage/current to their time derivatives; its coherent-coordinate array is [[0,100000],[-40,0]]. The characteristic polynomial is s^2+1/(L*C), with a Complex rate s and Real positive L,C. These equations describe an ideal model; an uncertainty declaration of none does not certify physical exactness.\nThe exact reference coordinates are L=25/1000=1/40 H and C=10/1000000=1/100000 F. Therefore L*C=1/4000000 s^2, sqrt(L*C)=1/2000 s, omega0=2000 rad/s, f0=1000/pi Hz, T=pi/1000 s, and sqrt(L/C)=sqrt(2500)=50 ohm. The frequency kind counts periods per second; the angular-frequency kind accumulates angle per second. The explicit one-second and one-hertz constants implement f0=(1 s/T)*(1 Hz); no conversion of unlike kinds is inferred from their identical dimensions. The expression 8*atan(1) denotes the full-cycle angle 2*pi rad without an irrational measure scale.\nAt omega=1000,2000,4000 rad/s, the inductor and capacitor reactances in ohms are respectively (25,100), (50,50), (100,25), so Z is -75*i, 0, +75*i ohm. Every real component is zero. Below and above resonance the principal impedance phase arg(V_hat)-arg(I_hat) is -pi/2 and +pi/2 rad, respectively -90 and +90 degrees. Phase is an angle difference, defined modulo a full turn; the displayed branch lies in (-pi,pi]. At exact resonance Z=0, its phase is undefined, and the series admittance 1/Z has a pole; neither infinity nor a zero phase is a finite expected value. Away from resonance Y is +i/75 and -i/75 S. A nonzero ideal voltage drive at resonance has no bounded sinusoidal steady-state current, so no such amplitude is asserted.\nThe eigenvalues are s_plus=+2000*i and s_minus=-2000*i s^(-1), both with zero real component. Their product is 4000000 s^(-2), their sum is zero, and (s-2000*i)*(s+2000*i)=s^2+4000000. These are rate-valued eigenvalues, not hertz; multiplying their imaginary magnitudes by one radian gives omega0. Initial v=5 V and i=0 A give E=(C*v^2+L*i^2)/2=1/8000 J. The independent trajectory v=5*cos(2000*t/(1 s)) V and i=-(1/10)*sin(2000*t/(1 s)) A satisfies both differential equations and preserves E by cos^2+sin^2=1; equivalently dE/dt=C*v*dv/dt+L*i*di/dt=v*i-i*v=0.\nAll reference values follow from the displayed hand arithmetic, independent of engine evaluation. For the irrational values use Machin's identity pi=16*atan(1/5)-4*atan(1/239), proved by the tangent addition formula and the first-quadrant branch. Alternating sums through j=15 and j=5 in atan(x)=sum((-1)^j*x^(2*j+1)/(2*j+1)), with their signed next-term remainders, give 3.141592653589793<pi<3.141592653589794. Rational scaling and reciprocal endpoint reversal then give 318.309886183790<f0/(1 Hz)<318.309886183791, 0.003141592653589793<T/(1 s)<0.003141592653589794, and 1.5707963267948965<abs(phase)/(1 rad)<1.570796326794897. These enclosures justify the twelve-significant-digit values; decimal-12 denotes rounding, not an exact value or an engine-certified enclosure. Exact formulas remain in closed_form and derivation.\nSchema v2 has rational scalar value fields and Real-only algebra declarations. Complex phasors are therefore represented by named scalar real/reactive components, and eigenvalues by named scalar real/imaginary components with their pairing fixed by the names. The four spectral component expressions and two nonzero phase expressions are explicitly unsupported. An unsupported equation records the undefined resonance phase without inventing a numeric observable. Degrees appear only in documentary text because a degree measure needs the unavailable exact scale pi/180. Scalar descriptor checking does not certify a spectrum, a complex argument, a trigonometric value or the physical model.\n"
+instance = "L=25 mH, C=10 microfarad; impedance samples at 1000 rad/s, the derived resonance, and 4000 rad/s. For the separate source-free energy check, initial capacitor voltage is 5 V and initial current is 0 A. The strictly positive L,C domain is a model assumption, not a consequence of nonzero flags.\n"
+
+[[kinds]]
+name = "inductance"
+type = "named"
+dimensions = ["2", "1", "-2", "-2", "0", "0", "0"]
+
+[[kinds]]
+name = "capacitance"
+type = "named"
+dimensions = ["-2", "-1", "4", "2", "0", "0", "0"]
+
+[[kinds]]
+name = "duration_squared"
+type = "named"
+dimensions = ["0", "0", "2", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "duration"
+type = "named"
+dimensions = ["0", "0", "1", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "angular_frequency"
+type = "named"
+dimensions = ["0", "0", "-1", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "frequency"
+type = "named"
+dimensions = ["0", "0", "-1", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "rate"
+type = "named"
+dimensions = ["0", "0", "-1", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "impedance"
+type = "named"
+dimensions = ["2", "1", "-3", "-2", "0", "0", "0"]
+
+[[kinds]]
+name = "impedance_squared"
+type = "named"
+dimensions = ["4", "2", "-6", "-4", "0", "0", "0"]
+
+[[kinds]]
+name = "admittance"
+type = "named"
+dimensions = ["-2", "-1", "3", "2", "0", "0", "0"]
+
+[[kinds]]
+name = "voltage"
+type = "named"
+dimensions = ["2", "1", "-3", "-1", "0", "0", "0"]
+
+[[kinds]]
+name = "voltage_squared"
+type = "named"
+dimensions = ["4", "2", "-6", "-2", "0", "0", "0"]
+
+[[kinds]]
+name = "current"
+type = "named"
+dimensions = ["0", "0", "0", "1", "0", "0", "0"]
+
+[[kinds]]
+name = "current_squared"
+type = "named"
+dimensions = ["0", "0", "0", "2", "0", "0", "0"]
+
+[[kinds]]
+name = "energy"
+type = "named"
+dimensions = ["2", "1", "-2", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "angle"
+type = "angle"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+
+[[kinds]]
+name = "ratio"
+type = "ratio"
+dimensions = ["0", "0", "0", "0", "0", "0", "0"]
+
+[[kind_rules]]
+operation = "multiply"
+left = "inductance"
+right = "capacitance"
+result = "duration_squared"
+reason = "The LC product sets the squared natural time scale."
+
+[[kind_rules]]
+operation = "divide"
+left = "angle"
+right = "duration"
+result = "angular_frequency"
+reason = "Angle accumulated per natural time is angular frequency."
+
+[[kind_rules]]
+operation = "divide"
+left = "angle"
+right = "angular_frequency"
+result = "duration"
+reason = "A full-cycle angle divided by angular frequency gives the period."
+
+[[kind_rules]]
+operation = "divide"
+left = "angular_frequency"
+right = "angle"
+result = "rate"
+reason = "Divide by the explicit one-radian convention to obtain the exponential derivative rate."
+
+[[kind_rules]]
+operation = "divide"
+left = "inductance"
+right = "capacitance"
+result = "impedance_squared"
+reason = "The LC ratio sets squared characteristic impedance."
+
+[[kind_rules]]
+operation = "multiply"
+left = "rate"
+right = "inductance"
+result = "impedance"
+reason = "Inductive reactance multiplies inductance by the derivative rate."
+
+[[kind_rules]]
+operation = "multiply"
+left = "rate"
+right = "capacitance"
+result = "admittance"
+reason = "Capacitive susceptance multiplies capacitance by the derivative rate."
+
+[[kind_rules]]
+operation = "divide"
+left = "ratio"
+right = "admittance"
+result = "impedance"
+reason = "The inverse capacitive susceptance has impedance kind."
+
+[[kind_rules]]
+operation = "multiply"
+left = "capacitance"
+right = "voltage_squared"
+result = "energy"
+reason = "The electric storage term is capacitance times squared voltage."
+
+[[kind_rules]]
+operation = "multiply"
+left = "inductance"
+right = "current_squared"
+result = "energy"
+reason = "The magnetic storage term is inductance times squared current."
+
+[[kind_rules]]
+operation = "power"
+base = "duration_squared"
+exponent = "1/2"
+result = "duration"
+reason = "The positive root of the LC product is a natural duration."
+
+[[kind_rules]]
+operation = "power"
+base = "impedance_squared"
+exponent = "1/2"
+result = "impedance"
+reason = "Choose the positive characteristic impedance."
+
+[[kind_rules]]
+operation = "power"
+base = "voltage"
+exponent = "2"
+result = "voltage_squared"
+reason = "Square the initial voltage in the electric energy."
+
+[[kind_rules]]
+operation = "power"
+base = "current"
+exponent = "2"
+result = "current_squared"
+reason = "Square the initial current in the magnetic energy."
+
+[[parameters]]
+name = "L"
+description = "ideal inductance"
+value = "25"
+uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["2", "1", "-2", "-2", "0", "0", "0"], kind = "inductance", measure = { display = "mH", scale = "1/1000", offset = "0" }, affine_role = "difference" }
+nonzero = true
+
+[[parameters]]
+name = "C"
+description = "ideal capacitance"
+value = "10"
+uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["-2", "-1", "4", "2", "0", "0", "0"], kind = "capacitance", measure = { display = "microfarad", scale = "1/1000000", offset = "0" }, affine_role = "difference" }
+nonzero = true
+
+[[parameters]]
+name = "omega_below"
+description = "angular frequency of the below-resonance sample"
+value = "1000"
+uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "angular_frequency", measure = { display = "rad/s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = true
+
+[[parameters]]
+name = "omega_above"
+description = "angular frequency of the above-resonance sample"
+value = "4000"
+uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "angular_frequency", measure = { display = "rad/s", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = true
+
+[[parameters]]
+name = "v_initial"
+description = "initial capacitor voltage"
+value = "5"
+uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["2", "1", "-3", "-1", "0", "0", "0"], kind = "voltage", measure = { display = "V", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
+
+[[parameters]]
+name = "i_initial"
+description = "initial loop current"
+value = "0"
+uncertainty = { kind = "none" }
+role = "quantity"
+descriptor = { dimensions = ["0", "0", "0", "1", "0", "0", "0"], kind = "current", measure = { display = "A", scale = "1", offset = "0" }, affine_role = "difference" }
+nonzero = false
+
+[[symbols]]
+name = "radian"
+description = "One radian for the explicit angular-frequency/rate relation"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "angle", measure = { display = "rad", scale = "1", offset = "0" }, affine_role = "difference" }
+source = "problem.model: coherent coordinate and full-cycle conventions"
+assurance = "Exact source-free unit reference, independent of the expected numerical answers"
+kind = "constant"
+value = "1"
+
+[[symbols]]
+name = "second"
+description = "One second for the explicit period-to-frequency relation"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+source = "problem.model: coherent coordinate and full-cycle conventions"
+assurance = "Exact source-free unit reference, independent of the expected numerical answers"
+kind = "constant"
+value = "1"
+
+[[symbols]]
+name = "hertz"
+description = "One cycle per second for the explicit period-to-frequency relation"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "frequency", measure = { display = "Hz", scale = "1", offset = "0" }, affine_role = "difference" }
+source = "problem.model: coherent coordinate and full-cycle conventions"
+assurance = "Exact source-free unit reference, independent of the expected numerical answers"
+kind = "constant"
+value = "1"
+
+[[observables]]
+name = "omega0"
+description = "natural angular frequency"
+closed_form = "radian/sqrt(L*C)"
+value = "2000"
+value_kind = "exact"
+derivation = "L*C=(1/40)*(1/100000)=1/4000000 s^2. Its positive square root is 1/2000 s; one radian divided by that duration is 2000 rad/s.\n"
+second_route = "The characteristic polynomial s^2+4000000 has imaginary rate magnitudes 2000 s^(-1); the explicit radian factor converts that magnitude to angular frequency."
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "angular_frequency", measure = { display = "rad/s", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "radian/sqrt(L*C)" }
+
+[[observables]]
+name = "frequency0"
+description = "cycles per second at resonance"
+closed_form = "1000/pi"
+value = "318.309886184"
+value_kind = "decimal-12"
+derivation = "One period spans 2*pi rad, so f0=omega0/(2*pi rad)=1000/pi Hz. The independently derived enclosure in problem.model is (318.309886183790,318.309886183791) Hz.\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "frequency", measure = { display = "Hz", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "hertz*(second/period)" }
+
+[[observables]]
+name = "period"
+description = "source-free oscillation period"
+closed_form = "pi/1000"
+value = "0.00314159265359"
+value_kind = "decimal-12"
+derivation = "T=2*pi rad/omega0=pi/1000 s. Scale the Machin enclosure in problem.model by 1/1000; both endpoints round to the stated twelve significant digits.\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "1", "0", "0", "0", "0"], kind = "duration", measure = { display = "s", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "8*atan(1)/omega0" }
+
+[[observables]]
+name = "characteristic_impedance"
+description = "positive energy-exchange impedance scale"
+closed_form = "sqrt(L/C)"
+value = "50"
+value_kind = "exact"
+derivation = "L/C=(1/40)/(1/100000)=2500 ohm^2, whose positive square root is 50 ohm.\n"
+second_route = "The energy identity C*V_max^2=L*I_max^2 gives V_max/I_max=sqrt(L/C); the independently differentiated trajectory has 5 V divided by 1/10 A, or 50 ohm."
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "sqrt(L/C)" }
+
+[[observables]]
+name = "impedance_real_below"
+description = "real part of the ideal series impedance below"
+closed_form = "0"
+value = "0"
+value_kind = "exact"
+derivation = "The ideal inductor and capacitor have purely imaginary impedances under the stated exp(+i*omega*t/radian) convention, hence the series real part is exactly zero.\n"
+second_route = "none"
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "0*(omega_below/radian)*L" }
+
+[[observables]]
+name = "reactance_below"
+description = "imaginary part of the ideal series impedance below"
+closed_form = "(omega_below/radian)*L-1/((omega_below/radian)*C)"
+value = "-75"
+value_kind = "exact"
+derivation = "At 1000 rad/s, (omega/radian)*L=25 ohm and 1/((omega/radian)*C)=100 ohm; subtraction gives -75 ohm.\n"
+second_route = "none"
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "(omega_below/radian)*L-1/((omega_below/radian)*C)" }
+
+[[observables]]
+name = "impedance_real_resonance"
+description = "real part of the ideal series impedance resonance"
+closed_form = "0"
+value = "0"
+value_kind = "exact"
+derivation = "The ideal inductor and capacitor have purely imaginary impedances under the stated exp(+i*omega*t/radian) convention, hence the series real part is exactly zero.\n"
+second_route = "none"
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "0*(omega0/radian)*L" }
+
+[[observables]]
+name = "reactance_resonance"
+description = "imaginary part of the ideal series impedance resonance"
+closed_form = "(omega0/radian)*L-1/((omega0/radian)*C)"
+value = "0"
+value_kind = "exact"
+derivation = "At 2000 rad/s the two positive reactances are each 50 ohm, so their difference is exactly zero.\n"
+second_route = "none"
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "(omega0/radian)*L-1/((omega0/radian)*C)" }
+
+[[observables]]
+name = "impedance_real_above"
+description = "real part of the ideal series impedance above"
+closed_form = "0"
+value = "0"
+value_kind = "exact"
+derivation = "The ideal inductor and capacitor have purely imaginary impedances under the stated exp(+i*omega*t/radian) convention, hence the series real part is exactly zero.\n"
+second_route = "none"
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "0*(omega_above/radian)*L" }
+
+[[observables]]
+name = "reactance_above"
+description = "imaginary part of the ideal series impedance above"
+closed_form = "(omega_above/radian)*L-1/((omega_above/radian)*C)"
+value = "75"
+value_kind = "exact"
+derivation = "At 4000 rad/s, (omega/radian)*L=100 ohm and 1/((omega/radian)*C)=25 ohm; subtraction gives 75 ohm.\n"
+second_route = "none"
+descriptor = { dimensions = ["2", "1", "-3", "-2", "0", "0", "0"], kind = "impedance", measure = { display = "ohm", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "(omega_above/radian)*L-1/((omega_above/radian)*C)" }
+
+[[observables]]
+name = "phase_below"
+description = "principal impedance phase difference below resonance"
+closed_form = "-pi/2"
+value = "-1.57079632679"
+value_kind = "decimal-12"
+derivation = "The impedance is -75*i ohm, so its principal argument is -pi/2 rad, exactly -90 degrees. Halve the independent pi enclosure in problem.model and apply the sign; the rounded coordinate is not an exact rational angle.\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "angle", measure = { display = "rad", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "arg(i*((omega_below/radian)*L-1/((omega_below/radian)*C)))", code = "complex-argument-and-branch", reason = "Schema v2 declares only Real scalar algebra, with no Complex phasor or argument operation. A phase result also needs a nonzero impedance and an explicit branch; the nominal sign and independent angle derivation do not provide an executable phase certificate.", dependencies = ["L", "C", "omega_below"], scope = ["expression"] }
+
+[[observables]]
+name = "phase_above"
+description = "principal impedance phase difference above resonance"
+closed_form = "+pi/2"
+value = "1.57079632679"
+value_kind = "decimal-12"
+derivation = "The impedance is +75*i ohm, so its principal argument is +pi/2 rad, exactly 90 degrees. Halve the independent pi enclosure in problem.model and apply the sign; the rounded coordinate is not an exact rational angle.\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "0", "0", "0", "0", "0"], kind = "angle", measure = { display = "rad", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "arg(i*((omega_above/radian)*L-1/((omega_above/radian)*C)))", code = "complex-argument-and-branch", reason = "Schema v2 declares only Real scalar algebra, with no Complex phasor or argument operation. A phase result also needs a nonzero impedance and an explicit branch; the nominal sign and independent angle derivation do not provide an executable phase certificate.", dependencies = ["L", "C", "omega_above"], scope = ["expression"] }
+
+[[observables]]
+name = "eigenvalue_plus_real"
+description = "real component of the plus state-space eigenvalue"
+closed_form = "0"
+value = "0"
+value_kind = "exact"
+derivation = "det(s*I-A)=s^2+1/(L*C)=s^2+4000000=(s-2000*i)*(s+2000*i). Choose the plus branch by the positive imaginary component. Its real coordinate is 0 s^(-1).\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "rate", measure = { display = "s^-1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "Re(eigenvalue_plus([[0,1/C],[-1/L,0]]))", code = "matrix-spectrum-and-complex-components", reason = "Schema v2 cannot declare the mixed voltage/current state operator or a Complex spectral result. The Real matrix core has no certified spectral step; the hand factorization supplies the reference component, not an executable eigenvalue certificate.", dependencies = ["L", "C"], scope = ["expression"] }
+
+[[observables]]
+name = "eigenvalue_plus_imag"
+description = "imag component of the plus state-space eigenvalue"
+closed_form = "+1/sqrt(L*C)"
+value = "2000"
+value_kind = "exact"
+derivation = "det(s*I-A)=s^2+1/(L*C)=s^2+4000000=(s-2000*i)*(s+2000*i). Choose the plus branch by the positive imaginary component. Its imag coordinate is 2000 s^(-1).\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "rate", measure = { display = "s^-1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "Im(eigenvalue_plus([[0,1/C],[-1/L,0]]))", code = "matrix-spectrum-and-complex-components", reason = "Schema v2 cannot declare the mixed voltage/current state operator or a Complex spectral result. The Real matrix core has no certified spectral step; the hand factorization supplies the reference component, not an executable eigenvalue certificate.", dependencies = ["L", "C"], scope = ["expression"] }
+
+[[observables]]
+name = "eigenvalue_minus_real"
+description = "real component of the minus state-space eigenvalue"
+closed_form = "0"
+value = "0"
+value_kind = "exact"
+derivation = "det(s*I-A)=s^2+1/(L*C)=s^2+4000000=(s-2000*i)*(s+2000*i). Choose the minus branch by the negative imaginary component. Its real coordinate is 0 s^(-1).\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "rate", measure = { display = "s^-1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "Re(eigenvalue_minus([[0,1/C],[-1/L,0]]))", code = "matrix-spectrum-and-complex-components", reason = "Schema v2 cannot declare the mixed voltage/current state operator or a Complex spectral result. The Real matrix core has no certified spectral step; the hand factorization supplies the reference component, not an executable eigenvalue certificate.", dependencies = ["L", "C"], scope = ["expression"] }
+
+[[observables]]
+name = "eigenvalue_minus_imag"
+description = "imag component of the minus state-space eigenvalue"
+closed_form = "-1/sqrt(L*C)"
+value = "-2000"
+value_kind = "exact"
+derivation = "det(s*I-A)=s^2+1/(L*C)=s^2+4000000=(s-2000*i)*(s+2000*i). Choose the minus branch by the negative imaginary component. Its imag coordinate is -2000 s^(-1).\n"
+second_route = "none"
+descriptor = { dimensions = ["0", "0", "-1", "0", "0", "0", "0"], kind = "rate", measure = { display = "s^-1", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "unsupported", text = "Im(eigenvalue_minus([[0,1/C],[-1/L,0]]))", code = "matrix-spectrum-and-complex-components", reason = "Schema v2 cannot declare the mixed voltage/current state operator or a Complex spectral result. The Real matrix core has no certified spectral step; the hand factorization supplies the reference component, not an executable eigenvalue certificate.", dependencies = ["L", "C"], scope = ["expression"] }
+
+[[observables]]
+name = "initial_energy"
+description = "total source-free electric and magnetic energy at the initial state"
+closed_form = "(C*v_initial^2+L*i_initial^2)/2"
+value = "1/8000"
+value_kind = "exact"
+derivation = "C*v_initial^2/2=(1/100000)*25/2=1/8000 J; L*i_initial^2/2=0. All inputs are exact reference coordinates within the ideal model.\n"
+second_route = "For v=5*cos(2000*t/(1 s)) V and i=-(1/10)*sin(2000*t/(1 s)) A, the electric and magnetic energies are cos^2/(8000) and sin^2/(8000) J, summing to 1/8000 J."
+descriptor = { dimensions = ["2", "1", "-2", "0", "0", "0", "0"], kind = "energy", measure = { display = "J", scale = "1", offset = "0" }, affine_role = "difference" }
+expression = { kind = "algebra", text = "(C*v_initial^2+L*i_initial^2)/2" }
+
+[[equations]]
+kind = "unsupported"
+name = "phase_at_resonance"
+expression = { kind = "unsupported", text = "phase_at_resonance = arg(Z(omega0))", code = "undefined-zero-impedance-phase", reason = "At the exact series resonance both impedance components vanish. arg(0) is mathematically undefined; no numeric phase observable or zero placeholder is admitted. The reciprocal admittance likewise has a pole.", dependencies = ["impedance_real_resonance", "reactance_resonance"], scope = ["expression"] }
+source = "problem.model: ideal resonance singularity"
+assurance = "Independent exact cancellation of the two 50 ohm reactances; this is an undefined result, not a pending numerical approximation"
+
+[[variants]]
+name = "fourfold_inductance"
+description = "rescale the natural time while retaining the same ideal topology"
+overrides = { L = "100" }
+expected = "With L=100 mH=1/10 H and unchanged C=1/100000 F, L*C=1/1000000 s^2. Thus omega0=1000 rad/s, f0=500/pi Hz, T=pi/500 s, characteristic impedance=100 ohm, and s_plus/minus=+/-1000*i s^(-1). Initial energy remains 1/8000 J because initial current is zero. The fixed omega_below=1000 rad/s sample is now at resonance: its reactance is zero and its phase is undefined. The derived resonance sample also has zero impedance. At omega_above=4000 rad/s, X=400-25=375 ohm and phase=+pi/2 rad. Sample names identify baseline slots, not enforced inequalities; variants validate input contracts and preserve these documentary expectations without executing phase expressions.\n"
+
+[errors]
+bounded = ["independent rational enclosures for pi-based reference coordinates from the stated alternating-series remainder", "exact reference identities for rational reactances, characteristic impedance, spectral components and initial energy"]
+estimated = []
+excluded = ["parasitic resistance, nonlinear inductance/capacitance and other physical model error", "undeclared measurement uncertainty", "a certified numerical spectrum or Complex phasor execution inferred from scalar descriptor checking", "undefined phase or infinite admittance treated as a finite resonance output", "time-stepping discretisation certification"]
+
+[stress]
+claims = ["rule:vision:semantic-kinds-and-roles", "rule:vision:measure-conversions", "rule:vision:heterogeneous-assembly", "rule:vision:spectral-guarantees", "rule:vision:independent-numerical-evidence"]
+bites = ["step:nrz:bite-exemplar-register", "step:nrz:bite-units-design", "step:nrz:bite-certified-matrix-core", "step:nrz:bite-units-and-foundations", "step:nrz:bite-physics-core", "step:nrz:bite-advanced-matrix-domains", "step:nrz:bite-accuracy-and-benchmarks"]
