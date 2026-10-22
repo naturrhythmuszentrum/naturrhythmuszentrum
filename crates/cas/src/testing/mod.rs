@@ -103,3 +103,9 @@ pub(crate) mod solve_local;
     reason = "the same fixture also serves public admission tests"
 )]
 pub(crate) mod sorts;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "replay tests share ledgers and syntax-only proposals"
+)]
+pub(crate) mod replay_answer;

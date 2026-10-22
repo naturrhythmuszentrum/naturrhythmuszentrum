@@ -256,8 +256,12 @@ fn application(
         substitutions,
         certificate,
     };
+    #[cfg(test)]
+    let before = reader.budget.usage();
     let mut checked =
         crate::scoped_check::check_application(cas, &draft, &premises, reader.budget)?;
+    #[cfg(test)]
+    crate::testing::replay_answer::record(rule, &before, &reader.budget.usage())?;
     checked.premises = ids;
     Ok(Decoded::Application(
         cas.publish_scoped(checked, reader.budget)?,

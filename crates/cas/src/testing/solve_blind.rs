@@ -146,3 +146,7 @@ pub(crate) use real_replay::refusals as real_expected_refusals;
 pub(crate) use oracle::{family_cubic, family_quadratic};
 
 pub(crate) use audit::applications as family_applications;
+
+#[path = "solve_blind/answer.rs"]
+mod answer;
+pub(crate) use answer::symbolic as complete_answer_symbolic;

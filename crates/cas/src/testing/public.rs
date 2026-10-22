@@ -216,3 +216,10 @@ pub(crate) mod coefficient_evaluation;
     reason = "public harness shares supplied Real witnesses"
 )]
 pub(crate) mod solve_real;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "public replay fixtures share original expected claims"
+)]
+#[path = "answer_public.rs"]
+pub(crate) mod answer;

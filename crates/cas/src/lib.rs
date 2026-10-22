@@ -352,6 +352,7 @@ mod region_check;
     reason = "shared private kernel implementation"
 )]
 mod scoped_check;
+mod wire_answer;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "shared private kernel implementation"
