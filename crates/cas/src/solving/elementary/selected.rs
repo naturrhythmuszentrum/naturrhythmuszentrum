@@ -537,51 +537,73 @@ impl Evaluation<'_> {
         result.map_or_else(|| Value::integer(0, &self.engine, budget), Ok)
     }
 
-    /// Root atoms in an identity contribute only equations of their exact existing selection slots.
+    /// Close the defining equations of the initial atoms under newly reached root atoms.
     pub(crate) fn root_relations(
         &self,
         form: &Form,
         budget: &mut Budget,
     ) -> Result<Vec<Form>, Fault> {
-        let mut seen = vector(0, budget)?;
+        let mut reached = vector(0, budget)?;
+        relation_atoms(form, &mut reached, budget)?;
         let mut result = vector(0, budget)?;
-        for term in &form.terms {
-            for (variable, _) in &term.powers {
-                let Variable::Atom(id) = variable else {
-                    continue;
-                };
-                budget.work(crate::graph::size(seen.len(), AT)?.max(1), AT)?;
-                if seen.contains(id) {
-                    continue;
-                }
-                reserve(&mut seen, 1, budget)?;
-                seen.push(*id);
-                let value = self.cas.state.expression(*id)?;
-                let (
-                    Operator::RootValue { slot },
-                    Some(ExpressionAttachment::SelectedRoot(selected)),
-                ) = (&value.operator, &value.attachment)
-                else {
-                    continue;
-                };
-                let selected = selection(self.cas, &self.cas.handle(*selected))?;
-                budget.solving(
-                    BudgetKind::SelectionSlots,
-                    crate::graph::size(selected.relations.len(), AT)?,
-                    AT,
-                )?;
-                let handle = selected
-                    .relations
-                    .get(usize::try_from(*slot).map_err(|_| invalid())?)
-                    .ok_or_else(invalid)?;
-                let root = self.expression(*id, true, budget)?;
-                let equation = self.root_equation(&root, relation(self.cas, handle)?, budget)?;
+        let mut next = 0;
+        while let Some(id) = reached.get(next).copied() {
+            budget.work(1, AT)?;
+            next += 1;
+            if let Some(equation) = self.selected_equation(id, budget)? {
+                relation_atoms(&equation, &mut reached, budget)?;
                 reserve(&mut result, 1, budget)?;
-                result.push(equation.numerator);
+                result.push(equation);
             }
         }
         Ok(result)
     }
+
+    /// Preserve exact selection, existence, map, region and strict denominator checks at every level.
+    fn selected_equation(&self, id: LogicalId, budget: &mut Budget) -> Result<Option<Form>, Fault> {
+        let value = self.cas.state.expression(id)?;
+        let (Operator::RootValue { slot }, Some(ExpressionAttachment::SelectedRoot(selected))) =
+            (&value.operator, &value.attachment)
+        else {
+            return Ok(None);
+        };
+        let selected = selection(self.cas, &self.cas.handle(*selected))?;
+        budget.solving(
+            BudgetKind::SelectionSlots,
+            crate::graph::size(selected.relations.len(), AT)?,
+            AT,
+        )?;
+        let handle = selected
+            .relations
+            .get(usize::try_from(*slot).map_err(|_| invalid())?)
+            .ok_or_else(invalid)?;
+        let root = self.expression(id, true, budget)?;
+        let equation = self.root_equation(&root, relation(self.cas, handle)?, budget)?;
+        Ok(Some(equation.numerator))
+    }
+}
+
+/// The retained queue is also the visited set: insert before expansion to break self and shared edges.
+fn relation_atoms(
+    form: &Form,
+    reached: &mut Vec<LogicalId>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    for term in &form.terms {
+        budget.work(1, AT)?;
+        for (variable, _) in &term.powers {
+            budget.work(1, AT)?;
+            let Variable::Atom(id) = variable else {
+                continue;
+            };
+            budget.work(crate::graph::size(reached.len(), AT)?.max(1), AT)?;
+            if !reached.contains(id) {
+                reserve(reached, 1, budget)?;
+                reached.push(*id);
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Locate a slot occurrence by following only the supplied expression closure.

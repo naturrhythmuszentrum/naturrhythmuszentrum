@@ -7,7 +7,7 @@ use crate::model::Field;
 use crate::solving::{SolveAnswer, SolveForm};
 use crate::testing::common::TestResult;
 
-/// Fixed diagnostic-1 measurements include both expected comparisons and sealing both outputs.
+/// Fixed tower-closure diagnostic-2 measurements include both expected comparisons and sealing both outputs.
 #[derive(Clone, Copy)]
 struct Boundary {
     kind: BudgetKind,
@@ -93,8 +93,8 @@ fn at_cap(
 /// The receiver and replay ledger both retain the unchanged blind-cubic profile except the tested cap.
 pub(crate) fn check(field: &Field) -> TestResult {
     let (coefficient_ops, work) = match field {
-        Field::Complex => (2_940_416, 401_214_861),
-        Field::Real => (2_038_597, 394_359_479),
+        Field::Complex => (2_940_416, 401_216_460),
+        Field::Real => (2_045_557, 394_652_183),
         _ => return Err("symbolic boundary field".into()),
     };
     let (cas, answer) = source(field)?;
