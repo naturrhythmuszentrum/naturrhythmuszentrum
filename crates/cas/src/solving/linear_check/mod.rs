@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Reversible exact elimination, independent rank bounds and original affine systems.
+//!
+//! # Linear and family certificates
+//!
+//! The supplied linear and family checks enable tags 9 and 16. Reversible row operations reconstruct the full matrix, nonzero echelon pivots certify a triangular minor, and all remaining rows must vanish for the rank upper bound. A pivot or scale may use an earlier checked scalar inverse identity with the same normalized pivot, exact coefficient map, context and region; both endpoints remain defined and their product is checked through the root relations. Canonically embedded nonzero ground constants in fractions and constant tower vectors are units, but formal parameter numerators and arbitrary quotient representatives are not. Affine systems retain their original equations and augmented ranks. Binomial coverage and linear-system claims must stay inside the original coefficient region, as do product covers, cover elimination, transport and family certificates. Family membership substitutes arbitrary bound parameters; coverage additionally checks an exact reverse-space recovery map, its full domain and the identity on every original solution. The zero polynomial therefore admits its whole-domain identity family. Automatic linear-family production remains separate.
 
 mod matrix;
 mod system;

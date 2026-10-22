@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Finite quotient arithmetic and independently replayed unit/component evidence.
+//!
+//! # Quotient arithmetic and root existence
+//!
+//! The tower leaf enables `coeff.identity`, `extension.unit` and `extension.split` (tags 0, 2 and 3). Monic finite quotients use parent arithmetic followed by descending reduction, and Euclidean inversion returns a unit, zero, a nonvanishing obligation or a component split. An earlier parent split takes precedence over a child computation. Replay independently verifies gcd divisibilities, Bézout identities and both inverse products. Component covers additionally reconstruct the proper factor product, coprimality, derivative-unit square-freeness, inductive parent reducedness and the actual child-generator projections. Component staging rebuilds dependent coefficient domains, polynomials and values from parent to child on both branches in one private transaction. Selection transport preserves the same ordered joint predicate and every unchanged relation slot on both children; mismatched constraints or a root sent to the wrong factor refuse. No quotient is called a field merely because its defining polynomial is square-free.
+//!
+//! `extension.adjoin` (tag 1) checks an exact leading-unit premise and a well-defined scalar coefficient map before asserting root existence. Complex FTA and algebraic closure of C support unconstrained root relations/selections and checked degree-decreasing splitting chains. Primitive-unity existence reconstructs the cyclotomic polynomial from the divisor product of Xⁿ−1; no numerical root or orientation is selected. Real odd binomials admit real roots, while positive/nonnegative real square-root selections require exact radicand signs or matching scoped sign premises. A selection’s principal or isolated metadata cannot supply existence or uniqueness. Caller-named fields remain unavailable without a separately specified closure interpretation.
 
 #![expect(
     dead_code,

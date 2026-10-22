@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Finite same-sort specialization, without an injectivity claim.
+//!
+//! # Finite coefficient evaluation
+//!
+//! `coeff.evaluate` independently checks a finite polynomial over rational or Gaussian ground constants, with original symbolic coefficients represented by its ordered source slots. Each image keeps its declared scalar sort or exact local family role. The checker requires explicit image-definedness and prior selected-root-existence premises, checks actual divisors before cancellation, and checks every localization unit after specialization on the exact target region. It evaluates all finite terms and compares the claimed scalar or family result through metered exact arithmetic. Zero specialization is valid and supplies no injectivity theorem. Family addition, subtraction, multiplication, division, negation and positive integer powers have this finite checker; other local operators retain a precise unsupported-operator boundary.
 
 mod evidence;
 mod finite;

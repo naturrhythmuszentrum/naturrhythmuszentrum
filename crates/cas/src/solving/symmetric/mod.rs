@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Degree-generic seeds, symmetric elimination and replayable coefficient recipes.
+//!
+//! # Computed resolvents and request-local reuse
+//!
+//! The symmetric leaf generates cyclic-character powers up to their computed character order, then partition seeds in restricted-growth-string order. It enumerates full adjacent-transposition orbits and expands only strictly smaller resolvents. Leading-lex subtraction computes every invariant coefficient in elementary symmetric functions, without a formula cache. Derived recipes retain explicit root and parameter images, coefficient maps and map hypotheses; `coeff.identity` independently checks the nested expansion and simultaneous coefficient substitution. Symmetry, expansion and substitution evidence is published together only after replay, with no implied solution coverage.
+//!
+//! Within one symbolic request, already computed complete orbit/resolvent scratch may be reused only with the identical coefficient algebra, ordered formal-root frame, primitive element and recursion depth. Computed cross-character pairings use the same algebra, frame and primitive checks and the identical enumeration bound. Copies are metered. Every regional identity, selected-root existence, unit obligation and coverage theorem is rebuilt and independently checked. The cache starts empty for each request and contains no stored formula or theorem authority.
 
 #![cfg_attr(
     not(test),

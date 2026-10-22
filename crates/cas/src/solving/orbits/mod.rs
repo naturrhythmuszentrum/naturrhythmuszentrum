@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independent replay of finite polynomial orbits under declared permutations.
+//!
+//! # Checked orbit coverage
+//!
+//! `orbit.cover` (tag 14) independently checks finite polynomial orbits under declared sort-preserving permutation bijections. Replay compares every action using exact coefficient arithmetic, rejects duplicate normalized members, checks closure and follows a reaching word for every member. The conclusion names the generated group only; full symmetric invariance requires the adjacent-transposition generators. Orbit actions, monomial visits and member peaks consume their separate budgets. Missing members, false tables and unreachable additions refuse atomically, and portable orbit witnesses replay in an empty store.
 
 #[expect(
     clippy::redundant_pub_crate,

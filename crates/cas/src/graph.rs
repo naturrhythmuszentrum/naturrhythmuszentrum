@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Append-only heterogeneous graph storage and atomic batch admission.
+//!
+//! # Atomic construction and rollback
+//!
+//! `Cas::admit` validates flat child-before-parent drafts and publishes them atomically. Handles carry a private store identity; public logical identifiers never authorize a lookup in another store. Graph-owned expression records share exact syntax, while each original operand use keeps a distinct occurrence, optional checked UTF-8 byte span and ordered child links. Sources with conflicting bytes under one key are refused. Failed admission preserves the published graph and all next identifiers.
+//!
+//! Draft admission, proof checking and replay, and producer transactions use one append-only rollback journal instead of copying the accumulated store. Each checkpoint restores node and edge indices, logical indexes and next identifiers, interning keys, policy identities, source keys, parent claims and all payload counters on refusal. An inner refusal undoes only its edits; an inner commit remains reversible by its enclosing transaction. Work covers touched payload, a fixed 256-unit counter checkpoint, logical key probes and validation, without a transaction charge proportional to unrelated records. Storage checks still include retained occupancy, pending drafts and journal reservation; nested transaction checkpoints reserve their bounded counter inventory under the existing staged-payload ceiling. Spent work is never refunded. Earlier witness bytes and future logical identifiers survive invalid input and mid-batch exhaustion unchanged. Full store copies are available only to tests needing an untouched control. Copying a checked application charges its own typed payload and optional scalar cache. Substitution prepays each reached record and copied scope, accumulating draft and memo workspace under the existing staged-payload limit; unrelated stored syntax contributes no work.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;

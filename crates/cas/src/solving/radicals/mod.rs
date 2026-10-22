@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Degree-generic radical proposals and independently replayable finite orbit evidence.
+//!
+//! # Retained cubic equation inventory
+//!
+//! The Real one-root cubic producer omits its separate square-radical equality: the checked defining relations supply it. The mixed general cubic retains the original-polynomial equalities for its first two selected generators because separate omission tests still refuse; the last, linear root after monic division needs no emitted equality. Inventory tests pin the removed Real square equation and the two retained mixed cubic equations, and complete mixed answers replay against independently rebuilt original requests (´test:crate:single-root-square-lemma-inventory´), (´test:crate:mixed-cubic-equation-inventory´), (´test:crate:mixed-complete-answer-closure´).
 
 #[expect(
     clippy::redundant_pub_crate,

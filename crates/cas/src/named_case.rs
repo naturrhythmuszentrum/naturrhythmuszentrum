@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Transparent named functions, checked against their retained canonical definition.
+//!
+//! # Transparent definitions
+//!
+//! `Cas::named_case` builds `NamedCase { name, coordinate, parameter }` with a retained canonical case operand. The checked case machinery unfolds abs, sign, ramp and a step whose rational parameter is its value at zero. Ordinary coordinate substitution must use an expanded definition; `rename_axes` transports the coordinate and definition together. Names grant no primitive shortcut.
 
 use crate::boundary_model::{CaseName, NamedCase};
 use crate::boundary_regions as syntax;

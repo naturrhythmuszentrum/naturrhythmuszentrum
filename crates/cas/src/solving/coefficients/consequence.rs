@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded production of explicit power identities; replay never invokes this search.
+//!
+//! # Transitive selected-root closure
+//!
+//! Selected-root relation collection follows every root atom in the initial formal numerator and every atom introduced by its specialized defining equation. A retained queue also records visited atoms, so shared parents and each equation's own root are expanded once. Every reached selection still needs its exact regional existence fact, checked coefficient map and strict denominators. Term scans, atom comparisons, queue growth and equation evaluation use the existing Work and scratch bounds. The reducer and its conservative acceptance rule are unchanged: only a zero remainder proves a consequence. In particular, the Real cubic `x³+x+1` derives the missing `s²=31/108` equation while checking `u³v³+1/27`, without using the separately emitted equality. Closure asserts no irreducibility or general ideal-membership completeness, and a selected root of `t³−8` does not by itself make `t−2` reducible. Crate tests cover this omission, exact traversal Work, shared parents, shifted/repeated and reducible/irreducible equations, distinct components, missing existence/relations, cycles, sibling regions and strict divisors (´test:crate:nested-root-remainder-without-lemma´), (´test:crate:root-closure-work-boundary´), (´test:crate:root-closure-defining-polynomial-twins´), (´test:crate:root-closure-selected-component-twins´), (´test:crate:root-closure-missing-inner-existence´), (´test:crate:root-closure-missing-defining-relation´), (´test:crate:root-closure-cyclic-relation-refused´), (´test:crate:root-closure-sibling-region-refused´), (´test:crate:root-closure-strict-denominator-mutation´).
 
 use super::storage::{invalid, vector};
 use super::{nonzero::Factors, polynomial::Polynomial};

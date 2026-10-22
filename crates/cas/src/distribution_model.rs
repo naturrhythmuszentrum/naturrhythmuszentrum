@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact distribution statements and finite certificates, separate from scalar claims.
+//!
+//! # Distribution judgments and calculus
+//!
+//! `EmbedRegular { space }` certifies finite polynomial cells before constructing a regular distribution. `DistributionStatement` groups regularity, embedding, equality, derivative, pairing and supported-action judgments under `Statement::Distribution`. Every judgment retains its exact real coordinate, open interval and test family, including scalar-valued pairing results. Regular representatives may differ at certified finite points; their pointwise ownership remains distinct.
+//!
+//! The first nine distribution schemas are `dist.regular`, `dist.ae`, `dist.linear`, `dist.derivative`, `dist.delta-pair`, `dist.smooth`, `dist.delta-multiply`, `dist.support-action` and `dist.jump`. The jump checker independently compares polynomial derivatives and right-minus-left traces on the complete partition. Higher derivatives repeat the first-order rule and increment existing delta orders. Ordinary declared tests produce symbolic derivative evaluations; `PairNearSupport` instead requires a checked finite delta support and a polynomial germ on an explicit neighborhood. It evaluates `PairNearSupport(δ₂, x² + 3) = 7` and `PairNearSupport(δ′₂, x² + 3) = −4` without classifying a polynomial as a compactly supported test.
+//!
+//! The derived integration-by-parts, delta-primitive and classical-bridge recipes retain primitive expansions and add no registry keys. Named and expanded routes enter both queues before completed-result dominance. Native equality shortcuts retain replayable expansions and the older frozen cost manifest; strict improvement is checked in the complete typed theorem class without scalar projection. Partition reuse applies during generation and independent replay.
+//!
+//! `ApplyAt` refuses distribution point values; `Product` refuses delta-square and a multiplier proved discontinuous at the delta support. The corresponding public reasons are `DistributionPointValue`, `DistributionProductUndefined` and `TestSpaceMismatch`. Unsupported smoothness remains `PendingPremise`. The independent `delta_order`, `test_nodes` and cumulative `pairing_steps` limits cover these operations.
 
 use crate::graph::Handle;
 use crate::number::Rational;

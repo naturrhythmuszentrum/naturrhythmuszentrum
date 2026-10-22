@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed distribution kernel dispatch and reconstructed membership requirements.
+//!
+//! # Verification
+//!
+//! Distribution tests add independent abs/J/Q and rational-ramp formulas, delta actions and products, finite-exception ownership separation, named refusals, typed evidence mutations, strict native shortcut reuse, exact specialized limits, deterministic bytes and a complete original-source-to-pairing lifecycle.
 
 use crate::budget::{Budget, BudgetKind};
 use crate::distribution_model::DistributionStatement;

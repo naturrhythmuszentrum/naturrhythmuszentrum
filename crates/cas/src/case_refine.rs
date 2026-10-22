@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Lazy common refinement with resumable pair cursors on both existing search queues.
+//!
+//! # Bounded refinement and calculus
+//!
+//! Native `Simplify` schedules common-refinement pairs lazily on the cost and progress queues. Empty pairs consume the shared refinement allowance, nested jobs share the same ledger, positive growth is charged, and each complete result retains a checked cover. Boundary calculus adds finite selector partitions, polynomial side jets, classical cell and point derivatives, witnessed nonexistence, and transparent named definitions. Distribution calculus adds checked regular embeddings, finite jump derivatives, delta actions and polynomial smooth multipliers in an exact declared space.
 
 use crate::budget::{Budget, BudgetKind};
 use crate::case_producer::Plan;

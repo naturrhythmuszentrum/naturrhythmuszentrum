@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded derivative production; all formulas remain untrusted until kernel replay.
+//!
+//! # Generated derivatives and Jacobians
+//!
+//! Differentiation uses an explicit postorder stack and memoizes by expression, context and ordered variable key. It proposes constant, variable, negation, sum, difference, product, quotient and fixed-integer-power formulas. Simplification requires checked rational identities and derivative transport. Composite denominators retain factored syntax when coefficient expansion would introduce additional unknown guards. Zero and negative powers retain nonzero conditions; exponent one avoids a new zero power. Unknown functions and other unimplemented grammar produce an unresolved blocker naming the pending logical expression. No whole Jacobian is emitted until all ordered partials check. Shared expressions reuse proof work while the requested row and variable order remain explicit.
+//!
+//! The three-output pendulum fixture checks a three-by-eight Jacobian, the shared final two columns and exact nominal coefficients. Its simultaneous operating-point substitutions are also applied to original domain judgments with the equality-instantiation schema. Independent hand formulas give the nonzero cells pi², -(621/625)pi² and -(1242/625)pi². Neither those symbolic derivatives nor their substitutions infer a covariance model or physical validity.
 
 use std::collections::BTreeMap;
 

@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit coordinate maps and finite root certificates for delta pullbacks.
+//!
+//! # Checked delta pullbacks
+//!
+//! `Task::Pullback { source_space, target_space, map_kind }` consumes an original delta and a scalar map from target to source. `PullbackKind::Affine` checks a nonzero scale, the complete interval image and the inverse scalar expression in the source coordinate. The output uses the reciprocal absolute Jacobian: `δ(2x−1) = ½δ_(1/2)` and `δ(−3x+6) = ⅓δ_2`. Map syntax permits positive powers and division by nonzero constant polynomials; strict zero powers and hidden denominator holes refuse. Both spaces and both maps remain in `DistributionStatement::Pullback`.
+//!
+//! `PullbackKind::SimpleZeros(roots)` requires the source zero delta on the whole real axis and a complete sorted rational-root list. The checker verifies the entire factorization, each root, each nonzero slope and its reciprocal absolute value. Thus `δ(x²−1) = ½δ_(-1) + ½δ_1`; a repeated root or omitted factor returns `PullbackHypotheses`. Roots outside the target interval remain in the certificate but contribute no delta. `pullback_certificate` exposes this checked evidence; `pullback_zeros` bounds all supplied roots before copying and replay allocation. General root solving and arbitrary nonlinear distribution pullbacks remain outside this fragment.
 
 use crate::graph::Handle;
 use crate::number::Rational;

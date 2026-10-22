@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Untrusted characteristic-zero multiplicity-layer production over exact rationals.
+//!
+//! # Certified square-free layers
+//!
+//! `SquareFree` reconstructs a nonzero univariate polynomial over Q from scalar rational/real syntax, normalizes its leading coefficient, differentiates its coefficient vector and computes exact extended Euclidean certificates. Successive gcd/quotient layers follow the characteristic-zero recurrence in `docs/design/cas-design.md`. Each certificate states both divisibilities and a Bézout combination; the checker verifies those coefficient identities without running the producer's Euclidean loop. It also verifies the recurrence, monicity, nonconstant factors, strictly increasing positive multiplicities, each factor's derivative gcd, every pairwise gcd, the complete product identity and the exact displayed endpoint factors. Layers need not be irreducible; x²+1 remains a valid single layer over Q.
+//!
+//! `SquareFreeCertificate`, `SquareFreeLayer` and `GcdCertificate` are untrusted public data with ascending-degree canonical rational vectors. `ApplicationDraft::certificate` uses `Certificate::SquareFree(Box<SquareFreeCertificate>)` only for `poly.square-free` version 1, with logical weight 8; other primitives reject that payload. `square_free_certificate` borrows checked evidence from the witness's graph application. The typed application contains the complete certificate; no earlier wire layout is retained. Every decoded coefficient/vector and retained certificate is bounded before copying or arithmetic. The producer publishes the factor expression and its replayed proof in one transaction.
+//!
+//! A nonzero constant returns its scalar and no factors. Zero returns `Outcome::Unsupported` with `UnsupportedReason::ZeroPolynomialMultiplicity`; non-rational coefficients and expressions outside the univariate fragment have distinct reasons. Positive-characteristic and complex coefficient requests remain unsupported. Degree, coefficient/intermediate bits, arithmetic work, retained payload and witness bytes have explicit refusal paths. The degree-five fixture, a hand-authored Bézout certificate for x²+1, independent binomial examples, rational coefficients, endpoint/certificate tampering, canonical replay, byte determinism and exact witness-size boundary are acceptance tests. None of these claims infer roots or physical meaning.
 
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};

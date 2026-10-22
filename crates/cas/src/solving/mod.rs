@@ -1,5 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact solving objects and explicit capability boundaries.
+//!
+//! # Capability registry
+//!
+//! `SOLVE_SCHEMAS` publishes the 21 current certificate subtype identities; `active_schema_bitmap()` and `SearchPolicy::active_schema_bitmap()` expose the separate executable capability. The bitmap belongs to search state keys and response audits, while mathematical witnesses carry only their exact used-rule manifest. Policy identity lookup uses a dedicated `(key, version)` index and never scans unrelated graph records.
+//!
+//! |Surface|Available contract|Boundary|
+//! |-------|------------------|--------|
+//! |Registry|80 version-one primitives: 59 general and 19 executable solving rules among 21 solving entries; logical policy v10.|`root.isolate` and `solve.local-branch` remain unavailable; subtype 13 is removed.|
+//! |Complex producer|Complete symbolic cubic with original Complex parameters, all degree drops and Radicals presentation.|No general higher-degree radical or generic Galois-obstruction checker.|
+//! |Real producer|Complete symbolic cubic with Real radicals or counted Real cells and `RealExact` presentation.|Three-root cells do not satisfy a separate Real-radicals request.|
+//! |Mixed families|Explicit Real base and Complex fibre, complete linear/binomial and algebraic cubic pieces, checked optional base/fibre covers.|Mixed cubic radical discovery and automatic general nonlinear systems remain unavailable.|
+//! |Portable answer|One presentation closure supplies exact expected Coverage and Presentation under a cumulative ledger.|Presentation without matching reachable coverage cannot certify a complete answer.|
+//!
+//! The registry counts and unavailable keys are pinned by (´test:integration:complete-answer-registry-inventory´). Constructors and represented payloads grant no theorem authority.
 
 mod evaluate;
 #[expect(

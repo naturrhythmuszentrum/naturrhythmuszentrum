@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independent reconstruction of the five native case theorem schemas.
+//!
+//! # Verification
+//!
+//! Native-case tests add ordered priority and signature changes, inactive branch coverage, reached undefined guards, singleton overlap, local selection, missing-point covers, function-indexed ownership, both merge directions, exact four-versus-three pair limits, nested budget sharing, typed substitution and axis maps, certificate/frame mutations and independent expected replay targets.
+//!
+//! # Native case proofs
+//!
+//! The five case schemas reconstruct exact domains, local selection, overlap compatibility and complete congruence. Rational polynomial identities are checked on real open cells and values are evaluated exactly at rational singletons. `Merge` records domain proofs, a cover, local equalities and closure, preserving both definedness directions. `Boundary` with `Ownership` records function-specific `Present(value)` or certified `Absent`; missing evidence remains `PendingPremise`. `Coverage` proves definedness on the requested region, distinguishes `UnknownTotality` from a proved hole, and preserves unsupported predicates as blockers. General integer-cell agreement beyond polynomial identity or exact singleton evaluation remains pending.
 
 use crate::budget::Budget;
 use crate::case_model::CaseCertificate;

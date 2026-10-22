@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Sealed, independently replayed calculus results with explicit incomplete coverage.
+//!
+//! # Complete and partial derivative maps
+//!
+//! `SearchResult::payload` boxes typed calculus results. A sealed `DerivativeMap` retains the complete selector partition, all replayed facts, pending cells, a separate derivative theorem on the union of successful cells, and an optional complete requested-domain derivative theorem. Higher orders consume the actual previous derivative, including owned point values. Abs and ramp have side derivatives −1/+1 and 0/1 with witnessed nonexistence at zero. J has owned value 1, traces 0/1 and slopes 0/0, so its derivative fails there. Q has first derivative zero at zero and second-derivative traces 2/4, proving second-derivative nonexistence.
 
 use crate::graph::Handle;
 use crate::proof_model::{Statement, VerifiedWitness};

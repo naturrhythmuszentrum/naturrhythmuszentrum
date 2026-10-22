@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Finite split calculus retains its bounds, extension convention and endpoint evidence.
+//!
+//! # Finite integration and summation
+//!
+//! `Task::Integrate(Box<SplitRange>)` and `Task::Sum(Box<SplitRange>)` consume one covered function occurrence. Bounds are exact finite rationals, and sums require ordered integer endpoints. `Statement::Split` retains the coordinate, full closed interval, original orientation and exact result. Integrals verify every polynomial cell and its antiderivative, with explicit owned or absent cut values; all finite-valued point extensions have the same integral. Sums verify a disjoint inclusive integer-range cover and polynomial forward differences, including every singleton. Improper convergence, symbolic bounds and infinite sums remain outside this fragment.
+//!
+//! The independent `integral.case-split` and `sum.case-split` checkers have semantic version 1 and logical weights 8 and 4. `split_certificate` exposes checked geometry and endpoint evidence. Producers use coefficient recurrences and Horner evaluation; replay uses derivative/composition identities and explicit powers. Both share the existing metered partition cache and apply the case, region, boundary, polynomial and wire ceilings.
 
 use crate::graph::Handle;
 use crate::number::Rational;

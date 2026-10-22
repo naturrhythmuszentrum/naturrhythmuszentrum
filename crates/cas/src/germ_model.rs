@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Standalone limit and series claims retain their approach and remainder convention.
+//!
+//! # Limits and side series
+//!
+//! `Task::Limit(Box<GermAt>)` uses checked polynomial side jets and trace projections on nonempty punctured neighborhoods. A two-sided request requires equal limits; sign therefore has limits −1 and 1 and a refused two-sided result. `Task::Series(Box<SeriesAt>)` retains centre, side, order and formal/analytic mode. Its exact remainder witnesses f(a+h) = P(h) + h^(n+1)R(h); ramp on the right at zero has coefficients `[0, 1, 0]` at order two and zero remainder.
+//!
+//! Formal side claims concern a punctured domain. Ordinary two-sided Taylor claims require matching coefficients and the actual centre value. Analytic mode additionally requires both full polynomial germs, including their remainders, to agree across that centre. This checks polynomial analyticity and supplies no general convergence theorem. `limit.case-restrict` and `series.case-restrict` have semantic version 1 and weights 2 and 4. All trace and remainder dependencies survive canonical expected replay, with the existing jet budgets and partition cache.
 
 use crate::domain_model::Side;
 use crate::graph::Handle;

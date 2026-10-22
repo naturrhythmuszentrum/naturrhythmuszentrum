@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact finite boundary evidence and explicitly ordered derivative statements.
+//!
+//! # Boundary tasks and checked jets
+//!
+//! `Task::Boundary` names its real coordinate and point. `Jets { order }` requests traces from zero through that order; `Jump { order }` requests the right-minus-left trace difference; `Derivative { order }` names a positive iterated classical derivative order. Complete finite partition evidence reconstructs every reachable case selector and requested-domain endpoint. Geometry alone supplies no analytic regularity: each jet additionally requires total local equality to a rational polynomial and an independently checked incident open neighborhood.
+//!
+//! `jet.polynomial` checks factorial-weighted shifted coefficients, with separate closed partition, trace-projection and jump-introduction modes. The derived `jet.jump` recipe records both projections and exact subtraction. `diff.case-interior` transports an existing scalar derivative through local equality on an open cell; its assembly mode checks all cells of the claimed derivative region. `diff.case-boundary` first compares both function traces with actual function-specific ownership, then compares slopes. Missing ownership or a side stays pending. Thus equal branch slopes do not rescue J's jump.
 
 use crate::domain_model::Side;
 use crate::graph::Handle;

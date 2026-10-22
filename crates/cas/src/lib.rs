@@ -1,12 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Exact mathematical graph construction and bounded conditional proof replay.
-//!
-//! The construction layer preserves distinct original occurrences and checked scopes.
-//! Its coverage receipts never establish a mathematical identity or physical validity.
-//! A closed primitive kernel checks supplied identities and derivative premises.
-//! Bounded identity search, scalar derivatives and ordered Jacobians produce replayed results.
-//! Rational square-free multiplicity certificates are generated and independently replayed.
-
+#![doc = include_str!("../README.md")]
 #![expect(
     clippy::multiple_crate_versions,
     reason = "petgraph 0.8.3 depends on hashbrown 0.15 while indexmap \

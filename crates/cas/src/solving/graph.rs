@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Capture-safe resolution, graph admission and borrowed solving views.
+//!
+//! # Exact object admission
+//!
+//! The `solving` facade adds exact coordinate products, tuples, coefficient algebras and values, sparse polynomials, extension levels, coefficient maps, root relations and joint selections, solution branches and sets, original problems and local germs. `Draft::Solve` admits syntax atomically; `Cas::solve_view` borrows graph-owned payloads and checked handles. Constructors never prove membership, existence, field structure or completeness. Product regions retain coordinate order; the existing interval checkers refuse them. Rational-function admission independently checks coprime multivariate numerator and denominator polynomials over Q or Q(i), with a monic denominator. Recursive content and primitive-part gcd calculations restore the original formal variable order before returning; coprimality does not assert a multivariate Bézout identity to one. When an operand is a monomial, exact per-variable exponent minima bound gcd normalization; both input factorizations are still independently reconstructed. Noncanonical pairs refuse atomically.
 
 use super::model::{
     CertificateBinomialCoverage, CertificateCoefficientIdentity, CertificateComponentSplit,
