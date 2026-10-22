@@ -6,8 +6,8 @@ use crate::test_api::{
     CompanionSetDraft, CovarianceBlock, Extent, Heap, JointLimits, JointModel, PublishedBundle,
     Source, SourceFactor, TargetMap,
 };
+use nrz_bindings::Descriptor;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
-use nrz_units::Descriptor;
 
 /// One scalar operator and two RHS entries share a declared rank-one source family.
 pub(crate) fn common<P: Scalar + 'static>(

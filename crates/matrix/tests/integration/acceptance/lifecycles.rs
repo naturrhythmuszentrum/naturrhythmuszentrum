@@ -4,8 +4,8 @@
 use super::{oracle, support};
 use crate::kernel_oracle::Rational;
 use nrz_accuracy::BudgetDecision;
+use nrz_bindings::Dimension;
 use nrz_matrix::{MomentAssurance, SolveStage};
-use nrz_units::Dimension;
 
 /// Truss input, physical shape, solve, implicit derivative and member-force covariance compose.
 /// ´test:integration:integrated-truss-matches-exact-physical-oracles´

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed native recipes retain ordered input/output contracts and exact coordinate definitions.
 
-use nrz_units::{Descriptor, Role};
+use nrz_bindings::{Descriptor, Role};
 
 use super::{ExecutionLimits, OperationError};
 use crate::{Axis, CheckedShape, CoordinateMap};

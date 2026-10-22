@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Stable mathematical identities and refreshed physical epochs across relocation.
 
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Extent, Heap, HeapError, HeapLimits, Layout};
-use nrz_units::Descriptor;
 
 use crate::testing::{TestResult, bound};
 

@@ -4,12 +4,12 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, execute, output, owner, shape};
 use crate::statistics_testing::{check, covariance};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     CompanionSetDraft, CovarianceBlock, Extent, Heap, HeapLimits, JointLimits, JointModel,
     MomentAssurance, OperationDraft, PublishedBundle, ShapeLimits, Source, SourceFactor, TargetMap,
 };
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
-use nrz_units::Descriptor;
 
 /// All sixteen output covariance entries agree with an independent rational joint contraction.
 /// ´test:integration:matrix-product-propagates-all-joint-entry-cross-blocks´

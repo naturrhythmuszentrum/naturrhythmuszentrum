@@ -7,8 +7,8 @@ use super::{
     matrix::{Matrix, singleton},
 };
 use crate::{CheckedOperation, Elementwise, OperationError, binding::NativeRecipe};
+use nrz_bindings::{CheckedSensitivity, SensitivityKernel};
 use nrz_scalar::{ArithmeticContext, Enclosure, Scalar};
-use nrz_units::{CheckedSensitivity, SensitivityKernel};
 
 /// Discharge the derivative's numerical premises on the same complete box used by D.
 pub(crate) fn map<P: Scalar + 'static, Q: Scalar + 'static>(
@@ -115,8 +115,8 @@ mod tests {
     use super::coefficient;
     use crate::kernel_testing::TestResult;
     use crate::{OperationError, StatisticsError};
+    use nrz_bindings::SensitivityKernel;
     use nrz_scalar::ArithmeticContext;
-    use nrz_units::SensitivityKernel;
 
     /// A checked relation cannot authorize a different numerical coordinate schedule.
     /// ´test:unit:native-derivative-schedule-rejects-unmatched-coordinates´

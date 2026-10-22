@@ -3,12 +3,12 @@
 
 use super::{Case, ResultOf, capture, model, shapes};
 use nrz_accuracy::{Budget, Limits, Promotion, RecoveryPolicy};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, ShapeLimits, SolveBudget,
     SolvePolicy,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 use std::time::Instant;
 
 /// A nonsingular rational system succeeds near the inverse witness's precision boundary, then refuses.

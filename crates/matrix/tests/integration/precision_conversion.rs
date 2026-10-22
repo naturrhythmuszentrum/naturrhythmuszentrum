@@ -3,11 +3,11 @@
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, PrecisionContract,
 };
 use nrz_scalar::Precision;
-use nrz_units::Descriptor;
 
 /// Narrowing encloses the exact represented source and widening preserves its entire carried bound.
 /// ´test:integration:precision-conversion-retains-errors-and-fresh-identities´

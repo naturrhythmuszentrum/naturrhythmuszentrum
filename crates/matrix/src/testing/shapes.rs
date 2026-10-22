@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Shape fixtures use only the installed public units and matrix facades.
+//! Shape fixtures use only the installed public bindings and matrix facades.
 
+use nrz_bindings::{
+    CheckedDeclarations, Context, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry,
+    Role,
+};
 use nrz_matrix::{
     Axis, AxisEntry, BlockDraft, CheckedShape, EntryDraft, Partition, ShapeDraft, ShapeLimits,
     StructureScope,
-};
-use nrz_units::{
-    CheckedDeclarations, Context, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry,
-    Role,
 };
 use std::rc::Rc;
 
@@ -17,7 +17,7 @@ pub(crate) type ResultOf<T> = Result<T, Box<dyn std::error::Error>>;
 /// Freeze a complete semantic registry without a direct CAS dependency.
 #[expect(
     clippy::default_trait_access,
-    reason = "the units context takes the CAS limits and environment, and nrz-matrix names no CAS type"
+    reason = "the bindings context takes the CAS limits and environment, and nrz-matrix names no CAS type"
 )]
 pub(crate) fn owner(registry: Registry) -> ResultOf<Rc<CheckedDeclarations>> {
     Ok(Rc::new(

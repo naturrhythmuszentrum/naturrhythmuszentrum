@@ -4,11 +4,11 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{axis, entry, execute, output, owner, shape};
 use crate::solve_testing::TestResult;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Extent, Heap, HeapLimits, OperationDraft, RecipeEvidence, ShapeLimits, ShapeRecipe,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Inverse publication restores reversed axes and encloses the bounded inverse family.
 /// ´test:integration:typed-identity-inverse-has-its-own-bounded-certificate´

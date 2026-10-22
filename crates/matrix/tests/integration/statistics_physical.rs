@@ -4,9 +4,11 @@
 use crate::kernel_testing::{TestResult, execute, output};
 use crate::shape_testing::{axis, dense, owner, quantity};
 use crate::statistics_testing::{attach, check, covariance, worked_covariance};
+use nrz_bindings::{
+    Descriptor, Dimension, ExponentPolicy, PairingWitness, Registry, UncertaintyMode,
+};
 use nrz_matrix::{Elementwise, EntryDraft, Extent, Heap, HeapLimits, OperationDraft};
 use nrz_scalar::Scalar;
-use nrz_units::{Descriptor, Dimension, ExponentPolicy, PairingWitness, Registry, UncertaintyMode};
 
 /// The squared-voltage example carries a voltage derivative and fourth-power covariance, with independent numerical errors.
 /// ´test:integration:worked-statistical-voltage-square-retains-physical-parameter-meanings´

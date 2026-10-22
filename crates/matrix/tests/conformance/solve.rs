@@ -3,11 +3,11 @@
 
 use crate::kernel_testing::{execute, output};
 use crate::solve_testing::{TestResult, draft, shapes};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError,
     ShapeLimits, SolveError,
 };
-use nrz_units::Descriptor;
 
 /// Both formats certify a pivoted system and all physical RHS columns together.
 /// ´test:integration:represented-square-solves-enclose-exact-rational-solutions´

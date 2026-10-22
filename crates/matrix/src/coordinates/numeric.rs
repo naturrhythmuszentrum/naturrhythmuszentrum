@@ -2,10 +2,10 @@
 //! Descriptor-only lowering and outward affine evaluation for conversion transactions.
 
 use nrz_accuracy::Nonnegative;
+use nrz_bindings::{CheckedMap, DescriptorConstant};
 use nrz_scalar::{
     ArithmeticContext, DecodedLiteral, Enclosure, Finite, LiteralLimits, NumericLiteral, Scalar,
 };
-use nrz_units::{CheckedMap, DescriptorConstant};
 
 use crate::conversion::ConversionError;
 
@@ -23,7 +23,7 @@ pub(crate) struct LoweredMap<P: Scalar> {
 }
 
 impl<P: Scalar> LoweredMap<P> {
-    /// Export only descriptor constants; stored numerical data never enters units arithmetic.
+    /// Export only descriptor constants; stored numerical data never enters bindings arithmetic.
     pub(crate) fn new(
         exact: &CheckedMap,
         limits: LiteralLimits,
@@ -75,10 +75,10 @@ pub(crate) struct ConvertedEntry<P: Scalar> {
     pub(crate) evaluation: P,
 }
 
-/// Units owns the bounded exact export; scalar alone evaluates its numeric spelling.
+/// Bindings owns the bounded exact export; scalar alone evaluates its numeric spelling.
 #[expect(
     clippy::default_trait_access,
-    reason = "the exact export policy type is inferred through units without a CAS dependency"
+    reason = "the exact export policy type is inferred through bindings without a CAS dependency"
 )]
 fn lower<P: Scalar>(
     constant: &DescriptorConstant,

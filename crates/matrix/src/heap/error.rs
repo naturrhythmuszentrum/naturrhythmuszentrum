@@ -72,7 +72,7 @@ pub enum HeapError {
     /// Presentation coordinates need a conversion kernel before import.
     #[error("import requires coherent coordinates")]
     NonCoherentMeasure,
-    /// Units could not derive the requested radius descriptor.
+    /// Bindings could not derive the requested radius descriptor.
     #[error("units descriptor check failed: {0}")]
-    Units(#[from] nrz_units::UnitError),
+    Units(#[from] nrz_bindings::UnitError),
 }

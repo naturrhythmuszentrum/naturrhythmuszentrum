@@ -35,7 +35,7 @@ fn square<P: Scalar + 'static>() -> TestResult {
     let proof = moments
         .checked_sensitivity()
         .ok_or("checked symbolic derivative")?;
-    assert_eq!(proof.recipe(), nrz_units::SensitivityRecipe::Square);
+    assert_eq!(proof.recipe(), nrz_bindings::SensitivityRecipe::Square);
     assert!(!proof.jacobian().witnesses().is_empty());
     check(
         moments.covariance(),
@@ -105,7 +105,7 @@ fn nonlinear_nominal_center_is_not_an_expectation() -> TestResult {
     let mut heap = Heap::new(HeapLimits::default())?;
     let source = heap.import_represented(
         nrz_matrix::Extent::new(1, 1)?,
-        &nrz_units::Descriptor::ratio(),
+        &nrz_bindings::Descriptor::ratio(),
         &[0.0_f64],
     )?;
     crate::statistics_testing::attach(&mut heap, source.value(), &[2.0 / 3.0], true)?;

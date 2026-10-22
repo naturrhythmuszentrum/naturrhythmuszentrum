@@ -19,8 +19,8 @@ pub(crate) struct Plan<P: Scalar> {
     pub(crate) limits: JointLimits,
     /// Captured represented operating points and their complete deterministic boxes.
     pub(crate) points: Vec<super::matrix::Matrix<P>>,
-    /// Replayed units-owned native derivative relation, when required.
-    pub(crate) derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
+    /// Replayed bindings-owned native derivative relation, when required.
+    pub(crate) derivative: Option<std::rc::Rc<nrz_bindings::CheckedSensitivity>>,
 }
 impl<P: Scalar + 'static> Plan<P> {
     /// Replace unconditional refusal with complete source, recipe and work validation.

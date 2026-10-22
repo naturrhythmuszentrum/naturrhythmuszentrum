@@ -2,11 +2,11 @@
 //! Public execution identity, provenance limit and staleness refusal twins.
 
 use crate::binding_testing::{TestResult, operation, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, Layout, OperationDraft,
     OperationError, ProvenanceLimits, ProvenanceUsage, PublishedBundle,
 };
-use nrz_units::Descriptor;
 
 /// Publish a copy through the complete public operation boundary.
 fn copy(

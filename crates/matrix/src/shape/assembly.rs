@@ -5,7 +5,7 @@ use super::{
     Axis, CheckedShape, EntryContract, EntryDraft, ShapeError, ShapeLimits, ShapeRecipe,
     StructureScope,
 };
-use nrz_units::{BinaryOp, CheckedDeclarations, Role};
+use nrz_bindings::{BinaryOp, CheckedDeclarations, Role};
 use std::{ops::Range, rc::Rc};
 
 /// One rectangular block whose entries are explicitly column ordered.
@@ -169,7 +169,7 @@ pub(crate) fn check_axes(
             return Err(ShapeError::LinearAxis);
         }
         owner.registry().binary(BinaryOp::Add, quantity, quantity)?;
-        nrz_units::PairingWitness::sensitivity(quantity, quantity)?;
+        nrz_bindings::PairingWitness::sensitivity(quantity, quantity)?;
     }
     Ok(())
 }
@@ -193,7 +193,7 @@ mod tests {
     use super::insert_entry;
     use crate::shape::EntryContract;
     use crate::{AxisEntry, ShapeError};
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// A rejected overlapping write retains the first private coverage witness.
     /// ´test:unit:shape-coverage-slot-is-not-overwritten´

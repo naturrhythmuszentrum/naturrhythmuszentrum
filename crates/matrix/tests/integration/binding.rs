@@ -2,11 +2,11 @@
 //! Frozen binding lifecycles over repeated maps, mutation and relocation.
 
 use crate::binding_testing::{TestResult, operation, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, Coverage, ExecutionLimits, Extent, Heap, HeapLimits, Layout, OperationDraft,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Repeated read selections preserve the base target and companion order in both precisions.
 fn repeated_binding<P: Scalar + 'static>() -> TestResult {

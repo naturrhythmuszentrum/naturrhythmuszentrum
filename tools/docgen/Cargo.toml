@@ -16,7 +16,7 @@ workspace = true
 
 [dependencies]
 nrz-cas = { path = "../../crates/cas" }
-nrz-units = { path = "../../crates/units" }
+nrz-bindings = { path = "../../crates/bindings" }
 minijinja.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -3,9 +3,9 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Extent, Heap, HeapLimits, OperationDraft, ShapeLimits};
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// The design's endpoint attains the linear plus interaction terms in each output entry.
 /// ´test:integration:matrix-product-encloses-the-design-interaction-example´

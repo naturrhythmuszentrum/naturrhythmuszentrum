@@ -58,7 +58,7 @@ mod tests {
         Binding, ExecutionLimits, Extent, Heap, HeapLimits, KernelKind, OperationDraft,
         OperationError, RecipeEvidence, ShapeLimits,
     };
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// Same extents and finite payloads do not let a sum candidate claim a different recipe.
     /// ´test:unit:kernel-candidate-recipe-substitution-refuses´

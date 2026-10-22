@@ -66,7 +66,7 @@ impl Heap {
 fn publish<P: Scalar + 'static>(
     heap: &mut Heap,
     targets: [Dependency; 2],
-    quantities: &[nrz_units::Descriptor; 2],
+    quantities: &[nrz_bindings::Descriptor; 2],
     lineage: super::store::Lineage,
     covariance: &Matrix<P>,
     context: &ArithmeticContext,
@@ -79,12 +79,12 @@ fn publish<P: Scalar + 'static>(
     let regions = [
         RegionData {
             extent: covariance.extent,
-            quantity: nrz_units::Descriptor::ratio(),
+            quantity: nrz_bindings::Descriptor::ratio(),
             values: covariance.centers.clone(),
         },
         RegionData {
             extent: covariance.extent,
-            quantity: nrz_units::Descriptor::ratio(),
+            quantity: nrz_bindings::Descriptor::ratio(),
             values: covariance.errors(context)?,
         },
     ];

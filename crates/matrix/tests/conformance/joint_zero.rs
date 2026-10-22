@@ -2,9 +2,9 @@
 //! Successful explicit zero blocks and exact source-count boundaries.
 
 use crate::testing::TestResult;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{CovarianceBlock, JointLimits, JointModel, Source, SourceFactor};
 use nrz_scalar::ArithmeticContext;
-use nrz_units::Descriptor;
 
 /// A zero block is available only through an explicit supported zero-covariance declaration.
 /// ´test:integration:declared-zero-block-is-available´

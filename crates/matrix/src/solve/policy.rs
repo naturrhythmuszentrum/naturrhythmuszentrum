@@ -4,8 +4,8 @@
 use super::SolveError;
 use crate::RegionContract;
 use nrz_accuracy::{Budget, BudgetAssessment, Nonnegative};
+use nrz_bindings::{Descriptor, Role};
 use nrz_scalar::{ArithmeticContext, Scalar};
-use nrz_units::{Descriptor, Role};
 
 /// A Frobenius budget in one explicitly named homogeneous difference measure.
 ///

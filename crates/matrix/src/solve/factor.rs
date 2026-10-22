@@ -237,7 +237,7 @@ impl<P: Scalar> FactorRef<P> {
 mod tests {
     use crate::solve_testing::{TestResult, draft};
     use crate::{Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, SolveError};
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// A private witness with a substituted arithmetic revision cannot authorize factor reuse.
     /// ´test:unit:factor-reuse-checks-witness-environment-revision´

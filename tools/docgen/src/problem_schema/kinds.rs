@@ -3,11 +3,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use nrz_cas::Rational;
-use nrz_units::{
+use nrz_bindings::{
     BinaryOp, CountDomain, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry, Role,
     Scale, UncertaintyMode,
 };
+use nrz_cas::Rational;
 use serde_json::{Value, json};
 
 use super::record::{Record, exact};

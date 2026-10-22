@@ -3,8 +3,8 @@
 
 use crate::coordinate_numeric::LoweredMap;
 use crate::{CopyEvidence, Coverage};
+use nrz_bindings::CheckedMap;
 use nrz_scalar::{DecodedLiteral, Precision, Scalar};
-use nrz_units::CheckedMap;
 
 /// Constant candidate, enclosure and evaluation error, widened exactly for inspection.
 #[derive(Clone, Copy, Debug, PartialEq)]

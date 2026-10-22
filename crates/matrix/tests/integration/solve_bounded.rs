@@ -4,9 +4,9 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{entry, execute, output};
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Coverage, Extent, Heap, HeapLimits, RecipeEvidence};
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// The diagonal worked example encloses its exact 22/19 perturbed solution.
 /// ´test:integration:bounded-solve-encloses-the-worked-diagonal-example´

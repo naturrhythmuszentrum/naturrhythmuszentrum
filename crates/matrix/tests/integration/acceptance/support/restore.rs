@@ -2,11 +2,11 @@
 //! Physical restoration uses separate homogeneous voltage and current regions.
 
 use super::{Case, ResultOf, shapes};
+use nrz_bindings::{CheckedDeclarations, Descriptor};
 use nrz_matrix::{
     CheckedShape, FixedCoefficient, Handle, Heap, LinearMap, OperationDraft, ShapeLimits, Value,
 };
 use nrz_scalar::LiteralLimits;
-use nrz_units::{CheckedDeclarations, Descriptor};
 use std::rc::Rc;
 
 /// Restore each admitted physical block with exact unit coefficients and retained source lineage.

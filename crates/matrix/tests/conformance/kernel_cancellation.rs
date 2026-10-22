@@ -3,9 +3,9 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Extent, Heap, HeapLimits, OperationDraft, ShapeLimits};
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// A tiny exact dot beside huge canceling terms is covered in both candidate formats.
 /// ´test:integration:product-cancellation-retains-an-independent-enclosure´

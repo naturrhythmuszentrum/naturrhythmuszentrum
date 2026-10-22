@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Crate interaction with typed locator resolution.
 
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 use crate::heap::identity::Key;
 use crate::{Companion, Extent, Handle, Heap, HeapError, HeapLimits, Value};

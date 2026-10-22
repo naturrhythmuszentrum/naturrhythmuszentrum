@@ -2,13 +2,13 @@
 //! Statistical support must satisfy whole-family structure independently of the nominal center.
 
 use crate::kernel_testing::{TestResult, axis, owner};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, BlockDraft, CompanionSetDraft, CovarianceBlock, EntryDraft, ExecutionLimits, Extent,
     Heap, HeapLimits, JointLimits, JointModel, OperationDraft, OperationError, ShapeDraft,
     ShapeLimits, Source, SourceFactor, StructureScope, TargetMap,
 };
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite};
-use nrz_units::Descriptor;
 
 /// A zero center permits varying center-only statistics, but a whole-family zero needs exact zero moments.
 /// ´test:integration:statistical-structure-distinguishes-center-and-family-zeros´

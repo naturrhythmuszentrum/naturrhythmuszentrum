@@ -3,14 +3,14 @@
 
 use super::{Case, ResultOf, capture, model, shapes};
 use nrz_accuracy::Budget;
+use nrz_bindings::CheckedDeclarations;
+use nrz_bindings::{Conversion, Descriptor, Measure, Role, Scale};
 use nrz_matrix::{
     Binding, CheckedShape, ExecutionLimits, Extent, FactorRef, FixedCoefficient, Handle, Heap,
     HeapLimits, JointLimits, LinearMap, OperationDraft, ShapeLimits, SolveBudget, SolvePolicy,
     SolveRecordKeys, Value,
 };
 use nrz_scalar::LiteralLimits;
-use nrz_units::CheckedDeclarations;
-use nrz_units::{Conversion, Descriptor, Measure, Role, Scale};
 use std::{rc::Rc, time::Instant};
 
 /// Exact nodal elimination of V1=E and I=V2-E, ordered (V4,V3,V2).

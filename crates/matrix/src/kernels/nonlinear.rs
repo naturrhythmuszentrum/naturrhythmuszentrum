@@ -7,8 +7,8 @@ use super::contract::{KernelContract, Recipe, regions, work};
 use crate::binding::buffer;
 use crate::{CheckedShape, NormalizedView, OperationDraft, OperationError, RegionContract};
 use nrz_accuracy::Nonnegative;
+use nrz_bindings::{Conversion, Descriptor, Measure, Role, Scale};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
-use nrz_units::{Conversion, Descriptor, Measure, Role, Scale};
 
 /// Closed native elementwise functions with independently checked deterministic domains.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -35,7 +35,7 @@ pub enum DomainReason {
 impl OperationDraft {
     /// Propose a native elementwise operation with a separately checked output shape.
     ///
-    /// Units checks the corresponding scalar power. Numerical domain checks are deferred
+    /// Bindings checks the corresponding scalar power. Numerical domain checks are deferred
     /// until the entire actual deterministic input box is available under the binding.
     /// # Errors
     /// Refuses unlike snapshots/extents, wrong output kinds, points or unsupported powers.
@@ -62,7 +62,7 @@ impl OperationDraft {
     }
 }
 
-/// Derive only descriptor constants through units; no stored coordinate enters exact algebra.
+/// Derive only descriptor constants through bindings; no stored coordinate enters exact algebra.
 fn descriptor(input: &CheckedShape, function: Elementwise) -> Result<Descriptor, OperationError> {
     let quantity = RegionContract::check(input.clone())?;
     let unit = Measure::coherent();

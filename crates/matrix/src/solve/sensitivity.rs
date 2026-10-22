@@ -5,8 +5,8 @@ use super::{FactorRef, SolveContract, SolveError};
 use crate::statistics::contraction::Work;
 use crate::statistics::{Affine, Matrix, MomentPayload, enclosed, singleton};
 use crate::{Bound, NormalizedView, OperationError, RecipeEvidence, StatisticsError};
+use nrz_bindings::{CheckedSensitivity, Context, Declaration, Descriptor, Evidence, SolveSymbols};
 use nrz_scalar::{ArithmeticContext, Enclosure, Scalar};
-use nrz_units::{CheckedSensitivity, Context, Declaration, Descriptor, Evidence, SolveSymbols};
 use std::rc::Rc;
 
 /// Independent residual and forward bounds for one exact nominal differential direction.
@@ -54,7 +54,7 @@ fn input_entries(contract: &SolveContract) -> Result<usize, OperationError> {
     })
 }
 
-/// Units checks the defining equations and their partials without seeing any heap numbers.
+/// Bindings checks the defining equations and their partials without seeing any heap numbers.
 pub(crate) fn check(contract: &SolveContract) -> Result<Rc<CheckedSensitivity>, OperationError> {
     let operator = contract.inputs.first().ok_or(SolveError::Contract)?;
     let order = operator.shape().extent().rows();
@@ -81,7 +81,7 @@ pub(crate) fn check(contract: &SolveContract) -> Result<Rc<CheckedSensitivity>, 
         .collect::<Vec<_>>();
     let mut builder = Context::with_real_symbols(
         operator.shape().declarations().registry().clone(),
-        nrz_units::Limits::default(),
+        nrz_bindings::Limits::default(),
         &keys,
     )
     .map_err(|cause| sensitivity_error(cause.into()))?;
@@ -99,7 +99,7 @@ pub(crate) fn check(contract: &SolveContract) -> Result<Rc<CheckedSensitivity>, 
     )?;
     Ok(Rc::new(
         builder
-            .check_solve_sensitivity(&symbols, &nrz_units::LimitsOverride::default())
+            .check_solve_sensitivity(&symbols, &nrz_bindings::LimitsOverride::default())
             .map_err(sensitivity_error)?,
     ))
 }
@@ -124,7 +124,7 @@ fn declare(
     Ok(())
 }
 /// Preserve the typed symbolic cause, including any unresolved relation or domain obligation.
-fn sensitivity_error(cause: nrz_units::SensitivityError) -> OperationError {
+fn sensitivity_error(cause: nrz_bindings::SensitivityError) -> OperationError {
     StatisticsError::Sensitivity(Rc::new(cause)).into()
 }
 

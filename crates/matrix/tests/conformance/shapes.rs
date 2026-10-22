@@ -2,12 +2,12 @@
 //! Ordered axes and physical quotient refusal twins at the public boundary.
 
 use crate::shape_testing::{ResultOf, axis, dense, owner, quantity, ratio_shape, ratios};
+use nrz_bindings::{
+    BinaryOp, Context, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry, Role,
+};
 use nrz_matrix::{
     Axis, AxisAlignment, AxisEntry, BlockDraft, EntryDraft, EntryMap, Extent, Partition,
     ShapeDraft, ShapeError, ShapeLimits, ShapeRecipe, StructureScope,
-};
-use nrz_units::{
-    BinaryOp, Context, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry, Role,
 };
 use std::rc::Rc;
 
@@ -203,7 +203,7 @@ fn empty_shape_operation_contracts() -> ResultOf<()> {
 /// ´test:integration:original-shape-evidence-retains-owner´
 #[expect(
     clippy::default_trait_access,
-    reason = "the units context takes the CAS limits and environment, and nrz-matrix names no CAS type"
+    reason = "the bindings context takes the CAS limits and environment, and nrz-matrix names no CAS type"
 )]
 #[test]
 fn original_shape_evidence_retains_owner() -> ResultOf<()> {

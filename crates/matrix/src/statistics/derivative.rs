@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Units supplies replayed native derivative identities; heap numbers never enter the graph.
+//! Bindings supplies replayed native derivative identities; heap numbers never enter the graph.
 
 use super::StatisticsError;
 use crate::{CheckedOperation, Elementwise, OperationError, binding::NativeRecipe};
-use nrz_units::{
+use nrz_bindings::{
     CheckedSensitivity, Context, Declaration, Evidence, SensitivityError, SensitivityRecipe,
 };
 use std::rc::Rc;
@@ -37,7 +37,7 @@ pub(crate) fn check(
     };
     let mut builder = Context::with_real_symbols(
         input.shape().declarations().registry().clone(),
-        nrz_units::Limits::default(),
+        nrz_bindings::Limits::default(),
         keys,
     )
     .map_err(|cause| refusal(SensitivityError::Algebra(cause)))?;
@@ -74,7 +74,7 @@ pub(crate) fn check(
         )
         .map_err(|cause| refusal(cause.into()))?;
     let coordinates = [String::from("x")];
-    let limits = nrz_units::LimitsOverride::default();
+    let limits = nrz_bindings::LimitsOverride::default();
     let checked = match function {
         Elementwise::Square | Elementwise::Reciprocal => builder.check_sensitivity(
             if function == Elementwise::Square {
@@ -101,7 +101,7 @@ pub(crate) fn check(
     }
     Ok(Some(Rc::new(checked)))
 }
-/// Retain the complete units/CAS cause without requiring its non-cloneable witness to clone.
+/// Retain the complete bindings/CAS cause without requiring its non-cloneable witness to clone.
 fn refusal(cause: SensitivityError) -> OperationError {
     StatisticsError::Sensitivity(Rc::new(cause)).into()
 }

@@ -4,15 +4,15 @@
 use super::KernelError;
 use super::contract::work;
 use crate::{CheckedShape, OperationError, RegionContract, ShapeLimits};
+use nrz_bindings::{Descriptor, DescriptorConstant};
 use nrz_scalar::{Finite, LiteralLimits};
-use nrz_units::{Descriptor, DescriptorConstant};
 
 /// An exact fixed coefficient definition, never a declaration of uncertain heap data.
 #[derive(Clone, Debug)]
 pub struct FixedCoefficient {
     /// Coherent scalar meaning of the coefficient or offset.
     pub(crate) quantity: Descriptor,
-    /// Exact represented constant or units-owned descriptor definition.
+    /// Exact represented constant or bindings-owned descriptor definition.
     pub(crate) value: CoefficientValue,
 }
 
@@ -20,10 +20,10 @@ pub struct FixedCoefficient {
 #[derive(Clone, Debug)]
 pub(crate) enum CoefficientValue {
     /// Checked source-free structural metadata, including signed and zero exact coefficients.
-    Expansion(Box<nrz_units::Conversion>),
+    Expansion(Box<nrz_bindings::Conversion>),
     /// This finite binary64 value defines the exact mathematical coefficient.
     Represented(f64),
-    /// Units-owned exact descriptor metadata, lowered under explicit limits.
+    /// Bindings-owned exact descriptor metadata, lowered under explicit limits.
     Descriptor(Box<DescriptorConstant>),
 }
 
@@ -43,7 +43,7 @@ impl FixedCoefficient {
         })
     }
 
-    /// Define a coefficient from an exact units-owned constant and its physical meaning.
+    /// Define a coefficient from an exact bindings-owned constant and its physical meaning.
     /// # Errors
     /// Refuses points, counts and noncoherent descriptors; map construction checks ownership.
     pub fn descriptor(
@@ -184,7 +184,7 @@ fn check_coefficients(
 
 /// Fixed numerical definitions have the same continuous coherent difference restriction as operands.
 fn check_quantity(quantity: &Descriptor) -> Result<(), OperationError> {
-    if quantity.role() != nrz_units::Role::Difference
+    if quantity.role() != nrz_bindings::Role::Difference
         || quantity.kind().count_domain().is_some()
         || quantity != &quantity.coherent()
     {

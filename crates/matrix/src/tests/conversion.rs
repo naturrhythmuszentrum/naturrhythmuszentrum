@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Units/scalar/accuracy adapters retain exact map identity and numerical companion targets.
+//! Bindings/scalar/accuracy adapters retain exact map identity and numerical companion targets.
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, contract, measure, reference_owner, shape};
 use crate::{Extent, Heap, HeapLimits, RecipeEvidence};
-use nrz_units::{Descriptor, Role};
+use nrz_bindings::{Descriptor, Role};
 
 /// The recorded coefficients retain their own exact-definition enclosures and displacements.
 /// ´test:crate:conversion-record-retains-lowered-constant-evidence´

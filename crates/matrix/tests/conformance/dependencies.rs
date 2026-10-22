@@ -47,8 +47,8 @@ const PACKAGES: [Package; 6] = [
         development: &["num-bigint", "num-rational", "num-traits"],
     },
     Package {
-        name: "nrz-units",
-        manifest: "crates/units/Cargo.toml",
+        name: "nrz-bindings",
+        manifest: "crates/bindings/Cargo.toml",
         normal: &["nrz-cas", "thiserror"],
         development: &[],
     },
@@ -59,7 +59,7 @@ const PACKAGES: [Package; 6] = [
             "faer",
             "nrz-scalar",
             "nrz-accuracy",
-            "nrz-units",
+            "nrz-bindings",
             "thiserror",
         ],
         development: &[],
@@ -69,7 +69,7 @@ const PACKAGES: [Package; 6] = [
         manifest: "tools/docgen/Cargo.toml",
         normal: &[
             "nrz-cas",
-            "nrz-units",
+            "nrz-bindings",
             "minijinja",
             "serde",
             "serde_json",
@@ -224,7 +224,7 @@ fn manifest_policy(manifest: &str) -> CheckResult {
 fn negative_twins() -> CheckResult {
     for manifest in [
         "[features]\nunchecked-assurance = []\n",
-        "[dependencies]\nnrz-units = { path = '../units', optional = true }\n",
+        "[dependencies]\nnrz-bindings = { path = '../bindings', optional = true }\n",
         "[target.'cfg(windows)'.dependencies]\nnrz-matrix = { path = '../matrix' }\n",
     ] {
         if manifest_policy(manifest).is_ok() {
@@ -236,7 +236,7 @@ fn negative_twins() -> CheckResult {
         for name in allowed {
             writeln!(output, "{name} v1.0.0")?;
         }
-        output.push_str("nrz-units v0.1.0 (/a/misleading/thiserror/path)\n");
+        output.push_str("nrz-bindings v0.1.0 (/a/misleading/thiserror/path)\n");
         if edges(&output, "nrz-scalar", allowed).is_ok() {
             return Err("edge policy accepted a forbidden resolved target".into());
         }

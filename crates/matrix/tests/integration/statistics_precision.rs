@@ -3,12 +3,12 @@
 
 use crate::conversion_testing::{TestResult, owner, shape};
 use crate::statistics_testing::{check, vector, worked_covariance};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, CheckedShape, ExecutionLimits, Handle, Heap, HeapLimits, JointLimits, OperationDraft,
     PrecisionContract, PublishedBundle, Value,
 };
 use nrz_scalar::{Precision, Scalar};
-use nrz_units::Descriptor;
 
 /// Narrowing and widening preserve the original mathematical covariance and mixed-format target maps.
 /// ´test:integration:statistical-precision-round-trip-retains-original-model-and-sources´

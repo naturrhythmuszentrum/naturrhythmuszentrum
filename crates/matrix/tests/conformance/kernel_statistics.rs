@@ -2,10 +2,10 @@
 //! Supported kernels propagate statistics; unfinished modes retain explicit refusals.
 
 use crate::kernel_testing::{TestResult, axis, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError, ShapeLimits,
 };
-use nrz_units::Descriptor;
 
 /// A repeated operand propagates its complete dependence rather than discarding statistics.
 /// ´test:integration:deterministic-sum-propagates-carried-statistics´

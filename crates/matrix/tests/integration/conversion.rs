@@ -3,8 +3,8 @@
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, contract, execute, measure, reference_owner, shape};
+use nrz_bindings::{BaseDimension, Descriptor, Dimension, Kind, Role};
 use nrz_matrix::{Coverage, Extent, Heap, HeapLimits};
-use nrz_units::{BaseDimension, Descriptor, Dimension, Kind, Role};
 
 /// Normalization subtracts the declared point origin and restoration adds it only to centers.
 /// ´test:integration:point-normalization-restoration-encloses-exact-origins´

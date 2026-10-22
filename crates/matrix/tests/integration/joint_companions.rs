@@ -2,11 +2,11 @@
 //! Source-preserving selections, concrete two-sided targets and stale evidence.
 
 use crate::testing::TestResult;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     CompanionSetDraft, CovarianceBlock, Extent, Heap, HeapError, HeapLimits, JointError,
     JointLimits, JointModel, Layout, Source, SourceFactor, TargetMap,
 };
-use nrz_units::Descriptor;
 
 /// Common sources retain dependence across distinct center regions and compaction.
 /// ´test:integration:joint-targets-survive-compaction-and-refuse-staleness´

@@ -5,7 +5,7 @@ use crate::binding_testing::{TestResult, operation, shape};
 use crate::{
     Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, OperationDraft, OperationError,
 };
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// Each later candidate may fail after previous copies passed, without publishing a prefix.
 /// ´test:crate:connected-candidate-refusals-publish-no-prefix´

@@ -37,11 +37,11 @@ pub struct StatisticalView<'h, P: Scalar> {
     /// Independent numerical mean-error regions in row/column target order.
     mean_errors: Vec<RegionView<'h, P>>,
     /// Independent error descriptors on full source-covariance parameters.
-    evaluation: &'h [nrz_units::EvaluationDescriptor],
+    evaluation: &'h [nrz_bindings::EvaluationDescriptor],
     /// Companion identity, distinct from every physical value target.
     identity: CompanionRef<P>,
     /// Independent paired uncertainty descriptors.
-    pairings: &'h [nrz_units::PairingWitness],
+    pairings: &'h [nrz_bindings::PairingWitness],
 }
 impl<P: Scalar> StatisticalView<'_, P> {
     /// Conditional finite-moment model, never a deterministic assurance token.
@@ -114,7 +114,7 @@ impl<P: Scalar> StatisticalView<'_, P> {
     }
     /// Covariance entry meanings in logical column order.
     #[must_use]
-    pub const fn pairings(&self) -> &[nrz_units::PairingWitness] {
+    pub const fn pairings(&self) -> &[nrz_bindings::PairingWitness] {
         self.pairings
     }
 }

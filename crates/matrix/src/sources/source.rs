@@ -2,8 +2,8 @@
 //! Shared immutable declarations prevent contradictory reuse across owners.
 
 use super::{JointError, model::Definition};
+use nrz_bindings::{Descriptor, Role};
 use nrz_scalar::Scalar;
-use nrz_units::{Descriptor, Role};
 use std::{cell::RefCell, rc::Rc};
 
 /// Process-local source identity; equality never establishes independence.

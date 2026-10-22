@@ -3,12 +3,12 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, DomainReason, Elementwise, ExecutionLimits, Extent, Heap, HeapLimits, KernelError,
     OperationDraft, OperationError,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Full-box domain violations and finite-format square overflow remain distinct typed reasons.
 /// ´test:integration:nonlinear-domains-refuse-atomically-in-both-formats´

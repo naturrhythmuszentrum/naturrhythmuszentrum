@@ -7,11 +7,11 @@ use crate::kernel_testing::{axis, entry, execute, output, shape};
 use crate::solve_testing::TestResult;
 use faer::prelude::*;
 use nrz_accuracy::{Budget, BudgetDecision};
+use nrz_bindings::{BaseDimension, Descriptor, Dimension, Kind, Role};
 use nrz_matrix::{
     Extent, Heap, HeapLimits, OperationDraft, RecipeEvidence, ShapeLimits, SolveBudget, SolvePolicy,
 };
 use nrz_scalar::Scalar;
-use nrz_units::{BaseDimension, Descriptor, Dimension, Kind, Role};
 
 /// Restoration adds a point origin only to the center and applies the difference scale to both bounds.
 /// ´test:integration:solve-restoration-encloses-exact-point-and-difference-results´
@@ -67,7 +67,7 @@ fn restored<P: Scalar + 'static>() -> TestResult {
     Ok(())
 }
 
-/// Build only exact descriptor definitions; no numerical fixture value enters units algebra.
+/// Build only exact descriptor definitions; no numerical fixture value enters bindings algebra.
 fn restoration_operation() -> TestResult<(OperationDraft, Descriptor)> {
     let point = Descriptor::new(
         Kind::Named(

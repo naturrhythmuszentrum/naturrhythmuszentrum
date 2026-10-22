@@ -33,8 +33,8 @@ pub enum ShapeError {
     EntryMeaning {
         /// Logical index in column order.
         index: usize,
-        /// Preserved units refusal.
-        cause: nrz_units::PairingError,
+        /// Preserved bindings refusal.
+        cause: nrz_bindings::PairingError,
     },
     /// The contract uses another frozen semantic state.
     #[error("shape declaration snapshots differ")]
@@ -56,20 +56,20 @@ pub enum ShapeError {
     StructureScope,
     /// A scalar operation could not be admitted.
     #[error("units descriptor check failed: {0}")]
-    Units(#[from] nrz_units::UnitError),
+    Units(#[from] nrz_bindings::UnitError),
     /// Formal pairing derivation failed.
     #[error("units pairing check failed: {0}")]
-    Pairing(#[from] nrz_units::PairingError),
+    Pairing(#[from] nrz_bindings::PairingError),
     /// Original declaration evidence is unavailable or invalid.
     #[error("original declaration check failed: {0}")]
-    Original(Box<nrz_units::Diagnostic>),
-    /// A requested operation needs a units surface not supplied by this subset.
+    Original(Box<nrz_bindings::Diagnostic>),
+    /// A requested operation needs a bindings surface not supplied by this subset.
     #[error("unsupported shape contract: {0}")]
     Unsupported(&'static str),
 }
 
-impl From<nrz_units::Diagnostic> for ShapeError {
-    fn from(value: nrz_units::Diagnostic) -> Self {
+impl From<nrz_bindings::Diagnostic> for ShapeError {
+    fn from(value: nrz_bindings::Diagnostic) -> Self {
         Self::Original(Box::new(value))
     }
 }

@@ -181,7 +181,7 @@ fn copy_owner<P: Scalar + 'static>(
 /// Inaccessible preparation faults and commit-boundary checks.
 #[cfg(test)]
 mod tests {
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     use super::{Heap, HeapError, HeapLimits};
     use crate::{Extent, Layout};

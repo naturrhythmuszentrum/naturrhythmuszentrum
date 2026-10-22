@@ -9,7 +9,7 @@ owners = [
   "SCALAR",
   "ACCURACY",
   "MATRIX",
-  "UNITS",
+  "BINDINGS",
   "CAS",
 ]
 
@@ -22,7 +22,7 @@ partitions = [
   { name = "scalar", owner = "SCALAR", pattern = '[ %s"templates/" ] %s"crates/scalar" [ "/" *VCHAR ]' },
   { name = "accuracy", owner = "ACCURACY", pattern = '[ %s"templates/" ] %s"crates/accuracy" [ "/" *VCHAR ]' },
   { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"crates/matrix" [ "/" *VCHAR ]' },
-  { name = "units", owner = "UNITS", pattern = '[ %s"templates/" ] %s"crates/units" [ "/" *VCHAR ]' },
+  { name = "bindings", owner = "BINDINGS", pattern = '[ %s"templates/" ] %s"crates/bindings" [ "/" *VCHAR ]' },
   { name = "cas", owner = "CAS", pattern = '[ %s"templates/" ] %s"crates/cas" [ "/" *VCHAR ]' },
 ]
 

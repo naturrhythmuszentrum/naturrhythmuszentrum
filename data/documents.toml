@@ -51,7 +51,7 @@ output = "docs/records/feasibility.md"
 requires = []
 
 [[document]]
-output = "crates/units/README.md"
+output = "crates/bindings/README.md"
 requires = []
 
 [[document]]

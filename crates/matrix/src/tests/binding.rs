@@ -5,7 +5,7 @@ use crate::binding_testing::{TestResult, operation};
 use crate::{
     Binding, ExecutionLimits, Extent, Handle, Heap, HeapError, HeapLimits, OperationError, Value,
 };
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// Runtime category and precision checks refuse forged locators before lending a view.
 /// ´test:crate:binding-rechecks-erased-category-and-precision´

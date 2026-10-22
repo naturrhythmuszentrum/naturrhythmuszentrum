@@ -3,12 +3,12 @@
 
 use crate::conversion_testing::{TestResult, measure, owner, shape};
 use crate::statistics_testing::{check, vector, worked_covariance};
+use nrz_bindings::{Descriptor, PairingWitness, Role, UncertaintyMode};
 use nrz_matrix::{
     Binding, ConversionContract, ConversionMode, ExecutionLimits, Heap, HeapLimits, JointLimits,
     OperationDraft,
 };
 use nrz_scalar::{LiteralLimits, Scalar};
-use nrz_units::{Descriptor, PairingWitness, Role, UncertaintyMode};
 
 /// Statistical and deterministic requests both preserve carried sources and both paired scale factors.
 /// ´test:integration:paired-conversions-scale-both-covariance-axes´
@@ -107,13 +107,13 @@ fn check_scaled<P: Scalar + 'static>(
 fn point_conversion_shifts_means_without_translating_covariance() -> TestResult {
     let declarations = owner()?;
     let point = Descriptor::new(
-        nrz_units::Kind::Named(
+        nrz_bindings::Kind::Named(
             "temperature".into(),
-            Box::new(nrz_units::Dimension::base(
-                nrz_units::BaseDimension::Temperature,
+            Box::new(nrz_bindings::Dimension::base(
+                nrz_bindings::BaseDimension::Temperature,
             )),
         ),
-        nrz_units::Measure::coherent(),
+        nrz_bindings::Measure::coherent(),
         Role::Point,
     )?;
     let target = Descriptor::new(

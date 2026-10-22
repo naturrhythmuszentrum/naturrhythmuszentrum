@@ -9,8 +9,8 @@ use crate::{
     OperationDraft, OperationError, OutputReservation, RecipeEvidence, RegionContract, Value,
 };
 use nrz_accuracy::Nonnegative;
+use nrz_bindings::Descriptor;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Precision, Scalar};
-use nrz_units::Descriptor;
 
 /// A region's actual coordinate descriptor and ordered tangent shape, retained unchanged by precision conversion.
 #[derive(Clone, Debug)]
@@ -22,7 +22,7 @@ pub struct PrecisionContract {
 impl PrecisionContract {
     /// Validate a coordinate representation without evaluating or changing any unit constant.
     /// # Errors
-    /// Refuses unsupported homogeneous shapes, incompatible descriptors and units failures.
+    /// Refuses unsupported homogeneous shapes, incompatible descriptors and bindings failures.
     pub fn new(shape: CheckedShape, descriptor: &Descriptor) -> Result<Self, OperationError> {
         shape.declarations.conversion_map(descriptor, descriptor)?;
         Ok(Self {

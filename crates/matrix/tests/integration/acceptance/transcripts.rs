@@ -2,11 +2,11 @@
 //! Deterministic inspection transcripts retain environment and numeric bits, with stable local names.
 
 use super::support::{self, Case, Parameter, ResultOf, Sample};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, CheckedOperation, ExecutionLimits, Extent, Handle, Heap, HeapLimits, RecordId,
     SolveEvidence, Value,
 };
-use nrz_units::Descriptor;
 use std::fmt::Write;
 
 /// The committed physical and adversarial cases reproduce every inspected numerical bit on fresh heaps.

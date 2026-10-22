@@ -62,8 +62,8 @@ pub enum OperationError {
     ProvenanceLimit,
 }
 
-impl From<nrz_units::MapError> for OperationError {
-    fn from(cause: nrz_units::MapError) -> Self {
+impl From<nrz_bindings::MapError> for OperationError {
+    fn from(cause: nrz_bindings::MapError) -> Self {
         Self::Conversion(cause.into())
     }
 }

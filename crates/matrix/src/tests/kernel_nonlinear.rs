@@ -7,7 +7,7 @@ use crate::{
     Binding, DomainReason, Elementwise, ExecutionLimits, Extent, Heap, HeapLimits, KernelError,
     OperationDraft, OperationError,
 };
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// A failed second entry discards the entire private output and every companion reservation.
 /// ´test:crate:nonlinear-late-domain-refusal-keeps-publication-empty´

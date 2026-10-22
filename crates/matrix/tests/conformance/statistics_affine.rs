@@ -70,12 +70,12 @@ fn matrix_entry_transpose_propagates_full_covariance() -> TestResult {
     let mut heap = Heap::new(HeapLimits::default())?;
     let source = heap.import_represented(
         Extent::new(2, 2)?,
-        &nrz_units::Descriptor::ratio(),
+        &nrz_bindings::Descriptor::ratio(),
         &[2.0_f64, 3.0, 4.0, 5.0],
     )?;
     let limits = JointLimits::default();
     let sources = (0..4)
-        .map(|_| nrz_matrix::Source::new(&nrz_units::Descriptor::ratio(), 1))
+        .map(|_| nrz_matrix::Source::new(&nrz_bindings::Descriptor::ratio(), 1))
         .collect::<Result<Vec<_>, _>>()?;
     let model = nrz_matrix::JointModel::from_factor(
         &sources,
@@ -149,7 +149,7 @@ fn empty_statistical_selection_retains_parameter_roles() -> crate::kernel_testin
     assert_eq!(means.extent(), nrz_matrix::Extent::new(0, 1)?);
     assert_eq!(
         means.mean_descriptor(),
-        Some(&nrz_units::Descriptor::ratio())
+        Some(&nrz_bindings::Descriptor::ratio())
     );
     Ok(())
 }

@@ -3,11 +3,11 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Extent, FixedCoefficient, Heap, HeapLimits, LinearMap, OperationDraft, ShapeLimits,
 };
 use nrz_scalar::{LiteralLimits, Scalar};
-use nrz_units::Descriptor;
 
 /// All corners, nominal centers and repeated-input multiplicity use an independent rational oracle.
 /// ´test:integration:sums-and-differences-enclose-rational-corners´
@@ -129,7 +129,7 @@ fn linear_map_encloses_exact_descriptor_coefficient() -> TestResult {
     let third = Descriptor::new(
         ratio.kind().clone(),
         crate::conversion_testing::measure(1, 3, 0, 1)?,
-        nrz_units::Role::Difference,
+        nrz_bindings::Role::Difference,
     )?;
     let exact = declarations.conversion_map(&third, &ratio)?;
     let coefficient = FixedCoefficient::descriptor(ratio.clone(), exact.scale().clone())?;

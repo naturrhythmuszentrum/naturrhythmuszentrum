@@ -4,8 +4,8 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{axis, entry, execute, output, owner, shape};
 use crate::solve_testing::TestResult;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Extent, Heap, HeapLimits, OperationDraft, RecipeEvidence, ShapeLimits};
-use nrz_units::Descriptor;
 
 /// A product input and an import with the same total give bit-identical solve radii.
 /// ´test:integration:solve-consumes-a-product-total-exactly-once´

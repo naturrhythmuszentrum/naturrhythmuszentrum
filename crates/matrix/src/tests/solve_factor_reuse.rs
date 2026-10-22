@@ -3,7 +3,7 @@
 
 use crate::solve_testing::{TestResult, draft};
 use crate::{Binding, Coverage, ExecutionLimits, Extent, Heap, HeapLimits};
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// Complete result coverage can change independently of the numerical factor's dependency key.
 /// ´test:crate:factor-key-excludes-result-only-coverage´

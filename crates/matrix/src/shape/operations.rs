@@ -5,7 +5,7 @@ use super::{
     Axis, AxisAlignment, CheckedShape, EntryContract, EntryMap, ShapeError, ShapeLimits,
     ShapeRecipe, StructureScope,
 };
-use nrz_units::{BinaryOp, PairingWitness};
+use nrz_bindings::{BinaryOp, PairingWitness};
 use std::rc::Rc;
 
 impl CheckedShape {
@@ -15,7 +15,7 @@ impl CheckedShape {
     /// Refuses non-difference coordinates, unsupported pairings or exhausted limits.
     pub fn identity(
         axis: &Axis,
-        declarations: Rc<nrz_units::CheckedDeclarations>,
+        declarations: Rc<nrz_bindings::CheckedDeclarations>,
         limits: ShapeLimits,
     ) -> Result<Self, ShapeError> {
         let extent = limits.extent(axis.entries.len(), axis.entries.len())?;
@@ -27,7 +27,7 @@ impl CheckedShape {
                 let mut entry = EntryContract::formal(output, input)?;
                 entry.zero = row != column;
                 if row == column {
-                    let ratio = nrz_units::Descriptor::ratio();
+                    let ratio = nrz_bindings::Descriptor::ratio();
                     entry.conversion =
                         Some(entry.pairing.check_entry(declarations.registry(), &ratio)?);
                     entry.scalar = Some(ratio);
@@ -358,10 +358,10 @@ impl CheckedShape {
 fn check_sum_entry(
     left: &EntryContract,
     right: &EntryContract,
-    registry: &nrz_units::Registry,
+    registry: &nrz_bindings::Registry,
 ) -> Result<(), ShapeError> {
     if left.dimension() != right.dimension() {
-        return Err(nrz_units::UnitError::DimensionMismatch.into());
+        return Err(nrz_bindings::UnitError::DimensionMismatch.into());
     }
     if let (Some(first), Some(second)) = (&left.scalar, &right.scalar) {
         registry.binary(BinaryOp::Add, first, second)?;

@@ -2,11 +2,11 @@
 //! Structured coordinates retain typed zeros, affine offsets and exact metric weights.
 
 use crate::shape_testing::{ResultOf, axis, dense, ratio_shape, ratios};
+use nrz_bindings::{Descriptor, Dimension, Measure};
 use nrz_matrix::{
     EntryDraft, ExactCoefficient, ExpansionNorm, ExpansionRow, ExpansionTerm, ShapeError,
     ShapeLimits, StructureScope, StructuredExpansion,
 };
-use nrz_units::{Descriptor, Dimension, Measure};
 
 /// A row duplicates one free coordinate with its exact unit coefficient.
 fn selected(index: usize) -> ResultOf<ExpansionRow> {

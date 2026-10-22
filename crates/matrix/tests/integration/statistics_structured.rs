@@ -4,12 +4,12 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, execute, output, owner, shape};
 use crate::statistics_testing::{attach, check, covariance};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     EntryMap, ExactCoefficient, ExpansionRow, ExpansionTerm, Extent, Heap, HeapLimits,
     OperationDraft, ShapeLimits, StructureScope, StructuredExpansion,
 };
 use nrz_scalar::{LiteralLimits, Scalar};
-use nrz_units::Descriptor;
 
 /// Structured symmetry duplicates one source coordinate on both covariance axes.
 /// ´test:integration:structured-duplication-expands-full-logical-covariance´
@@ -160,12 +160,12 @@ fn rational_expansion<P: Scalar + 'static>() -> TestResult {
     let half = crate::conversion_testing::measure(1, 2, 0, 1)?;
     let two = crate::conversion_testing::measure(2, 1, 0, 1)?;
     let quarter = crate::conversion_testing::measure(1, 4, 0, 1)?;
-    let negative = nrz_units::Dimension::integers([-1, 0, 0, 0, 0, 0, 0])?;
-    let zero = nrz_units::Measure::coherent().offset().clone();
+    let negative = nrz_bindings::Dimension::integers([-1, 0, 0, 0, 0, 0, 0])?;
+    let zero = nrz_bindings::Measure::coherent().offset().clone();
     let definition = |scale| {
         ExactCoefficient::new(
             &Descriptor::ratio(),
-            &nrz_units::Conversion {
+            &nrz_bindings::Conversion {
                 scale,
                 shift: zero.clone(),
             },

@@ -3,7 +3,7 @@
 
 use super::{Axis, CheckedShape, ShapeError, ShapeLimits, StructureScope};
 use crate::Extent;
-use nrz_units::{Conversion, Descriptor, Measure, PairingWitness, Role};
+use nrz_bindings::{Conversion, Descriptor, Measure, PairingWitness, Role};
 
 /// A typed exact source-free scalar definition, never a heap coordinate.
 #[derive(Clone, Debug, Eq, PartialEq)]

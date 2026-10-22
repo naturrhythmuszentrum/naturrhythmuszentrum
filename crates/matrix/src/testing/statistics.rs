@@ -7,8 +7,8 @@ use crate::test_api::{
     CompanionSetDraft, CovarianceBlock, DenseCovariance, Extent, Handle, Heap, JointLimits,
     JointModel, PublishedBundle, Source, TargetMap, Value,
 };
+use nrz_bindings::Descriptor;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
-use nrz_units::Descriptor;
 
 /// Attach a complete model to an existing vector, with explicitly optional means.
 pub(crate) fn attach<P: Scalar + 'static>(

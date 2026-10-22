@@ -5,8 +5,8 @@ use crate::kernel_oracle::Rational;
 use crate::solve_testing::{TestResult, shapes};
 use crate::solve_verification::{SolveWork, center, inverse};
 use crate::{Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, SolveError};
+use nrz_bindings::Descriptor;
 use nrz_scalar::ArithmeticContext;
-use nrz_units::Descriptor;
 
 /// A nonzero residual is certified from heap views independently of the supplied inverse.
 /// ´test:crate:solve-verifier-encloses-independent-residual-and-inverse-norms´

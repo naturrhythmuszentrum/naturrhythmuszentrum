@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Versioned replacement and retirement through the public heap boundary.
 
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Coverage, Extent, Heap, HeapError, HeapLimits};
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 use crate::testing::{TestResult, bound};
 

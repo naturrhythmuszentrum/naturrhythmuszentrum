@@ -4,9 +4,9 @@
 /// A refused statistical propagation or covariance materialization.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum StatisticsError {
-    /// Units could not establish a complete native derivative identity.
+    /// Bindings could not establish a complete native derivative identity.
     #[error("statistical derivative: {0}")]
-    Sensitivity(std::rc::Rc<nrz_units::SensitivityError>),
+    Sensitivity(std::rc::Rc<nrz_bindings::SensitivityError>),
     /// The complete declared numerical box does not establish a smooth derivative domain.
     #[error("statistical derivative domain for {function:?} at entry {entry}")]
     Domain {
@@ -24,9 +24,9 @@ pub enum StatisticsError {
     /// Finite outward arithmetic could not establish a parameter enclosure.
     #[error("statistical arithmetic: {0}")]
     Arithmetic(#[from] nrz_scalar::ArithmeticFailure),
-    /// Units refused a paired covariance or sensitivity descriptor.
+    /// Bindings refused a paired covariance or sensitivity descriptor.
     #[error("statistical pairing: {0}")]
-    Pairing(#[from] nrz_units::PairingError),
+    Pairing(#[from] nrz_bindings::PairingError),
     /// The selected logical coordinate has no checked source-selection row.
     #[error("missing statistical source at operand {slot}, entry {entry}")]
     MissingSource {
@@ -59,8 +59,8 @@ impl From<crate::JointError> for crate::OperationError {
         StatisticsError::Joint(cause).into()
     }
 }
-impl From<nrz_units::PairingError> for crate::OperationError {
-    fn from(cause: nrz_units::PairingError) -> Self {
+impl From<nrz_bindings::PairingError> for crate::OperationError {
+    fn from(cause: nrz_bindings::PairingError) -> Self {
         StatisticsError::Pairing(cause).into()
     }
 }

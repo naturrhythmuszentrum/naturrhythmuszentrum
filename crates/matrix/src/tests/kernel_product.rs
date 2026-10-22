@@ -5,8 +5,8 @@ use crate::contractions::{ContractionWork, product};
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, owner, shape};
 use crate::{Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft};
+use nrz_bindings::Descriptor;
 use nrz_scalar::ArithmeticContext;
-use nrz_units::Descriptor;
 
 /// The verifier encloses exact dots and each separate contribution without a backend candidate.
 /// ´test:crate:independent-contraction-retains-each-product-term´

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact replacement refusals and failure atomicity.
 
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Coverage, Extent, Heap, HeapError, HeapLimits};
-use nrz_units::Descriptor;
 
 use crate::testing::{TestResult, bound};
 

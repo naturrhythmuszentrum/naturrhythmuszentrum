@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-bindings"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Data-time quantity descriptors and checks over original symbolic expressions"
+readme = "README.md"
+keywords = ["units", "dimensions", "validation"]
+categories = ["mathematics", "science"]
+
+[dependencies]
+nrz-cas = { path = "../cas" }
+thiserror.workspace = true
+
+[lints]
+workspace = true

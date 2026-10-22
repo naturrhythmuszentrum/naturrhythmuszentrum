@@ -2,11 +2,11 @@
 //! Physical block assemblies keep coordinate meaning through descriptor operations.
 
 use crate::shape_testing::{ResultOf, axis, dense, owner, quantity, ratio_shape, ratios};
+use nrz_bindings::{BinaryOp, Descriptor, Dimension, ExponentPolicy, Registry};
 use nrz_matrix::{
     Axis, AxisAlignment, AxisEntry, BlockDraft, EntryDraft, Partition, ShapeDraft, ShapeLimits,
     ShapeRecipe, StructureScope,
 };
-use nrz_units::{BinaryOp, Descriptor, Dimension, ExponentPolicy, Registry};
 use std::rc::Rc;
 
 /// A truss stiffness transpose keeps stiffness dimensions; its inverse reverses them.

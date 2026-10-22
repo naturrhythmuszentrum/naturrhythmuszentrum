@@ -7,8 +7,8 @@ use crate::{
     LinearMap, OperationError, Partition, RegionContract, ShapeDraft, ShapeLimits,
     StructuredExpansion,
 };
+use nrz_bindings::{BinaryOp, Conversion, Descriptor};
 use nrz_scalar::{ArithmeticContext, LiteralLimits, NumericLiteral, Scalar};
-use nrz_units::{BinaryOp, Conversion, Descriptor};
 
 impl StructuredExpansion {
     /// Build the certified affine map from free coordinates to the full logical entry vector.
@@ -131,13 +131,13 @@ fn operator(
         limits,
     )?)
 }
-/// Decode only exact structural metadata through units' bounded export and scalar's outward parser.
+/// Decode only exact structural metadata through bindings' bounded export and scalar's outward parser.
 pub(crate) fn lower_definition<P: Scalar>(
     definition: &Conversion,
     limits: LiteralLimits,
     context: &ArithmeticContext,
 ) -> Result<crate::kernels::lowering::Coefficient<P>, OperationError> {
-    let spelling = definition.export_scale(&nrz_units::LimitsOverride::default())?;
+    let spelling = definition.export_scale(&nrz_bindings::LimitsOverride::default())?;
     let decoded = NumericLiteral::new(&spelling, limits)?.decode(context)?;
     Ok(crate::kernels::lowering::Coefficient {
         center: decoded.center().get(),

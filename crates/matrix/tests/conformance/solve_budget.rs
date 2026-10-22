@@ -4,12 +4,12 @@
 use crate::kernel_testing::{execute, output};
 use crate::solve_testing::{TestResult, draft};
 use nrz_accuracy::{Budget, BudgetDecision};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, RecipeEvidence,
     SolveBudget, SolveError, SolvePolicy,
 };
 use nrz_scalar::{Enclosure, Finite};
-use nrz_units::Descriptor;
 
 /// Absolute thresholds immediately below, at and above the available radius have distinct outcomes.
 /// ´test:integration:solve-budget-boundaries-retain-over-budget-certificates´

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Preserve shape definition identity while exporting independent units schema constants.
+//! Preserve shape definition identity while exporting independent bindings schema constants.
 
 use crate::{CoordinateMap, OperationError, PointOrigin, ReferenceScale};
-use nrz_units::{OriginDefinition, ReferenceDefinition};
+use nrz_bindings::{OriginDefinition, ReferenceDefinition};
 
 /// One ordered axis's immutable exact definitions.
 pub(super) struct AxisDefinitions {
@@ -61,7 +61,7 @@ impl DefinitionPool {
         })
     }
 
-    /// Reuse the units identity exactly when the original point definition is reused.
+    /// Reuse the bindings identity exactly when the original point definition is reused.
     fn origin(&mut self, original: &PointOrigin) -> Result<OriginDefinition, OperationError> {
         if let Some((_, retained)) = self
             .origins

@@ -83,7 +83,7 @@ mod tests {
     use crate::binding_testing::TestResult;
     use crate::heap::records::Meaning;
     use crate::{Extent, Heap, HeapError, HeapLimits};
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// Raw retirement cannot follow a forged companion edge into another value's bundle.
     /// ´test:unit:retirement-refuses-a-foreign-direct-companion-target´

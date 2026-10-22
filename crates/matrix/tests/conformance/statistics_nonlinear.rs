@@ -4,11 +4,11 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, execute, output, owner, shape};
 use crate::statistics_testing::{attach, check};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, Elementwise, ExecutionLimits, Extent, Heap, HeapLimits, MomentAssurance,
     OperationDraft, OperationError, StatisticsError,
 };
-use nrz_units::Descriptor;
 
 /// Reciprocal and positive-root derivatives use certified coefficient enclosures in both formats.
 /// ´test:integration:native-derivative-errors-enclose-exact-rational-coefficients´

@@ -265,9 +265,13 @@ fn schema_plans(
             heap.limits.schemas,
         )?;
         let bound = if specification.bounded {
-            let radius =
-                nrz_units::uncertainty(nrz_units::UncertaintyMode::Radius, &quantity, None, None)
-                    .map_err(HeapError::from)?;
+            let radius = nrz_bindings::uncertainty(
+                nrz_bindings::UncertaintyMode::Radius,
+                &quantity,
+                None,
+                None,
+            )
+            .map_err(HeapError::from)?;
             Some(intern(
                 &heap.schemas,
                 &mut pending,
@@ -338,7 +342,7 @@ mod tests {
     use crate::{
         Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, Layout, OperationError,
     };
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// The existing injectivity proof rechecks every private destination map.
     /// ´test:unit:reserved-output-map-cannot-repeat-an-address´

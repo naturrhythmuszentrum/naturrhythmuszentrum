@@ -4,7 +4,7 @@
 use crate::kernel_oracle::Rational;
 use crate::solve_testing::{TestResult, draft};
 use crate::{Binding, ExecutionLimits, Extent, Heap, HeapLimits};
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// A deliberately poor f32 iterate is corrected using widened residual arithmetic and the original LU.
 /// ´test:crate:mixed-residual-correction-reuses-the-certified-factor´

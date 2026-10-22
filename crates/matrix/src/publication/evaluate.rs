@@ -216,7 +216,7 @@ mod tests {
     use crate::binding_testing::{TestResult, operation};
     use crate::heap::identity::allocate_identity;
     use crate::{Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, OperationError};
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
     use std::sync::atomic::AtomicU64;
 
     /// Exhausted candidate counters refuse without issuing a token or changing the heap.

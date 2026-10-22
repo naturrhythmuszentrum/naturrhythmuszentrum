@@ -3,11 +3,11 @@
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, contract, execute, measure, owner, shape};
+use nrz_bindings::{BaseDimension, Descriptor, Dimension, Kind, LimitsOverride, Role};
 use nrz_matrix::{
     Axis, ConversionContract, ConversionError, CoordinateMap, Extent, Heap, HeapLimits,
     NormalizationSchema, OperationError, PointOrigin, ReferenceScale, ShapeLimits,
 };
-use nrz_units::{BaseDimension, Descriptor, Dimension, Kind, LimitsOverride, Role};
 
 /// Make independent exact ratio references; equal descriptions do not create identity.
 fn reference(scale: u32) -> TestResult<ReferenceScale> {
@@ -19,7 +19,7 @@ fn reference(scale: u32) -> TestResult<ReferenceScale> {
 
 /// One point equation with a formal solution and independently named X/Y/W definitions.
 fn schema(
-    declarations: &std::rc::Rc<nrz_units::CheckedDeclarations>,
+    declarations: &std::rc::Rc<nrz_bindings::CheckedDeclarations>,
     domain: ReferenceScale,
     columns: ReferenceScale,
 ) -> TestResult<NormalizationSchema> {
@@ -229,7 +229,7 @@ fn schema_maps_reuse_definition_identities() -> TestResult {
     Ok(())
 }
 
-/// A failed schema export preserves the exact units cause rather than an unavailable placeholder.
+/// A failed schema export preserves the exact bindings cause rather than an unavailable placeholder.
 /// ´test:integration:schema-map-refusal-retains-units-cause´
 #[test]
 fn schema_map_refusal_retains_units_cause() -> TestResult {
@@ -259,7 +259,7 @@ fn schema_map_refusal_retains_units_cause() -> TestResult {
     let OperationError::Conversion(ConversionError::Map(cause)) = refused else {
         return Err("units cause lost".into());
     };
-    assert!(matches!(cause, nrz_units::MapError::Algebra(_)));
+    assert!(matches!(cause, nrz_bindings::MapError::Algebra(_)));
     assert_eq!(cause, expected);
     Ok(())
 }

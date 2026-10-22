@@ -4,8 +4,8 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, entry, execute, output};
 use crate::shape_testing::{axis, dense, owner, quantity};
+use nrz_bindings::{Descriptor, Dimension, ExponentPolicy, Registry};
 use nrz_matrix::{Elementwise, EntryDraft, Extent, Heap, HeapLimits, OperationDraft};
-use nrz_units::{Descriptor, Dimension, ExponentPolicy, Registry};
 
 /// The native square carries squared physical kinds and includes the design's quadratic radii.
 /// ´test:integration:squared-voltage-region-encloses-the-worked-interaction´

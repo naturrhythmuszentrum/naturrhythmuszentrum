@@ -13,7 +13,7 @@
     "crates/scalar/Cargo.toml",
     "crates/accuracy/Cargo.toml",
     "crates/matrix/Cargo.toml",
-    "crates/units/Cargo.toml",
+    "crates/bindings/Cargo.toml",
     "crates/cas/Cargo.toml"
   ],
   "labels": [
@@ -47,8 +47,8 @@
     {
       "description": "Data-time quantity descriptors and checks over original symbolic expressions",
       "has_readme_template": true,
-      "name": "nrz-units",
-      "path": "crates/units"
+      "name": "nrz-bindings",
+      "path": "crates/bindings"
     },
     {
       "description": "Exact graph construction and checked symbolic derivations",

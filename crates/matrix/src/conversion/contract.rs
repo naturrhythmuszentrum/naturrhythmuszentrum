@@ -6,11 +6,11 @@ use crate::binding::{NativeRecipe, buffer};
 use crate::{
     CheckedOperation, CheckedShape, ExecutionLimits, OperationDraft, OperationError, RegionContract,
 };
+use nrz_bindings::{CheckedMap, Descriptor};
 use nrz_scalar::LiteralLimits;
-use nrz_units::{CheckedMap, Descriptor};
 use std::rc::Rc;
 
-/// A source and destination rectangle with an exact units-owned affine map.
+/// A source and destination rectangle with an exact bindings-owned affine map.
 ///
 /// Shapes describe the ordered difference coordinates. For point regions the
 /// map additionally retains the affine role and its declared origin.
@@ -97,7 +97,7 @@ pub(super) fn region(
     shape: CheckedShape,
     descriptor: &Descriptor,
 ) -> Result<RegionContract, OperationError> {
-    if descriptor.role() == nrz_units::Role::Point
+    if descriptor.role() == nrz_bindings::Role::Point
         && shape.entries().iter().any(crate::EntryContract::is_zero)
     {
         return Err(ConversionError::Contract.into());

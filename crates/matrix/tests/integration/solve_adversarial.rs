@@ -3,9 +3,9 @@
 
 use crate::kernel_testing::{execute, output};
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Extent, Heap, HeapLimits, Layout};
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Every accepted adversarial fixture is checked against rational elimination and separate faer work.
 /// ´test:integration:adversarial-square-solves-pass-independent-oracles-in-both-formats´

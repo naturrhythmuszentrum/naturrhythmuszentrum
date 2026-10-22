@@ -3,8 +3,8 @@
 
 use std::marker::PhantomData;
 
+use nrz_bindings::Descriptor;
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 use super::records::{Meaning, Record};
 use super::schema::Schema;

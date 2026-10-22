@@ -15,7 +15,7 @@ pub struct ParameterErrorView<'h, P: Scalar> {
     /// Statistical parameter owner; never a value handle.
     pub(crate) target: CompanionRef<P>,
     /// Full source-covariance product descriptors in column order.
-    pub(crate) descriptors: &'h [nrz_units::EvaluationDescriptor],
+    pub(crate) descriptors: &'h [nrz_bindings::EvaluationDescriptor],
 }
 impl<P: Scalar> ParameterErrorView<'_, P> {
     /// The immutable companion parameter owner; version one for this occupation.
@@ -25,7 +25,7 @@ impl<P: Scalar> ParameterErrorView<'_, P> {
     }
     /// Error descriptors retain both covariance factors and the evaluation-radius role.
     #[must_use]
-    pub const fn descriptors(&self) -> &[nrz_units::EvaluationDescriptor] {
+    pub const fn descriptors(&self) -> &[nrz_bindings::EvaluationDescriptor] {
         self.descriptors
     }
 }
@@ -57,7 +57,7 @@ pub struct CovarianceParameterView<'h, P: Scalar> {
     /// Numerical storage is private; no homogeneous ratio schema replaces physical products.
     pub(crate) region: &'h RegionView<'h, P>,
     /// Each entry retains both source-side descriptor factors.
-    pub(crate) descriptors: &'h [nrz_units::EvaluationDescriptor],
+    pub(crate) descriptors: &'h [nrz_bindings::EvaluationDescriptor],
 }
 impl<P: Scalar + 'static> CovarianceParameterView<'_, P> {
     /// Shape of the full source covariance.
@@ -80,11 +80,11 @@ impl<P: Scalar + 'static> CovarianceParameterView<'_, P> {
         &self,
         row: usize,
         column: usize,
-    ) -> Result<&nrz_units::PairingWitness, crate::HeapError> {
+    ) -> Result<&nrz_bindings::PairingWitness, crate::HeapError> {
         let index = self.region.extent().index(row, column)?;
         self.descriptors
             .get(index)
-            .map(nrz_units::EvaluationDescriptor::target)
+            .map(nrz_bindings::EvaluationDescriptor::target)
             .ok_or(crate::HeapError::InvalidLayout)
     }
     /// Export parameter centers without granting independent-source semantics.

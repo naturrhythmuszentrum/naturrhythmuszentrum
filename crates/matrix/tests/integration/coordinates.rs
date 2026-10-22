@@ -2,12 +2,12 @@
 //! Heterogeneous normalization and logical structure stay independent of physical layout.
 
 use crate::shape_testing::{ResultOf, axis, dense, owner, quantity, ratio_shape, ratios};
+use nrz_bindings::{BinaryOp, Descriptor, ExponentPolicy, Registry};
 use nrz_matrix::{
     Axis, AxisEntry, CoordinateMap, EntryDraft, ExactCoefficient, ExpansionNorm, ExpansionRow,
     ExpansionTerm, Extent, Heap, HeapLimits, Layout, NormalizationSchema, Partition,
     ReferenceScale, ShapeError, ShapeLimits, StructureScope, StructuredExpansion,
 };
-use nrz_units::{BinaryOp, Descriptor, ExponentPolicy, Registry};
 
 /// Build one exact source-free reference per ordered axis coordinate.
 fn coordinates(axis: &Axis) -> ResultOf<CoordinateMap> {

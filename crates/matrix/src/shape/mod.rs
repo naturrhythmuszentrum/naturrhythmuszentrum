@@ -13,7 +13,7 @@ mod operations;
 mod partition;
 
 use crate::Extent;
-use nrz_units::CheckedDeclarations;
+use nrz_bindings::CheckedDeclarations;
 use std::rc::Rc;
 
 pub use assembly::{BlockDraft, ShapeDraft};

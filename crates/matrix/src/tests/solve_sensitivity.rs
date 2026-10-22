@@ -5,8 +5,8 @@ use crate::kernel_oracle::Rational;
 use crate::solve_testing::{TestResult, draft};
 use crate::statistics::{Matrix, enclosed};
 use crate::{Binding, ExecutionLimits, Extent, Heap, HeapLimits};
+use nrz_bindings::Descriptor;
 use nrz_scalar::ArithmeticContext;
-use nrz_units::Descriptor;
 
 /// The differential parameter enclosure is retained even when its represented candidate has zero residual.
 /// ´test:crate:solve-differential-includes-rhs-parameter-error´

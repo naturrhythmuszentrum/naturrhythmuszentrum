@@ -2,7 +2,7 @@
 //! Ordered coordinate identities and formal reciprocal duals.
 
 use super::{Partition, ShapeError, ShapeLimits};
-use nrz_units::{Conversion, Descriptor, Dimension, Measure, PairingWitness, Role};
+use nrz_bindings::{Conversion, Descriptor, Dimension, Measure, PairingWitness, Role};
 use std::rc::Rc;
 
 /// A coordinate identity, compared by ownership rather than its display label.
@@ -210,7 +210,7 @@ impl Axis {
     /// Derive reciprocal dual coordinates with unchanged ordered identities.
     ///
     /// # Errors
-    /// Refuses point axes or an unsupported units pairing.
+    /// Refuses point axes or an unsupported bindings pairing.
     pub fn dual(&self) -> Result<Self, ShapeError> {
         Ok(Self {
             entries: self

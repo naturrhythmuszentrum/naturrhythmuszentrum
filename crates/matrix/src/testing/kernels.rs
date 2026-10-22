@@ -7,8 +7,8 @@ use crate::test_api::{
     OperationDraft, Outcome, Partition, PublishedBundle, ShapeDraft, ShapeLimits, StructureScope,
     Value,
 };
+use nrz_bindings::{CheckedDeclarations, Descriptor};
 use nrz_scalar::Scalar;
-use nrz_units::{CheckedDeclarations, Descriptor};
 use std::rc::Rc;
 
 /// Declare an ordered ratio axis; callers clone it to preserve coordinate identity.

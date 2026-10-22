@@ -9,8 +9,8 @@ use crate::heap::{
 };
 use crate::storage::{Format, Region};
 use crate::{Bound, Candidate, Extent, OperationError};
+use nrz_bindings::Descriptor;
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// One independently shaped statistical region awaiting the atomic transaction commit.
 #[derive(Debug)]

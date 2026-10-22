@@ -5,11 +5,11 @@ use crate::kernel_testing::output;
 use crate::recovery_testing::{policy, proof};
 use crate::solve_testing::{TestResult, draft};
 use nrz_accuracy::{Limits, Promotion};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, SolveError, SolveStop,
 };
 use nrz_scalar::Precision;
-use nrz_units::Descriptor;
 
 /// A tighter requested certificate succeeds only after explicit widening and a fresh f64 execution.
 /// ´test:integration:solve-f64-retry-has-distinct-conversion-and-certificate´

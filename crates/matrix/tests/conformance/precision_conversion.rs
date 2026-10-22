@@ -3,12 +3,12 @@
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError,
     PrecisionContract,
 };
 use nrz_scalar::Precision;
-use nrz_units::Descriptor;
 
 /// The scalar nearest rule and matrix displacement region agree at both parity directions of a tie.
 /// ´test:integration:precision-halfway-ties-have-exact-rational-displacement´

@@ -9,8 +9,8 @@ use super::{
 };
 use crate::heap::identity::Key;
 use crate::{Bound, Candidate, Dependency, OperationError, OutputRecord};
+use nrz_bindings::{Descriptor, EvaluationDescriptor, PairingWitness, UncertaintyMode};
 use nrz_scalar::{ArithmeticContext, Scalar};
-use nrz_units::{Descriptor, EvaluationDescriptor, PairingWitness, UncertaintyMode};
 
 /// Already prepared moment records; linking them cannot fail or run numerical code.
 #[derive(Debug)]
@@ -38,7 +38,7 @@ struct PendingMoment {
     /// Local Jacobian.
     jacobian: PendingParameter,
     /// Retained checked derivative identity for the local native recipe.
-    derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
+    derivative: Option<std::rc::Rc<nrz_bindings::CheckedSensitivity>>,
     /// Explicit mean parameters, if declared.
     means: Option<PendingParameter>,
 }
@@ -275,7 +275,7 @@ fn parameter<P: Scalar>(
     let errors = matrix.errors(context)?;
     let quantity = mean.cloned().unwrap_or_else(Descriptor::ratio);
     let radius = if let Some(mean) = mean {
-        nrz_units::uncertainty(UncertaintyMode::Radius, mean, None, None)
+        nrz_bindings::uncertainty(UncertaintyMode::Radius, mean, None, None)
             .map_err(crate::HeapError::from)?
     } else {
         Descriptor::ratio()
@@ -325,7 +325,7 @@ mod tests {
         JointLimits, JointModel, OperationDraft, OperationError, Source, SourceFactor,
         StatisticsError, TargetMap,
     };
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// Private candidate corruption cannot publish a value after removing its moments.
     /// ´test:unit:statistical-publication-rejects-an-incomplete-candidate´

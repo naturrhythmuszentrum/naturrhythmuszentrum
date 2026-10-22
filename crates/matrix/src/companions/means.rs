@@ -3,8 +3,8 @@
 
 use super::TargetMap;
 use crate::{Handle, Heap, JointError, JointLimits, Value};
+use nrz_bindings::{Descriptor, UncertaintyMode, uncertainty};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
-use nrz_units::{Descriptor, UncertaintyMode, uncertainty};
 
 /// Declared mathematical means and certified center-parameter displacements.
 ///

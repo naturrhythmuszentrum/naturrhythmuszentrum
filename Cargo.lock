@@ -617,6 +617,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrz-bindings"
+version = "0.1.0"
+dependencies = [
+ "nrz-cas",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "nrz-cas"
 version = "0.1.0"
 dependencies = [
@@ -634,8 +642,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "minijinja",
+ "nrz-bindings",
  "nrz-cas",
- "nrz-units",
  "serde",
  "serde_json",
  "tempfile",
@@ -649,8 +657,8 @@ version = "0.1.0"
 dependencies = [
  "faer",
  "nrz-accuracy",
+ "nrz-bindings",
  "nrz-scalar",
- "nrz-units",
  "thiserror 2.0.21",
 ]
 
@@ -661,14 +669,6 @@ dependencies = [
  "num-bigint",
  "num-rational",
  "num-traits",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "nrz-units"
-version = "0.1.0"
-dependencies = [
- "nrz-cas",
  "thiserror 2.0.21",
 ]
 

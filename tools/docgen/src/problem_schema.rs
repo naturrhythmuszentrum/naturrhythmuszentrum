@@ -7,15 +7,15 @@ mod record;
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use nrz_bindings::{
+    CheckedExpression, Companion, CompanionEvidence, Context, Declaration, Descriptor, Evidence,
+    Kind, Observable, Role, uncertainty,
+};
 use nrz_cas::{
     Rational,
     limits::Limits,
     source::{SyntaxNode, WalkEvent},
     syntax::{AtomicSort, Declaration as CasDeclaration, Environment, Field, Operator, Sort},
-};
-use nrz_units::{
-    CheckedExpression, Companion, CompanionEvidence, Context, Declaration, Descriptor, Evidence,
-    Kind, Observable, Role, uncertainty,
 };
 use serde_json::{Value, json};
 
@@ -97,7 +97,7 @@ pub(crate) fn validate(
 
 /// Declare every schema name before parsing forward references.
 fn schema_context(
-    registry: nrz_units::Registry,
+    registry: nrz_bindings::Registry,
     items: &[Item<'_>],
     entry: &Record<'_>,
 ) -> Result<Context, Error> {
@@ -581,12 +581,12 @@ fn check_item(
 /// Serialize stable relationship fields rather than debug output.
 fn companion_json(companion: &Companion) -> Value {
     let mode = match companion.mode {
-        nrz_units::UncertaintyMode::Radius => "radius",
-        nrz_units::UncertaintyMode::Standard => "standard",
-        nrz_units::UncertaintyMode::RelativeRadius => "relative-radius",
-        nrz_units::UncertaintyMode::RelativeStandard => "relative-standard",
-        nrz_units::UncertaintyMode::Variance => "variance",
-        nrz_units::UncertaintyMode::Covariance => "covariance",
+        nrz_bindings::UncertaintyMode::Radius => "radius",
+        nrz_bindings::UncertaintyMode::Standard => "standard",
+        nrz_bindings::UncertaintyMode::RelativeRadius => "relative-radius",
+        nrz_bindings::UncertaintyMode::RelativeStandard => "relative-standard",
+        nrz_bindings::UncertaintyMode::Variance => "variance",
+        nrz_bindings::UncertaintyMode::Covariance => "covariance",
     };
     let mut value = json!({"mode": mode, "target": companion.value.as_str()});
     if let Some(other) = &companion.other {

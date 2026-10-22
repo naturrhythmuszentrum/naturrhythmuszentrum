@@ -6,7 +6,7 @@ use crate::{
     CompanionSetDraft, CovarianceBlock, Extent, Heap, HeapLimits, JointLimits, JointModel,
     OperationDraft, ShapeLimits, Source, SourceFactor, TargetMap,
 };
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// Appended covariance descriptors cannot replace the reserved value/total/evaluation prefix.
 /// ´test:crate:statistical-reservations-preserve-the-value-prefix´

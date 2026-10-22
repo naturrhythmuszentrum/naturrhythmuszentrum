@@ -3,10 +3,10 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Axis, EntryMap, Extent, Heap, HeapError, HeapLimits, OperationDraft, Partition, ShapeLimits,
 };
-use nrz_units::Descriptor;
 
 /// A selected repeated output retains both sum parents, including the nonprimary dependency.
 /// ´test:integration:sum-selection-invalidates-through-either-operand´

@@ -40,9 +40,9 @@ pub(crate) struct JointRecord {
     /// Optional declared mathematical mean families and their parameter errors.
     pub(crate) means: Option<Rc<dyn Any>>,
     /// Independently derived covariance entry meanings in column order.
-    pub(crate) pairings: Vec<nrz_units::PairingWitness>,
+    pub(crate) pairings: Vec<nrz_bindings::PairingWitness>,
     /// Full source-covariance parameter errors, independent of selected physical targets.
-    pub(crate) evaluation: Vec<nrz_units::EvaluationDescriptor>,
+    pub(crate) evaluation: Vec<nrz_bindings::EvaluationDescriptor>,
 }
 
 mod parameter;

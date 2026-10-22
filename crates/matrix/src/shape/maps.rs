@@ -3,7 +3,7 @@
 
 use super::{Axis, Partition, ShapeError, ShapeLimits};
 use crate::Extent;
-use nrz_units::Conversion;
+use nrz_bindings::Conversion;
 
 /// A checked logical selection, independent of physical storage addresses.
 #[derive(Clone, Debug, Eq, PartialEq)]

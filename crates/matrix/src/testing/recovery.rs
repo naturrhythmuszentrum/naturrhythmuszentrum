@@ -4,7 +4,7 @@
 use crate::kernel_testing::TestResult;
 use crate::test_api::{RecipeEvidence, SolveBudget, SolveEvidence, SolvePolicy};
 use nrz_accuracy::{Budget, Limits, Promotion, RecoveryPolicy};
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// Bind a finite correction schedule to an explicit absolute output budget.
 pub(crate) fn policy(

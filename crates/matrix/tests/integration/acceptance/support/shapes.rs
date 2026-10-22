@@ -2,20 +2,20 @@
 //! Checked physical and normalized coordinates, without a direct CAS dependency.
 
 use super::ResultOf;
+use nrz_bindings::{
+    CheckedDeclarations, Context, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry,
+    Role,
+};
 use nrz_matrix::{
     Axis, AxisEntry, BlockDraft, CheckedShape, EntryDraft, Partition, ShapeDraft, ShapeLimits,
     StructureScope,
-};
-use nrz_units::{
-    CheckedDeclarations, Context, Descriptor, Dimension, ExponentPolicy, Kind, Measure, Registry,
-    Role,
 };
 use std::rc::Rc;
 
 /// Freeze a descriptor owner before supplying any numerical coordinates.
 #[expect(
     clippy::default_trait_access,
-    reason = "matrix uses the units facade without naming its CAS implementation types"
+    reason = "matrix uses the bindings facade without naming its CAS implementation types"
 )]
 pub(crate) fn owner(registry: Registry) -> ResultOf<Rc<CheckedDeclarations>> {
     Ok(Rc::new(

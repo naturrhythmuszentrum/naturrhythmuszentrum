@@ -2,9 +2,9 @@
 //! Public source admission laws with independent dyadic rational expectations.
 
 use crate::testing::TestResult;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{CovarianceBlock, JointError, JointLimits, JointModel, Source, SourceFactor};
 use nrz_scalar::{ArithmeticContext, Scalar};
-use nrz_units::Descriptor;
 
 /// Decode the small binary fixture endpoints independently as exact integer fractions.
 fn fraction(value: f64) -> Result<(i128, i128), Box<dyn std::error::Error>> {

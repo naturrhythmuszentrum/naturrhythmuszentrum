@@ -2,11 +2,11 @@
 //! Owned public observations separate deterministic evidence from process measurements.
 
 use super::ResultOf;
+use nrz_bindings::{Descriptor, Dimension};
 use nrz_matrix::{
     Heap, KernelEvidence, MomentAssurance, OperationError, Outcome, ParameterView, PublishedBundle,
     RecipeEvidence, SolveEvidence, SolveFailure, SolveStage,
 };
-use nrz_units::{Descriptor, Dimension};
 
 /// Center/error pairs of one independently shaped numerical parameter region.
 #[derive(Debug, Clone, PartialEq)]

@@ -145,7 +145,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Binding, Extent, Handle, Heap, OperationError, Value, ValueVersion};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example(heap: &mut Heap, binding: Binding<f64>, value: Handle<Value, f64>, version: ValueVersion) -> Result<(), OperationError> {
 //!     let bound = binding.validate(heap)?;
 //!     let inputs = bound.normalized_inputs()?;
@@ -160,7 +160,7 @@
 //!
 //! ```compile_fail,E0499
 //! use nrz_matrix::{Binding, Extent, Handle, Heap, OperationError, Value, ValueVersion};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example(heap: &mut Heap, binding: Binding<f64>, value: Handle<Value, f64>, version: ValueVersion) -> Result<(), OperationError> {
 //!     let bound = binding.validate(heap)?;
 //!     let inputs = bound.normalized_inputs()?;
@@ -177,7 +177,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Binding, Extent, Handle, Heap, OperationError, Value, ValueVersion};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example(heap: &mut Heap, binding: Binding<f64>, value: Handle<Value, f64>, version: ValueVersion) -> Result<(), OperationError> {
 //!     let bound = binding.validate(heap)?;
 //!     let inputs = bound.normalized_inputs()?;
@@ -192,7 +192,7 @@
 //!
 //! ```compile_fail,E0499
 //! use nrz_matrix::{Binding, Extent, Handle, Heap, OperationError, Value, ValueVersion};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example(heap: &mut Heap, binding: Binding<f64>, value: Handle<Value, f64>, version: ValueVersion) -> Result<(), OperationError> {
 //!     let bound = binding.validate(heap)?;
 //!     let inputs = bound.normalized_inputs()?;
@@ -209,7 +209,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Binding, Extent, Handle, Heap, OperationError, Value, ValueVersion};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example(heap: &mut Heap, binding: Binding<f64>, value: Handle<Value, f64>, version: ValueVersion) -> Result<(), OperationError> {
 //!     let bound = binding.validate(heap)?;
 //!     let inputs = bound.normalized_inputs()?;
@@ -224,7 +224,7 @@
 //!
 //! ```compile_fail,E0499
 //! use nrz_matrix::{Binding, Extent, Handle, Heap, OperationError, Value, ValueVersion};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example(heap: &mut Heap, binding: Binding<f64>, value: Handle<Value, f64>, version: ValueVersion) -> Result<(), OperationError> {
 //!     let bound = binding.validate(heap)?;
 //!     let inputs = bound.normalized_inputs()?;

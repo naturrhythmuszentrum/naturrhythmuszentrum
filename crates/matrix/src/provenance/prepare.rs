@@ -209,7 +209,7 @@ impl Provenance {
 mod tests {
     use crate::binding_testing::{TestResult, operation};
     use crate::{Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError};
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// Lifetime record accounting never wraps into an apparently affordable append.
     /// ´test:unit:provenance-counter-overflow-refuses-atomically´

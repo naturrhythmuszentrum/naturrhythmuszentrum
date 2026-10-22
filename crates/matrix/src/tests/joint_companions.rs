@@ -5,7 +5,7 @@ use crate::{
     CompanionSetDraft, CovarianceBlock, Extent, Heap, HeapError, HeapLimits, JointLimits,
     JointModel, Source, SourceFactor, TargetMap,
 };
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 /// Statistical factor occupations cannot be accessed as deterministic bounds or values.
 /// ´test:crate:joint-regions-retain-category-separation´

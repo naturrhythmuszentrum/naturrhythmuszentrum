@@ -2,12 +2,12 @@
 //! Complete publication, lineage, compaction and invalidation lifecycles.
 
 use crate::binding_testing::{TestResult, operation, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, Coverage, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, OperationDraft,
     OperationError, ProvenanceLimits,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Exercise complete exact-copy publication for each sealed primitive format.
 fn publish_format<P: Scalar + 'static>() -> TestResult {

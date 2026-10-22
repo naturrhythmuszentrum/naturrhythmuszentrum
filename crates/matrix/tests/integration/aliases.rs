@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Whole-base evidence invalidation after selected scratch publication.
 
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Coverage, Extent, Heap, HeapError, HeapLimits, Layout};
-use nrz_units::Descriptor;
 
 use crate::testing::{TestResult, bound};
 

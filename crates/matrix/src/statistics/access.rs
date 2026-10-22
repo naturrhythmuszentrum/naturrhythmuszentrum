@@ -7,8 +7,8 @@ use super::{
     store::{Parameter, Record},
 };
 use crate::{Companion, Handle, Heap, HeapError, OperationError, RegionView, Value, ValueStamp};
+use nrz_bindings::{EvaluationDescriptor, PairingWitness};
 use nrz_scalar::{ArithmeticContext, Scalar};
-use nrz_units::{EvaluationDescriptor, PairingWitness};
 
 /// A numerical statistical parameter and its own deterministic evaluation-error region.
 #[derive(Debug)]
@@ -67,7 +67,7 @@ impl<P: Scalar + 'static> ParameterView<'_, P> {
     }
     /// Mean parameters retain the value quantity; paired matrices have per-entry descriptors.
     #[must_use]
-    pub fn mean_descriptor(&self) -> Option<&nrz_units::Descriptor> {
+    pub fn mean_descriptor(&self) -> Option<&nrz_bindings::Descriptor> {
         self.mean.then(|| self.centers.descriptor())
     }
 }
@@ -137,7 +137,7 @@ impl<P: Scalar> MomentView<'_, P> {
     }
     /// Replayed native symbolic derivative identity, distinct from its numerical evaluation.
     #[must_use]
-    pub fn checked_sensitivity(&self) -> Option<&nrz_units::CheckedSensitivity> {
+    pub fn checked_sensitivity(&self) -> Option<&nrz_bindings::CheckedSensitivity> {
         self.record.derivative.as_deref()
     }
     /// Mathematical mean parameters; nominal centers never create this declaration.

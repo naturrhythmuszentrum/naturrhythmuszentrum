@@ -2,10 +2,10 @@
 //! Exact origin/reference schema acceptance and refusal pairs.
 
 use crate::shape_testing::{ResultOf, axis, quantity, ratio_shape, ratios};
+use nrz_bindings::{Conversion, Descriptor, Kind, Measure, Role, Scale, UnitError};
 use nrz_matrix::{
     Axis, CoordinateMap, NormalizationSchema, PointOrigin, ReferenceScale, ShapeError, ShapeLimits,
 };
-use nrz_units::{Conversion, Descriptor, Kind, Measure, Role, Scale, UnitError};
 
 /// Small exact descriptor constants, without importing or evaluating any heap number.
 fn measure(name: &str, scale: u32, origin: u32) -> ResultOf<Measure> {
@@ -258,7 +258,10 @@ fn point_map(
 fn affine_column_and_reference_limits_refuse() -> ResultOf<()> {
     let snapshot = ratios()?;
     let value = Descriptor::new(
-        Kind::Named("coordinate".into(), Box::new(nrz_units::Dimension::zero())),
+        Kind::Named(
+            "coordinate".into(),
+            Box::new(nrz_bindings::Dimension::zero()),
+        ),
         Measure::coherent(),
         Role::Difference,
     )?;

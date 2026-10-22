@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public fixtures only; no crate-private heap state is available here.
 
+use nrz_bindings::{Descriptor, Dimension, Kind, Measure, Role};
 use nrz_scalar::Scalar;
-use nrz_units::{Descriptor, Dimension, Kind, Measure, Role};
 
 use nrz_matrix::{Companion, Handle, PublishedBundle};
 
@@ -10,7 +10,7 @@ use nrz_matrix::{Companion, Handle, PublishedBundle};
 pub(crate) type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 /// A coherent voltage difference with a named physical kind.
-pub(crate) fn voltage() -> Result<Descriptor, nrz_units::UnitError> {
+pub(crate) fn voltage() -> Result<Descriptor, nrz_bindings::UnitError> {
     Descriptor::new(
         Kind::Named(
             "voltage".to_owned(),

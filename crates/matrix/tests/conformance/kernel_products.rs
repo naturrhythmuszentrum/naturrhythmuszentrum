@@ -3,10 +3,10 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError, ShapeLimits,
 };
-use nrz_units::Descriptor;
 
 /// Rectangular composition checks each output contraction against independently decoded fractions.
 /// ´test:integration:rectangular-product-encloses-exact-dot-products´

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact represented imports and explicit refusal boundaries.
 
-use nrz_matrix::{Coverage, Extent, Heap, HeapError, HeapLimits};
-use nrz_units::{
+use nrz_bindings::{
     CountDomain, Descriptor, Kind, Measure, Role, Scale, UncertaintyMode, uncertainty,
 };
+use nrz_matrix::{Coverage, Extent, Heap, HeapError, HeapLimits};
 
 use crate::testing::{TestResult, bound, voltage};
 
@@ -149,7 +149,7 @@ fn count_and_presentation_refusals() -> TestResult {
     Ok(())
 }
 
-/// Unsupported nested relative radius derivation preserves the units cause and publishes nothing.
+/// Unsupported nested relative radius derivation preserves the bindings cause and publishes nothing.
 /// ´test:integration:relative-bound-derivation-refuses´
 #[test]
 fn relative_bound_derivation_refuses() -> TestResult {
@@ -164,7 +164,7 @@ fn relative_bound_derivation_refuses() -> TestResult {
     let extent = Extent::new(1, 1)?;
     assert!(matches!(
         heap.import_declared_bounds(extent, &relative, &[1.0_f64], &[0.1]),
-        Err(HeapError::Units(nrz_units::UnitError::RelativeReference))
+        Err(HeapError::Units(nrz_bindings::UnitError::RelativeReference))
     ));
     let bundle = heap.import_represented(extent, &relative, &[1.0_f64])?;
     assert_eq!(heap.value(bundle.value())?.region().descriptor(), &relative);

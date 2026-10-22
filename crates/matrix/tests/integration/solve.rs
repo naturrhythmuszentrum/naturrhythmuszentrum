@@ -3,8 +3,8 @@
 
 use crate::kernel_testing::output;
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits};
-use nrz_units::Descriptor;
 
 /// A factored solve publishes both source edges, then an RHS change invalidates its result.
 /// ´test:integration:factored-solve-publication-retains-both-input-dependencies´

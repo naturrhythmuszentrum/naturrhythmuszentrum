@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public injectivity proofs and selected-publication refusal boundaries.
 
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Extent, Heap, HeapError, HeapLimits, Layout};
-use nrz_units::Descriptor;
 
 use crate::testing::{TestResult, bound};
 

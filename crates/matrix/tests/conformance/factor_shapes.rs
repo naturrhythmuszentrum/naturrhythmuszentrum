@@ -2,8 +2,10 @@
 //! Descriptor factor admission is distinct from numerical reconstruction and root existence.
 
 use crate::shape_testing::{ResultOf, axis, dense, owner, quantity, ratio_shape, ratios};
+use nrz_bindings::{
+    Descriptor, Dimension, ExponentPolicy, Measure, Registry, Role, Scale, UnitError,
+};
 use nrz_matrix::{CholeskyRootContract, EntryDraft, QrShapeContract, ShapeError, ShapeLimits};
-use nrz_units::{Descriptor, Dimension, ExponentPolicy, Measure, Registry, Role, Scale, UnitError};
 
 /// QR envelopes retain the exact intermediate coordinate identities.
 /// ´test:integration:qr-shape-retains-intermediate-axis´

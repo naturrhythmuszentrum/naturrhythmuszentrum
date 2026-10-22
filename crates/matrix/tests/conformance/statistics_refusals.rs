@@ -3,12 +3,12 @@
 
 use crate::kernel_testing::{TestResult, axis, owner, shape};
 use crate::statistics_testing::scalar;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, CompanionSetDraft, CovarianceBlock, ExecutionLimits, Extent, Heap, HeapLimits,
     JointError, JointLimits, JointModel, OperationDraft, OperationError, ShapeLimits, Source,
     SourceFactor, StatisticsError, TargetMap,
 };
-use nrz_units::Descriptor;
 
 /// A raw equal-byte copy cannot supply the checked K rows required for a cross-lineage request.
 /// ´test:integration:cross-covariance-refuses-a-value-without-source-rows´

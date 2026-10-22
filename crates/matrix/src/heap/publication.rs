@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Import preparation and the allocation-free, callback-free publication step.
 
+use nrz_bindings::{Descriptor, UncertaintyMode, uncertainty};
 use nrz_scalar::Scalar;
-use nrz_units::{Descriptor, UncertaintyMode, uncertainty};
 
 use super::identity::{Key, identity};
 use super::records::{Location, Meaning, Record};
@@ -62,11 +62,11 @@ impl Heap {
     /// Atomically import a value and its declared componentwise absolute-bound region.
     ///
     /// The nonnegative finite bounds are assumptions on every corresponding value entry.
-    /// Units derives a separate zero-offset radius descriptor; no statistic is promoted.
+    /// Bindings derives a separate zero-offset radius descriptor; no statistic is promoted.
     ///
     /// # Errors
     /// In addition to represented-import refusals, rejects invalid bound lengths,
-    /// negative/nonfinite radii and unsupported units uncertainty derivations.
+    /// negative/nonfinite radii and unsupported bindings uncertainty derivations.
     pub fn import_declared_bounds<P: Scalar + 'static>(
         &mut self,
         extent: Extent,

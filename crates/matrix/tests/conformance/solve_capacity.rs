@@ -3,8 +3,8 @@
 
 use crate::kernel_testing::output;
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, OperationError};
-use nrz_units::Descriptor;
 
 /// Below, at and above five live scalar slots test the actual output bundle reservation.
 /// ´test:integration:solve-output-capacity-boundaries-are-atomic´

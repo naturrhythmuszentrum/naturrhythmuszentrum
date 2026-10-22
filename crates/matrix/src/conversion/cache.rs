@@ -3,8 +3,8 @@
 
 use super::ConversionError;
 use crate::coordinate_numeric::LoweredMap;
+use nrz_bindings::CheckedMap;
 use nrz_scalar::{ArithmeticContext, LiteralLimits, Precision, Scalar};
-use nrz_units::CheckedMap;
 use std::any::Any;
 
 /// Two sealed formats, each retaining its own coefficient evaluation bounds.

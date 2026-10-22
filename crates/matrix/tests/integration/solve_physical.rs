@@ -6,12 +6,12 @@ use crate::kernel_testing::{entry, execute, output};
 use crate::shape_testing::{axis, dense, owner, quantity};
 use crate::solve_testing::TestResult;
 use nrz_accuracy::Budget;
+use nrz_bindings::{Descriptor, ExponentPolicy, Registry};
 use nrz_matrix::{
     EntryDraft, Extent, Heap, HeapLimits, OperationDraft, OperationError, ShapeLimits, SolveBudget,
     SolveError, SolvePolicy,
 };
 use nrz_scalar::Scalar;
-use nrz_units::{Descriptor, ExponentPolicy, Registry};
 
 /// The solution and its tolerance retain voltage kinds in both execution formats.
 /// ´test:integration:physical-square-solve-retains-voltage-and-refuses-ratio-budget´

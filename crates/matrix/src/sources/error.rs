@@ -10,9 +10,9 @@ pub enum JointError {
     /// Outward arithmetic could not produce finite evidence.
     #[error("joint arithmetic: {0}")]
     Arithmetic(#[from] nrz_scalar::ArithmeticFailure),
-    /// Units refused a companion pairing.
+    /// Bindings refused a companion pairing.
     #[error("joint pairing: {0}")]
-    Pairing(#[from] nrz_units::PairingError),
+    Pairing(#[from] nrz_bindings::PairingError),
     /// Explicit storage or work policy was exhausted.
     #[error("joint model resource limit exhausted")]
     ResourceLimit,

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public complete-bundle publication and independent owner lifecycles.
 
+use nrz_bindings::{Descriptor, Kind, Measure, Role};
 use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-use nrz_units::{Descriptor, Kind, Measure, Role};
 
 use crate::testing::{TestResult, bound, voltage};
 

@@ -3,10 +3,10 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError, ShapeLimits,
 };
-use nrz_units::Descriptor;
 
 /// The sum's admitted work count is tested immediately below, at and above its requirement.
 /// ´test:integration:sum-work-and-scratch-boundaries-refuse-before-publication´

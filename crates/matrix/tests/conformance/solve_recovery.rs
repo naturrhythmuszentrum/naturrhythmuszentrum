@@ -5,11 +5,11 @@ use crate::kernel_testing::output;
 use crate::recovery_testing::{policy, proof};
 use crate::solve_testing::{TestResult, draft};
 use nrz_accuracy::{Limits, Promotion};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, SolveError, SolveStop,
 };
 use nrz_scalar::{Precision, Scalar};
-use nrz_units::Descriptor;
 
 /// Zero corrections and stagnation retain complete attempts but never issue a success candidate.
 /// ´test:integration:solve-refinement-stops-with-an-honest-refusal´

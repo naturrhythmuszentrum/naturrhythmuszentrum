@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Strict, located access to the versioned JSON/TOML wire records.
 
+use nrz_bindings::Context;
 use nrz_cas::{
     Fault, Rational,
     limits::{Budget, Limits},
     source::OriginalForm,
 };
-use nrz_units::Context;
 use serde_json::Value;
 
 use crate::error::Error;

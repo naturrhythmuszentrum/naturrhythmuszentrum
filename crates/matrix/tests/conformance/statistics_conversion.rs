@@ -2,12 +2,12 @@
 //! Statistical conversion failure cannot publish an earlier deterministic candidate.
 
 use crate::conversion_testing::{TestResult, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationDraft, OperationError,
     PrecisionContract, StatisticsError,
 };
 use nrz_scalar::Precision;
-use nrz_units::Descriptor;
 
 /// A finite value conversion cannot publish when its covariance cannot fit the target format.
 /// ´test:integration:statistical-precision-overflow-is-atomic´

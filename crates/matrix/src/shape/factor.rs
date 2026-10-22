@@ -2,7 +2,7 @@
 //! Descriptor-only factor envelopes; no numerical factor or reconstruction witness.
 
 use super::{Axis, CheckedShape, ShapeError, ShapeLimits};
-use nrz_units::{Conversion, Descriptor, Measure, Role, Scale};
+use nrz_bindings::{Conversion, Descriptor, Measure, Role, Scale};
 
 /// Ordered homogeneous QR descriptors with an explicit intermediate axis.
 ///
@@ -76,7 +76,7 @@ impl QrShapeContract {
     }
 }
 
-/// Units-admitted half-dimension scalar descriptor for a homogeneous Cholesky factor.
+/// Bindings-admitted half-dimension scalar descriptor for a homogeneous Cholesky factor.
 ///
 /// This admits a scalar root kind only. Positive definiteness, a physical metric,
 /// factor axes and numerical Cholesky evidence remain independent requirements.
@@ -89,7 +89,7 @@ pub struct CholeskyRootContract {
 }
 
 impl CholeskyRootContract {
-    /// Request the half-power through units' explicit exponent and semantic kind rules.
+    /// Request the half-power through bindings' explicit exponent and semantic kind rules.
     ///
     /// # Errors
     /// Refuses heterogeneous input, fractional-dimension policy or an unregistered root kind.

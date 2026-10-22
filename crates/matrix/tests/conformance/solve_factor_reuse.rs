@@ -2,12 +2,12 @@
 //! Equal center bits cannot authorize reuse across changed operator keys.
 
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, Layout, OperationError, SolveError,
     SolveStage,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Operator version, selected region and original checked recipe are separate mandatory key components.
 /// ´test:integration:factor-reuse-refuses-changed-version-region-and-recipe´

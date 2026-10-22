@@ -113,7 +113,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example() -> Result<(), HeapError> {
 //!     let mut heap = Heap::new(HeapLimits::default())?;
 //!     let extent = Extent::new(1, 1)?;
@@ -129,7 +129,7 @@
 //!
 //! ```compile_fail,E0502
 //! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example() -> Result<(), HeapError> {
 //!     let mut heap = Heap::new(HeapLimits::default())?;
 //!     let extent = Extent::new(1, 1)?;
@@ -147,7 +147,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Extent, Heap, HeapError};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! #[derive(Clone, Copy, Debug)]
 //! struct External;
 //! fn import(heap: &mut Heap, data: &[f64]) -> Result<(), HeapError> {
@@ -160,7 +160,7 @@
 //!
 //! ```compile_fail,E0277
 //! use nrz_matrix::{Extent, Heap, HeapError};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! #[derive(Clone, Copy, Debug)]
 //! struct External;
 //! fn import(heap: &mut Heap, data: &[External]) -> Result<(), HeapError> {
@@ -175,7 +175,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example() -> Result<(), HeapError> {
 //!     let mut heap = Heap::new(HeapLimits::default())?;
 //!     let bundle = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
@@ -190,7 +190,7 @@
 //!
 //! ```compile_fail,E0502
 //! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example() -> Result<(), HeapError> {
 //!     let mut heap = Heap::new(HeapLimits::default())?;
 //!     let bundle = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
@@ -229,7 +229,7 @@
 //!
 //! ```rust
 //! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example() -> Result<(), HeapError> {
 //!     let mut heap = Heap::new(HeapLimits::default())?;
 //!     let value = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;
@@ -243,7 +243,7 @@
 //!
 //! ```compile_fail,E0502
 //! use nrz_matrix::{Extent, Heap, HeapError, HeapLimits};
-//! use nrz_units::Descriptor;
+//! use nrz_bindings::Descriptor;
 //! fn example() -> Result<(), HeapError> {
 //!     let mut heap = Heap::new(HeapLimits::default())?;
 //!     let value = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f64])?;

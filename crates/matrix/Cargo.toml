@@ -15,7 +15,7 @@ categories = ["mathematics", "science"]
 faer.workspace = true
 nrz-scalar.workspace = true
 nrz-accuracy = { path = "../accuracy" }
-nrz-units = { path = "../units" }
+nrz-bindings = { path = "../bindings" }
 thiserror.workspace = true
 
 [lints]

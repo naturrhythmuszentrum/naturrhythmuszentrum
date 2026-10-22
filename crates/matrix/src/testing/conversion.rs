@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Conversion fixtures build descriptor constants through units; numerical truth is independent.
+//! Conversion fixtures build descriptor constants through bindings; numerical truth is independent.
 
 use crate::test_api::{
     Axis, AxisEntry, BlockDraft, CheckedShape, ConversionContract, ConversionMode, EntryDraft,
     Partition, ShapeDraft, ShapeLimits, StructureScope,
 };
-use nrz_scalar::LiteralLimits;
-use nrz_units::{
+use nrz_bindings::{
     CheckedDeclarations, CheckedMap, Context, Conversion, Descriptor, ExponentPolicy, Measure,
     Registry, Role, Scale,
 };
+use nrz_scalar::LiteralLimits;
 use std::rc::Rc;
 
 /// Fallible fixture and oracle result.
@@ -67,7 +67,7 @@ pub(crate) fn measure(
 /// One frozen declaration owner, used by both shape contracts and exact maps.
 #[expect(
     clippy::default_trait_access,
-    reason = "CAS policy types are inferred solely through the units facade"
+    reason = "CAS policy types are inferred solely through the bindings facade"
 )]
 pub(crate) fn owner() -> TestResult<Rc<CheckedDeclarations>> {
     Ok(Rc::new(
@@ -147,7 +147,7 @@ pub(crate) fn execute<P: nrz_scalar::Scalar + 'static>(
 /// Freeze exact reference/origin declarations for the public normalization-map adapter.
 #[expect(
     clippy::default_trait_access,
-    reason = "CAS policy types are inferred solely through the units facade"
+    reason = "CAS policy types are inferred solely through the bindings facade"
 )]
 pub(crate) fn reference_owner(point: &Descriptor) -> TestResult<Rc<CheckedDeclarations>> {
     let mut builder = Context::with_real_symbols(
@@ -157,18 +157,18 @@ pub(crate) fn reference_owner(point: &Descriptor) -> TestResult<Rc<CheckedDeclar
     )?;
     builder.declare(
         "reference".into(),
-        nrz_units::Declaration::Constant {
+        nrz_bindings::Declaration::Constant {
             descriptor: point.difference().coherent(),
             value: integer_measure(10)?.scale().clone(),
-            evidence: nrz_units::Evidence::default(),
+            evidence: nrz_bindings::Evidence::default(),
         },
     )?;
     builder.declare(
         "origin".into(),
-        nrz_units::Declaration::Constant {
+        nrz_bindings::Declaration::Constant {
             descriptor: point.clone(),
-            value: nrz_units::Measure::coherent().offset().clone(),
-            evidence: nrz_units::Evidence::default(),
+            value: nrz_bindings::Measure::coherent().offset().clone(),
+            evidence: nrz_bindings::Evidence::default(),
         },
     )?;
     Ok(Rc::new(builder.freeze()?))

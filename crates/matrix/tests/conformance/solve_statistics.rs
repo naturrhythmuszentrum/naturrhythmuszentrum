@@ -5,10 +5,10 @@ use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{execute, output};
 use crate::solve_testing::{TestResult, draft};
 use crate::statistics_testing::{check, scalar};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, StatisticsError,
 };
-use nrz_units::Descriptor;
 
 /// Repeated A and B retain one source; their differential contributions cancel.
 /// ´test:integration:square-solve-preserves-identical-operand-source´

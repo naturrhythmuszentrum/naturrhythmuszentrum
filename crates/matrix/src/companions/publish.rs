@@ -9,8 +9,8 @@ use crate::heap::{
 };
 use crate::storage::{Format, Region};
 use crate::{Extent, Heap, HeapError, JointError, JointLimits, JointModel, Layout};
+use nrz_bindings::{Descriptor, PairingWitness, UncertaintyMode};
 use nrz_scalar::Scalar;
-use nrz_units::{Descriptor, PairingWitness, UncertaintyMode};
 use std::{marker::PhantomData, rc::Rc};
 
 /// Unpublished two-sided source relation over existing versioned value selections.
@@ -258,7 +258,7 @@ fn prepare_regions<P: Scalar + 'static>(
 /// Parameter errors retain the full covariance product meaning, never a source radius.
 fn evaluation_descriptors<P: Scalar>(
     model: &JointModel<P>,
-) -> Result<Vec<nrz_units::EvaluationDescriptor>, JointError> {
+) -> Result<Vec<nrz_bindings::EvaluationDescriptor>, JointError> {
     if matches!(
         model.representation(),
         crate::CovarianceRepresentation::Factor(_)
@@ -274,7 +274,7 @@ fn evaluation_descriptors<P: Scalar>(
                 Some(column.descriptor()),
                 None,
             )?;
-            descriptors.push(nrz_units::EvaluationDescriptor::new(&pairing));
+            descriptors.push(nrz_bindings::EvaluationDescriptor::new(&pairing));
         }
     }
     Ok(descriptors)

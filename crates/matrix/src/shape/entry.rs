@@ -2,7 +2,7 @@
 //! Original entry recipes, typed structural zeros and retained quotient witnesses.
 
 use super::{AxisEntry, ShapeError};
-use nrz_units::{
+use nrz_bindings::{
     CheckedDeclarations, CheckedExpression, Conversion, Descriptor, Dimension, Measure,
     PairingWitness,
 };
@@ -80,7 +80,7 @@ impl EntryContract {
         self.evidence.as_ref()
     }
 
-    /// Units evidence for the original primal relation, retained through dual transpose.
+    /// Bindings evidence for the original primal relation, retained through dual transpose.
     #[must_use]
     pub const fn pairing(&self) -> &PairingWitness {
         &self.pairing

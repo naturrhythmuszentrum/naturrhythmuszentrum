@@ -2,7 +2,7 @@
 //! Exact coordinate schemas; numerical lowering and evaluation belong to later kernels.
 
 use crate::{Axis, AxisAlignment, CheckedShape, ShapeError, ShapeLimits};
-use nrz_units::{
+use nrz_bindings::{
     Conversion, Descriptor, Kind, Measure, NamedReference, PairingWitness, Role, Scale,
 };
 use std::rc::Rc;
@@ -27,7 +27,7 @@ impl Eq for DefinitionId {}
 pub struct ReferenceScale {
     /// Scoped declaration identity; cloning preserves it.
     identity: DefinitionId,
-    /// Units-checked nonzero difference reference and its declared name.
+    /// Bindings-checked nonzero difference reference and its declared name.
     reference: NamedReference,
 }
 
@@ -464,7 +464,7 @@ fn check_affine_columns(
     Ok(())
 }
 
-/// Exact row/column scale quotients are derived through units, never by heap arithmetic.
+/// Exact row/column scale quotients are derived through bindings, never by heap arithmetic.
 fn entry_maps(
     rows: &CoordinateMap,
     columns: &CoordinateMap,

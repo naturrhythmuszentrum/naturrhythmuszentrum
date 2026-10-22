@@ -93,22 +93,22 @@ allowances = []
 [MATRIX."owners.reach-conform"]
 allowances = []
 
-[UNITS."labels.mints-well-formed"]
+[BINDINGS."labels.mints-well-formed"]
 allowances = []
 
-[UNITS."labels.mints-kind-conform"]
+[BINDINGS."labels.mints-kind-conform"]
 allowances = []
 
-[UNITS."labels.mints-unique"]
+[BINDINGS."labels.mints-unique"]
 allowances = []
 
-[UNITS."labels.heads-conform"]
+[BINDINGS."labels.heads-conform"]
 allowances = []
 
-[UNITS."labels.citations-local-resolve"]
+[BINDINGS."labels.citations-local-resolve"]
 allowances = []
 
-[UNITS."owners.reach-conform"]
+[BINDINGS."owners.reach-conform"]
 allowances = []
 
 [CAS."labels.mints-well-formed"]

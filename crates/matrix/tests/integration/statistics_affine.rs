@@ -4,12 +4,12 @@
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
 use crate::statistics_testing::{check, covariance, vector, worked_covariance};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     FixedCoefficient, Heap, HeapLimits, JointLimits, LinearMap, MomentAssurance, OperationDraft,
     ShapeLimits,
 };
 use nrz_scalar::{LiteralLimits, Scalar};
-use nrz_units::Descriptor;
 
 /// The worked affine map propagates means, every covariance entry and the output/input cross block.
 /// ´test:integration:affine-worked-moments-retain-complete-cross-blocks´

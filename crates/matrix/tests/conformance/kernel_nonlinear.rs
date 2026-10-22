@@ -3,9 +3,9 @@
 
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Elementwise, Extent, Heap, HeapLimits, OperationDraft};
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// Squaring retains the nonlinear radius and includes zero when the input box crosses it.
 /// ´test:integration:native-square-encloses-nonlinear-endpoints´

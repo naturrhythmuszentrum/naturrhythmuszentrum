@@ -3,8 +3,8 @@
 
 use crate::kernel_testing::output;
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, SolveError};
-use nrz_units::Descriptor;
 
 /// Family uncertainty cannot be accepted when the common operator may be singular.
 /// ´test:integration:solve-perturbation-margin-refuses-at-and-above-one´

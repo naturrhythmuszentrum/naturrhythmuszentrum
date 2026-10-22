@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Fixed mathematical definitions are enclosed without routing heap values through units.
+//! Fixed mathematical definitions are enclosed without routing heap values through bindings.
 
 use super::linear::CoefficientValue;
 use super::{FixedCoefficient, KernelError};
@@ -20,7 +20,7 @@ pub(crate) struct Coefficient<P: Scalar> {
 /// Lower each definition independently and retain coefficient uncertainty over perturbations.
 #[expect(
     clippy::default_trait_access,
-    reason = "exact export limits are inferred through the public units facade"
+    reason = "exact export limits are inferred through the public bindings facade"
 )]
 pub(crate) fn lower<P: Scalar + 'static>(
     coefficient: &FixedCoefficient,

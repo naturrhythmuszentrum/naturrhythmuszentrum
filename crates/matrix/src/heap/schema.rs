@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact immutable schema interning for homogeneous contiguous regions.
 
-use nrz_units::{Descriptor, Measure};
+use nrz_bindings::{Descriptor, Measure};
 
 use super::{Extent, HeapError};
 

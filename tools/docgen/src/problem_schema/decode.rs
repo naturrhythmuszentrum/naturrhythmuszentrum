@@ -404,7 +404,7 @@ pub(super) fn metadata(record: &Record<'_>, value: &Record<'_>) -> Result<(), Er
             let minimum = record.at("minimum")?.integer()?;
             let maximum = record.bound("maximum")?;
             let number = value.rational()?;
-            if nrz_units::CountDomain::new(Some(minimum), maximum)
+            if nrz_bindings::CountDomain::new(Some(minimum), maximum)
                 .and_then(|domain| domain.check(&number))
                 .is_err()
             {

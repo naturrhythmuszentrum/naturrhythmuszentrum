@@ -6,7 +6,7 @@
 pub enum ConversionError {
     /// Exact descriptor map checking or bounded export failed.
     #[error("conversion map: {0}")]
-    Map(#[from] nrz_units::MapError),
+    Map(#[from] nrz_bindings::MapError),
     /// An outward finite arithmetic result was unavailable.
     #[error("conversion arithmetic: {0}")]
     Arithmetic(#[from] nrz_scalar::ArithmeticFailure),
@@ -55,7 +55,7 @@ mod tests {
     use crate::conversion_oracle::covers;
     use crate::conversion_testing::{TestResult, contract, execute, owner, shape};
     use crate::{Extent, Heap, HeapError, HeapLimits};
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// An evaluation companion cannot be substituted for another value's reverse target edge.
     /// ´test:unit:conversion-evaluation-target-corruption-refuses´

@@ -2,11 +2,11 @@
 //! Repeated physical selections retain one source coordinate from initial admission.
 
 use crate::testing::TestResult;
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     CompanionSetDraft, CovarianceBlock, Extent, Heap, HeapLimits, JointError, JointLimits,
     JointModel, Layout, Source, SourceFactor, TargetMap,
 };
-use nrz_units::Descriptor;
 
 /// A repeated entry cannot acquire two source coordinates, even with identical schemas.
 /// ´test:integration:repeated-target-cannot-invent-sources´

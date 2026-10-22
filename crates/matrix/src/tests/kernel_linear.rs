@@ -5,7 +5,7 @@ use crate::conversion_testing::{contract as conversion, measure};
 use crate::kernel_oracle::Rational;
 use crate::kernel_testing::{TestResult, axis, entry, execute, output, owner, shape};
 use crate::{Extent, Heap, HeapLimits, OperationDraft, ShapeLimits};
-use nrz_units::{Descriptor, Role};
+use nrz_bindings::{Descriptor, Role};
 
 /// The total already covers the input evaluation region; adding a zero operand must not add it again.
 /// ´test:crate:sum-consumes-conversion-total-exactly-once´

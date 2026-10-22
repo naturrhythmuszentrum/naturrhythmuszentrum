@@ -205,7 +205,7 @@ impl Heap {
 /// Inaccessible version and dependency-corruption boundaries.
 #[cfg(test)]
 mod tests {
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     use super::super::{Extent, HeapLimits};
     use super::{Heap, HeapError, Meaning, ValueVersion};

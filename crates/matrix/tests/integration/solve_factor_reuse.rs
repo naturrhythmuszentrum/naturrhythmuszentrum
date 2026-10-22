@@ -3,11 +3,11 @@
 
 use crate::kernel_testing::output;
 use crate::solve_testing::{TestResult, draft};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, SolvePolicy, SolveRecordKeys, SolveStage,
 };
 use nrz_scalar::Scalar;
-use nrz_units::Descriptor;
 
 /// RHS replacement, unrelated mutation and compaction preserve factor eligibility in both formats.
 /// ´test:integration:factor-reuse-is-specific-to-unchanged-operator-dependencies´

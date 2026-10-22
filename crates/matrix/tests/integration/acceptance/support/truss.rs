@@ -3,12 +3,12 @@
 
 use super::{Case, ResultOf, capture, model, shapes};
 use nrz_accuracy::Budget;
+use nrz_bindings::{BinaryOp, Descriptor, ExponentPolicy, Registry};
 use nrz_matrix::{
     Binding, CheckedShape, ExecutionLimits, Extent, FixedCoefficient, Heap, HeapLimits, LinearMap,
     OperationDraft, PublishedBundle, ShapeLimits, SolveBudget, SolvePolicy, SolveRecordKeys,
 };
 use nrz_scalar::{ArithmeticContext, LiteralLimits, NumericLiteral};
-use nrz_units::{BinaryOp, Descriptor, ExponentPolicy, Registry};
 use std::time::Instant;
 
 /// Execute the committed truss problem, with a separately declared finite-moment load scenario.

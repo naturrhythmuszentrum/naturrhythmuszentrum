@@ -2,12 +2,12 @@
 //! The heterogeneous shape contract is retained even where direct numerical storage refuses.
 
 use crate::shape_testing::{ResultOf, axis, dense, owner, quantity};
+use nrz_bindings::{BinaryOp, Descriptor, ExponentPolicy, Registry};
 use nrz_matrix::{
     Axis, AxisEntry, BlockDraft, CheckedShape, CoordinateMap, EntryDraft, NormalizationSchema,
     OperationDraft, OperationError, Partition, ReferenceScale, ShapeDraft, ShapeLimits,
     StructureScope,
 };
-use nrz_units::{BinaryOp, Descriptor, ExponentPolicy, Registry};
 use std::rc::Rc;
 
 /// The full ladder's physical blocks check; the current homogeneous operation boundary is explicit.

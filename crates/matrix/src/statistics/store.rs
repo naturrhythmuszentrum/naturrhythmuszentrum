@@ -3,8 +3,8 @@
 
 use super::{matrix::Matrix, model::Model};
 use crate::{Dependency, heap::identity::Key};
+use nrz_bindings::EvaluationDescriptor;
 use nrz_scalar::Scalar;
-use nrz_units::EvaluationDescriptor;
 use std::marker::PhantomData;
 
 /// Statistical law, independent of deterministic physical-input coverage.
@@ -65,7 +65,7 @@ pub(crate) struct Record {
     /// Local derivative and its numerical evaluation error.
     pub(crate) jacobian: Option<Parameter>,
     /// Retained replayed native derivative evidence, when this is an elementwise output.
-    pub(crate) derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
+    pub(crate) derivative: Option<std::rc::Rc<nrz_bindings::CheckedSensitivity>>,
     /// Declared means; absent for nominal operating points.
     pub(crate) means: Option<Parameter>,
 }
@@ -81,7 +81,7 @@ pub(crate) struct MomentPayload<P: Scalar> {
     /// Checked local derivative.
     pub(crate) jacobian: Matrix<P>,
     /// Symbolic native derivative identity retained independently of numerical errors.
-    pub(crate) derivative: Option<std::rc::Rc<nrz_units::CheckedSensitivity>>,
+    pub(crate) derivative: Option<std::rc::Rc<nrz_bindings::CheckedSensitivity>>,
     /// Exact affine mean family, when declared for every input.
     pub(crate) means: Option<Matrix<P>>,
 }

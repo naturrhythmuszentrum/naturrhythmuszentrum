@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Descriptor indirection and typed storage interaction during compaction.
 
-use nrz_units::Descriptor;
+use nrz_bindings::Descriptor;
 
 use crate::storage::{Format, Region, Storage};
 use crate::{Extent, Heap, HeapError, HeapLimits, Layout};

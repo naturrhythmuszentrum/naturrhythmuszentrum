@@ -5,7 +5,7 @@ use crate::test_api::{
     Axis, AxisEntry, BlockDraft, CheckedOperation, CheckedShape, EntryDraft, ExecutionLimits,
     OperationDraft, Partition, ShapeDraft, ShapeLimits, StructureScope,
 };
-use nrz_units::{Context, Descriptor, ExponentPolicy, Registry};
+use nrz_bindings::{Context, Descriptor, ExponentPolicy, Registry};
 use std::rc::Rc;
 
 /// Fallible fixture and test result.
@@ -14,7 +14,7 @@ pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 /// Declare a homogeneous rectangle over ratio columns and physical rows.
 #[expect(
     clippy::default_trait_access,
-    reason = "CAS types are inferred through the units facade"
+    reason = "CAS types are inferred through the bindings facade"
 )]
 pub(crate) fn shape(
     rows: usize,
@@ -66,7 +66,7 @@ pub(crate) fn operation(rows: usize, columns: usize) -> TestResult<CheckedOperat
 /// A single explicitly typed structural zero, with separately selected family scope.
 #[expect(
     clippy::default_trait_access,
-    reason = "CAS types are inferred through the units facade"
+    reason = "CAS types are inferred through the bindings facade"
 )]
 pub(crate) fn zero_shape(scope: StructureScope) -> TestResult<CheckedShape> {
     let owner = Rc::new(

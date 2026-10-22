@@ -2,10 +2,10 @@
 //! Binding refusal twins at the public operation boundary.
 
 use crate::binding_testing::{TestResult, operation, shape};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapError, HeapLimits, OperationDraft, OperationError,
 };
-use nrz_units::Descriptor;
 
 /// Foreign and retired handles refuse while the surviving local occupation binds.
 /// ´test:integration:binding-refuses-foreign-and-retired-inputs´

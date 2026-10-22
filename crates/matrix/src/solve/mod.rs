@@ -33,7 +33,7 @@ mod tests {
     use crate::{
         Binding, ExecutionLimits, Extent, Heap, HeapLimits, OperationError, RecipeEvidence,
     };
-    use nrz_units::Descriptor;
+    use nrz_bindings::Descriptor;
 
     /// Altered proof extent cannot authorize otherwise finite private solve payloads.
     /// ´test:unit:solve-candidate-proof-substitution-refuses-atomically´

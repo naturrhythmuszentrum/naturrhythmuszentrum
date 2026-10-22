@@ -3,9 +3,9 @@
 
 use crate::conversion_oracle::covers;
 use crate::conversion_testing::{TestResult, contract, execute, measure, owner, shape};
+use nrz_bindings::{BaseDimension, Descriptor, Dimension, Kind, Role};
 use nrz_matrix::{ConversionMode, Coverage, Extent, Heap, HeapLimits};
 use nrz_scalar::Scalar;
-use nrz_units::{BaseDimension, Descriptor, Dimension, Kind, Role};
 
 /// The declared centimetre example has a total physical bound and a separate evaluation bound.
 /// ´test:integration:measure-conversion-encloses-centimetre-oracle´
@@ -23,7 +23,7 @@ fn centimetres<P: Scalar + 'static>() -> TestResult {
             "length".into(),
             Box::new(Dimension::base(BaseDimension::Length)),
         ),
-        nrz_units::Measure::coherent(),
+        nrz_bindings::Measure::coherent(),
         Role::Difference,
     )?;
     let centimetre = Descriptor::new(
@@ -135,7 +135,7 @@ fn statistical_conversion_propagates_a_complete_model() -> TestResult {
     )
 }
 
-/// Missing point origins and nonconstant references preserve the units-owned typed refusals.
+/// Missing point origins and nonconstant references preserve the bindings-owned typed refusals.
 /// ´test:integration:conversion-refuses-missing-origins-and-references´
 #[test]
 fn conversion_refuses_missing_origins_and_references() -> TestResult {
@@ -150,20 +150,20 @@ fn conversion_refuses_missing_origins_and_references() -> TestResult {
     let declarations = crate::conversion_testing::reference_owner(&point)?;
     assert!(matches!(
         declarations.normalization_map(&point, "reference", None),
-        Err(nrz_units::MapError::Origin)
+        Err(nrz_bindings::MapError::Origin)
     ));
     assert!(matches!(
         declarations.normalization_map(&point.difference(), "missing", None),
-        Err(nrz_units::MapError::ConstantDeclaration(_))
+        Err(nrz_bindings::MapError::ConstantDeclaration(_))
     ));
     assert!(matches!(
-        nrz_units::uncertainty(
-            nrz_units::UncertaintyMode::RelativeRadius,
+        nrz_bindings::uncertainty(
+            nrz_bindings::UncertaintyMode::RelativeRadius,
             &point,
             None,
             None
         ),
-        Err(nrz_units::UnitError::RelativeReference)
+        Err(nrz_bindings::UnitError::RelativeReference)
     ));
     Ok(())
 }

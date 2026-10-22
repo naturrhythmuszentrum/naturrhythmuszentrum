@@ -158,7 +158,7 @@ fn matrix<P: Scalar + 'static>() -> TestResult {
         .jacobian()
         .work();
     assert_eq!(work.requests, 96);
-    assert!(work.construction <= nrz_units::Limits::default().work);
+    assert!(work.construction <= nrz_bindings::Limits::default().work);
     let jacobian = matrix_jacobian()?;
     check(moments.jacobian().ok_or("Jacobian")?, &jacobian)?;
     check(
@@ -176,7 +176,7 @@ fn matrix_inputs<P: Scalar + 'static>(
     use nrz_matrix::{
         CompanionSetDraft, CovarianceBlock, Extent, JointModel, Source, SourceFactor, TargetMap,
     };
-    let quantity = nrz_units::Descriptor::ratio();
+    let quantity = nrz_bindings::Descriptor::ratio();
     let one = P::ONE;
     let two = P::from_u8(2);
     let three = P::from_u8(3);

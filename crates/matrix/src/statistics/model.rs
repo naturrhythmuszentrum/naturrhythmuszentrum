@@ -3,8 +3,8 @@
 
 use super::{StatisticsError, matrix::Matrix};
 use crate::{JointLimits, JointModel, ModelId, OperationError, SourceId};
+use nrz_bindings::Descriptor;
 use nrz_scalar::{ArithmeticContext, Scalar};
-use nrz_units::Descriptor;
 use std::{any::Any, rc::Rc};
 
 /// Original precision-erased source model; propagation never invents sources.

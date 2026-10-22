@@ -4,7 +4,7 @@
 use super::ConversionContract;
 use super::definitions::{AxisDefinitions, DefinitionPool};
 use crate::{CoordinateMap, EntryNormalization, NormalizationSchema, OperationError};
-use nrz_units::{CheckedDeclarations, CheckedMap, LimitsOverride};
+use nrz_bindings::{CheckedDeclarations, CheckedMap, LimitsOverride};
 
 /// Separate center and difference maps for one formal physical entry.
 #[derive(Clone, Debug)]
@@ -91,12 +91,12 @@ impl NormalizationMaps {
 }
 
 impl ConversionContract {
-    /// Export one schema's scalar axes and formal row/column entry maps through units.
+    /// Export one schema's scalar axes and formal row/column entry maps through bindings.
     ///
     /// Definitions retain their H identity within this bundle and are independent of
-    /// equal labels in frozen declarations. No stored coordinate enters units algebra.
+    /// equal labels in frozen declarations. No stored coordinate enters bindings algebra.
     /// # Errors
-    /// Preserves each units `MapError` cause, including exact arithmetic limits.
+    /// Preserves each bindings `MapError` cause, including exact arithmetic limits.
     pub fn from_normalization_schema(
         schema: &NormalizationSchema,
         limits: &LimitsOverride,

@@ -4,11 +4,11 @@
 use crate::recovery_testing::{policy, proof};
 use crate::solve_testing::{TestResult, draft};
 use nrz_accuracy::{Limits, Promotion};
+use nrz_bindings::Descriptor;
 use nrz_matrix::{
     Binding, ExecutionLimits, Extent, Heap, HeapLimits, ProvenanceLimits, SolveRecordKeys,
     SolveStage,
 };
-use nrz_units::Descriptor;
 
 /// Every failed boundary retains its original operands and only the numerical phases that ran.
 /// ´test:integration:solve-records-retain-every-failure-stage´

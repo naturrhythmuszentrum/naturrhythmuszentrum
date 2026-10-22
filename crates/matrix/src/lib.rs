@@ -2,7 +2,7 @@
 #![doc = include_str!("../README.md")]
 #![expect(
     clippy::multiple_crate_versions,
-    reason = "faer and units carry duplicate transitive dependency versions"
+    reason = "faer and bindings carry duplicate transitive dependency versions"
 )]
 
 #[expect(

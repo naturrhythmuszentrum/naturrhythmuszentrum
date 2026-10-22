@@ -4,7 +4,7 @@
 use crate::{
     Axis, AxisEntry, BlockDraft, EntryDraft, Partition, ShapeDraft, ShapeLimits, StructureScope,
 };
-use nrz_units::{Context, Descriptor, ExponentPolicy, Registry};
+use nrz_bindings::{Context, Descriptor, ExponentPolicy, Registry};
 use std::rc::Rc;
 
 /// Derived contracts share the frozen owner and retain their original operand checks.
@@ -13,7 +13,7 @@ use std::rc::Rc;
 fn shape_derivation_shares_frozen_owner() -> Result<(), Box<dyn std::error::Error>> {
     #[expect(
         clippy::default_trait_access,
-        reason = "infer CAS-owned argument types through units without a forbidden direct CAS dependency"
+        reason = "infer CAS-owned argument types through bindings without a forbidden direct CAS dependency"
     )]
     let context = Context::new(
         Registry::new(ExponentPolicy::Rational),

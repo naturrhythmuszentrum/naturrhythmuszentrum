@@ -2,12 +2,12 @@
 //! Dense parameters, numerical error targets and cross-value lineage lifecycles.
 
 use crate::testing::TestResult;
+use nrz_bindings::{Descriptor, PairingKind, UncertaintyMode};
 use nrz_matrix::{
     CompanionSetDraft, CovarianceBlock, DenseCovariance, Extent, Heap, HeapError, HeapLimits,
     JointError, JointLimits, JointModel, Source, TargetMap,
 };
 use nrz_scalar::{ArithmeticContext, Enclosure};
-use nrz_units::{Descriptor, PairingKind, UncertaintyMode};
 
 /// A covariance error region targets product parameters and cannot resolve as a physical bound.
 /// ´test:integration:covariance-errors-target-parameters´
