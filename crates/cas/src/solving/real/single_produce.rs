@@ -72,14 +72,6 @@ impl Leaf<'_> {
     ) -> Result<Handle, CoefficientFailure> {
         self.mark("real-one-root-radicals")?;
         let (square, _) = self.square_root(&data.resolvent.radicand, discriminant)?;
-        let squared = self.expression(
-            Operator::IntegerPower(2),
-            std::slice::from_ref(&square.root),
-        )?;
-        let radicand =
-            self.frame
-                .literal(self.cas, &data.resolvent.radicand, &self.map, self.budget)?;
-        self.equality(&squared, &radicand)?;
         let parent = Engine {
             state: &self.cas.state,
             domain: &data.base.source.domain,

@@ -250,6 +250,6 @@ fn single_root_square_lemma_inventory() -> TestResult {
             }
         }
     }
-    assert_eq!(count, 1);
+    assert_eq!(count, 0);
     Ok(())
 }

@@ -7,7 +7,7 @@ use crate::model::Field;
 use crate::solving::{SolveAnswer, SolveForm};
 use crate::testing::common::TestResult;
 
-/// Fixed tower-closure diagnostic-2 measurements include both expected comparisons and sealing both outputs.
+/// Fixed tower-closure diagnostics 2 and 4 measurements include both expected comparisons and sealing both outputs.
 #[derive(Clone, Copy)]
 struct Boundary {
     kind: BudgetKind,
@@ -94,7 +94,7 @@ fn at_cap(
 pub(crate) fn check(field: &Field) -> TestResult {
     let (coefficient_ops, work) = match field {
         Field::Complex => (2_940_416, 401_216_460),
-        Field::Real => (2_045_557, 394_652_183),
+        Field::Real => (2_008_224, 388_307_978),
         _ => return Err("symbolic boundary field".into()),
     };
     let (cas, answer) = source(field)?;

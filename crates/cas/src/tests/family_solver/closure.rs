@@ -123,3 +123,64 @@ fn mixed_complete_answer_closure() -> TestResult {
     assert_eq!(report.lines().count(), 7);
     Ok(())
 }
+
+/// Recognize the four-step original cubic Horner equation, with one identical root at every power.
+fn cubic_equation_root(
+    cas: &crate::Cas,
+    left: &crate::Handle,
+) -> TestResult<Option<crate::LogicalId>> {
+    let mut value = left.logical_id();
+    let mut root = None;
+    for _ in 0..4 {
+        let addition = cas.state.expression(value)?;
+        if addition.operator != crate::model::Operator::Add {
+            return Ok(None);
+        }
+        let [product, _] = addition.operands.as_slice() else {
+            return Ok(None);
+        };
+        let multiplication = cas.state.expression(*product)?;
+        if multiplication.operator != crate::model::Operator::Mul {
+            return Ok(None);
+        }
+        let [previous, selected] = multiplication.operands.as_slice() else {
+            return Ok(None);
+        };
+        if root.is_some_and(|expected| expected != *selected) {
+            return Ok(None);
+        }
+        root = Some(*selected);
+        value = *previous;
+    }
+    let initial = cas.state.expression(value)?;
+    if initial.operator != crate::model::Operator::Rational(crate::Rational::zero()) {
+        return Ok(None);
+    }
+    Ok(root)
+}
+
+/// The original general cubic keeps two selected-generator equations and derives the last linear root.
+/// ´test:crate:mixed-cubic-equation-inventory´
+#[test]
+fn mixed_cubic_equation_inventory() -> TestResult {
+    let (mut fixture, original) = request(4)?;
+    let crate::request::Outcome::Solved { answer, .. } = fixture.cas.run(&original) else {
+        return Err("mixed cubic inventory answer".into());
+    };
+    let coverage = answer.coverage.as_ref().ok_or("mixed inventory coverage")?;
+    let applications = crate::testing::solve_blind::family_applications(&fixture.cas, coverage)?;
+    let mut roots = std::collections::BTreeSet::new();
+    for application in applications {
+        if let Statement::Equality { left, right, .. } = application.conclusion {
+            let zero = fixture.cas.state.expression(right.logical_id())?;
+            if zero.operator == crate::model::Operator::Rational(crate::Rational::zero())
+                && let Some(root) = cubic_equation_root(&fixture.cas, &left)?
+            {
+                assert!(roots.insert(root));
+            }
+        }
+    }
+    assert_eq!(roots.len(), 2);
+    replay(&fixture, &answer, 4, None)?;
+    Ok(())
+}

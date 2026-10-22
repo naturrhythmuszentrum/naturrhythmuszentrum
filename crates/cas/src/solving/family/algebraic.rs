@@ -112,7 +112,8 @@ pub(crate) fn roots(
     for root in &mut roots {
         *root = engine.sub(root, &shift, budget)?;
     }
-    for root in &roots {
+    // The last linear root follows from quotient relations; the two selected generators still need these identities.
+    for root in roots.iter().take(2) {
         let engine = Engine {
             state: &cas.state,
             domain: &polynomial.domain,
@@ -134,7 +135,7 @@ pub(crate) fn roots(
     })
 }
 
-/// Every nested generator contributes an explicit defining equality before later factor reduction.
+/// The selected generators retain original-polynomial identities needed by conservative factor reduction.
 fn equation(
     cas: &mut Cas,
     construction: &mut Construction,
