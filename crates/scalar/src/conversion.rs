@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit precision changes with independently outward displacement bounds.
+//!
+//! # Coverage through precision changes
+//!
+//! `widen` converts a binary32 center and enclosure exactly to binary64, preserving their existing coverage. `narrow` range-checks a binary64 center, rounds it to nearest binary32, and converts each endpoint outward by comparing its exact widening with the source. `PrecisionChange` exposes the new representation and an outward destination-format bound on additional center displacement. Existing error remains the caller's obligation. `Enclosure::displacement_from` bounds the distance of a finite candidate from every point in an independently obtained enclosure.
+//!
+//! Conversion and literal tests independently decode returned endpoints into rationals, covering exact widening, outward narrowing, halfway ties, subnormal loss, underflow to zero, common descriptor constants, syntax/resource/range refusals and an import-to-narrowing-to-widening lifecycle. The lifecycle retains import error and conversion displacement as separate numerical contributions.
 
 use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite, Scalar};
 

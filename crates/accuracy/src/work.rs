@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked cumulative limits shared across execution and precision retry.
+//!
+//! # Cumulative reservation contract
+//!
+//! `Limits` sets finite cumulative attempt and work allowances; zero means no allowance, with no unlimited sentinel. Its `WorkBudget` reserves an attempt and its known work atomically before execution and charges additional work before an operation. Failed reservations change neither counter; successful reservations are never refunded after failure. Checked integer addition prevents wraparound. The caller defines a reproducible work unit and includes numerical verification in its charges.
 
 use core::fmt;
 

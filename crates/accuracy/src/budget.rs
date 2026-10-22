@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Conservative tolerance evaluation and decisions on available upper bounds.
+//!
+//! # Conservative threshold decisions
+//!
+//! `Budget::new` takes nonnegative absolute and relative tolerances and a strictly positive characteristic difference scale, all interpreted as exactly represented numbers. `Budget::from_enclosures` admits lowered coefficient enclosures only when both tolerance lower endpoints are nonnegative and the scale lower endpoint is positive. The scale remains mandatory for a purely absolute budget. A shifted point center is never an implicit relative reference; the caller checks physical descriptors and the named norm/coordinates.
+//!
+//! `assess_budget` encloses `absolute + relative * reference_scale` with scalar arithmetic and retains the threshold in a `BudgetAssessment`. It returns `Met` only when the supplied error upper bound is at most the threshold's lower endpoint, `Exceeded` only when it is strictly greater than the upper endpoint, and `Unresolved` for the remaining overlap. `Exceeded` says the available bound fails the threshold; it does not prove the actual error is too large. No request produces `NotRequested`, never `Met`. Proved nonnegativity permits clamping a negative underflow endpoint to zero. Tolerance overflow returns the scalar cause rather than a successful comparison. `Budget::widen` exactly widens coefficient endpoints and preserves all prior widths.
 
 use crate::{AccuracyFailure, Nonnegative};
 use nrz_scalar::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite, Scalar};

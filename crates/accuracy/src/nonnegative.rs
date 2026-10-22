@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Finite nonnegative magnitudes and outward composition.
+//!
+//! # Magnitude composition
+//!
+//! `Nonnegative<P>::new` admits finite nonnegative magnitudes and canonicalizes signed zero. Its private state proves that numerical invariant, not that a caller-supplied magnitude bounds a physical error. `add` returns an outward upper sum and `scale` an outward upper product, including underflow. Each delegates to scalar enclosures under an explicit `ArithmeticContext`; an unavailable finite endpoint returns the scalar error through `AccuracyFailure`. No fallible arithmetic is hidden behind operator traits.
 
 use crate::AccuracyFailure;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};

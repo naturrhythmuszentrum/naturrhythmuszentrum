@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded floating decoding of exact numeric spellings, without symbolic arithmetic.
+//!
+//! # Exact spelling import contract
+//!
+//! `NumericLiteral::new` checks a borrowed signed integer, decimal or scientific spelling, or one fraction whose sides are such literals. `LiteralLimits` bounds combined significand digits, written and effective decimal exponents, and work. Eight work units per input byte prepay grammar and candidate scans; each enclosure operation costs one additional unit. Defaults permit 1024 digits, exponent magnitude 4096 and 100000 work units. Zero limits are valid refusing policies. Whitespace, expressions, separators and nonfinite spellings are rejected.
+//!
+//! Decoding accumulates digits by enclosed multiply-by-ten/add and applies decimal scale by bounded repeated multiplication or division by ten. This avoids building an overflowing power-of-ten denominator for subnormal literals. A native parser selects a finite candidate for a single literal; a fraction uses its lower endpoint. `DecodedLiteral` exposes the candidate, the exact-spelling enclosure, its numerical displacement bound and charged work. It promises containment rather than tight or correctly rounded fraction candidates. Overflowing intermediates and zero-containing denominator enclosures refuse even when another conversion algorithm could succeed. Production decoding has no rational or CAS dependency.
 
 mod evaluate;
 mod limits;

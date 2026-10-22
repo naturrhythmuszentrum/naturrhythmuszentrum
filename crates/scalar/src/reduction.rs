@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Increasing-index reductions and scaled Euclidean/Frobenius norm bounds.
+//!
+//! # Scaled norm contract
+//!
+//! `norm_upper` bounds the Euclidean norm, or the Frobenius norm when passed every logical matrix entry. It scales by a positive normal power of two chosen from the greatest magnitude, encloses division even at underflow, then squares, sums, takes square root and multiplies back outward. Empty and all-zero inputs return zero. The caller supplies any structural multiplicities. Independent rational tests square the returned upper bound against the exact sum of squares, and exercise fused cancellation and fixed reduction order in both formats.
 
 use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite, Scalar};
 

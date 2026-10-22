@@ -2,22 +2,50 @@
 
 # nrz-scalar · `guide:scalar:overview`
 
-`nrz-scalar` supplies sealed binary32/binary64 element arithmetic for the matrix kernels. `Finite<P>` admits finite primitives and canonicalizes signed zero. `Enclosure<P>` is a closed real set with private finite endpoints; it owns no quantity, ledger, descriptor or physical uncertainty. See the matrix-core design for the heap's use of this substrate.
+## Purpose · `sec:scalar:purpose`
 
-`ArithmeticContext::new` admits only the `x86_64-unknown-linux-gnu` target and checks selected rounding and gradual-underflow probes. Certification additionally requires the independent boundary corpus to pass for each compiler and profile. Arithmetic assumes IEEE round-to-nearest ties-to-even, gradual underflow and correctly rounded primitives. Fast math, excess precision and changes to the floating environment are unsupported; probes cannot establish that external code preserves that environment. Callers can retain the context's arithmetic revision in their records.
+`nrz-scalar` is the engine's boundary from exact constant spellings to finite floating values with proven enclosures and import error. It also supplies the outward arithmetic used to verify float kernels. In the two-graph architecture, exact descriptors stay in CAS while numerical region versions and kernel applications form the computational graph. Scalar supports the latter without assigning meaning to its numbers: an enclosure is a closed real set, whether a binding later reads its coordinates as voltage, current or something else.
 
-Addition, subtraction, multiplication, division and square root enclose each rounded result by its outward neighbours. Only proved zero/unit identities bypass widening; a zero rounded residual proves no exactness. Multiplication and division take all four endpoint pairs, square handles zero crossings and nonnegativity, and negation and absolute value are exact. Nonfinite admission, inverted endpoints, zero-containing divisors, negative square roots and nonfinite required neighbours return errors. The arithmetic context is explicit at every rounded operation.
+## Place in the engine · `sec:scalar:engine`
 
-Public conformance tests decode binary endpoints into independent exact rationals, cover cancellation, ties, subnormals and finite limits, and square root endpoints before comparison. The Rump lifecycle contains the independent target −54767/66192 in both formats. Compile twins exercise finite-state privacy and format sealing. Fused evaluation, reductions, scaled norms, precision changes and literal decoding extend these same inclusion proofs.
+Scalar has no production dependency on CAS, bindings, accuracy or matrix. Bindings exports a checked exact constant spelling; `NumericLiteral` encloses that spelling in the requested binary32 or binary64 format; matrix retains the candidate, enclosure and import error with the numerical computation. Accuracy builds nonnegative bounds and budget policies on scalar, and matrix uses both crates. Heap values never travel back into CAS arithmetic.
 
-`Enclosure::mul_add` explicitly evaluates all eight endpoint triples with one fused rounding each. Separate `mul` and `add` calls retain two rounded operations. `sum` and `dot` accept plain slices and use a left fold in increasing index order starting at exact zero; dot multiplies before adding. Unequal dot lengths and overflowing intermediates refuse, even if reassociation could produce a finite answer.
+Scalar owns finite admission, temporary enclosures, primitive arithmetic, reductions, format changes and bounded literal decoding. It owns no heap, quantity descriptor, physical uncertainty, source identity or coverage ledger. Bindings supplies the reading of a region; matrix is responsible for attaching scalar's numerical evidence to the right region version. See `docs/design/descriptor-binding.md` and `docs/design/matrix-core-design.md` for those boundaries.
 
-`norm_upper` bounds the Euclidean norm, or the Frobenius norm when passed every logical matrix entry. It scales by a positive normal power of two chosen from the greatest magnitude, encloses division even at underflow, then squares, sums, takes square root and multiplies back outward. Empty and all-zero inputs return zero. The caller supplies any structural multiplicities. Independent rational tests square the returned upper bound against the exact sum of squares, and exercise fused cancellation and fixed reduction order in both formats.
+## In the LC target · `sec:scalar:lc-target`
 
-`widen` converts a binary32 center and enclosure exactly to binary64, preserving their existing coverage. `narrow` range-checks a binary64 center, rounds it to nearest binary32, and converts each endpoint outward by comparing its exact widening with the source. `PrecisionChange` exposes the new representation and an outward destination-format bound on additional center displacement. Existing error remains the caller's obligation. `Enclosure::displacement_from` bounds the distance of a finite candidate from every point in an independently obtained enclosure.
+For `L=25 mH=1/40 H` and `C=10 µF=1/100000 F`, the exact descriptor calculation gives `ω₀=2000 rad/s` and `f₀=1000/π Hz`. Scalar can already enclose rational spellings such as `1/40` and `1/100000`, retaining the discrepancy of each floating candidate from its exact value. Its multiplication, division and square-root enclosures are numerical ingredients for the later LC kernels; decoding the constants alone does not certify an LC computation.
 
-`NumericLiteral::new` checks a borrowed signed integer, decimal or scientific spelling, or one fraction whose sides are such literals. `LiteralLimits` bounds combined significand digits, written and effective decimal exponents, and work. Eight work units per input byte prepay grammar and candidate scans; each enclosure operation costs one additional unit. Defaults permit 1024 digits, exponent magnitude 4096 and 100000 work units. Zero limits are valid refusing policies. Whitespace, expressions, separators and nonfinite spellings are rejected.
+Stage 3d in `docs/design/lc-resonance.md` will use these imports for mixed-coordinate restoration, and stage 3g will enclose the restricted two-state spectrum. Exact π scales exist on the descriptor side, but non-rational coefficients refuse at bindings export today. Stage 5 must add a certified constant enclosure before `1000/π`, degree conversions or π-dependent phase values can be evaluated numerically. A decimal approximation to π is not an exact replacement for that definition.
 
-Decoding accumulates digits by enclosed multiply-by-ten/add and applies decimal scale by bounded repeated multiplication or division by ten. This avoids building an overflowing power-of-ten denominator for subnormal literals. A native parser selects a finite candidate for a single literal; a fraction uses its lower endpoint. `DecodedLiteral` exposes the candidate, the exact-spelling enclosure, its numerical displacement bound and charged work. It promises containment rather than tight or correctly rounded fraction candidates. Overflowing intermediates and zero-containing denominator enclosures refuse even when another conversion algorithm could succeed. Production decoding has no rational or CAS dependency.
+## Main concepts and types · `sec:scalar:concepts`
 
-Conversion and literal tests independently decode returned endpoints into rationals, covering exact widening, outward narrowing, halfway ties, subnormal loss, underflow to zero, common descriptor constants, syntax/resource/range refusals and an import-to-narrowing-to-widening lifecycle. The lifecycle retains import error and conversion displacement as separate numerical contributions.
+`Scalar` seals the formats to `f32` and `f64`. `Finite<P>` admits a finite primitive and canonicalizes signed zero. `ArithmeticContext` admits the supported floating environment. `Enclosure<P>` keeps private, finite, ordered endpoints and provides fallible operations under that context. `NumericLiteral` and `LiteralLimits` describe a bounded exact spelling; decoding returns a `DecodedLiteral` with a center, enclosure, displacement bound and charged work.
+
+```rust
+use nrz_scalar::{ArithmeticContext, Finite, LiteralLimits, NumericLiteral};
+
+let context = ArithmeticContext::new()?;
+let literal = NumericLiteral::new("1/8", LiteralLimits::default())?;
+let decoded = literal.decode::<f64>(&context)?;
+assert!(decoded.enclosure().contains(Finite::new(0.125)?));
+# Ok::<(), nrz_scalar::ArithmeticFailure>(())
+```
+
+`sum` and `dot` use a fixed increasing-index fold; `norm_upper` bounds a Euclidean or logical-entry Frobenius norm. `widen`, `narrow` and `PrecisionChange` make representation changes explicit. Their displacement is an additional numerical contribution; the caller must preserve existing error. Detailed arithmetic, decoding and conversion contracts live in `src/enclosure.rs`, `src/fused.rs`, `src/reduction.rs`, `src/literal/mod.rs` and `src/conversion.rs`.
+
+## Guarantees and refusals · `sec:scalar:guarantees`
+
+Successful arithmetic contains the exact real result under the admitted arithmetic model. Rounded operations widen outward; only proved identities avoid widening. A rounded zero residual does not prove exactness. Literal decoding promises containment, not a tight interval or a correctly rounded fraction candidate. Numerical reproducibility means agreement within the tracked error for the same exact target, not identical result bits.
+
+Nonfinite inputs, inverted endpoints, division by an enclosure containing zero, negative square-root domains and unavailable finite outward neighbours refuse. Overflowing intermediates can refuse even when another algorithm would succeed. Literal digit, exponent and work limits are finite; zero allowances are valid refusing policies.
+
+## Current scope and limits · `sec:scalar:scope`
+
+`ArithmeticContext::new` restricts admission to `x86_64-unknown-linux-gnu` and checks selected rounding and gradual-underflow probes. Each compiler/profile also needs the independent boundary corpus. IEEE round-to-nearest ties-to-even, gradual underflow and correctly rounded primitives are assumptions; fast math, excess precision and a changed floating environment are unsupported. Probes cannot guarantee that external code preserves those assumptions.
+
+The decoder accepts integers, decimals, scientific notation and one literal fraction, with no CAS or production rational dependency. It is not an expression interpreter or a transcendental constant evaluator. Scalar proves numerical containment; physical domains, source assumptions and operation-specific meaning remain above it.
+
+## Testing · `sec:scalar:testing`
+
+Public conformance tests independently decode binary endpoints into exact rationals, including cancellation, halfway ties, subnormals, underflow and finite limits in both formats. Square-root and norm checks compare squared bounds with exact rational targets. The Rump lifecycle contains the independent target `−54767/66192`; import/conversion lifecycles keep old error and new displacement separate. Compile twins enforce private finite state and sealed formats, while literal tests cover syntax and resource refusals. The public target is run with `cargo test -p nrz-scalar --test public`; rustdoc checks the example and compile twins.

@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit fused evaluation of the multi-affine endpoint expression.
+//!
+//! # Fused and separate evaluation
+//!
+//! `Enclosure::mul_add` explicitly evaluates all eight endpoint triples with one fused rounding each. Separate `mul` and `add` calls retain two rounded operations. `sum` and `dot` accept plain slices and use a left fold in increasing index order starting at exact zero; dot multiplies before adding. Unequal dot lengths and overflowing intermediates refuse, even if reassociation could produce a finite answer.
 
 use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Scalar, primitive};
 

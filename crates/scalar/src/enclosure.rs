@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Finite closed real sets used as temporary kernel verification objects.
+//!
+//! # Containment and refusal contract
+//!
+//! Addition, subtraction, multiplication, division and square root enclose each rounded result by its outward neighbours. Only proved zero/unit identities bypass widening; a zero rounded residual proves no exactness. Multiplication and division take all four endpoint pairs, square handles zero crossings and nonnegativity, and negation and absolute value are exact. Nonfinite admission, inverted endpoints, zero-containing divisors, negative square roots and nonfinite required neighbours return errors. The arithmetic context is explicit at every rounded operation.
+//!
+//! Public conformance tests decode binary endpoints into independent exact rationals, cover cancellation, ties, subnormals and finite limits, and square root endpoints before comparison. The Rump lifecycle contains the independent target −54767/66192 in both formats. Compile twins exercise finite-state privacy and format sealing. Fused evaluation, reductions, scaled norms, precision changes and literal decoding extend these same inclusion proofs.
 
 use crate::{ArithmeticContext, ArithmeticFailure, Finite, Scalar, primitive};
 

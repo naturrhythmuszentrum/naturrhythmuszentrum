@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit environment admission with limited runtime probes.
+//!
+//! # Arithmetic environment
+//!
+//! `ArithmeticContext::new` admits only the `x86_64-unknown-linux-gnu` target and checks selected rounding and gradual-underflow probes. Certification additionally requires the independent boundary corpus to pass for each compiler and profile. Arithmetic assumes IEEE round-to-nearest ties-to-even, gradual underflow and correctly rounded primitives. Fast math, excess precision and changes to the floating environment are unsupported; probes cannot establish that external code preserves that environment. Callers can retain the context's arithmetic revision in their records.
 
 use crate::{ArithmeticFailure, Scalar};
 
