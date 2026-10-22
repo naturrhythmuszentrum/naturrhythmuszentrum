@@ -11,6 +11,7 @@ owners = [
   "MATRIX",
   "BINDINGS",
   "CAS",
+  "ORCHESTRATION",
 ]
 
 partitions = [
@@ -26,4 +27,29 @@ partitions = [
   { name = "cas", owner = "CAS", pattern = '[ %s"templates/" ] %s"crates/cas" [ "/" *VCHAR ]' },
 ]
 
-may_cite = []
+imports = [
+  { owner = "ORCHESTRATION", registry = ".linter/imports/orchestration.toml" },
+]
+
+may_cite = [
+  { owner = "NRZ", target = "ORCHESTRATION" },
+  { owner = "DOCGEN", target = "ORCHESTRATION" },
+  { owner = "SCALAR", target = "ORCHESTRATION" },
+  { owner = "ACCURACY", target = "ORCHESTRATION" },
+  { owner = "MATRIX", target = "ORCHESTRATION" },
+  { owner = "BINDINGS", target = "ORCHESTRATION" },
+  { owner = "CAS", target = "ORCHESTRATION" },
+  { owner = "NRZ", target = "DOCGEN" },
+  { owner = "NRZ", target = "SCALAR" },
+  { owner = "NRZ", target = "ACCURACY" },
+  { owner = "NRZ", target = "MATRIX" },
+  { owner = "NRZ", target = "BINDINGS" },
+  { owner = "NRZ", target = "CAS" },
+  { owner = "ACCURACY", target = "SCALAR" },
+  { owner = "BINDINGS", target = "CAS" },
+  { owner = "DOCGEN", target = "BINDINGS" },
+  { owner = "DOCGEN", target = "CAS" },
+  { owner = "MATRIX", target = "ACCURACY" },
+  { owner = "MATRIX", target = "BINDINGS" },
+  { owner = "MATRIX", target = "SCALAR" },
+]
