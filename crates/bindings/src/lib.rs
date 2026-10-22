@@ -51,6 +51,7 @@ mod measure;
 )]
 mod original;
 mod pairing;
+pub mod readings;
 mod registry;
 #[expect(
     clippy::redundant_pub_crate,

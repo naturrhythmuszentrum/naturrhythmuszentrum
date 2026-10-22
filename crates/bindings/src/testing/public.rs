@@ -28,3 +28,10 @@ pub(crate) mod sensitivity;
 )]
 #[path = "constants.rs"]
 pub(crate) mod constants;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "physical reading fixtures are shared by public integration and conformance tests"
+)]
+#[path = "readings.rs"]
+pub(crate) mod readings;
