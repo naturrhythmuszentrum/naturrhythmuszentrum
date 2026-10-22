@@ -5,6 +5,11 @@
     reason = "nrz-cas uses petgraph 0.8.3 with hashbrown 0.15 while indexmap uses hashbrown 0.17"
 )]
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
+mod admission;
 mod checked;
 mod checker;
 #[expect(
@@ -56,7 +61,12 @@ mod sensitivity;
 
 pub use nrz_cas::{ExactConstant, PositiveConstant};
 
-pub use nrz_cas::limits::{Limits, LimitsOverride};
+pub use nrz_cas::limits::{Budget, Limits, LimitsOverride};
+
+pub use admission::{
+    AdmissionError, BindingSymbols, CompanionKind, CopyWitness, HomogeneousRecipe, QuantitySymbol,
+    SymbolBinding, SymbolKind,
+};
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};
 pub use constants::{

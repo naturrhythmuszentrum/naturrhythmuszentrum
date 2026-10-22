@@ -229,9 +229,22 @@ pub enum RootSelection {
     Predicate(String),
 }
 
+/// Closed associations between independently declared symbols; never equations or proofs.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum SymbolRelation {
+    /// A selected homogeneous copy result and its exact source symbol.
+    Copy,
+    /// A deterministic difference-bound symbol and its exact value target.
+    DeterministicBound,
+    /// A numerical-error symbol and its exact value target.
+    NumericalError,
+}
+
 /// Mathematical syntax tags; all operands remain explicitly ordered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// An association between two closed declared symbols, without truth or rewrite authority.
+    SymbolRelation(SymbolRelation),
     /// Complex conjugation, preserving the complex scalar field.
     Conjugate,
     /// The real component of a complex scalar.

@@ -5,7 +5,7 @@ pub use crate::graph::{Draft, ExpressionDraft, GraphCounts, OccurrenceDraft, Ver
 pub use crate::model::{
     Approach, AtomicSort, Binding, Branch, Constant, Declaration, Environment, Extent, Field,
     MatrixOperation, Operator, PredicateKind, RootSelection, ScalarOperation, Scope, Sort, Span,
-    SpectralKind,
+    SpectralKind, SymbolRelation,
 };
 pub use crate::substitution::Substitution;
 

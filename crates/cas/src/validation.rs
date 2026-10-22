@@ -427,6 +427,9 @@ pub(crate) fn expression(
     operands: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<(u64, u64), Fault> {
+    if let Operator::SymbolRelation(kind) = draft.operator {
+        return symbol_relation(state, draft, context, operands, kind, budget);
+    }
     scope_limit(&draft.scope, budget)?;
     declared_sort(&draft.sort, budget)?;
     binding_shape(&draft.operator, draft.binding.as_ref(), operands.len())?;
@@ -494,6 +497,63 @@ pub(crate) fn expression(
         root_polynomial(state, polynomial, variable, budget)?;
     }
     Ok((depth, unfolded))
+}
+
+/// Check a fixed association edge without expanding either endpoint's declaration context.
+fn symbol_relation(
+    state: &State,
+    draft: &ExpressionDraft,
+    context: LogicalId,
+    operands: &[LogicalId],
+    kind: crate::model::SymbolRelation,
+    budget: &mut Budget,
+) -> Result<(u64, u64), Fault> {
+    budget.work(1, AT)?;
+    if !draft.scope.is_empty() || draft.binding.is_some() {
+        return Err(Fault::invalid(InvalidCode::Scope, AT));
+    }
+    if draft.sort != Sort::Value(AtomicSort::Boolean) || draft.space.is_some() {
+        return Err(sort_error());
+    }
+    let [result_id, target_id] = operands else {
+        return Err(Fault::invalid(InvalidCode::Reference, AT));
+    };
+    if result_id == target_id {
+        return Err(Fault::invalid(InvalidCode::Reference, AT));
+    }
+    let result = state.expression(*result_id)?;
+    let target = state.expression(*target_id)?;
+    let result_shape = relation_endpoint(result, budget)?;
+    let target_shape = relation_endpoint(target, budget)?;
+    if result.header != context {
+        return Err(Fault::invalid(InvalidCode::Context, AT));
+    }
+    if kind != crate::model::SymbolRelation::Copy && result_shape != target_shape {
+        return Err(sort_error());
+    }
+    budget.check(BudgetKind::Depth, 2, AT)?;
+    budget.check(BudgetKind::PeakExpressionSize, 3, AT)?;
+    Ok((2, 3))
+}
+
+/// A prior admitted closed Real matrix symbol is a sealed constant-size endpoint.
+fn relation_endpoint(value: &Expression, budget: &mut Budget) -> Result<[u32; 2], Fault> {
+    budget.work(1, AT)?;
+    if !matches!(value.operator, Operator::Free(_)) || !value.operands.is_empty() {
+        return Err(Fault::invalid(InvalidCode::Reference, AT));
+    }
+    if !value.scope.is_empty() || value.binding.is_some() {
+        return Err(Fault::invalid(InvalidCode::Scope, AT));
+    }
+    let Sort::Value(AtomicSort::Matrix {
+        field: Field::Real,
+        rows: crate::model::Extent::Literal(rows),
+        columns: crate::model::Extent::Literal(columns),
+    }) = value.sort
+    else {
+        return Err(sort_error());
+    };
+    Ok([rows, columns])
 }
 
 /// Recognize rational polynomial syntax without expanding coefficients or proving roots.
@@ -668,7 +728,10 @@ fn operator_sorts(
         | Operator::RegularAction => {
             crate::distribution_syntax::sorts(operator, result, children, budget)?
         }
-        Operator::Cases | Operator::RootValue { .. } | Operator::ExactCoefficient => false,
+        Operator::SymbolRelation(_)
+        | Operator::Cases
+        | Operator::RootValue { .. }
+        | Operator::ExactCoefficient => false,
         Operator::Conjugate => {
             children.len() == 1
                 && result == &Sort::Value(AtomicSort::Scalar(Field::Complex))
@@ -1107,4 +1170,247 @@ pub(crate) fn occurrence(
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::budget::Limits;
+    use crate::domain_model::HeaderDraft;
+    use crate::error::FaultKind;
+    use crate::graph::{Cas, Handle};
+    use crate::model::{Declaration, Extent, SymbolRelation};
+
+    type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+    /// Use the unchanged admission policy for independent setup and checked calls.
+    fn ledger() -> TestResult<Budget> {
+        Ok(Budget::new(Limits::default())?)
+    }
+
+    /// A literal rectangle has no unresolved extent declaration dependencies.
+    const fn rectangle(rows: u32, field: Field) -> Sort {
+        Sort::Value(AtomicSort::Matrix {
+            field,
+            rows: Extent::Literal(rows),
+            columns: Extent::Literal(1),
+        })
+    }
+
+    /// Each endpoint has an independent admitted header and an actual Free expression.
+    fn symbol(cas: &mut Cas, key: &str, sort: Sort, scope: Scope) -> TestResult<(Handle, Handle)> {
+        let drafts = [
+            Draft::Header(HeaderDraft::Core(Environment {
+                declarations: vec![Declaration {
+                    key: key.into(),
+                    display_name: key.into(),
+                    sort: sort.clone(),
+                }],
+                ..Environment::default()
+            })),
+            Draft::Expression(ExpressionDraft {
+                space: None,
+                operator: Operator::Free(key.into()),
+                sort,
+                header: Reference::Local(0),
+                scope,
+                binding: None,
+                operands: Vec::new(),
+            }),
+        ];
+        let handles = cas.admit(&drafts, &mut ledger()?)?;
+        Ok((
+            handles.first().ok_or("header")?.clone(),
+            handles.get(1).ok_or("symbol")?.clone(),
+        ))
+    }
+
+    /// A standard pair makes all mutation tests start from an admitted association shape.
+    fn fixture() -> TestResult<(Cas, ExpressionDraft)> {
+        let mut cas = Cas::new(Limits::default())?;
+        let (header, result) = symbol(&mut cas, "result", rectangle(2, Field::Real), Vec::new())?;
+        let (_, target) = symbol(&mut cas, "target", rectangle(2, Field::Real), Vec::new())?;
+        let draft = ExpressionDraft {
+            space: None,
+            operator: Operator::SymbolRelation(SymbolRelation::Copy),
+            sort: Sort::Value(AtomicSort::Boolean),
+            header: Reference::Existing(header),
+            scope: Vec::new(),
+            binding: None,
+            operands: vec![Reference::Existing(result), Reference::Existing(target)],
+        };
+        Ok((cas, draft))
+    }
+
+    /// Require the named structural refusal and prove the failed batch changed nothing.
+    fn refuses(cas: &mut Cas, draft: ExpressionDraft, code: InvalidCode) -> TestResult {
+        let before = cas.counts();
+        let result = cas.admit(&[Draft::Expression(draft)], &mut ledger()?);
+        assert!(
+            matches!(result, Err(Fault { kind: FaultKind::Invalid(actual), .. }) if actual == code)
+        );
+        assert_eq!(cas.counts(), before);
+        Ok(())
+    }
+
+    /// Scope, Boolean result and exact owner header are independent admission obligations.
+    /// ´test:unit:symbol-relation-refuses-scope-sort-and-header´
+    #[test]
+    fn symbol_relation_refuses_scope_sort_and_header() -> TestResult {
+        let (mut cas, original) = fixture()?;
+        let mut scoped = original.clone();
+        scoped.scope = vec![vec![AtomicSort::Integer]];
+        refuses(&mut cas, scoped, InvalidCode::Scope)?;
+        let mut result_sort = original.clone();
+        result_sort.sort = Sort::Value(AtomicSort::Integer);
+        refuses(&mut cas, result_sort, InvalidCode::Sort)?;
+        let (other_header, scoped_symbol) = symbol(
+            &mut cas,
+            "scoped",
+            rectangle(2, Field::Real),
+            vec![vec![AtomicSort::Integer]],
+        )?;
+        let mut header = original.clone();
+        header.header = Reference::Existing(other_header);
+        refuses(&mut cas, header, InvalidCode::Context)?;
+        let mut endpoint = original;
+        endpoint.operands[1] = Reference::Existing(scoped_symbol);
+        refuses(&mut cas, endpoint, InvalidCode::Scope)
+    }
+
+    /// Endpoints must be distinct prior Free symbols from this exact graph.
+    /// ´test:unit:symbol-relation-refuses-invalid-endpoint-identities´
+    #[test]
+    fn symbol_relation_refuses_invalid_endpoint_identities() -> TestResult {
+        let (mut cas, original) = fixture()?;
+        let mut repeated = original.clone();
+        repeated.operands[1] = repeated.operands[0].clone();
+        refuses(&mut cas, repeated, InvalidCode::Reference)?;
+        let mut forward = original.clone();
+        forward.operands[1] = Reference::Local(0);
+        refuses(&mut cas, forward, InvalidCode::Reference)?;
+        let (_, foreign) = fixture()?;
+        let mut external = original.clone();
+        external.operands[1] = foreign.operands[1].clone();
+        refuses(&mut cas, external, InvalidCode::ForeignHandle)?;
+        let admitted = cas.admit(&[Draft::Expression(original.clone())], &mut ledger()?)?;
+        let mut non_symbol = original.clone();
+        non_symbol.operands[1] = Reference::Existing(admitted.first().ok_or("relation")?.clone());
+        refuses(&mut cas, non_symbol, InvalidCode::Reference)?;
+        let mut arity = original;
+        arity.operands.pop();
+        refuses(&mut cas, arity, InvalidCode::Reference)
+    }
+
+    /// Only literal Real matrices participate, and companions preserve the target rectangle.
+    /// ´test:unit:symbol-relation-refuses-sorts-and-companion-extents´
+    #[test]
+    fn symbol_relation_refuses_sorts_and_companion_extents() -> TestResult {
+        let (mut cas, original) = fixture()?;
+        for (key, sort) in [
+            ("scalar", Sort::Value(AtomicSort::Scalar(Field::Real))),
+            ("complex", rectangle(2, Field::Complex)),
+        ] {
+            let (_, target) = symbol(&mut cas, key, sort, Vec::new())?;
+            let mut draft = original.clone();
+            draft.operands[1] = Reference::Existing(target);
+            refuses(&mut cas, draft, InvalidCode::Sort)?;
+        }
+        let (_, target) = symbol(&mut cas, "selected", rectangle(3, Field::Real), Vec::new())?;
+        let mut selected = original;
+        selected.operands[1] = Reference::Existing(target);
+        cas.admit(&[Draft::Expression(selected.clone())], &mut ledger()?)?;
+        for kind in [
+            SymbolRelation::DeterministicBound,
+            SymbolRelation::NumericalError,
+        ] {
+            selected.operator = Operator::SymbolRelation(kind);
+            refuses(&mut cas, selected.clone(), InvalidCode::Sort)?;
+        }
+        Ok(())
+    }
+
+    /// All three association tags round-trip and unknown kinds refuse canonical decoding.
+    /// ´test:unit:symbol-relation-wire-kinds´
+    #[test]
+    fn symbol_relation_wire_kinds() -> TestResult {
+        let (mut cas, original) = fixture()?;
+        for kind in [
+            SymbolRelation::Copy,
+            SymbolRelation::DeterministicBound,
+            SymbolRelation::NumericalError,
+        ] {
+            let operator = Operator::SymbolRelation(kind);
+            let mut draft = original.clone();
+            draft.operator = operator.clone();
+            cas.admit(&[Draft::Expression(draft)], &mut ledger()?)?;
+            let mut budget = ledger()?;
+            let mut out = Encoder::new(&mut budget, AT);
+            encoding::operator(&operator, &mut out)?;
+            let bytes = out.finish();
+            let decoded = crate::wire_read::Reader::new(&bytes, &mut budget)?.operator()?;
+            assert_eq!(decoded, operator);
+        }
+        assert!(matches!(
+            crate::wire_read::Reader::new(&[48, 3], &mut ledger()?)?.operator(),
+            Err(Fault {
+                kind: FaultKind::Invalid(InvalidCode::Encoding),
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    /// Association syntax supplies neither coefficient equality, normalization nor solving authority.
+    /// ´test:unit:symbol-relation-has-no-equation-authority´
+    #[test]
+    fn symbol_relation_has_no_equation_authority() -> TestResult {
+        let (mut cas, original) = fixture()?;
+        let before = cas.state.proof_count();
+        let handles = cas.admit(&[Draft::Expression(original)], &mut ledger()?)?;
+        let relation = handles.first().ok_or("relation")?;
+        let id = cas.checked(relation)?;
+        assert!(crate::polynomial::equal(&cas.state, id, id, false, &mut ledger()?).is_err());
+        assert!(crate::polynomial::normalize(&mut cas, id, &mut ledger()?).is_err());
+        assert!(cas.solve_view(relation).is_err());
+        assert_eq!(cas.state.proof_count(), before);
+        Ok(())
+    }
+
+    /// Relation admission has exact Work and payload boundaries and rolls back below either.
+    /// ´test:unit:symbol-relation-work-and-payload-boundaries´
+    #[test]
+    fn symbol_relation_work_and_payload_boundaries() -> TestResult {
+        let (mut measured_cas, draft) = fixture()?;
+        let mut measured = ledger()?;
+        measured_cas.admit(&[Draft::Expression(draft)], &mut measured)?;
+        let work = measured.usage().work;
+        let payload = measured_cas.counts().payload_bytes;
+        for (kind, needed) in [
+            (BudgetKind::Work, work),
+            (BudgetKind::PayloadBytes, payload),
+        ] {
+            for (limit, succeeds) in [(needed, true), (needed - 1, false)] {
+                let (mut cas, draft) = fixture()?;
+                let before = cas.counts();
+                let limits = if kind == BudgetKind::Work {
+                    Limits {
+                        work: limit,
+                        ..Limits::default()
+                    }
+                } else {
+                    Limits {
+                        payload_bytes: limit,
+                        ..Limits::default()
+                    }
+                };
+                let result = cas.admit(&[Draft::Expression(draft)], &mut Budget::new(limits)?);
+                assert_eq!(result.is_ok(), succeeds);
+                if !succeeds {
+                    assert_eq!(cas.counts(), before);
+                }
+            }
+        }
+        Ok(())
+    }
 }
