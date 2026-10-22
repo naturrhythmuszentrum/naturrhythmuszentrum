@@ -24,6 +24,11 @@ use decode::{Formula, Item};
 use kinds::Kinds;
 use record::{Record, budget, exact};
 
+/// This shared ceiling bounds recursive schema dependencies under (´rule:docgen:declaration-depth´); it is admission policy, not a completeness or cost guarantee.
+/// ´const:docgen:declaration-depth-limit´ (´[ORCHESTRATION-alg:const:count]´)
+/// ´const:docgen:declaration-depth-limit-count-128´
+const DECLARATION_DEPTH_LIMIT: usize = 128;
+
 /// Validate one source payload and attach deterministically regenerated evidence.
 ///
 /// TODO ´todo:code:declare-parameter-axes-and-shared-source´: declare parameter axes and shared source identities in the future versioned shape schema under def:nrz:companion-shape and rule:nrz:shape-data-time-evidence.
@@ -217,7 +222,7 @@ fn visit(
     if complete.contains(&item.name) {
         return Ok(());
     }
-    if active.len() >= 128 || !active.insert(item.name.clone()) {
+    if active.len() >= DECLARATION_DEPTH_LIMIT || !active.insert(item.name.clone()) {
         return Err(item.record.error("declaration cycle or depth limit"));
     }
     for name in edges(item, context)? {
@@ -287,7 +292,7 @@ fn resolve_descriptor(
     if matches!(item.formula, Formula::Metadata) {
         return Ok(None);
     }
-    if active.len() >= 128 || !active.insert(item.name.clone()) {
+    if active.len() >= DECLARATION_DEPTH_LIMIT || !active.insert(item.name.clone()) {
         return Err(item
             .record
             .error("descriptor relationship cycle or depth limit"));

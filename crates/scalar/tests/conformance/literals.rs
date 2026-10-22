@@ -1,4 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`literal_constant_rational_oracles`] | scalar | Mathematical descriptor constants and signed numeric grammar succeed in both formats. |
+//! | [`literal_halfway_ties`] | scalar | Decimal halfway literals contain the exact ties and select the nearest even candidate. |
+//! | [`literal_subnormal_and_underflow_oracles`] | scalar | Scientific notation reaches subnormals without forming an overflowing decimal denominator. |
+//! | [`literal_syntax_refusals`] | scalar | Grammar rejects expressions, unsupported spellings and malformed fraction components. |
+//! | [`literal_resource_boundaries`] | scalar | Limits are enforced at, below and above each resource boundary. |
+//! | [`literal_range_and_divisor_refusals`] | scalar | Overflow and zero-containing denominator enclosures refuse even when an exact quotient is small. |
+
 //! Exact rational expectations for bounded literal decoding.
 
 use crate::testing::{Binary, Rational, TestResult, contains};
@@ -19,6 +30,7 @@ fn decoded<P: Binary>(text: &str, exact: &Rational) -> TestResult {
 }
 
 /// Mathematical descriptor constants and signed numeric grammar succeed in both formats.
+/// ´claim:scalar:literal-constant-rational-oracles´
 /// ´test:integration:literal-constant-rational-oracles´
 #[test]
 fn literal_constant_rational_oracles() -> TestResult {
@@ -49,6 +61,7 @@ fn literal_constant_rational_oracles() -> TestResult {
 }
 
 /// Decimal halfway literals contain the exact ties and select the nearest even candidate.
+/// ´claim:scalar:literal-halfway-ties´
 /// ´test:integration:literal-halfway-ties´
 #[test]
 fn literal_halfway_ties() -> TestResult {
@@ -79,6 +92,7 @@ fn literal_halfway_ties() -> TestResult {
 }
 
 /// Scientific notation reaches subnormals without forming an overflowing decimal denominator.
+/// ´claim:scalar:literal-subnormal-and-underflow-oracles´
 /// ´test:integration:literal-subnormal-and-underflow-oracles´
 #[test]
 fn literal_subnormal_and_underflow_oracles() -> TestResult {
@@ -94,6 +108,7 @@ fn literal_subnormal_and_underflow_oracles() -> TestResult {
 }
 
 /// Grammar rejects expressions, unsupported spellings and malformed fraction components.
+/// ´claim:scalar:literal-syntax-refusals´
 /// ´test:integration:literal-syntax-refusals´
 #[test]
 fn literal_syntax_refusals() {
@@ -112,6 +127,7 @@ fn literal_syntax_refusals() {
 }
 
 /// Limits are enforced at, below and above each resource boundary.
+/// ´claim:scalar:literal-resource-boundaries´
 /// ´test:integration:literal-resource-boundaries´
 #[test]
 fn literal_resource_boundaries() -> TestResult {
@@ -155,6 +171,7 @@ fn literal_resource_boundaries() -> TestResult {
 }
 
 /// Overflow and zero-containing denominator enclosures refuse even when an exact quotient is small.
+/// ´claim:scalar:literal-range-and-divisor-refusals´
 /// ´test:integration:literal-range-and-divisor-refusals´
 #[test]
 fn literal_range_and_divisor_refusals() -> TestResult {

@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`finite_format_admission`] | scalar | Canonicalization, adjacency and format identity are visible through the facade. |
+//! | [`exact_identity_shortcuts`] | scalar | Only proved identities retain singleton endpoints. |
+//! | [`primitive_domain_and_range_refusals`] | scalar | Both formats reject undefined real operations and nonfinite enclosures. |
+
 //! Public input, identity, domain and range contracts.
 
 use crate::testing::{TestResult, point};
 use nrz_scalar::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite, Precision, Scalar};
 
 /// Canonicalization, adjacency and format identity are visible through the facade.
+/// ´claim:scalar:finite-format-admission´
 /// ´test:integration:finite-format-admission´
 #[test]
 fn finite_format_admission() -> TestResult {
@@ -72,6 +81,7 @@ fn identities<P: Scalar>() -> TestResult {
 }
 
 /// Only proved identities retain singleton endpoints.
+/// ´claim:scalar:exact-identity-shortcuts´
 /// ´test:integration:exact-identity-shortcuts´
 #[test]
 fn exact_identity_shortcuts() -> TestResult {
@@ -110,6 +120,7 @@ fn refusals<P: Scalar>() -> TestResult {
 }
 
 /// Both formats reject undefined real operations and nonfinite enclosures.
+/// ´claim:scalar:primitive-domain-and-range-refusals´
 /// ´test:integration:primitive-domain-and-range-refusals´
 #[test]
 fn primitive_domain_and_range_refusals() -> TestResult {

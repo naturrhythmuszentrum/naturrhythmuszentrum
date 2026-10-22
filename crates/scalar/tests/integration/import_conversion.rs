@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`literal_precision_change_lifecycle`] | scalar | Import error and new narrowing displacement cover the changed representation together. |
+
 //! Numeric import and explicit precision changes retain both error contributions.
 
 use crate::testing::{Binary, TestResult, contains};
@@ -8,6 +14,7 @@ use num_rational::Ratio;
 use num_traits::Signed;
 
 /// Import error and new narrowing displacement cover the changed representation together.
+/// ´claim:scalar:literal-precision-change-lifecycle´
 /// ´test:integration:literal-precision-change-lifecycle´
 #[test]
 fn literal_precision_change_lifecycle() -> TestResult {

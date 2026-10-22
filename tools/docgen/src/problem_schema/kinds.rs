@@ -116,7 +116,7 @@ fn resolve(
         path: "kinds".to_owned(),
         detail: format!("unknown kind {name}"),
     })?;
-    if active.len() >= 128 || !active.insert(name.to_owned()) {
+    if active.len() >= super::DECLARATION_DEPTH_LIMIT || !active.insert(name.to_owned()) {
         return Err(record.error("kind cycle or depth limit"));
     }
     let dimensions = dimension(&record.at("dimensions")?)?;

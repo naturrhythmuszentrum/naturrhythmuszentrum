@@ -1,0 +1,27 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Accuracy tests conformance evidence · `guide:accuracy:tests-conformance-evidence`
+
+## Integration test matrix · `tab:accuracy:conformance-integration-test-matrix`
+
+**Table (Integration test matrix)**
+
+|Test|Area|Claim|
+|----|----|-----|
+|(`test:integration:bound-admission-and-zero`)|accuracy|Nonfinite and negative values cannot enter either public bound constructor.|
+|(`test:integration:bound-composition-rational-oracles`)|accuracy|Outward sums and products include ties, tiny contributions and underflow.|
+|(`test:integration:bound-empty-identities-and-overflow`)|accuracy|Refusal and exact-identity laws hold in both formats.|
+|(`test:integration:budget-decisions-rational-oracle`)|accuracy|Both formats contain exact tolerances and every decisive result has the right direction.|
+|(`test:integration:budget-boundary-decisions`)|accuracy|Equality, below/above thresholds, unresolved overlap and absence stay distinct.|
+|(`test:integration:tolerance-never-rounds-up-for-acceptance`)|accuracy|Rounded tolerance products and underflow never create false budget success.|
+|(`test:integration:budget-domain-and-overflow-refusals`)|accuracy|Invalid coefficients, zero/uncertain scales and tolerance overflow are explicit refusals.|
+|(`test:integration:named-norm-rational-oracles`)|accuracy|Zero, huge, subnormal and mixed data have independent successful norm bounds.|
+|(`test:integration:norm-empty-and-overflow-contracts`)|accuracy|Norm overflow never becomes a nonfinite bound; empty summaries are exact zero.|
+|(`test:integration:recovery-transition-contract`)|accuracy|Protocol mistakes do not consume work and an absent budget stays unrequested.|
+|(`test:integration:refinement-limit-and-last-attempt-success`)|accuracy|Initial attempts and refinements are counted separately; acceptance uses the full bound.|
+|(`test:integration:certified-radius-stagnation-window`)|accuracy|Stagnation uses the certified radius rather than any residual diagnostic.|
+|(`test:integration:recovery-resource-stops`)|accuracy|Attempt/work exhaustion refuses before execution and preserves earlier evidence.|
+|(`test:integration:recovery-arithmetic-stopping-evidence`)|accuracy|Failures stop without losing valid bounds or inventing a successful comparison.|
+|(`test:integration:work-reservations-are-atomic`)|accuracy|An attempt charges both counters atomically and refusals preserve the old totals.|
+|(`test:integration:zero-and-integer-work-limits`)|accuracy|Zero allowances refuse work; maximum integer work never wraps to a new allowance.|
+|(`test:integration:recovery-policy-domain`)|accuracy|A positive window is required; zero refinements and explicit no-promotion are valid.|

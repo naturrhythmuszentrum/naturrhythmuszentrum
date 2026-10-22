@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`accepts_supported_major_and_newer_minor`] | docgen | Accept major one with newer minor and patch versions. |
+//! | [`checks_problem_schema_version_policy`] | docgen | Admit only the named v2 minor and reject legacy data with a migration diagnostic. |
+//! | [`rejects_invalid_envelopes`] | docgen | Reject missing fields, namespace and version errors, owners, and labels. |
+//! | [`envelope_error_precedes_payload_error`] | docgen | Reserve envelope validation ahead of an invalid typed payload. |
+//! | [`serializer_orders_fields_and_preserves_arrays`] | docgen | Serialize envelope keys first and sort nested objects without reordering arrays. |
+
 //! Envelope parsing and deterministic dataset encoding.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -12,6 +22,9 @@ use serde_json::{Map, Value};
 use crate::error::{self, Error};
 
 /// The six keys reserved by the documentation envelope.
+/// The ordered envelope keys are reserved ahead of payload keys so serialization and decoding agree (´rule:docgen:envelope-order´).
+/// ´const:docgen:envelope-keys´ (´[ORCHESTRATION-alg:const:form]´)
+/// ´const:docgen:envelope-keys-form-xe8b94b6d´
 const KEYS: [&str; 6] = [
     "namespace",
     "version",
@@ -69,6 +82,8 @@ pub(crate) fn read_json(root: &Path, path: &str) -> Result<Value, Error> {
 
 /// Read declared owner names from the linter snapshot.
 pub(crate) fn owners(root: &Path) -> Result<BTreeSet<String>, Error> {
+    /// Owner admission reads the declared linter owner inventory rather than a second hard-coded registry (´rule:docgen:owner-authority´).
+    /// ´const:docgen:envelope-path´ (´[ORCHESTRATION-alg:const:text]´)
     const PATH: &str = ".linter/owners.toml";
     let value = read_toml(root, PATH)?;
     let entries = value
@@ -311,6 +326,7 @@ mod tests {
     /// Accept major one with newer minor and patch versions.
     ///
     ///
+    /// ´claim:docgen:accepts-supported-major-and-newer-minor´
     /// ´test:unit:accepts-supported-major-and-newer-minor´
     #[test]
     fn accepts_supported_major_and_newer_minor() {
@@ -327,6 +343,7 @@ mod tests {
     }
 
     /// Admit only the named v2 minor and reject legacy data with a migration diagnostic.
+    /// ´claim:docgen:checks-problem-schema-version-policy´
     /// ´test:unit:checks-problem-schema-version-policy´
     #[test]
     fn checks_problem_schema_version_policy() {
@@ -347,6 +364,7 @@ mod tests {
     }
 
     /// Reject missing fields, namespace and version errors, owners, and labels.
+    /// ´claim:docgen:rejects-invalid-envelopes´
     /// ´test:unit:rejects-invalid-envelopes´
     #[test]
     fn rejects_invalid_envelopes() {
@@ -380,6 +398,7 @@ mod tests {
     }
 
     /// Reserve envelope validation ahead of an invalid typed payload.
+    /// ´claim:docgen:envelope-error-precedes-payload-error´
     /// ´test:unit:envelope-error-precedes-payload-error´
     #[test]
     fn envelope_error_precedes_payload_error() {
@@ -393,6 +412,7 @@ mod tests {
     }
 
     /// Serialize envelope keys first and sort nested objects without reordering arrays.
+    /// ´claim:docgen:serializer-orders-fields-and-preserves-arrays´
     /// ´test:unit:serializer-orders-fields-and-preserves-arrays´
     #[test]
     fn serializer_orders_fields_and_preserves_arrays() -> Result<(), Error> {

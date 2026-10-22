@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`budget_decisions_rational_oracle`] | accuracy | Both formats contain exact tolerances and every decisive result has the right direction. |
+//! | [`budget_boundary_decisions`] | accuracy | Equality, below/above thresholds, unresolved overlap and absence stay distinct. |
+//! | [`tolerance_never_rounds_up_for_acceptance`] | accuracy | Rounded tolerance products and underflow never create false budget success. |
+//! | [`budget_domain_and_overflow_refusals`] | accuracy | Invalid coefficients, zero/uncertain scales and tolerance overflow are explicit refusals. |
+
 //! Independent absolute, relative and ambiguous tolerance comparisons.
 
 use crate::testing::{Binary, TestResult};
@@ -44,6 +53,7 @@ fn rational_decisions<P: Binary>(absolute: P, relative: P, scale: P, errors: &[P
 }
 
 /// Both formats contain exact tolerances and every decisive result has the right direction.
+/// ´claim:accuracy:budget-decisions-rational-oracle´
 /// ´test:integration:budget-decisions-rational-oracle´
 #[test]
 fn budget_decisions_rational_oracle() -> TestResult {
@@ -106,6 +116,7 @@ fn boundaries<P: Binary>() -> TestResult {
 }
 
 /// Equality, below/above thresholds, unresolved overlap and absence stay distinct.
+/// ´claim:accuracy:budget-boundary-decisions´
 /// ´test:integration:budget-boundary-decisions´
 #[test]
 fn budget_boundary_decisions() -> TestResult {
@@ -140,6 +151,7 @@ fn rounded_up<P: Binary>(tenth: P) -> TestResult {
 }
 
 /// Rounded tolerance products and underflow never create false budget success.
+/// ´claim:accuracy:tolerance-never-rounds-up-for-acceptance´
 /// ´test:integration:tolerance-never-rounds-up-for-acceptance´
 #[test]
 fn tolerance_never_rounds_up_for_acceptance() -> TestResult {
@@ -189,6 +201,7 @@ fn invalid<P: Binary>() -> TestResult {
 }
 
 /// Invalid coefficients, zero/uncertain scales and tolerance overflow are explicit refusals.
+/// ´claim:accuracy:budget-domain-and-overflow-refusals´
 /// ´test:integration:budget-domain-and-overflow-refusals´
 #[test]
 fn budget_domain_and_overflow_refusals() -> TestResult {

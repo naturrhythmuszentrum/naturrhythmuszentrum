@@ -3,6 +3,26 @@
 
 use crate::ArithmeticFailure;
 
+/// The default significand ceiling bounds literal admission under (´rule:scalar:literal-policy´); it is policy, not a completeness or successful-cost guarantee.
+/// ´const:scalar:default-literal-digits´ (´[ORCHESTRATION-alg:const:count]´)
+/// ´const:scalar:default-literal-digits-count-1024´
+const DEFAULT_LITERAL_DIGITS: usize = 1024;
+
+/// The default exponent ceiling bounds decimal scaling under (´rule:scalar:literal-policy´); it is policy, not a completeness or successful-cost guarantee.
+/// ´const:scalar:default-literal-exponent´ (´[ORCHESTRATION-alg:const:count]´)
+/// ´const:scalar:default-literal-exponent-count-4096´
+const DEFAULT_LITERAL_EXPONENT: u32 = 4096;
+
+/// The default work ceiling bounds the complete literal evaluation under (´rule:scalar:literal-policy´); it is policy, not a completeness or successful-cost guarantee.
+/// ´const:scalar:default-literal-work´ (´[ORCHESTRATION-alg:const:count]´)
+/// ´const:scalar:default-literal-work-count-100000´
+const DEFAULT_LITERAL_WORK: u64 = 100_000;
+
+/// The per-byte charge prepays the bounded grammar and candidate scans under (´rule:scalar:literal-policy´); it is policy, not a completeness or successful-cost guarantee.
+/// ´const:scalar:literal-scan-work-per-byte´ (´[ORCHESTRATION-alg:const:count]´)
+/// ´const:scalar:literal-scan-work-per-byte-count-8´
+const LITERAL_SCAN_WORK_PER_BYTE: u64 = 8;
+
 /// Bounds on literal significand digits, decimal exponents and evaluation work.
 ///
 /// Eight work units per input byte prepay bounded grammar and candidate scans;
@@ -47,7 +67,11 @@ impl LiteralLimits {
 
 impl Default for LiteralLimits {
     fn default() -> Self {
-        Self::new(1024, 4096, 100_000)
+        Self::new(
+            DEFAULT_LITERAL_DIGITS,
+            DEFAULT_LITERAL_EXPONENT,
+            DEFAULT_LITERAL_WORK,
+        )
     }
 }
 
@@ -65,7 +89,7 @@ impl Work {
     pub(crate) fn new(bytes: usize, limit: u64) -> Result<Self, ArithmeticFailure> {
         let used = u64::try_from(bytes)
             .ok()
-            .and_then(|value| value.checked_mul(8))
+            .and_then(|value| value.checked_mul(LITERAL_SCAN_WORK_PER_BYTE))
             .ok_or(ArithmeticFailure::ResourceLimit)?;
         if used > limit {
             return Err(ArithmeticFailure::ResourceLimit);

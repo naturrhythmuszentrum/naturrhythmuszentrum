@@ -29,10 +29,13 @@ pub trait Scalar:
     + Neg<Output = Self>
 {
     /// Format identity.
+    /// The sealed format contract requires its own exact representation tag, fixed by (´rule:scalar:format-identities´).
     const PRECISION: Precision;
     /// Additive identity, with positive zero bits.
+    /// The scalar contract requires the canonical additive identity, fixed by (´rule:scalar:finite-identities´).
     const ZERO: Self;
     /// Multiplicative identity.
+    /// The scalar contract requires the exact multiplicative identity, fixed by (´rule:scalar:finite-identities´).
     const ONE: Self;
     /// Whether the value is finite.
     fn is_finite(self) -> bool;
@@ -76,60 +79,86 @@ mod private {
     impl Sealed for f64 {}
 }
 
-/// Implement only the primitive format operations, without exactness guesses.
-macro_rules! impl_scalar {
-    ($ty:ty, $precision:ident, $mask:expr) => {
-        impl Scalar for $ty {
-            const PRECISION: Precision = Precision::$precision;
-            const ZERO: Self = 0.0;
-            const ONE: Self = 1.0;
-            fn is_finite(self) -> bool {
-                self.is_finite()
-            }
-            fn abs(self) -> Self {
-                self.abs()
-            }
-            fn next_up(self) -> Self {
-                self.next_up()
-            }
-            fn next_down(self) -> Self {
-                self.next_down()
-            }
-            fn mul_add(self, multiplier: Self, addend: Self) -> Self {
-                self.mul_add(multiplier, addend)
-            }
-            fn power_of_two_scale(self) -> Self {
-                let exponent = self.abs().to_bits() & $mask;
-                if exponent == 0 {
-                    Self::MIN_POSITIVE
-                } else {
-                    Self::from_bits(exponent)
-                }
-            }
-            fn sqrt(self) -> Self {
-                self.sqrt()
-            }
-            fn min_positive_normal() -> Self {
+/// Implement the primitive methods while keeping each format constant inspectable.
+macro_rules! scalar_methods {
+    ($mask:expr) => {
+        fn is_finite(self) -> bool {
+            self.is_finite()
+        }
+        fn abs(self) -> Self {
+            self.abs()
+        }
+        fn next_up(self) -> Self {
+            self.next_up()
+        }
+        fn next_down(self) -> Self {
+            self.next_down()
+        }
+        fn mul_add(self, multiplier: Self, addend: Self) -> Self {
+            self.mul_add(multiplier, addend)
+        }
+        fn power_of_two_scale(self) -> Self {
+            let exponent = self.abs().to_bits() & $mask;
+            if exponent == 0 {
                 Self::MIN_POSITIVE
+            } else {
+                Self::from_bits(exponent)
             }
-            fn max_finite() -> Self {
-                Self::MAX
-            }
-            fn from_u8(value: u8) -> Self {
-                Self::from(value)
-            }
-            fn parse_nearest(text: &str) -> Option<Self> {
-                text.parse().ok()
-            }
-            fn to_f64(self) -> f64 {
-                f64::from(self)
-            }
-            fn same_bits(self, other: Self) -> bool {
-                self.to_bits() == other.to_bits()
-            }
+        }
+        fn sqrt(self) -> Self {
+            self.sqrt()
+        }
+        fn min_positive_normal() -> Self {
+            Self::MIN_POSITIVE
+        }
+        fn max_finite() -> Self {
+            Self::MAX
+        }
+        fn from_u8(value: u8) -> Self {
+            Self::from(value)
+        }
+        fn parse_nearest(text: &str) -> Option<Self> {
+            text.parse().ok()
+        }
+        fn to_f64(self) -> f64 {
+            f64::from(self)
+        }
+        fn same_bits(self, other: Self) -> bool {
+            self.to_bits() == other.to_bits()
         }
     };
 }
 
-impl_scalar!(f32, F32, 0x7f80_0000);
-impl_scalar!(f64, F64, 0x7ff0_0000_0000_0000);
+impl Scalar for f32 {
+    /// This tag identifies the sealed primitive format under (´rule:scalar:format-identities´).
+    /// ´const:scalar:f32-precision´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:f32-precision-form-x809900e6´
+    const PRECISION: Precision = Precision::F32;
+    /// Canonical positive zero supplies the additive identity under (´rule:scalar:finite-identities´).
+    /// ´const:scalar:f32-zero´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:f32-zero-form-x1d0a2219´
+    const ZERO: Self = 0.0;
+    /// Exact unity supplies the multiplicative identity under (´rule:scalar:finite-identities´).
+    /// ´const:scalar:f32-one´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:f32-one-form-x182e1cd2´
+    const ONE: Self = 1.0;
+
+    scalar_methods!(0x7f80_0000);
+}
+
+impl Scalar for f64 {
+    /// This tag identifies the sealed primitive format under (´rule:scalar:format-identities´).
+    /// ´const:scalar:f64-precision´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:f64-precision-form-x80a79ce1´
+    const PRECISION: Precision = Precision::F64;
+    /// Canonical positive zero supplies the additive identity under (´rule:scalar:finite-identities´).
+    /// ´const:scalar:f64-zero´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:f64-zero-form-x1d0a2219´
+    const ZERO: Self = 0.0;
+    /// Exact unity supplies the multiplicative identity under (´rule:scalar:finite-identities´).
+    /// ´const:scalar:f64-one´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:f64-one-form-x182e1cd2´
+    const ONE: Self = 1.0;
+
+    scalar_methods!(0x7ff0_0000_0000_0000);
+}

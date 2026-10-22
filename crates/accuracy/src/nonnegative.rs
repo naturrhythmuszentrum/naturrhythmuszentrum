@@ -20,10 +20,16 @@ pub struct Nonnegative<P: Scalar> {
 
 impl<P: Scalar> Nonnegative<P> {
     /// Exact zero bound.
+    /// The nonnegative wrapper retains the exact neutral bound required by (´rule:accuracy:bound-identities´).
+    /// ´const:accuracy:nonnegative-zero´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:accuracy:nonnegative-zero-form-x85cf2bf3´
     pub const ZERO: Self = Self {
         value: Finite::ZERO,
     };
     /// Exact unit magnitude.
+    /// The nonnegative wrapper retains the exact neutral scale required by (´rule:accuracy:bound-identities´).
+    /// ´const:accuracy:nonnegative-one´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:accuracy:nonnegative-one-form-xd513e429´
     pub const ONE: Self = Self { value: Finite::ONE };
 
     /// Admit a finite nonnegative value and canonicalize signed zero.

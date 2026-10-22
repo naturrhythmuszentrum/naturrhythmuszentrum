@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`environment_admission_refuses`] | scalar | Private admission cannot bypass either target or environment refusal. |
+
 //! Explicit environment admission with limited runtime probes.
 //!
 //! # Arithmetic environment
@@ -71,6 +77,7 @@ mod tests {
     use crate::ArithmeticFailure;
 
     /// Private admission cannot bypass either target or environment refusal.
+    /// ´claim:scalar:environment-admission-refuses´
     /// ´test:unit:environment-admission-refuses´
     #[test]
     fn environment_admission_refuses() {

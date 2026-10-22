@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`rump_polynomial_enclosure`] | scalar | The expected target is the independent exact fraction, never an enclosure calculation. |
+
 //! Rump's polynomial evaluated through the public enclosure facade.
 
 use crate::testing::{TestResult, contains, point};
@@ -57,6 +63,7 @@ fn evaluate<P: Scalar>(
 }
 
 /// The expected target is the independent exact fraction, never an enclosure calculation.
+/// ´claim:scalar:rump-polynomial-enclosure´
 /// ´test:integration:rump-polynomial-enclosure´
 #[test]
 fn rump_polynomial_enclosure() -> TestResult {

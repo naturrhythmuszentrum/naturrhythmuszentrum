@@ -1,0 +1,28 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Docgen schema source evidence · `guide:docgen:src-problem-schema-evidence`
+
+**Rule (Bounded schema dependency depth)** · `rule:docgen:declaration-depth`
+
+Declaration, descriptor and kind walks share a finite active-stack ceiling and reject cycles before recursive checking can proceed without a bound; this admission policy neither proves completeness nor measures successful symbolic cost.
+
+## Unit test matrix · `tab:docgen:problem-schema-unit-test-matrix`
+
+**Table (Unit test matrix)**
+
+|Test|Area|Claim|
+|----|----|-----|
+|(`test:unit:separates-counts-ratios-and-metadata`)|docgen|Accept quantities, counts and metadata separately and refuse role erasure.|
+|(`test:unit:checks-affine-origins-and-companion-measures`)|docgen|Preserve affine conversions and independently scaled uncertainty differences.|
+|(`test:unit:refuses-malformed-declarations-and-hidden-invalid-operands`)|docgen|Refuse absent or extra fields, invalid exact literals, scales and unknown symbols.|
+|(`test:unit:checks-rational-policy-and-forward-reference-cycles`)|docgen|Admit rational exponent rules only under their explicit policy and reject cycles.|
+|(`test:unit:checks-every-variant-replacement-contract`)|docgen|Admit variant coordinates while refusing category, count and nonzero violations.|
+|(`test:unit:rechecks-evidence-and-isolates-unsupported-results`)|docgen|Preserve deliberately unsupported formulas and refuse manufactured downstream evidence.|
+|(`test:unit:checks-original-equation-sides`)|docgen|Check equation sides and refuse a dimensionally invalid right side with its path.|
+|(`test:unit:checks-variance-and-relative-reference-evidence`)|docgen|Derive squared and relative uncertainty contracts without rebinding their targets.|
+|(`test:unit:checks-covariance-targets-and-scale-products`)|docgen|Covariance uses both target dimensions and their scale product, with signed magnitudes.|
+|(`test:unit:refuses-kind-substitution-and-fractional-count-overrides`)|docgen|Equal dimensions never authorize another kind, and count overrides retain their domain.|
+|(`test:unit:keeps-independent-uncertainty-components-distinct`)|docgen|Measurement and computational components retain distinct modes, sources and assurances.|
+|(`test:unit:irrational-descriptor-schema-export-refuses`)|docgen|The rational schema names the missing enclosure instead of printing an approximate measure.|
+|(`test:unit:irrational-output-schema-export-refuses`)|docgen|Output conversion evidence obeys the same version-two rational export boundary.|

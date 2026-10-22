@@ -1,0 +1,13 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Accuracy testing test support · `guide:accuracy:testing-test-support`
+
+**Definition (Evidence scope)** · `def:accuracy:testing-test-support`
+
+Independent rational helpers support bound and tolerance checks without supplying production enclosure arithmetic.
+
+## Unit test matrix · `tab:accuracy:testing-unit-test-matrix`
+
+**Table (Unit test matrix)**
+
+No unit tests in this folder.

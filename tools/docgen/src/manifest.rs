@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`refuses_invalid_document_rows`] | docgen | Refuse source-directory outputs, escaping paths, and repeated outputs. |
+//! | [`refuses_explicit_template_path`] | docgen | Refuse even a correctly mirrored template override in the manifest. |
+
 //! The manifest of renders and their mirrored template sources.
 
 use std::collections::BTreeSet;
@@ -15,8 +22,14 @@ use crate::envelope;
 use crate::error::{self, Error};
 
 /// Path of the document manifest.
+/// The document manifest path fixes the complete declared output inventory (´rule:docgen:input-layout´).
+/// ´const:docgen:manifest-path´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:manifest-path-text-xc31b15ce´
 const PATH: &str = "data/documents.toml";
 /// Manifest namespace.
+/// The manifest namespace separates output declarations from input and dataset payloads (´rule:docgen:dataset-identities´).
+/// ´const:docgen:manifest-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:manifest-namespace-text-x0b00b544´
 const NAMESPACE: &str = "org.naturrhythmuszentrum.docs.manifest";
 
 /// One document output and its complete input declaration.
@@ -166,6 +179,7 @@ mod tests {
     }
 
     /// Refuse source-directory outputs, escaping paths, and repeated outputs.
+    /// ´claim:docgen:refuses-invalid-document-rows´
     /// ´test:unit:refuses-invalid-document-rows´
     #[test]
     fn refuses_invalid_document_rows() -> Result<(), Box<dyn std::error::Error>> {
@@ -190,6 +204,7 @@ mod tests {
     }
 
     /// Refuse even a correctly mirrored template override in the manifest.
+    /// ´claim:docgen:refuses-explicit-template-path´
     /// ´test:unit:refuses-explicit-template-path´
     #[test]
     fn refuses_explicit_template_path() -> Result<(), Box<dyn std::error::Error>> {

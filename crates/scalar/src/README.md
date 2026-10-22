@@ -1,0 +1,19 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Scalar src evidence · `guide:scalar:src-evidence`
+
+**Rule (Sealed format identities)** · `rule:scalar:format-identities`
+
+A sealed scalar implementation identifies its own primitive representation; widening, narrowing and arithmetic-context admission must retain that distinction rather than accepting a caller-selected tag.
+
+**Rule (Exact finite identities)** · `rule:scalar:finite-identities`
+
+The scalar and finite wrappers preserve canonical positive zero as the additive identity and exact unity as the multiplicative identity; only proved identities authorize the arithmetic shortcuts that retain singleton enclosures.
+
+## Unit test matrix · `tab:scalar:unit-test-matrix`
+
+**Table (Unit test matrix)**
+
+|Test|Area|Claim|
+|----|----|-----|
+|(`test:unit:environment-admission-refuses`)|scalar|Private admission cannot bypass either target or environment refusal.|

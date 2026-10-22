@@ -128,3 +128,60 @@ allowances = []
 
 [CAS."owners.reach-conform"]
 allowances = []
+
+[SCALAR."profile.tests-conform"]
+allowances = []
+
+[SCALAR."profile.claims-conform"]
+allowances = []
+
+[SCALAR."profile.constants-conform"]
+allowances = []
+
+[SCALAR."projection.test-indexes-current"]
+allowances = []
+
+[SCALAR."projection.test-matrices-current"]
+allowances = []
+
+[SCALAR."projection.constant-pins-current"]
+allowances = []
+
+[NRZ."policy.owner.names"."nrz"]
+allowances = []
+
+[ACCURACY."profile.tests-conform"]
+allowances = []
+
+[ACCURACY."profile.claims-conform"]
+allowances = []
+
+[ACCURACY."profile.constants-conform"]
+allowances = []
+
+[ACCURACY."projection.test-indexes-current"]
+allowances = []
+
+[ACCURACY."projection.test-matrices-current"]
+allowances = []
+
+[ACCURACY."projection.constant-pins-current"]
+allowances = []
+
+[DOCGEN."profile.tests-conform"]
+allowances = []
+
+[DOCGEN."profile.claims-conform"]
+allowances = []
+
+[DOCGEN."profile.constants-conform"]
+allowances = []
+
+[DOCGEN."projection.test-indexes-current"]
+allowances = []
+
+[DOCGEN."projection.test-matrices-current"]
+allowances = []
+
+[DOCGEN."projection.constant-pins-current"]
+allowances = []

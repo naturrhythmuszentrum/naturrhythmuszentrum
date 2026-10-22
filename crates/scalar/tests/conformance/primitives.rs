@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`binary32_primitive_boundary_oracle`] | scalar | Binary32 boundaries include ties, cancellation, subnormals and both finite limits. |
+//! | [`binary64_primitive_boundary_oracle`] | scalar | Binary64 boundaries exercise the same laws at its independent exponent range. |
+//! | [`endpoint_hulls_enclose`] | scalar | All four signs and zero crossings preserve inclusion in both formats. |
+//! | [`outward_neighbours_without_residual_shortcuts`] | scalar | The outward-neighbour rule applies at exact ordinary sums and underflow alike. |
+
 //! Independent boundary oracles for each correctly rounded primitive.
 
 use nrz_scalar::{ArithmeticContext, Enclosure, Scalar};
@@ -32,6 +41,7 @@ fn binary_corpus<P: Binary>(values: &[P]) -> TestResult {
 }
 
 /// Binary32 boundaries include ties, cancellation, subnormals and both finite limits.
+/// ´claim:scalar:binary32-primitive-boundary-oracle´
 /// ´test:integration:binary32-primitive-boundary-oracle´
 #[test]
 fn binary32_primitive_boundary_oracle() -> TestResult {
@@ -62,6 +72,7 @@ fn binary32_primitive_boundary_oracle() -> TestResult {
 }
 
 /// Binary64 boundaries exercise the same laws at its independent exponent range.
+/// ´claim:scalar:binary64-primitive-boundary-oracle´
 /// ´test:integration:binary64-primitive-boundary-oracle´
 #[test]
 fn binary64_primitive_boundary_oracle() -> TestResult {
@@ -131,6 +142,7 @@ fn endpoint_hulls<P: Binary>(intervals: &[(P, P)]) -> TestResult {
 }
 
 /// All four signs and zero crossings preserve inclusion in both formats.
+/// ´claim:scalar:endpoint-hulls-enclose´
 /// ´test:integration:endpoint-hulls-enclose´
 #[test]
 fn endpoint_hulls_enclose() -> TestResult {
@@ -155,6 +167,7 @@ fn neighbours<P: Scalar>() -> TestResult {
 }
 
 /// The outward-neighbour rule applies at exact ordinary sums and underflow alike.
+/// ´claim:scalar:outward-neighbours-without-residual-shortcuts´
 /// ´test:integration:outward-neighbours-without-residual-shortcuts´
 #[test]
 fn outward_neighbours_without_residual_shortcuts() -> TestResult {

@@ -1,4 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`recovery_transition_contract`] | accuracy | Protocol mistakes do not consume work and an absent budget stays unrequested. |
+//! | [`refinement_limit_and_last_attempt_success`] | accuracy | Initial attempts and refinements are counted separately; acceptance uses the full bound. |
+//! | [`certified_radius_stagnation_window`] | accuracy | Stagnation uses the certified radius rather than any residual diagnostic. |
+//! | [`recovery_resource_stops`] | accuracy | Attempt/work exhaustion refuses before execution and preserves earlier evidence. |
+//! | [`recovery_arithmetic_stopping_evidence`] | accuracy | Failures stop without losing valid bounds or inventing a successful comparison. |
+
 //! Recovery protocol, finite stopping conditions and retained numerical evidence.
 
 use crate::testing::{Binary, TestResult};
@@ -60,6 +70,7 @@ fn protocol<P: Binary>() -> TestResult {
 }
 
 /// Protocol mistakes do not consume work and an absent budget stays unrequested.
+/// ´claim:accuracy:recovery-transition-contract´
 /// ´test:integration:recovery-transition-contract´
 #[test]
 fn recovery_transition_contract() -> TestResult {
@@ -108,6 +119,7 @@ fn iteration_limits<P: Binary>() -> TestResult {
 }
 
 /// Initial attempts and refinements are counted separately; acceptance uses the full bound.
+/// ´claim:accuracy:refinement-limit-and-last-attempt-success´
 /// ´test:integration:refinement-limit-and-last-attempt-success´
 #[test]
 fn refinement_limit_and_last_attempt_success() -> TestResult {
@@ -154,6 +166,7 @@ fn stagnation<P: Binary>() -> TestResult {
 }
 
 /// Stagnation uses the certified radius rather than any residual diagnostic.
+/// ´claim:accuracy:certified-radius-stagnation-window´
 /// ´test:integration:certified-radius-stagnation-window´
 #[test]
 fn certified_radius_stagnation_window() -> TestResult {
@@ -205,6 +218,7 @@ fn resource_stops<P: Binary>() -> TestResult {
 }
 
 /// Attempt/work exhaustion refuses before execution and preserves earlier evidence.
+/// ´claim:accuracy:recovery-resource-stops´
 /// ´test:integration:recovery-resource-stops´
 #[test]
 fn recovery_resource_stops() -> TestResult {
@@ -252,6 +266,7 @@ fn arithmetic_stops<P: Binary>() -> TestResult {
 }
 
 /// Failures stop without losing valid bounds or inventing a successful comparison.
+/// ´claim:accuracy:recovery-arithmetic-stopping-evidence´
 /// ´test:integration:recovery-arithmetic-stopping-evidence´
 #[test]
 fn recovery_arithmetic_stopping_evidence() -> TestResult {

@@ -1,4 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`separates_counts_ratios_and_metadata`] | docgen | Accept quantities, counts and metadata separately and refuse role erasure. |
+//! | [`checks_affine_origins_and_companion_measures`] | docgen | Preserve affine conversions and independently scaled uncertainty differences. |
+//! | [`refuses_malformed_declarations_and_hidden_invalid_operands`] | docgen | Refuse absent or extra fields, invalid exact literals, scales and unknown symbols. |
+//! | [`checks_rational_policy_and_forward_reference_cycles`] | docgen | Admit rational exponent rules only under their explicit policy and reject cycles. |
+//! | [`checks_every_variant_replacement_contract`] | docgen | Admit variant coordinates while refusing category, count and nonzero violations. |
+//! | [`rechecks_evidence_and_isolates_unsupported_results`] | docgen | Preserve deliberately unsupported formulas and refuse manufactured downstream evidence. |
+//! | [`checks_original_equation_sides`] | docgen | Check equation sides and refuse a dimensionally invalid right side with its path. |
+//! | [`checks_variance_and_relative_reference_evidence`] | docgen | Derive squared and relative uncertainty contracts without rebinding their targets. |
+//! | [`checks_covariance_targets_and_scale_products`] | docgen | Covariance uses both target dimensions and their scale product, with signed magnitudes. |
+//! | [`refuses_kind_substitution_and_fractional_count_overrides`] | docgen | Equal dimensions never authorize another kind, and count overrides retain their domain. |
+//! | [`keeps_independent_uncertainty_components_distinct`] | docgen | Measurement and computational components retain distinct modes, sources and assurances. |
+//! | [`irrational_descriptor_schema_export_refuses`] | docgen | The rational schema names the missing enclosure instead of printing an approximate measure. |
+//! | [`irrational_output_schema_export_refuses`] | docgen | Output conversion evidence obeys the same version-two rational export boundary. |
+
 //! Independent version-two fixtures; no migrated repository data is required.
 
 use serde_json::{Value, json};
@@ -97,6 +115,7 @@ fn with_standard(mut value: Value) -> Value {
 }
 
 /// Accept quantities, counts and metadata separately and refuse role erasure.
+/// ´claim:docgen:separates-counts-ratios-and-metadata´
 /// ´test:unit:separates-counts-ratios-and-metadata´
 #[test]
 fn separates_counts_ratios_and_metadata() -> Result<(), Error> {
@@ -134,6 +153,7 @@ fn separates_counts_ratios_and_metadata() -> Result<(), Error> {
 }
 
 /// Preserve affine conversions and independently scaled uncertainty differences.
+/// ´claim:docgen:checks-affine-origins-and-companion-measures´
 /// ´test:unit:checks-affine-origins-and-companion-measures´
 #[test]
 fn checks_affine_origins_and_companion_measures() -> Result<(), Error> {
@@ -162,6 +182,7 @@ fn checks_affine_origins_and_companion_measures() -> Result<(), Error> {
 }
 
 /// Refuse absent or extra fields, invalid exact literals, scales and unknown symbols.
+/// ´claim:docgen:refuses-malformed-declarations-and-hidden-invalid-operands´
 /// ´test:unit:refuses-malformed-declarations-and-hidden-invalid-operands´
 #[test]
 fn refuses_malformed_declarations_and_hidden_invalid_operands() -> Result<(), Error> {
@@ -207,6 +228,7 @@ fn refuses_malformed_declarations_and_hidden_invalid_operands() -> Result<(), Er
 }
 
 /// Admit rational exponent rules only under their explicit policy and reject cycles.
+/// ´claim:docgen:checks-rational-policy-and-forward-reference-cycles´
 /// ´test:unit:checks-rational-policy-and-forward-reference-cycles´
 #[test]
 fn checks_rational_policy_and_forward_reference_cycles() -> Result<(), Error> {
@@ -242,6 +264,7 @@ fn checks_rational_policy_and_forward_reference_cycles() -> Result<(), Error> {
 }
 
 /// Admit variant coordinates while refusing category, count and nonzero violations.
+/// ´claim:docgen:checks-every-variant-replacement-contract´
 /// ´test:unit:checks-every-variant-replacement-contract´
 #[test]
 fn checks_every_variant_replacement_contract() -> Result<(), Error> {
@@ -271,6 +294,7 @@ fn checks_every_variant_replacement_contract() -> Result<(), Error> {
 }
 
 /// Preserve deliberately unsupported formulas and refuse manufactured downstream evidence.
+/// ´claim:docgen:rechecks-evidence-and-isolates-unsupported-results´
 /// ´test:unit:rechecks-evidence-and-isolates-unsupported-results´
 #[test]
 fn rechecks_evidence_and_isolates_unsupported_results() -> Result<(), Error> {
@@ -297,6 +321,7 @@ fn rechecks_evidence_and_isolates_unsupported_results() -> Result<(), Error> {
 }
 
 /// Check equation sides and refuse a dimensionally invalid right side with its path.
+/// ´claim:docgen:checks-original-equation-sides´
 /// ´test:unit:checks-original-equation-sides´
 #[test]
 fn checks_original_equation_sides() -> Result<(), Error> {
@@ -314,6 +339,7 @@ fn checks_original_equation_sides() -> Result<(), Error> {
 }
 
 /// Derive squared and relative uncertainty contracts without rebinding their targets.
+/// ´claim:docgen:checks-variance-and-relative-reference-evidence´
 /// ´test:unit:checks-variance-and-relative-reference-evidence´
 #[test]
 fn checks_variance_and_relative_reference_evidence() -> Result<(), Error> {
@@ -369,6 +395,7 @@ fn checks_variance_and_relative_reference_evidence() -> Result<(), Error> {
 }
 
 /// Covariance uses both target dimensions and their scale product, with signed magnitudes.
+/// ´claim:docgen:checks-covariance-targets-and-scale-products´
 /// ´test:unit:checks-covariance-targets-and-scale-products´
 #[test]
 fn checks_covariance_targets_and_scale_products() -> Result<(), Error> {
@@ -414,6 +441,7 @@ fn checks_covariance_targets_and_scale_products() -> Result<(), Error> {
 }
 
 /// Equal dimensions never authorize another kind, and count overrides retain their domain.
+/// ´claim:docgen:refuses-kind-substitution-and-fractional-count-overrides´
 /// ´test:unit:refuses-kind-substitution-and-fractional-count-overrides´
 #[test]
 fn refuses_kind_substitution_and_fractional_count_overrides() -> Result<(), Error> {
@@ -447,6 +475,7 @@ fn refuses_kind_substitution_and_fractional_count_overrides() -> Result<(), Erro
 }
 
 /// Measurement and computational components retain distinct modes, sources and assurances.
+/// ´claim:docgen:keeps-independent-uncertainty-components-distinct´
 /// ´test:unit:keeps-independent-uncertainty-components-distinct´
 #[test]
 fn keeps_independent_uncertainty_components_distinct() -> Result<(), Error> {
@@ -480,6 +509,7 @@ fn keeps_independent_uncertainty_components_distinct() -> Result<(), Error> {
 }
 
 /// The rational schema names the missing enclosure instead of printing an approximate measure.
+/// ´claim:docgen:irrational-descriptor-schema-export-refuses´
 /// ´test:unit:irrational-descriptor-schema-export-refuses´
 #[test]
 fn irrational_descriptor_schema_export_refuses() -> Result<(), Box<dyn std::error::Error>> {
@@ -499,6 +529,7 @@ fn irrational_descriptor_schema_export_refuses() -> Result<(), Box<dyn std::erro
 }
 
 /// Output conversion evidence obeys the same version-two rational export boundary.
+/// ´claim:docgen:irrational-output-schema-export-refuses´
 /// ´test:unit:irrational-output-schema-export-refuses´
 #[test]
 fn irrational_output_schema_export_refuses() -> Result<(), Box<dyn std::error::Error>> {

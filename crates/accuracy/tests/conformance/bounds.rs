@@ -1,4 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`bound_admission_and_zero`] | accuracy | Nonfinite and negative values cannot enter either public bound constructor. |
+//! | [`bound_composition_rational_oracles`] | accuracy | Outward sums and products include ties, tiny contributions and underflow. |
+//! | [`bound_empty_identities_and_overflow`] | accuracy | Refusal and exact-identity laws hold in both formats. |
+
 //! Nonnegative admission and exact-rational composition checks.
 
 use crate::testing::{Binary, Rational, TestResult, covers};
@@ -6,6 +14,7 @@ use nrz_accuracy::{AccuracyFailure, BoundVectorRef, Nonnegative};
 use nrz_scalar::{ArithmeticContext, ArithmeticFailure};
 
 /// Nonfinite and negative values cannot enter either public bound constructor.
+/// ´claim:accuracy:bound-admission-and-zero´
 /// ´test:integration:bound-admission-and-zero´
 #[test]
 fn bound_admission_and_zero() -> TestResult {
@@ -68,6 +77,7 @@ fn composition<P: Binary>(left: &[P], right: &[P]) -> TestResult {
 }
 
 /// Outward sums and products include ties, tiny contributions and underflow.
+/// ´claim:accuracy:bound-composition-rational-oracles´
 /// ´test:integration:bound-composition-rational-oracles´
 #[test]
 fn bound_composition_rational_oracles() -> TestResult {
@@ -120,6 +130,7 @@ fn boundary<P: Binary>() -> TestResult {
 }
 
 /// Refusal and exact-identity laws hold in both formats.
+/// ´claim:accuracy:bound-empty-identities-and-overflow´
 /// ´test:integration:bound-empty-identities-and-overflow´
 #[test]
 fn bound_empty_identities_and_overflow() -> TestResult {

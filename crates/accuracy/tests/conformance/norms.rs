@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`named_norm_rational_oracles`] | accuracy | Zero, huge, subnormal and mixed data have independent successful norm bounds. |
+//! | [`norm_empty_and_overflow_contracts`] | accuracy | Norm overflow never becomes a nonfinite bound; empty summaries are exact zero. |
+
 //! Independent rational expectations for all named entry norms.
 
 use crate::testing::{Binary, Rational, TestResult, covers};
@@ -43,6 +50,7 @@ fn norms<P: Binary>(values: &[P]) -> TestResult {
 }
 
 /// Zero, huge, subnormal and mixed data have independent successful norm bounds.
+/// ´claim:accuracy:named-norm-rational-oracles´
 /// ´test:integration:named-norm-rational-oracles´
 #[test]
 fn named_norm_rational_oracles() -> TestResult {
@@ -90,6 +98,7 @@ fn extremes<P: Binary>() -> TestResult {
 }
 
 /// Norm overflow never becomes a nonfinite bound; empty summaries are exact zero.
+/// ´claim:accuracy:norm-empty-and-overflow-contracts´
 /// ´test:integration:norm-empty-and-overflow-contracts´
 #[test]
 fn norm_empty_and_overflow_contracts() -> TestResult {

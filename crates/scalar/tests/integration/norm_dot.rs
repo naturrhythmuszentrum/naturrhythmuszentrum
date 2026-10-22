@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`dot_to_norm_lifecycle`] | scalar | A complete small contraction/norm lifecycle carries its independent exact target. |
+
 //! A contraction and norm bound composed through the public scalar API.
 
 use crate::testing::{Binary, TestResult, contains};
@@ -22,6 +28,7 @@ fn lifecycle<P: Binary>(left: &[P], right: &[P]) -> TestResult {
 }
 
 /// A complete small contraction/norm lifecycle carries its independent exact target.
+/// ´claim:scalar:dot-to-norm-lifecycle´
 /// ´test:integration:dot-to-norm-lifecycle´
 #[test]
 fn dot_to_norm_lifecycle() -> TestResult {

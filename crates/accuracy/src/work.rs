@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`attempt_counter_does_not_wrap`] | accuracy | An inaccessible exhausted counter cannot wrap into an available attempt. |
+
 //! Checked cumulative limits shared across execution and precision retry.
 //!
 //! # Cumulative reservation contract
@@ -142,6 +148,7 @@ mod tests {
     use super::{Limits, ResourceLimit, WorkBudget};
 
     /// An inaccessible exhausted counter cannot wrap into an available attempt.
+    /// ´claim:accuracy:attempt-counter-does-not-wrap´
     /// ´test:unit:attempt-counter-does-not-wrap´
     #[test]
     fn attempt_counter_does_not_wrap() {

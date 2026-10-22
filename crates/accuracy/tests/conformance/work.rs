@@ -1,10 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`work_reservations_are_atomic`] | accuracy | An attempt charges both counters atomically and refusals preserve the old totals. |
+//! | [`zero_and_integer_work_limits`] | accuracy | Zero allowances refuse work; maximum integer work never wraps to a new allowance. |
+//! | [`recovery_policy_domain`] | accuracy | A positive window is required; zero refinements and explicit no-promotion are valid. |
+
 //! Public cumulative work accounting at exact limits and integer boundaries.
 
 use crate::testing::TestResult;
 use nrz_accuracy::{AccuracyFailure, Limits, Promotion, RecoveryPolicy, ResourceLimit};
 
 /// An attempt charges both counters atomically and refusals preserve the old totals.
+/// ´claim:accuracy:work-reservations-are-atomic´
 /// ´test:integration:work-reservations-are-atomic´
 #[test]
 fn work_reservations_are_atomic() -> TestResult {
@@ -27,6 +36,7 @@ fn work_reservations_are_atomic() -> TestResult {
 }
 
 /// Zero allowances refuse work; maximum integer work never wraps to a new allowance.
+/// ´claim:accuracy:zero-and-integer-work-limits´
 /// ´test:integration:zero-and-integer-work-limits´
 #[test]
 fn zero_and_integer_work_limits() -> TestResult {
@@ -46,6 +56,7 @@ fn zero_and_integer_work_limits() -> TestResult {
 }
 
 /// A positive window is required; zero refinements and explicit no-promotion are valid.
+/// ´claim:accuracy:recovery-policy-domain´
 /// ´test:integration:recovery-policy-domain´
 #[test]
 fn recovery_policy_domain() -> TestResult {

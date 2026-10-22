@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`fused_endpoint_triples`] | scalar | Eight-corner hulls cover mixed signs, uncertainty widths and cancellation. |
+//! | [`fused_rounding_is_explicit`] | scalar | Fused cancellation has one rounding and differs from multiply-then-add. |
+//! | [`fused_boundary_oracle`] | scalar | Fused arithmetic covers underflow, ties and overflow in both formats. |
+//! | [`fused_intermediate_range`] | scalar | Fused evaluation does not accidentally round or overflow its product first. |
+
 //! Independent exact products and sums for explicit fused evaluation.
 
 use crate::testing::{Binary, TestResult, contains, contains_or_overflows, point};
@@ -31,6 +40,7 @@ fn triples<P: Binary>(boxes: &[(P, P)]) -> TestResult {
 }
 
 /// Eight-corner hulls cover mixed signs, uncertainty widths and cancellation.
+/// ´claim:scalar:fused-endpoint-triples´
 /// ´test:integration:fused-endpoint-triples´
 #[test]
 fn fused_endpoint_triples() -> TestResult {
@@ -55,6 +65,7 @@ fn distinction<P: Binary>(left: P, right: P, offset: P) -> TestResult {
 }
 
 /// Fused cancellation has one rounding and differs from multiply-then-add.
+/// ´claim:scalar:fused-rounding-is-explicit´
 /// ´test:integration:fused-rounding-is-explicit´
 #[test]
 fn fused_rounding_is_explicit() -> TestResult {
@@ -84,6 +95,7 @@ fn boundaries<P: Binary>(cases: &[(P, P, P)]) -> TestResult {
 }
 
 /// Fused arithmetic covers underflow, ties and overflow in both formats.
+/// ´claim:scalar:fused-boundary-oracle´
 /// ´test:integration:fused-boundary-oracle´
 #[test]
 fn fused_boundary_oracle() -> TestResult {
@@ -118,6 +130,7 @@ fn fused_range<P: Scalar>() -> TestResult {
 }
 
 /// Fused evaluation does not accidentally round or overflow its product first.
+/// ´claim:scalar:fused-intermediate-range´
 /// ´test:integration:fused-intermediate-range´
 #[test]
 fn fused_intermediate_range() -> TestResult {

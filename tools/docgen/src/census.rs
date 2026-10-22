@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`census_across_workspace_roots`] | docgen | Use explicit members across all three roots and only mirrored README sources. |
+//! | [`derives_member_order_and_optional_facts`] | docgen | Keep member order, inherit one description, and represent absent values distinctly. |
+//! | [`refuses_invalid_member_paths`] | docgen | Reject globs, parent traversal, and duplicates before reading member manifests. |
+
 //! Workspace census derived directly from Cargo manifests.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -15,10 +23,19 @@ use crate::error::{self, Error};
 use crate::manifest;
 
 /// Path of the generated census.
+/// The census path fixes the generated manifest inventory consumed by templates (´rule:docgen:dataset-identities´).
+/// ´const:docgen:census-dataset´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:census-dataset-text-xed59db91´
 pub(crate) const DATASET: &str = "data/datasets/census.json";
 /// Namespace of the generated census.
+/// The census namespace identifies workspace membership facts independently of their storage path (´rule:docgen:dataset-identities´).
+/// ´const:docgen:census-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:census-namespace-text-xcb052780´
 const NAMESPACE: &str = "org.naturrhythmuszentrum.docs.dataset.census";
 /// Path of the root Cargo manifest.
+/// The root Cargo manifest declares the workspace members inspected by the census (´rule:docgen:input-layout´).
+/// ´const:docgen:census-root-manifest´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:census-root-manifest-text-xe2a94b47´
 const ROOT_MANIFEST: &str = "Cargo.toml";
 
 /// One explicit workspace member.
@@ -281,6 +298,7 @@ mod tests {
     }
 
     /// Use explicit members across all three roots and only mirrored README sources.
+    /// ´claim:docgen:census-across-workspace-roots´
     /// ´test:unit:census-across-workspace-roots´
     #[test]
     fn census_across_workspace_roots() -> Result<(), Box<dyn std::error::Error>> {
@@ -312,6 +330,7 @@ mod tests {
     }
 
     /// Keep member order, inherit one description, and represent absent values distinctly.
+    /// ´claim:docgen:derives-member-order-and-optional-facts´
     /// ´test:unit:derives-member-order-and-optional-facts´
     #[test]
     fn derives_member_order_and_optional_facts() -> Result<(), Box<dyn std::error::Error>> {
@@ -331,6 +350,7 @@ mod tests {
     }
 
     /// Reject globs, parent traversal, and duplicates before reading member manifests.
+    /// ´claim:docgen:refuses-invalid-member-paths´
     /// ´test:unit:refuses-invalid-member-paths´
     #[test]
     fn refuses_invalid_member_paths() -> Result<(), Box<dyn std::error::Error>> {

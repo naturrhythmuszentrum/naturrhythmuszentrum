@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`bound_vector_policy_lifecycle`] | accuracy | Several independent vectors flow through a bounded policy without a physical assurance claim. |
+//! | [`precision_retry_retains_work_and_budget_width`] | accuracy | Widening preserves every budget endpoint and transfers cumulative work, not old success. |
+//! | [`precision_retry_cannot_reset_limits`] | accuracy | An authorized retry does not reset exhausted resources, even after nonfinite arithmetic. |
+//! | [`precision_retry_permission_boundaries`] | accuracy | Success, lack of a request, forbidden promotion and unsupported arithmetic do not authorize retry. |
+
 //! Bound vectors through fixed budgets, bounded refinement and explicit precision retry.
 
 use crate::testing::{Binary, Rational, TestResult};
@@ -53,6 +62,7 @@ fn vector_policy<P: Binary>() -> TestResult {
 }
 
 /// Several independent vectors flow through a bounded policy without a physical assurance claim.
+/// ´claim:accuracy:bound-vector-policy-lifecycle´
 /// ´test:integration:bound-vector-policy-lifecycle´
 #[test]
 fn bound_vector_policy_lifecycle() -> TestResult {
@@ -61,6 +71,7 @@ fn bound_vector_policy_lifecycle() -> TestResult {
 }
 
 /// Widening preserves every budget endpoint and transfers cumulative work, not old success.
+/// ´claim:accuracy:precision-retry-retains-work-and-budget-width´
 /// ´test:integration:precision-retry-retains-work-and-budget-width´
 #[test]
 fn precision_retry_retains_work_and_budget_width() -> TestResult {
@@ -107,6 +118,7 @@ fn precision_retry_retains_work_and_budget_width() -> TestResult {
 }
 
 /// An authorized retry does not reset exhausted resources, even after nonfinite arithmetic.
+/// ´claim:accuracy:precision-retry-cannot-reset-limits´
 /// ´test:integration:precision-retry-cannot-reset-limits´
 #[test]
 fn precision_retry_cannot_reset_limits() -> TestResult {
@@ -143,6 +155,7 @@ fn precision_retry_cannot_reset_limits() -> TestResult {
 }
 
 /// Success, lack of a request, forbidden promotion and unsupported arithmetic do not authorize retry.
+/// ´claim:accuracy:precision-retry-permission-boundaries´
 /// ´test:integration:precision-retry-permission-boundaries´
 #[test]
 fn precision_retry_permission_boundaries() -> TestResult {

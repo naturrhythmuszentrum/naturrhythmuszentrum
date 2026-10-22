@@ -1,5 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`decodes_valid_problem_and_fixture`] | docgen | Decode one valid problem and one valid fixture into the ordered dataset. |
+//! | [`layout_refuses_stray_file`] | docgen | Reject a stray file at the top of the problems tree. |
+//! | [`layout_refuses_second_file`] | docgen | Reject a second file inside an otherwise valid slug directory. |
+//! | [`layout_refuses_malformed_slug`] | docgen | Reject a slug with a repeated hyphen. |
+//! | [`envelope_refuses_wrong_namespace`] | docgen | Reject an input namespace that disagrees with its tree location. |
+//! | [`envelope_refuses_second_label`] | docgen | Reject a second envelope label even when both labels are well formed. |
+//! | [`identity_refuses_register_mismatch`] | docgen | Catch a register that differs from the envelope label. |
+//! | [`values_refuse_invalid_number`] | docgen | Reject a value string outside the exact grammar. |
+//! | [`units_refuse_unknown_key`] | docgen | Reject an undeclared descriptor field. |
+//! | [`uncertainty_refuses_incomplete_shape`] | docgen | Reject an enclosure that omits its source. TODO ´todo:code:reject-missing-correlations-under-the-future´: reject missing correlations under the future shared-source contract without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra. |
+//! | [`exactness_refuses_wrong_precision`] | docgen | Reject a decimal with fewer significant digits than declared. |
+//! | [`labels_refuse_wrong_bite_kind`] | docgen | Reject a bite label outside the step and NRZ area. |
+//! | [`envelope_precedes_payload_error`] | docgen | Report an invalid envelope before attempting to decode an invalid payload. |
+
 //! Discovery, validation, and derivation of reference problems and fixtures.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,12 +31,24 @@ use crate::envelope;
 use crate::error::{self, Error};
 
 /// Path of the derived exemplar dataset.
+/// The problems dataset path fixes the generated checked-reference artifact (´rule:docgen:dataset-identities´).
+/// ´const:docgen:problems-dataset´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:problems-dataset-text-x030db020´
 pub(crate) const DATASET: &str = "data/datasets/problems.json";
 /// Dataset namespace.
+/// The problems dataset namespace identifies the checked problem and fixture collection (´rule:docgen:dataset-identities´).
+/// ´const:docgen:problems-dataset-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:problems-dataset-namespace-text-x0d7c2157´
 const DATASET_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.dataset.problems";
 /// Problem input namespace.
+/// The problem input namespace identifies records admitted from the problem tree (´rule:docgen:dataset-identities´).
+/// ´const:docgen:problems-problem-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:problems-problem-namespace-text-xbd999d53´
 const PROBLEM_NAMESPACE: &str = "org.naturrhythmuszentrum.problems.problem";
 /// Fixture input namespace.
+/// The fixture input namespace distinguishes fixture records from ordinary problems (´rule:docgen:dataset-identities´).
+/// ´const:docgen:problems-fixture-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:problems-fixture-namespace-text-x6aa920fd´
 const FIXTURE_NAMESPACE: &str = "org.naturrhythmuszentrum.problems.fixture";
 
 /// One input path and its identity inferred from the tree.
@@ -405,6 +435,7 @@ mod tests {
 
     /// Decode one valid problem and one valid fixture into the ordered dataset.
     ///
+    /// ´claim:docgen:decodes-valid-problem-and-fixture´
     /// ´test:unit:decodes-valid-problem-and-fixture´
     #[test]
     fn decodes_valid_problem_and_fixture() -> Result<(), Box<dyn std::error::Error>> {
@@ -418,6 +449,7 @@ mod tests {
     }
 
     /// Reject a stray file at the top of the problems tree.
+    /// ´claim:docgen:layout-refuses-stray-file´
     /// ´test:unit:layout-refuses-stray-file´
     #[test]
     fn layout_refuses_stray_file() -> Result<(), Box<dyn std::error::Error>> {
@@ -432,6 +464,7 @@ mod tests {
     }
 
     /// Reject a second file inside an otherwise valid slug directory.
+    /// ´claim:docgen:layout-refuses-second-file´
     /// ´test:unit:layout-refuses-second-file´
     #[test]
     fn layout_refuses_second_file() -> Result<(), Box<dyn std::error::Error>> {
@@ -446,6 +479,7 @@ mod tests {
     }
 
     /// Reject a slug with a repeated hyphen.
+    /// ´claim:docgen:layout-refuses-malformed-slug´
     /// ´test:unit:layout-refuses-malformed-slug´
     #[test]
     fn layout_refuses_malformed_slug() -> Result<(), Box<dyn std::error::Error>> {
@@ -459,6 +493,7 @@ mod tests {
     }
 
     /// Reject an input namespace that disagrees with its tree location.
+    /// ´claim:docgen:envelope-refuses-wrong-namespace´
     /// ´test:unit:envelope-refuses-wrong-namespace´
     #[test]
     fn envelope_refuses_wrong_namespace() -> Result<(), Box<dyn std::error::Error>> {
@@ -478,6 +513,7 @@ mod tests {
     }
 
     /// Reject a second envelope label even when both labels are well formed.
+    /// ´claim:docgen:envelope-refuses-second-label´
     /// ´test:unit:envelope-refuses-second-label´
     #[test]
     fn envelope_refuses_second_label() -> Result<(), Box<dyn std::error::Error>> {
@@ -500,6 +536,7 @@ mod tests {
     }
 
     /// Catch a register that differs from the envelope label.
+    /// ´claim:docgen:identity-refuses-register-mismatch´
     /// ´test:unit:identity-refuses-register-mismatch´
     #[test]
     fn identity_refuses_register_mismatch() {
@@ -510,6 +547,7 @@ mod tests {
 
     /// Reject a value string outside the exact grammar.
     ///
+    /// ´claim:docgen:values-refuse-invalid-number´
     /// ´test:unit:values-refuse-invalid-number´
     #[test]
     fn values_refuse_invalid_number() {
@@ -520,6 +558,7 @@ mod tests {
 
     /// Reject an undeclared descriptor field.
     ///
+    /// ´claim:docgen:units-refuse-unknown-key´
     /// ´test:unit:units-refuse-unknown-key´
     #[test]
     fn units_refuse_unknown_key() {
@@ -532,6 +571,7 @@ mod tests {
     ///
     /// TODO ´todo:code:reject-missing-correlations-under-the-future´: reject missing correlations under the future shared-source contract without treating standard uncertainty as a radius under rule:vision:uncertainty-unit-algebra.
     ///
+    /// ´claim:docgen:uncertainty-refuses-incomplete-shape´
     /// ´test:unit:uncertainty-refuses-incomplete-shape´
     #[test]
     fn uncertainty_refuses_incomplete_shape() {
@@ -554,6 +594,7 @@ mod tests {
 
     /// Reject a decimal with fewer significant digits than declared.
     ///
+    /// ´claim:docgen:exactness-refuses-wrong-precision´
     /// ´test:unit:exactness-refuses-wrong-precision´
     #[test]
     fn exactness_refuses_wrong_precision() {
@@ -563,6 +604,7 @@ mod tests {
     }
 
     /// Reject a bite label outside the step and NRZ area.
+    /// ´claim:docgen:labels-refuse-wrong-bite-kind´
     /// ´test:unit:labels-refuse-wrong-bite-kind´
     #[test]
     fn labels_refuse_wrong_bite_kind() {
@@ -572,6 +614,7 @@ mod tests {
     }
 
     /// Report an invalid envelope before attempting to decode an invalid payload.
+    /// ´claim:docgen:envelope-precedes-payload-error´
     /// ´test:unit:envelope-precedes-payload-error´
     #[test]
     fn envelope_precedes_payload_error() -> Result<(), Box<dyn std::error::Error>> {

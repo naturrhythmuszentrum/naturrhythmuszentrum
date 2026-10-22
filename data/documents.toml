@@ -121,3 +121,59 @@ requires = []
 [[document]]
 output = "docs/design/descriptor-binding.md"
 requires = []
+
+[[document]]
+output = "crates/scalar/src/README.md"
+requires = []
+
+[[document]]
+output = "crates/scalar/tests/conformance/README.md"
+requires = []
+
+[[document]]
+output = "crates/scalar/tests/integration/README.md"
+requires = []
+
+[[document]]
+output = "crates/accuracy/src/README.md"
+requires = []
+
+[[document]]
+output = "crates/accuracy/tests/conformance/README.md"
+requires = []
+
+[[document]]
+output = "crates/accuracy/tests/integration/README.md"
+requires = []
+
+[[document]]
+output = "tools/docgen/src/README.md"
+requires = []
+
+[[document]]
+output = "tools/docgen/src/problem_schema/README.md"
+requires = []
+
+[[document]]
+output = "tools/docgen/tests/README.md"
+requires = []
+
+[[document]]
+output = "crates/scalar/src/literal/README.md"
+requires = []
+
+[[document]]
+output = "crates/scalar/src/testing/README.md"
+requires = []
+
+[[document]]
+output = "crates/scalar/tests/README.md"
+requires = []
+
+[[document]]
+output = "crates/accuracy/src/testing/README.md"
+requires = []
+
+[[document]]
+output = "crates/accuracy/tests/README.md"
+requires = []

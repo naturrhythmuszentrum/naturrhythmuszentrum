@@ -1,4 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`bound_vector_composition_lifecycle`] | accuracy | Composition remains outward and duplicated matrix entries contribute twice. |
+
 //! Compose nonnegative contributions and preserve full logical multiplicity.
 
 use crate::testing::{Binary, Rational, TestResult, covers};
@@ -28,6 +34,7 @@ fn lifecycle<P: Binary>() -> TestResult {
 }
 
 /// Composition remains outward and duplicated matrix entries contribute twice.
+/// ´claim:accuracy:bound-vector-composition-lifecycle´
 /// ´test:integration:bound-vector-composition-lifecycle´
 #[test]
 fn bound_vector_composition_lifecycle() -> TestResult {

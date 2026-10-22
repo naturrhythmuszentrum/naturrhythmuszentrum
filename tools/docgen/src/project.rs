@@ -13,12 +13,24 @@ use crate::envelope;
 use crate::error::{self, Error};
 
 /// Path of the only hand-edited documentation input.
+/// The project input path fixes the authored project source in the declared layout (´rule:docgen:input-layout´).
+/// ´const:docgen:project-input´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:project-input-text-x8d5f8ea5´
 const INPUT: &str = "data/inputs/project.toml";
 /// Path of the derived project dataset.
+/// The project dataset path fixes the generated project artifact consumed by templates (´rule:docgen:dataset-identities´).
+/// ´const:docgen:project-dataset´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:project-dataset-text-xf75787cf´
 pub(crate) const DATASET: &str = "data/datasets/project.json";
 /// Namespace of the hand-edited input.
+/// The project input namespace distinguishes authored project records from derived datasets (´rule:docgen:dataset-identities´).
+/// ´const:docgen:project-input-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:project-input-namespace-text-xe5cb5f8c´
 const INPUT_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.input.project";
 /// Namespace of the derived project dataset.
+/// The project dataset namespace identifies the derived project payload independently of its filename (´rule:docgen:dataset-identities´).
+/// ´const:docgen:project-dataset-namespace´ (´[ORCHESTRATION-alg:const:text]´)
+/// ´const:docgen:project-dataset-namespace-text-xa1cfe704´
 const DATASET_NAMESPACE: &str = "org.naturrhythmuszentrum.docs.dataset.project";
 
 /// One planned implementation bite.

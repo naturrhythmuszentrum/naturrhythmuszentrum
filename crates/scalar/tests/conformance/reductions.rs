@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`fixed_reduction_rational_oracles`] | scalar | Cancellation, underflow and exact small answers succeed in each format. |
+//! | [`reduction_order_and_empty_laws`] | scalar | Increasing-index left folds refuse intermediate overflow instead of reassociating. |
+//! | [`scaled_norm_rational_oracle`] | scalar | Scaling contains norms of huge, tiny, mixed and empty data without direct squaring overflow. |
+//! | [`reduction_and_norm_refusals`] | scalar | Invalid input and unbounded norms are never converted into a finite certificate. |
+
 //! Independent exact sums, products and squared-norm bounds.
 
 use crate::testing::{Binary, Rational, TestResult, contains};
@@ -20,6 +29,7 @@ fn reductions<P: Binary>(left: &[P], right: &[P]) -> TestResult {
 }
 
 /// Cancellation, underflow and exact small answers succeed in each format.
+/// ´claim:scalar:fixed-reduction-rational-oracles´
 /// ´test:integration:fixed-reduction-rational-oracles´
 #[test]
 fn fixed_reduction_rational_oracles() -> TestResult {
@@ -60,6 +70,7 @@ fn order<P: Binary>() -> TestResult {
 }
 
 /// Increasing-index left folds refuse intermediate overflow instead of reassociating.
+/// ´claim:scalar:reduction-order-and-empty-laws´
 /// ´test:integration:reduction-order-and-empty-laws´
 #[test]
 fn reduction_order_and_empty_laws() -> TestResult {
@@ -84,6 +95,7 @@ fn norm<P: Binary>(values: &[P]) -> TestResult {
 }
 
 /// Scaling contains norms of huge, tiny, mixed and empty data without direct squaring overflow.
+/// ´claim:scalar:scaled-norm-rational-oracle´
 /// ´test:integration:scaled-norm-rational-oracle´
 #[test]
 fn scaled_norm_rational_oracle() -> TestResult {
@@ -102,6 +114,7 @@ fn scaled_norm_rational_oracle() -> TestResult {
 }
 
 /// Invalid input and unbounded norms are never converted into a finite certificate.
+/// ´claim:scalar:reduction-and-norm-refusals´
 /// ´test:integration:reduction-and-norm-refusals´
 #[test]
 fn reduction_and_norm_refusals() -> TestResult {

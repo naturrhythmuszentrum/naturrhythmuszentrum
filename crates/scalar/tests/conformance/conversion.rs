@@ -1,4 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`exact_widening_preserves_coverage`] | scalar | Widening preserves exact centers and both endpoints, including every binary32 boundary. |
+//! | [`outward_narrowing_rational_oracle`] | scalar | Subnormal loss, finite limits, signs and halfway values retain their exact original targets. |
+//! | [`narrowing_halfway_ties`] | scalar | Nearest conversion obeys even-significand tie selection, including zero/subnormal ties. |
+//! | [`narrowing_enclosure_and_range`] | scalar | Endpoint conversion is outward even when its rounded center and source center differ. |
+
 //! Independent binary/rational precision-conversion oracles.
 
 use crate::testing::{Binary, TestResult, contains, point};
@@ -6,6 +15,7 @@ use nrz_scalar::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite, narrow
 use num_traits::{Signed, Zero};
 
 /// Widening preserves exact centers and both endpoints, including every binary32 boundary.
+/// ´claim:scalar:exact-widening-preserves-coverage´
 /// ´test:integration:exact-widening-preserves-coverage´
 #[test]
 fn exact_widening_preserves_coverage() -> TestResult {
@@ -53,6 +63,7 @@ fn narrowing(value: f64, context: &ArithmeticContext) -> TestResult {
 }
 
 /// Subnormal loss, finite limits, signs and halfway values retain their exact original targets.
+/// ´claim:scalar:outward-narrowing-rational-oracle´
 /// ´test:integration:outward-narrowing-rational-oracle´
 #[test]
 fn outward_narrowing_rational_oracle() -> TestResult {
@@ -79,6 +90,7 @@ fn outward_narrowing_rational_oracle() -> TestResult {
 }
 
 /// Nearest conversion obeys even-significand tie selection, including zero/subnormal ties.
+/// ´claim:scalar:narrowing-halfway-ties´
 /// ´test:integration:narrowing-halfway-ties´
 #[test]
 fn narrowing_halfway_ties() -> TestResult {
@@ -104,6 +116,7 @@ fn narrowing_halfway_ties() -> TestResult {
 }
 
 /// Endpoint conversion is outward even when its rounded center and source center differ.
+/// ´claim:scalar:narrowing-enclosure-and-range´
 /// ´test:integration:narrowing-enclosure-and-range´
 #[test]
 fn narrowing_enclosure_and_range() -> TestResult {

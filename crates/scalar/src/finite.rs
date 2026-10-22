@@ -12,8 +12,14 @@ pub struct Finite<P: Scalar> {
 
 impl<P: Scalar> Finite<P> {
     /// Exact positive zero.
+    /// The finite wrapper preserves the primitive canonical additive identity under (´rule:scalar:finite-identities´).
+    /// ´const:scalar:finite-zero´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:finite-zero-form-xb07cf042´
     pub const ZERO: Self = Self { value: P::ZERO };
     /// Exact one.
+    /// The finite wrapper preserves the primitive exact unit identity under (´rule:scalar:finite-identities´).
+    /// ´const:scalar:finite-one´ (´[ORCHESTRATION-alg:const:form]´)
+    /// ´const:scalar:finite-one-form-x9f92c2e6´
     pub const ONE: Self = Self { value: P::ONE };
 
     /// Admit a finite primitive and canonicalize signed zero.

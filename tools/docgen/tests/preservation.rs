@@ -1,4 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`preserves_every_reference_payload_field`] | docgen | Every original value, magnitude, identity, citation and documentary string survives exactly. Additional entries must pass authoritative v2 validation and the generated fixed point. |
+//! | [`preservation_rejects_missing_or_changed_originals`] | docgen | Neither removing an original source nor changing its documentary payload can pass preservation. |
+
 //! Exact conservation of the independent v1 reference payload during schema migration.
 
 use std::collections::BTreeMap;
@@ -150,6 +157,7 @@ fn source_payload(
 
 /// Every original value, magnitude, identity, citation and documentary string survives exactly.
 /// Additional entries must pass authoritative v2 validation and the generated fixed point.
+/// ´claim:docgen:preserves-every-reference-payload-field´
 /// ´test:integration:preserves-every-reference-payload-field´
 #[test]
 fn preserves_every_reference_payload_field() -> Result<(), Box<dyn std::error::Error>> {
@@ -182,6 +190,7 @@ fn preserves_every_reference_payload_field() -> Result<(), Box<dyn std::error::E
 }
 
 /// Neither removing an original source nor changing its documentary payload can pass preservation.
+/// ´claim:docgen:preservation-rejects-missing-or-changed-originals´
 /// ´test:integration:preservation-rejects-missing-or-changed-originals´
 #[test]
 fn preservation_rejects_missing_or_changed_originals() -> Result<(), Box<dyn std::error::Error>> {

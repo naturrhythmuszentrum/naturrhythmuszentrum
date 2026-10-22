@@ -1,5 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+//! # Test index
+//!
+//! | Test | Area | Claim |
+//! |------|------|-------|
+//! | [`refuses_requirement_mismatch`] | docgen | Reject a declared dataset that differs from the manifest row. |
+//! | [`refuses_wrong_dataset_major`] | docgen | Reject a template major that differs from the dataset's major. |
+
 //! Strict rendering of manifest templates.
 
 use std::collections::BTreeMap;
@@ -191,6 +198,7 @@ mod tests {
     use crate::manifest::Document;
 
     /// Reject a declared dataset that differs from the manifest row.
+    /// ´claim:docgen:refuses-requirement-mismatch´
     /// ´test:unit:refuses-requirement-mismatch´
     #[test]
     fn refuses_requirement_mismatch() {
@@ -207,6 +215,7 @@ mod tests {
     }
 
     /// Reject a template major that differs from the dataset's major.
+    /// ´claim:docgen:refuses-wrong-dataset-major´
     /// ´test:unit:refuses-wrong-dataset-major´
     #[test]
     fn refuses_wrong_dataset_major() {
