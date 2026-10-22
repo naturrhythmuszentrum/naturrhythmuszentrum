@@ -28,6 +28,22 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// A selection requires a different or nonliteral rectangle or malformed result shape.
+    SelectionShape,
+    /// A selected row or column lies outside its declared rectangle.
+    SelectionOutOfRange,
+    /// An injective selection repeats an entry.
+    SelectionDuplicate,
+    /// An explicit list violates its requested coordinate order.
+    SelectionOrder,
+    /// An affine map has incompatible input, output or coefficient extents.
+    ReadingShape,
+    /// A reading lacks its exact closed declaration or defining source.
+    ReadingDefinition,
+    /// Two readings have no common exact coordinate family.
+    ReadingUnrelated,
+    /// The complete composed coefficient maps disagree on the admitted family.
+    ReadingMismatch,
     /// A declared scalar space has no installed specification.
     SpaceRegistrationUnavailable,
     /// No registered directed placement supports the requested ambient.

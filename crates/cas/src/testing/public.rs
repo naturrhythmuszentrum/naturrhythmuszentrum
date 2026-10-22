@@ -223,3 +223,10 @@ pub(crate) mod solve_real;
 )]
 #[path = "answer_public.rs"]
 pub(crate) mod answer;
+
+#[path = "readings.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared reading fixtures stay crate-visible"
+)]
+pub(crate) mod readings;

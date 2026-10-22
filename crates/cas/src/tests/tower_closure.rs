@@ -217,7 +217,7 @@ fn root_closure_work_boundary() -> TestResult {
     Ok(())
 }
 
-/// Inventory the exact S3 square equation separately from the evaluator's existence-only premises.
+/// Inventory the exact Real theorem surface square equation separately from the evaluator's existence-only premises.
 /// ´test:crate:single-root-square-lemma-inventory´
 #[test]
 fn single_root_square_lemma_inventory() -> TestResult {

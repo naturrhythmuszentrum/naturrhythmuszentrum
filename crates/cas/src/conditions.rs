@@ -160,6 +160,8 @@ impl Conditions {
                 | Operator::Sub
                 | Operator::Mul
                 | Operator::Matrix { .. }
+                | Operator::Select(_)
+                | Operator::AffineReading(_)
                 | Operator::IntegerPower(_) => None,
                 Operator::Div => Some(Obligation {
                     kind: GuardKind::NonZero,

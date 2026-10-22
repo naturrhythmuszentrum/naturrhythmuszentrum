@@ -243,6 +243,10 @@ pub enum SymbolRelation {
 /// Mathematical syntax tags; all operands remain explicitly ordered.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Operator {
+    /// Checked finite entry projection retaining its exact declared source.
+    Select(Box<crate::readings::EntrySelection>),
+    /// Transparent definition with ordered operands: declared symbol, exact source.
+    AffineReading(Box<crate::readings::AffineMap>),
     /// An association between two closed declared symbols, without truth or rewrite authority.
     SymbolRelation(SymbolRelation),
     /// Complex conjugation, preserving the complex scalar field.

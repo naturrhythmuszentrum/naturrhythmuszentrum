@@ -708,11 +708,18 @@ fn operator_sorts(
     scope: &Scope,
     environment: &Environment,
     children: &[&Expression],
-    budget: &Budget,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     let same = children.iter().all(|child| child.sort == *result);
     let first = children.first().copied();
     let valid = match operator {
+        Operator::Select(_) | Operator::AffineReading(_) => {
+            if !scope.is_empty() {
+                return Err(Fault::invalid(InvalidCode::Scope, AT));
+            }
+            crate::readings::syntax::validate(operator, result, children, budget)?;
+            true
+        }
         Operator::RegularEmbed
         | Operator::DistributionZero
         | Operator::Delta { .. }
@@ -732,17 +739,8 @@ fn operator_sorts(
         | Operator::Cases
         | Operator::RootValue { .. }
         | Operator::ExactCoefficient => false,
-        Operator::Conjugate => {
-            children.len() == 1
-                && result == &Sort::Value(AtomicSort::Scalar(Field::Complex))
-                && children.first().is_some_and(|child| child.sort == *result)
-        }
-        Operator::RealPart | Operator::ImagPart => {
-            children.len() == 1
-                && result == &Sort::Value(AtomicSort::Scalar(Field::Real))
-                && children.first().is_some_and(|child| {
-                    child.sort == Sort::Value(AtomicSort::Scalar(Field::Complex))
-                })
+        Operator::Conjugate | Operator::RealPart | Operator::ImagPart => {
+            component_sorts(operator, result, children)
         }
         Operator::NamedCase(value) => {
             children.len() == 1 && same && named_case_sort(value, result, scope, environment)
@@ -809,6 +807,20 @@ fn operator_sorts(
         | Operator::Entrywise(_) => matrix_sorts(operator, result, children, budget)?,
     };
     if valid { Ok(()) } else { Err(sort_error()) }
+}
+
+/// Total Complex component syntax keeps the original scalar arity and field checks.
+fn component_sorts(operator: &Operator, result: &Sort, children: &[&Expression]) -> bool {
+    let result_field = if *operator == Operator::Conjugate {
+        Field::Complex
+    } else {
+        Field::Real
+    };
+    children.len() == 1
+        && result == &Sort::Value(AtomicSort::Scalar(result_field))
+        && children
+            .first()
+            .is_some_and(|child| child.sort == Sort::Value(AtomicSort::Scalar(Field::Complex)))
 }
 
 /// Arithmetic retains its existing pointwise sort restrictions for every operand.

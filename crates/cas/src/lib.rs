@@ -278,6 +278,11 @@ mod tests;
 pub mod domain;
 pub mod limits;
 pub mod proof;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "reading syntax and wire helpers stay within CAS"
+)]
+pub mod readings;
 pub mod request;
 pub mod source;
 pub mod syntax;

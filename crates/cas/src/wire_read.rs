@@ -354,6 +354,12 @@ impl<'a, 'b> Reader<'a, 'b> {
     /// Decode every represented operator without relying on Rust enum layout.
     pub(crate) fn operator(&mut self) -> Result<Operator, Fault> {
         match self.byte()? {
+            49 => Ok(Operator::Select(Box::new(
+                crate::readings::wire::read_selection(self)?,
+            ))),
+            50 => Ok(Operator::AffineReading(Box::new(
+                crate::readings::wire::read_affine(self)?,
+            ))),
             48 => Ok(Operator::SymbolRelation(match self.byte()? {
                 0 => crate::model::SymbolRelation::Copy,
                 1 => crate::model::SymbolRelation::DeterministicBound,
