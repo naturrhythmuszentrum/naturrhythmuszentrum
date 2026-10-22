@@ -5,75 +5,72 @@
 
 ## Purpose · `sec:nrz:overview-purpose`
 
-Naturrhythmuszentrum is a matrix-based physics calculation engine for researchers, engineers, and developers who need inspectable dimensions, accuracy, and assumptions. It represents physical relationships and computational dependencies with petgraph, uses faer for linear-algebra candidates, and expresses quantities through dimensions, measures, and semantic kinds, keeping discrete physical counts distinct from ratios, angles, amount of substance, and structural metadata (`def:vision:dimensions`), (`def:vision:measures`), (`def:vision:counts`), (`rule:vision:semantic-kinds-and-roles`), (`rule:vision:counts-and-metadata`). Its result carries evidence about numerical reliability under a stated mathematical model and declared input uncertainty (`def:vision:purpose-and-audience`).
+Naturrhythmuszentrum is a physics calculation engine for results whose meaning, numerical error and assumptions remain inspectable. It combines exact symbolic structure with verified floating matrix computations. A result carries evidence for a stated mathematical model and admitted input family; that evidence does not certify the model's physical adequacy. Accuracy governs acceptance before speed, and deterministic bounds, statistical models and numerical evaluation errors retain their separate meanings.
 
-Accuracy governs acceptance before speed; dimensions, measures, kinds and affine roles survive scalar, matrix, and graph abstractions; and every public physical scalar and matrix carries evidence (`prin:vision:accuracy-before-speed`), (`prin:vision:dimensions-survive-abstraction`), (`prin:vision:values-carry-evidence`). Guarantees identify their scope, workspace code uses safe Rust, documentation is reproducible, and package and computational boundaries remain independently reviewable (`prin:vision:guarantees-name-scope`), (`prin:vision:safety-defines-boundaries`), (`prin:vision:documentation-is-reproducible`), (`prin:vision:reviewable-boundaries`). Algebraic unit checks cover original equations, blocks, observables and uncertainty expressions through CAS descriptor validation, while types gate category, precision, validation state and fixed engine roles (`req:vision:algebraic-unit-checks`). Measurement and computational uncertainties belong to the matrix’s contents and each has its own derived dimension, measure and kind (`def:vision:intrinsic-uncertainty-companions`), (`rule:vision:uncertainty-unit-algebra`).
+The first reusable physical target is LC resonance: one small circuit exercises mixed voltage/current coordinates, a Complex spectrum, phasor response, frequency kinds and explicit undefined outcomes. The implemented foundations already support exact CAS proofs, physical descriptor checks, outward arithmetic and certified homogeneous matrix operations. The complete LC engine remains an implementation route, not an available end-to-end product.
+
+## Two graphs joined by bindings · `sec:nrz:overview-architecture`
+
+The descriptor graph is exact CAS structure: symbols, sorts, kinds, units, axes and checked relations. Its definitions and judgments have the same meaning on every machine. The computational graph consists of float-region versions and the kernel applications that produced them, with tracked error and dependencies. Bindings joins a symbol's exact meaning to its selected numerical representation, or eventually to an exact value requiring no numerical region. See `docs/design/descriptor-binding.md` for the architecture and its implementation boundary.
+
+The heap knows only floats in that architecture. A region has no inherent unit, kind, sort or physical meaning. Several symbols may read the same allocation through checked relations: a Complex symbol can read a 2×2 block while a Real symbol reads its corner, or the state `(v,i)` and its voltage/current components can read one two-float buffer. Every overlap needs a checked relation between the readings. Stage 3a still enforces one symbol owner per migrated region; general shared readings and the remaining semantic-record migration are later work.
+
+A kernel is a float procedure with an exact array law and an enclosure theorem. Meaning is checked on the descriptor side before lowering to a numerical schedule. Exact constants cross the boundary once: bindings exports their spelling, scalar encloses it in the requested format with import error, and matrix uses the enclosure. No heap value enters CAS arithmetic. Exact π-dependent descriptors already exist, but a non-rational coefficient refuses numerical export until the quantity stage supplies certified constant evaluation.
+
+Successful executions of the same exact target agree within their tracked error under admitted arithmetic models. They need not produce identical centers or bit patterns. Domain, coverage, coordinates and source assumptions must agree before two bounds can support that comparison; covariance is not a deterministic tolerance.
 
 ## Workspace · `sec:nrz:overview-workspace`
 
-The baseline is a virtual nightly Cargo workspace. The packages below are the target structure and join the workspace member list as coherent implementations land (`def:vision:baseline-and-proposed-tree`). Dependencies follow the declared graph, including normal, build, development, and feature-dependent edges (`rule:vision:layer-enforcement`). The `nrz-cas` package supplies exact original occurrences, budgeted rationals and proved equalities; the bindings client checks declared physical operations before normalization. Descriptor representation and typed checked access are selected by (`spec:nrz:descriptor-units-boundary`); problem schema v2 and docgen now apply that authority to reference declarations (`spec:nrz:problem-data-schema`); production numerical integration remains under (`dec:nrz:algebra-and-data-time-units-boundary`).
-
-The computation contract connects storage and graph evaluation through (`spec:nrz:descriptor-heap-computation`); its implementation responsibilities remain in the existing bites (`dec:nrz:computation-model-implementation-boundary`).
+The nightly Rust workspace contains six implemented packages. Dependencies flow from matrix through bindings to CAS, with scalar and accuracy beneath matrix. Matrix integrates faer for candidates and verifies the supported numerical laws independently. CAS owns its exact graph; future physics plans will assemble descriptor operations and schedule supported numerical subgraphs without introducing another authority for meaning. Package structure is discussed in `docs/design/architecture.md`, with the ownership refinements in `docs/design/descriptor-binding.md`.
 
 **Table (Workspace packages)** · `tab:nrz:workspace-packages`
 
-|Directory|Crate|Responsibility|Engine dependencies|Architecture|
-|---------|-----|--------------|-------------------|------------|
-|`crates/cas`|`nrz-cas`|Exact original occurrences, mathematical graphs and checked symbolic derivations|None of the other engine packages|(`tab:vision:package-structure`)|
-|`crates/scalar`|`nrz-scalar`|Supported scalar contracts, conversions, and validated primitive numerical operations|None of the other engine packages|(`tab:vision:package-structure`)|
-|`crates/accuracy`|`nrz-accuracy`|Dimension-neutral envelope primitives, assurance, policy, and compact provenance|`nrz-scalar`|(`tab:vision:package-structure`)|
-|`crates/bindings`|`nrz-bindings`|Authoritative quantity descriptors, exact measures, kinds and original-expression evidence|`nrz-cas`; later `nrz-scalar`, `nrz-accuracy`|(`tab:vision:package-structure`)|
-|`crates/matrix`|`nrz-matrix`|Matrix-owned scalar arenas and descriptor heaps, checked views, intrinsic uncertainties, faer adapters and certificates|`nrz-scalar`, `nrz-accuracy`, `nrz-bindings`|(`tab:vision:package-structure`)|
-|`crates/physics`|`nrz-physics`|Physical structures, constraint assembly, and computation plans and batch bindings using petgraph|`nrz-bindings`, `nrz-matrix`, `nrz-accuracy`|(`tab:vision:package-structure`)|
-|`crates/engine`|`nrz`|Curated application-facing exports and entry points|Public interfaces of the engine packages above|(`tab:vision:package-structure`)|
-|`tools/docgen`|`nrz-docgen`|TOML ingestion, deterministic datasets, minijinja rendering, and fixed-point verification|Tooling dependencies on `nrz-bindings` and `nrz-cas`|(`tab:vision:package-structure`)|
+|Crate|Path|Responsibility|Engine dependencies|
+|-----|----|--------------|-------------------|
+|`nrz-cas`|`crates/cas`|Exact graph structure, original occurrences and independently checked symbolic judgments.|None.|
+|`nrz-bindings`|`crates/bindings`|Physical meaning, exact maps and checked symbol/representation relations over CAS.|`nrz-cas`.|
+|`nrz-scalar`|`crates/scalar`|Exact-spelling imports and finite binary arithmetic with outward enclosures.|None.|
+|`nrz-accuracy`|`crates/accuracy`|Nonnegative bound composition, conservative budgets and finite recovery policies.|`nrz-scalar`.|
+|`nrz-matrix`|`crates/matrix`|Versioned numerical regions, float kernels, companions and verified publication.|`nrz-bindings`, `nrz-scalar`, `nrz-accuracy`.|
+|`nrz-docgen`|`tools/docgen`|Validated documentation inputs, deterministic datasets, rendering and fixed-point checks.|`nrz-bindings`, `nrz-cas` for tooling checks.|
+|`nrz-physics` (planned)|`crates/physics`|Reusable physical descriptor plans, source models and numerical scheduling.|Planned bindings, matrix and accuracy clients.|
+|`nrz` (planned)|`crates/engine`|Curated application-facing exports.|Planned public engine interfaces.|
 
-The matrix package integrates faer. Physics owns physical and computational petgraph schemas; `nrz-cas` owns its private mathematical graph. Engine interfaces check and preserve dimensions, measures, kinds, normalization maps, and intrinsic uncertainty companions across those boundaries (`rule:vision:backend-boundaries`), (`rule:vision:heterogeneous-assembly`), (`def:vision:intrinsic-uncertainty-companions`).
+Each implemented crate's README is its rustdoc front page, introducing purpose, dependencies, the LC contribution, public concepts, guarantees, limits and testing. Detailed contracts live beside the corresponding source modules and types. The planned physics and facade packages are not workspace members.
+
+## LC target and plan · `sec:nrz:overview-plan`
+
+For `L=25 mH` and `C=10 µF`, the independent reference answers include `ω₀=2000 rad/s`, `f₀=1000/π Hz`, characteristic impedance `50 ohm` and state roots `±2000i s⁻¹`. Impedance below, at and above resonance is `−75i`, `0` and `+75i ohm`. At resonance, impedance succeeds while phase is undefined and admittance/current cannot produce a finite result. The source-free energy check and driven phasor experiment are distinct uses of the same ideal elements.
+
+`docs/design/lc-resonance.md` defines the dispatch route. Stage 3a is implemented: bindings checks homogeneous import/copy value, companion and planned result symbols, while matrix validates and atomically publishes their live numerical inventory. The subsequent stages are:
+
+- 3b–3c: graph-backed descriptors and representations, then general versioned bindings and meaning-free kernel contracts.
+- 3d–3e: mixed-coordinate maps and complete restoration, then cumulative symbolic policy and exact LC theorem transport.
+- 3f–3h: checked phasor blocks, the positive two-state spectral theorem, then integrated LC numerical acceptance.
+- 5: quantities, certified π/phase evaluation and data-time binding for supported recipes.
+- 6: reusable LC plans and shared-source frequency batches.
+- 4: within-error reproducibility and environment provenance after the first physics slice.
+
+The numbering identifies stages rather than execution order. The design route retains the separate earlier symbolic proof-cost work and does not imply a general eigensolver, Complex numerical library or time integrator. The broader engine plan remains in `docs/plan/plan.md`; the LC design refines the relevant implementation sequence.
 
 ## Documentation · `sec:nrz:overview-documentation`
 
-Every repository Markdown file is a committed render of a minijinja template. Edit the template and its owning TOML inputs; derive JSON datasets and regenerate the render in the same meaningful commit. Templates live at `templates/{output}.j2`, with inputs and datasets under `data/` (`prin:vision:documentation-is-reproducible`), (`dec:vision:documentation-layout`), (`rule:vision:documentation-envelope-and-derivation`).
+Repository Markdown is committed output from minijinja templates. Edit `templates/{output}.j2` and the corresponding inputs, and keep rendered documents synchronized in the same commit. Inputs and derived datasets live under `data/`. `nrz-docgen data` derives datasets, `nrz-docgen render` renders documents, and `nrz-docgen check` checks generated bytes, inventory and repeat-generation stability without writing.
 
-The generator interface is established by (`step:nrz:bite-documentation-generator`):
+**Table (Documentation map)** · `tab:nrz:documentation-set`
 
-```sh
-nrz-docgen data
-nrz-docgen render
-nrz-docgen check
-```
-
-The commands derive datasets, render documents, and verify the committed generation fixed point. `check` regenerates in an isolated output area, compares bytes and output inventory, verifies that another generation changes nothing, and exits 3 on drift (`rule:vision:fixed-point-gate-and-bootstrap`), (`step:nrz:bite-documentation-generator`).
-
-**Table (Documentation set)** · `tab:nrz:documentation-set`
-
-|Document|Title label|Role|
-|--------|-----------|----|
-|Conceptual architecture of the Naturrhythmuszentrum engine|(`spec:vision:conceptual-architecture`)|Defines purpose, guarantees, dimensions, measures, counts, algebraic unit checks, uncertainty contracts, numerical boundaries, repository structure, and completion obligations.|
-|Matrix shapes, uncertainties and numerical errors|(`spec:nrz:matrix-shapes`)|Defines ordered physical axes, admissible operations, independently shaped uncertainty and numerical-error companions, and their implementation evidence.|
-|Descriptor heaps, computation plans and batches|(`spec:nrz:descriptor-heap-computation`)|Defines safe scalar storage and versioned references, plan/binding checks, per-point evidence, shared-source covariance and deterministic replay.|
-|Descriptor units and the typed computation boundary|(`spec:nrz:descriptor-units-boundary`)|Selects exact descriptor authority and typed checked access, with an executable resistor and static-exponent comparison.|
-|Versioned problem data|(`spec:nrz:problem-data-schema`)|Defines roles, descriptors, executable formulas, unsupported evidence and the generator validation contract.|
-|Exemplars to design against|(`reg:exemplars:reference-register`)|Records the systems, problems, and adversarial fixtures that inform and test those decisions.|
-|The engine's plan|(`plan:nrz:engine-plan`)|Orders implementation bites and states their deliverables, verification, exclusions, import procedure, and gate.|
-|Naturrhythmuszentrum|(`guide:nrz:overview`)|Provides the workspace and documentation entry point.|
-|Contributing to Naturrhythmuszentrum|(`guide:nrz:contributing`)|Defines meaningful commits, documentation changes, verification handoff, and licensing.|
-
-## Plan · `sec:nrz:overview-plan`
-
-The plan gives the dependencies and completion evidence for these bites (`plan:nrz:engine-plan`):
-
-- Bite 1, documentation generator: establish reproducible datasets, templates, and the five renders (`step:nrz:bite-documentation-generator`).
-- Bite 1b, exemplar register: seed the seven reference problems and bind adversarial fixtures to feasibility tests (`step:nrz:bite-exemplar-register`).
-- Bite 2, numerical feasibility: establish safe backend and validated-arithmetic feasibility before broad APIs (`step:nrz:bite-numerical-feasibility`).
-- Bite 3, units design: decide descriptor representation and typed checked computation through prototypes and an integral static comparison (`step:nrz:bite-units-design`), (`req:vision:expression-and-symbol-contract`).
-- Bite 4, units and numerical foundations: integrate numerical quantities, intrinsic uncertainties, conversion bounds and the data-time checker with scalar and accuracy foundations and the implemented data validation boundary (`step:nrz:bite-units-and-foundations`), (`req:vision:unit-data-migration`).
-- Bite 5, certified matrix core: establish supported matrix storage, arithmetic, and square solve guarantees (`step:nrz:bite-certified-matrix-core`).
-- Bite 6, initial physics core: assemble and evaluate supported physical problems with explicit error coverage (`step:nrz:bite-physics-core`).
-- Bite 7, advanced matrix domains: admit further operations through their own domain checks and certificates (`step:nrz:bite-advanced-matrix-domains`).
-- Bite 8, accuracy and benchmarks: consolidate whole-problem accuracy, uncertainty comparisons, and recorded performance evidence (`step:nrz:bite-accuracy-and-benchmarks`).
-
-Current bite status belongs to the superloop's records (`conv:nrz:status-records`).
+|Path|Role|
+|----|----|
+|`docs/design/descriptor-binding.md`|Two graphs, exact meanings, float storage, bindings and current migration gaps.|
+|`docs/design/lc-resonance.md`|LC model, independent answers, ownership and stages 3a–3h, 5, 6 and 4.|
+|`docs/design/architecture.md`|Project purpose, guarantees and package structure.|
+|`docs/design/matrix-core-design.md`, `docs/design/shapes.md`|Numerical enclosure, shape, companion and operation contracts.|
+|`docs/design/cas-design.md`, `docs/design/cas-solving-design.md`|Exact graph, proof, replay and solving contracts.|
+|`docs/design/units-design.md`, `docs/design/problem-data-schema.md`|Physical checking and the versioned data boundary.|
+|`docs/reference/`, `data/problems/`|Reference systems, fixtures and their generated problem documentation.|
+|`docs/records/`, `docs/plan/plan.md`|Recorded evidence, admission limits and the broader implementation plan.|
+|`CONTRIBUTING.md`, `tools/docgen/README.md`|Contribution rules and documentation commands.|
 
 ## Licensing · `sec:nrz:overview-licensing`
 
-Code is AGPL-3.0-only under `LICENSE-CODE`; data and documentation are CC0-1.0 under `LICENSE-DOCS`. Code sources carry `SPDX-License-Identifier: AGPL-3.0-only`; documentation, data inputs, and narrative documentation templates carry `SPDX-License-Identifier: CC0-1.0`. Generated material receives its own explicit classification, and third-party material retains its applicable attribution (`rule:vision:metadata-and-licenses`). Contribution requirements are in (`rule:nrz:source-license-classification`).
+Code is AGPL-3.0-only under `LICENSE-CODE`; data and documentation are CC0-1.0 under `LICENSE-DOCS`. Code sources keep their `SPDX-License-Identifier: AGPL-3.0-only` line; documentation, inputs and narrative templates keep `SPDX-License-Identifier: CC0-1.0`. Generated material has an explicit classification, and third-party material retains its applicable attribution. See `CONTRIBUTING.md` for contribution requirements.
