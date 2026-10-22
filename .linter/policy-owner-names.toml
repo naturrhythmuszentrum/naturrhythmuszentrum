@@ -1,4 +1,4 @@
-namespace = "org.naturrhythmuszentrum.linter.policy.owner.names"
+namespace = "class.linter.policy.owner.names"
 version = [1, 0, 0]
 
 [set.name-prefix-ignore]

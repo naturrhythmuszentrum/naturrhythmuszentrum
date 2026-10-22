@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: CC0-1.0
 # Declares empty allowance lists for every activation, so each check measures the whole share it governs.
-namespace = "org.naturrhythmuszentrum.linter.lists"
+namespace = "class.linter.lists"
 version = [1, 0, 0]
 
 [NRZ."labels.mints-well-formed"]

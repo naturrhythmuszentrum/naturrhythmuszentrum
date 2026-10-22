@@ -1,4 +1,4 @@
-namespace = "org.naturrhythmuszentrum.linter.policy.spdx"
+namespace = "class.linter.policy.spdx"
 version = [1, 0, 0]
 
 [set.identifier]

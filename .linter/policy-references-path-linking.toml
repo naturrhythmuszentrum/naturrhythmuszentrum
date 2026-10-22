@@ -1,2 +1,2 @@
-namespace = "org.naturrhythmuszentrum.linter.policy.references.path-linking"
+namespace = "class.linter.policy.references.path-linking"
 version = [1, 0, 0]
