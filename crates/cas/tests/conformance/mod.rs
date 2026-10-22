@@ -57,3 +57,5 @@ mod sorts;
 mod sort_routing;
 
 mod coefficient_evaluation;
+
+mod solve_real;

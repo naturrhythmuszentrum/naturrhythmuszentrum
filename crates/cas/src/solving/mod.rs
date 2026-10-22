@@ -8,6 +8,7 @@ mod evaluate;
 )]
 pub(crate) mod graph;
 mod model;
+mod real;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "scalar-space admission is shared within the crate"

@@ -61,7 +61,11 @@ mod refine;
 )]
 pub(crate) mod selected;
 mod split;
-mod total;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "Real signs share strict scalar totality checking"
+)]
+pub(crate) mod total;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "shared exact solving checks remain crate-private"

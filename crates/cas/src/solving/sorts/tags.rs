@@ -36,6 +36,9 @@ impl RealSignConclusion {
             Self::Negative => 0,
             Self::Zero => 1,
             Self::Positive => 2,
+            Self::NonNegative => 3,
+            Self::NonPositive => 4,
+            Self::NonZero => 5,
         }
     }
     /// Reject every unregistered tag.
@@ -44,6 +47,9 @@ impl RealSignConclusion {
             0 => Self::Negative,
             1 => Self::Zero,
             2 => Self::Positive,
+            3 => Self::NonNegative,
+            4 => Self::NonPositive,
+            5 => Self::NonZero,
             _ => return Err(invalid()),
         })
     }

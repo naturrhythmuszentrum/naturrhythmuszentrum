@@ -12,6 +12,12 @@ pub enum RealSignConclusion {
     Zero,
     /// Strictly positive expression.
     Positive,
+    /// Nonnegative expression, including zero.
+    NonNegative,
+    /// Nonpositive expression, including zero.
+    NonPositive,
+    /// Nonzero expression whose strict sign need not be known.
+    NonZero,
 }
 
 /// Closed ordered-field rule vocabulary; each use retains its exact earlier premises.
@@ -140,21 +146,21 @@ pub struct CertificateRealRootCount<R = Handle> {
     pub cells: Vec<R>,
     /// Square-free polynomial support.
     pub square_free: R,
-    /// Exact derivative polynomial.
+    /// Exact derivative of the original polynomial, before square-free reduction.
     pub derivative: R,
     /// Terminal derivative gcd.
     pub gcd: R,
     /// Signed remainder polynomials in descending degree order.
     pub chain: Vec<R>,
-    /// Exact division quotients.
+    /// Original derivative divided by the gcd, two ordered Bezout multipliers, then signed-chain quotients.
     pub quotients: Vec<R>,
-    /// Positive chain rescalings, with sign evidence.
+    /// Optional positive coefficient rescalings for chain entries from index two, in that order.
     pub rescalings: Vec<R>,
-    /// Derivative, gcd, remainder and multiplicity identity premise slots.
+    /// Additional identity premise slots; empty when finite identities are reconstructed directly.
     pub identities: Vec<u32>,
     /// Leading-unit premise slots.
     pub units: Vec<u32>,
-    /// Endpoint, rescaling and infinity sign premise slots.
+    /// Rescaling signs, both infinity leading-sign rows, then each cell's order and endpoint derivative signs.
     pub signs: Vec<u32>,
     /// Claimed counts in the same cell order.
     pub counts: Vec<u32>,
