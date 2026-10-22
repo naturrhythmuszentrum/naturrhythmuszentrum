@@ -264,8 +264,13 @@ pub(crate) fn compile_step(
     budget.check(BudgetKind::Depth, depth, AT)?;
     let left = cas.checked(&step.left)?;
     let right = cas.checked(&step.right)?;
-    conditions.endpoint(&cas.state, context, left, budget)?;
-    conditions.endpoint(&cas.state, context, right, budget)?;
+    let affine = step.primitive == Primitive::Jets
+        && crate::readings::check::applicable(&cas.state, left, right)?;
+    // The affine checker traverses every original source in its closed, total grammar.
+    if !affine {
+        conditions.endpoint(&cas.state, context, left, budget)?;
+        conditions.endpoint(&cas.state, context, right, budget)?;
+    }
     if step.primitive == Primitive::Substitute {
         substitute(cas, context, step, earlier, &mut conditions, budget)?;
     } else if step.primitive == Primitive::SquareFree {

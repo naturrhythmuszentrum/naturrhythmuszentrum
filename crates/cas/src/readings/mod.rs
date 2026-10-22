@@ -7,6 +7,8 @@
 //! exact source. A bare declaration is never equated to a definition by its name.
 
 mod affine;
+pub(crate) mod check;
+mod proof;
 mod selection;
 pub(crate) mod syntax;
 pub(crate) mod wire;
