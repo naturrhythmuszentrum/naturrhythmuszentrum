@@ -12,7 +12,7 @@ use crate::testing::common::TestResult;
 use crate::testing::replay_answer::{Obligation, expected, measured, proposal};
 
 /// A prepared receiver has original source and proposed syntax, with no checked applications.
-type Receiver = (super::source::Fixture, Judgment, Judgment);
+pub(crate) type Receiver = (super::source::Fixture, Judgment, Judgment);
 
 /// Measurements retain both standalone baselines and the one-closure replacement.
 #[derive(Debug)]
@@ -26,7 +26,12 @@ pub(crate) struct Measurement {
     pub(crate) coverage_obligations: Vec<Obligation>,
 }
 
-fn receiver(cas: &Cas, answer: &SolveAnswer, keys: &[&str], field: &Field) -> TestResult<Receiver> {
+pub(crate) fn receiver(
+    cas: &Cas,
+    answer: &SolveAnswer,
+    keys: &[&str],
+    field: &Field,
+) -> TestResult<Receiver> {
     let (mut fixture, request) = super::source::symbolic_in_field(keys, field)?;
     let crate::task::Task::Solve(original) = &request.task else {
         return Err("expected original solve request".into());
@@ -41,7 +46,7 @@ fn receiver(cas: &Cas, answer: &SolveAnswer, keys: &[&str], field: &Field) -> Te
     Ok((fixture, coverage, presentation))
 }
 
-fn exported(cas: &Cas, witness: &VerifiedWitness) -> TestResult<Vec<u8>> {
+pub(crate) fn exported(cas: &Cas, witness: &VerifiedWitness) -> TestResult<Vec<u8>> {
     assert!(witness.is_discharged());
     assert_eq!(
         witness.hypotheses(),

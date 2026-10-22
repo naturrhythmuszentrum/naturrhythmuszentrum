@@ -392,6 +392,49 @@ The receiving store may contain original syntax or older checked results, but ev
 
 Expected source, context, region and form come from the client's independent request. A proposed set may be admitted as syntax without importing a proof; its membership and coverage remain unproved until the replay succeeds. Tests start that way with zero checked applications and compare both complete expected judgments. Per-obligation test ledgers record inclusive primitive-check before/after counters without changing production accounting. Standalone coverage and presentation retain their existing APIs and bytes. A missing coverage premise, different covered set or changed expected source, region, form, branch policy or premise fails. Evidence is `complete_answer_symbolic_fixtures` in `crates/cas/src/tests/wire_answer.rs`, `complete_answer_portable_pair` in `crates/cas/tests/integration/wire_answer.rs`, and `complete_answer_expected_mutations`, `complete_answer_policy_mutation`, `complete_answer_premise_mutation`, `complete_answer_requires_coverage_dependency`, `complete_answer_rejects_different_covered_set` and `complete_answer_cumulative_ledger` in `crates/cas/tests/conformance/wire_answer.rs`.
 
+**Table (Measured portable complete-answer replay)** · `tab:nrz:cas-solving-answer-replay-costs`
+
+|Fixture|Coefficient order|Before CoefficientOps|After CoefficientOps|Before Work|After Work|Transport bytes before → after|
+|-------|-----------------|---------------------|--------------------|-----------|----------|------------------------------|
+|`blind_symbolic_complex_complete`|d,c,b,a|5,819,879|2,940,416|720,771,120|401,214,861|249,284 → 126,387|
+|`blind_symbolic_acceptance_audit`|d,c,b,a|5,819,879|2,940,416|720,771,120|401,214,861|249,284 → 126,387|
+|`blind_complete_coefficient_renaming`|d,c,b,a|5,819,879|2,940,416|720,771,120|401,214,861|249,284 → 126,387|
+|`blind_complete_coefficient_renaming`|delta,gamma,beta,alpha|5,819,879|2,940,416|722,557,048|402,137,852|249,434 → 126,462|
+|`blind_symbolic_source_retains_parameters`|d,c,b,a|5,819,879|2,940,416|720,771,120|401,214,861|249,284 → 126,387|
+|`blind_symbolic_source_retains_parameters`|delta,gamma,beta,alpha|5,819,879|2,940,416|722,557,048|402,137,852|249,434 → 126,462|
+|`blind_missing_stratum_mutations`|d,c,b,a|5,819,879|2,940,416|720,771,120|401,214,861|249,284 → 126,387|
+|`blind_symbolic_real_complete`|d,c,b,a|4,027,299|2,038,597|701,302,781|394,359,479|280,717 → 142,717|
+
+Measured on sojka on 2026-10-22, diagnostic 1, with unchanged `Limits::blind_cubic()`. Before is the sum of standalone coverage and standalone presentation replay in equivalent fresh receivers; the Complex sum exceeds the coefficient ceiling and is not a successful cumulative run under that ceiling. After is one `Cas::replay_answer` call with one ledger, including both complete expected-judgment comparisons and sealing both exportable witnesses. Transport bytes count input witnesses: the new route sends only presentation, while the returned standalone coverage and presentation encodings retain their original bytes. No claim is made that both returned byte buffers shrink.
+
+Every receiving store is reconstructed from the original source plus the proposed solution set's admitted syntax, with zero checked applications before replay. Source/proposal setup and later export-copy checks have separate setup ledgers; they do not preload checked facts or reset the replay ledger. Ordinary Complex standalone coverage is 2,879,463 coefficient operations and 353,639,462 Work; presentation is 2,940,416 and 367,131,658. Real standalone coverage is 1,988,702 and 341,749,441; presentation is 2,038,597 and 359,553,340. The review's earlier receiver had already inspected coverage. The new proof-empty setup adds 2,536 coefficient operations to each Complex standalone replay and 420 to each Real standalone replay, hence baseline differences of 5,072 and 840 from the dated review. These measurements do not revise that historical record.
+
+Complex complete-answer replay uses 65.74 percent of the 4,472,832 coefficient ceiling, and Real uses 45.58 percent; both meet the 90-percent target. No within-rule memoization is introduced: each primitive has the same coefficient and Work delta as standalone presentation. Removing the second coverage interpretation accounts for the coefficient reduction. The additional Work above standalone presentation pays coverage selection, expected-claim comparison and canonical sealing. Diagnostic 1's check process took 19.76 s and peaked at 828,264 KiB RSS; its measurement process took 91.26 s, including compilation, peaked at 2,298,072 KiB RSS, and ran the eight-case test for 54.86 s. These are process observations, not per-rule wall timings.
+
+**Table (Dominant complete-answer obligations)** · `tab:nrz:cas-solving-answer-replay-attribution`
+
+|Field|Rule|Before CoefficientOps|Before share|After CoefficientOps|After share|
+|-----|----|---------------------|------------|--------------------|-----------|
+|Complex|`solve.product`|2,932,496|50.39 percent|1,466,248|49.87 percent|
+|Complex|`coeff.identity`|1,561,800|26.84 percent|780,900|26.56 percent|
+|Complex|`linear.equivalent`|992,080|17.05 percent|496,040|16.87 percent|
+|Real|`real.root-count`|2,799,894|69.52 percent|1,399,947|68.67 percent|
+|Real|`real.sign`|550,728|13.67 percent|275,364|13.51 percent|
+|Real|`solve.product`|272,110|6.76 percent|136,055|6.67 percent|
+
+Diagnostic 2 repeats all eight measurement rows and records the inclusive primitive-check deltas. Before combines both standalone ledgers; after contains one presentation closure. Complex `root.select` remains 60,953 coefficient operations (1.05 percent before, 2.07 percent after), and Real `root.select` remains 49,895 (1.24 percent before, 2.45 percent after). The application sequence, count and each coefficient/Work delta match standalone presentation exactly: 367 applications for Complex and 507 for Real. These totals include each rule's internal obligations and do not subdivide nested arithmetic. Complex `solve.product` accounts for the 2,536-operation difference from the review's receiver setup. This bite shares the whole checked closure; it introduces no within-rule cache.
+
+**Table (Exact cumulative answer boundaries)** · `tab:nrz:cas-solving-answer-replay-boundaries`
+
+|Fixture|Counter|N succeeds|N−1 refuses|
+|-------|-------|----------|-----------|
+|Complex d,c,b,a|CoefficientOps|2,940,416|2,940,415|
+|Complex d,c,b,a|Work|401,214,861|401,214,860|
+|Real d,c,b,a|CoefficientOps|2,038,597|2,038,596|
+|Real d,c,b,a|Work|394,359,479|394,359,478|
+
+Each boundary test rebuilds the exact proof-empty receiver described above, changes only the selected replay-ledger cap, and leaves every store ceiling at `Limits::blind_cubic()`. Success must reproduce both canonical witnesses; refusal must identify the counter and attempted N, restore the graph and preserve spent work. Existing Work pins are untouched. The cases `complete_answer_complex_boundaries` and `complete_answer_real_boundaries` are in `crates/cas/src/tests/wire_answer.rs`.
+
 ## Executable slices and refusal evidence · `sec:nrz:cas-solving-design-tests`
 
 **Definition (Later producer boundaries)** · `def:nrz:cas-solving-design-later-producers`

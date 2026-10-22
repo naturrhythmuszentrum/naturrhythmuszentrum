@@ -150,3 +150,7 @@ pub(crate) use audit::applications as family_applications;
 #[path = "solve_blind/answer.rs"]
 mod answer;
 pub(crate) use answer::symbolic as complete_answer_symbolic;
+
+#[path = "solve_blind/answer_boundaries.rs"]
+mod answer_boundaries;
+pub(crate) use answer_boundaries::check as complete_answer_boundaries;
