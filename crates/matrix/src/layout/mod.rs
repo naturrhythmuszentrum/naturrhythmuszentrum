@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked maps from logical column order into one owning region.
+//!
+//! # Selections, packing and disjoint outputs
+//!
+//! `Layout::strided` checks signed affine extents, products, sums and both extreme addresses against the owning region. `Layout::gather` validates each explicit index under its supplied work limit. Repeated indices and zero strides are valid read selections. Empty maps have no addressable entry. All maps use logical order `i + m*j`; a selection of a view addresses that view's logical entries, and `Layout::compose` checks and flattens the map into base-region offsets. General composition refuses if enumeration exceeds the work limit.
+//!
+//! `HeapLimits::with_layout_work` bounds gather validation, general composition and raw/packed copies (default 1,048,576 entries). Copy size is also bounded by the per-precision element capacity. `RegionView::pack` copies any admitted map through checked indices into a fresh contiguous faer slab in logical column order. `PackedRegion` is an owned raw snapshot with read-only access, independent of subsequent heap changes; it carries no publication or numerical evidence. The temporary raw copy and packed slab may coexist during packing. No backend mutable view escapes.
+//!
+//! `Heap::validate_outputs` checks injectivity within each destination and mutual disjointness across the whole destination list. Dense affine maps, including reversed and transposed contiguous maps, use exact sorted address ranges. Other maps enumerate and sort all destination addresses under one combined layout work limit. Duplicate addresses refuse; exhausting the limit refuses even when the destinations might be disjoint. An overlapping bounding box is never accepted as a proof. The number of output descriptors is separately bounded by descriptor capacity. Inputs remain read-only and may overlap; all numerical mutation stays in independent scratch.
 
 mod affine;
 mod outputs;

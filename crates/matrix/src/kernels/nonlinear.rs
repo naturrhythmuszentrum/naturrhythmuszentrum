@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Native direct interval images discharge deterministic domains over the entire input box.
+//!
+//! # Whole-box nonlinear domains
+//!
+//! `OperationDraft::map_elementwise` admits `Elementwise::Square`, `Reciprocal` and `SquareRoot` with a separately checked output shape. Bindings derives the required scalar power from descriptor metadata, and the input and output retain one frozen declaration owner and identical extents. Each entry's complete deterministic box is formed outward from its represented center and total radius. Native scalar interval images enclose the entire box, including the quadratic term for square and zero-crossing square intervals. No sampled derivative or first-order approximation substitutes for that enclosure.
+//!
+//! The new evaluation region encloses the exact function at the represented center. The total encloses the full image around the candidate and includes that evaluation region once. `KernelError::Domain` identifies the function, logical entry and `DomainReason`: a reciprocal box including zero, a root box containing negative values, or an image that cannot be enclosed in the finite execution format. A late entry refusal discards the entire candidate and all companion reservations. Deterministic square root at zero is supported; a statistical operand at zero still refuses through the statistics boundary. Exact rational endpoint oracles and independent squared-endpoint comparisons test both binary formats, including irrational roots and physical squared-voltage descriptors.
 
 use super::KernelError;
 use super::arithmetic::{Entry, operand, singleton};

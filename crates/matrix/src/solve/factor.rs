@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Opaque factors depend only on the exact checked operator and never become value handles.
+//!
+//! # Opaque factors and exact reuse dependencies
+//!
+//! `Bound::factor` returns an opaque `FactorRef` with an independently checked inverse witness, and `Bound::evaluate_factored` accepts it in any execution whose exact operator dependencies match. No LU entries or private inverse candidate can be exported as a certified value. The factor's identity and inverse-norm accessor report historical facts of its original factorization execution. The ordinary `evaluate` path creates the same private resource internally. All success paths use the existing single-candidate, complete-bundle publication protocol and retain both operand dependencies; a failed inverse check, singular candidate or work limit publishes nothing.
+//!
+//! `FactorDependency` records the exact operator identity/version, immutable heap schema, selected logical region, precision, checked operator recipe revision, LU algorithm and inverse-witness arithmetic/norm revision. Cloning a solve draft or checked operation preserves its operator revision; constructing a new draft creates a new checked revision and conservatively refuses an older factor. Output budgets, restoration, client keys and RHS values can change on a cloned draft without changing that operator revision. `Bound::validate_factor` checks eligibility without claiming a new solve certificate. Physical compaction and unrelated allocation changes preserve eligibility; changed operator versions or selections refuse even when bytes agree. `SolveEvidence::factor_use` names the originating and current executions and the validated key. Every reused solve recomputes its residual, perturbation bound, statistics and budget.
 
 use super::backend::Lu;
 use crate::solve_verification::{InverseWitness, SolveWork};

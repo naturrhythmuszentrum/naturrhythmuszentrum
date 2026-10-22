@@ -1,5 +1,29 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exclusive checked bindings, frozen dependencies and private output reservations.
+//!
+//! # Execution lease and private reservations
+//!
+//! `Binding::new` requires a `CheckedOperation`. `validate` takes the exclusive heap borrow and captures every actual value identity/version, schema, logical selection and declared-bound occupation, schema and target version. It checks every concrete slot and structural zero, including zero radii for `WholeFamily` zeros. Inputs can overlap or repeat. `ExecutionLimits` bounds the slot count and the total selected centers plus carried companions per scan or private payload set. Heap limits also apply to the complete output reservation.
+//!
+//! `Bound` owns the checked evidence and real private destination slabs and descriptor reservations. It uses the existing output proof to establish injectivity and mutual disjointness for all destination regions, including companions. `output_reservations` exposes future identities and schemas, never output handles. Dropping a binding releases the reservations without publishing a value. Binding preparation can coexist with one temporary zero payload set and its reserved backend slabs; both sets are bounded by the scratch entry limit. No caller callback runs in publication preparation.
+//!
+//! `physical_input` lends an immutable `PhysicalView`. `normalized_inputs` lends the complete operation-ordered `NormalizedInputs` bundle with the binding's unique execution identity and its explicit coherent unit-reference interpretation. Companion entries follow exactly the same selected logical map. Neither view grants raw mutation. The exclusive binding and its shorter borrows prevent mutation, growth, compaction and another execution through the same heap until they end. Execution and reserved value identities use the checked nonwrapping process-local allocator. A published ordered shape retains its coordinate identities: a later binding must use those same ordered axes. A projected alias of a derived value needs a matching supported shape contract; matching dimensions or newly repeated coordinate names cannot reinterpret an output.
+//!
+//! ```rust
+//! use nrz_matrix::{Binding, CheckedShape, ExecutionLimits, Handle, Heap, OperationDraft, Value};
+//!
+//! fn copy_value(heap: &mut Heap, shape: CheckedShape, input: Handle<Value, f64>)
+//!     -> Result<Handle<Value, f64>, Box<dyn std::error::Error>>
+//! {
+//!     let limits = ExecutionLimits::default();
+//!     let operation = OperationDraft::copy(vec![shape]).check(limits)?;
+//!     let bound = Binding::new(operation, vec![input], limits).validate(heap)?;
+//!     let candidate = bound.evaluate(bound.normalized_inputs()?)?;
+//!     let outcome = bound.publish(candidate)?;
+//!     Ok(outcome.output().first().ok_or("missing copy output")?.value())
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 mod error;
 pub(crate) mod lifecycle;

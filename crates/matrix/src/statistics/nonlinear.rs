@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked native Jacobians at named operating points with full smooth-domain checks.
+//!
+//! # Nonlinear moments and numerical obligations
+//!
+//! Matrix products propagate the full joint covariance of both ordered entry vectors through the operation-specific Jacobian. When both operands vary, the result carries `MomentAssurance::LinearizedMoments`; an explicitly modeled zero-variation factor with an exact declared mean at the operating point preserves `AffineMoments`. Missing source coverage cannot stand in for that fixed-factor declaration. Native square, reciprocal and positive-root kernels retain a bindings-owned `CheckedSensitivity`, exposed through `MomentView::checked_sensitivity`, and evaluate its closed derivative schedule with a separate certified Jacobian error region. No heap numbers enter the symbolic graph.
+//!
+//! Nonlinear covariance describes the stated local linearization, never the actual nonlinear moments. These results have no declared output mean; even when input means are known, the nominal output is not promoted to an expectation. Subsequent affine operations retain inherited `LinearizedMoments`. Reciprocal requires a whole deterministic box separated from zero. Statistical square root requires a strictly positive operating point and neighborhood, so it refuses at zero even when deterministic square root is valid. The deterministic total continues to use the full direct interval image, including nonlinear remainder; statistical covariance never enters that total.
 
 use super::{
     StatisticsError,

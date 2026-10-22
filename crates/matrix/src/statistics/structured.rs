@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked whole-family expansions reuse the existing deterministic and statistical affine kernel.
+//!
+//! # Whole-family structured propagation
+//!
+//! `StructuredExpansion::linear_map` requires `WholeFamily` scope and a homogeneous free-coordinate column with H's exact axis identities. It exports signed and zero source-free coefficients through bindings and reuses the existing certified affine kernel, yielding the full logical entry vector and covariance `T U Tᵀ`. A checked entry transformation can reshape that vector into the original rectangle. Duplicate off-diagonal entries remain dependent. Center-only symmetry imposes no covariance reduction; existing full logical or proven-metric norm contracts remain unchanged. Whole-family structural zeros additionally require certified zero mean and variation.
 
 use super::StatisticsError;
 use crate::{

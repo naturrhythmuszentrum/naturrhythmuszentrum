@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete solve attempts distinguish binding, factor, evaluation and publication boundaries.
+//!
+//! # Recorded solve lifecycles
+//!
+//! `Heap::solve_recorded` and `solve_factored_recorded` cover the full request lifecycle. A `SolveFailureRecord` distinguishes binding, factorization, evaluation and publication refusals, retaining the checked operation, every proposed operand and any numerical failure record. A binding refusal has no invented execution or certificate. A successful `OperationRecord` reports `SolveStage::Published` and its complete `solve_evidence`; current access still validates every input and output dependency, while historical records remain inspectable after replacement. `RecoveredSolve::initial_record` and `RecoveryFailure::initial_record`/`promoted_record` preserve this same lifecycle through precision recovery, including binding refusals. Optional `SolveRecordKeys` retain plan, binding, point and node identities under a combined 4096-byte limit through `SolvePolicy::with_record_keys`; they never authorize cache reuse.
 
 use crate::binding::NativeRecipe;
 use crate::{

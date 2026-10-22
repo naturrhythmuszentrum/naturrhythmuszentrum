@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Import preparation and the allocation-free, callback-free publication step.
+//!
+//! # Import preparation and complete publication
+//!
+//! `Heap::import_represented` admits finite coherent coordinates with explicitly represented-only coverage. `Heap::import_declared_bounds` atomically admits finite centers and nonnegative finite componentwise radius entries, deriving the radius descriptor through bindings. These supplied bounds remain caller assumptions. Imports use logical column order, canonicalize signed zero, and retain point/difference roles. Floating count storage and noncoherent coordinate imports refuse. Unsupported nested relative-radius derivation preserves the bindings error.
+//!
+//! `HeapLimits` bounds descriptor slots, elements per precision (including companions), and immutable schemas. Preparation scans and validates the complete bundle, reserves metadata capacity and builds every slab before an allocation-free publication step. Replacement scratch is bounded by the same element limit as the new live bundle; old and prepared storage may coexist, so peak heap-owned addressable elements can reach twice that limit, in addition to backend padding and metadata. A refusal publishes no partial value or companion. Rust allocator aborts remain outside the recoverable-capacity contract. Process-local identities never wrap and make no persistence promise.
 
 use nrz_bindings::{Descriptor, UncertaintyMode, uncertainty};
 use nrz_scalar::Scalar;

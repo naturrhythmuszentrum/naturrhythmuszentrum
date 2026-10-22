@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked retirement and replacement over the supported whole-region dependency graph.
+//!
+//! # Replacement, retirement and stale bundles
+//!
+//! `Heap::replace_represented` and `Heap::replace_declared_bounds` require the caller's captured `ValueVersion`. They preserve the value handle and base `ValueId`, advance the whole base version exactly once, and atomically replace the entire supported companion set. Extents, quantity schemas and precision remain fixed. Even identical center bits with changed bounds advance the version. Represented replacement explicitly removes declared-input coverage. Captured old bound handles become stale; unrelated values and companions remain valid. A stale expected version, invalid payload, capacity refusal or exhausted version leaves the old bundle unchanged.
+//!
+//! `Heap::retire` retires the whole value/bound bundle and releases its storage. Vacant descriptor and arena slots are reused with incremented generations; exhausted generations are never reused. Old handles and cached internal arena keys cannot revive. A fresh import has a fresh `ValueId` and starts at version one even when its schema and bytes match retired data. Schema capacity counts immutable lifetime entries, including those no longer used by a live value. Retiring a base also retires every alias of that occupation. Retiring only an alias releases its descriptor; nested aliases already point directly to the base.
+//!
+//! `Heap::retire` can reclaim a stale derived base and all its companions and aliases. Retirement checks live storage ownership, formats, layouts, schemas and direct target/reverse edges through a private structural snapshot; it neither reads numerical entries nor authorizes stale mathematical evidence. Historical operation records remain retained. Current compaction refuses while an unreclaimed stale derived descriptor exists; retire those stale bundles before compacting the surviving current heap. Relocation of stale storage is outside this contract; any extension must preserve evidence access checks.
 
 use nrz_scalar::Scalar;
 

@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Scoped solve proof facts retain distinct inverse, residual and forward claims.
+//!
+//! # Inverse, residual and input-family certificates
+//!
+//! Safe faer partial-pivoted LU supplies the physical solution candidate and, in a separate identity solve, a private inverse candidate. A separate increasing-index interval path reads the saved normalized heap views to enclose `I − ZA` and `B − AX`. A strict inverse-defect margin proves an inverse-norm upper bound; multiplying it by the residual norm proves the represented-center forward radius. `RecipeEvidence::Solve` retains those facts, both precisions, the arithmetic revision and the admitted work. Coherent unit references restore the homogeneous result exactly. Its componentwise total and numerical evaluation companions both cover that radius and overlap: consume the total once.
+//!
+//! Bounded solves compute outward Frobenius radii `r_A` and `r_B` from the selected componentwise totals. Evaluation and product contribution regions overlap those totals and are never added again. With inverse bound `g`, represented residual bound `rho`, and candidate norm `z`, a positive lower margin `d ≤ 1 − g r_A` establishes the complete joint bound `g (rho + r_B + r_A z) / d`. The same operator perturbation acts on every RHS column. `SolveEvidence` exposes all these bounds and the separate numerical-only `g rho`; the latter is already included in the total. A failed margin returns `SolveError::PerturbationMargin` without claiming singularity or inaccurate true output.
+//!
+//! Solve failure records retain proof stages. If the input-family margin fails, the stored-center certificate remains inspectable and explicitly excludes every input bound. Family, restored-output and budget accessors return `None` until their respective stages complete; `SolveEvidence::is_complete` is required for publication. A later restoration failure retains the already proved normalized family bound. Completed budget refusals retain all stages. These partial facts never grant a result handle or promote the stored-center claim into declared physical coverage.
 
 use crate::solve_verification::{CenterCertificate, FamilyCertificate, InverseWitness};
 use crate::{Coverage, Extent, OutputReservation};

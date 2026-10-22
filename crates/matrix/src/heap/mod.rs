@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Homogeneous descriptor ownership and checked publication.
+//! Numerical region ownership, retained schema adapters and checked publication.
+//!
+//! # Numerical ownership and implemented facade
+//!
+//! `nrz-matrix` owns numerical regions in separate binary32 and binary64 faer arenas. A scalar is a 1×1 region. Values and declared absolute bounds have separate storage regions and bindings descriptors; every bound names the exact identity and version of its entire target region. Heap coordinates never enter CAS arithmetic. The facade still retains homogeneous descriptor schemas; `docs/design/descriptor-binding.md` places all meaning in checked bindings and specifies the remaining migration. See `docs/design/matrix-core-design.md` for numerical contracts.
+//!
+//! The prototype `DenseSystem`, bare `certified_solve` and mutable-field solver reports remain retired. Square solving is available through the checked operation and transaction boundary documented in `src/solve/` and `src/binding/`; historical feasibility records do not supply its certificates.
+//!
+//! The implemented homogeneous operation subset supports checked copy, homogeneous affine conversions and the deterministic kernels documented in `src/kernels/`, plus joint source declarations and covariance admission. Execution of mixed physical entries remains unavailable through this facade; float storage itself imposes no physical homogeneity principle. `Factor` and `Workspace` are category markers only. Numerical conversions use scalar outward enclosures and accuracy nonnegative bounds.
 
 mod aliases;
 mod error;
@@ -33,7 +41,8 @@ use slots::Slots;
 /// Single numerical owner of precision-separated faer arenas and descriptor slots.
 ///
 /// Imports state represented-only or declared-bound coverage explicitly. This subset
-/// stores coherent homogeneous regions, not checked linear operators or solve results.
+/// admits coherent homogeneous imports and publishes the supported checked operation results.
+/// Descriptor records are retained facade metadata pending the binding migration.
 #[derive(Debug)]
 pub struct Heap {
     /// Unique process-local scope; a foreign handle is refused before indexing.

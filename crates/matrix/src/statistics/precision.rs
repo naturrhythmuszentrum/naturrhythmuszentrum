@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Outward conversion of numerical parameters preserves their original mathematical target.
+//!
+//! # Precision and model identity
+//!
+//! Precision changes retain the original immutable `JointModel`, its source identities and original parameter definitions. Numerical source sensitivities, means and covariance enclosures are converted outward; narrowing discrepancy remains numerical error and creates no random source. Later propagation still evaluates that original model. `materialize_cross_covariance` accepts different target precisions and stores its parameters in the left target's precision, retaining each target's original format and selection. Parameter overflow refuses the whole candidate even when the value itself would fit.
 
 use crate::OperationError;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Precision, Scalar};

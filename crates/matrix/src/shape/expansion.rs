@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact affine structural expansions and their independently checked metric contract.
+//!
+//! # Whole-family affine expansion and metrics
+//!
+//! `StructuredExpansion::check` admits bounded exact source-free affine maps `vec(A) = T z + d` with retained free-coordinate identities, typed coefficients, typed omitted zeros and exact offsets. Expansion outputs and offsets use coherent physical coordinates; free inputs use their declared difference measures. Explicit duplicate coefficient positions refuse, and an expansion cannot contradict a logical structural zero. Logical entries need concrete scalar descriptors; formal solve/inverse quotients require a separate scalar admission first. `ExactCoefficient` defines an exact scalar constant from a zero-shift bindings map factor in a declared difference measure, including signed coefficients and exact zeros. Its exact algebra is confined to descriptor constants.
+//!
+//! Only `WholeFamily` expansion authorizes the same map on perturbations and both covariance axes. `CenterOnly` refuses companion compression. `metric(LogicalFrobenius)` derives the exact Gram matrix `T^T T` for homogeneous logical differences and coherent free coordinates. Symmetric duplication therefore weights an off-diagonal square twice. `PackedEuclidean` additionally requires the exact Gram identity and refuses ordinary symmetric packing. A heterogeneous physical norm or unsupported reference metric refuses; normalization does not silently supply an isometry. These metrics apply to differences, where `d` cancels; computing a center norm must also evaluate the retained affine offset. No symmetry declaration proves positive definiteness or physical self-adjointness.
 
 use super::{Axis, CheckedShape, ShapeError, ShapeLimits, StructureScope};
 use crate::Extent;

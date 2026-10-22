@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Local budgets name the homogeneous output difference coordinates explicitly.
+//!
+//! # Conservative output budgets
+//!
+//! `SolveBudget::frobenius` names the output difference descriptor and an accuracy `Budget<f64>`. Absolute tolerance and positive characteristic scale use that descriptor, while the relative coefficient is a ratio. `SolvePolicy::with_budget` and `OperationDraft::with_solve_policy` require its exact kind, role and measure to match the final output; point results use differences. Coefficients are checked before faer entry. The bound is widened exactly for the comparison, and acceptance uses the lower endpoint of `absolute + relative × scale`. No request yields `NotRequested`. `BudgetExceeded` rejects the available certificate threshold, and `BudgetUnresolved` preserves an overlapping comparison. Both retain the complete valid solve proof in the failure record while publishing no output. Factor reuse remains separate from each new RHS certificate.
 
 use super::SolveError;
 use crate::RegionContract;

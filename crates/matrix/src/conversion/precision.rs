@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Precision changes allocate new representations and preserve old deterministic coverage.
+//!
+//! # Precision transactions
+//!
+//! `PrecisionContract::new` checks a region's actual descriptor and ordered tangent shape without changing either. `OperationDraft::precision` declares binary32-to-binary64 or binary64-to-binary32 conversion. `Binding::<P, Q>::convert_precision` accepts only handles of its source type and validates both types against that recipe before reserving output storage. The result contains `PublishedBundle<Q>` values with fresh `ValueId`s and version one; the original arenas and handles keep their scalar type and contents. Measure and precision changes remain distinct operation records.
+//!
+//! Widening is exact for centers and prior bound endpoints; its new evaluation region is zero and it preserves every old bound. Narrowing uses scalar's nearest center conversion and independent outward endpoint conversion. It outward-converts the prior total radius, then adds the newly certified center displacement exactly once through accuracy. Range overflow or a nonfinite outward bound refuses the whole transaction. The new evaluation region bounds only this representation change, while the total retains all old coverage. Statistical parameters are outward-converted with their own numerical-error regions while retaining the original model and source IDs.
+//!
+//! `RecipeEvidence::Precision` records both formats and the arithmetic revision. `OperationRecord::target_map` exposes each one-input source/destination dependency pair, including their exact identities, versions, layouts, formats and companion relationships. Obtain a current record through `Heap::operation_record`; historical mappings cannot authorize current evidence. Every converted total and evaluation companion is retargeted to its reserved new value in the same no-fail commit. A later failure in a bundle sharing one source discards all earlier private candidates, and both the old representations and their capacity remain unchanged.
 
 use super::{ConversionError, PrecisionEvidence};
 use crate::binding::{NativeRecipe, buffer};

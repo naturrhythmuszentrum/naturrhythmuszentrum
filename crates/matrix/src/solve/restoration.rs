@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Restore a norm ball entrywise and retain the new numerical error exactly once.
+//!
+//! # Restored solve evidence
+//!
+//! `OperationDraft::restore_solution` attaches a checked homogeneous `ConversionContract` to the solve before publication. Its source shape must be the derived solution shape. The exact affine map restores every center and scales differences with the absolute coefficient enclosure; shifts and origins enter only centers. Coefficient lowering and restoration evaluation errors are included once in each overlapping total/numerical view. The joint Frobenius bound uses the scale times the original joint radius plus the norm of the new restoration errors. The result, complete companions, exact map evidence and both original dependencies publish atomically. Coherent unit-reference restoration remains exact when no additional map is requested.
 
 use super::{SolveContract, SolveError};
 use crate::binding::buffer;

@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Direct base-value indirection for composed, read-only entry selections.
+//!
+//! # Alias-wide versions and checked replacement
+//!
+//! `Heap::alias` creates a descriptor pointing directly to the base value. It retains the base identity and resolves its current version and coverage on every read, including after whole-base replacement. The selected extent and entry map are available from `RegionView`; its schema identity names the owning homogeneous schema before selection. `ValueView::bound` names the whole-base companion, while `Heap::selected_bound` applies the identical entry map to the bound and exposes the base target and current version. Checked replacement through an alias first proves its output injectivity, copies the base into fresh scratch, scatters selected entries through checked indices and publishes the complete base bundle once. All aliases, including disjoint selections of that base, observe the new version. Old companion handles become stale. Represented replacement drops the entire base's declared coverage explicitly; bounded replacement keeps untouched bounds. A partial selection cannot introduce declared coverage on a represented-only base because the other entries have no bounds. A bijective whole-base selection can supply that complete coverage.
 
 use nrz_scalar::Scalar;
 

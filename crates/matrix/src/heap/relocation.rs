@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Between-borrow relocation, prepared in a separate owner before atomic indirection changes.
+//!
+//! # Compaction contract
+//!
+//! `Heap::compact` requires an exclusive heap borrow, so live views and future exclusively borrowed evaluations prevent compaction. It prepares fresh precision-separated slabs and dense arena slot tables, validates every affected value, companion and alias map, then installs all indirection and the successor physical epoch together. It retains one slab per owned region and stable descriptor slot indices. Value versions, schemas, bound handles and target identities remain unchanged when only storage moves. `RegionView::layout_epoch` exposes the refreshed physical revision; cached internal regions with an older epoch refuse even if an arena slot/generation coincides. Epoch exhaustion and all preparation failures leave the current heap unchanged. Compaction work counts copied entries across both precisions plus explicit gather entries. Old and new slabs may coexist during preparation, with one additional raw region copy; compaction introduces no numerical or source-independence claim.
 
 use nrz_scalar::Scalar;
 

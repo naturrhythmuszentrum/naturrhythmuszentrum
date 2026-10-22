@@ -1,5 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed deterministic region kernels under the existing transaction owner.
+//!
+//! # Closed deterministic kernels and evidence
+//!
+//! `OperationDraft::add` and `subtract` derive a single checked output from two ordered homogeneous difference regions. Both input totals enter the outward radius even when the operands are the same handle or overlapping aliases. A distinct evaluation region encloses the discrepancy between the floating center and the exact represented-center operation. That error already belongs to the total and must not be added again. Different deterministic coverage scopes refuse with `KernelError::CoverageMismatch`; statistical companions follow the complete joint affine propagation documented in `src/statistics/`.
+//!
+//! `LinearMap::new` checks a fixed source-free operator, operand shape and affine offsets. `FixedCoefficient::represented` defines an exact binary64 mathematical constant; `descriptor` accepts a bindings-owned exact descriptor constant from the same frozen snapshot. Coefficients are enclosed in the execution format before use. The total includes `abs(L) r` with outward coefficient enclosures plus the complete floating and coefficient displacement at the represented center. Uncertain coefficient values belong in numerical operand regions, not fixed definitions. The output shape retains the derived coordinate axes, while offsets can fill entries that were structural zeros in the homogeneous product.
+//!
+//! `OperationDraft::transform_entries` checks selection, repetition and reshape against explicit new axes and an `EntryMap`. `dual_transpose` retains the reciprocal formal dual axes and permutes each total exactly. Both publish fresh values and totals with zero new evaluation error. Coherent formal dual references retain their primal reference definitions with reciprocal interpretation; general scaled formal-dual normalization still refuses. These operations preserve dependence through the original source selection and do not claim independent copies.
+//!
+//! Every kernel runs through `Binding`, normalized borrowed views, private candidates and atomic publication. Output reservations use the actual result extent. `RecipeEvidence::Kernel` exposes the closed `KernelKind`, precision, arithmetic revision and conservative admitted work count. Limits include numerical verification and complete output payloads. Only the private evaluator creates kernel evidence. Publication checks its recipe identity, all source dependencies, complete companion inventories and target versions. A multi-input result records every parent; a change to either operand invalidates downstream claims. `OperationRecord::target_map` refuses a multi-input output because it has no single source/destination pair; the operation record and provenance retain the complete relation.
 
 mod arithmetic;
 mod backend_product;

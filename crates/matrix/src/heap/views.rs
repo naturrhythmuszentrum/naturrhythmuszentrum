@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked borrows, independent companion access and explicit raw copies.
+//!
+//! # Checked access and raw exports
+//!
+//! Opaque `Handle<Category, P>` locators carry a heap scope and descriptor occupation generation. Value and companion access checks ownership, occupation, category, precision, region bounds and target versions before lending a read-only `RegionView`. Equal schemas are interned using exact descriptor equality without merging value identities. Each arena slab owns a one-column faer matrix; logical rectangles select its entries through checked layouts. `RegionView::export` returns an owned raw copy without evidence or a declaration of source independence. Live borrows prevent heap mutation.
 
 use std::marker::PhantomData;
 

@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Matrix multiplication combines faer centers with independent nominal and interaction bounds.
+//!
+//! # Verified products and overlapping contributions
+//!
+//! `OperationDraft::matmul` checks ordered matrix composition and publishes one result rectangle. Safe faer multiplication supplies candidate centers. A separate increasing-index outward contraction encloses each exact represented-center dot product and measures its displacement from that candidate; it does not assume faer's reduction order. The total is the outward sum of `abs(A) R_B`, `R_A abs(B)`, `R_A R_B` and the new evaluation error. Empty ratio contractions publish typed zero results after checking their physical pairing; unsupported scalar quotient meanings retain the existing typed refusal.
+//!
+//! `ProductTerm::RightInput`, `LeftInput` and `Interaction` name three separate companion regions exposed by `PublishedBundle::contribution`, `ValueView::contribution` and `Heap::selected_contribution`. They carry the result's radius descriptor and exact target identity/version. These derivation terms overlap the total; they are not additional radii to add to it. Copy and entry transformations retain each term in the same logical order. Further arithmetic consumes the prior total once and retains the earlier derivation in provenance. Reservations, scratch admission, dependency validation, replacement, retirement and compaction include all three regions. Statistical operands use the complete joint product linearization documented in `src/statistics/`.
 
 use super::arithmetic::{Entry, finish};
 use super::contract::{KernelContract, Recipe, regions, work};

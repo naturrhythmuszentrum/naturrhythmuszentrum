@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed native recipes retain ordered input/output contracts and exact coordinate definitions.
+//!
+//! # Closed copy admission
+//!
+//! `OperationDraft::copy` checks a native recipe with one fresh output per input. Each `RegionContract` retains its checked ordered shape, frozen declarations and concrete homogeneous difference descriptor. It explicitly defines one coherent unit reference for every domain and codomain coordinate through `CoordinateMap`; normalization and restoration therefore copy the represented entries exactly. This admits physical homogeneous differences as well as ratios. Points, heterogeneous entry schemas and formal entries without a concrete scalar descriptor refuse. The copy recipe continues to refuse general scales and affine origins; the separate `ConversionContract` recipe admits checked bindings maps. Empty rectangles use ratio schemas and have no addressable entries.
+//!
+//! The homogeneous copy admission comes from bindings `HomogeneousRecipe` and a retained `CopyWitness` over actual value, deterministic-bound, numerical-error and planned result symbols. Matrix resolves each numerical region's unique opaque owner and checks live extents, selected layouts, finite payloads, versions and companion targets. Missing or double owners and mismatched companion/result symbols refuse. `RegionContract::check` delegates its physical homogeneity decision to bindings; the duplicate matrix descriptor comparison is replaced by the declared symbol check.
 
 use nrz_bindings::{Descriptor, HomogeneousRecipe};
 

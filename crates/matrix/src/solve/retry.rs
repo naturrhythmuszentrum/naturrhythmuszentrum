@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Fresh binary64 executions retain original input coverage and explicit conversion records.
+//!
+//! # Explicit precision recovery
+//!
+//! `Heap::solve_recovering` accepts a checked f32 solve binding. When its policy explicitly permits promotion and a recoverable numerical stop occurs, it widens the complete input bundle through the ordinary precision transaction and performs a fresh f64 factorization and solve. `RecoveredSolve` exposes the actual precision, the typed successful outcome, the initial failure and the conversion record. `RecoveryFailure` retains the original, conversion and promoted failures that exist. Attempts share the original finite allowance; conversion work is also charged. Widening preserves measurement, import and statistical parameter errors and cannot recover lost input information. A successful conversion can remain as an independently valid record when the later solve refuses; no unsuccessful solve publishes a solution handle.
 
 use crate::binding::NativeRecipe;
 use crate::{

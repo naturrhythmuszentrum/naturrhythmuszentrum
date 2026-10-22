@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact coordinate schemas; numerical lowering and evaluation belong to later kernels.
+//!
+//! # References, origins and exact normalization
+//!
+//! `ReferenceScale` defines one positive exact source-free unit of a typed difference measure. Bindings' `Measure` admits checked positive exact scales, including π expressions, and refuses unchecked symbolic text, zero, negative or unproved-positive scales; points, counts and relative kinds cannot become normalization references. References have distinct definition identities even when their labels and exact scales agree. `PointOrigin` defines the zero point of an exact point measure and likewise retains its identity. These constructors define exact schema constants; they accept no heap value, uncertainty assertion or numerical calibration operand.
+//!
+//! `CoordinateMap` checks one reference per ordered axis entry and one compatible origin exactly for point coordinates. It maps coherent physical centers to normalized coordinates and retains exact restoration maps. `NormalizationSchema` checks one shared X/Y/W system for a square solve and records `A_hat = S_Y^-1 A S_X`, `B_hat = S_Y^-1 B S_W` and `X_hat = S_X^-1 X S_W`. Every matrix entry retains its typed row/column reference quotient. Center maps subtract origins first. For an affine vector equation, the right-hand-side recipe then adds the separately recorded `S_Y^-1 (O_Y - A O_X) S_W` correction, so the solved physical equation retains its variable-origin contribution. Solution restoration adds its declared origin only to centers. Separate zero-shift maps restore differences, deterministic radii and numerical evaluation errors; paired covariance restoration must use both sides.
+//!
+//! Point origins are shared by each row across all ratio RHS columns, with each column retaining its own reference scale. Non-ratio column origins explicitly refuse until an entry-origin schema exists. Arbitrary distinct origins per matrix entry are not inferred from axis origins. Formal dual normalization also refuses because bindings supplies no scalar dual kind. Exact maps are retained as bindings conversions. A schema check alone claims no numerical normalization. Named-reference maps have a numerical transaction path through `ConversionContract`. `ConversionContract::from_normalization_schema` also exports the shape-owned X/Y/W definitions through bindings; formal entry maps and the multi-input RHS correction still require later numerical lowering.
 
 use crate::{Axis, AxisAlignment, CheckedShape, ShapeError, ShapeLimits};
 use nrz_bindings::{

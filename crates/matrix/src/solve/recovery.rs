@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded same-factor corrections and explicit fresh-precision retry evidence.
+//!
+//! # Finite refinement and stopping evidence
+//!
+//! `SolvePolicy::with_recovery` authorizes a finite accuracy `RecoveryPolicy` and cumulative `Limits`. Each correction reuses the LU factors, forms an independently enclosed f64 residual, selects a finite correction RHS, and updates in the declared candidate format. The full inverse, residual, input-family, restoration and budget interpretation remains mandatory. `SolveEvidence::recovery` exposes every completed attempt, both precisions, certified residual and total radius, charged work and the explicit `SolveStop`. A refinement limit, stagnation or exhausted work returns a refusal with available evidence; the last iterate is never published as a success. Zero corrections and disabled promotion are supported.
 
 use super::{FactorRef, SolveContract, SolveError, restoration::Restored};
 use crate::{NormalizedView, OperationError, OutputReservation, RecipeEvidence};

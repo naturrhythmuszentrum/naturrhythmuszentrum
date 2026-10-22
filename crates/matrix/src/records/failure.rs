@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Refusals retain independently valid exact-copy evidence without success handles.
+//!
+//! # Retained partial evidence
+//!
+//! `Failure` carries a typed cause and an unpublished `FailureRecord`. A later candidate or provenance refusal preserves each independently validated earlier `CopyEvidence`, including its exact input coverage, without a success handle or an exposed candidate payload. `FailureRecord::evidence` rechecks the particular claim's actual source and companion dependencies; `historical_evidence` supplies only the recorded attempt facts. The copy recipe asserts represented bit identity and retention of declared assumptions, not a new floating certificate, statistical model, numerical budget success or source independence.
 
 use nrz_scalar::Scalar;
 

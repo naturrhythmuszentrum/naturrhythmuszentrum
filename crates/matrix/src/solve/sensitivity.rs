@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Certified differential solves preserve the complete joint operator/RHS source model.
+//!
+//! # Certified differential solves
+//!
+//! Solve statistics certify each column of `A delta X = delta B - delta A X_0` using the same opaque factors and inverse witness. `X_0` is the exact represented nominal solution, enclosed independently; its rounded candidate is never substituted as an exact derivative parameter. `SolveEvidence::sensitivities` records each direction's residual and joint forward bound. The local Jacobian, composed source sensitivity and full covariance each have separate numerical parameter-error regions.
+//!
+//! A modeled operator with zero variation and its exact mean at the operating point preserves `AffineMoments` in the right-hand sides. A variable operator yields `LinearizedMoments`, including common-operator cross-column covariance and every supplied operator/RHS cross block. Missing joint models, selected source rows or cross blocks refuse before evaluation. Statistical inverses use the typed identity as source-free RHS columns. Bindings retains the checked solve-equation derivative relation; floating derivative solves discharge its invertibility and exact-nominal-solution obligations. Optional homogeneous restoration scales sensitivities and both covariance axes and shifts only means. Statistical work includes all derivative columns, their certificates and complete parameter storage; deterministic totals still consume overlapping contributions once.
 
 use super::{FactorRef, SolveContract, SolveError};
 use crate::statistics::contraction::Work;
