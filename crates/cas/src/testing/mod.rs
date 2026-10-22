@@ -93,3 +93,13 @@ pub(crate) mod solve_linear;
     reason = "shared solving fixtures remain crate-visible"
 )]
 pub(crate) mod solve_local;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "family crate tests share original public sort fixtures"
+)]
+#[expect(
+    dead_code,
+    reason = "the same fixture also serves public admission tests"
+)]
+pub(crate) mod sorts;

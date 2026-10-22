@@ -32,7 +32,7 @@ mod projection;
 pub(crate) use projection::projection;
 
 mod arms;
-pub(crate) use arms::arm;
+pub(crate) use arms::{arm, placement_operands};
 
 mod ambient_resolution;
 mod routing;

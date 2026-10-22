@@ -215,7 +215,17 @@ pub(crate) fn construct(
                 || matches!(smaller.expression, RegionExpr::GuardTrue { base, .. }
                     | RegionExpr::GuardFalse { base, .. } | RegionExpr::Difference { base, .. } if
                         base == superset);
-            if valid { Ok(()) } else { Err(invalid()) }
+            if valid {
+                Ok(())
+            } else if smaller.lies_over.is_some() || larger.lies_over.is_some() {
+                if crate::solving::family::region::subset(cas, subset, superset, budget)? {
+                    Ok(())
+                } else {
+                    Err(invalid())
+                }
+            } else {
+                Err(invalid())
+            }
         }
         Statement::Empty { region } => {
             let expression = &cas.state.region(cas.checked(region)?)?.expression;

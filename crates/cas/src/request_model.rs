@@ -51,6 +51,8 @@ pub enum UnsupportedReason {
 /// A mathematical refusal returned before constructing an ill-sorted operation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RefusalReason {
+    /// A query is proved outside every represented placement piece.
+    NoApplicablePiece,
     /// Complex roots have no admitted ordering.
     ComplexOrdering,
     /// Requested root choices are proved incompatible.

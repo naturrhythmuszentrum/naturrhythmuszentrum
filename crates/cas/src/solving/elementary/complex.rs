@@ -53,7 +53,7 @@ enum Atom {
 /// One bounded interpretation shares component variables across maps, premises and conclusions.
 pub(crate) struct Components<'a, 'b> {
     /// Owning graph, coefficient arithmetic, exact region and earlier checked premises.
-    evaluation: &'a Evaluation<'b>,
+    pub(crate) evaluation: &'a Evaluation<'b>,
     /// Shared real and imaginary components for each declaration or selected root slot.
     atoms: Vec<(Atom, Parts)>,
     /// Joint selections whose defining equations and predicates have already been recorded.
@@ -195,7 +195,12 @@ impl<'a, 'b> Components<'a, 'b> {
     }
 
     /// A norm is nonzero if either real component is nonzero, or regional evidence proves the norm.
-    fn divide(&self, left: &Parts, right: &Parts, budget: &mut Budget) -> Result<Parts, Fault> {
+    pub(crate) fn divide(
+        &self,
+        left: &Parts,
+        right: &Parts,
+        budget: &mut Budget,
+    ) -> Result<Parts, Fault> {
         let engine = &self.evaluation.engine;
         let norm = right.real.mul(&right.real, engine, budget)?.add(
             &right.imaginary.mul(&right.imaginary, engine, budget)?,
@@ -254,7 +259,7 @@ impl<'a, 'b> Components<'a, 'b> {
     }
 
     /// Recursion across earlier map dependencies is bounded independently of expression depth.
-    fn expression(
+    pub(crate) fn expression(
         &mut self,
         root: LogicalId,
         bound: &[Parts],
@@ -262,7 +267,11 @@ impl<'a, 'b> Components<'a, 'b> {
     ) -> Result<Parts, Fault> {
         self.depth = self.depth.checked_add(1).ok_or_else(invalid)?;
         budget.check(BudgetKind::Depth, self.depth, AT)?;
-        let result = self.walk(root, bound, budget);
+        let result = if crate::solving::family::local(self.evaluation.cas, root)? {
+            crate::solving::family::components::read(self, root, bound, budget)
+        } else {
+            self.walk(root, bound, budget)
+        };
         self.depth = self.depth.checked_sub(1).ok_or_else(invalid)?;
         result
     }
@@ -279,6 +288,12 @@ impl<'a, 'b> Components<'a, 'b> {
         let mut values = vector(1, budget)?;
         while let Some((id, ready)) = pending.pop() {
             budget.work(1, AT)?;
+            if crate::solving::family::local(self.evaluation.cas, id)? {
+                let value = self.expression(id, bound, budget)?;
+                reserve(&mut values, 1, budget)?;
+                values.push(value);
+                continue;
+            }
             let expression = self.evaluation.cas.state.expression(id)?;
             budget.check(BudgetKind::Depth, expression.depth, AT)?;
             if expression.header

@@ -163,6 +163,7 @@ impl Cas {
             &draft.ambient,
             locals,
             &mut edges,
+            budget,
         )?;
         let value = Region {
             lies_over,

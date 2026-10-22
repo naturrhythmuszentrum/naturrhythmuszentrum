@@ -31,6 +31,11 @@ pub(crate) fn handles(
             ..
         } => Ok(true),
         Task::Simplify | Task::Equal { .. } => {
+            for id in inputs {
+                if crate::solving::family::local(cas, *id)? {
+                    return Ok(true);
+                }
+            }
             for id in case_syntax::order(cas, inputs, budget)? {
                 if cas.state.expression(id)?.domain.is_some() {
                     return Ok(true);
@@ -249,6 +254,18 @@ impl Runner<'_> {
         conclusion: Statement,
         premises: &[Handle],
     ) -> Result<Handle, Fault> {
+        if crate::solving::family::native::handles(self.cas, &conclusion)? {
+            return crate::solving::family::recipes::push(
+                &mut self.plan,
+                self.cas,
+                &self.request.context,
+                rule,
+                &conclusion,
+                premises,
+                self.generation,
+                self.checker,
+            );
+        }
         self.plan.push(
             self.cas,
             &self.request.context,
@@ -305,12 +322,26 @@ impl Runner<'_> {
             .clone();
         for id in case_syntax::canonical(self.cas, &arms, self.generation)? {
             let arm = self.cas.state.arm(id)?.clone();
-            match crate::case_check::subset(
-                self.cas,
-                region.logical_id(),
-                arm.region,
-                self.generation,
-            ) {
+            let contained = if crate::solving::family::local(self.cas, function.logical_id())? {
+                if crate::solving::family::region::subset(
+                    self.cas,
+                    region.logical_id(),
+                    arm.region,
+                    self.generation,
+                )? {
+                    Ok(())
+                } else {
+                    Err(invalid())
+                }
+            } else {
+                crate::case_check::subset(
+                    self.cas,
+                    region.logical_id(),
+                    arm.region,
+                    self.generation,
+                )
+            };
+            match contained {
                 Ok(()) => {
                     let right = self.cas.handle(arm.value);
                     return self.push(
@@ -337,6 +368,36 @@ impl Runner<'_> {
 
     /// Totality is a definedness fact on the requested region, with the complete cover recorded.
     fn coverage(&mut self, function: &Handle, region: &Handle) -> Result<Handle, Fault> {
+        if crate::solving::family::local(self.cas, function.logical_id())? {
+            for id in &self.cas.state.expression(function.logical_id())?.arms {
+                let arm = self.cas.state.arm(*id)?;
+                if !crate::solving::family::region::subset(
+                    self.cas,
+                    region.logical_id(),
+                    arm.region,
+                    self.generation,
+                )? {
+                    return Err(Fault::invalid(
+                        InvalidCode::UnknownTotality,
+                        Location::new("family case coverage"),
+                    ));
+                }
+            }
+            let predicate = case_syntax::predicate(
+                self.cas,
+                function.logical_id(),
+                crate::model::PredicateKind::Defined,
+                self.generation,
+            )?;
+            return self.push(
+                Primitive::CaseDomain,
+                Statement::PredicateFact {
+                    region: region.clone(),
+                    predicate: self.cas.handle(predicate),
+                },
+                &[],
+            );
+        }
         let (domain_proof, defined) = crate::case_producer::domain(
             &mut self.plan,
             self.cas,
@@ -372,6 +433,24 @@ impl Runner<'_> {
 
     /// Refinement is scheduled lazily; its complete cover remains an explicit premise.
     fn simplify(&mut self, function: &Handle) -> Result<Handle, Fault> {
+        if crate::solving::family::local(self.cas, function.logical_id())? {
+            let domain = self.cas.handle(
+                self.cas
+                    .state
+                    .context(self.request.context.logical_id())?
+                    .admissible,
+            );
+            return self.push(
+                Primitive::CaseCongruence,
+                Statement::Equality {
+                    left: function.clone(),
+                    right: function.clone(),
+                    domain,
+                    domain_contract: DomainContract::DefinedAndEqual,
+                },
+                &[],
+            );
+        }
         let (output, premises) = crate::case_refine::produce(
             &mut self.plan,
             self.cas,

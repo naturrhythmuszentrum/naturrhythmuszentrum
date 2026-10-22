@@ -2,7 +2,11 @@
 //! Independently replayed membership, strict coordinate transport and total degree partitions.
 
 mod binomial;
-mod complex;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "family evaluation shares the existing exact components"
+)]
+pub(crate) mod complex;
 mod conjugation;
 #[expect(
     clippy::redundant_pub_crate,

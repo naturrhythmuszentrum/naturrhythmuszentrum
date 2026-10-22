@@ -69,7 +69,7 @@ pub(crate) fn validate(
         SolveDraft::ScalarSpace(value) => super::registry::validate(value).map(|_| ()),
         SolveDraft::SpacePlacement(value) => super::registry::placement(state, value),
         SolveDraft::ScalarPiece(value) => super::incidence::validate(state, value),
-        SolveDraft::ParameterBase(value) => check_base(state, value),
+        SolveDraft::ParameterBase(value) => check_base(state, value, budget),
         SolveDraft::SpaceFamily(value) => check_family(state, value),
         SolveDraft::FamilyExpression(value) => check_expression(state, value, budget),
         SolveDraft::FibrePiece(value) => check_piece(state, value),
@@ -80,7 +80,11 @@ pub(crate) fn validate(
 }
 
 /// Every base coordinate remains an original Real coefficient.
-fn check_base(state: &State, value: &ParameterBaseData<Handle>) -> Result<(), Fault> {
+fn check_base(
+    state: &State,
+    value: &ParameterBaseData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     let frame = crate::solving::graph::coordinates(state, value.coordinates.logical_id())?;
     let region = state.region(value.domain.logical_id())?;
     if frame.header != value.header
@@ -98,7 +102,27 @@ fn check_base(state: &State, value: &ParameterBaseData<Handle>) -> Result<(), Fa
     {
         return Err(invalid());
     }
-    Ok(())
+    base_dependencies(state, value, &value.domain, budget)
+}
+
+/// A base domain or stratum may mention only its original Real coordinate declarations.
+pub(super) fn base_dependencies(
+    state: &State,
+    base: &ParameterBaseData<Handle>,
+    region: &Handle,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let coordinates = crate::solving::graph::coordinates(state, base.coordinates.logical_id())?;
+    budget.work(
+        size(coordinates.coordinates.len(), AT)?.saturating_mul(budget.limits().name_bytes),
+        AT,
+    )?;
+    let keys = coordinates
+        .coordinates
+        .iter()
+        .map(|coordinate| coordinate.key.as_str())
+        .collect();
+    crate::solving::graph::free_keys(state, region, &keys, true, budget)
 }
 
 /// Family coordinates are disjoint original declarations in their exact local roles.

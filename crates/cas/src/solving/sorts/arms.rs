@@ -113,7 +113,7 @@ fn operand_ambient(state: &State, id: LogicalId) -> Result<LogicalId, Fault> {
 }
 
 /// Nested local bodies retain each distinct original operand/direct-edge requirement.
-fn placement_operands(
+pub(crate) fn placement_operands(
     state: &State,
     body: &super::FamilyExpressionData<crate::graph::Handle>,
     budget: &mut Budget,

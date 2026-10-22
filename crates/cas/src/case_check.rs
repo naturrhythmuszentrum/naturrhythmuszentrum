@@ -50,6 +50,9 @@ pub(crate) fn reconstruct(
     {
         return Err(invalid());
     }
+    if crate::solving::family::native::handles(cas, &draft.conclusion)? {
+        return crate::solving::family::native::reconstruct(cas, draft, premises, budget);
+    }
     let context = cas.checked(&draft.context)?;
     let within = cas.state.context(context)?.admissible;
     let certificate = match draft.rule {

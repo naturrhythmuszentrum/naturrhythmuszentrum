@@ -29,6 +29,13 @@ fn endpoints(
     domain: &Handle,
     same_sort: bool,
 ) -> Result<(), Fault> {
+    if crate::solving::family::body(cas, cas.checked(left)?)?.is_some()
+        || crate::solving::family::body(cas, cas.checked(right)?)?.is_some()
+    {
+        return crate::solving::family::native::validate_endpoints(
+            cas, left, right, domain, same_sort,
+        );
+    }
     let left = cas.state.expression(cas.checked(left)?)?;
     let right = cas.state.expression(cas.checked(right)?)?;
     let domain = cas.state.region(cas.checked(domain)?)?;

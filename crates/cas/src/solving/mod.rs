@@ -4,6 +4,12 @@
 mod evaluate;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "native cases dispatch only the new family shapes"
+)]
+pub(crate) mod family;
+pub use family::membership::PlacementOutcome;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "typed admission helpers stay within the crate"
 )]
 pub(crate) mod graph;

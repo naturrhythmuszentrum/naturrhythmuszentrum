@@ -1435,6 +1435,8 @@ pub struct SolveSpec {
 /// A missing proof, rather than a mathematical contradiction.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SolveReason {
+    /// Neither incidence nor exclusion of a placement query has been proved.
+    PieceMembershipPending,
     /// No registered direct operand placement supplies the requested ambient.
     SpacePlacementUnavailable,
     /// Several installed signatures require an explicit ambient choice.

@@ -228,6 +228,9 @@ pub(crate) fn weaken(
     {
         return Err(invalid());
     }
+    if crate::solving::family::restriction::applies(cas, premises)? {
+        return crate::solving::family::restriction::check(cas, draft, premises, budget);
+    }
     let source = premises.first().ok_or_else(invalid)?;
     let subset = premises.get(1).ok_or_else(invalid)?;
     if !matches!(

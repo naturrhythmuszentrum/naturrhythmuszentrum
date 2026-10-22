@@ -8,6 +8,10 @@ use crate::error::Fault;
 use crate::graph::{Cas, Edge, LogicalId, Reference, ScalarEdge, State};
 
 /// Resolve the acyclic family/base links and check the total coordinate product.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the family projection preserves its ordinary region admission inputs"
+)]
 pub(crate) fn projection(
     cas: &Cas,
     state: &State,
@@ -16,6 +20,7 @@ pub(crate) fn projection(
     ambient: &AmbientDomain,
     locals: &[LogicalId],
     edges: &mut Vec<(LogicalId, Edge)>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<Option<LiesOver<LogicalId>>, Fault> {
     let Some(draft) = draft else {
         return Ok(None);
@@ -35,6 +40,7 @@ pub(crate) fn projection(
     {
         return Err(invalid());
     }
+    super::admission::base_dependencies(state, original, &cas.handle(stratum), budget)?;
     product(state, ambient, original, shape)?;
     edges
         .try_reserve(2)
