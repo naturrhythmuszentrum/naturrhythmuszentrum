@@ -15,39 +15,39 @@
   ],
   "bites": [
     {
-      "id": "1",
+      "id": "step:nrz:bite-documentation-generator",
       "title": "Documentation generator"
     },
     {
-      "id": "1b",
+      "id": "step:nrz:bite-exemplar-register",
       "title": "Exemplar register"
     },
     {
-      "id": "2",
+      "id": "step:nrz:bite-numerical-feasibility",
       "title": "Numerical feasibility"
     },
     {
-      "id": "3",
+      "id": "step:nrz:bite-units-design",
       "title": "Units design"
     },
     {
-      "id": "4",
-      "title": "Units and numerical foundations"
-    },
-    {
-      "id": "5",
+      "id": "step:nrz:bite-certified-matrix-core",
       "title": "Certified matrix core"
     },
     {
-      "id": "6",
+      "id": "step:nrz:bite-units-and-foundations",
+      "title": "Units and numerical foundations"
+    },
+    {
+      "id": "step:nrz:bite-physics-core",
       "title": "Initial physics core"
     },
     {
-      "id": "7",
+      "id": "step:nrz:bite-advanced-matrix-domains",
       "title": "Advanced matrix domains"
     },
     {
-      "id": "8",
+      "id": "step:nrz:bite-accuracy-and-benchmarks",
       "title": "Accuracy and benchmarks"
     }
   ],
