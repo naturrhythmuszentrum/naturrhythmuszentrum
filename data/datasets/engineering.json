@@ -1,0 +1,919 @@
+{
+  "namespace": "org.naturrhythmuszentrum.docs.dataset.engineering",
+  "version": [
+    1,
+    0,
+    0
+  ],
+  "owner": "NRZ",
+  "license": "CC0-1.0",
+  "sources": [
+    "data/inputs/engineering.toml",
+    "crates/accuracy/src/budget.rs",
+    "crates/accuracy/src/error.rs",
+    "crates/accuracy/src/nonnegative.rs",
+    "crates/accuracy/src/recovery.rs",
+    "crates/accuracy/src/vector.rs",
+    "crates/accuracy/src/work.rs",
+    "crates/scalar/src/conversion.rs",
+    "crates/scalar/src/enclosure.rs",
+    "crates/scalar/src/error.rs",
+    "crates/scalar/src/fused.rs",
+    "crates/scalar/src/literal/evaluate.rs",
+    "crates/scalar/src/reduction.rs",
+    "tools/docgen/src/check.rs",
+    "tools/docgen/src/error.rs"
+  ],
+  "labels": [],
+  "kernels": [
+    {
+      "claims": [
+        "[ACCURACY-claim:accuracy:budget-decisions-rational-oracle]",
+        "[ACCURACY-claim:accuracy:budget-boundary-decisions]",
+        "[ACCURACY-claim:accuracy:tolerance-never-rounds-up-for-acceptance]"
+      ],
+      "domain": "Nonnegative tolerances and a strictly positive reference scale.",
+      "guarantee": "Acceptance uses a conservative lower tolerance endpoint; overlap remains unresolved.",
+      "id": "accuracy-budget",
+      "law": "absolute + relative*reference_scale",
+      "operation": "Conservative tolerance comparison",
+      "owner": "ACCURACY",
+      "refusals": "InvalidBudget; Arithmetic",
+      "shape": "A certified bound and optional numerical budget.",
+      "source": "crates/accuracy/src/budget.rs"
+    },
+    {
+      "claims": [
+        "[ACCURACY-claim:accuracy:bound-composition-rational-oracles]",
+        "[ACCURACY-claim:accuracy:bound-vector-composition-lifecycle]"
+      ],
+      "domain": "Finite nonnegative magnitudes and matching contraction lengths.",
+      "guarantee": "Outward arithmetic retains an upper bound; repeated entries retain their multiplicity.",
+      "id": "accuracy-composition",
+      "law": "Nonnegative sums, scales and contractions.",
+      "operation": "Bound composition",
+      "owner": "ACCURACY",
+      "refusals": "InvalidBound; LengthMismatch; Arithmetic",
+      "shape": "Scalar bounds and bound vectors.",
+      "source": "crates/accuracy/src/nonnegative.rs"
+    },
+    {
+      "claims": [
+        "[ACCURACY-claim:accuracy:named-norm-rational-oracles]",
+        "[ACCURACY-claim:accuracy:norm-empty-and-overflow-contracts]"
+      ],
+      "domain": "Finite nonnegative entries.",
+      "guarantee": "The selected summary remains conservative, including empty inputs.",
+      "id": "accuracy-norms",
+      "law": "Declared maximum, sum and Euclidean summaries.",
+      "operation": "Named bound norms",
+      "owner": "ACCURACY",
+      "refusals": "InvalidBound; Arithmetic",
+      "shape": "Bound vectors.",
+      "source": "crates/accuracy/src/vector.rs"
+    },
+    {
+      "claims": [
+        "[ACCURACY-claim:accuracy:recovery-resource-stops]",
+        "[ACCURACY-claim:accuracy:precision-retry-cannot-reset-limits]",
+        "[ACCURACY-claim:accuracy:precision-retry-permission-boundaries]"
+      ],
+      "domain": "A valid policy, state and caller-supplied allowance.",
+      "guarantee": "Reservations precede work and are not refunded by failure or precision retry.",
+      "id": "accuracy-recovery",
+      "law": "Retain cumulative attempts and work across admitted recovery transitions.",
+      "operation": "Bounded recovery and promotion",
+      "owner": "ACCURACY",
+      "refusals": "InvalidPolicy; InvalidRecoveryState; ResourceLimit; Arithmetic",
+      "shape": "A per-precision recovery state.",
+      "source": "crates/accuracy/src/recovery.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:binary32-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:binary64-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:endpoint-hulls-enclose]"
+      ],
+      "domain": "Finite interval endpoints.",
+      "guarantee": "Outward endpoint sums enclose the complete interval sum.",
+      "id": "scalar-addition",
+      "law": "x+y",
+      "operation": "Addition",
+      "owner": "SCALAR",
+      "refusals": "NonFinite; InvertedEndpoints; Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:binary32-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:binary64-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:endpoint-hulls-enclose]"
+      ],
+      "domain": "The complete divisor interval is separated from zero.",
+      "guarantee": "The hull of outward endpoint quotients encloses every admitted quotient.",
+      "id": "scalar-division",
+      "law": "x/y",
+      "operation": "Division",
+      "owner": "SCALAR",
+      "refusals": "ZeroInDivisor; Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:fixed-reduction-rational-oracles]",
+        "[SCALAR-claim:scalar:dot-to-norm-lifecycle]"
+      ],
+      "domain": "Finite slices of matching length.",
+      "guarantee": "Each product and fixed-order addition is enclosed independently of backend reduction order.",
+      "id": "scalar-dot",
+      "law": "sum x_i*y_i",
+      "operation": "Ordered dot product",
+      "owner": "SCALAR",
+      "refusals": "LengthMismatch; Overflow; UnsupportedEnvironment",
+      "shape": "Paired finite slices.",
+      "source": "crates/scalar/src/reduction.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:fused-endpoint-triples]",
+        "[SCALAR-claim:scalar:fused-rounding-is-explicit]",
+        "[SCALAR-claim:scalar:fused-intermediate-range]"
+      ],
+      "domain": "Finite endpoint triples.",
+      "guarantee": "The outward corner hull encloses the multi-affine image under the explicit fused law.",
+      "id": "scalar-fused",
+      "law": "x*y+z with a fused rounding schedule.",
+      "operation": "Fused multiply-add",
+      "owner": "SCALAR",
+      "refusals": "Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/fused.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:literal-constant-rational-oracles]",
+        "[SCALAR-claim:scalar:literal-resource-boundaries]",
+        "[SCALAR-claim:scalar:literal-range-and-divisor-refusals]"
+      ],
+      "domain": "Admitted grammar within digit, exponent and work ceilings.",
+      "guarantee": "The independently computed enclosure contains the exact literal and the selected candidate.",
+      "id": "scalar-literal",
+      "law": "The exact real value of admitted numeric text.",
+      "operation": "Bounded literal import",
+      "owner": "SCALAR",
+      "refusals": "InvalidLiteral; LiteralRange; ResourceLimit; ZeroInDivisor",
+      "shape": "A scalar numeric literal.",
+      "source": "crates/scalar/src/literal/evaluate.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:binary32-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:binary64-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:endpoint-hulls-enclose]"
+      ],
+      "domain": "Finite interval endpoints.",
+      "guarantee": "The hull of outward endpoint products encloses the complete product family.",
+      "id": "scalar-multiplication",
+      "law": "x*y",
+      "operation": "Multiplication",
+      "owner": "SCALAR",
+      "refusals": "NonFinite; InvertedEndpoints; Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:outward-narrowing-rational-oracle]",
+        "[SCALAR-claim:scalar:narrowing-halfway-ties]",
+        "[SCALAR-claim:scalar:literal-precision-change-lifecycle]"
+      ],
+      "domain": "Source center and endpoints fit the destination finite range.",
+      "guarantee": "Directed endpoints retain the old enclosure; a separate bound covers center displacement.",
+      "id": "scalar-narrow",
+      "law": "Round the center and enclose its representation displacement.",
+      "operation": "Precision narrowing",
+      "owner": "SCALAR",
+      "refusals": "Overflow; UnsupportedEnvironment",
+      "shape": "Scalar center and interval.",
+      "source": "crates/scalar/src/conversion.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:scaled-norm-rational-oracle]",
+        "[SCALAR-claim:scalar:reduction-and-norm-refusals]"
+      ],
+      "domain": "Finite slice entries.",
+      "guarantee": "Positive power scaling avoids direct squaring overflow while retaining an outward norm upper bound.",
+      "id": "scalar-norm",
+      "law": "sqrt(sum x_i*x_i)",
+      "operation": "Scaled Euclidean norm",
+      "owner": "SCALAR",
+      "refusals": "Overflow; UnsupportedEnvironment",
+      "shape": "Finite slices.",
+      "source": "crates/scalar/src/reduction.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:binary32-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:binary64-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:endpoint-hulls-enclose]"
+      ],
+      "domain": "Finite interval endpoints.",
+      "guarantee": "Endpoint extrema and the exact minimum at the origin enclose the full image.",
+      "id": "scalar-square",
+      "law": "x*x",
+      "operation": "Square",
+      "owner": "SCALAR",
+      "refusals": "Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:binary32-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:binary64-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:endpoint-hulls-enclose]"
+      ],
+      "domain": "The complete input interval is nonnegative.",
+      "guarantee": "Monotone outward endpoint roots enclose the full image.",
+      "id": "scalar-square-root",
+      "law": "sqrt(x)",
+      "operation": "Square-root",
+      "owner": "SCALAR",
+      "refusals": "NegativeRoot; Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:binary32-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:binary64-primitive-boundary-oracle]",
+        "[SCALAR-claim:scalar:endpoint-hulls-enclose]"
+      ],
+      "domain": "Finite interval endpoints.",
+      "guarantee": "Opposite endpoint differences enclose the complete interval difference.",
+      "id": "scalar-subtraction",
+      "law": "x-y",
+      "operation": "Subtraction",
+      "owner": "SCALAR",
+      "refusals": "NonFinite; InvertedEndpoints; Overflow; UnsupportedEnvironment",
+      "shape": "Scalar intervals.",
+      "source": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:fixed-reduction-rational-oracles]",
+        "[SCALAR-claim:scalar:reduction-order-and-empty-laws]"
+      ],
+      "domain": "Finite entries in fixed index order.",
+      "guarantee": "An outward increasing-index fold encloses the exact sum, including its empty identity.",
+      "id": "scalar-sum",
+      "law": "sum x_i",
+      "operation": "Ordered sum",
+      "owner": "SCALAR",
+      "refusals": "Overflow; UnsupportedEnvironment",
+      "shape": "Finite slices.",
+      "source": "crates/scalar/src/reduction.rs"
+    },
+    {
+      "claims": [
+        "[SCALAR-claim:scalar:exact-widening-preserves-coverage]"
+      ],
+      "domain": "The admitted narrower finite format.",
+      "guarantee": "Center and endpoints widen exactly without additional displacement.",
+      "id": "scalar-widen",
+      "law": "Preserve the represented center and enclosure.",
+      "operation": "Precision widening",
+      "owner": "SCALAR",
+      "refusals": "The input must already satisfy finite admission.",
+      "shape": "Scalar center and interval.",
+      "source": "crates/scalar/src/conversion.rs"
+    }
+  ],
+  "measurements": [
+    {
+      "command": "orchestration-linter coverage",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "adopted-claimed-tests",
+      "metric": "Tests carrying claims",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "declarations",
+      "value": "103"
+    },
+    {
+      "command": "orchestration-linter check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "adopted-constants",
+      "metric": "Registered constants",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "constants",
+      "value": "29"
+    },
+    {
+      "command": "orchestration-linter check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "adopted-file-indexes",
+      "metric": "Current file indexes",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "indexes",
+      "value": "26"
+    },
+    {
+      "command": "orchestration-linter check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "adopted-matrix-folders",
+      "metric": "Current matrix folders",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "folders",
+      "value": "14"
+    },
+    {
+      "command": "cargo run -p nrz-docgen -- check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "docgen-check-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "195520"
+    },
+    {
+      "command": "cargo run -p nrz-docgen -- check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "docgen-check-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "1.30"
+    },
+    {
+      "command": "cargo run -p nrz-docgen -- data",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "docgen-data-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "403452"
+    },
+    {
+      "command": "cargo run -p nrz-docgen -- data",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "docgen-data-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "3.16"
+    },
+    {
+      "command": "cargo run -p nrz-docgen -- render",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "docgen-render-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "34816"
+    },
+    {
+      "command": "cargo run -p nrz-docgen -- render",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "docgen-render-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "0.28"
+    },
+    {
+      "command": "orchestration-linter check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "host-check-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "36076"
+    },
+    {
+      "command": "orchestration-linter check",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "host-check-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "3.48"
+    },
+    {
+      "command": "orchestration-linter coverage",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "host-coverage-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "40944"
+    },
+    {
+      "command": "orchestration-linter coverage",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "host-coverage-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "3.83"
+    },
+    {
+      "command": "orchestration-linter project --write",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "host-project-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "39244"
+    },
+    {
+      "command": "orchestration-linter project --write",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "host-project-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "2.83"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "strict-clippy-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "942352"
+    },
+    {
+      "command": "cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "strict-clippy-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "35.13"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-rustdoc-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "829412"
+    },
+    {
+      "command": "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-rustdoc-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "27.50"
+    },
+    {
+      "command": "orchestration-linter coverage",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-test-declarations",
+      "metric": "Covered test declarations",
+      "source": "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "declarations",
+      "value": "1280"
+    },
+    {
+      "command": "cargo test --workspace --no-fail-fast",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-tests-failed",
+      "metric": "Failed test cases",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "tests",
+      "value": "0"
+    },
+    {
+      "command": "cargo test --workspace --no-fail-fast",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-tests-passed",
+      "metric": "Passed test cases",
+      "source": "diagnostic 5 on sojka; includes the command's unit, integration and documentation tests; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "tests",
+      "value": "1383"
+    },
+    {
+      "command": "cargo test --workspace --no-fail-fast",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-tests-peak-rss",
+      "metric": "Peak resident memory",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "KiB",
+      "value": "2370916"
+    },
+    {
+      "command": "cargo test --workspace --no-fail-fast",
+      "commit": "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede",
+      "date": "2026-10-22",
+      "id": "workspace-tests-wall",
+      "metric": "Process wall",
+      "source": "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668",
+      "unit": "s",
+      "value": "154.58"
+    }
+  ],
+  "refusals": [
+    {
+      "category": "failure",
+      "meaning": "The scalar substrate cannot enclose the operation.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "Arithmetic"
+    },
+    {
+      "category": "failure",
+      "meaning": "A bound entry is negative or nonfinite.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "InvalidBound"
+    },
+    {
+      "category": "failure",
+      "meaning": "Tolerances or the positive reference scale fail admission.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "InvalidBudget"
+    },
+    {
+      "category": "failure",
+      "meaning": "The stagnation window is invalid.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "InvalidPolicy"
+    },
+    {
+      "category": "failure",
+      "meaning": "The operation violates the recovery phase or retry permission.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "InvalidRecoveryState"
+    },
+    {
+      "category": "failure",
+      "meaning": "Contraction vectors have different lengths.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "LengthMismatch"
+    },
+    {
+      "category": "failure",
+      "meaning": "An attempt or work reservation exceeds its cumulative allowance.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/error.rs",
+      "type_name": "AccuracyFailure",
+      "variant": "ResourceLimit"
+    },
+    {
+      "category": "resource",
+      "meaning": "No further candidate or refinement attempt can be reserved.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/work.rs",
+      "type_name": "ResourceLimit",
+      "variant": "Attempts"
+    },
+    {
+      "category": "resource",
+      "meaning": "Requested work exceeds the cumulative allowance.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/work.rs",
+      "type_name": "ResourceLimit",
+      "variant": "Work"
+    },
+    {
+      "category": "refusing stop",
+      "meaning": "Arithmetic or tolerance evaluation failed.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/recovery.rs",
+      "type_name": "StopReason",
+      "variant": "Arithmetic"
+    },
+    {
+      "category": "successful stop",
+      "meaning": "The certified upper radius satisfies the requested tolerance.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/recovery.rs",
+      "type_name": "StopReason",
+      "variant": "BudgetMet"
+    },
+    {
+      "category": "successful stop",
+      "meaning": "No budget was requested; the available bound ends recovery.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/recovery.rs",
+      "type_name": "StopReason",
+      "variant": "NotRequested"
+    },
+    {
+      "category": "refusing stop",
+      "meaning": "The configured refinement allowance is used.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/recovery.rs",
+      "type_name": "StopReason",
+      "variant": "RefinementLimit"
+    },
+    {
+      "category": "refusing stop",
+      "meaning": "A cumulative attempt or work reservation failed.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/recovery.rs",
+      "type_name": "StopReason",
+      "variant": "ResourceLimit"
+    },
+    {
+      "category": "refusing stop",
+      "meaning": "The certified radius did not improve within the permitted window.",
+      "owner": "ACCURACY",
+      "source": "crates/accuracy/src/recovery.rs",
+      "type_name": "StopReason",
+      "variant": "Stagnation"
+    },
+    {
+      "category": "failure",
+      "meaning": "Committed bytes differ from the current generation.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/check.rs",
+      "type_name": "Class",
+      "variant": "Changed"
+    },
+    {
+      "category": "failure",
+      "meaning": "An expected generated path is absent.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/check.rs",
+      "type_name": "Class",
+      "variant": "Missing"
+    },
+    {
+      "category": "failure",
+      "meaning": "An undeclared managed path remains in the tree.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/check.rs",
+      "type_name": "Class",
+      "variant": "Stale"
+    },
+    {
+      "category": "failure",
+      "meaning": "Repeated generation does not preserve bytes or inventory.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/check.rs",
+      "type_name": "Class",
+      "variant": "Unstable"
+    },
+    {
+      "category": "failure",
+      "meaning": "A required dataset is absent or incompatible.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "DatasetCompatibility"
+    },
+    {
+      "category": "failure",
+      "meaning": "A required envelope field is absent or invalid.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "Envelope"
+    },
+    {
+      "category": "failure",
+      "meaning": "A filesystem operation failed at the retained path.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "Io"
+    },
+    {
+      "category": "failure",
+      "meaning": "A committed JSON document is syntactically invalid.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "JsonSyntax"
+    },
+    {
+      "category": "failure",
+      "meaning": "The declared output inventory is invalid.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "Manifest"
+    },
+    {
+      "category": "failure",
+      "meaning": "Workspace membership or a supported manifest fact is invalid.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "Membership"
+    },
+    {
+      "category": "failure",
+      "meaning": "A typed record or its semantic constraints are invalid.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "Payload"
+    },
+    {
+      "category": "failure",
+      "meaning": "A template cannot be loaded or evaluated.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "Template"
+    },
+    {
+      "category": "failure",
+      "meaning": "A template header violates the declared source contract.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "TemplateHeader"
+    },
+    {
+      "category": "failure",
+      "meaning": "An input TOML document is syntactically invalid.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "TomlSyntax"
+    },
+    {
+      "category": "failure",
+      "meaning": "Text is outside the bounded numeric grammar.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "InvalidLiteral"
+    },
+    {
+      "category": "failure",
+      "meaning": "The lower endpoint exceeds the upper endpoint.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "InvertedEndpoints"
+    },
+    {
+      "category": "failure",
+      "meaning": "Dot-product slices differ in length.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "LengthMismatch"
+    },
+    {
+      "category": "failure",
+      "meaning": "Literal evaluation needs an unbounded intermediate or result.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "LiteralRange"
+    },
+    {
+      "category": "failure",
+      "meaning": "The real root enclosure includes negative inputs.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "NegativeRoot"
+    },
+    {
+      "category": "failure",
+      "meaning": "An input is infinite or not a number.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "NonFinite"
+    },
+    {
+      "category": "failure",
+      "meaning": "A candidate or required outward neighbor is nonfinite.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "Overflow"
+    },
+    {
+      "category": "failure",
+      "meaning": "Literal digits, exponent or work exceed the declared ceiling.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "ResourceLimit"
+    },
+    {
+      "category": "failure",
+      "meaning": "The target or floating-environment probes are unsupported.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "UnsupportedEnvironment"
+    },
+    {
+      "category": "failure",
+      "meaning": "Division is undefined within the divisor enclosure.",
+      "owner": "SCALAR",
+      "source": "crates/scalar/src/error.rs",
+      "type_name": "ArithmeticFailure",
+      "variant": "ZeroInDivisor"
+    }
+  ],
+  "source_versions": [
+    {
+      "fingerprint": "e9fcbb08ac4e14d8",
+      "path": "crates/accuracy/src/budget.rs"
+    },
+    {
+      "fingerprint": "9f71b6d9817cfaf0",
+      "path": "crates/accuracy/src/error.rs"
+    },
+    {
+      "fingerprint": "91db2ca85c0e136b",
+      "path": "crates/accuracy/src/nonnegative.rs"
+    },
+    {
+      "fingerprint": "00517aae5a83f4a5",
+      "path": "crates/accuracy/src/recovery.rs"
+    },
+    {
+      "fingerprint": "29aabac47750f62a",
+      "path": "crates/accuracy/src/vector.rs"
+    },
+    {
+      "fingerprint": "97f230865969655d",
+      "path": "crates/accuracy/src/work.rs"
+    },
+    {
+      "fingerprint": "6e188ffd1926b1e3",
+      "path": "crates/scalar/src/conversion.rs"
+    },
+    {
+      "fingerprint": "9fdf2b1b2a75692c",
+      "path": "crates/scalar/src/enclosure.rs"
+    },
+    {
+      "fingerprint": "0c09e7631658c930",
+      "path": "crates/scalar/src/error.rs"
+    },
+    {
+      "fingerprint": "7bbda2a195d1c71c",
+      "path": "crates/scalar/src/fused.rs"
+    },
+    {
+      "fingerprint": "f0bdbfefd2e3dc81",
+      "path": "crates/scalar/src/literal/evaluate.rs"
+    },
+    {
+      "fingerprint": "784a070115c8c17d",
+      "path": "crates/scalar/src/reduction.rs"
+    },
+    {
+      "fingerprint": "af25fd69955bb04b",
+      "path": "tools/docgen/src/check.rs"
+    },
+    {
+      "fingerprint": "0bcffd6f3190e7ac",
+      "path": "tools/docgen/src/error.rs"
+    }
+  ]
+}

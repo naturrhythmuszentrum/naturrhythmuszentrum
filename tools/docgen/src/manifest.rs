@@ -106,7 +106,10 @@ pub(crate) fn read(root: &Path, owners: &BTreeSet<String>) -> Result<Vec<Documen
         check_symlinks(root, &template_path(&document.output))?;
         let mut requirements = BTreeSet::new();
         for name in &document.requires {
-            if name != "project" && name != "census" && name != "problems" {
+            if !matches!(
+                name.as_str(),
+                "project" | "census" | "problems" | "engineering"
+            ) {
                 return Err(invalid(
                     &document.output,
                     &format!("unknown dataset {name}"),

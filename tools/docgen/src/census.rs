@@ -7,6 +7,7 @@
 //! | [`census_across_workspace_roots`] | docgen | Use explicit members across all three roots and only mirrored README sources. |
 //! | [`derives_member_order_and_optional_facts`] | docgen | Keep member order, inherit one description, and represent absent values distinctly. |
 //! | [`refuses_invalid_member_paths`] | docgen | Reject globs, parent traversal, and duplicates before reading member manifests. |
+//! | [`census_dependency_identities_and_refusals`] | docgen | Manifest edges retain aliases, workspace inheritance and dependency kinds while refusing conditional declarations. |
 
 //! Workspace census derived directly from Cargo manifests.
 
@@ -50,6 +51,12 @@ struct Member {
     description: Option<String>,
     /// Whether a regular mirrored README template exists.
     has_readme_template: bool,
+    /// Direct unconditional normal dependency package names.
+    normal_dependencies: Vec<String>,
+    /// Direct development dependency package names.
+    development_dependencies: Vec<String>,
+    /// Direct build dependency package names.
+    build_dependencies: Vec<String>,
 }
 
 /// Typed census payload.
@@ -143,6 +150,52 @@ fn inspect_member(
         .and_then(Value::as_str)
         .ok_or_else(|| membership(&member_manifest, "package name must be a string"))?
         .to_owned();
+    let description = member_description(workspace, package, &member_manifest)?;
+    let template = manifest::template_path(&format!("{path}/README.md"));
+    manifest::check_symlinks(root, &template)?;
+    let has_readme_template = match fs::symlink_metadata(root.join(&template)) {
+        Ok(metadata) if metadata.file_type().is_file() => true,
+        Ok(_) => {
+            return Err(membership(
+                &template,
+                "README template must be a regular file",
+            ));
+        }
+        Err(problem) if problem.kind() == ErrorKind::NotFound => false,
+        Err(source) => return Err(error::io(&template, source)),
+    };
+    Ok(Member {
+        name,
+        path: path.to_owned(),
+        description,
+        has_readme_template,
+        normal_dependencies: dependencies(
+            &member_value,
+            workspace,
+            &member_manifest,
+            "dependencies",
+        )?,
+        development_dependencies: dependencies(
+            &member_value,
+            workspace,
+            &member_manifest,
+            "dev-dependencies",
+        )?,
+        build_dependencies: dependencies(
+            &member_value,
+            workspace,
+            &member_manifest,
+            "build-dependencies",
+        )?,
+    })
+}
+
+/// Resolve only the supported explicit or inherited package description forms.
+fn member_description(
+    workspace: &Map<String, Value>,
+    package: &Map<String, Value>,
+    path: &str,
+) -> Result<Option<String>, Error> {
     let description = match package.get("description") {
         None => None,
         Some(Value::String(text)) => Some(text.clone()),
@@ -164,30 +217,71 @@ fn inspect_member(
         }
         Some(_) => {
             return Err(membership(
-                &member_manifest,
+                path,
                 "description must be a string or description.workspace = true",
             ));
         }
     };
-    let template = manifest::template_path(&format!("{path}/README.md"));
-    manifest::check_symlinks(root, &template)?;
-    let has_readme_template = match fs::symlink_metadata(root.join(&template)) {
-        Ok(metadata) if metadata.file_type().is_file() => true,
-        Ok(_) => {
-            return Err(membership(
-                &template,
-                "README template must be a regular file",
-            ));
-        }
-        Err(problem) if problem.kind() == ErrorKind::NotFound => false,
-        Err(source) => return Err(error::io(&template, source)),
+    Ok(description)
+}
+
+/// Read declared direct package identities, refusing conditional edges instead of guessing.
+fn dependencies(
+    value: &Value,
+    workspace: &Map<String, Value>,
+    path: &str,
+    kind: &str,
+) -> Result<Vec<String>, Error> {
+    if value.get("target").is_some() {
+        return Err(membership(
+            path,
+            "target-specific dependencies are not supported",
+        ));
+    }
+    let Some(entries) = value.get(kind) else {
+        return Ok(Vec::new());
     };
-    Ok(Member {
-        name,
-        path: path.to_owned(),
-        description,
-        has_readme_template,
-    })
+    let entries = entries
+        .as_object()
+        .ok_or_else(|| membership(path, "dependencies must be a table"))?;
+    let mut names = BTreeSet::new();
+    for (alias, declaration) in entries {
+        if declaration.get("optional").and_then(Value::as_bool) == Some(true) {
+            return Err(membership(path, "optional dependencies are not supported"));
+        }
+        let inherited = declaration.get("workspace").and_then(Value::as_bool) == Some(true);
+        let declaration = if inherited {
+            workspace
+                .get("dependencies")
+                .and_then(|table| table.get(alias))
+                .ok_or_else(|| membership(path, "inherited workspace dependency is absent"))?
+        } else {
+            declaration
+        };
+        names.insert(dependency_name(path, alias, declaration)?.to_owned());
+    }
+    Ok(names.into_iter().collect())
+}
+
+/// Dependency aliases resolve only through an explicit package field or their own key.
+fn dependency_name<'a>(path: &str, alias: &'a str, value: &'a Value) -> Result<&'a str, Error> {
+    if value.is_string() {
+        return Ok(alias);
+    }
+    let table = value
+        .as_object()
+        .ok_or_else(|| membership(path, "dependency must be a version or table"))?;
+    if table.get("optional").and_then(Value::as_bool) == Some(true) {
+        return Err(membership(path, "optional dependencies are not supported"));
+    }
+    match table.get("package") {
+        None => Ok(alias),
+        Some(Value::String(name)) if !name.is_empty() => Ok(name),
+        Some(_) => Err(membership(
+            path,
+            "dependency package must be a nonempty string",
+        )),
+    }
 }
 
 /// Validate a committed census dataset before rendering uses it.
@@ -369,6 +463,39 @@ mod tests {
                 derive(directory.path()),
                 Err(Error::Membership { .. })
             ));
+        }
+        Ok(())
+    }
+    /// Manifest edges retain aliases, workspace inheritance and dependency kinds while refusing conditional declarations.
+    /// ´claim:docgen:census-dependency-identities-and-refusals´
+    /// ´test:unit:census-dependency-identities-and-refusals´
+    #[test]
+    fn census_dependency_identities_and_refusals() -> Result<(), Box<dyn std::error::Error>> {
+        let workspace =
+            serde_json::json!({"dependencies": {"shared": {"package": "actual", "version": "1"}}});
+        let workspace = workspace.as_object().ok_or("workspace object")?;
+        let value = serde_json::json!({"dependencies": {"shared": {"workspace": true}, "plain": "1"},
+            "dev-dependencies": {"oracle": {"package": "exact-oracle", "version": "1"}}});
+        assert_eq!(
+            super::dependencies(&value, workspace, "Cargo.toml", "dependencies")?,
+            ["actual", "plain"]
+        );
+        assert_eq!(
+            super::dependencies(&value, workspace, "Cargo.toml", "dev-dependencies")?,
+            ["exact-oracle"]
+        );
+        assert_eq!(
+            super::dependencies(&value, workspace, "Cargo.toml", "build-dependencies")?,
+            [] as [String; 0]
+        );
+        for bad in [
+            serde_json::json!({"target": {}, "dependencies": {}}),
+            serde_json::json!({"dependencies": {"optional": {"optional": true}}}),
+            serde_json::json!({"dependencies": {"missing": {"workspace": true}}}),
+            serde_json::json!({"dependencies": {"shared": {"workspace": true, "optional": true}}}),
+            serde_json::json!({"dependencies": {"invalid": false}}),
+        ] {
+            assert!(super::dependencies(&bad, workspace, "Cargo.toml", "dependencies").is_err());
         }
         Ok(())
     }

@@ -177,3 +177,7 @@ requires = []
 [[document]]
 output = "crates/accuracy/tests/README.md"
 requires = []
+
+[[document]]
+output = "tools/docgen/src/engineering/README.md"
+requires = []

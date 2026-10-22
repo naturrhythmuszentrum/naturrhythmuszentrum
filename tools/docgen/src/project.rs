@@ -12,7 +12,7 @@ use serde_json::Value;
 use crate::envelope;
 use crate::error::{self, Error};
 
-/// Path of the only hand-edited documentation input.
+/// Path of the hand-edited project input.
 /// The project input path fixes the authored project source in the declared layout (´rule:docgen:input-layout´).
 /// ´const:docgen:project-input´ (´[ORCHESTRATION-alg:const:text]´)
 /// ´const:docgen:project-input-text-x8d5f8ea5´
@@ -57,17 +57,21 @@ struct Project {
     bites: Vec<Bite>,
 }
 
-/// Derive the deterministic project dataset from the only input.
+/// Derive the deterministic project dataset from its declared input.
 pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>, Value), Error> {
     let directory = "data/inputs";
     for entry in
         fs::read_dir(root.join(directory)).map_err(|source| error::io(directory, source))?
     {
         let entry = entry.map_err(|source| error::io(directory, source))?;
-        if entry.file_name() != "project.toml" {
+        if !matches!(
+            entry.file_name().to_str(),
+            Some("project.toml" | "engineering.toml")
+        ) {
             return Err(Error::Payload {
                 path: format!("{directory}/{}", entry.file_name().to_string_lossy()),
-                detail: "only project.toml is accepted in data/inputs".to_owned(),
+                detail: "only project.toml and engineering.toml are accepted in data/inputs"
+                    .to_owned(),
             });
         }
     }

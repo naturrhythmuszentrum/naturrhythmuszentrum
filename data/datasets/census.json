@@ -21,39 +21,96 @@
   ],
   "members": [
     {
+      "build_dependencies": [],
       "description": "Deterministic documentation datasets, rendering, and fixed-point checks",
+      "development_dependencies": [
+        "tempfile"
+      ],
       "has_readme_template": true,
       "name": "nrz-docgen",
+      "normal_dependencies": [
+        "clap",
+        "minijinja",
+        "nrz-bindings",
+        "nrz-cas",
+        "serde",
+        "serde_json",
+        "thiserror",
+        "toml"
+      ],
       "path": "tools/docgen"
     },
     {
+      "build_dependencies": [],
       "description": "Finite binary element arithmetic with outward enclosures",
+      "development_dependencies": [
+        "num-bigint",
+        "num-rational",
+        "num-traits"
+      ],
       "has_readme_template": true,
       "name": "nrz-scalar",
+      "normal_dependencies": [
+        "thiserror"
+      ],
       "path": "crates/scalar"
     },
     {
+      "build_dependencies": [],
       "description": "Dimension-neutral nonnegative bounds and conservative accuracy policies",
+      "development_dependencies": [
+        "num-bigint",
+        "num-rational",
+        "num-traits"
+      ],
       "has_readme_template": true,
       "name": "nrz-accuracy",
+      "normal_dependencies": [
+        "nrz-scalar"
+      ],
       "path": "crates/accuracy"
     },
     {
+      "build_dependencies": [],
       "description": "Typed descriptor heap with owned numerical regions and bound companions",
+      "development_dependencies": [],
       "has_readme_template": true,
       "name": "nrz-matrix",
+      "normal_dependencies": [
+        "faer",
+        "nrz-accuracy",
+        "nrz-bindings",
+        "nrz-scalar",
+        "thiserror"
+      ],
       "path": "crates/matrix"
     },
     {
+      "build_dependencies": [],
       "description": "Data-time quantity descriptors and checks over original symbolic expressions",
+      "development_dependencies": [],
       "has_readme_template": true,
       "name": "nrz-bindings",
+      "normal_dependencies": [
+        "nrz-cas",
+        "thiserror"
+      ],
       "path": "crates/bindings"
     },
     {
+      "build_dependencies": [],
       "description": "Exact graph construction and checked symbolic derivations",
+      "development_dependencies": [],
       "has_readme_template": true,
       "name": "nrz-cas",
+      "normal_dependencies": [
+        "num-bigint",
+        "num-complex",
+        "num-integer",
+        "num-rational",
+        "num-traits",
+        "petgraph"
+      ],
       "path": "crates/cas"
     }
   ]

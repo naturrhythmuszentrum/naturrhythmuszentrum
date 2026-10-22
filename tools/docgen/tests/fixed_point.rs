@@ -72,6 +72,10 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
             "# {{ project.name }}\n",
         ),
     )?;
+    fs::write(
+        root.join("data/inputs/engineering.toml"),
+        include_str!("support/engineering.toml"),
+    )?;
     write_problem(root, "alpha", "problem")?;
     Ok(())
 }

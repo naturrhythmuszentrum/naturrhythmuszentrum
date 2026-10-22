@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: CC0-1.0
+namespace = "org.naturrhythmuszentrum.docs.input.engineering"
+version = [1, 0, 0]
+owner = "NRZ"
+license = "CC0-1.0"
+sources = []
+labels = []
+source_versions = []
+kernels = []
+refusals = []
+measurements = []
