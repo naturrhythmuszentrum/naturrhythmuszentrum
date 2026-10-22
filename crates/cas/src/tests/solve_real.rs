@@ -62,6 +62,13 @@ fn real_discriminant_stratum_mutations() -> crate::testing::common::TestResult {
     crate::testing::solve_blind::real_stratum_mutations()
 }
 
+/// Whole-request generation, replay, witness size and Real isolation all retain exact cap-minus-one refusal.
+/// ´test:crate:real-measured-resource-boundaries´
+#[test]
+fn real_measured_resource_boundaries() -> crate::testing::common::TestResult {
+    crate::testing::solve_blind::real_measured_boundaries()
+}
+
 /// A different declaration field, base region or original denominator is a different expected theorem.
 /// ´test:crate:real-fresh-expected-claim-refusals´
 #[test]

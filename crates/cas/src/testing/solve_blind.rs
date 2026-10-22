@@ -134,6 +134,10 @@ pub(crate) use real_acceptance::check as real_acceptance;
 mod real_mutations;
 pub(crate) use real_mutations::strata as real_stratum_mutations;
 
+#[path = "solve_blind/real_budget.rs"]
+mod real_budget;
+pub(crate) use real_budget::measured as real_measured_boundaries;
+
 #[path = "solve_blind/real_replay.rs"]
 mod real_replay;
 pub(crate) use real_replay::refusals as real_expected_refusals;
