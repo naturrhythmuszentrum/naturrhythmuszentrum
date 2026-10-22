@@ -117,3 +117,7 @@ requires = []
 [[document]]
 output = "docs/design/lc-resonance.md"
 requires = []
+
+[[document]]
+output = "docs/design/descriptor-binding.md"
+requires = []
