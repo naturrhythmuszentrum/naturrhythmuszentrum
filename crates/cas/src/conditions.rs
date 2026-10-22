@@ -160,6 +160,7 @@ impl Conditions {
                 | Operator::Sub
                 | Operator::Mul
                 | Operator::Matrix { .. }
+                | Operator::MatrixMultiply
                 | Operator::Select(_)
                 | Operator::AffineReading(_)
                 | Operator::IntegerPower(_) => None,

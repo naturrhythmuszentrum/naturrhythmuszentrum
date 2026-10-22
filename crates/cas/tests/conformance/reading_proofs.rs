@@ -286,3 +286,117 @@ fn reading_matrix_products_remain_ordered() -> TestResult {
     );
     Ok(())
 }
+
+/// Native ordered products are total after every original factor has its own domain checked.
+/// ´test:integration:native-matrix-product-reflexivity-replays´
+#[test]
+fn native_matrix_product_reflexivity_replays() -> TestResult {
+    let mut source = native_product()?;
+    let expected = source.expected()?;
+    let step = crate::testing::witness::equality(
+        &source.fixture.context,
+        &source
+            .fixture
+            .cas
+            .admissible_region(&source.fixture.context)?,
+        Primitive::Reflexivity,
+        &source.left,
+        &source.right,
+    );
+    let proof = source
+        .fixture
+        .cas
+        .check_proof(&source.fixture.context, &[step], &mut ledger()?)?;
+    assert!(proof.is_discharged());
+    assert_eq!(proof.judgment(), &expected);
+    let bytes = source.fixture.cas.export_witness(&proof, &mut ledger()?)?;
+    let mut receiver = native_product()?;
+    let expected = receiver.expected()?;
+    let checked = receiver
+        .fixture
+        .cas
+        .replay(&bytes, &expected, &mut ledger()?)?;
+    assert!(checked.is_discharged());
+    Ok(())
+}
+
+/// Independent product syntax keeps native order and admits no proof during construction.
+fn native_product() -> TestResult<ReadingCase> {
+    use crate::testing::readings::matrix;
+    let mut fixture = Fixture::new(&[("A", matrix(2, 2)), ("x", matrix(2, 1))])?;
+    let node = fixture.term(
+        Operator::MatrixMultiply,
+        matrix(2, 1),
+        &[fixture.symbol("A")?, fixture.symbol("x")?],
+    )?;
+    Ok(ReadingCase {
+        fixture,
+        left: node.clone(),
+        right: node,
+    })
+}
+
+/// A structural zero factor cannot erase an invalid original entry in either ordered operand.
+/// ´test:integration:native-matrix-product-zero-keeps-invalid-original´
+#[test]
+fn native_matrix_product_zero_keeps_invalid_original() -> TestResult {
+    use crate::testing::readings::matrix;
+    let mut fixture = Fixture::new(&[("a", real())])?;
+    let zero = fixture.term(Operator::Rational(Rational::zero()), real(), &[])?;
+    let invalid = fixture.term(Operator::Div, real(), &[fixture.symbol("a")?, zero.clone()])?;
+    let zero = fixture.term(
+        Operator::Matrix {
+            rows: 1,
+            columns: 1,
+        },
+        matrix(1, 1),
+        &[zero],
+    )?;
+    let invalid = fixture.term(
+        Operator::Matrix {
+            rows: 1,
+            columns: 1,
+        },
+        matrix(1, 1),
+        &[invalid],
+    )?;
+    for operands in [[zero.clone(), invalid.clone()], [invalid, zero]] {
+        let node = fixture.term(Operator::MatrixMultiply, matrix(1, 1), &operands)?;
+        let step = crate::testing::witness::equality(
+            &fixture.context,
+            &fixture.cas.admissible_region(&fixture.context)?,
+            Primitive::Reflexivity,
+            &node,
+            &node,
+        );
+        let before = fixture.cas.counts();
+        refuses(
+            fixture
+                .cas
+                .check_proof(&fixture.context, &[step], &mut ledger()?),
+            InvalidCode::RefutedDomain,
+        );
+        assert_eq!(fixture.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Native product shape admission still refuses a changed contraction extent before any proof.
+/// ´test:integration:native-matrix-product-refuses-extent-mismatch´
+#[test]
+fn native_matrix_product_refuses_extent_mismatch() -> TestResult {
+    use crate::testing::readings::matrix;
+    let mut fixture = Fixture::new(&[("A", matrix(2, 2)), ("x", matrix(3, 1))])?;
+    let before = fixture.cas.counts();
+    assert!(
+        fixture
+            .term(
+                Operator::MatrixMultiply,
+                matrix(2, 1),
+                &[fixture.symbol("A")?, fixture.symbol("x")?]
+            )
+            .is_err()
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
