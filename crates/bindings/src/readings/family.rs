@@ -102,6 +102,11 @@ impl CoordinateFamily {
     pub fn entries(&self) -> &[EntryMeaning] {
         &self.entries
     }
+    /// Complete original free-coordinate meanings, including coordinates omitted by an expansion.
+    #[must_use]
+    pub fn original_entries(&self) -> &[EntryMeaning] {
+        &self.root_entries
+    }
     /// Literal source rectangle in logical column order.
     #[must_use]
     pub const fn shape(&self) -> [u32; 2] {

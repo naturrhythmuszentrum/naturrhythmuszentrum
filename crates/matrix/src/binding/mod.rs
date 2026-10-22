@@ -25,6 +25,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
+mod adapters;
 mod error;
 pub(crate) mod lifecycle;
 mod limits;
@@ -34,6 +35,10 @@ mod snapshot;
 pub(crate) mod symbols;
 mod views;
 
+pub use adapters::{
+    AffineAdapter, CompanionAdapter, EntryTicket, OperatorAdapter, ReadingAdapter,
+    ReadingAdapterError, ReadingCoverage,
+};
 pub use error::OperationError;
 pub use lifecycle::{SymbolState, ValueBinding};
 pub use limits::ExecutionLimits;

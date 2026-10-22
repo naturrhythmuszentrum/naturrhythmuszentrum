@@ -10,6 +10,7 @@ mod family;
 mod grid;
 mod maps;
 mod meaning;
+mod operations;
 mod projection;
 mod relation;
 mod representation;
@@ -25,6 +26,12 @@ pub use companions::{
 pub use family::CoordinateFamily;
 pub use grid::IndexedReading;
 pub use meaning::EntryMeaning;
+/// Exact algebra construction API used by these physical adapters.
+pub use nrz_cas as algebra;
+pub use operations::{
+    AffineOperation, LinearOperator, OperatorApplication, OperatorCoefficient,
+    ReadingOperationError,
+};
 pub use projection::{ProjectionSpace, ReadingProjection};
 pub use relation::ReadingRelation;
 pub use representation::{Representation, RepresentationDefinition, RepresentationKind};

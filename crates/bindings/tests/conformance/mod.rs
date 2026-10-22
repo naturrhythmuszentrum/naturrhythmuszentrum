@@ -26,3 +26,5 @@ mod companion_readings;
 mod representations;
 
 mod reading_sources;
+
+mod reading_operations;

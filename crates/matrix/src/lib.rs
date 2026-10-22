@@ -35,6 +35,10 @@ mod shape;
 mod storage;
 
 pub use binding::{
+    AffineAdapter, CompanionAdapter, EntryTicket, OperatorAdapter, ReadingAdapter,
+    ReadingAdapterError, ReadingCoverage,
+};
+pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
     InputSnapshot, NormalizedInputs, NormalizedView, OperationDraft, OperationError,
     OutputReservation, PhysicalView, RegionContract, SymbolState, ValueBinding,
