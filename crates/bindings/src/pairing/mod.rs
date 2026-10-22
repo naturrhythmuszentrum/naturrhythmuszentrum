@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Layout-free companion and formal sensitivity relations, never numerical witnesses.
+//!
+//! # Companion, sensitivity and contraction contracts
+//!
+//! `PairingWitness::uncertainty` derives componentwise radius and standard schemas, variance schemas and ordered covariance/cross-covariance entry schemas through the existing scalar uncertainty rules. Covariance dimensions add both target dimensions, its measure multiplies both difference scales, and its kind retains both target kinds. All companion offsets are zero. `NamedReference` requires a nonempty declaration key, a difference descriptor and an explicit nonzero assumption. Relative radius and relative standard schemas retain that reference; a missing, mismatched or extra reference refuses. `validate_targets` and `validate_reference` check exact captured schemas and reference declarations. They do not resolve concrete value identities, indices, extents, sources or versions (see `docs/design/matrix-core-design.md`).
+//!
+//! `PairingWitness::sensitivity` derives an output-over-input dimension and difference-scale quotient, retaining both original target schemas, including point roles and origins. It creates a formal relation rather than a scalar named kind or a registry multiplication rule. `check_entry` checks a supplied scalar coefficient through the existing registry before returning its exact coordinate map; uncertainty entries must have the derived uncertainty kind. Discrete count targets and unnamed relative sensitivity coordinates refuse; a separately declared continuous quantity may have its own sensitivity. A schema alone does not establish a derivative formula. Native symbolic derivative witnesses are supplied by the checked sensitivity recipes documented in `src/sensitivity/` (see `docs/design/matrix-core-design.md`).
+//!
+//! `contract_covariance` checks both input sides of one descriptor term in `J_left U J_right^T`, accepting covariance or a variance with its repeated target. It derives the paired output covariance schema without inferring independence or performing a numerical contraction. `contract_radius` accepts only an absolute deterministic radius. Wrong modes and target-side mismatches refuse even for equal dimensions; changed measures, affine origins or roles require explicitly rederived pairings. Matrix owns the ordered maps, actual derivative evidence, coverage, source model and numerical propagation.
 
 mod checking;
 mod contraction;

@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit angle and rate vocabulary, separate from ordinary same-kind conversion.
+//!
+//! # Angle and rate vocabulary
+//!
+//! `Registry::with_angle_frequency` explicitly installs `rad`, `degree`, `turn`, `Hz`, `rad/s` and `s^-1`. Degrees have exact scale `pi/180` and turns `2*pi`; all six are differences with zero offset. `Kind::frequency`, `Kind::angular_frequency` and `Kind::rate` declare three distinct meanings at the same inverse-time dimension. The empty registry remains empty, and `register_measure` only registers a checked descriptor: a reporting key such as `turn` cannot create a physical relation.
 
 use nrz_cas::{ExactConstant, Rational};
 

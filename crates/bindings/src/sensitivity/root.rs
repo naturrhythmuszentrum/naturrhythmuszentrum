@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Positive-root sensitivity from checked polynomial partials and a fixed analytic implication.
+//!
+//! # Positive-root sensitivity
+//!
+//! `Context::check_root_sensitivity` accepts original `sqrt(input)` calls and distinct declared output-placeholder keys. It checks the root kind and the reverse squared-root relation, constructs every original operation of `t²-x`, checks that relation physically, and requests its polynomial partials in root-placeholder order followed by independent-input order. Every returned partial is checked against its fixed coefficient, with input and placeholder measure scales included. The named root call itself never enters the unsupported CAS derivative grammar. Implicit partials use one explicit `Task::Differentiate` request per scalar cell; `JacobianEntry::witness_index` associates each cell with its exact proof in `JacobianEvidence::witnesses`. The adapter checks every source, coordinate and domain before retaining that association.
+//!
+//! The final `SensitivityKernel::PositiveRoot` follows the fixed positive-root implication `2*t*dt=dx`, giving `s/(2*t)` for a declared input scale `s` and coherent positive output `t`. `SensitivityObligation::PositiveRoot` requires the numerical owner to enclose that exact root and establish strict positivity and a smooth neighborhood. A zero operating input cannot discharge this obligation even though polynomial partials exist there. `originals` retains the original root calls, `jacobian` retains the checked polynomial relations and replayed partials, and `auxiliary_symbols` identifies the output placeholders. These placeholders are not independent input columns or new statistical sources. Bindings supplies neither an implicit-function theorem from CAS nor a numerical domain certificate (see `docs/design/matrix-core-design.md`).
 
 use std::collections::BTreeMap;
 

@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit semantic operation declarations and conservative builtin rules.
+//!
+//! # Ordered semantic rules and function signatures
+//!
+//! Addition and subtraction require compatible kinds and the affine role table. Point minus point is a difference; point plus difference and difference plus point are points; point plus point, difference minus point and multiplicative point operations are refused. Products and powers require explicit kind rules beyond the standard continuous ratio and uncertainty relationships. Rules are ordered, checked against dimension arithmetic and rejected on duplicate registration. Multiplication does not consult the commuted registration: a registered rule for count multiplied by ratio applies to `n*2`, while `2*n` uses count scaling unless its own ordered rule is registered. Registry declarations are assumptions about physical meaning, not proofs of them.
+//!
+//! sin, cos and tan take angle differences in radians and return ratios; asin, acos and atan reverse that relationship; exp and log take and return ratios. sqrt checks a rational power, while `count_ratio` checks an explicit count relation and retains a quotient coordinate expression. Other applications need an ordered fixed signature; their arguments and result receive exact conversions to and from the signature's declared measures. Numerical domains of logarithms, inverse functions and roots remain obligations of the original expression, not conclusions of dimensional checking.
 
 mod catalog;
 mod relation;

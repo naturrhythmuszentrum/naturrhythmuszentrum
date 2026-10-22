@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked quantity and independent uncertainty descriptors.
+//!
+//! # Quantity and uncertainty meanings
+//!
+//! A descriptor combines a seven-axis SI dimension, an explicit semantic kind, an exact measure and an affine point or difference role. Dimensions use budgeted CAS rational arithmetic, with signed 64-bit numerators and unsigned 64-bit denominators as an explicit dimension admission boundary; an integral-only policy can reject fractional results. Kind identity is declared, never inferred from equal dimension vectors. Named kinds bind invariant dimensions in a registry. Nested kind relationships have a depth limit of 128.
+//!
+//! Radius, standard uncertainty, relative radius, relative standard uncertainty, variance and covariance have distinct kinds and their own measures. Absolute companions use difference dimensions and scales; variance squares them, and covariance takes the product of the two values' difference dimensions and scales. Relative descriptors require a compatible declared nonzero difference reference; the general descriptor constructor refuses a raw relative kind, and construction refuses a relative kind nested within any other uncertainty kind. Explicit relative conversion checks that reference, while ordinary division by a ratio coefficient preserves the uncertainty kind. Descriptor-only multiplication of standard uncertainties does not infer a variance, because value identity is unavailable at that layer. A standard uncertainty of a count is continuous, while the value remains discrete. These declarations provide neither numerical uncertainty propagation nor a proof of an assurance claim.
 
 use nrz_cas::Rational;
 

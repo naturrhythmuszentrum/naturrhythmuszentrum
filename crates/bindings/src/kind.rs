@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Semantic identity and discrete count-domain declarations.
+//!
+//! # Count domains
+//!
+//! A count has a declared thing and an integer domain, remains distinct from a continuous ratio and from amount of substance, and uses scale one with zero offset. Imports must be integers in the domain. Signed and nonnegative domains have conservative closure rules; bounded domains refuse unproved arithmetic. Known whole-number scaling checks domain closure. Dividing counts requires `count_ratio` and preserves divisor definedness as an original operation. No count is silently rounded or promoted to a continuous value.
 
 use crate::exact::{budget, ratio};
 use nrz_cas::Rational;

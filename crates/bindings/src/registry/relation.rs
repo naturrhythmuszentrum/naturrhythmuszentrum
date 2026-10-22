@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The full-cycle definition supplies an explicit relation between distinct frequency kinds.
+//!
+//! # Full-cycle frequency relation
+//!
+//! `Registry::frequency_relation` checks the distinct source and target kinds, difference roles and the registered full-cycle definition. Its private `FrequencyRelation` retains both actual coordinate descriptors, the typed turn angle, direction and exact CAS conversion. Forward coordinates multiply by the full-cycle angle and reverse coordinates divide by it; both endpoint measure scales participate. Thus `1000/pi Hz` becomes exactly `2000 rad/s`, and the inverse restores the exact original. `apply_exact` additionally checks the captured source schema, while ordinary same-kind conversion continues to refuse hertz versus angular frequency and derivative rate. The catalog's original frequency-times-angle multiplication rules support checked equations with retained source declarations; inverse cyclic interpretation uses the explicit full-cycle relation. Generic angular-frequency divided by angle retains the derivative-rate kind.
 
 use nrz_cas::ExactConstant;
 

@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact CAS measure definitions and role-aware conversion recipes.
+//!
+//! # Exact measure conversion and numerical export boundary
+//!
+//! A measure maps coordinates to coherent coordinates by a checked positive finite CAS expression and a rational offset. `Scale::Exact` supplies a rational literal; `Scale::Expression` supplies an owned `ExactConstant`. `Measure::new` requires a `PositiveConstant` witness reconstructed from that exact value. Reporting names and unchecked `Scale::Symbolic` text provide no evidence; the latter still returns `UnsupportedMeasureScale`. Zero, negative and unproved-positive expressions return `InvalidScale`. `Scale::pi` uses the typed CAS circle constant, without a numerical approximation.
+//!
+//! Conversion checks dimension, kind and role before composing scales in the CAS. For example `(pi/180)/(2*pi)` reduces to the exact Rational `1/360`. Measure origins remain rational; a point conversion's shift may be irrational because it divides the origin difference by the target scale. Differences have exact zero shifts and zero measure offsets. `Conversion::apply_exact` accepts source-free exact coordinates; `apply` additionally requires its exact result to be rational. Neither API accepts stored heap values. Companion products, variances, formal sensitivity quotients and original coordinate checking retain the exact scale graph.
+//!
+//! `Conversion::export_scale` exports signed or zero rational structural coefficients as bounded exact literals for numerical owners, and refuses a non-rational coefficient by name. The quantity stage must enclose pi-dependent constants once per exact map, precision and arithmetic revision, retain their evaluation error, and share eligible invariant evaluations. The implemented export surface retains exact descriptor meaning and explicit refusal; it supplies no numerical pi kernel or heap materialization.
 
 use nrz_cas::{ExactConstant, PositiveConstant, Rational};
 

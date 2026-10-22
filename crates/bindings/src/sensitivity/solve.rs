@@ -1,5 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Entrywise solve relations preserve one common operator across all right-hand sides.
+//!
+//! # Implicit solve sensitivity
+//!
+//! `Context::check_solve_sensitivity` validates a `SolveSymbols` inventory for a positive square order and a positive number of right-hand sides. Operator, right-hand-side and solution-placeholder entries use logical column order and distinct declared continuous keys. Bindings builds and checks each original scalar relation `sum_k A_ik X_kj - B_ij` with a first-product initialization and an increasing-index left fold. It then differentiates those relations in `(vec(X), vec(A), vec(B))` order and checks every coefficient against the fixed product-rule table. Original entry kinds and roles remain authoritative before any zero or cancellation; matched extents alone cannot admit a physical contraction.
+//!
+//! Final sensitivity columns use `(vec(A), vec(B))` and output rows use coherent `vec(X)`. Each `SensitivityKernel::Solve` selects the appropriate entry from a differential solve. In increasing input-column order, the numerical owner encloses `delta_B-delta_A*X_0`, including the selected input's exact measure scale, and solves with the same verified nominal operator. `Invertible` and `NominalSolution` obligations require a common invertibility certificate and an enclosure of the exact nominal `X_0`. A rounded candidate is insufficient. The 4-by-12 partial fixture costs reported in the seed README at `51105aeb4927f5e2d0bb76a607d87aae1d40c00b`, inspected on 2026-10-22, were 3,098,125 construction, 5,464,087 generation and 3,064,645 replay work units over 96 requests. Generation is its largest phase; its boundary test uses bounded fresh-run bisection to distinguish the required proof work from optional response encoding, then checks exact-limit success and one-below exhaustion. This preserves a common operator across all right-hand sides; it does not assert source independence, covariance validity or numerical solve accuracy. Aliased symbol inventories must first be expressed through the matrix owner's explicit structural maps (see `docs/design/matrix-core-design.md`).
 
 use std::collections::BTreeMap;
 

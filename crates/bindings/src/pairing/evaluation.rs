@@ -1,5 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Numerical parameter error is distinct from uncertainty of either physical target.
+//!
+//! # Parameter evaluation errors
+//!
+//! `EvaluationDescriptor` targets a checked companion or sensitivity parameter itself. It retains the full pairing and supplies `EvaluationKind::Radius`, the parameter's own dimension and its zero-offset difference measure. Thus covariance evaluation error has the product dimension of that covariance, with both target sides retained; it cannot become a bound on either physical value. An evaluated relative parameter retains its named reference through explicit evaluation-descriptor semantics. No nested relative scalar kind is admitted, and no conversion into an ordinary scalar uncertainty descriptor is exposed. The matrix owner binds this schema to the parameter region and version and certifies the numerical bound (see `docs/design/matrix-core-design.md`).
 
 use super::{PairingError, PairingWitness};
 use crate::{Dimension, Measure, Role};
