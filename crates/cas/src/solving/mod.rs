@@ -7,6 +7,7 @@ mod evaluate;
     reason = "native cases dispatch only the new family shapes"
 )]
 pub(crate) mod family;
+pub use family::cover::{FamilyCoverGroup, FamilyCoverRequest, FamilyCoverResult, FamilyPiece};
 pub use family::membership::PlacementOutcome;
 #[expect(
     clippy::redundant_pub_crate,

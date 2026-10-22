@@ -308,7 +308,13 @@ fn check_piece(state: &State, value: &FibrePieceData<Handle>) -> Result<(), Faul
         return Err(invalid());
     };
     if set.problem != value.problem
-        || problem.region != value.region
+        || state.region(problem.region.logical_id())?.ambient
+            != state.region(value.region.logical_id())?.ambient
+        || state
+            .region(problem.region.logical_id())?
+            .lies_over
+            .as_ref()
+            .is_none_or(|over| over.family != value.family.logical_id())
         || problem.unknowns != shape.unknowns
         || problem.ambient != super::field(state, &shape.fibre_space)?
     {

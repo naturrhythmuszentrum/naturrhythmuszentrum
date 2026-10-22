@@ -547,3 +547,7 @@ pub(crate) use specialize::{guards, samples};
 #[path = "real_oracle.rs"]
 mod real;
 pub(crate) use real::samples as real_samples;
+
+#[path = "family_oracle.rs"]
+mod family;
+pub(crate) use family::{cubic as family_cubic, quadratic as family_quadratic};

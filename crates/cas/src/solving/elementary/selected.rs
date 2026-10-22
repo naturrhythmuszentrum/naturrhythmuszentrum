@@ -65,6 +65,15 @@ impl Evaluation<'_> {
         id: LogicalId,
         budget: &mut Budget,
     ) -> Result<Option<Value>, Fault> {
+        if self
+            .cas
+            .state
+            .region(self.region.logical_id())?
+            .lies_over
+            .is_some()
+        {
+            return crate::solving::family::parameters::read(self, id, budget);
+        }
         let Some(frame) = self.parameter_frame()? else {
             return Ok(None);
         };
@@ -129,6 +138,15 @@ impl Evaluation<'_> {
         coefficient: &crate::solving::coefficients::model::Element,
         budget: &mut Budget,
     ) -> Result<bool, Fault> {
+        if self
+            .cas
+            .state
+            .region(self.region.logical_id())?
+            .lies_over
+            .is_some()
+        {
+            return crate::solving::family::parameters::zero(self, coefficient, budget);
+        }
         let Some(frame) = self.parameter_frame()? else {
             return Ok(false);
         };
@@ -306,6 +324,9 @@ impl Evaluation<'_> {
         map: &CoefficientMapData<Handle>,
         budget: &mut Budget,
     ) -> Result<Option<Value>, Fault> {
+        if matches!(map.target, MapTarget::Family { .. }) {
+            return crate::solving::family::parameters::fraction(self, handle, map, budget);
+        }
         if map.source != *self.engine.domain {
             return Ok(None);
         }
@@ -351,7 +372,7 @@ impl Evaluation<'_> {
             return Err(invalid());
         }
         if map.region != *self.region {
-            return Err(invalid());
+            crate::solving::family::mapping::restrict_map(self, map, budget)?;
         }
         crate::solving::coefficients::proof::identity_map(self.cas, map, self.premises, budget)?;
         match &stored.value {
@@ -362,7 +383,10 @@ impl Evaluation<'_> {
                 numerator,
                 denominator,
             } => {
-                let scalar = matches!(&map.target, MapTarget::ScalarAmbient { .. });
+                let scalar = matches!(
+                    &map.target,
+                    MapTarget::ScalarAmbient { .. } | MapTarget::Family { .. }
+                );
                 if scalar {
                     // The full map and original denominator are checked before any canonical reuse.
                     crate::solving::coefficients::proof::denominator(

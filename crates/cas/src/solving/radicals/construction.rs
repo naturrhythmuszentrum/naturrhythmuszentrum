@@ -108,6 +108,17 @@ impl Construction {
         bound: bool,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
+        if cas
+            .state
+            .region(self.region.logical_id())?
+            .lies_over
+            .is_some()
+            && let Some(value) = crate::solving::family::construction::expression(
+                cas, self, &operator, operands, bound, budget,
+            )?
+        {
+            return Ok(value);
+        }
         let mut arguments = vector(operands.len(), budget)?;
         arguments.extend(operands.iter().cloned().map(Reference::Existing));
         let scope = if bound {
@@ -141,14 +152,25 @@ impl Construction {
         let mut values = vector(images.len(), budget)?;
         values.extend(images.iter().cloned().map(Reference::Existing));
 
+        let target = cas
+            .state
+            .region(self.region.logical_id())?
+            .lies_over
+            .as_ref()
+            .map_or_else(
+                || MapTarget::ScalarAmbient {
+                    header: Reference::Existing(self.header.clone()),
+                    field: Field::Complex,
+                },
+                |over| MapTarget::Family {
+                    family: Reference::Existing(cas.handle(over.family)),
+                },
+            );
         materialize::admit(
             cas,
             SolveDraft::CoefficientMap(CoefficientMapData {
                 source: Reference::Existing(domain.clone()),
-                target: MapTarget::ScalarAmbient {
-                    header: Reference::Existing(self.header.clone()),
-                    field: Field::Complex,
-                },
+                target,
                 mode: MapMode::Specialization,
                 region: Reference::Existing(self.region.clone()),
                 images: values,
@@ -349,6 +371,18 @@ impl Construction {
     ) -> Result<(Handle, Handle), Fault> {
         let (relation, selection, root) =
             self.selection(cas, interpretation[0], interpretation[1], budget)?;
+        if order.is_none()
+            && cas
+                .state
+                .region(self.region.logical_id())?
+                .lies_over
+                .is_some()
+            && let Some(real) = crate::solving::family::real_roots::choose(
+                cas, self, polynomial, &relation, budget,
+            )?
+        {
+            return Ok(real);
+        }
         if order.is_none()
             && let Some(real) =
                 super::real_choice::choose(cas, self, polynomial, &relation, budget)?

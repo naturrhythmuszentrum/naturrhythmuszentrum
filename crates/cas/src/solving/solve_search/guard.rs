@@ -77,6 +77,16 @@ pub(crate) fn expression(
     if !value.denominator.equals(&one, budget)? {
         return Err(invalid().into());
     }
+    if cas
+        .state
+        .region(construction.region.logical_id())?
+        .lies_over
+        .is_some()
+    {
+        let images = super::coefficient_images(cas, construction, &pending.domain, budget)?;
+        let map = construction.mapping(cas, &pending.domain, &images, budget)?;
+        return Ok(construction.literal(cas, pending, &map, budget)?);
+    }
     let images = super::coefficient_images(cas, construction, &pending.domain, budget)?;
     if value.numerator.variables != images.len() {
         return Err(invalid().into());

@@ -52,6 +52,9 @@ fn parameters(
     coordinates: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    if matches!(map.target, MapTarget::Family { .. }) {
+        return crate::solving::family::mapping::parameters(cas, map, coordinates, budget);
+    }
     if map.mode != MapMode::Specialization {
         return Err(invalid());
     }
@@ -174,6 +177,9 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    if matches!(map.target, MapTarget::Family { .. }) {
+        crate::solving::family::region::projection(cas, &map.region, premises, budget)?;
+    }
     let mut current = map;
     let mut depth = 0_u64;
     loop {

@@ -212,10 +212,20 @@ impl Cas {
         for (position, member) in members.iter().enumerate() {
             edges.push((*member, Edge::RegionInput(position_u32(position)?)));
         }
+        let projection = if base.lies_over.is_some() {
+            crate::solving::family::context::projection(
+                state,
+                enclosing.admissible,
+                restriction,
+                &mut edges,
+            )?
+        } else {
+            base.lies_over
+        };
         let admissible = self.retain_region(
             state,
             Region {
-                lies_over: base.lies_over,
+                lies_over: projection,
                 header: enclosing.header_id,
                 scope: base.scope,
                 ambient: base.ambient,

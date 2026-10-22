@@ -32,7 +32,11 @@ impl Components<'_, '_> {
                 .ok_or_else(invalid)?,
         )?;
         if relation.region != *self.evaluation.region {
-            return Err(invalid());
+            crate::solving::family::restriction::relation_region(
+                self.evaluation,
+                relation,
+                budget,
+            )?;
         }
         budget.work(crate::graph::size(self.selections.len(), AT)?.max(1), AT)?;
         if !self.selections.contains(&selected) {
@@ -63,7 +67,11 @@ impl Components<'_, '_> {
         for (index, handle) in selection.relations.iter().enumerate() {
             let relation = super::super::selected::relation(self.evaluation.cas, handle)?;
             if relation.region != *self.evaluation.region {
-                return Err(invalid());
+                crate::solving::family::restriction::relation_region(
+                    self.evaluation,
+                    relation,
+                    budget,
+                )?;
             }
             let key = Atom::Root(selected, u32::try_from(index).map_err(|_| invalid())?);
             let mut root = self.atom(key, relation.ambient != Field::Complex, budget)?;
@@ -89,7 +97,11 @@ impl Components<'_, '_> {
         budget: &mut Budget,
     ) -> Result<Parts, Fault> {
         if relation.region != *self.evaluation.region {
-            return Err(invalid());
+            crate::solving::family::restriction::relation_region(
+                self.evaluation,
+                relation,
+                budget,
+            )?;
         }
         let stored = polynomial(&self.evaluation.cas.state, &relation.polynomial)?;
         let SolveDraft::CoefficientMap(map) =

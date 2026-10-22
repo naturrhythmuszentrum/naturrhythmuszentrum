@@ -33,6 +33,10 @@ pub(crate) fn canonical_map(
     let CoefficientDomainData::Fraction { base, coordinates } = domain(state, source)? else {
         return Ok(false);
     };
+    if matches!(mapping.target, MapTarget::Family { .. }) {
+        crate::solving::family::mapping::parameters_state(state, mapping, coordinates, budget)?;
+        return Ok(true);
+    }
     let SolveDraft::CoordinateSpace(product) =
         crate::solving::graph::object(state, coordinates.logical_id())?
     else {

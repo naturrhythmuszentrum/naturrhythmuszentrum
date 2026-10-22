@@ -237,26 +237,7 @@ pub(crate) fn construct(
                 Err(invalid())
             }
         }
-        Statement::Cover { domain, members } => {
-            let domain = cas.state.region(cas.checked(domain)?)?;
-            let RegionExpr::Union(expected) = &domain.expression else {
-                return Err(invalid());
-            };
-            let mut actual = Vec::new();
-            actual
-                .try_reserve_exact(members.len())
-                .map_err(|_| Fault::allocation(AT))?;
-            for member in members {
-                actual.push(cas.checked(member)?);
-            }
-            actual.sort_unstable();
-            actual.dedup();
-            if actual == *expected {
-                Ok(())
-            } else {
-                Err(invalid())
-            }
-        }
+        Statement::Cover { domain, members } => construct_cover(cas, domain, members, budget),
         Statement::Disjoint { left, right } => {
             let first = &cas.state.region(cas.checked(left)?)?.expression;
             let second = &cas.state.region(cas.checked(right)?)?.expression;
@@ -283,6 +264,38 @@ pub(crate) fn construct(
             if valid { Ok(()) } else { Err(invalid()) }
         }
         _ => Err(invalid()),
+    }
+}
+
+/// Compare the exact constructor cover inventory without changing its accounting.
+fn construct_cover(
+    cas: &Cas,
+    domain: &crate::graph::Handle,
+    members: &[crate::graph::Handle],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if cas.state.region(domain.logical_id())?.lies_over.is_some()
+        && crate::solving::family::region::identity_cover(cas, domain, members, budget)?
+    {
+        return Ok(());
+    }
+    let domain = cas.state.region(cas.checked(domain)?)?;
+    let RegionExpr::Union(expected) = &domain.expression else {
+        return Err(invalid());
+    };
+    let mut actual = Vec::new();
+    actual
+        .try_reserve_exact(members.len())
+        .map_err(|_| Fault::allocation(AT))?;
+    for member in members {
+        actual.push(cas.checked(member)?);
+    }
+    actual.sort_unstable();
+    actual.dedup();
+    if actual == *expected {
+        Ok(())
+    } else {
+        Err(invalid())
     }
 }
 

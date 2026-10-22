@@ -23,6 +23,14 @@ pub(crate) fn subset(
     {
         return Ok(false);
     }
+    if let RegionExpr::Meet(members) = &second.expression {
+        for member in members {
+            if !subset(cas, left, *member, budget)? {
+                return Ok(false);
+            }
+        }
+        return Ok(true);
+    }
     let mut pending = vec![(left, 1_u64)];
     while let Some((id, depth)) = pending.pop() {
         budget.work(1, AT)?;
@@ -146,11 +154,20 @@ pub(crate) fn lifted(
 
 /// Recover one exact family from region ancestry, rejecting mixed-family intersections.
 pub(crate) fn family(cas: &Cas, root: LogicalId, budget: &mut Budget) -> Result<LogicalId, Fault> {
+    family_state(&cas.state, root, budget)
+}
+
+/// Shared admission follows exactly the same family ancestry.
+pub(crate) fn family_state(
+    state: &crate::graph::State,
+    root: LogicalId,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
     let mut pending = vec![root];
     let mut found = None;
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let value = cas.state.region(id)?;
+        let value = state.region(id)?;
         if let Some(over) = &value.lies_over {
             if found.is_some_and(|family| family != over.family) {
                 return Err(invalid());
@@ -169,4 +186,20 @@ pub(crate) fn family(cas: &Cas, root: LogicalId, budget: &mut Budget) -> Result<
         }
     }
     found.ok_or_else(invalid)
+}
+
+/// A complete family piece supplies a singleton cover only by exact structural containment.
+pub(crate) fn identity_cover(
+    cas: &Cas,
+    domain: &Handle,
+    members: &[Handle],
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    let [member] = members else {
+        return Ok(false);
+    };
+    if family(cas, domain.logical_id(), budget)? != family(cas, member.logical_id(), budget)? {
+        return Ok(false);
+    }
+    subset(cas, domain.logical_id(), member.logical_id(), budget)
 }

@@ -111,10 +111,29 @@ pub(crate) fn propose(
     }
     audit.mark("source-polynomial", &original.region, 0, budget)?;
     let polynomial = read::polynomial(cas, original, budget)?;
+    let region = if cas
+        .state
+        .region(original.region.logical_id())?
+        .lies_over
+        .is_some()
+    {
+        let current = cas.handle(cas.state.context(request.context.logical_id())?.admissible);
+        if !crate::solving::family::region::subset(
+            cas,
+            current.logical_id(),
+            original.region.logical_id(),
+            budget,
+        )? {
+            return Err(crate::solving::family::invalid().into());
+        }
+        current
+    } else {
+        original.region.clone()
+    };
     let mut construction = Construction {
         header: original.header.clone(),
         context: request.context.clone(),
-        region: original.region.clone(),
+        region,
         steps: Vec::new(),
     };
     let reuse_coverage = matches!(

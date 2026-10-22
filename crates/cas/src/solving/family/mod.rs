@@ -20,9 +20,39 @@ pub(crate) mod region;
 mod build;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "radical construction dispatches only explicit family regions"
+)]
+pub(crate) mod construction;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "local contexts preserve the exact selected family stratum"
+)]
+pub(crate) mod context;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scalar evaluation dispatches explicit family bodies"
+)]
+pub(crate) mod evaluate;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared coefficient consumers dispatch only the explicit family target"
+)]
+pub(crate) mod mapping;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "native case admission validates placement propositions"
 )]
 pub(crate) mod membership;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scalar parameter readers dispatch only explicit family regions and maps"
+)]
+pub(crate) mod parameters;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the mixed polynomial reader retains native family source syntax"
+)]
+pub(crate) mod polynomial;
 mod query;
 #[expect(
     clippy::redundant_pub_crate,
@@ -73,3 +103,28 @@ pub(crate) fn local(cas: &Cas, id: LogicalId) -> Result<bool, Fault> {
     }
     Ok(false)
 }
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the mixed route constructs complete algebraic cubic pieces"
+)]
+pub(crate) mod algebraic;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "family coverage preserves repeated factor multiplicity"
+)]
+pub(crate) mod coverage;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "family root construction retains base-local Real certificates"
+)]
+pub(crate) mod real_roots;
+
+mod root_selection;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the public solving facade exports the expanded family cover recipe"
+)]
+pub(crate) mod cover;

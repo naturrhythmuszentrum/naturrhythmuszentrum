@@ -46,7 +46,12 @@ pub(crate) struct Fixture {
 impl Fixture {
     /// Keep all declarations in one immutable header, with distinct scalar sorts.
     pub(crate) fn new() -> TestResult<Self> {
-        let mut cas = Cas::new(Limits::default())?;
+        Self::with_limits(Limits::default())
+    }
+
+    /// Mixed solving shares the unchanged acceptance profile.
+    pub(crate) fn with_limits(limits: Limits) -> TestResult<Self> {
+        let mut cas = Cas::new(limits)?;
         let declarations = [
             ("r", Field::Real),
             ("c", Field::Complex),

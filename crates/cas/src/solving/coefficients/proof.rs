@@ -75,6 +75,7 @@ pub(crate) fn ground_map(
     budget.work(1, AT)?;
     let source = domain(&cas.state, &map.source)?;
     match &map.target {
+        MapTarget::Family { .. } => crate::solving::family::mapping::ground(cas, map, budget),
         MapTarget::CoefficientDomain { domain: target }
             if *target == map.source && map.images.is_empty() =>
         {

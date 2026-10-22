@@ -324,6 +324,9 @@ impl<R> MapTarget<R> {
         write: &mut impl FnMut(&R) -> Result<S, Fault>,
     ) -> Result<MapTarget<S>, Fault> {
         Ok(match self {
+            Self::Family { family } => MapTarget::Family {
+                family: write(family)?,
+            },
             Self::CoefficientDomain { domain } => MapTarget::CoefficientDomain {
                 domain: write(domain)?,
             },
@@ -1067,6 +1070,7 @@ impl<R> MapTarget<R> {
     /// Enumerate every typed child without copying its payload.
     fn references<'a>(&'a self, result: &mut Vec<&'a R>) {
         match self {
+            Self::Family { family } => result.push(family),
             Self::CoefficientDomain { domain } => {
                 result.push(domain);
             }
@@ -1935,6 +1939,7 @@ fn check_map(
     coefficient_domain(state, &value.source)?;
     let region = state.region(value.region.logical_id())?;
     match &value.target {
+        MapTarget::Family { .. } => super::family::mapping::validate(state, value, budget)?,
         MapTarget::CoefficientDomain { domain } => {
             coefficient_domain(state, domain)?;
             for image in &value.images {
@@ -1995,11 +2000,7 @@ fn check_relation(
     if map.source != polynomial_data.domain
         || map.mode != MapMode::Specialization
         || map.region != value.region
-        || map.target
-            != (MapTarget::ScalarAmbient {
-                header: value.header.clone(),
-                field: value.ambient.clone(),
-            })
+        || !super::family::mapping::relation_target(state, map, &value.header, &value.ambient)?
     {
         return Err(invalid());
     }
@@ -2608,6 +2609,11 @@ fn edges_coefficient_map(
     edge_family(result, &value.images, Edge::GeneratorImage)?;
     edge_family(result, &value.denominators, Edge::DenominatorFactor)?;
     match &value.target {
+        MapTarget::Family { family } => edge(
+            result,
+            family,
+            Edge::Scalar(crate::graph::ScalarEdge::Family),
+        )?,
         MapTarget::CoefficientDomain { domain } => edge(result, domain, Edge::MapTarget)?,
         MapTarget::ScalarAmbient { header, .. } => edge(result, header, Edge::InHeader)?,
     }
@@ -2879,13 +2885,7 @@ fn coefficient_literal(
     let SolveDraft::CoefficientMap(mapping) = object(state, map)? else {
         return Err(invalid());
     };
-    let MapTarget::ScalarAmbient {
-        header: target,
-        field,
-    } = &mapping.target
-    else {
-        return Err(invalid());
-    };
+    let (target, field) = super::family::mapping::scalar_target(state, mapping)?;
     if target.logical_id() != header
         || coefficient(state, &cas.handle(value))?.domain != mapping.source
     {
@@ -2894,7 +2894,7 @@ fn coefficient_literal(
     Ok(ScalarLiteral {
         header,
         operator: crate::model::Operator::ExactCoefficient,
-        field: field.clone(),
+        field,
         scope: state.region(mapping.region.logical_id())?.scope.clone(),
         attachment: crate::graph::ExpressionAttachment::ExactCoefficient { value, map },
         edges: vec![

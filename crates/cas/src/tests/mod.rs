@@ -44,3 +44,5 @@ mod sorts_wire;
 mod solve_real;
 
 mod family;
+
+mod family_solver;

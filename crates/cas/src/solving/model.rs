@@ -1094,6 +1094,11 @@ pub enum CoefficientDomainData<R = Reference> {
 /// The explicitly typed codomain of a coefficient map.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum MapTarget<R = Reference> {
+    /// Local interpretation in one explicitly projected Real-in-Complex family.
+    Family {
+        /// Exact family; its original base and fibre declarations remain distinct.
+        family: R,
+    },
     /// `CoefficientDomain` syntax; admission does not prove its mathematical claims.
     CoefficientDomain {
         /// Exact domain.

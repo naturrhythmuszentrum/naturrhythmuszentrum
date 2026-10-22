@@ -80,7 +80,7 @@ impl Cas {
     ) -> Result<VerifiedWitness, Fault> {
         self.transaction(generation, |cas, generation| {
             let statement = &source.judgment().statement;
-            let original = crate::context_check::domain(statement)
+            let original = super::restriction::domain(statement)
                 .ok_or_else(invalid)?
                 .clone();
             let target = cas.handle(cas.state.context(cas.checked(context)?)?.admissible);
@@ -111,7 +111,7 @@ impl Cas {
                 cas,
                 context,
                 Primitive::ContextWeaken,
-                crate::context_check::restricted(statement, &target),
+                super::restriction::restricted(statement, &target),
                 &[source.proof().clone(), subset],
                 Certificate::None,
                 generation,
@@ -149,7 +149,11 @@ fn identity(
 }
 
 /// Retain all original piece domains reached through local bodies or scalar operands.
-fn regions(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<Vec<Handle>, Fault> {
+pub(crate) fn regions(
+    cas: &Cas,
+    statement: &Statement,
+    budget: &mut Budget,
+) -> Result<Vec<Handle>, Fault> {
     let mut pending = match statement {
         Statement::Equality { left, right, .. } => vec![left.logical_id(), right.logical_id()],
         Statement::Compatibility { left, right, .. } => vec![
@@ -193,7 +197,11 @@ fn regions(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<Vec<
 }
 
 /// Materialize the exact preimage syntax before any subset theorem is requested.
-fn pullback(cas: &mut Cas, total: &Handle, budget: &mut Budget) -> Result<Handle, Fault> {
+pub(crate) fn pullback(
+    cas: &mut Cas,
+    total: &Handle,
+    budget: &mut Budget,
+) -> Result<Handle, Fault> {
     let over = cas
         .state
         .region(cas.checked(total)?)?

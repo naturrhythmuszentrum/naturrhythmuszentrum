@@ -141,3 +141,8 @@ pub(crate) use real_budget::measured as real_measured_boundaries;
 #[path = "solve_blind/real_replay.rs"]
 mod real_replay;
 pub(crate) use real_replay::refusals as real_expected_refusals;
+
+// Independent family samples share only the test-side rational quotient arithmetic.
+pub(crate) use oracle::{family_cubic, family_quadratic};
+
+pub(crate) use audit::applications as family_applications;

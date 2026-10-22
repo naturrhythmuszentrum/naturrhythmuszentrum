@@ -105,7 +105,7 @@ fn power(
 }
 
 /// Strict division remains outside this polynomial producer until its original guard is certified.
-fn operation(
+pub(crate) fn operation(
     engine: &Engine<'_>,
     operator: &Operator,
     operands: &[Dense],
@@ -171,7 +171,7 @@ fn literal(
 }
 
 /// Visit only the original expression closure using a bounded explicit postfix stack.
-fn expression(
+pub(crate) fn expression(
     cas: &Cas,
     engine: &Engine<'_>,
     root: LogicalId,
@@ -184,6 +184,12 @@ fn expression(
     let mut values = vector(1, budget)?;
     while let Some((id, ready)) = pending.pop() {
         budget.work(1, super::AT)?;
+        if crate::solving::family::local(cas, id)? {
+            values.push(crate::solving::family::polynomial::read(
+                cas, engine, id, unknown, region, budget,
+            )?);
+            continue;
+        }
         let current = cas.state.expression(id)?;
         budget.check(BudgetKind::Depth, current.depth, super::AT)?;
         if !ready && !current.operands.is_empty() {

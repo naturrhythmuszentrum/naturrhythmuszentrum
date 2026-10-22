@@ -392,6 +392,11 @@ fn draft(
                 crate::solving::CoefficientMapData {
                     source: Reference::Existing(map.source.clone()),
                     target: match &map.target {
+                        crate::solving::MapTarget::Family { family } => {
+                            crate::solving::MapTarget::Family {
+                                family: Reference::Existing(family.clone()),
+                            }
+                        }
                         crate::solving::MapTarget::CoefficientDomain { domain } => {
                             crate::solving::MapTarget::CoefficientDomain {
                                 domain: Reference::Existing(domain.clone()),

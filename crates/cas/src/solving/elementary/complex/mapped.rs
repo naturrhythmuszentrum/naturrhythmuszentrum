@@ -37,8 +37,11 @@ impl Components<'_, '_> {
         self.depth = self.depth.checked_add(1).ok_or_else(invalid)?;
         budget.check(BudgetKind::Depth, self.depth, AT)?;
         let stored = value(&self.evaluation.cas.state, handle)?;
-        if (&stored.domain, &map.region) != (&map.source, self.evaluation.region) {
+        if stored.domain != map.source {
             return Err(invalid());
+        }
+        if map.region != *self.evaluation.region {
+            crate::solving::family::mapping::base_map(self.evaluation, map, budget)?;
         }
         crate::solving::coefficients::proof::identity_map(
             self.evaluation.cas,

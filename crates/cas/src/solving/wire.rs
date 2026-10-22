@@ -1465,6 +1465,10 @@ impl<R> MapTarget<R> {
         write: &mut impl FnMut(&R, &mut Encoder<'_>) -> Result<(), Fault>,
     ) -> Result<(), Fault> {
         match self {
+            Self::Family { family } => {
+                out.byte(2)?;
+                write(family, out)?;
+            }
             Self::CoefficientDomain { domain } => {
                 out.byte(0)?;
                 write(domain, out)?;
@@ -3345,6 +3349,9 @@ impl MapTarget<Handle> {
     /// Decode the closed payload subtype without inferring any proof.
     fn decode(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Self, Fault> {
         Ok(match reader.byte()? {
+            2 => Self::Family {
+                family: crate::wire_decode::object(reader, records)?,
+            },
             0 => Self::CoefficientDomain {
                 domain: crate::wire_decode::object(reader, records)?,
             },

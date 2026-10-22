@@ -12,7 +12,7 @@ pub(crate) fn applies(cas: &Cas, premises: &[CheckedApplication]) -> Result<bool
     let [source, subset] = premises else {
         return Ok(false);
     };
-    let Some(original) = crate::context_check::domain(&source.judgment.statement) else {
+    let Some(original) = domain(&source.judgment.statement) else {
         return Ok(false);
     };
     let Statement::Subset { superset, .. } = &subset.judgment.statement else {
@@ -33,7 +33,7 @@ pub(crate) fn check(
     let [source, subset] = premises else {
         return Err(invalid());
     };
-    let original = crate::context_check::domain(&source.judgment.statement).ok_or_else(invalid)?;
+    let original = domain(&source.judgment.statement).ok_or_else(invalid)?;
     let target = cas.handle(cas.state.context(cas.checked(&draft.context)?)?.admissible);
     let Statement::Subset {
         subset: actual,
@@ -53,14 +53,22 @@ pub(crate) fn check(
         || over.stratum != original.logical_id()
         || over.family != region::family(cas, target.logical_id(), budget)?
         || !region::lifted(cas, original.logical_id(), superset.logical_id(), budget)?
-        || draft.conclusion != crate::context_check::restricted(&source.judgment.statement, &target)
+        || !statement_matches(
+            cas,
+            &source.judgment.statement,
+            &draft.conclusion,
+            &target,
+            over.family,
+            budget,
+        )?
     {
         return Err(invalid());
     }
-    if !matches!(
+    let supported = matches!(
         source.judgment.statement,
-        Statement::Equality { .. } | Statement::PredicateFact { .. }
-    ) {
+        Statement::Equality { .. } | Statement::PredicateFact { .. } | Statement::Cover { .. }
+    ) || matches!(&source.judgment.statement, Statement::Solve(value) if matches!(value.as_ref(), crate::solving::SolveStatement::RootExistence(_) | crate::solving::SolveStatement::RealSign(_)));
+    if !supported {
         return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
     }
     if !source.conditions.requirements.is_empty()
@@ -104,4 +112,114 @@ fn base_only(
         crate::solving::graph::free_keys(&cas.state, object, &keys, true, budget)?;
     }
     Ok(())
+}
+
+/// Family restriction recognizes existing pointwise Real existence and sign statements.
+pub(crate) fn domain(statement: &Statement) -> Option<&crate::graph::Handle> {
+    if let Statement::Solve(value) = statement {
+        return match value.as_ref() {
+            crate::solving::SolveStatement::RootExistence(value) => Some(&value.region),
+            crate::solving::SolveStatement::RealSign(value) => Some(&value.region),
+            _ => None,
+        };
+    }
+    crate::context_check::domain(statement)
+}
+
+/// Change only the evaluation region of an existing pointwise statement.
+pub(crate) fn restricted(statement: &Statement, target: &crate::graph::Handle) -> Statement {
+    let mut result = crate::context_check::restricted(statement, target);
+    if let Statement::Solve(value) = &mut result {
+        match value.as_mut() {
+            crate::solving::SolveStatement::RootExistence(value) => value.region.clone_from(target),
+            crate::solving::SolveStatement::RealSign(value) => value.region.clone_from(target),
+            _ => {}
+        }
+    }
+    result
+}
+
+/// A selected Real base relation keeps its exact source region under a checked pullback.
+pub(crate) fn source(
+    cas: &Cas,
+    target: &crate::graph::Handle,
+    original: &crate::graph::Handle,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let family = region::family(cas, target.logical_id(), budget)?;
+    for premise in premises {
+        budget.work(1, AT)?;
+        if let Statement::Subset { subset, superset } = &premise.judgment.statement
+            && subset == target
+            && cas
+                .state
+                .region(superset.logical_id())?
+                .lies_over
+                .as_ref()
+                .is_some_and(|over| over.family == family && over.stratum == original.logical_id())
+            && region::lifted(cas, original.logical_id(), superset.logical_id(), budget)?
+        {
+            return Ok(());
+        }
+    }
+    Err(invalid())
+}
+
+/// Same-region selected relations retain their old checks; family pullbacks require a Real original.
+pub(crate) fn relation_region(
+    evaluation: &crate::solving::elementary::evaluate::Evaluation<'_>,
+    relation: &crate::solving::RootRelationData<crate::graph::Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if relation.region == *evaluation.region {
+        return Ok(());
+    }
+    if relation.ambient != crate::model::Field::Real {
+        return Err(invalid());
+    }
+    source(
+        evaluation.cas,
+        evaluation.region,
+        &relation.region,
+        evaluation.premises,
+        budget,
+    )
+}
+
+/// Pulling back a cover preserves the complete original member inventory and predicate trees.
+fn statement_matches(
+    cas: &Cas,
+    source: &Statement,
+    conclusion: &Statement,
+    target: &crate::graph::Handle,
+    family: crate::graph::LogicalId,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    if let Statement::Cover { members, .. } = source {
+        let Statement::Cover {
+            domain,
+            members: actual,
+        } = conclusion
+        else {
+            return Ok(false);
+        };
+        if domain != target || members.len() != actual.len() {
+            return Ok(false);
+        }
+        for (original, lifted) in members.iter().zip(actual) {
+            let value = cas.state.region(lifted.logical_id())?;
+            if value
+                .lies_over
+                .as_ref()
+                .is_none_or(|over| over.family != family || over.stratum != original.logical_id())
+                || value.ambient != cas.state.region(target.logical_id())?.ambient
+                || !region::lifted(cas, original.logical_id(), lifted.logical_id(), budget)?
+            {
+                return Ok(false);
+            }
+        }
+        return Ok(true);
+    }
+    Ok(*conclusion == restricted(source, target))
 }

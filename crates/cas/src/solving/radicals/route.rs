@@ -750,6 +750,15 @@ impl Route<'_, '_> {
                 CoefficientFailure::Unsupported(SolveReason::GenericRadicalRouteUnavailable),
             ),
             Recipe::General(recipe) => {
+                if crate::solving::family::algebraic::applies(self.cas, map)? {
+                    return crate::solving::family::algebraic::roots(
+                        self.cas,
+                        self.construction,
+                        &recipe,
+                        map,
+                        self.budget,
+                    );
+                }
                 for coefficient in recipe
                     .coefficients
                     .coefficients

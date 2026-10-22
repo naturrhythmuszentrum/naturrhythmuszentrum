@@ -61,6 +61,20 @@ impl Regional<'_> {
             self.construction.context.clone(),
             self.construction.region.clone(),
         );
+        if self
+            .cas
+            .state
+            .region(region.logical_id())?
+            .lies_over
+            .is_some()
+        {
+            crate::solving::family::construction::projection(
+                self.cas,
+                self.construction,
+                self.problem,
+                self.budget,
+            )?;
+        }
         let scope = EvaluationScope {
             context: &context,
             region: &region,
@@ -110,6 +124,22 @@ impl Regional<'_> {
         .derive(&polynomial, &map, 0)?;
         self.audit
             .mark("factor-coverage", &region, 0, self.budget)?;
+        if self
+            .cas
+            .state
+            .region(region.logical_id())?
+            .lies_over
+            .is_some()
+        {
+            return Ok(crate::solving::family::coverage::emit(
+                self.cas,
+                self.construction,
+                self.problem,
+                &polynomial,
+                &values,
+                self.budget,
+            )?);
+        }
         Ok(crate::solving::radicals::proof::coverage(
             self.cas,
             self.construction,
@@ -245,6 +275,20 @@ impl Regional<'_> {
 
     /// Parent coverage names exactly the union of both closed child solution sets.
     fn split(&mut self, expression: &Handle) -> Result<Proposal, CoefficientFailure> {
+        if self
+            .cas
+            .state
+            .region(self.construction.region.logical_id())?
+            .lies_over
+            .is_some()
+        {
+            crate::solving::family::construction::projection(
+                self.cas,
+                self.construction,
+                self.problem,
+                self.budget,
+            )?;
+        }
         let children = self.children(expression)?;
         let certificate_children =
             crate::solving::coefficients::storage::copied(&children, self.budget)?;
