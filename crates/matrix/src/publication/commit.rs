@@ -386,6 +386,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         self.heap.symbols.publish(self.reservations.owners);
         self.heap.provenance.publish(graph);
         self.heap.statistics.records.extend(moments.records);
+        self.reservations.planned.publish();
         Outcome {
             output: self.reservations.bundles,
             record,

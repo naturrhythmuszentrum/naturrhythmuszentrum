@@ -61,3 +61,4 @@ mod solve_factor_reuse;
 mod acceptance;
 
 mod exact_scale_boundaries;
+mod symbol_lifecycle;

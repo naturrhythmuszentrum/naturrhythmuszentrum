@@ -61,6 +61,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
     ) -> Self {
         Self {
             operation,
+            symbol_inputs: None,
             inputs,
             limits,
             output: std::marker::PhantomData,

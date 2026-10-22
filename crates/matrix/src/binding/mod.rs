@@ -2,6 +2,7 @@
 //! Exclusive checked bindings, frozen dependencies and private output reservations.
 
 mod error;
+pub(crate) mod lifecycle;
 mod limits;
 mod operation;
 mod reservation;
@@ -10,6 +11,7 @@ pub(crate) mod symbols;
 mod views;
 
 pub use error::OperationError;
+pub use lifecycle::{SymbolState, ValueBinding};
 pub use limits::ExecutionLimits;
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};
@@ -31,6 +33,8 @@ pub struct ExecutionId(pub(crate) u64);
 pub struct Binding<P: Scalar, Q: Scalar = P> {
     /// Private checked recipe, never an unchecked draft.
     pub(crate) operation: CheckedOperation,
+    /// Optional exact selected bindings supplied through symbol lookup.
+    pub(crate) symbol_inputs: Option<Vec<ValueBinding<P>>>,
     /// Operation-ordered input locators.
     pub(crate) inputs: Vec<Handle<Value, P>>,
     /// Explicit work and private scratch limits.
@@ -49,7 +53,26 @@ impl<P: Scalar + 'static> Binding<P> {
     ) -> Self {
         Self {
             operation,
+            symbol_inputs: None,
             inputs,
+            limits,
+            output: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<P: Scalar + 'static> Binding<P> {
+    /// Bind a checked recipe to exact symbol-selected inputs.
+    #[must_use]
+    pub fn from_symbols(
+        operation: CheckedOperation,
+        inputs: Vec<ValueBinding<P>>,
+        limits: ExecutionLimits,
+    ) -> Self {
+        Self {
+            inputs: inputs.iter().map(ValueBinding::handle).collect(),
+            symbol_inputs: Some(inputs),
+            operation,
             limits,
             output: std::marker::PhantomData,
         }
@@ -79,6 +102,11 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         self.limits.check(self.inputs.len(), 0)?;
         if let NativeRecipe::Solve(contract) = &self.operation.recipe {
             contract.preflight(heap, &self.inputs, self.limits)?;
+        }
+        if let Some(symbols) = &self.symbol_inputs {
+            for binding in symbols {
+                heap.value_by_symbol(binding.symbol(), binding)?;
+            }
         }
         let dependencies = capture(heap, &self.inputs)?;
         let entries = payload_entries(&dependencies)?;

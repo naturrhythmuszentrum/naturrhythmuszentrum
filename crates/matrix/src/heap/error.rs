@@ -4,6 +4,9 @@
 /// A refused heap transaction or access; no partial bundle is published.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum HeapError {
+    /// A planned symbol has no complete published numerical binding.
+    #[error("symbol value is unavailable until complete publication")]
+    UnavailableSymbol,
     /// The migrated value or companion region has no current symbol owner.
     #[error("region has no current symbol owner")]
     MissingSymbolOwner,

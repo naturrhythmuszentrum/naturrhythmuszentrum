@@ -37,7 +37,7 @@ mod storage;
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
     InputSnapshot, NormalizedInputs, NormalizedView, OperationDraft, OperationError,
-    OutputReservation, PhysicalView, RegionContract,
+    OutputReservation, PhysicalView, RegionContract, SymbolState, ValueBinding,
 };
 
 pub use layout::{Layout, PackedRegion};

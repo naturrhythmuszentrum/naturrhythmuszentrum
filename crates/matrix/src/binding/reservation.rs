@@ -59,6 +59,8 @@ impl OutputReservation {
 /// Complete invisible bundle; its prepared slots use the heap's existing commit primitive.
 #[derive(Debug)]
 pub(crate) struct Reservations<P: Scalar> {
+    /// Publicly inspectable symbol bindings with transaction-owned availability.
+    pub(crate) planned: super::lifecycle::Plans<P>,
     /// Exact planned result symbols, prepared before any numerical allocation.
     pub(crate) symbols: Vec<nrz_bindings::BindingSymbols>,
     /// Sealed bindings correspondence for each copied output.
@@ -95,6 +97,9 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         let storage = heap.storage.prepare(&slices, &[], heap.limits)?;
         let prepared = assemble_outputs(heap, &specifications, plans, &symbols, &slots, &storage)?;
         Ok(Self {
+            planned: super::lifecycle::Plans {
+                values: prepared.planned,
+            },
             copies,
             symbols,
             owners: prepared.owners,
@@ -149,6 +154,8 @@ impl<Q: Scalar + 'static> Reservations<Q> {
 
 /// Private numerical bundles and their matching exact owners.
 struct PreparedOutputs<P: Scalar> {
+    /// Prepared selected result bindings, with no public value access.
+    planned: Vec<super::ValueBinding<P>>,
     /// Complete descriptor payloads in slot order.
     records: Vec<Record>,
     /// Future value/companion locators.
@@ -172,6 +179,7 @@ fn assemble_outputs<Q: Scalar + 'static>(
     let mut records = buffer(slots.keys().len())?;
     let mut bundles = buffer(specifications.len())?;
     let mut outputs = buffer(specifications.len())?;
+    let mut planned = buffer(specifications.len())?;
     for ((specification, plan), inventory) in specifications.iter().zip(plans).zip(symbols) {
         let start = records.len();
         let count = 1
@@ -210,11 +218,21 @@ fn assemble_outputs<Q: Scalar + 'static>(
             evaluation: plan.evaluation.is_some(),
             contributions: plan.contributions.is_some(),
         });
+        let schemas = [Some(plan.value), plan.bound, plan.evaluation].map(|index| {
+            index.map(|index| SchemaId {
+                scope: heap.scope,
+                index,
+            })
+        });
+        planned.push(super::lifecycle::planned(
+            heap.scope, bundle, stamp, extent, schemas, inventory,
+        )?);
         owners.extend(super::symbols::prepare(heap, inventory, bundle, stamp)?);
         records.extend(prepared);
         bundles.push(bundle);
     }
     Ok(PreparedOutputs {
+        planned,
         records,
         bundles,
         outputs,

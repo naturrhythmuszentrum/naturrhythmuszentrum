@@ -79,7 +79,29 @@ impl Heap {
         self.import(extent, quantity, centers, Some(bounds))
     }
 
-    /// Prepare completely, then publish under the same exclusive heap borrow.
+    /// Import through caller-predeclared value and companion symbols.
+    ///
+    /// Bounds and numerical import errors are explicit supplied assumptions. Error
+    /// radii must be covered by the total; they are not added a second time.
+    /// # Errors
+    /// Refuses derived result symbols, incomplete symbols/payloads, nonfinite or
+    /// negative radii, wrong coverage, invalid coordinates and exhausted capacities.
+    pub fn import_symbols<P: Scalar + 'static>(
+        &mut self,
+        symbols: &nrz_bindings::BindingSymbols,
+        centers: &[P],
+        bounds: Option<&[P]>,
+        errors: Option<&[P]>,
+        coverage: super::Coverage,
+    ) -> Result<crate::ValueBinding<P>, HeapError> {
+        let prepared = self.prepare_symbol_import(symbols, centers, bounds, errors, coverage)?;
+        let binding = imported_binding(self.scope, &prepared, symbols)?;
+        self.publish_bundle(prepared);
+        binding.publish();
+        Ok(binding)
+    }
+
+    /// Existing convenience imports create exact declarations before numerical allocation.
     fn import<P: Scalar + 'static>(
         &mut self,
         extent: Extent,
@@ -87,18 +109,6 @@ impl Heap {
         centers: &[P],
         bounds: Option<&[P]>,
     ) -> Result<PublishedBundle<P>, HeapError> {
-        let prepared = self.prepare_import(extent, quantity, centers, bounds)?;
-        Ok(self.publish_bundle(prepared))
-    }
-
-    /// Finish every fallible check and allocation before linking any public record.
-    fn prepare_import<P: Scalar + 'static>(
-        &mut self,
-        extent: Extent,
-        quantity: &Descriptor,
-        centers: &[P],
-        bounds: Option<&[P]>,
-    ) -> Result<PreparedImport<P>, HeapError> {
         check_quantity(quantity)?;
         let symbols = crate::binding::symbols::declare(
             quantity,
@@ -106,19 +116,53 @@ impl Heap {
             [bounds.is_some(), false],
             &mut crate::binding::symbols::budget()?,
         )?;
-        scan(extent, centers, bounds)?;
-        let schema_plan = self.prepare_schemas(extent, quantity, bounds.is_some())?;
-        let count = 1 + usize::from(bounds.is_some());
+        let coverage = if bounds.is_some() {
+            super::Coverage::DeclaredBounds
+        } else {
+            super::Coverage::RepresentedInputs
+        };
+        let prepared = self.prepare_symbol_import(&symbols, centers, bounds, None, coverage)?;
+        Ok(self.publish_bundle(prepared))
+    }
+
+    /// Finish every fallible symbol, payload and allocation check before publication.
+    fn prepare_symbol_import<P: Scalar + 'static>(
+        &mut self,
+        symbols: &nrz_bindings::BindingSymbols,
+        centers: &[P],
+        bounds: Option<&[P]>,
+        errors: Option<&[P]>,
+        coverage: super::Coverage,
+    ) -> Result<PreparedImport<P>, HeapError> {
+        symbols.check_import()?;
+        let quantity = symbols.value().descriptor();
+        check_quantity(quantity)?;
+        let [rows, columns] = symbols.value().shape();
+        let extent = Extent::new(
+            usize::try_from(rows).map_err(|_| HeapError::ExtentOverflow)?,
+            usize::try_from(columns).map_err(|_| HeapError::ExtentOverflow)?,
+        )?;
+        scan_symbols(symbols, extent, centers, bounds, errors, coverage)?;
+        let mut schemas = self.prepare_schemas(extent, quantity, bounds.is_some())?;
+        schemas.evaluation = errors.and(schemas.bound);
+        let count = 1 + usize::from(bounds.is_some()) + usize::from(errors.is_some());
         let descriptors = self.descriptors.prepare(count, self.limits.descriptors)?;
-        let payloads = [centers, bounds.unwrap_or(&[])];
+        let payloads = [centers, bounds.unwrap_or(&[]), errors.unwrap_or(&[])];
         let inputs = payloads.get(..count).ok_or(HeapError::LengthMismatch)?;
         let storage = self.storage.prepare(inputs, &[], self.limits)?;
         let stamp = ValueStamp {
             id: ValueId(identity()?),
             version: ValueVersion(1),
         };
-        let mut prepared = assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)?;
-        prepared.owners = crate::binding::symbols::prepare(self, &symbols, prepared.bundle, stamp)?;
+        let mut prepared = assemble(self.scope, extent, schemas, stamp, descriptors, storage)?;
+        prepared.owners = crate::binding::symbols::prepare(self, symbols, prepared.bundle, stamp)?;
+        if let Some(record) = prepared.records.values.first_mut()
+            && let Meaning::Value {
+                coverage: actual, ..
+            } = &mut record.meaning
+        {
+            *actual = coverage;
+        }
         Ok(prepared)
     }
 
@@ -220,6 +264,67 @@ impl Heap {
             contributions: None,
         })
     }
+}
+
+/// Check complete declared presence and overlapping numerical error before allocation.
+fn scan_symbols<P: Scalar>(
+    symbols: &nrz_bindings::BindingSymbols,
+    extent: Extent,
+    centers: &[P],
+    bounds: Option<&[P]>,
+    errors: Option<&[P]>,
+    coverage: super::Coverage,
+) -> Result<(), HeapError> {
+    let bound_matches = symbols.bound().is_some() == bounds.is_some();
+    let error_matches = symbols.error().is_some() == errors.is_some();
+    if !bound_matches || !error_matches {
+        return Err(nrz_bindings::AdmissionError::CompanionMismatch.into());
+    }
+    if coverage == super::Coverage::DeclaredBounds && bounds.is_none() {
+        return Err(HeapError::MissingCoverage);
+    }
+    scan(extent, centers, bounds)?;
+    scan(extent, centers, errors)?;
+    if let (Some(total), Some(error)) = (bounds, errors)
+        && error.iter().zip(total).any(|(error, total)| error > total)
+    {
+        return Err(nrz_bindings::AdmissionError::CompanionMismatch.into());
+    }
+    Ok(())
+}
+
+/// Build the selected import binding while all regions are still private.
+fn imported_binding<P: Scalar>(
+    scope: u64,
+    prepared: &PreparedImport<P>,
+    symbols: &nrz_bindings::BindingSymbols,
+) -> Result<crate::ValueBinding<P>, HeapError> {
+    let record = prepared
+        .records
+        .values
+        .first()
+        .ok_or(HeapError::LengthMismatch)?;
+    let Meaning::Value { stamp, .. } = record.meaning else {
+        return Err(HeapError::CategoryMismatch);
+    };
+    let schemas = [0, 1, 2].map(|position| {
+        prepared
+            .records
+            .values
+            .get(position)
+            .map(|record| super::SchemaId {
+                scope,
+                index: record.schema,
+            })
+    });
+    crate::binding::lifecycle::planned(
+        scope,
+        prepared.bundle,
+        stamp,
+        record.layout.extent(),
+        schemas,
+        symbols,
+    )
 }
 
 /// Bind matching descriptor payloads to their reserved occupations before publication.
