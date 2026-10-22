@@ -16,7 +16,7 @@ Scalar owns finite admission, temporary enclosures, primitive arithmetic, reduct
 
 For `L=25 mH=1/40 H` and `C=10 µF=1/100000 F`, the exact descriptor calculation gives `ω₀=2000 rad/s` and `f₀=1000/π Hz`. Scalar can already enclose rational spellings such as `1/40` and `1/100000`, retaining the discrepancy of each floating candidate from its exact value. Its multiplication, division and square-root enclosures are numerical ingredients for the later LC kernels; decoding the constants alone does not certify an LC computation.
 
-Stage 3d in `docs/design/lc-resonance.md` will use these imports for mixed-coordinate restoration, and stage 3g will enclose the restricted two-state spectrum. Exact π scales exist on the descriptor side, but non-rational coefficients refuse at bindings export today. Stage 5 must add a certified constant enclosure before `1000/π`, degree conversions or π-dependent phase values can be evaluated numerically. A decimal approximation to π is not an exact replacement for that definition.
+The coordinate-lowering step in `docs/design/lc-resonance.md` will use these imports for mixed-coordinate restoration, and the spectral-lowering step will enclose the restricted two-state spectrum. Exact π scales exist on the descriptor side, but non-rational coefficients refuse at bindings export today. The LC-quantities step must add a certified constant enclosure before `1000/π`, degree conversions or π-dependent phase values can be evaluated numerically. A decimal approximation to π is not an exact replacement for that definition.
 
 ## Main concepts and types · `sec:scalar:concepts`
 

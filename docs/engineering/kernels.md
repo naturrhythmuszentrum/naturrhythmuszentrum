@@ -38,13 +38,13 @@ Precision changes preserve existing coverage and account for the changed center 
 
 **Definition (Matrix design obligations)** · `def:nrz:engineering-matrix-law-boundary`
 
-The design specifies complete-family affine propagation, product interactions, direct nonlinear domains, verified square solves and complete joint-source statistics. Those laws remain distinct from the future meaning-free heap/kernel boundary and mixed LC lowerings; this wave does not replace their source-linked evidence inventory (`tab:nrz:matrix-core-operation-propagation`), (`rule:nrz:matrix-core-solve-theorem`), (`rule:nrz:matrix-core-joint-sources`), (`rule:nrz:descriptor-binding-kernel-boundary`).
+The design specifies complete-family affine propagation, product interactions, direct nonlinear domains, verified square solves and complete joint-source statistics. Those laws remain distinct from the future meaning-free heap/kernel boundary and mixed LC lowerings; this catalogue does not replace their source-linked evidence inventory (`tab:nrz:matrix-core-operation-propagation`), (`rule:nrz:matrix-core-solve-theorem`), (`rule:nrz:matrix-core-joint-sources`), (`rule:nrz:descriptor-binding-kernel-boundary`).
 
 ## Open intents · `sec:nrz:engineering-kernel-intents`
 
 **Claim (Matrix kernel evidence adoption)** · `claim:nrz:engineering-matrix-kernel-evidence`
 
-A later matrix documentation wave will register every current kernel law, domain, shape, refusal and executable claim; numerical acceptance owns the integrated LC evidence using those registered contracts (`step:nrz:lc-resonance-numerical-acceptance`).
+The matrix kernel catalogue will register every current kernel law, domain, shape, refusal and executable claim; numerical acceptance owns the integrated LC evidence using those registered contracts (`step:nrz:lc-resonance-numerical-acceptance`).
 
 **Claim (Meaning-free mixed numerical execution)** · `claim:nrz:engineering-lc-kernels`
 

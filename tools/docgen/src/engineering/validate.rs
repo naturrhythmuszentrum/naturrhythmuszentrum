@@ -106,7 +106,11 @@ fn owner_source(owner: &str, source: &str, sources: &BTreeSet<String>) -> Result
         "SCALAR" => "crates/scalar/",
         "ACCURACY" => "crates/accuracy/",
         "DOCGEN" => "tools/docgen/",
-        _ => return Err(invalid("catalogue owner is outside the adopted wave")),
+        _ => {
+            return Err(invalid(
+                "catalogue owner is outside the registered catalogue owners",
+            ));
+        }
     };
     if !source.starts_with(prefix) || !sources.contains(source) {
         return Err(invalid(

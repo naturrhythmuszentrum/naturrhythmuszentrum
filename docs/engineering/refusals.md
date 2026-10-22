@@ -64,9 +64,9 @@ The generator rejects malformed envelopes before typed payloads, rejects forged 
 
 ## Open intents · `sec:nrz:engineering-refusal-intents`
 
-**Claim (Remaining owner refusal catalogues)** · `claim:nrz:engineering-later-wave-refusals`
+**Claim (Remaining owner refusal catalogues)** · `claim:nrz:engineering-remaining-refusals`
 
-Later documentation waves will register bindings, matrix and CAS refusal variants and their executable claims, preserving mathematical nonexistence, missing proof and resource exhaustion as distinct outcomes; symbolic lowering and numerical acceptance own their LC-facing use (`step:nrz:lc-resonance-symbolic-lowering`), (`step:nrz:lc-resonance-numerical-acceptance`).
+The remaining owner documentation will register refusal variants and their executable claims, preserving mathematical nonexistence, missing proof and resource exhaustion as distinct outcomes; symbolic lowering and numerical acceptance own their LC-facing use (`step:nrz:lc-resonance-symbolic-lowering`), (`step:nrz:lc-resonance-numerical-acceptance`).
 
 **Claim (LC domain outcomes through reusable plans)** · `claim:nrz:engineering-lc-refusal-outcomes`
 

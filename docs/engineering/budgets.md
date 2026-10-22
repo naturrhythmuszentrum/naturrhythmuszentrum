@@ -28,9 +28,9 @@ An exact boundary names its complete operation, successful ceiling and immediate
 
 ## Open intents · `sec:nrz:engineering-budget-intents`
 
-**Claim (Remaining owner policies and boundaries)** · `claim:nrz:engineering-later-wave-budgets`
+**Claim (Remaining owner policies and boundaries)** · `claim:nrz:engineering-remaining-budgets`
 
-Later documentation waves will register the bindings, matrix and CAS policy ceilings and exact boundary claims before their values enter this record; cumulative LC budget evidence belongs to symbolic lowering and numerical acceptance (`step:nrz:lc-resonance-symbolic-lowering`), (`step:nrz:lc-resonance-numerical-acceptance`).
+The remaining owner documentation will register the policy ceilings and exact boundary claims before their values enter this record; cumulative LC budget evidence belongs to symbolic lowering and numerical acceptance (`step:nrz:lc-resonance-symbolic-lowering`), (`step:nrz:lc-resonance-numerical-acceptance`).
 
 **Claim (Shared physical symbolic allowance)** · `claim:nrz:engineering-shared-symbolic-budget`
 

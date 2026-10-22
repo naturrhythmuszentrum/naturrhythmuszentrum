@@ -43,7 +43,7 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
             "name = \"Fixture\"\n",
             "description = \"A fixture project.\"\n",
             "repository = \"https://example.invalid/fixture\"\n",
-            "bites = [{ id = \"1\", title = \"Documentation generator\" }]\n",
+            "bites = [{ id = \"step:nrz:bite-documentation-generator\", title = \"Documentation generator\" }]\n",
         ),
     )?;
     fs::write(

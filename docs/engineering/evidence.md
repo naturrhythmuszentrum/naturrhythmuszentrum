@@ -56,9 +56,9 @@ Engineering generation preserves canonical record order, refuses changed source 
 
 ## Open intents · `sec:nrz:engineering-evidence-intents`
 
-**Claim (Remaining crate evidence registration)** · `claim:nrz:engineering-later-wave-evidence`
+**Claim (Remaining crate evidence registration)** · `claim:nrz:engineering-remaining-evidence`
 
-Later documentation waves will register all bindings, matrix and CAS test claims and exact projections; numerical acceptance owns the integrated LC evidence consuming those registered contracts (`step:nrz:lc-resonance-numerical-acceptance`).
+The remaining owner documentation will register all test claims and exact projections; numerical acceptance owns the integrated LC evidence consuming those registered contracts (`step:nrz:lc-resonance-numerical-acceptance`).
 
 **Claim (Complete symbol and physical lifecycle evidence)** · `claim:nrz:engineering-lc-oracles`
 
