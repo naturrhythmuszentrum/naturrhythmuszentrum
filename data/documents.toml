@@ -113,3 +113,7 @@ requires = []
 [[document]]
 output = "docs/records/project-review.md"
 requires = []
+
+[[document]]
+output = "docs/design/lc-resonance.md"
+requires = []
