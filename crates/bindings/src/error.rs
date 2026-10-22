@@ -41,6 +41,9 @@ pub enum UnitError {
     /// Equal dimensions do not imply compatible kinds.
     #[error("incompatible semantic kinds")]
     KindMismatch,
+    /// An exact descriptor relation is being applied to a different captured source schema.
+    #[error("descriptor relation source differs from its checked schema")]
+    RelationSource,
     /// The affine roles do not admit this operation.
     #[error("invalid affine-role operation")]
     AffineRole,

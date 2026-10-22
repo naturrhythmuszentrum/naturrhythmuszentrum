@@ -130,6 +130,35 @@ pub enum Kind {
 }
 
 impl Kind {
+    /// Angular frequency, distinct from cyclic frequency and derivative rate at equal dimension.
+    /// # Errors
+    /// Refuses exhausted exact dimension arithmetic.
+    pub fn angular_frequency() -> Result<Self, UnitError> {
+        Self::time_inverse("angular_frequency")
+    }
+
+    /// Cyclic frequency, with coherent measure hertz and an explicit full-cycle relation.
+    /// # Errors
+    /// Refuses exhausted exact dimension arithmetic.
+    pub fn frequency() -> Result<Self, UnitError> {
+        Self::time_inverse("frequency")
+    }
+
+    /// A derivative or eigenvalue rate, with coherent measure inverse seconds.
+    /// # Errors
+    /// Refuses exhausted exact dimension arithmetic.
+    pub fn rate() -> Result<Self, UnitError> {
+        Self::time_inverse("rate")
+    }
+
+    /// Equal dimensions do not identify the three explicitly named rate meanings.
+    fn time_inverse(name: &str) -> Result<Self, UnitError> {
+        Ok(Self::Named(
+            name.into(),
+            Box::new(Dimension::integers([0, 0, -1, 0, 0, 0, 0])?),
+        ))
+    }
+
     /// Whether this kind requires an explicit compatible nonzero reference.
     #[must_use]
     pub const fn is_relative(&self) -> bool {

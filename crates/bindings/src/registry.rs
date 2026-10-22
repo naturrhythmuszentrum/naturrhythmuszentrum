@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit semantic operation declarations and conservative builtin rules.
 
+mod catalog;
+mod relation;
+
+pub use relation::{FrequencyDirection, FrequencyRelation};
+
 use std::collections::BTreeMap;
 
 use crate::exact::ratio;
@@ -29,6 +34,10 @@ pub enum BinaryOp {
 /// TODO ´todo:code:expose-semantic-rule-snapshot-identities-for´: expose semantic rule snapshot identities for reusable client plan checks under rule:nrz:plan-validation.
 #[derive(Clone, Debug)]
 pub struct Registry {
+    /// Explicitly registered measure descriptors, separate from names of semantic kinds.
+    measures: BTreeMap<String, Descriptor>,
+    /// The checked full-cycle angle definition, present only in the explicit standard catalog.
+    full_cycle: Option<Descriptor>,
     /// Admitted dimension exponents, independent of static representation choices.
     policy: ExponentPolicy,
     /// Invariant dimensions of declared named kinds.
@@ -44,6 +53,8 @@ impl Registry {
     #[must_use]
     pub const fn new(policy: ExponentPolicy) -> Self {
         Self {
+            measures: BTreeMap::new(),
+            full_cycle: None,
             policy,
             names: BTreeMap::new(),
             binary: Vec::new(),

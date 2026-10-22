@@ -75,7 +75,7 @@ pub use pairing::{
     EvaluationDescriptor, EvaluationKind, NamedReference, PairingError, PairingKind, PairingSide,
     PairingWitness,
 };
-pub use registry::{BinaryOp, Registry};
+pub use registry::{BinaryOp, FrequencyDirection, FrequencyRelation, Registry};
 pub use sensitivity::{
     CheckedSensitivity, JacobianEntry, JacobianEvidence, SensitivityEntry, SensitivityError,
     SensitivityKernel, SensitivityObligation, SensitivityRecipe, SensitivityWork, SolveSymbols,

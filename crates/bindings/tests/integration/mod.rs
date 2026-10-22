@@ -14,3 +14,5 @@ mod real_symbols;
 mod schema_constants;
 
 mod exact_scales;
+
+mod frequency_relations;
