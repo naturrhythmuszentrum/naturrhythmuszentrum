@@ -4,6 +4,15 @@
 /// A refused heap transaction or access; no partial bundle is published.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum HeapError {
+    /// The migrated value or companion region has no current symbol owner.
+    #[error("region has no current symbol owner")]
+    MissingSymbolOwner,
+    /// A current region version already has a symbol owner.
+    #[error("region version already has a symbol owner")]
+    DuplicateSymbolOwner,
+    /// Exact value, companion or result symbol admission refused.
+    #[error("binding symbols: {0}")]
+    Symbols(nrz_bindings::AdmissionError),
     /// The handle belongs to a different heap.
     #[error("handle belongs to another heap")]
     ForeignHandle,
@@ -75,4 +84,13 @@ pub enum HeapError {
     /// Bindings could not derive the requested radius descriptor.
     #[error("units descriptor check failed: {0}")]
     Units(#[from] nrz_bindings::UnitError),
+}
+
+impl From<nrz_bindings::AdmissionError> for HeapError {
+    fn from(cause: nrz_bindings::AdmissionError) -> Self {
+        match cause {
+            nrz_bindings::AdmissionError::Units(cause) => Self::Units(cause),
+            cause => Self::Symbols(cause),
+        }
+    }
 }

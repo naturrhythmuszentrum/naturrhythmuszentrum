@@ -45,6 +45,8 @@ impl<P: Scalar> CompanionSnapshot<P> {
 /// One operation-ordered input dependency, retaining its selected logical map.
 #[derive(Clone, Debug)]
 pub struct InputSnapshot<P: Scalar> {
+    /// Bindings-checked value and companion symbols for the owning base.
+    pub(crate) symbols: nrz_bindings::BindingSymbols,
     /// Selected value occupation, possibly an alias.
     handle: Handle<Value, P>,
     /// Actual base value identity and content version.
@@ -121,6 +123,7 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
             })
             .transpose()?;
         Ok(Self {
+            symbols: super::symbols::capture(heap, handle)?,
             handle,
             stamp: value.stamp(),
             schema: value.region().schema_id(),
@@ -145,7 +148,17 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
             || region.schema_id() != self.schema
             || region.layout() != &self.layout
             || region.extent() != contract.shape().extent()
-            || region.descriptor() != contract.descriptor()
+        {
+            return Err(OperationError::InputMismatch { slot });
+        }
+        self.symbols
+            .value()
+            .check_descriptor(contract.descriptor())
+            .map_err(|_| OperationError::InputMismatch { slot })?;
+        let current = super::symbols::capture(heap, self.handle)?;
+        if current.value() != self.symbols.value()
+            || current.bound() != self.symbols.bound()
+            || current.error() != self.symbols.error()
         {
             return Err(OperationError::InputMismatch { slot });
         }

@@ -23,6 +23,8 @@ struct PreparedImport<P: Scalar> {
     schemas: Vec<Schema>,
     /// Complete value and optional companion descriptors.
     records: PreparedSlots<Record>,
+    /// Prepared exact symbol owners, installed with their numerical regions.
+    owners: Vec<crate::binding::symbols::Owner>,
     /// Future locators, returned only after publication.
     bundle: PublishedBundle<P>,
 }
@@ -98,6 +100,12 @@ impl Heap {
         bounds: Option<&[P]>,
     ) -> Result<PreparedImport<P>, HeapError> {
         check_quantity(quantity)?;
+        let symbols = crate::binding::symbols::declare(
+            quantity,
+            extent,
+            [bounds.is_some(), false],
+            &mut crate::binding::symbols::budget()?,
+        )?;
         scan(extent, centers, bounds)?;
         let schema_plan = self.prepare_schemas(extent, quantity, bounds.is_some())?;
         let count = 1 + usize::from(bounds.is_some());
@@ -109,7 +117,9 @@ impl Heap {
             id: ValueId(identity()?),
             version: ValueVersion(1),
         };
-        assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)
+        let mut prepared = assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)?;
+        prepared.owners = crate::binding::symbols::prepare(self, &symbols, prepared.bundle, stamp)?;
+        Ok(prepared)
     }
 
     /// Prepare a checked replacement without touching the old value or its reverse edges.
@@ -128,6 +138,12 @@ impl Heap {
             .checked_add(1)
             .ok_or(HeapError::CounterExhausted)?;
         let extent = snapshot.schema.extent;
+        let symbols = crate::binding::symbols::declare(
+            &snapshot.schema.quantity,
+            extent,
+            [bounds.is_some(), false],
+            &mut crate::binding::symbols::budget()?,
+        )?;
         scan(extent, centers, bounds)?;
         let schema_plan =
             self.prepare_schemas(extent, &snapshot.schema.quantity, bounds.is_some())?;
@@ -148,7 +164,8 @@ impl Heap {
             id: snapshot.stamp.id,
             version: ValueVersion(next),
         };
-        let prepared = assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)?;
+        let mut prepared = assemble(self.scope, extent, schema_plan, stamp, descriptors, storage)?;
+        prepared.owners = crate::binding::symbols::prepare(self, &symbols, prepared.bundle, stamp)?;
         Ok(self.publish_bundle(prepared))
     }
 
@@ -157,6 +174,7 @@ impl Heap {
         self.storage.publish(prepared.storage);
         self.schemas.extend(prepared.schemas);
         self.descriptors.publish(prepared.records);
+        self.symbols.publish(prepared.owners);
         prepared.bundle
     }
 
@@ -223,6 +241,7 @@ fn assemble<P: Scalar + 'static>(
         storage.epoch(),
     )?;
     Ok(PreparedImport {
+        owners: Vec::new(),
         storage,
         schemas: schemas.pending,
         records: descriptors.bind(records)?,

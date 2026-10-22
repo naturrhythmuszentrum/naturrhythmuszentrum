@@ -59,6 +59,12 @@ impl OutputReservation {
 /// Complete invisible bundle; its prepared slots use the heap's existing commit primitive.
 #[derive(Debug)]
 pub(crate) struct Reservations<P: Scalar> {
+    /// Exact planned result symbols, prepared before any numerical allocation.
+    pub(crate) symbols: Vec<nrz_bindings::BindingSymbols>,
+    /// Sealed bindings correspondence for each copied output.
+    pub(crate) copies: Vec<nrz_bindings::CopyWitness>,
+    /// Complete opaque owners installed in the same numerical publication.
+    pub(crate) owners: Vec<super::symbols::Owner>,
     /// Real allocated zero-initialized destination slabs, unavailable to views.
     pub(crate) storage: PreparedStorage,
     /// New immutable schemas with pre-reserved heap capacity.
@@ -79,6 +85,7 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         operation: &crate::CheckedOperation,
     ) -> Result<Self, OperationError> {
         let specifications = specifications(inputs, operation)?;
+        let (symbols, copies) = output_symbols(inputs, operation, &specifications)?;
         let (plans, schemas) = schema_plans(heap, &specifications, operation)?;
         let payloads = zeros::<Q>(&specifications, &plans)?;
         let slices = payloads.iter().map(Vec::as_slice).collect::<Vec<_>>();
@@ -86,56 +93,16 @@ impl<Q: Scalar + 'static> Reservations<Q> {
             .descriptors
             .prepare(slices.len(), heap.limits.descriptors)?;
         let storage = heap.storage.prepare(&slices, &[], heap.limits)?;
-        let mut records = buffer(slices.len())?;
-        let mut bundles = buffer(specifications.len())?;
-        let mut outputs = buffer(specifications.len())?;
-        for (specification, plan) in specifications.iter().zip(plans) {
-            let start = records.len();
-            let count = 1
-                + usize::from(plan.bound.is_some())
-                + usize::from(plan.evaluation.is_some())
-                + 3 * usize::from(plan.contributions.is_some());
-            let end = start.checked_add(count).ok_or(HeapError::Capacity)?;
-            let stamp = ValueStamp {
-                id: ValueId(identity()?),
-                version: ValueVersion(1),
-            };
-            let extent = specification.extent;
-            let (mut prepared, bundle) = prepare_records::<Q>(
-                heap.scope,
-                extent,
-                slots.keys().get(start..end).ok_or(HeapError::Capacity)?,
-                storage.keys().get(start..end).ok_or(HeapError::Capacity)?,
-                &plan,
-                stamp,
-                storage.epoch(),
-            )?;
-            if let Some(record) = prepared.first_mut()
-                && let crate::heap::records::Meaning::Value { coverage, .. } = &mut record.meaning
-            {
-                *coverage = specification.coverage;
-            }
-            outputs.push(OutputReservation {
-                stamp,
-                extent,
-                schema: SchemaId {
-                    scope: heap.scope,
-                    index: plan.value,
-                },
-                coverage: specification.coverage,
-                bounded: plan.bound.is_some(),
-                evaluation: plan.evaluation.is_some(),
-                contributions: plan.contributions.is_some(),
-            });
-            records.extend(prepared);
-            bundles.push(bundle);
-        }
+        let prepared = assemble_outputs(heap, &specifications, plans, &symbols, &slots, &storage)?;
         Ok(Self {
+            copies,
+            symbols,
+            owners: prepared.owners,
             storage,
             schemas,
-            records: slots.bind(records)?,
-            bundles,
-            outputs,
+            records: slots.bind(prepared.records)?,
+            bundles: prepared.bundles,
+            outputs: prepared.outputs,
         })
     }
 
@@ -145,6 +112,17 @@ impl<Q: Scalar + 'static> Reservations<Q> {
             || self.storage.keys().len() != self.records.keys().len()
         {
             return Err(HeapError::LengthMismatch.into());
+        }
+        super::symbols::validate(&self.owners, &self.symbols, &self.bundles, &self.outputs)?;
+        for (copy, symbols) in self.copies.iter().zip(&self.symbols) {
+            if copy.result().value() != symbols.value()
+                || copy.result().bound() != symbols.bound()
+                || copy.result().error() != symbols.error()
+            {
+                return Err(
+                    HeapError::Symbols(nrz_bindings::AdmissionError::ResultMismatch).into(),
+                );
+            }
         }
         let schema_count = heap
             .schemas
@@ -167,6 +145,124 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         crate::layout::validate_outputs(&destinations, heap.limits.layout_work)?;
         Ok(())
     }
+}
+
+/// Private numerical bundles and their matching exact owners.
+struct PreparedOutputs<P: Scalar> {
+    /// Complete descriptor payloads in slot order.
+    records: Vec<Record>,
+    /// Future value/companion locators.
+    bundles: Vec<PublishedBundle<P>>,
+    /// Numerical output contracts.
+    outputs: Vec<OutputReservation>,
+    /// Matching exact symbol owners.
+    owners: Vec<super::symbols::Owner>,
+}
+
+/// Assemble fixed-size output bundles after the complete storage reservation.
+fn assemble_outputs<Q: Scalar + 'static>(
+    heap: &mut Heap,
+    specifications: &[OutputSpecification],
+    plans: Vec<SchemaPlan>,
+    symbols: &[nrz_bindings::BindingSymbols],
+    slots: &crate::heap::slots::SlotPlan,
+    storage: &PreparedStorage,
+) -> Result<PreparedOutputs<Q>, OperationError> {
+    let mut owners = buffer(symbols.len().checked_mul(3).ok_or(HeapError::Capacity)?)?;
+    let mut records = buffer(slots.keys().len())?;
+    let mut bundles = buffer(specifications.len())?;
+    let mut outputs = buffer(specifications.len())?;
+    for ((specification, plan), inventory) in specifications.iter().zip(plans).zip(symbols) {
+        let start = records.len();
+        let count = 1
+            + usize::from(plan.bound.is_some())
+            + usize::from(plan.evaluation.is_some())
+            + 3 * usize::from(plan.contributions.is_some());
+        let end = start.checked_add(count).ok_or(HeapError::Capacity)?;
+        let stamp = ValueStamp {
+            id: ValueId(identity()?),
+            version: ValueVersion(1),
+        };
+        let extent = specification.extent;
+        let (mut prepared, bundle) = prepare_records::<Q>(
+            heap.scope,
+            extent,
+            slots.keys().get(start..end).ok_or(HeapError::Capacity)?,
+            storage.keys().get(start..end).ok_or(HeapError::Capacity)?,
+            &plan,
+            stamp,
+            storage.epoch(),
+        )?;
+        if let Some(record) = prepared.first_mut()
+            && let crate::heap::records::Meaning::Value { coverage, .. } = &mut record.meaning
+        {
+            *coverage = specification.coverage;
+        }
+        outputs.push(OutputReservation {
+            stamp,
+            extent,
+            schema: SchemaId {
+                scope: heap.scope,
+                index: plan.value,
+            },
+            coverage: specification.coverage,
+            bounded: plan.bound.is_some(),
+            evaluation: plan.evaluation.is_some(),
+            contributions: plan.contributions.is_some(),
+        });
+        owners.extend(super::symbols::prepare(heap, inventory, bundle, stamp)?);
+        records.extend(prepared);
+        bundles.push(bundle);
+    }
+    Ok(PreparedOutputs {
+        records,
+        bundles,
+        outputs,
+        owners,
+    })
+}
+
+/// Ordered output declarations and their optional copy correspondences.
+type OutputSymbols = (
+    Vec<nrz_bindings::BindingSymbols>,
+    Vec<nrz_bindings::CopyWitness>,
+);
+
+/// Bindings derives exact output/companion meanings before the float allocation schedule.
+fn output_symbols<P: Scalar>(
+    inputs: &[InputSnapshot<P>],
+    operation: &crate::CheckedOperation,
+    specifications: &[OutputSpecification],
+) -> Result<OutputSymbols, OperationError> {
+    let mut ledger = super::symbols::budget()?;
+    let mut symbols = buffer(specifications.len())?;
+    let mut copies = buffer(specifications.len())?;
+    for (slot, (output, specification)) in operation.outputs.iter().zip(specifications).enumerate()
+    {
+        let inventory = if matches!(operation.recipe, super::NativeRecipe::Copy) {
+            let input = inputs.get(slot).ok_or(OperationError::InputCount)?;
+            let result = input
+                .symbols
+                .copy_result(super::symbols::shape(specification.extent)?, &mut ledger)
+                .map_err(HeapError::from)?;
+            copies.push(
+                output
+                    .admission
+                    .check_copy(&input.symbols, &result)
+                    .map_err(HeapError::from)?,
+            );
+            result
+        } else {
+            super::symbols::declare(
+                output.descriptor(),
+                specification.extent,
+                [specification.bounded, specification.evaluation],
+                &mut ledger,
+            )?
+        };
+        symbols.push(inventory);
+    }
+    Ok((symbols, copies))
 }
 
 /// Independently derived destination extent and coverage, never inferred from input slot order.

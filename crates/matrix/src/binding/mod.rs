@@ -6,6 +6,7 @@ mod limits;
 mod operation;
 mod reservation;
 mod snapshot;
+pub(crate) mod symbols;
 mod views;
 
 pub use error::OperationError;

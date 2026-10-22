@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed native recipes retain ordered input/output contracts and exact coordinate definitions.
 
-use nrz_bindings::{Descriptor, Role};
+use nrz_bindings::{Descriptor, HomogeneousRecipe};
 
 use super::{ExecutionLimits, OperationError};
 use crate::{Axis, CheckedShape, CoordinateMap};
@@ -127,6 +127,8 @@ pub struct RegionContract {
     pub(crate) shape: CheckedShape,
     /// Actual coherent, normalized or presentation interpretation required of the region.
     pub(crate) quantity: Descriptor,
+    /// Bindings-owned homogeneous admission, retained beside numerical execution.
+    pub(crate) admission: HomogeneousRecipe,
     /// Exact coherent unit references for the input axis.
     domain: CoordinateMap,
     /// Exact coherent unit references for the output axis.
@@ -134,31 +136,23 @@ pub struct RegionContract {
 }
 
 impl RegionContract {
-    /// Admit only the concrete entry schemas implemented by homogeneous heap storage.
+    /// Consume the bindings predicate for this closed homogeneous recipe.
     pub(crate) fn check(shape: CheckedShape) -> Result<Self, OperationError> {
-        let quantity = shape.entries().first().map_or_else(
-            || Ok(Descriptor::ratio()),
-            |entry| {
-                entry
-                    .scalar_descriptor()
-                    .map(Descriptor::coherent)
-                    .ok_or(OperationError::UnsupportedShape)
-            },
-        )?;
-        if quantity.role() != Role::Difference
-            || shape.entries().iter().any(|entry| {
-                entry
-                    .scalar_descriptor()
-                    .is_none_or(|value| value.coherent() != quantity)
-            })
-        {
-            return Err(OperationError::UnsupportedShape);
-        }
+        let admission = HomogeneousRecipe::check(
+            shape
+                .entries()
+                .iter()
+                .map(crate::EntryContract::scalar_descriptor),
+            shape.extent().entries(),
+        )
+        .map_err(|_| OperationError::UnsupportedShape)?;
+        let quantity = admission.descriptor().clone();
         let domain = unit_coordinates(shape.domain())?;
         let codomain = unit_coordinates(shape.codomain())?;
         Ok(Self {
             shape,
             quantity,
+            admission,
             domain,
             codomain,
         })
