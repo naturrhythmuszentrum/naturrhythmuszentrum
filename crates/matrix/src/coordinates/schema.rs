@@ -34,7 +34,7 @@ pub struct ReferenceScale {
 impl ReferenceScale {
     /// Define the positive coherent magnitude given by this exact difference measure's scale.
     ///
-    /// `Measure` has already refused symbolic, zero and negative scales. The reference
+    /// `Measure` retains checked positivity and finiteness evidence for its exact scale. The reference
     /// is one unit of that measure, so no positivity assumption about a heap value enters.
     /// # Errors
     /// Refuses points, counts, relative kinds, empty names or unsupported pairing kinds.
@@ -432,7 +432,7 @@ fn coordinate_measure(
     );
     Ok(Measure::new(
         "normalized-reference",
-        Scale::Exact(reference.scale().clone()),
+        Scale::Exact(reference.rational_scale()?.clone()),
         offset,
     )?)
 }

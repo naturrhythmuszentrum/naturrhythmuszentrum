@@ -613,8 +613,8 @@ fn checked_fields(
     );
     if let Some(conversion) = checked.output_conversion() {
         record["output_conversion"] = json!({
-            "scale": exact(&conversion.scale, source)?,
-            "shift": exact(&conversion.shift, source)?
+            "scale": exact(conversion.rational_scale().map_err(|error| source.error(error))?, source)?,
+            "shift": exact(conversion.rational_shift().map_err(|error| source.error(error))?, source)?
         });
     }
     Ok(())

@@ -70,7 +70,7 @@ fn descriptor(input: &CheckedShape, function: Elementwise) -> Result<Descriptor,
         scale: unit.scale().clone(),
         shift: unit.scale().clone(),
     }
-    .apply(unit.scale())
+    .apply(unit.rational_scale().map_err(crate::ShapeError::from)?)
     .map_err(crate::ShapeError::from)?;
     let double = Measure::new(
         "native-exponent",
@@ -93,8 +93,14 @@ fn descriptor(input: &CheckedShape, function: Elementwise) -> Result<Descriptor,
         Elementwise::Reciprocal => {
             let shifted = Measure::new(
                 "native-negative-exponent",
-                Scale::Exact(unit.scale().clone()),
-                unit.scale().clone(),
+                Scale::Exact(
+                    unit.rational_scale()
+                        .map_err(crate::ShapeError::from)?
+                        .clone(),
+                ),
+                unit.rational_scale()
+                    .map_err(crate::ShapeError::from)?
+                    .clone(),
             )
             .map_err(crate::ShapeError::from)?;
             unit.conversion_to(&shifted, Role::Point)
@@ -105,7 +111,13 @@ fn descriptor(input: &CheckedShape, function: Elementwise) -> Result<Descriptor,
     Ok(input
         .declarations()
         .registry()
-        .power(quantity.descriptor(), &exponent)
+        .power(
+            quantity.descriptor(),
+            exponent
+                .as_rational()
+                .ok_or(nrz_bindings::UnitError::UnsupportedExactConstantExport)
+                .map_err(crate::ShapeError::from)?,
+        )
         .map_err(crate::ShapeError::from)?)
 }
 

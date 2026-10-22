@@ -254,7 +254,7 @@ impl SolveData {
         equation: usize,
         input: &CheckedExpression,
     ) -> Result<Handle, SensitivityError> {
-        let scale = graph.constant(input.descriptor().measure().scale().clone())?;
+        let scale = graph.constant(input.descriptor().measure().rational_scale()?.clone())?;
         let row = equation % self.order;
         let rhs_column = equation / self.order;
         if column < self.solution.len() {

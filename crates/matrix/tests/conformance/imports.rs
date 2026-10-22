@@ -128,8 +128,8 @@ fn count_and_presentation_refusals() -> TestResult {
         voltage()?.kind().clone(),
         Measure::new(
             "shifted",
-            Scale::Exact(coherent.scale().clone()),
-            coherent.scale().clone(),
+            Scale::Exact(coherent.rational_scale()?.clone()),
+            coherent.rational_scale()?.clone(),
         )?,
         Role::Point,
     )?;
@@ -219,7 +219,7 @@ fn coherent_measure_names_stay_distinct() -> TestResult {
         Kind::Ratio,
         Measure::new(
             "another name",
-            Scale::Exact(coherent.scale().clone()),
+            Scale::Exact(coherent.rational_scale()?.clone()),
             coherent.offset().clone(),
         )?,
         Role::Difference,

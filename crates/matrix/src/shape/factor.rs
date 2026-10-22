@@ -100,7 +100,7 @@ impl CholeskyRootContract {
             scale: coherent.scale().clone(),
             shift: coherent.scale().clone(),
         }
-        .apply(coherent.scale())?;
+        .apply(coherent.rational_scale()?)?;
         let double = Measure::new(
             "root-exponent-denominator",
             Scale::Exact(twice),
@@ -110,7 +110,7 @@ impl CholeskyRootContract {
         let root = input
             .declarations
             .registry()
-            .power(&quantity, &half.scale)?;
+            .power(&quantity, half.rational_scale()?)?;
         Ok(Self {
             input: input.clone(),
             root,

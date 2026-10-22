@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Exact rational measure definitions and role-aware conversion recipes.
+//! Exact CAS measure definitions and role-aware conversion recipes.
 
-use nrz_cas::Rational;
+use nrz_cas::{ExactConstant, PositiveConstant, Rational};
 
 use crate::{Role, UnitError, exact::budget};
 
-/// A proposed scale definition, including the explicitly unsupported future boundary.
+/// A proposed exact scale definition; admission requires checked positivity.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Scale {
     /// An exact dimensionless rational scale.
     Exact(Rational),
-    /// An irrational or symbolic definition, refused without approximation.
+    /// A finite closed CAS expression whose positivity is checked during admission.
+    Expression(ExactConstant),
+    /// Unchecked text is not mathematical evidence and is refused without approximation.
     Symbolic(String),
 }
 
@@ -20,7 +22,7 @@ pub struct Measure {
     /// Human-readable unit name, never interpreted as a dimension or kind.
     name: String,
     /// Strictly positive scale.
-    scale: Rational,
+    scale: PositiveConstant,
     /// Coherent-coordinate origin for points.
     offset: Rational,
 }
@@ -29,17 +31,10 @@ impl Measure {
     /// Validate a measure definition without inferring semantics from its name.
     ///
     /// # Errors
-    /// Refuses symbolic scales, nonpositive scales and empty names.
+    /// Refuses unchecked text, nonpositive or unproved-positive scales and empty names.
     pub fn new(name: impl Into<String>, scale: Scale, offset: Rational) -> Result<Self, UnitError> {
-        let scale = match scale {
-            Scale::Exact(value) => value,
-            Scale::Symbolic(definition) => {
-                return Err(UnitError::UnsupportedMeasureScale(definition));
-            }
-        };
-        if scale.is_negative() || scale.is_zero() {
-            return Err(UnitError::InvalidScale);
-        }
+        let value = scale.value()?;
+        let scale = value.positive().ok_or(UnitError::InvalidScale)?;
         let name = name.into();
         if name.is_empty() {
             return Err(UnitError::InvalidMeasureName);
@@ -56,7 +51,7 @@ impl Measure {
     pub fn coherent() -> Self {
         Self {
             name: "SI".to_owned(),
-            scale: Rational::one(),
+            scale: PositiveConstant::one(),
             offset: Rational::zero(),
         }
     }
@@ -69,7 +64,22 @@ impl Measure {
 
     /// Exact scale relative to coherent coordinates.
     #[must_use]
-    pub const fn scale(&self) -> &Rational {
+    pub const fn scale(&self) -> &ExactConstant {
+        self.scale.value()
+    }
+
+    /// Extract a rational scale at an existing rational-only numerical boundary.
+    /// # Errors
+    /// Refuses a non-rational exact scale without a numerical approximation.
+    pub fn rational_scale(&self) -> Result<&Rational, UnitError> {
+        self.scale()
+            .as_rational()
+            .ok_or(UnitError::UnsupportedExactConstantExport)
+    }
+
+    /// Retained checked positivity and finiteness witness for the exact scale.
+    #[must_use]
+    pub const fn scale_witness(&self) -> &PositiveConstant {
         &self.scale
     }
 
@@ -102,13 +112,12 @@ impl Measure {
             return Err(UnitError::OffsetOnDifference);
         }
         let mut ledger = budget()?;
-        let scale = self.scale.div(&target.scale, &mut ledger)?;
+        let scale = self.scale().div(target.scale(), &mut ledger)?;
         let shift = if role == Role::Point {
-            self.offset
-                .sub(&target.offset, &mut ledger)?
-                .div(&target.scale, &mut ledger)?
+            ExactConstant::from(self.offset.sub(&target.offset, &mut ledger)?)
+                .div(target.scale(), &mut ledger)?
         } else {
-            Rational::zero()
+            ExactConstant::zero()
         };
         Ok(Conversion { scale, shift })
     }
@@ -120,9 +129,9 @@ impl Measure {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Conversion {
     /// Multiplicative coordinate factor.
-    pub scale: Rational,
+    pub scale: ExactConstant,
     /// Translation, always zero for differences.
-    pub shift: Rational,
+    pub shift: ExactConstant,
 }
 
 impl Conversion {
@@ -133,7 +142,7 @@ impl Conversion {
     /// Refuses the same exact arithmetic, output-byte and formatting-work limits as descriptor constants.
     pub fn export_scale(&self, limits: &crate::LimitsOverride) -> Result<String, crate::MapError> {
         let mut ledger = nrz_cas::limits::Budget::new(crate::Limits::default().resolve(limits)?)?;
-        Ok(self.scale.exact_string(&mut ledger)?)
+        Ok(self.rational_scale()?.exact_string(&mut ledger)?)
     }
 
     /// Apply the map to an exact coordinate for conversion oracles and exact imports.
@@ -143,10 +152,59 @@ impl Conversion {
     /// # Errors
     /// Refuses exact arithmetic overflow; no floating conversion bound is implied.
     pub fn apply(&self, coordinate: &Rational) -> Result<Rational, UnitError> {
+        self.apply_exact(&coordinate.clone().into())?
+            .as_rational()
+            .cloned()
+            .ok_or(UnitError::UnsupportedExactConstantExport)
+    }
+
+    /// Apply an exact map to a source-free exact coordinate, retaining irrational constants.
+    /// # Errors
+    /// Refuses exhausted exact arithmetic or CAS graph budgets.
+    pub fn apply_exact(&self, coordinate: &ExactConstant) -> Result<ExactConstant, UnitError> {
         let mut ledger = budget()?;
         Ok(self
             .scale
             .mul(coordinate, &mut ledger)?
             .add(&self.shift, &mut ledger)?)
+    }
+
+    /// Extract the exact rational factor required by a rational-only consumer.
+    /// # Errors
+    /// Refuses a non-rational factor without approximation.
+    pub fn rational_scale(&self) -> Result<&Rational, UnitError> {
+        self.scale
+            .as_rational()
+            .ok_or(UnitError::UnsupportedExactConstantExport)
+    }
+
+    /// Extract the exact rational shift required by a rational-only consumer.
+    /// # Errors
+    /// Refuses a non-rational shift without approximation.
+    pub fn rational_shift(&self) -> Result<&Rational, UnitError> {
+        self.shift
+            .as_rational()
+            .ok_or(UnitError::UnsupportedExactConstantExport)
+    }
+}
+
+impl Scale {
+    /// Propose the exact circle constant through the CAS's typed mathematical constructor.
+    /// # Errors
+    /// Refuses exhausted exact graph construction or proof budgets.
+    pub fn pi() -> Result<Self, UnitError> {
+        Ok(Self::Expression(ExactConstant::named(
+            nrz_cas::syntax::Constant::Pi,
+            &mut budget()?,
+        )?))
+    }
+
+    /// Text cannot acquire graph or positivity authority through a reporting spelling.
+    pub(crate) fn value(self) -> Result<ExactConstant, UnitError> {
+        match self {
+            Self::Exact(value) => Ok(value.into()),
+            Self::Expression(value) => Ok(value),
+            Self::Symbolic(definition) => Err(UnitError::UnsupportedMeasureScale(definition)),
+        }
     }
 }

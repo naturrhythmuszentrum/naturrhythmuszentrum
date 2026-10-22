@@ -221,8 +221,8 @@ fn conversion_coefficient_export_retains_signed_zero_and_limits() -> TestResult 
     let mut ledger = Budget::new(Limits::default())?;
     for spelling in ["-7/3", "0"] {
         let value = nrz_bindings::Conversion {
-            scale: Rational::parse(spelling, &mut ledger)?,
-            shift: Rational::zero(),
+            scale: Rational::parse(spelling, &mut ledger)?.into(),
+            shift: Rational::zero().into(),
         };
         let twin = value.clone();
         assert_eq!(value.export_scale(&LimitsOverride::default())?, spelling);

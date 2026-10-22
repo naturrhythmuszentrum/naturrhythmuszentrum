@@ -167,7 +167,7 @@ fn rational_expansion<P: Scalar + 'static>() -> TestResult {
             &Descriptor::ratio(),
             &nrz_bindings::Conversion {
                 scale,
-                shift: zero.clone(),
+                shift: zero.clone().into(),
             },
         )
     };
@@ -182,7 +182,8 @@ fn rational_expansion<P: Scalar + 'static>() -> TestResult {
                             .exponents()
                             .first()
                             .ok_or("negative literal")?
-                            .clone(),
+                            .clone()
+                            .into(),
                     )?,
                 ),
             ],

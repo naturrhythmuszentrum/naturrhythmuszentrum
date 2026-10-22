@@ -2,7 +2,7 @@
 //! Map and coefficient identities contain exact definitions, never floating approximations.
 
 use nrz_cas::{
-    Rational,
+    ExactConstant,
     limits::{Budget, Limits, LimitsOverride},
 };
 
@@ -111,8 +111,8 @@ pub struct DescriptorConstant {
     pub(crate) map: MapIdentity,
     /// Scale versus shift within that map.
     pub(crate) kind: ConstantKind,
-    /// CAS rational definition of a descriptor constant only.
-    pub(crate) value: Rational,
+    /// Checked CAS expression of a descriptor constant only.
+    pub(crate) value: ExactConstant,
 }
 
 impl DescriptorConstant {
@@ -128,14 +128,24 @@ impl DescriptorConstant {
         self.kind
     }
 
+    /// Exact checked coefficient retained even when numerical export is unavailable.
+    #[must_use]
+    pub const fn exact(&self) -> &ExactConstant {
+        &self.value
+    }
+
     /// Export a bounded exact integer or literal-fraction spelling for a numerical decoder.
     ///
     /// # Errors
-    /// Returns the CAS's exact arithmetic, output-byte or formatting-work refusal.
+    /// Refuses non-rational constants by name; also retains exact arithmetic, byte and work refusals.
     /// No approximate number is produced and no stored coordinate is accepted.
     pub fn export(&self, limits: &LimitsOverride) -> Result<String, MapError> {
         let mut ledger = Budget::new(Limits::default().resolve(limits)?)?;
-        Ok(self.value.exact_string(&mut ledger)?)
+        let value = self
+            .value
+            .as_rational()
+            .ok_or(crate::UnitError::UnsupportedExactConstantExport)?;
+        Ok(value.exact_string(&mut ledger)?)
     }
 }
 
@@ -199,7 +209,7 @@ impl CheckedMap {
     /// Refuses bounded exact descriptor arithmetic failure.
     pub fn inverse(&self) -> Result<Self, MapError> {
         let mut ledger = crate::exact::budget()?;
-        let scale = Rational::one().div(&self.scale.value, &mut ledger)?;
+        let scale = ExactConstant::one().div(&self.scale.value, &mut ledger)?;
         let shift = self
             .shift
             .value

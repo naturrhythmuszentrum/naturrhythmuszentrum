@@ -31,12 +31,12 @@ impl ExactCoefficient {
         }
         let value = descriptor
             .conversion_to(&descriptor.coherent())?
-            .apply(&definition.scale)?;
+            .apply(definition.rational_scale()?)?;
         Ok(Self {
             descriptor: descriptor.coherent(),
             value: Conversion {
-                scale: value,
-                shift: Measure::coherent().offset().clone(),
+                scale: value.into(),
+                shift: Measure::coherent().offset().clone().into(),
             },
         })
     }
@@ -347,12 +347,13 @@ impl StructuredExpansion {
                 .get(self.extent.index(logical, column)?)
                 .ok_or(ShapeError::EntryIndex)?
                 .value;
-            let product = first.apply(&second.scale)?;
+            let product = first.apply(second.rational_scale()?)?;
             sum.scale = Conversion {
                 scale: Measure::coherent().scale().clone(),
                 shift: sum.scale,
             }
-            .apply(&product)?;
+            .apply(&product)?
+            .into();
         }
         Ok(sum)
     }
@@ -395,7 +396,9 @@ fn check_row(
             logical.declarations.registry(),
             term.coefficient.descriptor(),
         )?;
-        entry.value.scale = conversion.apply(&term.coefficient.value.scale)?;
+        entry.value.scale = conversion
+            .apply(term.coefficient.value.rational_scale()?)?
+            .into();
         entry.definition = Some(term.coefficient.clone());
     }
     Ok(())
@@ -468,7 +471,7 @@ fn check_identity_metric(extent: Extent, entries: &[Conversion]) -> Result<(), S
     let coherent = Measure::coherent();
     for (index, entry) in entries.iter().enumerate() {
         let expected = if index % extent.rows() == index / extent.rows() {
-            coherent.scale()
+            coherent.rational_scale()?
         } else {
             coherent.offset()
         };
@@ -481,7 +484,7 @@ fn check_identity_metric(extent: Extent, entries: &[Conversion]) -> Result<(), S
 
 /// The exact zero map is metadata; no floating or heap coordinate enters this algebra.
 fn zero_map() -> Conversion {
-    let zero = Measure::coherent().offset().clone();
+    let zero: nrz_bindings::ExactConstant = Measure::coherent().offset().clone().into();
     Conversion {
         scale: zero.clone(),
         shift: zero,

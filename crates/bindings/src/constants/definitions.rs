@@ -3,7 +3,7 @@
 
 use std::rc::Rc;
 
-use nrz_cas::{Rational, limits::Budget};
+use nrz_cas::{ExactConstant, Rational, limits::Budget};
 
 use super::MapError;
 use crate::{
@@ -42,7 +42,7 @@ struct ConstantDeclaration {
     /// Original physical coordinate descriptor.
     descriptor: Descriptor,
     /// Exact definition in the descriptor's declared measure.
-    value: Rational,
+    value: ExactConstant,
 }
 
 impl ConstantDeclaration {
@@ -58,12 +58,12 @@ impl ConstantDeclaration {
             identity: DefinitionIdentity::Declaration(owner.id().clone()),
             name: key.into(),
             descriptor: descriptor.clone(),
-            value: value.clone(),
+            value: value.clone().into(),
         })
     }
 
     /// A schema definition is separate immutable evidence, never an addition to the owner.
-    fn schema(name: String, descriptor: &Descriptor, value: Rational) -> Self {
+    fn schema(name: String, descriptor: &Descriptor, value: ExactConstant) -> Self {
         Self {
             identity: DefinitionIdentity::Schema(SchemaIdentity(Rc::new(()))),
             name,
@@ -81,11 +81,11 @@ impl ConstantDeclaration {
     }
 
     /// Convert a definition, never a stored coordinate, with the caller's shared ledger.
-    fn coherent(&self, ledger: &mut Budget) -> Result<Rational, MapError> {
+    fn coherent(&self, ledger: &mut Budget) -> Result<ExactConstant, MapError> {
         Ok(self
             .value
             .mul(self.descriptor.measure().scale(), ledger)?
-            .add(self.descriptor.measure().offset(), ledger)?)
+            .add(&self.descriptor.measure().offset().clone().into(), ledger)?)
     }
 }
 
@@ -107,16 +107,13 @@ impl ReferenceDefinition {
     /// Declare a positive exact reference coordinate in the supplied difference measure.
     ///
     /// # Errors
-    /// Refuses symbolic, zero or negative definitions, empty names, points, counts and relative kinds.
+    /// Refuses unchecked text and unproved-positive definitions, empty names, points, counts and relative kinds.
     pub fn new(
         name: impl Into<String>,
         descriptor: &Descriptor,
         value: Scale,
     ) -> Result<Self, MapError> {
-        let value = match value {
-            Scale::Exact(value) => value,
-            Scale::Symbolic(text) => return Err(UnitError::UnsupportedMeasureScale(text).into()),
-        };
+        let value = value.value()?;
         Self::checked(ConstantDeclaration::schema(name.into(), descriptor, value))
     }
 
@@ -131,8 +128,7 @@ impl ReferenceDefinition {
     /// Positivity follows from the exact coordinate and the descriptor's positive measure scale.
     fn checked(declaration: ConstantDeclaration) -> Result<Self, MapError> {
         if declaration.descriptor.role() != Role::Difference
-            || declaration.value.is_zero()
-            || declaration.value.is_negative()
+            || declaration.value.positive().is_none()
         {
             return Err(MapError::Reference);
         }
@@ -163,7 +159,7 @@ impl ReferenceDefinition {
     }
 
     /// Positive coherent definition, computed only within the supplied descriptor ledger.
-    pub(crate) fn coherent(&self, ledger: &mut Budget) -> Result<Rational, MapError> {
+    pub(crate) fn coherent(&self, ledger: &mut Budget) -> Result<ExactConstant, MapError> {
         self.declaration.coherent(ledger)
     }
 }
@@ -186,7 +182,7 @@ impl OriginDefinition {
         Self::checked(ConstantDeclaration::schema(
             name.into(),
             descriptor,
-            Rational::zero(),
+            ExactConstant::zero(),
         ))
     }
 
@@ -217,7 +213,7 @@ impl OriginDefinition {
     }
 
     /// Exact coherent point origin for affine map construction.
-    pub(crate) fn coherent(&self, ledger: &mut Budget) -> Result<Rational, MapError> {
+    pub(crate) fn coherent(&self, ledger: &mut Budget) -> Result<ExactConstant, MapError> {
         self.declaration.coherent(ledger)
     }
 }

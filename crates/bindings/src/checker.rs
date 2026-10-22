@@ -351,6 +351,27 @@ impl<'a> State<'a> {
             })
     }
 
+    /// Import a checked constant graph without replacing original physical operands.
+    fn constant(
+        &mut self,
+        source: &Source,
+        value: &nrz_cas::ExactConstant,
+    ) -> Result<Coordinate, Diagnostic> {
+        let coordinate = self
+            .coordinates
+            .constant(&source.header, value, &mut self.budget)
+            .map_err(|error| {
+                self.error(
+                    source,
+                    Failure::Coordinates(error),
+                    Expectation::Rule("bounded exact constant expression"),
+                    Vec::new(),
+                )
+            })?;
+        self.coordinate_location = self.location(source);
+        Ok(coordinate)
+    }
+
     /// Apply an exact coordinate map without normalizing original operations.
     ///
     /// TODO ´todo:code:apply-axis-conversions-to-values-and´: apply axis conversions to values and both covariance indices while excluding affine uncertainty offsets under def:nrz:covariance-shape.
@@ -361,11 +382,11 @@ impl<'a> State<'a> {
         conversion: &Conversion,
     ) -> Result<Coordinate, Diagnostic> {
         if conversion.scale != Rational::one() {
-            let scale = self.build(source, Operator::Rational(conversion.scale.clone()), &[])?;
+            let scale = self.constant(source, &conversion.scale)?;
             coordinates = self.build(source, Operator::Mul, &[scale, coordinates])?;
         }
         if conversion.shift != Rational::zero() {
-            let shift = self.build(source, Operator::Rational(conversion.shift.clone()), &[])?;
+            let shift = self.constant(source, &conversion.shift)?;
             coordinates = self.build(source, Operator::Add, &[coordinates, shift])?;
         }
         Ok(coordinates)
@@ -649,10 +670,11 @@ impl<'a> State<'a> {
             )?,
             Declaration::Constant { value, .. } => {
                 if descriptor.kind() == &Kind::Ratio {
-                    literal =
-                        Some(conversion.apply(&value).map_err(|error| {
-                            self.units(source, error, vec![descriptor.clone()])
-                        })?);
+                    literal = conversion
+                        .apply_exact(&value.clone().into())
+                        .map_err(|error| self.units(source, error, vec![descriptor.clone()]))?
+                        .as_rational()
+                        .cloned();
                 }
                 let coordinates = self.build(source, Operator::Rational(value), &[])?;
                 self.convert(source, coordinates, &conversion)?

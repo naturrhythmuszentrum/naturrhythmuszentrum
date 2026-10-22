@@ -194,7 +194,7 @@ impl Roots {
             let negative = input
                 .descriptor()
                 .measure()
-                .scale()
+                .rational_scale()?
                 .negated(&mut graph.budget)?;
             graph.constant(negative)
         } else {

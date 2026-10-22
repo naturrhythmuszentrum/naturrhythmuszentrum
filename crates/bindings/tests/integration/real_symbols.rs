@@ -20,7 +20,7 @@ fn real_symbol_bindings_only_constant_lifecycle() -> Result<(), Box<dyn std::err
         "reference".into(),
         Declaration::Constant {
             descriptor: point.difference(),
-            value: point.measure().scale().clone(),
+            value: point.measure().rational_scale()?.clone(),
             evidence: Evidence::default(),
         },
     )?;

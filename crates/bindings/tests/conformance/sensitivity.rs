@@ -174,7 +174,7 @@ fn native_sensitivity_measure_chain_rule() -> TestResult {
             entry
                 .pairing()
                 .measure()
-                .scale()
+                .rational_scale()?
                 .exact_string(&mut Budget::new(Limits::default())?)?,
             "100"
         );

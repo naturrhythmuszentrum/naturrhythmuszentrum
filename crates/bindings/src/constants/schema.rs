@@ -2,7 +2,7 @@
 //! Checked schema exports use exact descriptor arithmetic and never evaluate a value operand.
 
 use nrz_cas::{
-    Rational,
+    ExactConstant,
     limits::{Budget, Limits, LimitsOverride},
 };
 
@@ -147,14 +147,16 @@ fn check_origin(
 /// Derive coefficients from exact definitions; input coordinates are never accepted here.
 fn normalization(
     measure: &Measure,
-    magnitude: &Rational,
+    magnitude: &ExactConstant,
     origin: Option<&OriginDefinition>,
     ledger: &mut Budget,
 ) -> Result<Conversion, MapError> {
-    let origin = origin.map_or_else(|| Ok(Rational::zero()), |origin| origin.coherent(ledger))?;
+    let origin = origin.map_or_else(
+        || Ok(ExactConstant::zero()),
+        |origin| origin.coherent(ledger),
+    )?;
     let scale = measure.scale().div(magnitude, ledger)?;
-    let shift = measure
-        .offset()
+    let shift = ExactConstant::from(measure.offset().clone())
         .sub(&origin, ledger)?
         .div(magnitude, ledger)?;
     Ok(Conversion { scale, shift })

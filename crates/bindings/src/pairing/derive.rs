@@ -72,5 +72,5 @@ fn quotient_measure(output: &Descriptor, input: &Descriptor) -> Result<Measure, 
         .measure()
         .scale()
         .div(input.measure().scale(), &mut budget()?)?;
-    Measure::new("sensitivity", Scale::Exact(scale), Rational::zero())
+    Measure::new("sensitivity", Scale::Expression(scale), Rational::zero())
 }

@@ -47,7 +47,11 @@ fn cholesky_root_policy_refusal_pairs() -> ResultOf<()> {
     )?;
     let half = Measure::coherent().conversion_to(&double, Role::Difference)?;
     let mut registry = Registry::new(ExponentPolicy::Rational);
-    registry.register_power(area.kind().clone(), half.scale, length.kind().clone())?;
+    registry.register_power(
+        area.kind().clone(),
+        half.rational_scale()?.clone(),
+        length.kind().clone(),
+    )?;
     let snapshot = owner(registry)?;
     let operator = dense(
         &snapshot,

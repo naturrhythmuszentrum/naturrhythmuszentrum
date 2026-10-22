@@ -478,3 +478,50 @@ fn keeps_independent_uncertainty_components_distinct() -> Result<(), Error> {
     assert!(check(&source).is_err());
     Ok(())
 }
+
+/// The rational schema names the missing enclosure instead of printing an approximate measure.
+/// ´test:unit:irrational-descriptor-schema-export-refuses´
+#[test]
+fn irrational_descriptor_schema_export_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    use nrz_bindings::{Descriptor, Kind, Measure, Role, Scale, UnitError};
+    let quantity = Descriptor::new(
+        Kind::Ratio,
+        Measure::new("pi", Scale::pi()?, Measure::coherent().offset().clone())?,
+        Role::Difference,
+    )?;
+    let kinds = std::collections::BTreeMap::from([("ratio".into(), Kind::Ratio)]);
+    let value = Value::Null;
+    let record = super::Record::new(&value, "irrational measure");
+    let result = super::kinds::evidence(&quantity, &kinds, &record);
+    assert!(matches!(result, Err(Error::Payload { detail, .. })
+        if detail == UnitError::UnsupportedExactConstantExport.to_string()));
+    Ok(())
+}
+
+/// Output conversion evidence obeys the same version-two rational export boundary.
+/// ´test:unit:irrational-output-schema-export-refuses´
+#[test]
+fn irrational_output_schema_export_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    use nrz_bindings::{
+        Context, Descriptor, ExponentPolicy, Kind, Measure, Registry, Role, Scale, UnitError,
+    };
+    let builder = Context::with_real_symbols(
+        Registry::new(ExponentPolicy::Rational),
+        nrz_bindings::Limits::default(),
+        &[],
+    )?;
+    let target = Descriptor::new(
+        Kind::Ratio,
+        Measure::new("pi", Scale::pi()?, Measure::coherent().offset().clone())?,
+        Role::Difference,
+    )?;
+    let original = builder.parse("literal", "1")?;
+    let checked = builder.check_against(&original, &target)?;
+    let value = Value::Null;
+    let source = super::Record::new(&value, "irrational output");
+    let mut output = json!({});
+    let result = super::checked_fields(&mut output, &checked, &source);
+    assert!(matches!(result, Err(Error::Payload { detail, .. })
+        if detail == UnitError::UnsupportedExactConstantExport.to_string()));
+    Ok(())
+}

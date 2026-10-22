@@ -238,7 +238,7 @@ pub(crate) fn coefficient(
     if !active {
         return graph.constant(Rational::zero());
     }
-    let scale = graph.constant(input.descriptor().measure().scale().clone())?;
+    let scale = graph.constant(input.descriptor().measure().rational_scale()?.clone())?;
     let coherent = input.coordinates.clone();
     match recipe {
         SensitivityRecipe::Square => {

@@ -46,6 +46,11 @@ mod encoding;
 mod error;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "closed constant proof helpers stay inside private CAS modules"
+)]
+mod exact_constant;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
         unreachable_pub"
 )]
@@ -239,6 +244,7 @@ mod service;
 mod shortcut;
 
 pub use error::{Exhaustion, Fault, FaultKind, InvalidCode, Location};
+pub use exact_constant::{ExactConstant, PositiveConstant};
 pub use graph::{Cas, Handle, LogicalId, Reference};
 pub use number::Rational;
 

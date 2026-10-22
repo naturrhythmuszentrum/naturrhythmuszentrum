@@ -303,7 +303,7 @@ fn third(shape: &CheckedShape) -> ResultOf<FixedCoefficient> {
         scale: unit.scale().clone(),
         shift: unit.scale().clone(),
     };
-    let three = increment.apply(&increment.apply(unit.scale())?)?;
+    let three = increment.apply(&increment.apply(unit.rational_scale()?)?)?;
     let triple = Measure::new("three", Scale::Exact(three), unit.offset().clone())?;
     let conversion = unit.conversion_to(&triple, Role::Difference)?;
     let ratio = Descriptor::ratio();
@@ -311,7 +311,7 @@ fn third(shape: &CheckedShape) -> ResultOf<FixedCoefficient> {
         ratio.kind().clone(),
         Measure::new(
             "third",
-            Scale::Exact(conversion.scale),
+            Scale::Exact(conversion.rational_scale()?.clone()),
             unit.offset().clone(),
         )?,
         Role::Difference,

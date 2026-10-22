@@ -205,7 +205,9 @@ pub fn uncertainty(
     }
     let scale = match mode {
         UncertaintyMode::Radius | UncertaintyMode::Standard => value.measure.scale().clone(),
-        UncertaintyMode::RelativeRadius | UncertaintyMode::RelativeStandard => Rational::one(),
+        UncertaintyMode::RelativeRadius | UncertaintyMode::RelativeStandard => {
+            nrz_cas::ExactConstant::one()
+        }
         UncertaintyMode::Variance => value.measure.scale().pow(2, &mut budget()?)?,
         UncertaintyMode::Covariance => value.measure.scale().mul(
             other
@@ -222,7 +224,7 @@ pub fn uncertainty(
     );
     Descriptor::validated(
         kind,
-        Measure::new("uncertainty", Scale::Exact(scale), Rational::zero())?,
+        Measure::new("uncertainty", Scale::Expression(scale), Rational::zero())?,
         Role::Difference,
     )
 }

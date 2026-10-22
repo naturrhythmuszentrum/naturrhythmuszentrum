@@ -22,17 +22,17 @@ pub(crate) fn integer_measure(value: u32) -> TestResult<Measure> {
         scale: unit.scale().clone(),
         shift: unit.scale().clone(),
     };
-    let two = increment.apply(unit.scale())?;
+    let two = increment.apply(unit.rational_scale()?)?;
     let mut number = unit.offset().clone();
     for bit in (0..(32 - value.leading_zeros())).rev() {
         let shift = if value & (1 << bit) == 0 {
             unit.offset()
         } else {
-            unit.scale()
+            unit.rational_scale()?
         };
         number = Conversion {
-            scale: two.clone(),
-            shift: shift.clone(),
+            scale: two.clone().into(),
+            shift: shift.clone().into(),
         }
         .apply(&number)?;
     }
@@ -53,13 +53,15 @@ pub(crate) fn measure(
     let unit = Measure::coherent();
     let scale = integer_measure(numerator)?
         .conversion_to(&integer_measure(denominator)?, Role::Difference)?
-        .scale;
+        .rational_scale()?
+        .clone();
     let shift = if offset == 0 {
         unit.offset().clone()
     } else {
         integer_measure(offset)?
             .conversion_to(&integer_measure(offset_denominator)?, Role::Difference)?
-            .scale
+            .rational_scale()?
+            .clone()
     };
     Ok(Measure::new("fixture", Scale::Exact(scale), shift)?)
 }
@@ -159,7 +161,7 @@ pub(crate) fn reference_owner(point: &Descriptor) -> TestResult<Rc<CheckedDeclar
         "reference".into(),
         nrz_bindings::Declaration::Constant {
             descriptor: point.difference().coherent(),
-            value: integer_measure(10)?.scale().clone(),
+            value: integer_measure(10)?.rational_scale()?.clone(),
             evidence: nrz_bindings::Evidence::default(),
         },
     )?;

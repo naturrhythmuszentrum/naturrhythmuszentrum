@@ -217,7 +217,7 @@ pub(super) fn evidence(
         "kind": name,
         "measure": {
             "display": value.measure().name(),
-            "scale": exact(value.measure().scale(), record)?,
+            "scale": exact(value.measure().rational_scale().map_err(|error| record.error(error))?, record)?,
             "offset": exact(value.measure().offset(), record)?,
         },
         "affine_role": if value.role() == Role::Point { "point" } else { "difference" },

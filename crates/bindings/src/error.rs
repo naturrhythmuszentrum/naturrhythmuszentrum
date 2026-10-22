@@ -20,10 +20,13 @@ pub enum UnitError {
     /// The requested dimension is outside the selected exponent policy.
     #[error("fractional dimension is not admitted by the exponent policy")]
     NonIntegralDimension,
-    /// Symbolic or irrational scale definitions require another representation contract.
+    /// Unchecked textual scale definitions provide no CAS expression or positivity evidence.
     #[error("unsupported measure scale: {0}")]
     UnsupportedMeasureScale(String),
-    /// A measure's exact scale must be positive.
+    /// The numerical decoder only accepts rational constants, so an enclosure is still required.
+    #[error("unsupported exact constant export: non-rational enclosure required")]
+    UnsupportedExactConstantExport,
+    /// A measure's exact scale must have a checked positive finite witness.
     #[error("measure scale must be strictly positive")]
     InvalidScale,
     /// A measure needs a nonempty reporting name.

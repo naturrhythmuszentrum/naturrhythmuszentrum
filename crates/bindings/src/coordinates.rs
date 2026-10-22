@@ -69,6 +69,41 @@ impl Coordinates {
         })
     }
 
+    /// Import an exact closed constant through CAS drafts, preserving the shared check ledger.
+    pub(super) fn constant(
+        &mut self,
+        header: &Handle,
+        value: &nrz_cas::ExactConstant,
+        budget: &mut Budget,
+    ) -> Result<Coordinate, Fault> {
+        if let Some(number) = value.as_rational() {
+            return self.push(header, Operator::Rational(number.clone()), &[], budget);
+        }
+        let drafts = value.expression_drafts(Reference::Existing(header.clone()), budget)?;
+        let mut coordinates: Vec<Coordinate> = Vec::new();
+        coordinates
+            .try_reserve_exact(drafts.len())
+            .map_err(|_| Fault::allocation(Location::new("constant coordinate drafts")))?;
+        for draft in drafts {
+            let operands = draft
+                .operands
+                .iter()
+                .map(|reference| {
+                    let Reference::Local(index) = reference else {
+                        return Err(unsupported());
+                    };
+                    usize::try_from(*index)
+                        .ok()
+                        .and_then(|index| coordinates.get(index))
+                        .cloned()
+                        .ok_or_else(unsupported)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            coordinates.push(self.push(header, draft.operator, &operands, budget)?);
+        }
+        coordinates.pop().ok_or_else(unsupported)
+    }
+
     /// Admit all drafts once and resolve the checked result's transaction-local reference.
     pub(super) fn publish(
         &self,
@@ -110,4 +145,58 @@ fn shape(operands: &[Coordinate], budget: &Budget) -> Result<(u64, u64), Fault> 
     budget.check(BudgetKind::Depth, depth, at)?;
     budget.check(BudgetKind::PeakExpressionSize, size, at)?;
     Ok((depth, size))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Coordinates;
+    use nrz_cas::domain::HeaderDraft;
+    use nrz_cas::limits::{Budget, BudgetKind, Limits};
+    use nrz_cas::syntax::{Constant, Draft, Environment};
+    use nrz_cas::{Cas, ExactConstant, Fault, FaultKind};
+
+    fn import(value: &ExactConstant, work: u64) -> Result<u64, Fault> {
+        let mut cas = Cas::new(Limits::default())?;
+        let mut setup = Budget::new(Limits::default())?;
+        let header = cas
+            .admit(
+                &[Draft::Header(HeaderDraft::Core(Environment::default()))],
+                &mut setup,
+            )?
+            .pop()
+            .ok_or_else(|| {
+                Fault::invalid(
+                    nrz_cas::InvalidCode::Reference,
+                    nrz_cas::Location::new("coordinate test header"),
+                )
+            })?;
+        let mut budget = Budget::new(Limits {
+            work,
+            ..Limits::default()
+        })?;
+        let mut coordinates = Coordinates::default();
+        let root = coordinates.constant(&header, value, &mut budget)?;
+        coordinates.publish(&mut cas, &root, &mut budget)?;
+        Ok(budget.usage().work)
+    }
+
+    /// Exact graph import and atomic coordinate publication share the caller's N/N-1 ledger.
+    /// ´test:unit:constant-coordinate-work-boundary´
+    #[test]
+    fn constant_coordinate_work_boundary() -> Result<(), Box<dyn std::error::Error>> {
+        let value = ExactConstant::named(Constant::Pi, &mut Budget::new(Limits::default())?)?;
+        let work = import(&value, Limits::default().work)?;
+        assert_eq!(import(&value, work)?, work);
+        assert!(matches!(
+            import(&value, work.checked_sub(1).ok_or("empty work")?),
+            Err(Fault {
+                kind: FaultKind::Exhausted {
+                    budget: BudgetKind::Work,
+                    ..
+                },
+                ..
+            })
+        ));
+        Ok(())
+    }
 }
