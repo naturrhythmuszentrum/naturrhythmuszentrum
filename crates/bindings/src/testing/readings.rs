@@ -281,3 +281,85 @@ pub(crate) fn complex_case(copy: u32, sign: i64, structured: bool) -> TestResult
         component,
     })
 }
+
+/// Check exact Work, cumulative precharge and staged-payload boundaries without raising a limit.
+pub(crate) fn boundaries(mut attempt: impl FnMut(Limits, u64) -> TestResult<u64>) -> TestResult {
+    let needed = attempt(Limits::default(), 0)?;
+    assert!(needed > 0);
+    assert!(
+        attempt(
+            Limits {
+                work: needed,
+                ..Limits::default()
+            },
+            0
+        )
+        .is_ok()
+    );
+    assert!(
+        attempt(
+            Limits {
+                work: needed - 1,
+                ..Limits::default()
+            },
+            0
+        )
+        .is_err()
+    );
+    assert!(
+        attempt(
+            Limits {
+                work: needed,
+                ..Limits::default()
+            },
+            1
+        )
+        .is_err()
+    );
+    assert!(
+        attempt(
+            Limits {
+                staged_payload_bytes: 0,
+                ..Limits::default()
+            },
+            0
+        )
+        .is_err()
+    );
+    let mut lower = 0;
+    let mut upper = Limits::default().staged_payload_bytes;
+    while lower + 1 < upper {
+        let middle = lower + (upper - lower) / 2;
+        if attempt(
+            Limits {
+                staged_payload_bytes: middle,
+                ..Limits::default()
+            },
+            0,
+        )
+        .is_ok()
+        {
+            upper = middle;
+        } else {
+            lower = middle;
+        }
+    }
+    attempt(
+        Limits {
+            staged_payload_bytes: upper,
+            ..Limits::default()
+        },
+        0,
+    )?;
+    assert!(
+        attempt(
+            Limits {
+                staged_payload_bytes: upper - 1,
+                ..Limits::default()
+            },
+            0
+        )
+        .is_err()
+    );
+    Ok(())
+}

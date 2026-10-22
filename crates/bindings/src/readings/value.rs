@@ -24,7 +24,7 @@ pub struct ReadingDefinition {
 }
 
 /// Sealed physical descriptor over a CAS defined reading.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PhysicalReading {
     /// Complete source family and original physical declarations.
     pub(super) family: CoordinateFamily,

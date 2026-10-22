@@ -72,6 +72,11 @@ impl ReadingAxis {
             boundaries,
         })
     }
+    /// Exact declaration scope and admissible family domain.
+    #[must_use]
+    pub const fn context(&self) -> &Handle {
+        &self.context
+    }
     /// Actual structural index symbol.
     #[must_use]
     pub const fn node(&self) -> &Handle {

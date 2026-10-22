@@ -6,7 +6,7 @@ use nrz_cas::{Cas, Handle, limits::Budget, readings::AffineMap, syntax::Operator
 use std::rc::Rc;
 
 /// Exact ordered coordinate family; it contains no numerical input or enclosure.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoordinateFamily {
     /// Exact scope and admissible family domain.
     pub(super) context: Handle,

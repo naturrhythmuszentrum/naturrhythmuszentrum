@@ -107,10 +107,10 @@ impl ReadingRelation {
 /// Compare complete local endpoint identity before permitting witness reuse.
 fn same(left: &ReadingProjection, right: &ReadingProjection) -> bool {
     let node = left.node == right.node;
-    let reading = left.reading.node == right.reading.node;
+    let reading = left.reading == right.reading;
     let coordinates = left.coordinates == right.coordinates;
     let entries = left.entries == right.entries;
-    node && reading && coordinates && entries
+    node && reading && coordinates && entries && left.space == right.space
 }
 
 /// Reconstruct the full scope, domain and equality from independently checked endpoints.

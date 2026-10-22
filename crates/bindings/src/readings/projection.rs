@@ -9,9 +9,20 @@ use nrz_cas::{
     syntax::{AtomicSort, Field, Operator, Sort},
 };
 
+/// Coordinate domain named by one exact projection.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ProjectionSpace {
+    /// Logical coordinates after the physical reading map.
+    Value,
+    /// Selected original storage coordinates before the physical reading map.
+    Selected,
+}
+
 /// A checked ordered component projection of one physical reading.
 #[derive(Clone, Debug)]
 pub struct ReadingProjection {
+    /// Whether indices name logical results or original selected coordinates.
+    pub(super) space: ProjectionSpace,
     /// Complete original reading behind the projection.
     pub(super) reading: PhysicalReading,
     /// Ordered result-coordinate indices, without duplicates.
@@ -52,6 +63,62 @@ impl PhysicalReading {
         }
         let node = projection_node(self, cas, coordinates, budget)?;
         Ok(ReadingProjection {
+            space: ProjectionSpace::Value,
+            reading: self.clone(),
+            coordinates: ordered,
+            node,
+            entries,
+        })
+    }
+
+    /// Project original selected entries, including every repeated or negated stored copy.
+    /// # Errors
+    /// Refuses duplicate/out-of-range selected positions and exhausted exact resources.
+    pub fn project_selected(
+        &self,
+        cas: &mut Cas,
+        coordinates: &[u32],
+        budget: &mut Budget,
+    ) -> Result<ReadingProjection, ReadingError> {
+        let mut indices = support::reserve(coordinates.len(), budget)?;
+        let mut entries = support::reserve(coordinates.len(), budget)?;
+        let mut ordered = support::reserve(coordinates.len(), budget)?;
+        for coordinate in coordinates {
+            budget.work(
+                u64::try_from(ordered.len()).map_err(|_| ReadingError::Shape)?,
+                support::AT,
+            )?;
+            if ordered.contains(coordinate) {
+                return Err(ReadingError::Shape);
+            }
+            let index = *self
+                .selection
+                .indices()
+                .get(usize::try_from(*coordinate).map_err(|_| ReadingError::Shape)?)
+                .ok_or(ReadingError::Shape)?;
+            let position =
+                u64::from(index.column) * u64::from(self.family.shape()[0]) + u64::from(index.row);
+            entries.push(
+                self.family
+                    .entries()
+                    .get(usize::try_from(position).map_err(|_| ReadingError::Shape)?)
+                    .ok_or(ReadingError::Shape)?
+                    .clone(),
+            );
+            indices.push(index);
+            ordered.push(*coordinate);
+        }
+        let spec = if let [entry] = indices.as_slice() {
+            SelectionSpec::Entry(*entry)
+        } else {
+            SelectionSpec::Entries {
+                entries: indices,
+                order: EntryOrder::Given,
+            }
+        };
+        let node = cas.select_entries(self.family.node(), &spec, budget)?;
+        Ok(ReadingProjection {
+            space: ProjectionSpace::Selected,
             reading: self.clone(),
             coordinates: ordered,
             node,
@@ -61,6 +128,12 @@ impl PhysicalReading {
 }
 
 impl ReadingProjection {
+    /// Distinguish selected storage copies from logical result components.
+    #[must_use]
+    pub const fn space(&self) -> ProjectionSpace {
+        self.space
+    }
+
     /// Exact original reading, including its source selection.
     #[must_use]
     pub const fn reading(&self) -> &PhysicalReading {

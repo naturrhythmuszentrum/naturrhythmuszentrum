@@ -340,3 +340,69 @@ fn physical_reading_replay_refuses_changed_domain() -> TestResult {
     );
     Ok(())
 }
+
+/// Stored-copy overlaps name selected positions separately from logical Complex components.
+/// ´test:integration:selected-copy-overlap-replays´
+#[test]
+fn selected_copy_overlap_replays() -> crate::testing::readings::TestResult {
+    use nrz_bindings::readings::{ProjectionSpace, ReadingRelation};
+    let mut sender = crate::testing::readings::complex_case(0, 1, true)?;
+    let left = sender.whole.project_selected(
+        &mut sender.fixture.cas,
+        &[3],
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    let right = sender.component.project_selected(
+        &mut sender.fixture.cas,
+        &[0],
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    let relation = ReadingRelation::prove(
+        &mut sender.fixture.cas,
+        left,
+        right,
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    let bytes = relation.export(
+        &sender.fixture.cas,
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    let mut receiver = crate::testing::readings::complex_case(0, 1, true)?;
+    let left = receiver.whole.project_selected(
+        &mut receiver.fixture.cas,
+        &[3],
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    let right = receiver.component.project_selected(
+        &mut receiver.fixture.cas,
+        &[0],
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    let checked = ReadingRelation::replay(
+        &mut receiver.fixture.cas,
+        left,
+        right,
+        &bytes,
+        &mut crate::testing::readings::ledger()?,
+    )?;
+    assert_eq!(checked.left().space(), ProjectionSpace::Selected);
+    assert_eq!(checked.left().coordinates(), &[3]);
+    Ok(())
+}
+
+/// Original selected-copy projection has independent exact Work and payload boundaries.
+/// ´test:integration:selected-projection-resource-boundaries´
+#[test]
+fn selected_projection_resource_boundaries() -> crate::testing::readings::TestResult {
+    crate::testing::readings::boundaries(|limits, precharge| {
+        let mut case = crate::testing::readings::complex_case(0, 1, true)?;
+        let mut budget = nrz_bindings::Budget::new(limits)?;
+        budget.work(
+            precharge,
+            nrz_cas::Location::new("selected projection boundary"),
+        )?;
+        case.whole
+            .project_selected(&mut case.fixture.cas, &[3, 2], &mut budget)?;
+        Ok(budget.usage().work)
+    })
+}

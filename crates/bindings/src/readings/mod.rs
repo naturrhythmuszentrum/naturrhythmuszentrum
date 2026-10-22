@@ -5,19 +5,31 @@
 //! on the full free-coordinate family and replayed against a reconstructed judgment.
 //! Physical meaning is checked before zero coefficients can discard coordinates.
 
+mod companions;
 mod family;
+mod grid;
+mod maps;
 mod meaning;
 mod projection;
 mod relation;
+mod representation;
 mod shape;
+mod sources;
 mod support;
 mod value;
 
+pub use companions::{
+    CompanionParameters, CompanionReading, CompanionReadingError, CompanionReadingKind,
+    CompanionRelation, ParameterErrorReading,
+};
 pub use family::CoordinateFamily;
+pub use grid::IndexedReading;
 pub use meaning::EntryMeaning;
-pub use projection::ReadingProjection;
+pub use projection::{ProjectionSpace, ReadingProjection};
 pub use relation::ReadingRelation;
+pub use representation::{Representation, RepresentationDefinition, RepresentationKind};
 pub use shape::{ReadingAxis, ReadingShape};
+pub use sources::{JointSources, ReadingSource, SourceEdge, SourceError, SourceKnowledge};
 pub use value::{PhysicalReading, ReadingDefinition};
 
 /// A refused physical reading or exact relation.
