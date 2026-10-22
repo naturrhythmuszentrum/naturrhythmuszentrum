@@ -80,7 +80,11 @@ fn replay_complete(
         statement: nrz_cas::proof::Statement::Solve(Box::new(SolveStatement::Presentation(
             nrz_cas::solving::StatementPresentation {
                 set,
-                form: SolveForm::Radicals,
+                form: if fixture.field == nrz_cas::syntax::Field::Real {
+                    SolveForm::RealExact
+                } else {
+                    SolveForm::Radicals
+                },
                 region: fixture.region.clone(),
             },
         ))),
@@ -221,24 +225,35 @@ fn blind_symbolic_complex_complete() -> TestResult {
     Ok(())
 }
 
-/// The Real fixture is refused by the producer ambient check before any initial coefficient map.
-/// Both discriminant signs and lower-degree families remain blocked by the named real-isolation boundary.
+/// The original Real cubic explicitly requests `AnyExact` and receives complete `RealExact` coverage and presentation.
 /// ´test:integration:blind-symbolic-real-complete´
 #[test]
 fn blind_symbolic_real_complete() -> TestResult {
-    let (mut fixture, request) = crate::testing::solve_blind::symbolic_in_field(
+    let (mut fixture, request) = real_request()?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Solved { answer, .. } = outcome else {
+        return Err(format!("real symbolic acceptance: {outcome:?}").into());
+    };
+    assert_eq!(answer.form, SolveForm::RealExact);
+    assert_eq!(answer.unresolved_regions, [] as [nrz_cas::Handle; 0]);
+    replay_complete(&fixture.cas, &answer, real_request()?)
+}
+
+/// This visible request revision preserves every original Real declaration and source occurrence.
+fn real_request() -> TestResult<(
+    crate::testing::solve_blind::Fixture,
+    nrz_cas::request::Request,
+)> {
+    let (fixture, mut request) = crate::testing::solve_blind::symbolic_in_field(
         &["d", "c", "b", "a"],
         &nrz_cas::syntax::Field::Real,
     )?;
-    let outcome = fixture.cas.run(&request);
-    let Outcome::Unresolved { solve_reason, .. } = outcome else {
-        return Err(format!("real symbolic boundary moved: {outcome:?}").into());
+    let nrz_cas::request::Task::Solve(specification) = &mut request.task else {
+        return Err("Real solve request".into());
     };
-    assert_eq!(
-        solve_reason,
-        Some(nrz_cas::solving::SolveReason::RealIsolationUnavailable)
-    );
-    Ok(())
+    assert_eq!(specification.form, SolveForm::Radicals);
+    specification.form = SolveForm::AnyExact;
+    Ok((fixture, request))
 }
 
 /// Nonreal cubic roots retain their Gaussian embedding through both fresh expected-claim replays.

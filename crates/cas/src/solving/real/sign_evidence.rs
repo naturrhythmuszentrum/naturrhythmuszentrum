@@ -137,6 +137,21 @@ pub(super) fn hypothesis(
     if !step.arguments.is_empty() || step.exponent != 0 {
         return Err(invalid());
     }
+    if let [slot] = step.premises.as_slice()
+        && matches!(&premise(premises, *slot)?.judgment.statement, Statement::Solve(statement)
+            if matches!(statement.as_ref(), SolveStatement::RealSign(sign)
+                if sign.region == *region && sign.subject == step.subject))
+    {
+        return entails(
+            fact(
+                cas,
+                &premise(premises, *slot)?.judgment.statement,
+                region,
+                &step.subject,
+            )?,
+            step.conclusion,
+        );
+    }
     crate::solving::elementary::total::check(
         cas,
         step.subject.logical_id(),
@@ -166,7 +181,11 @@ pub(super) fn identity(
     step: &RealSignStep,
     arguments: &[&RealSignStep],
     premises: &[CheckedApplication],
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
+    if arguments.is_empty() {
+        return normalized(cas, region, step, premises, budget);
+    }
     let ([source], [slot]) = (arguments, step.premises.as_slice()) else {
         return Err(invalid());
     };
@@ -225,4 +244,43 @@ pub(super) fn root(
     }
     let strict = crate::solving::towers::real_roots::positive_selection(cas, selection, budget)?;
     entails(if strict { 4 } else { 6 }, step.conclusion)
+}
+
+/// An explicit prior unit chooses the coefficient algebra; exact evaluation checks the zero identity.
+fn normalized(
+    cas: &Cas,
+    region: &Handle,
+    step: &RealSignStep,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let [slot] = step.premises.as_slice() else {
+        return Err(invalid());
+    };
+    if step.exponent != 0 {
+        return Err(invalid());
+    }
+    let Statement::Solve(statement) = &premise(premises, *slot)?.judgment.statement else {
+        return Err(invalid());
+    };
+    let SolveStatement::Unit(unit) = statement.as_ref() else {
+        return Err(invalid());
+    };
+    if unit.region != *region {
+        return Err(invalid());
+    }
+    let evaluation = crate::solving::elementary::evaluate::Evaluation {
+        cas,
+        engine: crate::solving::coefficients::arithmetic::Engine {
+            state: &cas.state,
+            domain: &unit.domain,
+        },
+        region,
+        premises,
+        free: &[],
+        bound: &[],
+    };
+    let value = evaluation.expression(step.subject.logical_id(), true, budget)?;
+    evaluation.zero(&value, budget)?;
+    entails(2, step.conclusion)
 }

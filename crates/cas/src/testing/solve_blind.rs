@@ -52,7 +52,8 @@ pub(crate) fn derivative(coefficients: &[i64]) -> crate::testing::common::TestRe
 }
 
 pub(crate) use source::{
-    gaussian_polynomial, nonzero_consequence, polynomial, regional_unit, symbolic,
+    Fixture, gaussian_polynomial, nonzero_consequence, polynomial, real_polynomial, regional_unit,
+    symbolic, symbolic_in_field,
 };
 
 #[path = "solve_blind/trace.rs"]
@@ -120,3 +121,19 @@ pub(crate) fn independent_symbolic_product() -> crate::testing::common::TestResu
 #[path = "solve_blind/inclusion.rs"]
 mod inclusion;
 pub(crate) use inclusion::check as inclusion_candidates;
+
+#[path = "solve_blind/real.rs"]
+mod real;
+pub(crate) use real::prefixes as real_prefixes;
+
+#[path = "solve_blind/real_acceptance.rs"]
+mod real_acceptance;
+pub(crate) use real_acceptance::check as real_acceptance;
+
+#[path = "solve_blind/real_mutations.rs"]
+mod real_mutations;
+pub(crate) use real_mutations::strata as real_stratum_mutations;
+
+#[path = "solve_blind/real_replay.rs"]
+mod real_replay;
+pub(crate) use real_replay::refusals as real_expected_refusals;

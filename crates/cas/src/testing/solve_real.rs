@@ -563,3 +563,333 @@ fn count_statement(
     )?;
     Ok(())
 }
+
+impl Fixture {
+    /// Materialize only the selection whose existence is the last independently authored theorem.
+    pub(crate) fn selected_value(&mut self) -> TestResult<Handle> {
+        let Statement::Solve(statement) = &self.steps.last().ok_or("Real existence")?.conclusion
+        else {
+            return Err("Real existence claim".into());
+        };
+        let SolveStatement::RootExistence(value) = statement.as_ref() else {
+            return Err("Real existence shape".into());
+        };
+        let draft = Draft::RootValue {
+            header: reference(&self.base.header),
+            selection: reference(&value.relation),
+            slot: 0,
+        };
+        admit(&mut self.base, draft)
+    }
+
+    /// Representation tests need an actual finite tuple in its original Real coordinate frame.
+    pub(crate) fn finite_set(&mut self, entry: &Handle) -> TestResult<Handle> {
+        let unknown = self.base.free("x")?;
+        let predicate = self.base.equation(&unknown, &unknown)?;
+        let problem = self.base.problem("x", &predicate, &[])?;
+        let solving::SolveView::SolveProblem(value) = self.base.cas.solve_view(&problem)? else {
+            return Err("Real representation problem".into());
+        };
+        let (coordinates, domain) = (value.unknowns.clone(), value.domain.clone());
+        let tuple = solving::TupleData {
+            header: reference(&self.base.header),
+            scope: Vec::new(),
+            coordinates: reference(&coordinates),
+            entries: vec![reference(entry)],
+        };
+        let tuple = admit(&mut self.base, Draft::Solve(SolveDraft::Tuple(tuple)))?;
+        let branch = solving::SolutionBranchData {
+            problem: reference(&problem),
+            region: reference(&self.base.region),
+            domain: reference(&domain),
+            kind: solving::SolutionBranchKind::Finite {
+                tuples: vec![reference(&tuple)],
+            },
+        };
+        let branch = admit(
+            &mut self.base,
+            Draft::Solve(SolveDraft::SolutionBranch(branch)),
+        )?;
+        admit(
+            &mut self.base,
+            Draft::Solve(SolveDraft::SolutionSet(solving::SolutionSetData {
+                problem: reference(&problem),
+                branches: vec![reference(&branch)],
+            })),
+        )
+    }
+
+    /// Presentation is independent of coverage and retains all supplied proof dependencies.
+    pub(crate) fn present(&mut self, set: &Handle, form: solving::SolveForm) -> TestResult<u32> {
+        self.push(
+            SolveSchema::RootSelectionRefinement,
+            SolveStatement::Presentation(solving::StatementPresentation {
+                set: set.clone(),
+                form,
+                region: self.base.region.clone(),
+            }),
+            SolveCertificate::RootSelectionRefinement(
+                solving::CertificateRootSelectionRefinement {
+                    mode: solving::RefinementMode::Presentation,
+                    target_kind: solving::RefinementTargetKind::SolutionSet,
+                    target: set.clone(),
+                    witnesses: Vec::new(),
+                    compatibility: Vec::new(),
+                    form: Some(form),
+                },
+            ),
+        )
+    }
+
+    /// A checked Complex intermediate is deliberately absent from the final Real tuple.
+    pub(crate) fn complex_intermediate(&mut self) -> TestResult {
+        let draft = Draft::Expression(crate::test_api::syntax::ExpressionDraft {
+            header: reference(&self.base.header),
+            scope: Vec::new(),
+            space: None,
+            binding: None,
+            operator: Operator::Rational(Rational::from_ratio(
+                1,
+                1,
+                &mut Budget::new(Limits::blind_cubic())?,
+            )?),
+            sort: crate::test_api::syntax::Sort::Value(AtomicSort::Scalar(Field::Complex)),
+            operands: Vec::new(),
+        });
+        let value = admit(&mut self.base, draft)?;
+        let index = u32::try_from(self.steps.len())?;
+        self.steps.push(ApplicationDraft {
+            rule: Primitive::Reflexivity,
+            context: self.base.context.clone(),
+            conclusion: Statement::Equality {
+                left: value.clone(),
+                right: value,
+                domain: self.base.region.clone(),
+                domain_contract: crate::test_api::proof::DomainContract::DefinedAndEqual,
+            },
+            premises: (0..index).collect(),
+            substitutions: Vec::new(),
+            certificate: Certificate::None,
+        });
+        Ok(())
+    }
+}
+
+/// Every altered count reuses an accepted chain and changes only the actual cells and matching claim.
+pub(crate) fn altered_cells(root_dependent: bool) -> TestResult<Fixture> {
+    let mut fixture = existence()?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let original = fixture
+        .steps
+        .iter()
+        .find_map(|step| match &step.certificate {
+            Certificate::Solve(value) => match value.as_ref() {
+                SolveCertificate::RealRootCount(value) => Some(value.clone()),
+                _ => None,
+            },
+            _ => None,
+        })
+        .ok_or("original Real count")?;
+    let mut changed = original.clone();
+    if root_dependent {
+        let root = fixture.selected_value()?;
+        changed.cells[0] = fixture.cell(
+            solving::RealEndpoint::NegativeInfinity,
+            solving::RealEndpoint::RealExpression(reference(&root)),
+            false,
+        )?;
+    } else {
+        let left = fixture.literal(-1, 1)?;
+        let right = fixture.literal(1, 1)?;
+        let first = solving::RealCellData {
+            header: reference(&fixture.base.header),
+            scope: Vec::new(),
+            region: reference(&fixture.base.region),
+            left: solving::RealEndpoint::NegativeInfinity,
+            right: solving::RealEndpoint::RealExpression(reference(&left)),
+            left_open: true,
+            right_open: false,
+        };
+        let second = solving::RealCellData {
+            left: solving::RealEndpoint::RealExpression(reference(&left)),
+            right: solving::RealEndpoint::RealExpression(reference(&right)),
+            left_open: false,
+            right_open: true,
+            ..first.clone()
+        };
+        changed.cells[0] = admit(&mut fixture.base, Draft::Solve(SolveDraft::RealCell(first)))?;
+        changed.cells[1] = admit(
+            &mut fixture.base,
+            Draft::Solve(SolveDraft::RealCell(second)),
+        )?;
+    }
+    assert_ne!(changed.cells, original.cells);
+    assert_eq!(changed.signs, original.signs);
+    assert_eq!(changed.counts, original.counts);
+    count_statement(&mut fixture, changed)?;
+    Ok(fixture)
+}
+
+impl Fixture {
+    /// The zero difference route must establish strict equality, with its exact operand orientation.
+    pub(crate) fn sign_equality(&mut self, left: &Handle, right: &Handle) -> TestResult {
+        let unit = self.unit(1, 1)?;
+        let difference =
+            self.base
+                .expression(Operator::Sub, &[left.clone(), right.clone()], false)?;
+        self.sign_steps(vec![solving::RealSignStep {
+            rule: solving::RealSignRule::Identity,
+            subject: difference,
+            conclusion: solving::RealSignConclusion::Zero,
+            arguments: Vec::new(),
+            premises: vec![unit],
+            exponent: 0,
+        }])?;
+        self.steps
+            .last_mut()
+            .ok_or("ground zero identity")?
+            .conclusion = Statement::Equality {
+            left: left.clone(),
+            right: right.clone(),
+            domain: self.base.region.clone(),
+            domain_contract: crate::test_api::proof::DomainContract::DefinedAndEqual,
+        };
+        Ok(())
+    }
+}
+
+/// Both projected and canceled Complex declarations occur in the actual covered Real predicate.
+pub(crate) fn complex_original(
+    cancel: bool,
+) -> TestResult<(crate::test_api::Cas, crate::test_api::request::Request)> {
+    use crate::testing::sorts::{admit as add, expression};
+    let mut fixture = crate::testing::sort_routing::Fixture::new(Field::Real, 0)?;
+    let solving::SolveView::SolveProblem(original) = fixture.cas.solve_view(&fixture.problem)?
+    else {
+        return Err("Complex original problem".into());
+    };
+    let original = original.clone();
+    let header = &original.header;
+    let complex = if cancel {
+        expression(
+            &mut fixture.cas,
+            header,
+            Field::Complex,
+            Operator::Sub,
+            Vec::new(),
+            vec![reference(&fixture.complex), reference(&fixture.complex)],
+        )?
+    } else {
+        fixture.complex
+    };
+    let projected = expression(
+        &mut fixture.cas,
+        header,
+        Field::Real,
+        Operator::RealPart,
+        Vec::new(),
+        vec![reference(&complex)],
+    )?;
+    let unknown = expression(
+        &mut fixture.cas,
+        header,
+        Field::Real,
+        Operator::Free("x".into()),
+        Vec::new(),
+        Vec::new(),
+    )?;
+    let arguments = vec![reference(&unknown), reference(&projected)];
+    let predicate = add(
+        &mut fixture.cas,
+        Draft::Condition {
+            header: reference(header),
+            scope: Vec::new(),
+            kind: PredicateKind::Equal,
+            arguments: arguments.clone(),
+        },
+    )?;
+    let problem = add(
+        &mut fixture.cas,
+        Draft::Solve(SolveDraft::SolveProblem(solving::SolveProblemData {
+            header: reference(header),
+            scope: Vec::new(),
+            predicate: reference(&predicate),
+            coefficients: reference(&original.coefficients),
+            unknowns: reference(&original.unknowns),
+            region: reference(&original.region),
+            domain: reference(&original.domain),
+            coefficient_domain: reference(&original.coefficient_domain),
+            ambient: Field::Real,
+            denominators: Vec::new(),
+        })),
+    )?;
+    let boolean = add(
+        &mut fixture.cas,
+        Draft::Expression(crate::test_api::syntax::ExpressionDraft {
+            header: reference(header),
+            scope: Vec::new(),
+            space: None,
+            binding: None,
+            operator: Operator::Predicate(PredicateKind::Equal),
+            sort: crate::test_api::syntax::Sort::Value(AtomicSort::Boolean),
+            operands: arguments,
+        }),
+    )?;
+    let request = original_request(
+        &mut fixture.cas,
+        header,
+        &original.region,
+        &problem,
+        &boolean,
+    )?;
+    Ok((fixture.cas, request))
+}
+
+/// The occurrence receipt covers the complete actual predicate and its original exclusions.
+fn original_request(
+    cas: &mut crate::test_api::Cas,
+    header: &Handle,
+    region: &Handle,
+    problem: &Handle,
+    boolean: &Handle,
+) -> TestResult<crate::test_api::request::Request> {
+    use crate::test_api::request::{CoveredInput, Request, Task};
+    use crate::testing::sorts::admit as add;
+    let context = add(
+        cas,
+        Draft::Context(crate::test_api::domain::ContextDraft::Root {
+            header: reference(header),
+            admissible: reference(region),
+            assumptions: Vec::new(),
+        }),
+    )?;
+    let source = add(
+        cas,
+        Draft::Source {
+            key: "Real-complex-original".into(),
+            text: "covered original Real predicate".into(),
+        },
+    )?;
+    let mut budget = Budget::new(Limits::default())?;
+    let occurrence = cas.materialize_original(boolean, &source, &mut budget)?;
+    let receipt = cas.walk_original(&occurrence, &mut budget)?.receipt;
+    Ok(Request {
+        task: Task::Solve(Box::new(solving::SolveSpec {
+            problem: problem.clone(),
+            goal: solving::SolveGoal::Complete,
+            form: solving::SolveForm::AnyExact,
+            exclusions: solving::ExclusionPolicy::PreserveOriginal,
+        })),
+        context,
+        inputs: vec![CoveredInput {
+            root: occurrence,
+            receipt,
+        }],
+        premises: Vec::new(),
+        limits: crate::test_api::limits::LimitsOverride::default(),
+    })
+}

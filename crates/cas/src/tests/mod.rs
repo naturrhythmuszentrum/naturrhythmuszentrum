@@ -40,3 +40,5 @@ mod solve_linear;
 mod solve_local;
 
 mod sorts_wire;
+
+mod solve_real;

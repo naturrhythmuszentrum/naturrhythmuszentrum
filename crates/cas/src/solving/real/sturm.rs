@@ -156,7 +156,6 @@ pub(super) fn check(
     if length < 2
         || certificate.units.len() != length
         || certificate.quotients.len() != length + 2
-        || !certificate.identities.is_empty()
         || !certificate.rescalings.is_empty() && certificate.rescalings.len() != length - 2
     {
         return Err(invalid());

@@ -2,8 +2,16 @@
 //! Bounded degree-generic discovery with independent coverage and presentation replay.
 
 mod guard;
-mod presentation;
-mod read;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real producer shares deferred presentation scheduling"
+)]
+pub(crate) mod presentation;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real entrypoint preserves the same original polynomial parser"
+)]
+pub(crate) mod read;
 mod regional;
 #[expect(
     clippy::redundant_pub_crate,
@@ -72,6 +80,22 @@ pub(crate) fn propose(
         return Err(crate::solving::coefficients::storage::invalid().into());
     };
     let original = problem(cas, &specification.problem)?;
+    if original.ambient == crate::model::Field::Real {
+        let form = if specification.form == SolveForm::AnyExact {
+            SolveForm::RealExact
+        } else {
+            specification.form
+        };
+        let (construction, set, presentations) =
+            super::real::producer::propose(cas, request, audit, budget)?;
+        return Ok(Proposed {
+            construction,
+            set,
+            form,
+            presentations,
+            reuse_coverage: true,
+        });
+    }
     if original.ambient != crate::model::Field::Complex {
         return Err(CoefficientFailure::Unsupported(
             SolveReason::RealIsolationUnavailable,
@@ -199,7 +223,15 @@ fn execute(
             fault: None,
         }) => {
             let reason = if answer.facts.is_empty() {
-                SolveReason::RadicalFormUnavailable
+                if let crate::task::Task::Solve(specification) = &request.task
+                    && specification.form == SolveForm::Radicals
+                    && problem(cas, &specification.problem)
+                        .is_ok_and(|problem| problem.ambient == crate::model::Field::Real)
+                {
+                    SolveReason::RequestedRealRadicalsUnavailable
+                } else {
+                    SolveReason::RadicalFormUnavailable
+                }
             } else {
                 SolveReason::ConditionalCoverage
             };

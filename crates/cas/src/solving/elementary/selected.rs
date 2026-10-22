@@ -39,7 +39,7 @@ pub(crate) fn relation<'a>(
 }
 
 impl Evaluation<'_> {
-    /// Match only the actual Complex coefficient frame; ground and unrelated declarations keep formal slots.
+    /// Match only the actual coefficient declaration frame; ground and unrelated declarations keep formal slots.
     fn parameter_frame(
         &self,
     ) -> Result<Option<&crate::solving::CoordinateSpaceData<Handle>>, Fault> {
@@ -73,9 +73,26 @@ impl Evaluation<'_> {
             return Ok(None);
         };
         budget.work(crate::graph::size(frame.coordinates.len(), AT)?.max(1), AT)?;
+        let real = expression.sort
+            == crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
+                crate::model::Field::Real,
+            ));
+        let real_frame = if real && expression.header == frame.header.logical_id() {
+            budget.work(crate::graph::size(frame.coordinates.len(), AT)?.max(1), AT)?;
+            frame.coordinates.iter().all(|coordinate| {
+                coordinate.field == crate::model::Field::Real
+                    && coordinate.role == crate::solving::CoordinateRole::Coefficient
+            })
+        } else {
+            false
+        };
         if !frame.coordinates.iter().any(|coordinate| {
             coordinate.key == *key
-                && coordinate.field == crate::model::Field::Complex
+                && (coordinate.field == crate::model::Field::Complex || real_frame)
+                && expression.sort
+                    == crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
+                        coordinate.field.clone(),
+                    ))
                 && coordinate.role == crate::solving::CoordinateRole::Coefficient
         }) {
             return Ok(None);
@@ -117,7 +134,13 @@ impl Evaluation<'_> {
         };
         budget.work(crate::graph::size(frame.coordinates.len(), AT)?.max(1), AT)?;
         if !frame.coordinates.iter().all(|coordinate| {
-            coordinate.field == crate::model::Field::Complex
+            matches!(
+                coordinate.field,
+                crate::model::Field::Real | crate::model::Field::Complex
+            ) && frame
+                .coordinates
+                .first()
+                .is_some_and(|first| first.field == coordinate.field)
                 && coordinate.role == crate::solving::CoordinateRole::Coefficient
         }) {
             return Ok(false);
@@ -144,14 +167,35 @@ impl Evaluation<'_> {
         {
             return Ok(true);
         }
-        let relations = crate::solving::coefficients::regional::zeros(
+        let mut relations = crate::solving::coefficients::regional::zeros(
             &self.cas.state,
             self.engine.domain,
             &value.numerator,
             self.region,
             budget,
         )?;
+        if frame
+            .coordinates
+            .first()
+            .is_some_and(|coordinate| coordinate.field == crate::model::Field::Real)
+        {
+            crate::solving::real::zero::append(
+                self.cas,
+                self.engine.domain,
+                self.region,
+                self.premises,
+                &mut relations,
+                budget,
+            )?;
+        }
         let mut remainder = value.numerator.copy(budget)?;
+        if frame
+            .coordinates
+            .first()
+            .is_some_and(|coordinate| coordinate.field == crate::model::Field::Real)
+        {
+            return crate::solving::real::zero::reduce(remainder, &relations, budget);
+        }
         for relation in &relations {
             let (_, reduced) =
                 crate::solving::coefficients::gcd::division(&remainder, relation, budget)?;
@@ -270,7 +314,13 @@ impl Evaluation<'_> {
         };
         budget.work(crate::graph::size(frame.coordinates.len(), AT)?.max(1), AT)?;
         if !frame.coordinates.iter().all(|coordinate| {
-            coordinate.field == crate::model::Field::Complex
+            matches!(
+                coordinate.field,
+                crate::model::Field::Real | crate::model::Field::Complex
+            ) && frame
+                .coordinates
+                .first()
+                .is_some_and(|first| first.field == coordinate.field)
                 && coordinate.role == crate::solving::CoordinateRole::Coefficient
         }) {
             return Ok(None);

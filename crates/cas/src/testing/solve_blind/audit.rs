@@ -8,17 +8,6 @@ use crate::solving::radicals::route::Audit;
 use crate::testing::common::TestResult;
 use std::collections::BTreeMap;
 
-/// A complete phase payload keeps the empty-ledger assertion readable.
-type Phase = (
-    (&'static str, Option<usize>),
-    Handle,
-    u64,
-    Option<crate::solving::symmetric::cursor::Seed>,
-    u64,
-    u64,
-    u64,
-);
-
 /// Reconstruct an independently checked proof's applications without using producer scratch history.
 fn visit(
     cas: &Cas,
@@ -68,7 +57,7 @@ pub(crate) fn applications(
 }
 
 /// Each boundary is constructed independently, including both source and renaming spellings.
-/// The Real fixture records its original `Radicals` request and the absence of an initial map.
+/// The Real fixture records its explicit request revision and its actual same-Real initial map.
 pub(crate) fn symbolic(source_revision: &str) -> TestResult<String> {
     use crate::model::Field;
     let ordinary = ["d", "c", "b", "a"];
@@ -189,12 +178,38 @@ fn initial_map(fixture: &mut super::source::Fixture) -> TestResult<String> {
         region: fixture.region.clone(),
         steps: Vec::new(),
     };
-    let map = construction.mapping(
-        &mut fixture.cas,
-        &fixture.algebra,
-        &images,
-        &mut Budget::new(Limits::blind_cubic())?,
-    )?;
+    let mut budget = Budget::new(Limits::blind_cubic())?;
+    let map = if fixture.field == crate::model::Field::Real {
+        fixture
+            .cas
+            .admit(
+                &[crate::graph::Draft::Solve(
+                    crate::solving::SolveDraft::CoefficientMap(
+                        crate::solving::CoefficientMapData {
+                            source: crate::Reference::Existing(fixture.algebra.clone()),
+                            target: MapTarget::ScalarAmbient {
+                                header: crate::Reference::Existing(fixture.header.clone()),
+                                field: fixture.field.clone(),
+                            },
+                            mode: MapMode::Specialization,
+                            region: crate::Reference::Existing(fixture.region.clone()),
+                            images: images
+                                .iter()
+                                .cloned()
+                                .map(crate::Reference::Existing)
+                                .collect(),
+                            denominators: Vec::new(),
+                        },
+                    ),
+                )],
+                &mut budget,
+            )?
+            .into_iter()
+            .next()
+            .ok_or("Real initial map")?
+    } else {
+        construction.mapping(&mut fixture.cas, &fixture.algebra, &images, &mut budget)?
+    };
     let SolveView::CoefficientMap(mapping) = fixture.cas.solve_view(&map)? else {
         return Err("initial map missing".into());
     };
@@ -213,12 +228,13 @@ fn initial_map(fixture: &mut super::source::Fixture) -> TestResult<String> {
         mapping.target,
         MapTarget::ScalarAmbient {
             header: fixture.header.clone(),
-            field: crate::model::Field::Complex
+            field: fixture.field.clone()
         }
     );
     Ok(format!(
-        "initial_map={mapping:?}\ninitial_map_source=Q({})\ninitial_map_images={keys:?}\ninitial_map_target=ScalarAmbient(Complex)\ninitial_map_check=exact-Free accepted\n",
-        keys.join(",")
+        "initial_map={mapping:?}\ninitial_map_source=Q({})\ninitial_map_images={keys:?}\ninitial_map_target=ScalarAmbient({:?})\ninitial_map_check=exact-Free accepted\n",
+        keys.join(","),
+        fixture.field
     ))
 }
 
@@ -226,51 +242,21 @@ fn initial_map(fixture: &mut super::source::Fixture) -> TestResult<String> {
 fn boundary(name: &str, keys: &[&str], field: &crate::model::Field) -> TestResult<String> {
     let (mut fixture, request) = super::source::symbolic_in_field(keys, field)?;
     let declarations = declaration_record(&fixture, &request, field)?;
-    let mapping = if *field == crate::model::Field::Complex {
-        initial_map(&mut fixture)?
-    } else {
-        "initial_map=None (propose refuses Real before coefficient_images)\n".into()
-    };
+    let mapping = initial_map(&mut fixture)?;
     let measurement = if *field == crate::model::Field::Complex {
         complex_acceptance(&mut fixture, &request, keys)?
     } else {
-        real_refusal(&mut fixture, &request)?
+        let mut request = request;
+        let crate::task::Task::Solve(value) = &mut request.task else {
+            return Err("Real audit request".into());
+        };
+        assert_eq!(value.form, crate::solving::SolveForm::Radicals);
+        value.form = crate::solving::SolveForm::AnyExact;
+        super::real_acceptance::measurement(&mut fixture, &request)?
     };
     Ok(format!(
         "boundary={name}\nkeys={keys:?}\n{declarations}{mapping}{measurement}"
     ))
-}
-
-/// The genuine Real boundary precedes coefficient production and keeps its historical form.
-fn real_refusal(
-    fixture: &mut super::source::Fixture,
-    request: &crate::request_model::Request,
-) -> TestResult<String> {
-    let mut generation = Budget::new(Limits::blind_cubic())?;
-    let mut checker = Budget::new(Limits::blind_cubic())?;
-    let mut audit = Audit::default();
-    let result = crate::solving::solve_search::produce(
-        &mut fixture.cas,
-        request,
-        &mut audit,
-        &mut generation,
-        &mut checker,
-    );
-    assert!(matches!(
-        result,
-        Err(
-            crate::solving::coefficients::model::CoefficientFailure::Unsupported(
-                crate::solving::SolveReason::RealIsolationUnavailable
-            )
-        )
-    ));
-    assert_eq!(audit.phases, [] as [Phase; 0]);
-    assert_eq!(generation.usage().coefficient_ops, 0);
-    assert_eq!(checker.usage().work, 0);
-    Ok(
-        "refusal=RealIsolationUnavailable\nfirst_operation=solve_search::propose ambient check\n"
-            .into(),
-    )
 }
 
 /// Record real generation, reconstruction, independent samples and fresh expected-claim replay.

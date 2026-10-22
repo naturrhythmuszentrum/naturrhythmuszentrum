@@ -41,6 +41,16 @@ fn subject(draft: &ApplicationDraft, certificate: &CertificateRealRootCount) -> 
     let Statement::Solve(statement) = &draft.conclusion else {
         return Err(invalid());
     };
+    if let SolveStatement::Coverage(claim) = statement.as_ref() {
+        return if claim.region == certificate.region && certificate.identities.len() == 1 {
+            Ok(())
+        } else {
+            Err(invalid())
+        };
+    }
+    if !certificate.identities.is_empty() {
+        return Err(invalid());
+    }
     let SolveStatement::RealRootCount(claim) = statement.as_ref() else {
         return Err(invalid());
     };
@@ -109,11 +119,19 @@ pub(super) fn check(
             return Err(invalid());
         }
     }
-    let below = signs.infinity(&certificate.chain, true, budget)?;
-    let above = signs.infinity(&certificate.chain, false, budget)?;
-    inventory(&mut signs, certificate, (below, above), budget)?;
+    let alternatives = signs.infinities(&certificate.chain, budget)?;
+    let start = signs.cursor;
+    for infinities in alternatives {
+        signs.cursor = start;
+        inventory(&mut signs, certificate, infinities, budget)?;
+    }
     if signs.cursor != signs.slots.len() {
         return Err(invalid());
+    }
+    if let Statement::Solve(statement) = &draft.conclusion
+        && let SolveStatement::Coverage(coverage) = statement.as_ref()
+    {
+        super::coverage::check(&signs.evaluation, certificate, coverage, budget)?;
     }
     Ok(())
 }

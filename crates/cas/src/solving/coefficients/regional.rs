@@ -49,12 +49,13 @@ pub(crate) fn contained(
     Ok(false)
 }
 
-/// Equality is recognized only against exact zero; explicit nonzero has the opposite truth value.
+/// Equality recognizes exact zero; true positivity and explicit nonzero supply nonvanishing.
 fn guard(
     state: &State,
     source: &Handle,
     region: LogicalId,
     predicate: LogicalId,
+    truth: bool,
     budget: &mut Budget,
 ) -> Result<Option<(Polynomial, bool)>, Fault> {
     let Vertex::Condition(condition) = state.node(predicate)? else {
@@ -65,7 +66,9 @@ fn guard(
         return Ok(None);
     }
     match (&condition.kind, condition.arguments.as_slice()) {
-        (PredicateKind::NonZero, [argument]) => {
+        (PredicateKind::NonZero | PredicateKind::Positive, [argument])
+            if condition.kind == PredicateKind::NonZero || truth =>
+        {
             let Some(value) =
                 super::guard_polynomial::read(state, source, region, *argument, budget)?
             else {
@@ -120,7 +123,7 @@ fn at_source(
             _ => None,
         };
         if let Some((predicate, truth)) = guarded
-            && let Some((value, when_true)) = guard(state, source, id, predicate, budget)?
+            && let Some((value, when_true)) = guard(state, source, id, predicate, truth, budget)?
             && visitor(value, when_true == truth, budget)?
         {
             return Ok(true);

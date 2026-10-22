@@ -109,6 +109,20 @@ pub(super) fn check(
             }
             entails(mask(root.conclusion), claim.conclusion)
         }
+        Statement::Equality {
+            left,
+            right,
+            domain,
+            domain_contract: crate::proof_model::DomainContract::DefinedAndEqual,
+        } if *domain == certificate.region && root.conclusion == RealSignConclusion::Zero => {
+            let difference = cas.state.expression(root.subject.logical_id())?;
+            if difference.operator != crate::model::Operator::Sub
+                || difference.operands != [left.logical_id(), right.logical_id()]
+            {
+                return Err(invalid());
+            }
+            Ok(())
+        }
         Statement::PredicateFact { predicate, region } if *region == certificate.region => {
             super::sign_evidence::predicate(
                 cas,

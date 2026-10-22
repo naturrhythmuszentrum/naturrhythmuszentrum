@@ -86,7 +86,7 @@ fn degree(
 }
 
 /// Horner composition with X-shift derives every translated coefficient without a stored formula.
-fn compose(
+pub(crate) fn compose(
     engine: &Engine<'_>,
     coefficients: &[Element],
     shift: &Element,

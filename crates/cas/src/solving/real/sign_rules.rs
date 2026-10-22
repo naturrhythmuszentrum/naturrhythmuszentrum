@@ -36,7 +36,7 @@ const fn product(left: u8, right: u8) -> u8 {
 }
 
 /// Apply a finite ordered-field sign table to every possibility retained by both premises.
-fn combine(left: u8, right: u8, multiply: bool) -> u8 {
+pub(super) fn combine(left: u8, right: u8, multiply: bool) -> u8 {
     let mut result = 0;
     for first in SIGNS {
         for second in SIGNS {
@@ -96,7 +96,7 @@ fn inverse_binary(
     let forward = expression.operands == [step.subject.logical_id(), known.subject.logical_id()];
     let backward = expression.operands == [known.subject.logical_id(), step.subject.logical_id()];
     if expression.operator != desired || !(forward || backward) {
-        return Err(invalid());
+        return pair(cas, step, arguments, multiply);
     }
     let mut possible = 0;
     for sign in SIGNS {
@@ -120,12 +120,25 @@ fn power(
         return Err(invalid());
     }
     let expression = cas.state.expression(step.subject.logical_id())?;
+    if expression.operator != Operator::IntegerPower(i64::from(step.exponent)) {
+        let [source] = arguments else {
+            return Err(invalid());
+        };
+        let powered = cas.state.expression(source.subject.logical_id())?;
+        if powered.operator != Operator::IntegerPower(i64::from(step.exponent))
+            || powered.operands != [step.subject.logical_id()]
+        {
+            return Err(invalid());
+        }
+        return match mask(source.conclusion) {
+            2 => entails(2, step.conclusion),
+            4 | 5 => entails(5, step.conclusion),
+            _ => Err(invalid()),
+        };
+    }
     let [operand] = expression.operands.as_slice() else {
         return Err(invalid());
     };
-    if expression.operator != Operator::IntegerPower(i64::from(step.exponent)) {
-        return Err(invalid());
-    }
     let possible = match arguments {
         [] => {
             crate::solving::elementary::total::check(cas, *operand, region, premises, budget)?;
@@ -148,13 +161,18 @@ fn reflection(cas: &Cas, step: &RealSignStep, arguments: &[&RealSignStep]) -> Re
     if step.exponent == 0 || step.exponent.is_multiple_of(2) {
         return Err(invalid());
     }
+    let target = cas.state.expression(step.subject.logical_id())?;
+    if target.operator == Operator::IntegerPower(i64::from(step.exponent))
+        && target.operands == [source.subject.logical_id()]
+    {
+        return entails(mask(source.conclusion), step.conclusion);
+    }
     let expression = cas.state.expression(source.subject.logical_id())?;
     if expression.operator == Operator::IntegerPower(i64::from(step.exponent))
         && expression.operands == [step.subject.logical_id()]
     {
         return entails(mask(source.conclusion), step.conclusion);
     }
-    let target = cas.state.expression(step.subject.logical_id())?;
     if expression.operator != Operator::Sub || target.operator != Operator::Sub {
         return Err(invalid());
     }
@@ -188,7 +206,7 @@ pub(super) fn check(
             return sign_evidence::hypothesis(cas, region, step, premises, budget);
         }
         RealSignRule::Identity => {
-            return sign_evidence::identity(cas, region, step, arguments, premises);
+            return sign_evidence::identity(cas, region, step, arguments, premises, budget);
         }
         RealSignRule::Root => return sign_evidence::root(cas, region, step, premises, budget),
         _ => {}
@@ -241,4 +259,39 @@ fn negation(cas: &Cas, step: &RealSignStep, arguments: &[&RealSignStep]) -> Resu
         return Err(invalid());
     }
     entails(negate(mask(source.conclusion)), step.conclusion)
+}
+
+/// A common pair's sum and product constrain both signs by the same finite ordered-field tables.
+fn pair(
+    cas: &Cas,
+    step: &RealSignStep,
+    arguments: &[&RealSignStep],
+    multiply: bool,
+) -> Result<(), Fault> {
+    let [sum_fact, product_fact] = arguments else {
+        return Err(invalid());
+    };
+    if multiply {
+        return Err(invalid());
+    }
+    let sum_expression = cas.state.expression(sum_fact.subject.logical_id())?;
+    let product_expression = cas.state.expression(product_fact.subject.logical_id())?;
+    if sum_expression.operator != Operator::Add
+        || product_expression.operator != Operator::Mul
+        || sum_expression.operands != product_expression.operands
+        || !sum_expression.operands.contains(&step.subject.logical_id())
+    {
+        return Err(invalid());
+    }
+    let mut possible = 0;
+    for left in SIGNS {
+        for right in SIGNS {
+            if sum(left, right) & mask(sum_fact.conclusion) != 0
+                && product(left, right) & mask(product_fact.conclusion) != 0
+            {
+                possible |= left;
+            }
+        }
+    }
+    entails(possible, step.conclusion)
 }

@@ -16,6 +16,8 @@ fn node(value: &Vertex) -> Result<(), Fault> {
         Vertex::Expression(value) => value.sort == Sort::Value(AtomicSort::Scalar(Field::Complex)),
         Vertex::Solve(value) => match value.as_ref() {
             SolveDraft::RootRelation(value) => value.ambient != Field::Real,
+            SolveDraft::Polynomial(value) => value.variables.contains(&Field::Complex),
+            SolveDraft::CoefficientDomain(crate::solving::CoefficientDomainData::Gaussian) => true,
             SolveDraft::CoordinateSpace(value) => value
                 .coordinates
                 .iter()
@@ -80,6 +82,18 @@ pub(crate) fn check<'a>(
         seen.insert(index);
         let value = cas.state.graph.node_weight(index).ok_or_else(invalid)?;
         node(value)?;
+        if let Vertex::ScopedApplication(application) = value {
+            for handle in super::closure_evidence::roots(cas, application, budget)? {
+                crate::solving::coefficients::storage::reserve(&mut pending, 1, budget)?;
+                pending.push((
+                    *cas.state
+                        .indices
+                        .get(&handle.logical_id())
+                        .ok_or_else(invalid)?,
+                    depth.saturating_add(1),
+                ));
+            }
+        }
         for edge in cas.state.graph.edges(index) {
             if matches!(value, Vertex::Header(_)) && !matches!(edge.weight(), Edge::ParentHeader) {
                 continue;
@@ -89,4 +103,25 @@ pub(crate) fn check<'a>(
         }
     }
     Ok(())
+}
+
+/// Presentation checks every supplied proof dependency, including intermediates absent from the final tuple.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "RealExact presentation checks its complete proof closure"
+)]
+pub(crate) fn evidence(
+    cas: &Cas,
+    set: &Handle,
+    premises: &[crate::proof_model::CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let mut roots = crate::solving::coefficients::storage::vector(1, budget)?;
+    roots.push(set.clone());
+    for premise in premises {
+        let additional = super::closure_evidence::roots(cas, premise, budget)?;
+        crate::solving::coefficients::storage::reserve(&mut roots, additional.len(), budget)?;
+        roots.extend(additional);
+    }
+    check(cas, &roots, None, budget)
 }

@@ -543,3 +543,7 @@ fn multiply_factor(
 #[path = "specialize.rs"]
 mod specialize;
 pub(crate) use specialize::{guards, samples};
+
+#[path = "real_oracle.rs"]
+mod real;
+pub(crate) use real::samples as real_samples;

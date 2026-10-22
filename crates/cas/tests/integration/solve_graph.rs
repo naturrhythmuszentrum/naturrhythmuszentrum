@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Complete source coverage and honest unavailable solving service lifecycles.
+//! Complete source coverage, the Real zero family and precise unsupported solving fragments.
 
 use crate::testing::common::TestResult;
 use crate::testing::solve_graph::Fixture;
 use nrz_cas::request::Outcome;
 use nrz_cas::solving::SolveReason;
 
-/// A covered symbolic problem remains unresolved until its independent producers exist.
-/// ´test:integration:solve-original-request-is-unresolved´
+/// The original Real identity x=x produces its whole-coordinate family with checked coverage.
+/// ´test:integration:solve-original-request-zero-family´
 #[test]
-fn solve_original_request_is_unresolved() -> TestResult {
+fn solve_original_request_zero_family() -> TestResult {
     let mut fixture = Fixture::new()?;
     let request = fixture.request()?;
     assert_eq!(
@@ -21,15 +21,32 @@ fn solve_original_request_is_unresolved() -> TestResult {
             .visited(),
         3
     );
-    let expected =
-        if nrz_cas::solving::capabilities()[9] == nrz_cas::solving::Availability::Available {
-            SolveReason::RealIsolationUnavailable
-        } else {
-            SolveReason::CoefficientDomainUnavailable
-        };
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Solved { answer, .. } = outcome else {
+        return Err(format!("Real identity: {outcome:?}").into());
+    };
+    assert_eq!(answer.form, nrz_cas::solving::SolveForm::RealExact);
+    assert_eq!(answer.unresolved_regions, [] as [nrz_cas::Handle; 0]);
+    assert!(
+        answer
+            .coverage
+            .as_ref()
+            .ok_or("identity coverage")?
+            .is_discharged()
+    );
+    let nrz_cas::solving::SolveView::SolutionSet(set) = fixture.cas.solve_view(&answer.set)? else {
+        return Err("identity set".into());
+    };
+    let [branch] = set.branches.as_slice() else {
+        return Err("identity family branch".into());
+    };
+    let nrz_cas::solving::SolveView::SolutionBranch(branch) = fixture.cas.solve_view(branch)?
+    else {
+        return Err("identity branch".into());
+    };
     assert!(matches!(
-        fixture.cas.run(&request),
-        Outcome::Unresolved { solve_reason: Some(reason), .. } if reason == expected
+        branch.kind,
+        nrz_cas::solving::SolutionBranchKind::Image { .. }
     ));
     Ok(())
 }
@@ -104,16 +121,18 @@ fn solve_root_witness_v4_round_trip() -> TestResult {
 #[test]
 fn solve_original_denominators_survive() -> TestResult {
     let (mut fixture, request) = crate::testing::solve_graph::quotient_request(false)?;
-    let expected =
-        if nrz_cas::solving::capabilities()[9] == nrz_cas::solving::Availability::Available {
-            SolveReason::RealIsolationUnavailable
-        } else {
-            SolveReason::CoefficientDomainUnavailable
-        };
-    assert!(matches!(
-        fixture.cas.run(&request),
-        Outcome::Unresolved { solve_reason: Some(reason), .. } if reason == expected
-    ));
+    // The original division remains outside the polynomial grammar; cancellation cannot erase x≠0.
+    let outcome = fixture.cas.run(&request);
+    assert!(
+        matches!(
+            outcome,
+            Outcome::Unresolved {
+                solve_reason: Some(SolveReason::PolynomialFragment),
+                ..
+            }
+        ),
+        "{outcome:?}"
+    );
     let (mut omitted, invalid_request) = crate::testing::solve_graph::quotient_request(true)?;
     let before = omitted.cas.counts();
     assert!(matches!(

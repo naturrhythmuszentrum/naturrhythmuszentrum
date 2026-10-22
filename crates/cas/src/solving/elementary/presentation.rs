@@ -36,6 +36,9 @@ fn root(
             .get(usize::try_from(slot).map_err(|_| invalid())?)
             .ok_or_else(invalid)?,
     )?;
+    if form == SolveForm::Radicals && selected.cell.is_some() {
+        return Err(invalid());
+    }
     let polynomial = polynomial(&evaluation.cas.state, &relation.polynomial)?;
     let order_proved = evaluation.premises.iter().any(|premise| matches!(&premise.judgment.statement, Statement::Solve(statement) if matches!(statement.as_ref(), SolveStatement::RootOrder(value) if value.value.logical_id() == id && &value.region == evaluation.region)));
     if form == SolveForm::Radicals && !order_proved {
@@ -233,6 +236,12 @@ pub(crate) fn check(
         return Err(invalid());
     };
     let original = problem(cas, &set.problem)?;
+    if claim.form == SolveForm::RealExact {
+        if original.ambient != crate::model::Field::Real {
+            return Err(invalid());
+        }
+        crate::solving::real::closure::evidence(cas, &claim.set, premises, budget)?;
+    }
     super::proof::region(cas, &draft.context, original, &claim.region)?;
     let evaluation = Evaluation {
         cas,

@@ -12,7 +12,7 @@ use crate::solving::towers::dense::Dense;
 use crate::testing::common::TestResult;
 
 /// Each diagnostic root uses exactly its dependency closure; unrelated earlier roots are not evidence.
-fn closure(
+pub(super) fn closure(
     steps: &[crate::proof_model::ApplicationDraft],
     root: usize,
 ) -> TestResult<Vec<crate::proof_model::ApplicationDraft>> {

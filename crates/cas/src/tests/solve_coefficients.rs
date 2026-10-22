@@ -1092,7 +1092,7 @@ fn coefficient_regional_polynomial_scope() -> TestResult {
     Ok(())
 }
 
-/// Explicit nonzero guards and inherited bases work; positivity and partial syntax are not generalized.
+/// A total Real x>0 entails x≠0 on every contained cell; a false positivity guard still permits x=0.
 /// ´test:crate:coefficient-explicit-regional-guards´
 #[test]
 fn coefficient_explicit_regional_guards() -> TestResult {
@@ -1104,9 +1104,13 @@ fn coefficient_explicit_regional_guards() -> TestResult {
     let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
     let draft = fixture.fraction(&top, &one);
     let parameter = admit(&mut fixture.cas, &draft)?;
-    for (kind, decided) in [
-        (PredicateKind::NonZero, true),
-        (PredicateKind::Positive, false),
+    // The nested y≠0 guard preserves the ancestor's assertion about x.
+    // Both false guards admit the independent point (x,y)=(0,1), so x has no unit there.
+    for (kind, truth, decided) in [
+        (PredicateKind::NonZero, true, true),
+        (PredicateKind::NonZero, false, false),
+        (PredicateKind::Positive, true, true),
+        (PredicateKind::Positive, false, false),
     ] {
         let predicate = admit(
             &mut fixture.cas,
@@ -1117,9 +1121,12 @@ fn coefficient_explicit_regional_guards() -> TestResult {
                 arguments: vec![Reference::Existing(x.clone())],
             },
         )?;
-        let region = fixture.region_expression(RegionExpr::GuardTrue {
-            base: Reference::Existing(fixture.region.clone()),
-            predicate: Reference::Existing(predicate),
+        let base = Reference::Existing(fixture.region.clone());
+        let predicate = Reference::Existing(predicate);
+        let region = fixture.region_expression(if truth {
+            RegionExpr::GuardTrue { base, predicate }
+        } else {
+            RegionExpr::GuardFalse { base, predicate }
         })?;
         let context = fixture.context.clone();
         let original = fixture.region.clone();
@@ -1131,6 +1138,20 @@ fn coefficient_explicit_regional_guards() -> TestResult {
         fixture.region = original;
         fixture.context = context;
     }
+    Ok(())
+}
+
+/// A partial x/x guard supplies no polynomial unit; the strict reader never cancels its denominator.
+/// ´test:crate:coefficient-partial-regional-guard-refuses´
+#[test]
+fn coefficient_partial_regional_guard_refuses() -> TestResult {
+    use crate::syntax::Operator;
+    let mut fixture = Fixture::new()?;
+    let x = fixture.guard_expression(Operator::Free("x".into()), &[])?;
+    let top = fixture.polynomial(2, &[(vec![1, 0], 1)])?;
+    let one = fixture.polynomial(2, &[(vec![0, 0], 1)])?;
+    let draft = fixture.fraction(&top, &one);
+    let parameter = admit(&mut fixture.cas, &draft)?;
     let partial = fixture.guard_expression(Operator::Div, &[x.clone(), x])?;
     let cells = fixture.guard_cells(&partial)?;
     fixture.on_region(&cells[1])?;

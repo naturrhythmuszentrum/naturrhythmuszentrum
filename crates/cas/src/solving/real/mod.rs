@@ -7,8 +7,10 @@ mod cell_exists;
     reason = "RealExact presentation shares semantic Real closure"
 )]
 pub(crate) mod closure;
+mod closure_evidence;
 mod count;
 mod count_signs;
+mod coverage;
 mod sign;
 mod sign_evidence;
 mod sign_rules;
@@ -70,3 +72,51 @@ pub(crate) fn check(
     }
     Ok(conditions)
 }
+
+mod cells_produce;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real producer shares finite construction components"
+)]
+pub(crate) mod construction;
+mod count_produce;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real producer shares finite construction components"
+)]
+pub(crate) mod derive;
+mod factor_sign;
+mod finite;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real producer shares finite construction components"
+)]
+pub(crate) mod free;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real producer shares finite construction components"
+)]
+pub(crate) mod leaf;
+mod lower_produce;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real entrypoint returns the shared unsealed proposal"
+)]
+pub(crate) mod producer;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the Real producer shares finite construction components"
+)]
+pub(crate) mod render;
+mod roots_produce;
+mod sign_produce;
+mod single_produce;
+mod three_produce;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "checked Real zero predicates feed the same-sort evaluator"
+)]
+pub(crate) mod zero;
+
+#[cfg(test)]
+mod parameter_tests;

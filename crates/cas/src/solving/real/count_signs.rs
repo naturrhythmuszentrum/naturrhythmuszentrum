@@ -50,13 +50,61 @@ impl Signs<'_> {
         Ok(mask(claim.conclusion))
     }
 
-    /// At each infinity the leading coefficient and degree parity reconstruct the polynomial sign.
-    pub(super) fn infinity(
+    /// Each leading sign is reconstructed twice, retaining correlation between both infinities.
+    pub(super) fn infinities(
         &mut self,
         chain: &[Handle],
-        negative: bool,
         budget: &mut Budget,
-    ) -> Result<u32, Fault> {
+    ) -> Result<Vec<(u32, u32)>, Fault> {
+        let first = self.leading(chain, budget)?;
+        let second = self.leading(chain, budget)?;
+        let mut alternatives = storage::vector(1, budget)?;
+        alternatives.push(Vec::new());
+        for (left, right) in first.iter().zip(&second) {
+            let possible = left & right;
+            if possible & 2 != 0 || possible == 0 {
+                return Err(invalid());
+            }
+            let mut next = storage::vector(0, budget)?;
+            for signs in alternatives {
+                for sign in [1, 4] {
+                    if possible & sign == 0 {
+                        continue;
+                    }
+                    let mut extended = storage::copied(&signs, budget)?;
+                    storage::reserve(&mut extended, 1, budget)?;
+                    extended.push(sign);
+                    storage::reserve(&mut next, 1, budget)?;
+                    next.push(extended);
+                }
+            }
+            alternatives = next;
+        }
+        let mut result = storage::vector(alternatives.len(), budget)?;
+        for signs in alternatives {
+            let positive = variations(&signs, budget)?;
+            let mut negative = storage::copied(&signs, budget)?;
+            for (sign, polynomial) in negative.iter_mut().zip(chain) {
+                let stored = storage::polynomial(&self.evaluation.cas.state, polynomial)?;
+                if !stored
+                    .terms
+                    .first()
+                    .ok_or_else(invalid)?
+                    .exponents
+                    .first()
+                    .ok_or_else(invalid)?
+                    .is_multiple_of(2)
+                {
+                    *sign = negate(*sign);
+                }
+            }
+            result.push((variations(&negative, budget)?, positive));
+        }
+        Ok(result)
+    }
+
+    /// A nonzero leading sign may be weak only when every retained possibility verifies the same counts.
+    fn leading(&mut self, chain: &[Handle], budget: &mut Budget) -> Result<Vec<u8>, Fault> {
         let mut signs = storage::vector(chain.len(), budget)?;
         for handle in chain {
             let polynomial = storage::polynomial(&self.evaluation.cas.state, handle)?;
@@ -65,17 +113,12 @@ impl Signs<'_> {
                 .evaluation
                 .mapped(&term.coefficient, self.map, budget)?;
             let sign = self.next(&value, budget)?;
-            if !matches!(sign, 1 | 4) {
+            if !matches!(sign, 1 | 4 | 5) {
                 return Err(invalid());
             }
-            let odd = !term
-                .exponents
-                .first()
-                .ok_or_else(invalid)?
-                .is_multiple_of(2);
-            signs.push(if negative && odd { negate(sign) } else { sign });
+            signs.push(sign);
         }
-        variations(&signs, budget)
+        Ok(signs)
     }
 
     /// Evaluate the kth derivative directly by falling factorials in the original polynomial support.

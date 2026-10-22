@@ -423,7 +423,7 @@ fn blind_incremental_proof_replay() -> TestResult {
 }
 
 /// Independent boundary inventories retain declaration fields, initial maps and original forms.
-/// The Complex boundaries reconstruct checked proof DAGs; the separate Real refusal remains earlier.
+/// Every boundary reconstructs its checked proof DAG and freshly replays its original expected claim.
 /// ´test:crate:blind-symbolic-acceptance-audit´
 #[test]
 fn blind_symbolic_acceptance_audit() -> TestResult {
@@ -432,15 +432,17 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     assert!(record.starts_with(&format!("source_revision={revision}\n")));
     assert!(record.contains("policy=logical-v10"));
     assert_eq!(record.matches("result=Solved(Radicals)").count(), 7);
-    assert_eq!(record.matches("fresh_coverage=true").count(), 7);
-    assert_eq!(record.matches("fresh_presentation=true").count(), 7);
-    assert!(record.contains("refusal=RealIsolationUnavailable"));
+    assert_eq!(record.matches("fresh_coverage=true").count(), 8);
+    assert_eq!(record.matches("fresh_presentation=true").count(), 8);
+    assert_eq!(record.matches("result=Solved(RealExact)").count(), 1);
+    assert!(record.contains("requested_form=AnyExact"));
     assert!(record.contains("interning_comparisons="));
     assert!(record.contains("phases="));
     assert_eq!(record.matches("declaration_field=Complex\n").count(), 7);
     assert_eq!(record.matches("declaration_field=Real\n").count(), 1);
     assert_eq!(record.matches("original_form=Radicals\n").count(), 8);
-    assert!(record.contains("initial_map=None (propose refuses Real before coefficient_images)"));
+    assert!(record.contains("initial_map_target=ScalarAmbient(Real)"));
+    assert!(record.contains("real_only_closure=true"));
     Ok(())
 }
 

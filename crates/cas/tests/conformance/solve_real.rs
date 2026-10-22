@@ -322,3 +322,254 @@ fn real_sign_forward_edge() -> TestResult {
 fn real_sturm_repeated_singletons() -> TestResult {
     replay(solve_real::repeated()?, solve_real::repeated()?)
 }
+
+/// A checked quotient sign carries its definedness through an exact same-region premise import.
+/// ´test:integration:real-sign-checked-division-import´
+#[test]
+fn real_sign_checked_division_import() -> TestResult {
+    use nrz_cas::solving::{RealSignConclusion as Sign, RealSignRule as Rule};
+    let mut fixture = solve_real::Fixture::new()?;
+    let one = fixture.literal(1, 1)?;
+    let two = fixture.literal(2, 1)?;
+    let quotient = fixture.base.expression(
+        nrz_cas::syntax::Operator::Div,
+        &[one.clone(), two.clone()],
+        false,
+    )?;
+    let proof = fixture.sign_steps(vec![
+        node(Rule::Rational, &one, Sign::Positive, &[]),
+        node(Rule::Rational, &two, Sign::Positive, &[]),
+        node(Rule::Product, &quotient, Sign::Positive, &[0, 1]),
+    ])?;
+    let mut import = node(Rule::Hypothesis, &quotient, Sign::Positive, &[]);
+    import.premises = vec![proof];
+    fixture.sign_steps(vec![import])?;
+    let mut target = solve_real::Fixture::new()?;
+    let first = target.literal(1, 1)?;
+    let second = target.literal(2, 1)?;
+    let value = target
+        .base
+        .expression(nrz_cas::syntax::Operator::Div, &[first, second], false)?;
+    let mut expected = node(Rule::Hypothesis, &value, Sign::Positive, &[]);
+    expected.premises = vec![0];
+    target.sign_steps(vec![expected])?;
+    replay(fixture, target)
+}
+
+/// A one-root Real stratum accepts real radicals; the three-root stratum retains complete exact coverage.
+/// ´test:integration:real-radicals-presentation-boundary´
+#[test]
+fn real_radicals_presentation_boundary() -> TestResult {
+    use nrz_cas::request::Outcome;
+    use nrz_cas::solving::{SolveForm, SolveReason};
+    let (mut fixture, request) =
+        crate::testing::solve_blind::real_polynomial(&[8, 0, 0, 1], SolveForm::Radicals)?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::Solved { answer, .. } = outcome else {
+        return Err(format!("Real radical: {outcome:?}").into());
+    };
+    assert_eq!(answer.form, SolveForm::Radicals);
+    assert!(
+        answer
+            .coverage
+            .ok_or("Real radical coverage")?
+            .is_discharged()
+    );
+    assert!(
+        answer
+            .facts
+            .last()
+            .ok_or("Real radical presentation")?
+            .is_discharged()
+    );
+    let (mut fixture, request) =
+        crate::testing::solve_blind::real_polynomial(&[1, -3, 0, 1], SolveForm::Radicals)?;
+    let outcome = fixture.cas.run(&request);
+    let Outcome::SolvePartial { answer, reason, .. } = outcome else {
+        return Err(format!("Real cell radical refusal: {outcome:?}").into());
+    };
+    assert_eq!(reason, SolveReason::RequestedRealRadicalsUnavailable);
+    assert_eq!(answer.form, SolveForm::AnyExact);
+    assert_eq!(answer.facts.len(), 0);
+    let coverage = answer.coverage.ok_or("retained Real cell coverage")?;
+    assert!(coverage.is_discharged());
+    assert_eq!(
+        coverage.hypotheses(),
+        [] as [nrz_cas::domain::HypothesisRef; 0]
+    );
+    Ok(())
+}
+
+/// A cell root is exact Real syntax but cannot be presented as a real radical.
+/// ´test:integration:real-cell-refuses-radicals´
+#[test]
+fn real_cell_refuses_radicals() -> TestResult {
+    use nrz_cas::solving::SolveForm;
+    let mut fixture = solve_real::existence()?;
+    let root = fixture.selected_value()?;
+    let set = fixture.finite_set(&root)?;
+    fixture.present(&set, SolveForm::RealExact)?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let step = fixture.steps.last_mut().ok_or("Real cell presentation")?;
+    let Statement::Solve(statement) = &mut step.conclusion else {
+        return Err("Real presentation statement".into());
+    };
+    let SolveStatement::Presentation(claim) = statement.as_mut() else {
+        return Err("Real presentation claim".into());
+    };
+    assert_eq!(claim.form, SolveForm::RealExact);
+    claim.form = SolveForm::Radicals;
+    let Certificate::Solve(certificate) = &mut step.certificate else {
+        return Err("Real presentation certificate".into());
+    };
+    let SolveCertificate::RootSelectionRefinement(value) = certificate.as_mut() else {
+        return Err("Real refinement".into());
+    };
+    assert_eq!(value.form, Some(SolveForm::RealExact));
+    value.form = Some(SolveForm::Radicals);
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// A checked Complex equality is still a forbidden dependency of a `RealExact` presentation.
+/// ´test:integration:real-presentation-refuses-complex-intermediate´
+#[test]
+fn real_presentation_refuses_complex_intermediate() -> TestResult {
+    use nrz_cas::solving::SolveForm;
+    let mut fixture = solve_real::Fixture::new()?;
+    let one = fixture.literal(1, 1)?;
+    let set = fixture.finite_set(&one)?;
+    fixture.present(&set, SolveForm::RealExact)?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    fixture.steps.pop().ok_or("prior Real presentation")?;
+    fixture.complex_intermediate()?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    fixture.present(&set, SolveForm::RealExact)?;
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// Count-one cells refuse overlapping endpoint ownership and endpoints depending on the counted relation.
+/// ´test:integration:real-cells-overlap-and-dependency´
+#[test]
+fn real_cells_overlap_and_dependency() -> TestResult {
+    for root_dependent in [false, true] {
+        let mut fixture = solve_real::altered_cells(root_dependent)?;
+        assert!(
+            fixture
+                .base
+                .cas
+                .check_proof(
+                    &fixture.base.context,
+                    &fixture.steps,
+                    &mut Budget::new(Limits::blind_cubic())?
+                )
+                .is_err()
+        );
+    }
+    Ok(())
+}
+
+/// Exact normalization of the difference proves a ground equality with the same strict domain.
+/// ´test:integration:real-zero-difference-equality´
+#[test]
+fn real_zero_difference_equality() -> TestResult {
+    let mut fixture = solve_real::Fixture::new()?;
+    let one = fixture.literal(1, 1)?;
+    let two = fixture.literal(2, 1)?;
+    let three = fixture.literal(3, 1)?;
+    let sum = fixture
+        .base
+        .expression(nrz_cas::syntax::Operator::Add, &[one, two], false)?;
+    fixture.sign_equality(&sum, &three)?;
+    fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut Budget::new(Limits::blind_cubic())?,
+    )?;
+    let Statement::Equality { left, right, .. } = &mut fixture
+        .steps
+        .last_mut()
+        .ok_or("ground equality")?
+        .conclusion
+    else {
+        return Err("ground equality shape".into());
+    };
+    assert_ne!(left, right);
+    std::mem::swap(left, right);
+    assert!(
+        fixture
+            .base
+            .cas
+            .check_proof(
+                &fixture.base.context,
+                &fixture.steps,
+                &mut Budget::new(Limits::blind_cubic())?
+            )
+            .is_err()
+    );
+    Ok(())
+}
+
+/// The public Real request refuses reachable Complex originals before any coefficient or orbit work.
+/// ´test:integration:real-original-complex-refusal´
+#[test]
+fn real_original_complex_refusal() -> TestResult {
+    for cancel in [false, true] {
+        let (mut cas, request) = solve_real::complex_original(cancel)?;
+        let outcome = cas.run(&request);
+        let nrz_cas::request::Outcome::Unresolved {
+            solve_reason,
+            usage,
+            ..
+        } = outcome
+        else {
+            return Err(format!("Complex original cancellation {cancel}: {outcome:?}").into());
+        };
+        assert_eq!(
+            solve_reason,
+            Some(nrz_cas::solving::SolveReason::RealProblemHasComplexSymbol)
+        );
+        assert_eq!(
+            [
+                usage.coefficient_ops,
+                usage.orbit_permutations,
+                usage.gcd_steps
+            ],
+            [0; 3]
+        );
+    }
+    Ok(())
+}

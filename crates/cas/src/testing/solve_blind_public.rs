@@ -58,6 +58,31 @@ pub(crate) fn polynomial(coefficients: &[i64]) -> TestResult<(Fixture, Request)>
     request(fixture, expression, format!("{coefficients:?}"), &limits)
 }
 
+/// The Real ground request keeps an explicit field and requested presentation.
+pub(crate) fn real_polynomial(
+    coefficients: &[i64],
+    form: SolveForm,
+) -> TestResult<(Fixture, Request)> {
+    let limits = degree_limits(coefficients.len());
+    let mut fixture =
+        Fixture::with_parameters(&Field::Real, &["a", "b", "c", "d"], limits.clone())?;
+    let unknown = fixture.free("x")?;
+    let mut expression = fixture.integer(0, false)?;
+    for coefficient in coefficients.iter().rev() {
+        let product = fixture.expression(Operator::Mul, &[expression, unknown.clone()], false)?;
+        let constant = fixture.integer(*coefficient, false)?;
+        expression = fixture.expression(Operator::Add, &[product, constant], false)?;
+    }
+    let (fixture, mut request) =
+        request(fixture, expression, format!("{coefficients:?}"), &limits)?;
+    let Task::Solve(specification) = &mut request.task else {
+        return Err("Real ground request".into());
+    };
+    assert_eq!(specification.form, SolveForm::Radicals);
+    specification.form = form;
+    Ok((fixture, request))
+}
+
 /// Only noncubic tests use a separate finite tower product ceiling.
 fn degree_limits(count: usize) -> Limits {
     Limits {

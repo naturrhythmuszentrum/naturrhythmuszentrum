@@ -56,12 +56,17 @@ fn predicate(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResu
         (PredicateKind::NonZero, [value]) => {
             Ok(expression(cas, *value, bindings)? != Complex::integer(0))
         }
+        (PredicateKind::Positive, [value]) => {
+            let scalar = expression(cas, *value, bindings)?;
+            assert_eq!(scalar.imaginary, Rational::integer(0));
+            Ok(scalar.real.numerator > 0)
+        }
         _ => Err("sample guard fragment".into()),
     }
 }
 
 /// Recursive containment tests every exact zero/nonzero ancestor, including local-context meets.
-fn region(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResult<bool> {
+pub(super) fn region(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResult<bool> {
     use crate::domain_model::RegionExpr;
     match &cas.state.region(id)?.expression {
         RegionExpr::Ambient => Ok(true),
@@ -120,7 +125,7 @@ fn product(
 }
 
 /// The zero family independently exposes its whole-coordinate identity map.
-fn identity_family(cas: &Cas, family: &Handle) -> TestResult {
+pub(super) fn identity_family(cas: &Cas, family: &Handle) -> TestResult {
     let SolveView::FamilyMap(map) = cas.solve_view(family)? else {
         return Err("sample identity family".into());
     };
