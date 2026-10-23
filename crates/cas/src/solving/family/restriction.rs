@@ -19,8 +19,12 @@ pub(crate) fn applies(cas: &Cas, premises: &[CheckedApplication]) -> Result<bool
         return Ok(false);
     };
     let lifted = cas.state.region(superset.logical_id())?;
-    Ok(lifted.lies_over.is_some()
-        && lifted.ambient != cas.state.region(original.logical_id())?.ambient)
+    let Some(over) = &lifted.lies_over else {
+        return Ok(false);
+    };
+    let changed_frame = lifted.ambient != cas.state.region(original.logical_id())?.ambient;
+    let exact_base = over.stratum == original.logical_id();
+    Ok(changed_frame || exact_base)
 }
 
 /// A closed base-local theorem is restricted through its exact predicate-for-predicate preimage.

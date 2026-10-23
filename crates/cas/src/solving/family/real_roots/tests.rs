@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! An exact LC radicand exposes the sign producer's finite guard-matching boundary.
+//! An exact LC radicand exercises separate-factor and explicit-quotient sign transport.
+
+mod transport;
 
 use super::{Engine, guard};
 use crate::budget::{Budget, Limits};
@@ -178,7 +180,7 @@ fn radicand(
     .element(Value::Fraction(fraction)))
 }
 
-/// Separate positive L and C guards do not yet synthesize the LC reciprocal-product sign.
+/// Separate positive L and C guards and an explicit reciprocal guard both yield supported proposals.
 /// ´test:unit:lc-reciprocal-sign-producer-gap´
 #[test]
 fn lc_reciprocal_sign_producer_gap() -> TestResult {
@@ -202,7 +204,7 @@ fn lc_reciprocal_sign_producer_gap() -> TestResult {
     region = positive(&mut cas, &header, &region, &inductance, &mut budget)?;
     region = positive(&mut cas, &header, &region, &capacitance, &mut budget)?;
     let value = radicand(&cas, &domain, &mut budget)?;
-    assert!(guard(&cas, &region, &value, &mut budget)?.is_none());
+    assert!(guard(&mut cas, &region, &value, &mut budget)?.is_some());
     let product = expression(
         &mut cas,
         &header,
@@ -231,12 +233,6 @@ fn lc_reciprocal_sign_producer_gap() -> TestResult {
         &positive_reciprocal,
         &mut budget,
     )?;
-    assert!(matches!(
-        guard(&cas, &region, &value, &mut budget),
-        Err(crate::Fault {
-            kind: crate::FaultKind::Invalid(crate::InvalidCode::UnsupportedFragment),
-            ..
-        })
-    ));
+    assert!(guard(&mut cas, &region, &value, &mut budget)?.is_some());
     Ok(())
 }

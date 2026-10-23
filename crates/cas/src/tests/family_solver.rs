@@ -3,6 +3,7 @@
 
 mod closure;
 mod cover;
+mod lc;
 mod placement;
 mod properties;
 

@@ -104,18 +104,31 @@ fn power(
     Ok(result)
 }
 
-/// Strict division remains outside this polynomial producer until its original guard is certified.
+/// Strict division transports only constant coefficients with checked regional nonvanishing.
 pub(crate) fn operation(
     engine: &Engine<'_>,
     operator: &Operator,
     operands: &[Dense],
     unknown: &str,
+    region: &crate::graph::Handle,
     budget: &mut Budget,
 ) -> Result<Dense, CoefficientFailure> {
     match (operator, operands) {
         (Operator::Add, [left, right]) => left.sum(right, false, engine.state, budget),
         (Operator::Sub, [left, right]) => left.sum(right, true, engine.state, budget),
         (Operator::Mul, [left, right]) => left.mul(right, engine.state, budget),
+        (Operator::Div, [left, right]) => {
+            let [denominator] = right.coefficients.as_slice() else {
+                return Err(unsupported());
+            };
+            let inverse = crate::solving::coefficients::transport::reciprocal(
+                engine,
+                denominator,
+                region,
+                budget,
+            )?;
+            left.scaled(&inverse, 0, engine.state, budget)
+        }
         (Operator::Neg, [value]) => {
             let minus = engine.neg(&engine.constant(true, budget)?, budget)?;
             value.scaled(&minus, 0, engine.state, budget)
@@ -214,6 +227,7 @@ pub(crate) fn expression(
                         &current.operator,
                         values.get(start..).ok_or_else(invalid)?,
                         unknown,
+                        region,
                         budget,
                     )?
                 };

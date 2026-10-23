@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Base-local positive square witnesses support the two Real-parameter quadratic strata.
 
+mod transport;
+
 use super::invalid;
 use crate::budget::Budget;
 use crate::error::Fault;
@@ -26,6 +28,8 @@ struct Base {
     stratum: Handle,
     /// Original positively oriented Real subject.
     guard: Handle,
+    /// Whether a multiplicative derivation replaces a single declared hypothesis.
+    derived: bool,
     /// Constant coefficient of the positive-square relation.
     constant: Element,
     /// Whether the Complex witness uses the imaginary unit.
@@ -83,7 +87,7 @@ fn project(
 }
 
 /// Match an existing positive base guard to either orientation of the actual radicand.
-fn guard(
+fn declared(
     cas: &Cas,
     stratum: &Handle,
     radicand: &Element,
@@ -130,6 +134,20 @@ fn guard(
         }
     }
     Ok(None)
+}
+
+/// Retain direct guard matches, then propose only the strict multiplicative fragment.
+fn guard(
+    cas: &mut Cas,
+    stratum: &Handle,
+    radicand: &Element,
+    budget: &mut Budget,
+) -> Result<Option<(Handle, bool, bool)>, Fault> {
+    if let Some((subject, imaginary)) = declared(cas, stratum, radicand, budget)? {
+        let derived = cas.state.expression(subject.logical_id())?.operator == Operator::Div;
+        return Ok(Some((subject, imaginary, derived)));
+    }
+    transport::guard(cas, stratum, radicand, budget)
 }
 
 /// Only a monic quadratic with zero linear term and a proved base orientation qualifies.
@@ -204,18 +222,26 @@ fn candidate(
         .neg(&constant, budget)
         .map_err(|error| fault(&error))?;
     let stratum = cas.handle(over.stratum);
-    let Some((guard, imaginary)) = guard(cas, &stratum, &radicand, budget)? else {
+    let Some((mut guard, imaginary, derived)) = guard(cas, &stratum, &radicand, budget)? else {
         return Ok(None);
     };
     if imaginary {
+        let engine = Engine {
+            state: &cas.state,
+            domain: &domain,
+        };
         constant = engine
             .neg(&constant, budget)
             .map_err(|error| fault(&error))?;
+    }
+    if derived {
+        (constant, guard) = transport::inverse_square(cas, &stratum, &constant, budget)?;
     }
     Ok(Some(Base {
         domain,
         stratum,
         guard,
+        derived,
         constant,
         imaginary,
     }))
@@ -230,6 +256,9 @@ fn sign(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     use crate::solving::{CertificateRealSign, RealSignConclusion, RealSignRule, RealSignStep};
+    if base.derived {
+        return transport::sign(cas, frame, &base.guard, &base.constant, map, budget);
+    }
     let constant = frame.literal(cas, &base.constant, map, budget)?;
     let subject = frame.expression(cas, Operator::Neg, &[constant], false, budget)?;
     let equality = equality(cas, frame, &base.guard, &subject, &base.domain, budget)?;
@@ -306,6 +335,9 @@ fn witness(
         .map_err(|error| fault(&error))?;
     let map = frame.mapping(cas, &base.domain, &images, budget)?;
     sign(cas, &mut frame, base, &map, budget)?;
+    let sign_source = base
+        .derived
+        .then_some(frame.inner.steps.len().saturating_sub(1));
     let engine = Engine {
         state: &cas.state,
         domain: &base.domain,
@@ -345,6 +377,9 @@ fn witness(
         substitutions: Vec::new(),
         certificate: Certificate::None,
     });
+    if let Some(source) = sign_source {
+        transport::lift_sign(construction, source, subset, budget)?;
+    }
     construction.steps.push(ApplicationDraft {
         rule: crate::rule::Primitive::ContextWeaken,
         context: construction.context.clone(),
@@ -372,7 +407,10 @@ pub(crate) fn choose(
     let Some(base) = candidate(cas, construction, source, budget)? else {
         return Ok(None);
     };
-    let real = witness(cas, construction, &base, budget)?;
+    let mut real = witness(cas, construction, &base, budget)?;
+    if base.derived {
+        real = transport::inverse_root(cas, &base.stratum, &real, budget)?;
+    }
     super::root_selection::include(cas, construction, target, &real, base.imaginary, budget)
         .map(Some)
 }

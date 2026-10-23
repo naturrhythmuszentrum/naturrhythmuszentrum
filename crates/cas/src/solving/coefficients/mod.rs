@@ -77,7 +77,7 @@ pub(crate) mod storage;
     clippy::redundant_pub_crate,
     reason = "coefficient transport is shared by private replay modules"
 )]
-mod transport;
+pub(crate) mod transport;
 
 /// Arithmetic availability does not enable an unchecked theorem schema.
 pub(crate) const fn availability() -> super::Availability {

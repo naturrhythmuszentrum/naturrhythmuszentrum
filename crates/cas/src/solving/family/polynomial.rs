@@ -40,6 +40,7 @@ pub(crate) fn read(
             &value.operator,
             &operands,
             unknown,
+            domain,
             budget,
         );
     }

@@ -86,3 +86,64 @@ pub(crate) fn frames(
     }
     Ok(())
 }
+
+/// A strict coefficient reciprocal requires both canonical factors to be nonzero locally.
+/// Original expression readers call this before cancellation can remove a divisor.
+pub(crate) fn reciprocal(
+    engine: &Engine<'_>,
+    element: &Element,
+    region: &Handle,
+    budget: &mut Budget,
+) -> Result<Element, CoefficientFailure> {
+    use super::model::Value;
+    if !nonzero(engine, element, region, &[], budget)? {
+        return Err(CoefficientFailure::Unsupported(
+            crate::solving::SolveReason::MissingUnitProof,
+        ));
+    }
+    let value = match &element.value {
+        Value::Scalar(value) => Value::Scalar(
+            super::scalar::Scalar::constant(value.ground(), true, budget)?.div(value, budget)?,
+        ),
+        Value::Fraction(value) => Value::Fraction(value.reciprocal(budget)?),
+        Value::Tower(_) => {
+            return Err(CoefficientFailure::Unsupported(
+                crate::solving::SolveReason::CoefficientDomainUnavailable,
+            ));
+        }
+    };
+    Ok(engine.element(value))
+}
+
+/// Existing regional factor evidence checks a constant form's complete fraction domain.
+pub(crate) fn nonzero(
+    engine: &Engine<'_>,
+    element: &Element,
+    region: &Handle,
+    premises: &[crate::proof_model::CheckedApplication],
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    super::storage::begin(budget)?;
+    if element.domain != *engine.domain {
+        return Err(invalid());
+    }
+    match &element.value {
+        super::model::Value::Scalar(value) => Ok(!value.zero(budget)?),
+        super::model::Value::Fraction(value) => {
+            for polynomial in [&value.denominator, &value.numerator] {
+                if !super::nonzero::proves(
+                    engine.state,
+                    engine.domain,
+                    polynomial,
+                    region,
+                    premises.iter().map(|premise| &premise.judgment.statement),
+                    budget,
+                )? {
+                    return Ok(false);
+                }
+            }
+            Ok(true)
+        }
+        super::model::Value::Tower(_) => Ok(false),
+    }
+}

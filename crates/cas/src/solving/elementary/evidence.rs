@@ -147,6 +147,18 @@ impl Evaluation<'_> {
                 return Ok(());
             }
         }
+        if let [term] = value.numerator.terms.as_slice()
+            && term.powers.is_empty()
+            && crate::solving::coefficients::transport::nonzero(
+                &self.engine,
+                &term.coefficient,
+                self.region,
+                self.premises,
+                budget,
+            )?
+        {
+            return Ok(());
+        }
         Err(invalid())
     }
 
