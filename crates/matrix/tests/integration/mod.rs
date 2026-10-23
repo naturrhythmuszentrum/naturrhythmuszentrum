@@ -66,3 +66,5 @@ mod symbol_lifecycle;
 mod conversion_errors;
 
 mod bounded_readings;
+
+mod complex_copies;

@@ -71,6 +71,7 @@ pub(super) fn prepare(
         companions,
         companion_reads,
         native: Vec::new(),
+        copies: Vec::new(),
     }))
 }
 

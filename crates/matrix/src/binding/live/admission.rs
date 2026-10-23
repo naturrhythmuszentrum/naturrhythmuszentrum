@@ -29,7 +29,7 @@ pub(super) fn universe<P: Scalar>(
     companions: &[crate::CompanionAdapter<usize>],
     regions: &[ReadingRegion<P>],
     budget: &mut Budget,
-) -> Result<(), LiveBindingError> {
+) -> Result<Vec<super::CopyDiscrepancy>, LiveBindingError> {
     charge::<ReadingRegion<P>>(regions.len(), budget)?;
     let mut actual = Vec::new();
     for (region, payload) in regions.iter().enumerate() {
@@ -58,17 +58,18 @@ pub(super) fn universe<P: Scalar>(
             return Err(crate::ReadingAdapterError::Coverage.into());
         }
     }
-    representations(coverage, regions, budget)?;
-    Ok(())
+    representations(coverage, companions, regions, budget)
 }
 
 /// Expanded numerical families require their supported complete block reconstruction.
 fn representations<P: Scalar>(
     coverage: &ReadingCoverage<usize>,
+    companions: &[crate::CompanionAdapter<usize>],
     regions: &[ReadingRegion<P>],
     budget: &mut Budget,
-) -> Result<(), LiveBindingError> {
+) -> Result<Vec<super::CopyDiscrepancy>, LiveBindingError> {
     use nrz_bindings::readings::RepresentationKind;
+    let mut copies = Vec::new();
     for adapter in coverage.readings() {
         let family = adapter.reading().family();
         if adapter.representation().kind() == RepresentationKind::ComplexBlock {
@@ -88,7 +89,9 @@ fn representations<P: Scalar>(
                         .ok_or(HeapError::InvalidLayout)
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            block(&values)?;
+            if block(&values).is_err() {
+                super::copies::append(&mut copies, adapter, companions, regions, &values, budget)?;
+            }
         } else if family.node() != family.root()
             && adapter.representation().kind() != RepresentationKind::None
         {
@@ -105,7 +108,7 @@ fn representations<P: Scalar>(
             }
         }
     }
-    Ok(())
+    Ok(copies)
 }
 
 /// Complete Complex block centers retain every repeated and negated represented coordinate.

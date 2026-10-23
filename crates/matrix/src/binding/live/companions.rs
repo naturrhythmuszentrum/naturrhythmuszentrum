@@ -87,7 +87,7 @@ fn check_error<P: Scalar>(
 }
 
 /// Resolve actual supplied parameter storage before any allocation.
-fn value<P: Scalar>(
+pub(super) fn value<P: Scalar>(
     regions: &[ReadingRegion<P>],
     entry: &crate::EntryTicket<usize>,
 ) -> Result<P, HeapError> {

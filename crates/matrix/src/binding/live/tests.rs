@@ -405,5 +405,6 @@ fn selected_reading_copy_retains_transitive_lineage() -> TestResult {
 
 mod bounded;
 mod checks;
+mod copies;
 mod domain;
 mod overlap;

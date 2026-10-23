@@ -63,6 +63,12 @@ impl SelectedReading {
                 }
             }
         }
+        for copy in &self.group.copies {
+            if copy.family() == adapter.reading().family().node() {
+                self.validate_entries(heap, copy.entries())?;
+                self.validate_entries(heap, copy.parameters())?;
+            }
+        }
         super::companions::validate_native(&self.group, heap)?;
         Ok(())
     }

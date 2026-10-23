@@ -93,3 +93,17 @@ mod solve_statistics_testing;
     reason = "bounded solve policy fixtures are shared across test modules"
 )]
 mod recovery_testing;
+
+#[path = "../src/testing/readings.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact reading fixtures are shared across the corresponding test layers"
+)]
+mod reading_testing;
+
+#[path = "../src/testing/copies.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact reading fixtures are shared across the corresponding test layers"
+)]
+mod copy_testing;

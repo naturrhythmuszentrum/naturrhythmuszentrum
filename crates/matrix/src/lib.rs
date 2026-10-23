@@ -36,9 +36,9 @@ mod storage;
 
 pub use binding::{
     AffineAdapter, CompanionAdapter, CoordinateContract, CoordinateError, CoordinateNorm,
-    CoordinateReading, DependencyPolicy, EntryTicket, LiveBindingError, OperatorAdapter,
-    ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage, ReadingImport,
-    ReadingRegion,
+    CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket, LiveBindingError,
+    OperatorAdapter, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
+    ReadingImport, ReadingRegion,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
@@ -268,3 +268,19 @@ mod solve_statistics_testing;
     reason = "bounded solve policy fixtures are shared across test modules"
 )]
 mod recovery_testing;
+
+#[cfg(test)]
+#[path = "testing/readings.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact reading fixtures are shared across the corresponding test layers"
+)]
+mod reading_testing;
+
+#[cfg(test)]
+#[path = "testing/copies.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "exact reading fixtures are shared across the corresponding test layers"
+)]
+mod copy_testing;

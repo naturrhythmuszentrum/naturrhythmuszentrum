@@ -48,8 +48,8 @@ pub use error::OperationError;
 pub use lifecycle::{SymbolState, ValueBinding};
 pub use limits::ExecutionLimits;
 pub use live::{
-    CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, DependencyPolicy,
-    LiveBindingError, ReadingBinding, ReadingImport, ReadingRegion,
+    CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, CopyDiscrepancy,
+    DependencyPolicy, LiveBindingError, ReadingBinding, ReadingImport, ReadingRegion,
 };
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};

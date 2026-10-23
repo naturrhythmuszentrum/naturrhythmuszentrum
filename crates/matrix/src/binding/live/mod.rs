@@ -5,6 +5,9 @@ mod admission;
 mod bounded;
 pub(crate) mod companions;
 mod coordinates;
+mod copies;
+
+pub use copies::CopyDiscrepancy;
 mod dependencies;
 
 pub use coordinates::{CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading};
@@ -43,6 +46,12 @@ pub struct ReadingRegion<P: Scalar> {
 /// A live admission or mutation refusal, before any partial numerical publication.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum LiveBindingError {
+    /// Outward verification of stored-copy consistency could not be represented.
+    #[error("stored copy arithmetic: {0}")]
+    Arithmetic(#[from] nrz_scalar::ArithmeticFailure),
+    /// Differing centers are not provably covered by the two selected numerical radii.
+    #[error("stored copy discrepancy exceeds its declared numerical coverage")]
+    UncoveredCopy,
     /// Numerical shape, version, precision, finiteness or allocation check failed.
     #[error("numerical reading: {0}")]
     Heap(#[from] HeapError),
@@ -80,6 +89,13 @@ impl<P: Scalar> ReadingBinding<P> {
     #[must_use]
     pub fn companions(&self) -> &[crate::CompanionAdapter<usize>] {
         &self.group.companions
+    }
+    /// Differing rounded copies in this exact family, with their selected error parameters.
+    pub fn copy_discrepancies(&self) -> impl Iterator<Item = &CopyDiscrepancy> {
+        self.group
+            .copies
+            .iter()
+            .filter(|copy| copy.family() == self.reading().family().node())
     }
     /// Transaction availability; published bindings still require live version checks.
     #[must_use]
@@ -158,6 +174,8 @@ pub(crate) struct Group {
     pub(crate) companions: Vec<crate::CompanionAdapter<usize>>,
     /// Cached dependency inventories of immutable companion definitions.
     pub(crate) companion_reads: Vec<DependencyInventory>,
+    /// Verified per-copy discrepancies and their exact selected error dependencies.
+    pub(crate) copies: Vec<CopyDiscrepancy>,
     /// Native result companion tickets retained before general map lowering.
     pub(crate) native: Vec<companions::NativeCompanion>,
 }

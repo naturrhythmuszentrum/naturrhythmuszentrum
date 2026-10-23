@@ -31,21 +31,25 @@ impl Heap {
         budget: &mut Budget,
     ) -> Result<ReadingImport<P>, LiveBindingError> {
         super::companions::check(&coverage, &companions, regions, budget)?;
-        super::admission::universe(&coverage, &companions, regions, budget)?;
+        let copies = super::admission::universe(&coverage, &companions, regions, budget)?;
         let plan = self
             .descriptors
             .prepare(regions.len(), self.limits.descriptors)?;
         let (schemas, indices) = schemas(self, regions)?;
         let tickets = tickets::<P>(self.scope, plan.keys(), regions, &indices)?;
-        let group = super::dependencies::prepare(
-            graph,
-            coverage,
-            companions,
-            tickets,
-            policy,
-            (self.scope, P::PRECISION),
-            budget,
-        )?;
+        let retained = super::copies::bytes(copies.capacity())?;
+        let mut group = budget.with_retained_payload(retained, super::admission::AT, |budget| {
+            super::dependencies::prepare(
+                graph,
+                coverage,
+                companions,
+                tickets,
+                policy,
+                (self.scope, P::PRECISION),
+                budget,
+            )
+        })?;
+        Rc::get_mut(&mut group).ok_or(HeapError::Capacity)?.copies = copies;
         if regions.is_empty() {
             self.symbols.reserve_observer(self.limits.descriptors)?;
         }
