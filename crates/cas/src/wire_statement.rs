@@ -235,6 +235,7 @@ pub(crate) fn certificate(
     records: &[Decoded],
 ) -> Result<Certificate, Fault> {
     Ok(match reader.byte()? {
+        13 => Certificate::Emptiness(Box::new(crate::emptiness::decode(reader, records)?)),
         12 => Certificate::Solve(Box::new(crate::solving::SolveCertificate::decode(
             reader, records,
         )?)),

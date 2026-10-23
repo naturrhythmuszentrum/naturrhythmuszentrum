@@ -111,7 +111,7 @@ fn compare_witness(
     let (records, root, rules, assigned) = table;
     let meter = super::inventory_budget::table_meter(records, assigned, budget)?;
     let actual = meter.run(budget, |budget| {
-        envelope(records, *root, rules, b"NRZCAS04", budget)
+        envelope(records, *root, rules, crate::wire::MAGIC, budget)
     })?;
     budget.work(size(actual.len().max(witness.bytes.len()), AT)?, AT)?;
     if actual != witness.bytes {

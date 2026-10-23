@@ -9,6 +9,9 @@ use crate::scalar_model::{Claim, Relation};
 
 pub(crate) use crate::wire_build::encode;
 
+/// The sole witness envelope revision, shared by replay and dependency authentication.
+pub(crate) const MAGIC: &[u8; 8] = b"NRZCAS05";
+
 /// Encode one fixed-width u32 local reference.
 pub(crate) fn index(value: u32, out: &mut Encoder<'_>) -> Result<(), Fault> {
     out.raw(&value.to_le_bytes())

@@ -246,6 +246,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// A trimmed graph of exact covers, local contradictions and checked empty lemmas.
+    Emptiness(Box<crate::emptiness::EmptinessDag>),
     /// Untrusted typed solving evidence.
     Solve(Box<crate::solving::SolveCertificate>),
     /// Complete finite roots with independently checked inverse absolute Jacobians.

@@ -100,7 +100,14 @@ fn active_policy_complete_manifest() -> TestResult {
         .iter()
         .map(|primitive| {
             let rule = primitive.specification();
-            assert_eq!(rule.version, 1);
+            assert_eq!(
+                rule.version,
+                if *primitive == nrz_cas::proof::Primitive::RegionDecide {
+                    2
+                } else {
+                    1
+                }
+            );
             assert_eq!(
                 rule.available,
                 match primitive {

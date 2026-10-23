@@ -159,7 +159,7 @@ fn solve_wire_old_magic_before_allocation() -> TestResult {
 #[test]
 fn solve_wire_count_preflight() -> TestResult {
     let mut fixture = Fixture::new()?;
-    let mut bytes = b"NRZCAS04".to_vec();
+    let mut bytes = b"NRZCAS05".to_vec();
     bytes.extend_from_slice(&0_u32.to_le_bytes());
     bytes.extend_from_slice(&u32::MAX.to_le_bytes());
     let before = fixture.cas.counts();
@@ -328,7 +328,7 @@ fn solve_unavailable_schemas() -> TestResult {
             fault.kind,
             FaultKind::Invalid(InvalidCode::UnsupportedFragment)
         );
-        let mut bytes = b"NRZCAS04".to_vec();
+        let mut bytes = b"NRZCAS05".to_vec();
         bytes.extend_from_slice(&1_u32.to_le_bytes());
         bytes.extend_from_slice(&u32::try_from(spec.key.len())?.to_le_bytes());
         bytes.extend_from_slice(spec.key.as_bytes());

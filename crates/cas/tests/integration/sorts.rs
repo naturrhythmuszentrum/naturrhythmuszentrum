@@ -11,7 +11,7 @@ use nrz_cas::limits::{Budget, Limits};
 fn scalar_family_expected_fresh_replay() -> TestResult {
     let (origin, witness) = family_witness()?;
     let bytes = origin.export_witness(&witness, &mut Budget::new(Limits::default())?)?;
-    assert_eq!(bytes.get(..8), Some(b"NRZCAS04".as_slice()));
+    assert_eq!(bytes.get(..8), Some(b"NRZCAS05".as_slice()));
     let (mut receiver, expected) = family_witness()?;
     let replayed = receiver.replay(
         &bytes,

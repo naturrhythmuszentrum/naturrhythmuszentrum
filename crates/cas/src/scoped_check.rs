@@ -139,6 +139,9 @@ fn rule_conditions(
         Primitive::ContextHypothesis => crate::context_check::hypothesis(cas, draft, budget)?,
         Primitive::ContextWeaken => crate::context_check::weaken(cas, draft, premises, budget)?,
         Primitive::ContextClose => crate::context_check::close(cas, draft, premises, budget)?,
+        Primitive::RegionDecide if matches!(&draft.certificate, Certificate::Emptiness(_)) => {
+            crate::emptiness::check(cas, draft, premises, budget)?
+        }
         Primitive::RegionDecide | Primitive::RegionConstruct => {
             if !premises.is_empty() || !draft.substitutions.is_empty() {
                 return Err(invalid());

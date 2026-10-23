@@ -254,11 +254,12 @@ fn complete_answer_registry_inventory() {
             .count(),
         21
     );
-    assert!(
-        PRIMITIVES
-            .iter()
-            .all(|rule| rule.specification().version == 1)
-    );
+    assert!(PRIMITIVES.iter().all(|rule| rule.specification().version
+        == if *rule == Primitive::RegionDecide {
+            2
+        } else {
+            1
+        }));
     let unavailable: Vec<_> = PRIMITIVES
         .iter()
         .filter(|rule| !rule.specification().available)

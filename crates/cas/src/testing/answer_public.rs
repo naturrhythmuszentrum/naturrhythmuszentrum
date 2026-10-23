@@ -78,7 +78,7 @@ pub(crate) fn refused(fixture: &mut AnswerFixture, bytes: &[u8]) -> TestResult {
 
 /// Decode only record boundaries independently of the production reader.
 pub(crate) fn records(bytes: &[u8]) -> TestResult<Vec<(u8, std::ops::Range<usize>)>> {
-    assert_eq!(bytes.get(..8), Some(b"NRZCAS04".as_slice()));
+    assert_eq!(bytes.get(..8), Some(b"NRZCAS05".as_slice()));
     let mut offset = 8;
     let manifest = index(bytes, &mut offset)?;
     for _ in 0..manifest {

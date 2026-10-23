@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Closed version-one primitive registry, without user-defined trusted callbacks.
+//! Closed versioned primitive registry, without user-defined trusted callbacks.
 
-/// A compiled checker whose mathematical meaning is fixed by semantic version one.
+/// A compiled checker whose mathematical meaning is fixed by its semantic version.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum Primitive {
     /// One registered solving schema, available only when its owning checker is enabled.
@@ -120,7 +120,7 @@ pub enum Primitive {
     ContextWeaken,
     /// Close a local frame while retaining every used predicate as evidence or residual.
     ContextClose,
-    /// Recompute a finite affine or integer truth partition.
+    /// Recompute finite cells or check a compact empty-region DAG.
     RegionDecide,
     /// Check the exact defining membership and inclusion laws of region constructors.
     RegionConstruct,
@@ -203,7 +203,7 @@ pub enum CertificateSchema {
     Hypothesis,
     /// Exact local frame being closed.
     Close,
-    /// Exact rational cuts and Boolean cell rows.
+    /// Exact rational cells or a compact empty-region DAG.
     Region,
 }
 
@@ -266,7 +266,7 @@ impl Primitive {
         )
     }
 
-    /// Read the pinned version-one schema metadata.
+    /// Read the pinned schema metadata.
     #[must_use]
     pub const fn specification(self) -> RuleSpec {
         let (key, weight) = match self {
@@ -334,7 +334,11 @@ impl Primitive {
         RuleSpec {
             primitive: self,
             key,
-            version: 1,
+            version: if matches!(self, Self::RegionDecide) {
+                2
+            } else {
+                1
+            },
             weight,
             conclusion: self.conclusion_kind(),
             premises: self.premise_shape(),
@@ -410,6 +414,7 @@ impl Primitive {
             | Self::CaseSelect
             | Self::CaseCongruence
             | Self::CaseEliminate => PremiseShape::CaseEvidence,
+            Self::RegionDecide => PremiseShape::AtLeast(0),
             Self::ContextClose => PremiseShape::AtLeast(2),
             Self::Jacobian => PremiseShape::JacobianCells,
             Self::Transitivity

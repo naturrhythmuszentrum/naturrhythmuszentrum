@@ -77,7 +77,7 @@ fn solve_coefficient_witness_v4_round_trip() -> TestResult {
     use nrz_cas::limits::{Budget, Limits};
     let (origin, witness) = crate::testing::solve_graph::coefficient_witness()?;
     let bytes = origin.export_witness(&witness, &mut Budget::new(Limits::default())?)?;
-    assert_eq!(bytes.get(..8), Some(b"NRZCAS04".as_slice()));
+    assert_eq!(bytes.get(..8), Some(b"NRZCAS05".as_slice()));
     assert_eq!(witness.hypotheses().len(), 1);
     let mut receiver = nrz_cas::Cas::new(Limits::default())?;
     let replayed = receiver.inspect(&bytes, &mut Budget::new(Limits::default())?)?;

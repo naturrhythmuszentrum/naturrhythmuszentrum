@@ -327,7 +327,7 @@ fn conclusion(
 
 /// Reject every noncurrent magic before any record, manifest or replay-store allocation.
 pub(crate) fn magic(bytes: &[u8]) -> Result<(), Fault> {
-    if bytes.get(..8) != Some(b"NRZCAS04".as_slice()) {
+    if bytes.get(..8) != Some(crate::wire::MAGIC.as_slice()) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     Ok(())

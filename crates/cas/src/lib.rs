@@ -160,6 +160,11 @@ mod case_syntax;
 )]
 mod descriptor;
 mod descriptor_model;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "empty-region checking stays inside the kernel"
+)]
+mod emptiness;
 mod number;
 mod parse_error;
 mod parser;

@@ -92,7 +92,11 @@ fn policy_record() -> String {
         })
         .collect();
     assert_eq!(manifest.len(), 80);
-    assert!(manifest.iter().all(|(_, version)| *version == 1));
+    assert!(
+        manifest
+            .iter()
+            .all(|(key, version)| *version == if *key == "region.decide" { 2 } else { 1 })
+    );
     assert_eq!(crate::solving::active_schema_bitmap() & 0x1_5fff, 0x1_5fff);
     let policy = crate::cost::CostPolicy::default();
     assert_eq!((&*policy.key, policy.version), ("logical", 10));

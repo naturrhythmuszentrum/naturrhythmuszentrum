@@ -1285,3 +1285,49 @@ fn region_arena_boundaries() -> TestResult {
     assert_eq!(exact.usage().region_nodes, 2);
     Ok(())
 }
+
+/// The compact contradiction agrees with the independent exhaustive affine-cell checker.
+/// ´test:integration:emptiness-sign-agrees-with-cell-oracle´
+#[test]
+fn emptiness_sign_agrees_with_cell_oracle() -> TestResult {
+    use nrz_cas::proof::{EmptinessDag, EmptyEvidence, EmptyFact, EmptyLeaf, EmptyNode};
+    let mut fixture = Fixture::new()?;
+    let positive = fixture.predicate(PredicateKind::Positive, &[fixture.x.clone()])?;
+    let positive = fixture.guarded(&positive)?;
+    let zero = fixture.predicate(
+        PredicateKind::Equal,
+        &[fixture.x.clone(), fixture.zero.clone()],
+    )?;
+    let empty = fixture.region(RegionExpr::GuardTrue {
+        base: Reference::Existing(positive.clone()),
+        predicate: Reference::Existing(zero),
+    })?;
+    let node = EmptyNode {
+        region: empty.clone(),
+        evidence: EmptyEvidence::Leaf(Box::new(EmptyLeaf::Sign {
+            subject: fixture.x.clone(),
+            nonzero: EmptyFact::Guard(positive),
+        })),
+    };
+    let mut step = application(
+        &fixture.context,
+        Primitive::RegionDecide,
+        Statement::Empty { region: empty },
+        Certificate::Emptiness(Box::new(EmptinessDag { nodes: vec![node] })),
+        Vec::new(),
+    );
+    let compact = fixture.cas.check_proof(
+        &fixture.context,
+        std::slice::from_ref(&step),
+        &mut budget()?,
+    )?;
+    step.certificate = Certificate::Region(RegionCertificate {
+        cuts: vec![Rational::zero()],
+        membership: vec![vec![false, false, false]],
+    });
+    let exhaustive = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut budget()?)?;
+    assert_eq!(compact.judgment(), exhaustive.judgment());
+    Ok(())
+}

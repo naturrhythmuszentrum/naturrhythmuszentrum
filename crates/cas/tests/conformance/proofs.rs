@@ -870,7 +870,7 @@ fn checked_jacobian_assembly() -> TestResult {
 fn witness_payload_tampering() -> TestResult {
     let original = canonical_fixture()?;
     let mut receiver = Cas::new(budget()?.limits().clone())?;
-    // NRZCAS04 records 4 and 6 are x and one; the latter is a forbidden forward operand reference.
+    // NRZCAS05 records 4 and 6 are x and one; the latter is a forbidden forward operand reference.
     for (position, prior, byte) in [(338, 1, 0), (302, 1, 2), (259, 4, 6), (395, 7, 255)] {
         assert_eq!(original.get(position), Some(&prior));
         assert_ne!(prior, byte);

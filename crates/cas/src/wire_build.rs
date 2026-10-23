@@ -319,7 +319,7 @@ pub(crate) fn encode(cas: &Cas, proof: LogicalId, budget: &mut Budget) -> Result
         hypotheses: application.conditions.hypotheses,
     };
     let (records, root, rules) = table(cas, root, budget)?;
-    envelope(records, root, &rules, b"NRZCAS04", budget)
+    envelope(records, root, &rules, crate::wire::MAGIC, budget)
 }
 
 /// A portable theorem comparison includes precisely its complete context and residual tuple set.
