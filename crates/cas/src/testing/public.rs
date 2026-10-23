@@ -237,3 +237,10 @@ pub(crate) mod readings;
     reason = "shared exact-map fixtures stay crate-visible"
 )]
 pub(crate) mod map_inverses;
+
+#[path = "jacobians.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public Jacobian fixtures"
+)]
+pub(crate) mod jacobians;

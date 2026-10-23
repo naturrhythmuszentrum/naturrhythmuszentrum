@@ -9,7 +9,7 @@ use crate::model::Operator;
 use std::collections::BTreeMap;
 
 /// Expand only native matrices and ordered products, retaining every original operand.
-pub(super) fn expand(
+pub(crate) fn expand(
     cas: &mut Cas,
     root: LogicalId,
     budget: &mut Budget,

@@ -28,6 +28,12 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// A fixed coordinate was requested as a derivative direction.
+    JacobianFixedSource,
+    /// A coordinate contract repeats a declaration key within one list.
+    JacobianDuplicateSource,
+    /// Original or differentiated expressions have unresolved whole-family domains.
+    JacobianDomain,
     /// Portable key bytes disagree with their authenticated local retained relation.
     ReuseKeyMismatch,
     /// An exact square map has identically zero determinant.

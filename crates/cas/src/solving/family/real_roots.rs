@@ -420,3 +420,6 @@ fn equality(
         budget,
     )
 }
+
+#[cfg(test)]
+mod tests;

@@ -57,3 +57,7 @@ mod dependency_domains;
 mod map_inverses;
 
 mod normalization;
+
+mod jacobians;
+
+mod jacobian_matrices;

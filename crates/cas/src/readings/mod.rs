@@ -12,7 +12,7 @@ pub(crate) mod check;
 mod coverage;
 mod determinant;
 mod entry_sets;
-mod exact_expand;
+pub(crate) mod exact_expand;
 mod exact_map;
 mod inventory;
 mod inventory_budget;

@@ -276,6 +276,7 @@ mod testing;
 mod tests;
 
 pub mod domain;
+pub mod jacobians;
 pub mod limits;
 pub mod proof;
 #[expect(
