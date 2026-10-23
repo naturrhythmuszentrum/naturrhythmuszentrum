@@ -102,7 +102,13 @@ fn active_policy_complete_manifest() -> TestResult {
             let rule = primitive.specification();
             assert_eq!(
                 rule.version,
-                if *primitive == nrz_cas::proof::Primitive::RegionDecide {
+                if matches!(
+                    *primitive,
+                    nrz_cas::proof::Primitive::RegionDecide
+                        | nrz_cas::proof::Primitive::Solve(
+                            nrz_cas::solving::SolveSchema::TotalPredicateSplit
+                        )
+                ) {
                     2
                 } else {
                     1

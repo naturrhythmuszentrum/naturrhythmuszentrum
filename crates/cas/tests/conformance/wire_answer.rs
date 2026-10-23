@@ -255,7 +255,11 @@ fn complete_answer_registry_inventory() {
         21
     );
     assert!(PRIMITIVES.iter().all(|rule| rule.specification().version
-        == if *rule == Primitive::RegionDecide {
+        == if matches!(
+            *rule,
+            Primitive::RegionDecide
+                | Primitive::Solve(nrz_cas::solving::SolveSchema::TotalPredicateSplit)
+        ) {
             2
         } else {
             1

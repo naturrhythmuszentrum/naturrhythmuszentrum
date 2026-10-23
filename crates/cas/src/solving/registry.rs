@@ -162,7 +162,11 @@ impl SolveSchema {
         RuleSpec {
             primitive: Primitive::Solve(self),
             key,
-            version: 1,
+            version: if matches!(self, Self::TotalPredicateSplit) {
+                2
+            } else {
+                1
+            },
             weight,
             conclusion: ConclusionKind::Solve,
             premises: PremiseShape::SolveEvidence,

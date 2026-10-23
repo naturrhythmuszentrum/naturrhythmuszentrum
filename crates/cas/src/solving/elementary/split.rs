@@ -180,6 +180,9 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    if certificate.mode == PredicateSplitMode::EmptyRegion {
+        return empty(cas, draft, certificate, premises, budget);
+    }
     if certificate.mode == PredicateSplitMode::EliminateCover {
         return eliminate(cas, draft, certificate, premises, budget);
     }
@@ -261,6 +264,62 @@ fn closed_region(
     }
     for member in members {
         super::member::contained(cas, child, &cas.handle(*member), budget)?;
+    }
+    Ok(())
+}
+
+/// No assignment in a checked empty region can solve the original problem there.
+fn empty(
+    cas: &Cas,
+    draft: &ApplicationDraft,
+    certificate: &CertificateTotalPredicateSplit,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let Statement::Solve(statement) = &draft.conclusion else {
+        return Err(invalid());
+    };
+    let SolveStatement::Coverage(coverage) = statement.as_ref() else {
+        return Err(invalid());
+    };
+    let original = super::proof::problem(cas, &coverage.problem)?;
+    super::proof::region(cas, &draft.context, original, &certificate.region)?;
+    super::member::contained(cas, &certificate.region, &original.region, budget)?;
+    let proof = premise(premises, certificate.cover.ok_or_else(invalid)?)?;
+    let Statement::Empty { region } = &proof.judgment.statement else {
+        return Err(invalid());
+    };
+    let same_context = proof.judgment.context == draft.context;
+    let same_region = *region == certificate.region && coverage.region == certificate.region;
+    let same_predicate = certificate.expression == original.predicate;
+    if !same_context
+        || !same_region
+        || !same_predicate
+        || !certificate.children.is_empty()
+        || !certificate.branches.is_empty()
+    {
+        return Err(invalid());
+    }
+    let SolveDraft::SolutionSet(set) =
+        crate::solving::graph::object(&cas.state, cas.checked(&coverage.set)?)?
+    else {
+        return Err(invalid());
+    };
+    if set.problem != coverage.problem || set.branches.len() != 1 {
+        return Err(invalid());
+    }
+    let branch = set.branches.first().ok_or_else(invalid)?;
+    let SolveDraft::SolutionBranch(branch) =
+        crate::solving::graph::object(&cas.state, cas.checked(branch)?)?
+    else {
+        return Err(invalid());
+    };
+    if branch.problem != coverage.problem
+        || branch.region != certificate.region
+        || branch.domain != original.domain
+        || !matches!(branch.kind, crate::solving::SolutionBranchKind::Empty)
+    {
+        return Err(invalid());
     }
     Ok(())
 }

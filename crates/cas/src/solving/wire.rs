@@ -152,6 +152,7 @@ impl PredicateSplitMode {
             Self::ZeroNonzero => 0,
             Self::RealSigns => 1,
             Self::EliminateCover => 2,
+            Self::EmptyRegion => 3,
         }
     }
 }
@@ -1950,6 +1951,7 @@ impl PredicateSplitMode {
             0 => Self::ZeroNonzero,
             1 => Self::RealSigns,
             2 => Self::EliminateCover,
+            3 => Self::EmptyRegion,
             _ => return Err(invalid()),
         })
     }
@@ -3724,10 +3726,16 @@ impl<R> SolveCertificate<R> {
                     && value.order != Some(0)
             }
             Self::TotalPredicateSplit(value) => {
-                (value.mode == PredicateSplitMode::EliminateCover) == value.cover.is_some()
+                matches!(
+                    value.mode,
+                    PredicateSplitMode::EliminateCover | PredicateSplitMode::EmptyRegion
+                ) == value.cover.is_some()
                     && match value.mode {
                         PredicateSplitMode::ZeroNonzero => value.children.len() == 2,
                         PredicateSplitMode::RealSigns => value.children.len() == 3,
+                        PredicateSplitMode::EmptyRegion => {
+                            value.children.is_empty() && value.branches.is_empty()
+                        }
                         PredicateSplitMode::EliminateCover => {
                             value.branches.len() == value.children.len()
                         }

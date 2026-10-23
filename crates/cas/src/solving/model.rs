@@ -131,6 +131,8 @@ pub enum PredicateSplitMode {
     RealSigns,
     /// Eliminate an earlier exact cover.
     EliminateCover,
+    /// Retain a checked empty region as a complete empty solution piece.
+    EmptyRegion,
 }
 
 /// `BinomialMode` discriminator with a stable explicit encoding.
@@ -866,7 +868,7 @@ pub struct CertificateSolutionTransport<R = Handle> {
 pub struct CertificateTotalPredicateSplit<R = Handle> {
     /// Closed schema mode.
     pub mode: PredicateSplitMode,
-    /// Explicit expression.
+    /// Split expression, or the exact original predicate for an empty piece.
     pub expression: R,
     /// Exact coefficient region.
     pub region: R,
@@ -874,7 +876,7 @@ pub struct CertificateTotalPredicateSplit<R = Handle> {
     pub children: Vec<R>,
     /// Ordered branches entries.
     pub branches: Vec<u32>,
-    /// Explicit cover.
+    /// Checked cover, or the exact empty-region premise in `EmptyRegion` mode.
     pub cover: Option<u32>,
 }
 
