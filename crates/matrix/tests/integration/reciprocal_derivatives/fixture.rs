@@ -33,8 +33,8 @@ pub(crate) struct Prepared {
 /// Measured exact preparation plus five complete live import/evaluation/access uses.
 pub(crate) fn policy() -> Limits {
     Limits {
-        work: 8_314_366 + 5 * (476_745 + 213 + 2),
-        replay_work: 8_314_366 + 5 * (476_745 + 213 + 2),
+        work: 6_443_904 + 5 * (476_745 + 213 + 2),
+        replay_work: 6_443_904 + 5 * (476_745 + 213 + 2),
         ..Limits::default()
     }
 }

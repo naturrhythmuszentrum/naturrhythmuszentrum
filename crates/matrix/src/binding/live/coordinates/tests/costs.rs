@@ -112,7 +112,7 @@ impl Numerical {
 /// Measured Work, staged bytes and output bytes for the immutable default-profile live fixture.
 pub(super) const fn profiles() -> [[u64; 3]; 6] {
     [
-        [305_746, 153_713, 60_522],
+        [226_798, 153_713, 60_522],
         [41_874, 60_778, 60_986],
         [38_801, 61_242, 61_450],
         [38_849, 122_212, 122_388],

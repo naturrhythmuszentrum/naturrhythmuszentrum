@@ -160,7 +160,7 @@ fn lc_coefficient_transport_boundaries() -> TestResult {
     }
     assert_eq!(
         measurements,
-        vec![(0, 5_026, 3_600), (1, 16_367, 10_510), (2, 12_999, 9_562)]
+        vec![(0, 5_026, 3_600), (1, 13_339, 10_510), (2, 10_515, 9_562)]
     );
     Ok(())
 }

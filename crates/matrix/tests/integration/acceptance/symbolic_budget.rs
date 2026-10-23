@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The unreduced ladder exposes the current caller-inaccessible symbolic sensitivity budget.
+//! The unreduced ladder exhausts witness replay under the integrated default symbolic policy.
+
+#[path = "symbolic_budget/limits.rs"]
+mod limits;
 
 use super::{oracle, support::ResultOf};
 use nrz_bindings::{Descriptor, SensitivityError};
@@ -9,7 +12,7 @@ use nrz_matrix::{
     Value,
 };
 
-/// The full five-by-five system is exactly solvable but its dense symbolic derivative draft refuses.
+/// The full five-by-five system passes draft validation but exhausts default witness replay.
 /// ´test:integration:integrated-full-ladder-retains-symbolic-work-refusal´
 #[test]
 fn integrated_full_ladder_retains_symbolic_work_refusal() -> ResultOf {
@@ -36,13 +39,18 @@ fn integrated_full_ladder_retains_symbolic_work_refusal() -> ResultOf {
     let OperationError::Statistics(StatisticsError::Sensitivity(cause)) = cause else {
         return Err("expected public sensitivity refusal".into());
     };
-    let SensitivityError::Algebra(fault) = cause.as_ref() else {
-        return Err("expected symbolic work refusal".into());
+    let SensitivityError::Evidence(outcome) = cause.as_ref() else {
+        return Err("expected symbolic witness replay refusal".into());
     };
-    assert_eq!(fault.location.operation, "draft validation");
+    let nrz_bindings::readings::algebra::request::Outcome::Exhausted { fault, .. } =
+        outcome.as_ref()
+    else {
+        return Err("expected exhausted symbolic replay".into());
+    };
+    assert_eq!(fault.location.operation, "typed witness DAG");
     assert_eq!(
         format!("{:?}", fault.kind),
-        "Exhausted { reason: Limit, budget: Work, limit: 2000000, needed: 2000857 }"
+        "Exhausted { reason: Limit, budget: ReplayWork, limit: 2000000, needed: 2000003 }"
     );
     assert_eq!(heap.provenance_usage().records(), 0);
     Ok(())

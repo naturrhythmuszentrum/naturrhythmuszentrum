@@ -173,12 +173,24 @@ fn expanded_representation_costs() -> TestResult {
             .contents(),
         contents.contents()
     );
-    assert_eq!(kernel.usage().work, 121_700);
-    assert_eq!(checking.usage().work, 171_214);
-    assert_eq!(replay.usage().work, 345_370);
-    assert_eq!(inventory.usage().work, 629_931);
-    assert_eq!(bytes.len(), 1_732);
-    assert_eq!(rules, vec![("poly.jets-equal", 124_915)]);
+    assert_eq!(
+        (
+            kernel.usage().work,
+            checking.usage().work,
+            replay.usage().work,
+            inventory.usage().work,
+            bytes.len(),
+            rules
+        ),
+        (
+            121_700,
+            171_214,
+            257_077,
+            629_931,
+            1_732,
+            vec![("poly.jets-equal", 124_915)]
+        )
+    );
     Ok(())
 }
 

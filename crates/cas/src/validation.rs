@@ -93,12 +93,10 @@ fn extent_parameters(
     };
     for extent in [rows, columns] {
         if let crate::model::Extent::Parameter(key) = extent {
-            let cost = size(environment.declarations.len(), AT)?
-                .checked_mul(budget.limits().name_bytes)
-                .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
-            budget.work(cost, AT)?;
-            if !environment.declarations.iter().any(|declaration| {
-                declaration.key == *key && declaration.sort == Sort::Value(AtomicSort::Integer)
+            let index =
+                crate::header::declaration_index(&environment.declarations, key, budget, AT)?;
+            if index.is_none_or(|index| {
+                environment.declarations[index].sort != Sort::Value(AtomicSort::Integer)
             }) {
                 return Err(Fault::invalid(InvalidCode::Scope, AT));
             }
@@ -312,26 +310,27 @@ pub(crate) fn environment(value: &Environment, budget: &mut Budget) -> Result<En
     field(&value.field, budget)?;
     let count = size(value.declarations.len(), AT)?;
     budget.check(BudgetKind::Vertices, count, AT)?;
-    let cost = count
-        .checked_mul(count)
-        .and_then(|n| n.checked_mul(budget.limits().name_bytes))
-        .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
-    budget.work(cost, AT)?;
+
     let mut out = Encoder::new(budget, AT);
     encoding::environment(value, &mut out)?;
     let encoded = out.finish();
     budget.work(size(encoded.len(), AT)?, AT)?;
     let mut canonical = value.clone();
-    canonical
-        .declarations
-        .sort_by(|left, right| left.key.cmp(&right.key));
-    let mut keys = BTreeSet::new();
+    crate::header::sort_declarations(&mut canonical.declarations, budget, AT)?;
+    budget.work(
+        count
+            .checked_mul(budget.limits().name_bytes)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
+        AT,
+    )?;
+    let mut previous = None;
     for declaration in &canonical.declarations {
         declared_sort(&declaration.sort, budget)?;
         sort_extents(&declaration.sort, &canonical, budget)?;
-        if declaration.key.is_empty() || !keys.insert(&declaration.key) {
+        if declaration.key.is_empty() || previous == Some(&declaration.key) {
             return Err(Fault::invalid(InvalidCode::Context, AT));
         }
+        previous = Some(&declaration.key);
     }
     if matches!(canonical.field, Field::PositiveCharacteristic(0 | 1)) {
         return Err(Fault::invalid(InvalidCode::Context, AT));
@@ -349,18 +348,12 @@ pub(crate) fn condition(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     scope_limit(scope, budget)?;
-    let header = &state.header(context)?.bytes;
     let mut values = Vec::new();
     values
         .try_reserve_exact(arguments.len())
         .map_err(|_| Fault::allocation(AT))?;
     for argument in arguments {
-        budget.work(
-            size(header.len(), AT)?
-                .checked_add(1)
-                .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
-            AT,
-        )?;
+        budget.work(1, AT)?;
         let value = state.expression(*argument)?;
         if !crate::header::embeds(state, value.header, context, budget)? || value.scope != *scope {
             return Err(Fault::invalid(InvalidCode::Scope, AT));
@@ -440,15 +433,17 @@ pub(crate) fn expression(
             extent_parameters(slot, environment, budget)?;
         }
     }
-    let header = &state.header(context)?.bytes;
     let mut scope_key = Encoder::new(budget, AT);
     encoding::scope(&draft.scope, &mut scope_key)?;
     encoding::binding(draft.binding.as_ref(), &mut scope_key)?;
     encoding::sort(&draft.sort, &mut scope_key)?;
     let comparison_bytes = size(scope_key.finish().len(), AT)?;
     let charge = comparison_bytes
-        .checked_add(size(header.len(), AT)?)
-        .and_then(|n| n.checked_mul(size(operands.len(), AT).ok()?.checked_add(1)?))
+        .checked_mul(
+            size(operands.len(), AT)?
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
+        )
         .and_then(|n| n.checked_mul(8))
         .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
     budget.work(charge, AT)?;
@@ -459,12 +454,7 @@ pub(crate) fn expression(
     let mut depth = 1_u64;
     let mut unfolded = 1_u64;
     for (position, operand) in operands.iter().enumerate() {
-        budget.work(
-            size(header.len(), AT)?
-                .checked_add(1)
-                .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
-            AT,
-        )?;
+        budget.work(1, AT)?;
         let child = state.expression(*operand)?;
         if !crate::header::embeds(state, child.header, context, budget)? {
             return Err(Fault::invalid(InvalidCode::Context, AT));
@@ -743,18 +733,14 @@ fn operator_sorts(
             component_sorts(operator, result, children)
         }
         Operator::NamedCase(value) => {
-            children.len() == 1 && same && named_case_sort(value, result, scope, environment)
+            children.len() == 1
+                && same
+                && named_case_sort(value, result, scope, environment, budget)?
         }
         Operator::Rational(_) | Operator::Free(_) | Operator::Bound { .. } => {
             leaf_sort(operator, result, scope, environment, budget)? && children.is_empty()
         }
-        Operator::Constant(_) => {
-            children.is_empty()
-                && matches!(
-                    result,
-                    Sort::Value(AtomicSort::Scalar(Field::Real | Field::Complex))
-                )
-        }
+        Operator::Constant(_) => constant_sort(result, children),
         Operator::Neg
         | Operator::Add
         | Operator::Sub
@@ -762,15 +748,12 @@ fn operator_sorts(
         | Operator::Div
         | Operator::IntegerPower(_)
         | Operator::GeneralPower(_) => arithmetic_sorts(operator, result, children),
-        Operator::Call(key) => call_sorts(key, result, environment, children),
+        Operator::Call(key) => call_sorts(key, result, environment, children, budget)?,
         Operator::Derivative(key) => {
             children.len() == 1
                 && same
                 && matches!(result, Sort::Value(AtomicSort::Scalar(_)))
-                && environment
-                    .declarations
-                    .iter()
-                    .any(|declaration| declaration.key == *key && declaration.sort == *result)
+                && indexed_sort(environment, key, budget)?.is_some_and(|sort| *sort == *result)
         }
         Operator::IntegerEmbed => {
             children.len() == 1
@@ -792,10 +775,8 @@ fn operator_sorts(
             ..
         } => {
             *multiplicity != Some(0)
-                && environment.declarations.iter().any(|declaration| {
-                    declaration.key == *variable
-                        && matches!(declaration.sort, Sort::Value(AtomicSort::Scalar(_)))
-                })
+                && indexed_sort(environment, variable, budget)?
+                    .is_some_and(|sort| matches!(sort, Sort::Value(AtomicSort::Scalar(_))))
                 && calculus_sorts(operator, result, children)
         }
         Operator::Matrix { .. }
@@ -807,6 +788,15 @@ fn operator_sorts(
         | Operator::Entrywise(_) => matrix_sorts(operator, result, children, budget)?,
     };
     if valid { Ok(()) } else { Err(sort_error()) }
+}
+
+/// Named constants remain operand-free values in a real or complex scalar field.
+const fn constant_sort(result: &Sort, children: &[&Expression]) -> bool {
+    children.is_empty()
+        && matches!(
+            result,
+            Sort::Value(AtomicSort::Scalar(Field::Real | Field::Complex))
+        )
 }
 
 /// Total Complex component syntax keeps the original scalar arity and field checks.
@@ -856,14 +846,13 @@ fn named_case_sort(
     result: &Sort,
     scope: &Scope,
     environment: &Environment,
-) -> bool {
-    scope.is_empty()
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    Ok(scope.is_empty()
         && *result == Sort::Value(AtomicSort::Scalar(Field::Real))
         && (value.parameter.is_some() == (value.name == crate::boundary_model::CaseName::Step))
-        && environment
-            .declarations
-            .iter()
-            .any(|item| item.key == value.coordinate && item.sort == *result)
+        && indexed_sort(environment, &value.coordinate, budget)?
+            .is_some_and(|sort| *sort == *result))
 }
 
 /// Check the value carried by an operand-free literal or variable.
@@ -872,7 +861,7 @@ fn leaf_sort(
     result: &Sort,
     scope: &Scope,
     environment: &Environment,
-    budget: &Budget,
+    budget: &mut Budget,
 ) -> Result<bool, Fault> {
     Ok(match operator {
         Operator::Rational(value) => {
@@ -886,11 +875,8 @@ fn leaf_sort(
             }
         }
         Operator::Free(key) => {
-            let declaration = environment
-                .declarations
-                .iter()
-                .find(|declaration| declaration.key == *key);
-            if declaration.is_some_and(|declaration| declaration.sort != *result) {
+            let declaration = indexed_sort(environment, key, budget)?;
+            if declaration.is_some_and(|sort| *sort != *result) {
                 return Err(Fault::invalid(
                     InvalidCode::SymbolSortMismatch,
                     Location::new("declared symbol sort"),
@@ -925,21 +911,35 @@ fn call_sorts(
     result: &Sort,
     environment: &Environment,
     children: &[&Expression],
-) -> bool {
-    environment.declarations.iter().any(|declaration| {
-        if declaration.key != key {
-            return false;
-        }
-        let Sort::Function { inputs, output } = &declaration.sort else {
-            return false;
-        };
-        inputs.len() == children.len()
-            && *result == Sort::Value(output.clone())
-            && inputs
-                .iter()
-                .zip(children)
-                .all(|(input, child)| child.sort == Sort::Value(input.clone()))
-    })
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    let Some(Sort::Function { inputs, output }) = indexed_sort(environment, key, budget)? else {
+        return Ok(false);
+    };
+    Ok(inputs.len() == children.len()
+        && *result == Sort::Value(output.clone())
+        && inputs
+            .iter()
+            .zip(children)
+            .all(|(input, child)| child.sort == Sort::Value(input.clone())))
+}
+
+/// Prepay canonical key lookup and the selected signature before any structural comparison.
+fn indexed_sort<'a>(
+    environment: &'a Environment,
+    key: &str,
+    budget: &mut Budget,
+) -> Result<Option<&'a Sort>, Fault> {
+    let Some(index) = crate::header::declaration_index(&environment.declarations, key, budget, AT)?
+    else {
+        return Ok(None);
+    };
+    let sort = &environment.declarations[index].sort;
+    let mut encoded = Encoder::new(budget, AT);
+    encoding::sort(sort, &mut encoded)?;
+    let bytes = size(encoded.finish().len(), AT)?;
+    budget.work(bytes, AT)?;
+    Ok(Some(sort))
 }
 
 /// Check the shape of a represented calculus request without executing it.

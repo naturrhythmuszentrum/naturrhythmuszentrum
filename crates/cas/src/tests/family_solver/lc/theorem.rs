@@ -24,7 +24,7 @@ fn generation(work: u64, arithmetic_steps: u64, denominator_factors: u64) -> Bud
 
 fn replay() -> BudgetUsage {
     BudgetUsage {
-        work: 1_464_494,
+        work: 1_433_783,
         arithmetic_steps: 15_576,
         condition_steps: 43,
         case_arms: 1,
@@ -60,9 +60,10 @@ fn lc_original_root_factor_theorem_replays() -> TestResult {
         .export_witness(&coverage, &mut super::ledger()?)?;
     let mut checking = super::ledger()?;
     super::replay::fresh(&source.cas, &answer.set, &bytes, &mut checking)?;
-    assert_eq!(usage, generation(838_465, 3_350, 4));
-    assert_eq!(checking.usage(), replay());
-    assert_eq!(bytes.len(), 6_140);
+    assert_eq!(
+        (usage, checking.usage(), bytes.len()),
+        (generation(809_206, 3_350, 4), replay(), 6_140)
+    );
     Ok(())
 }
 
@@ -97,41 +98,46 @@ fn lc_root_theorem_separate_ledgers() -> TestResult {
             )
         })
         .collect();
-    assert_eq!(proposal.usage(), generation(301_736, 3_346, 2));
     assert_eq!(
-        checking.usage(),
-        BudgetUsage {
-            work: 1_149_109,
-            arithmetic_steps: 15_810,
-            condition_steps: 53,
-            coefficient_ops: 19_717,
-            denominator_factors: 2,
-            tower_reductions: 1,
-            gcd_steps: 88,
-            selection_slots: 1,
-            solve_identities: 4,
-            isolation_steps: 10,
-            ..BudgetUsage::default()
-        }
-    );
-    assert_eq!(imported.usage(), replay());
-    assert_eq!(bytes.len(), 6_140);
-    assert_eq!(
-        rules,
-        vec![
-            ("real.sign", 1_430),
-            ("extension.unit", 9_484),
-            ("real.sign", 5_082),
-            ("real.sign", 858),
-            ("extension.unit", 9_490),
-            ("extension.adjoin", 1_595),
-            ("region.construct", 556),
-            ("ctx.weaken", 3_354),
-            ("ctx.weaken", 4_042),
-            ("root.select", 191_321),
-            ("coeff.identity", 51_019),
-            ("solve.product", 93_427),
-        ]
+        (
+            proposal.usage(),
+            checking.usage(),
+            imported.usage(),
+            bytes.len(),
+            rules
+        ),
+        (
+            generation(272_477, 3_346, 2),
+            BudgetUsage {
+                work: 1_149_109,
+                arithmetic_steps: 15_810,
+                condition_steps: 53,
+                coefficient_ops: 19_717,
+                denominator_factors: 2,
+                tower_reductions: 1,
+                gcd_steps: 88,
+                selection_slots: 1,
+                solve_identities: 4,
+                isolation_steps: 10,
+                ..BudgetUsage::default()
+            },
+            replay(),
+            6_140,
+            vec![
+                ("real.sign", 1_430),
+                ("extension.unit", 9_484),
+                ("real.sign", 5_082),
+                ("real.sign", 858),
+                ("extension.unit", 9_490),
+                ("extension.adjoin", 1_595),
+                ("region.construct", 556),
+                ("ctx.weaken", 3_354),
+                ("ctx.weaken", 4_042),
+                ("root.select", 191_321),
+                ("coeff.identity", 51_019),
+                ("solve.product", 93_427),
+            ]
+        )
     );
     Ok(())
 }

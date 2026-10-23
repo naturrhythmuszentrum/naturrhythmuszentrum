@@ -10,6 +10,10 @@ use nrz_bindings::{Budget, Limits};
 /// ´test:integration:coordinate-normalization-resource-boundaries´
 #[test]
 fn coordinate_normalization_resource_boundaries() -> TestResult {
+    let measured = (0..7)
+        .map(|index| attempt(index, Limits::default(), 0))
+        .collect::<TestResult<Vec<_>>>()?;
+    assert_eq!(measured, profiles().map(|profile| profile[0]));
     for (index, [work, staged, _]) in profiles().into_iter().enumerate() {
         let operation = u32::try_from(index)?;
         assert_eq!(attempt(operation, Limits::default(), 0)?, work);
@@ -141,10 +145,10 @@ fn coordinate_normalization_output_boundaries() -> TestResult {
 /// Measured default-profile Work, staged bytes and output bytes for the independent mixed reference fixture.
 const fn profiles() -> [[u64; 3]; 7] {
     [
-        [285_787, 72_030, 15_664],
-        [97_953, 65_062, 23_961],
-        [95_905, 65_062, 23_961],
-        [232_979, 81_838, 42_964],
+        [278_545, 72_030, 15_664],
+        [97_035, 65_062, 23_961],
+        [94_987, 65_062, 23_961],
+        [231_905, 81_838, 42_964],
         [71_487, 65_190, 3_327],
         [1_024, 24_689, 560],
         [19, 16, 0],

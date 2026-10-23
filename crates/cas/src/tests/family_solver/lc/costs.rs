@@ -47,15 +47,17 @@ fn lc_replay_work_attribution() -> TestResult {
         rows.iter().map(|row| row.work).sum::<u64>(),
         budget.usage().work
     );
-    assert_eq!(totals(rows.iter())?, [221_241, 75_578, 74_839, 1_092_836]);
-    for (rule, expected) in [
-        ("root.select", [190_520, 129, 672, 0]),
-        ("solve.product", [30_721, 61_906, 800, 0]),
-    ] {
-        assert_eq!(
-            totals(rows.iter().filter(|row| row.rule == rule))?,
-            expected
-        );
-    }
+    assert_eq!(
+        [
+            totals(rows.iter())?,
+            totals(rows.iter().filter(|row| row.rule == "root.select"))?,
+            totals(rows.iter().filter(|row| row.rule == "solve.product"))?
+        ],
+        [
+            [221_241, 75_578, 74_839, 1_062_125],
+            [190_520, 129, 672, 0],
+            [30_721, 61_906, 800, 0]
+        ]
+    );
     Ok(())
 }

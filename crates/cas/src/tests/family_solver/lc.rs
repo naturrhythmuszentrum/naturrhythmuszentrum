@@ -51,7 +51,7 @@ fn lc_original_coefficient_equality_replays() -> TestResult {
             replay.usage().work,
             bytes.len()
         ),
-        (101_354, 830_857, 405_403, 2_479)
+        (101_354, 817_786, 392_332, 2_479)
     );
     Ok(())
 }
@@ -72,8 +72,9 @@ fn lc_original_missing_domain_refuses() -> TestResult {
             crate::Location::new("solving object admission")
         )
     );
-    assert_eq!(usage.work, 8_563);
-    for (signs, work) in [([0, 1], 447_073), ([1, 0], 444_665)] {
+    let domain_work = usage.work;
+    let mut sign_work = Vec::new();
+    for signs in [[0, 1], [1, 0]] {
         let (mut source, request) = fixture::request(signs, true)?;
         let outcome = source.cas.run(&request);
         let Outcome::Unresolved {
@@ -88,8 +89,12 @@ fn lc_original_missing_domain_refuses() -> TestResult {
             solve_reason,
             Some(crate::solving::SolveReason::MissingUnitProof)
         );
-        assert_eq!(usage.work, work);
+        sign_work.push((signs, usage.work));
     }
+    assert_eq!(
+        (domain_work, sign_work),
+        (8_563, vec![([0, 1], 447_073), ([1, 0], 444_665)])
+    );
     Ok(())
 }
 
