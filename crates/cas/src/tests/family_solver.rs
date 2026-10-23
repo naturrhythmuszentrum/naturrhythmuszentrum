@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original mixed source requests with independent replay and retained declarations.
 
+mod citations;
 mod closure;
 mod cover;
 mod empty;

@@ -239,3 +239,48 @@ fn family_emptiness_resource_measurements() -> TestResult {
     );
     Ok(())
 }
+
+/// Empty family coverage cites both versioned rules and the exact empty-region premise kind.
+/// ´test:crate:empty-family-formal-citations-match-checker´
+#[test]
+fn empty_family_formal_citations_match_checker() -> TestResult {
+    let (mut fixture, problem, _, steps) = setup()?;
+    let witness = empty_witness(&mut fixture, &steps)?;
+    let piece =
+        fixture
+            .cas
+            .family_empty_piece(&problem, &witness, &mut ledger()?, &mut ledger()?)?;
+    let bytes = fixture
+        .cas
+        .export_witness(&piece.coverage, &mut ledger()?)?;
+    let mut fresh = crate::Cas::new(Limits::blind_cubic())?;
+    let (checked, observations) =
+        crate::testing::replay_answer::measured(|| Ok(fresh.inspect(&bytes, &mut ledger()?)?))?;
+    let citations = fresh.proof_citations(checked.proof(), &mut ledger()?)?;
+    let actual: Vec<_> = citations
+        .iter()
+        .map(|row| {
+            let lemma = row.formal_schema().lemma;
+            (lemma.name, lemma.version)
+        })
+        .collect();
+    assert_eq!(
+        actual,
+        [
+            ("region.construct", 1),
+            ("region.decide", 2),
+            ("solve.split", 2)
+        ]
+    );
+    assert_eq!(
+        citations
+            .iter()
+            .map(|row| row.primitive)
+            .collect::<Vec<_>>(),
+        observations.iter().map(|row| row.rule).collect::<Vec<_>>()
+    );
+    for premise in citations.iter().flat_map(|row| &row.premises) {
+        assert_eq!(premise.kind, crate::proof::HypothesisKind::EmptyRegion);
+    }
+    Ok(())
+}

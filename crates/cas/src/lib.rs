@@ -63,6 +63,7 @@ mod polynomial;
         unreachable_pub"
 )]
 mod proof_check;
+mod proof_citations;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \

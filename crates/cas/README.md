@@ -604,6 +604,14 @@ Formal hypothesis `hyp.germ-evidence`, version 1. The original function has the 
 
 Formal hypothesis `hyp.split-evidence`, version 1. The original function has the stated finite integral or sum. Required premises: Exact function, domain or inclusive integer range and endpoint value.
 
+## Checked proof citations · `sec:cas:proof-citations`
+
+`Cas::proof_citations(witness.proof(),budget)` lists every reachable checked application once in local child-before-parent admission order. Each `ProofCitation` exposes the actual primitive and its `formal_schema`, the ordered direct premise handles and formal kinds, the complete qualified assumption closure retained by that application, and every open residual kind. A shared earlier proof has one list entry and retains all its incoming premise edges. Inline checks inside a certificate remain part of their owning primitive's contract.
+
+The query authenticates the proof handle and reads graph-owned applications. It never trusts a caller-supplied primitive, recomputes a theorem, clones a certificate or publishes a record. Scalar and native applications use the same citation interface. Metadata copies grant no proof authority. Frame closure can replace a local assumption by an open residual; both collections must be empty before a consumer treats a conclusion as independent of assumptions. A proved premise's kind describes its mathematical shape and does not itself add an assumption.
+
+Extraction visits only reachable proof edges. It prepays each visited-set scan, one Work per edge or inspected metadata item, the square of the reachable-node count for sorting, scalar root-frame visits and full provenance-key comparisons. Every reserved vector element adds its byte size to Work and to a conservative simultaneous staged/output reservation that includes traversal scratch. Caller and store ceilings intersect without resetting prior Work; refusals leave the graph unchanged. Primitive versions, checker behavior, witness bytes and existing construction/replay pins are unchanged.
+
 ## Main concepts and types · `sec:cas:concepts`
 
 `Cas` is an owned exact graph; its `Handle` and `Reference` values retain store identity. `Rational` and `ExactConstant` support bounded exact arithmetic, with `PositiveConstant` witnessing admitted strict positivity. For example, the LC coefficient product remains an exact rational before any numerical import:

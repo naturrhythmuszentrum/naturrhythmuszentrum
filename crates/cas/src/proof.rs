@@ -22,6 +22,7 @@ pub use crate::hypothesis_kinds::{
 };
 pub use crate::lemma_cache::{ANONYMOUS_LEMMA_SCHEMA, AnonymousLemmaCache};
 pub use crate::multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};
+pub use crate::proof_citations::{PremiseCitation, ProofCitation};
 pub use crate::rule::{
     CertificateSchema, ConclusionKind, PRIMITIVES, PremiseShape, Primitive, RuleSpec,
 };

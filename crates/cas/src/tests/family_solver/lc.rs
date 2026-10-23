@@ -2,6 +2,7 @@
 //! The original determinant retains strict divisors through checked coefficient transport.
 
 mod cache;
+mod citations;
 mod costs;
 mod exclusion;
 mod exclusion_empty;
