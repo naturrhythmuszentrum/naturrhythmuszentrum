@@ -17,6 +17,9 @@
 
 pub use crate::conditions::{ConditionStatus, GuardKind};
 pub use crate::formal_register::{PRIMITIVE_SCHEMAS, PrimitiveSchema};
+pub use crate::hypothesis_kinds::{
+    HYPOTHESIS_KINDS, HYPOTHESIS_SCHEMAS, HypothesisKind, QualifiedHypothesis,
+};
 pub use crate::lemma_cache::{ANONYMOUS_LEMMA_SCHEMA, AnonymousLemmaCache};
 pub use crate::multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};
 pub use crate::rule::{

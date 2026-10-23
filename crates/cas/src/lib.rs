@@ -49,6 +49,7 @@ mod formal_register;
         unreachable_pub"
 )]
 mod graph;
+mod hypothesis_kinds;
 mod model;
 #[expect(
     clippy::redundant_pub_crate,

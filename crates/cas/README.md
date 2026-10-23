@@ -34,7 +34,7 @@ Compact empty-region certificates use one child-before-parent DAG of checked-cov
 
 `proof::EMPTY_SCHEMAS` gives each formal emptiness lemma and hypothesis kind a name, semantic version, estate label, statement and premise shapes. Applications remain anonymous: their identity retains the complete original statement, declarations, context, stratum, premises, representation and proof revision. A formal schema name never substitutes for that instance identity. Qualified hypothesis frames and slots retain the original assumptions.
 
-The register describes the existing cover, sign, factor and lemma checks together with the zero-set and monomial exclusion inferences. Its metadata grants no proof authority: the closed checker reconstructs each application and retains its complete conditions. The complete primitive register follows; other hypothesis kinds remain separate.
+The register describes the existing cover, sign, factor and lemma checks together with the zero-set and monomial exclusion inferences. Its metadata grants no proof authority: the closed checker reconstructs each application and retains its complete conditions. The complete primitive register follows; the formal hypothesis-kind register names the retained premise shapes.
 
 **Theorem (Empty split)** · `thm:cas:empty-split`
 
@@ -415,6 +415,194 @@ Formal primitive `solve.substitute`, version 1. Checked inverse coordinate maps 
 **Theorem (Primitive sum.case-split)** · `thm:cas:primitive-sum-case-split`
 
 Formal primitive `sum.case-split`, version 1. A complete finite inclusive integer partition sums to the checked forward-difference endpoint expression. Required premises: No ordered proof premises; complete range cover, exact forward differences and endpoint certificates.
+
+## Formal hypothesis kinds · `sec:cas:hypothesis-kinds`
+
+`proof::HYPOTHESIS_SCHEMAS` names every `HypothesisKind` with an `assum` label. Exhaustive matches classify every `PremiseShape`, every predicate constructor and every outer typed statement. Exact arities remain in `PremiseShape::Exact` and `PremiseShape::AtLeast`; a kind never replaces an ordered slot or its original statement. Solving and distribution subtypes retain their full existing typed certificate contracts.
+
+`HypothesisRef::qualified` pairs its exact frame and slot with the kind reconstructed from the retained predicate. Root slot zero is a predicate; local slot zero is the region-membership binder. A literal-zero equality has the declared-zero kind, while an arbitrary equality keeps the equality kind. Conjunctions and negations keep their original outer kind; inspection does not flatten or prove them. Foreign frames and absent slots refuse. `Cas::predicate_hypothesis_kind` and `Cas::statement_hypothesis_kind` inspect syntax without conferring truth.
+
+Kinds are derived views of the existing qualified records, so no redundant kind tag is serialized or trusted. Inspection reads a bounded number of records, allocates no payload and charges no logical Work, like the existing direct graph accessors. No proof, replay or consumer pin changes. A kind describes an assumed premise shape; a checked instance can supply evidence for that shape without making its conclusion depend on a new assumption.
+
+**Assumption (Hypothesis domain guard)** · `assum:cas:hyp-domain-guard`
+
+Formal hypothesis `hyp.domain-guard`, version 1. The original operands are defined on the stated region. Required premises: Exact original operands, context, scope and region.
+
+**Assumption (Hypothesis nonzero)** · `assum:cas:hyp-nonzero`
+
+Formal hypothesis `hyp.nonzero`, version 1. The exact scalar subject is defined and nonzero. Required premises: Original subject and qualified containing region.
+
+**Assumption (Hypothesis strict sign)** · `assum:cas:hyp-strict-sign`
+
+Formal hypothesis `hyp.strict-sign`, version 1. The exact Real subject is strictly positive or strictly negative. Required premises: Original Real subject, stated sign and qualified containing region.
+
+**Assumption (Hypothesis nonnegative)** · `assum:cas:hyp-nonnegative`
+
+Formal hypothesis `hyp.nonnegative`, version 1. The exact Real subject is nonnegative. Required premises: Original Real subject and qualified containing region.
+
+**Assumption (Hypothesis integer range)** · `assum:cas:hyp-integer-range`
+
+Formal hypothesis `hyp.integer-range`, version 1. The exact integer belongs to the stated half-open interval. Required premises: Original integer expression and exact interval bounds.
+
+**Assumption (Hypothesis differentiable)** · `assum:cas:hyp-differentiable`
+
+Formal hypothesis `hyp.differentiable`, version 1. The original function has the stated differentiability. Required premises: Exact function, coordinate, order and region.
+
+**Assumption (Hypothesis equality)** · `assum:cas:hyp-equality`
+
+Formal hypothesis `hyp.equality`, version 1. The two exact expressions agree under the stated definedness contract. Required premises: Original endpoints, context and domain with their definedness requirements.
+
+**Assumption (Hypothesis declared zero)** · `assum:cas:hyp-declared-zero`
+
+Formal hypothesis `hyp.declared-zero`, version 1. The exact subject equals zero. Required premises: Original equality operands with an exact rational zero, or a scalar zero-sign conclusion, on the qualified region.
+
+**Assumption (Hypothesis symmetric)** · `assum:cas:hyp-symmetric`
+
+Formal hypothesis `hyp.symmetric`, version 1. The original matrix is symmetric. Required premises: Exact ordered matrix expression and declaration snapshot.
+
+**Assumption (Hypothesis conjunction)** · `assum:cas:hyp-conjunction`
+
+Formal hypothesis `hyp.conjunction`, version 1. Every retained conjunct holds. Required premises: The complete original ordered predicate operands.
+
+**Assumption (Hypothesis disjunction)** · `assum:cas:hyp-disjunction`
+
+Formal hypothesis `hyp.disjunction`, version 1. At least one retained disjunct holds. Required premises: The complete original ordered predicate operands.
+
+**Assumption (Hypothesis negation)** · `assum:cas:hyp-negation`
+
+Formal hypothesis `hyp.negation`, version 1. The retained predicate is false. Required premises: The exact original predicate and its qualified region.
+
+**Assumption (Hypothesis universal)** · `assum:cas:hyp-universal`
+
+Formal hypothesis `hyp.universal`, version 1. The retained predicate holds for all values of its declared binders. Required premises: Exact binder sorts, body and outer scope.
+
+**Assumption (Hypothesis named)** · `assum:cas:hyp-named`
+
+Formal hypothesis `hyp.named`, version 1. The explicitly named mathematical predicate is assumed true. Required premises: Exact predicate name, ordered arguments and introducing frame.
+
+**Assumption (Hypothesis boolean)** · `assum:cas:hyp-boolean`
+
+Formal hypothesis `hyp.boolean`, version 1. The exact Boolean expression is defined and true. Required premises: Original Boolean expression, declaration snapshot and region.
+
+**Assumption (Hypothesis region membership)** · `assum:cas:hyp-region-membership`
+
+Formal hypothesis `hyp.region-membership`, version 1. Every point of the stated source region belongs to the exact containing region. Required premises: Exact source and containing regions, including the local membership binder when used.
+
+**Assumption (Hypothesis empty region)** · `assum:cas:hyp-empty-region`
+
+Formal hypothesis `hyp.empty-region`, version 1. The stated region has no assignments under the retained conditions. Required premises: Exact region and complete qualified conditions.
+
+**Assumption (Hypothesis cover)** · `assum:cas:hyp-cover`
+
+Formal hypothesis `hyp.cover`, version 1. Every point of the exact domain belongs to a retained cover member. Required premises: Complete exact domain and unordered member inventory.
+
+**Assumption (Hypothesis disjoint)** · `assum:cas:hyp-disjoint`
+
+Formal hypothesis `hyp.disjoint`, version 1. The two exact regions have empty intersection. Required premises: Both original regions under the same qualified interpretation.
+
+**Assumption (Hypothesis constructor)** · `assum:cas:hyp-constructor`
+
+Formal hypothesis `hyp.constructor`, version 1. The retained region satisfies its exact defining membership law. Required premises: Original region constructor and stated law.
+
+**Assumption (Hypothesis defined domain)** · `assum:cas:hyp-defined-domain`
+
+Formal hypothesis `hyp.defined-domain`, version 1. The original function is defined on exactly the stated domain. Required premises: Original function and exact region, including every operand requirement.
+
+**Assumption (Hypothesis compatibility)** · `assum:cas:hyp-compatibility`
+
+Formal hypothesis `hyp.compatibility`, version 1. The two original case associations agree in value and definedness on their overlap. Required premises: Exact associations and stated overlap region.
+
+**Assumption (Hypothesis elaboration)** · `assum:cas:hyp-elaboration`
+
+Formal hypothesis `hyp.elaboration`, version 1. The ordered source form elaborates to the stated native expression. Required premises: Complete source form, result and exact defined domain.
+
+**Assumption (Hypothesis incidence)** · `assum:cas:hyp-incidence`
+
+Formal hypothesis `hyp.incidence`, version 1. The stated side of a boundary has the exact incident neighborhood. Required premises: Original region, boundary, oriented side and neighborhood.
+
+**Assumption (Hypothesis ownership)** · `assum:cas:hyp-ownership`
+
+Formal hypothesis `hyp.ownership`, version 1. The exact function owns the stated point value or is absent there. Required premises: Original function, boundary and explicit presence or absence claim.
+
+**Assumption (Hypothesis derivative)** · `assum:cas:hyp-derivative`
+
+Formal hypothesis `hyp.derivative`, version 1. The stated expression is the derivative of the original function on the exact domain. Required premises: Original function, derivative, declared coordinate and domain.
+
+**Assumption (Hypothesis jacobian)** · `assum:cas:hyp-jacobian`
+
+Formal hypothesis `hyp.jacobian`, version 1. The ordered matrix contains the stated partial derivatives. Required premises: Original output column, matrix, ordered distinct coordinates and domain.
+
+**Assumption (Hypothesis square free)** · `assum:cas:hyp-square-free`
+
+Formal hypothesis `hyp.square-free`, version 1. The displayed layers reconstruct the polynomial with their exact multiplicities. Required premises: Original polynomial, factors, declared variable, coefficient field and domain.
+
+**Assumption (Hypothesis jet)** · `assum:cas:hyp-jet`
+
+Formal hypothesis `hyp.jet`, version 1. The original function has the stated oriented finite jet. Required premises: Exact region, boundary, side and ordered derivative values.
+
+**Assumption (Hypothesis jump)** · `assum:cas:hyp-jump`
+
+Formal hypothesis `hyp.jump`, version 1. The stated value is the right trace minus the left trace at the exact boundary. Required premises: Original function, boundary, derivative order and both actual traces.
+
+**Assumption (Hypothesis boundary partition)** · `assum:cas:hyp-boundary-partition`
+
+Formal hypothesis `hyp.boundary-partition`, version 1. The retained pieces form the stated complete finite boundary partition. Required premises: Complete selector pieces, point ownership and exact boundary inventory.
+
+**Assumption (Hypothesis case derivative)** · `assum:cas:hyp-case-derivative`
+
+Formal hypothesis `hyp.case-derivative`, version 1. The case has the stated positive-order classical derivative. Required premises: Original case, coordinate, order, domain and boundary evidence.
+
+**Assumption (Hypothesis derivative at)** · `assum:cas:hyp-derivative-at`
+
+Formal hypothesis `hyp.derivative-at`, version 1. The function has the stated classical derivative at its owned point. Required premises: Original function, point ownership and incident finite jets.
+
+**Assumption (Hypothesis derivative nonexistence)** · `assum:cas:hyp-derivative-nonexistence`
+
+Formal hypothesis `hyp.derivative-nonexistence`, version 1. The stated finite obstruction excludes the point derivative. Required premises: Original function, owned point and exact nonexistence evidence.
+
+**Assumption (Hypothesis trace)** · `assum:cas:hyp-trace`
+
+Formal hypothesis `hyp.trace`, version 1. The original function has the stated oriented trace. Required premises: Exact function, boundary, side, derivative order and value.
+
+**Assumption (Hypothesis solve evidence)** · `assum:cas:hyp-solve-evidence`
+
+Formal hypothesis `hyp.solve-evidence`, version 1. The retained typed solution, coefficient, root, family or Real fact holds. Required premises: The complete solving statement and ordered evidence selected by its certificate subtype and mode.
+
+**Assumption (Hypothesis distribution evidence)** · `assum:cas:hyp-distribution-evidence`
+
+Formal hypothesis `hyp.distribution-evidence`, version 1. The retained distribution or analytic fact holds in its exact declared space. Required premises: The complete typed statement and ordered evidence selected by its closed mode.
+
+**Assumption (Hypothesis boundary evidence)** · `assum:cas:hyp-boundary-evidence`
+
+Formal hypothesis `hyp.boundary-evidence`, version 1. The retained boundary-calculus facts hold with their exact oriented roles. Required premises: Exactly the ordered premises consumed by the closed boundary mode.
+
+**Assumption (Hypothesis case evidence)** · `assum:cas:hyp-case-evidence`
+
+Formal hypothesis `hyp.case-evidence`, version 1. The retained case facts hold on their exact regions. Required premises: Exactly the ordered premises consumed by the closed case mode.
+
+**Assumption (Hypothesis exact premises)** · `assum:cas:hyp-exact-premises`
+
+Formal hypothesis `hyp.exact-premises`, version 1. Every member of the exact ordered premise sequence holds. Required premises: Exactly the arity stored in the associated premise shape; each slot retains its typed statement and conditions.
+
+**Assumption (Hypothesis discharge premises)** · `assum:cas:hyp-discharge-premises`
+
+Formal hypothesis `hyp.discharge-premises`, version 1. The fixed premise prefix and every explicitly consumed discharge fact hold. Required premises: The minimum prefix arity stored in the associated premise shape, followed only by consumed evidence.
+
+**Assumption (Hypothesis jacobian cells)** · `assum:cas:hyp-jacobian-cells`
+
+Formal hypothesis `hyp.jacobian-cells`, version 1. Every ordered output and coordinate cell has its required derivative fact. Required premises: One derivative premise for every cell, with the original row and coordinate order.
+
+**Assumption (Hypothesis nonpositive)** · `assum:cas:hyp-nonpositive`
+
+Formal hypothesis `hyp.nonpositive`, version 1. The exact Real subject is nonpositive. Required premises: Original Real subject and qualified containing region.
+
+**Assumption (Hypothesis germ evidence)** · `assum:cas:hyp-germ-evidence`
+
+Formal hypothesis `hyp.germ-evidence`, version 1. The original function has the stated finite limit or series on its exact approach. Required premises: Exact function, boundary, approach, mode and finite coefficients or limit.
+
+**Assumption (Hypothesis split evidence)** · `assum:cas:hyp-split-evidence`
+
+Formal hypothesis `hyp.split-evidence`, version 1. The original function has the stated finite integral or sum. Required premises: Exact function, domain or inclusive integer range and endpoint value.
 
 ## Main concepts and types · `sec:cas:concepts`
 

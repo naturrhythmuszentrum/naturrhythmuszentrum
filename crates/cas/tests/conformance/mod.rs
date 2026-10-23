@@ -100,3 +100,5 @@ mod strict_sign;
 mod emptiness;
 
 mod formal_register;
+
+mod hypothesis_kinds;
