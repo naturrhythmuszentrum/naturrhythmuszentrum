@@ -71,11 +71,7 @@ pub(super) fn capture<P: Scalar + 'static>(
     let centers = heap.reading_entries(binding)?;
     let total = companion(heap, binding, CompanionKind::DeterministicBound)?;
     let error = companion(heap, binding, CompanionKind::NumericalError)?;
-    let coverage = if total.is_some() {
-        Coverage::DeclaredBounds
-    } else {
-        Coverage::RepresentedInputs
-    };
+    let coverage = binding.coverage(total.is_some());
     let zeros = || -> Result<Vec<P>, CoordinateError> {
         let mut result = crate::binding::buffer(count)?;
         result.resize(count, P::ZERO);

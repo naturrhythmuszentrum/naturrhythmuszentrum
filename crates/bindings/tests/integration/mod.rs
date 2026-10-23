@@ -22,3 +22,5 @@ mod readings;
 mod coordinate_normalization;
 mod lc_coordinates;
 mod lc_roots;
+
+mod phasor_blocks;

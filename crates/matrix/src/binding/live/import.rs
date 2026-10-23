@@ -13,6 +13,16 @@ use nrz_bindings::{Budget, readings::algebra::Cas};
 use nrz_scalar::Scalar;
 use std::rc::Rc;
 
+/// Exact operation and complete flattened source closure retained before result publication.
+pub(super) struct ImportProvenance {
+    /// Checked actual native operation and fresh output declaration.
+    pub(super) definition: nrz_bindings::readings::PhasorResultDefinition,
+    /// Every original source selection, including earlier result ancestors.
+    pub(super) sources: Vec<super::selected::SelectedReading>,
+    /// Original deterministic assurance scopes of the two product operands.
+    pub(super) coverage: [crate::Coverage; 2],
+}
+
 impl Heap {
     /// Admit all physical readings and their complete numerical entry universe together.
     ///
@@ -28,6 +38,26 @@ impl Heap {
         companions: Vec<crate::CompanionAdapter<usize>>,
         regions: &[ReadingRegion<P>],
         policy: DependencyPolicy,
+        budget: &mut Budget,
+    ) -> Result<ReadingImport<P>, LiveBindingError> {
+        self.import_readings_with_provenance(
+            graph, coverage, companions, regions, policy, None, budget,
+        )
+    }
+
+    /// A checked closed producer supplies its operation and source closure before any publication.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "same atomic import inputs plus sealed result provenance"
+    )]
+    pub(super) fn import_readings_with_provenance<P: Scalar + 'static>(
+        &mut self,
+        graph: Rc<Cas>,
+        coverage: ReadingCoverage<usize>,
+        companions: Vec<crate::CompanionAdapter<usize>>,
+        regions: &[ReadingRegion<P>],
+        policy: DependencyPolicy,
+        provenance: Option<ImportProvenance>,
         budget: &mut Budget,
     ) -> Result<ReadingImport<P>, LiveBindingError> {
         super::companions::check(&coverage, &companions, regions, budget)?;
@@ -49,7 +79,13 @@ impl Heap {
                 budget,
             )
         })?;
-        Rc::get_mut(&mut group).ok_or(HeapError::Capacity)?.copies = copies;
+        let mutable = Rc::get_mut(&mut group).ok_or(HeapError::Capacity)?;
+        mutable.copies = copies;
+        if let Some(provenance) = provenance {
+            mutable.antecedents = provenance.sources;
+            mutable.phasor_result = Some(provenance.definition);
+            mutable.phasor_inputs = Some(provenance.coverage);
+        }
         if regions.is_empty() {
             self.symbols.reserve_observer(self.limits.descriptors)?;
         }

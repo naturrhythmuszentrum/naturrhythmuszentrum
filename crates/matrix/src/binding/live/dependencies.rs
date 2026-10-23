@@ -52,8 +52,12 @@ pub(super) fn prepare(
     }
     let homogeneous = homogeneous(&graph, &coverage, budget)?;
     let mut companion_reads = Vec::new();
-    for companion in &companions {
-        companion_reads.push(graph.reading_dependencies(companion.companion().node(), budget)?);
+    // Whole-base writes already invalidate every reader before these fine inventories
+    // could be queried. Extract them only for the policy that consumes them.
+    if policy == DependencyPolicy::Entries {
+        for companion in &companions {
+            companion_reads.push(graph.reading_dependencies(companion.companion().node(), budget)?);
+        }
     }
     let states = (0..coverage.readings().len())
         .map(|_| Cell::new(SymbolState::Pending))
@@ -71,6 +75,9 @@ pub(super) fn prepare(
         companions,
         companion_reads,
         native: Vec::new(),
+        antecedents: Vec::new(),
+        phasor_result: None,
+        phasor_inputs: None,
         copies: Vec::new(),
     }))
 }

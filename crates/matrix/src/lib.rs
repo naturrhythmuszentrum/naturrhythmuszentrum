@@ -37,9 +37,10 @@ mod storage;
 pub use binding::{
     AffineAdapter, CompanionAdapter, CoordinateContract, CoordinateError, CoordinateNorm,
     CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket, LiveBindingError,
-    OperatorAdapter, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
-    ReadingImport, ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
-    ReciprocalDerivativeEvaluation,
+    OperatorAdapter, PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct,
+    PhasorPublication, PublishedPhasor, ReadingAdapter, ReadingAdapterError, ReadingBinding,
+    ReadingCoverage, ReadingImport, ReadingRegion, ReciprocalDerivativeContract,
+    ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
@@ -285,3 +286,11 @@ mod reading_testing;
     reason = "exact reading fixtures are shared across the corresponding test layers"
 )]
 mod copy_testing;
+
+#[cfg(test)]
+#[path = "testing/phasor.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "phasor source and publication fixtures are shared across test layers"
+)]
+mod phasor_testing;

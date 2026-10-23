@@ -26,6 +26,15 @@ impl SelectedReading {
     }
     /// Revalidate scope, occupation, schema, layout, precision and each covered entry version.
     pub(crate) fn validate(&self, heap: &Heap) -> Result<(), HeapError> {
+        self.validate_local(heap)?;
+        for source in &self.group.antecedents {
+            source.validate_local(heap)?;
+        }
+        Ok(())
+    }
+
+    /// A flattened source closure avoids recursive validation through prior result generations.
+    fn validate_local(&self, heap: &Heap) -> Result<(), HeapError> {
         if self.group.scope != heap.scope {
             return Err(HeapError::ForeignHandle);
         }

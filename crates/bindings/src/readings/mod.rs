@@ -12,6 +12,7 @@ mod maps;
 mod meaning;
 mod normalization;
 mod operations;
+mod phasor;
 mod projection;
 mod reciprocal;
 mod relation;
@@ -35,6 +36,9 @@ pub use nrz_cas as algebra;
 pub use operations::{
     AffineOperation, LinearOperator, OperatorApplication, OperatorCoefficient,
     ReadingOperationError,
+};
+pub use phasor::{
+    PhasorBlockCorrespondence, PhasorConjugation, PhasorConvention, PhasorResultDefinition,
 };
 pub use projection::{ProjectionSpace, ReadingProjection};
 pub use reciprocal::{

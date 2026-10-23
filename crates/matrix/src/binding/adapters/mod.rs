@@ -71,7 +71,7 @@ fn reserve<T>(count: usize, budget: &mut Budget) -> Result<Vec<T>, ReadingAdapte
 }
 
 /// Charge complete original physical metadata before an exact reading identity comparison.
-fn reading_work(
+pub(crate) fn reading_work(
     reading: &nrz_bindings::readings::PhysicalReading,
     budget: &mut Budget,
 ) -> Result<(), ReadingAdapterError> {

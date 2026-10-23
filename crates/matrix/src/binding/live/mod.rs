@@ -5,6 +5,10 @@ mod admission;
 mod bounded;
 pub(crate) mod companions;
 mod coordinates;
+mod phasor;
+pub use phasor::{
+    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PublishedPhasor,
+};
 mod derivatives;
 pub use derivatives::{
     ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
@@ -101,6 +105,28 @@ impl<P: Scalar> ReadingBinding<P> {
             .iter()
             .filter(|copy| copy.family() == self.reading().family().node())
     }
+    /// Actual checked product definition, when this reading was initialized by phasor publication.
+    #[must_use]
+    pub fn phasor_result(&self) -> Option<&nrz_bindings::readings::PhasorResultDefinition> {
+        self.group.phasor_result.as_ref()
+    }
+    /// Original operand assurance scopes retained by a published phasor result.
+    #[must_use]
+    pub fn phasor_input_coverage(&self) -> Option<[crate::Coverage; 2]> {
+        self.group.phasor_inputs
+    }
+    /// Derived numerical totals cannot upgrade represented inputs into declared physical bounds.
+    pub(crate) fn coverage(&self, declared: bool) -> crate::Coverage {
+        let inherited = self
+            .group
+            .phasor_inputs
+            .is_none_or(|inputs| inputs == [crate::Coverage::DeclaredBounds; 2]);
+        if declared && inherited {
+            crate::Coverage::DeclaredBounds
+        } else {
+            crate::Coverage::RepresentedInputs
+        }
+    }
     /// Transaction availability; published bindings still require live version checks.
     #[must_use]
     pub fn state(&self) -> SymbolState {
@@ -182,6 +208,12 @@ pub(crate) struct Group {
     pub(crate) copies: Vec<CopyDiscrepancy>,
     /// Native result companion tickets retained before general map lowering.
     pub(crate) native: Vec<companions::NativeCompanion>,
+    /// Flattened selected source closure of a checked published product.
+    pub(crate) antecedents: Vec<selected::SelectedReading>,
+    /// Actual checked operation that initialized a declared phasor result slot.
+    pub(crate) phasor_result: Option<nrz_bindings::readings::PhasorResultDefinition>,
+    /// Original operand assurance scopes, never promoted by generated numerical radii.
+    pub(crate) phasor_inputs: Option<[crate::Coverage; 2]>,
 }
 
 impl Group {

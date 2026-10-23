@@ -114,3 +114,10 @@ mod copy_testing;
     reason = "reciprocal fixtures are shared across public conformance and integration tests"
 )]
 mod reciprocal_testing;
+
+#[path = "../src/testing/phasor.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "phasor source and publication fixtures are shared across test layers"
+)]
+mod phasor_testing;
