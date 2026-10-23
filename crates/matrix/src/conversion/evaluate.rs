@@ -64,7 +64,11 @@ fn region<P: Scalar + 'static, Q: Scalar + 'static>(
             )?;
             centers.push(converted.center);
             totals.push(converted.total);
-            errors.push(converted.evaluation);
+            errors.push(map.propagate_error(
+                super::same_format(view.evaluation(row, column)?.unwrap_or(P::ZERO))?,
+                converted.evaluation,
+                context,
+            )?);
         }
     }
     Ok(Payload {

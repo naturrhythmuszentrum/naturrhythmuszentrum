@@ -37,6 +37,20 @@ impl<P: Scalar> LoweredMap<P> {
         })
     }
 
+    /// Propagate the earlier nominal-target error and add only this map's new discrepancy.
+    pub(crate) fn propagate_error(
+        &self,
+        prior: P,
+        discrepancy: P,
+        context: &ArithmeticContext,
+    ) -> Result<P, ConversionError> {
+        let magnitude = Nonnegative::new(self.scale.enclosure().abs().upper().get())?;
+        Ok(Nonnegative::new(prior)?
+            .scale(magnitude, context)?
+            .add(Nonnegative::new(discrepancy)?, context)?
+            .get())
+    }
+
     /// Enclose the exact affine image and propagate the old radius exactly once.
     pub(crate) fn evaluate(
         &self,
