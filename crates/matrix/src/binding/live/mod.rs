@@ -5,7 +5,11 @@ mod admission;
 mod bounded;
 pub(crate) mod companions;
 mod coordinates;
+mod parameters;
 mod phasor;
+pub use parameters::{
+    CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
+};
 pub use phasor::{
     PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PublishedPhasor,
 };

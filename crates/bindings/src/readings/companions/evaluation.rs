@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Numerical error in a companion parameter targets that parameter, not its physical values.
 
-use super::super::{ReadingError, maps, support};
+use super::super::{PhysicalReading, ReadingError, maps, support};
 use super::{CompanionReading, CompanionReadingError, parameters};
 use crate::{Descriptor, PairingWitness, UncertaintyMode};
 use nrz_cas::{Cas, Handle, limits::Budget, readings::AffineMap, syntax::Operator};
@@ -114,4 +114,75 @@ impl ParameterErrorReading {
     pub fn check_units(&self, actual: &[Descriptor]) -> Result<(), CompanionReadingError> {
         parameters::check_units(&self.units, actual)
     }
+}
+
+impl ParameterErrorReading {
+    /// Authenticate complete original parameter and parameter-error readings before execution.
+    ///
+    /// Stored output companion parameters cannot substitute for these original source symbols.
+    /// Both inputs must read their entire declared source in its original logical order.
+    /// # Errors
+    /// Refuses another source, selected copy, transformed parameter, unit or exact resource limit.
+    pub fn check_sources(
+        &self,
+        values: &PhysicalReading,
+        errors: &PhysicalReading,
+        budget: &mut Budget,
+    ) -> Result<(), CompanionReadingError> {
+        source_reading(values, self.source_target(), budget)?;
+        source_reading(errors, self.source(), budget)?;
+        if values.family().context() != &self.target.parameters.context
+            || errors.family().context() != &self.target.parameters.context
+            || values.entries().len() != self.target.parameters.units.len()
+            || errors.entries().len() != values.entries().len()
+        {
+            return Err(CompanionReadingError::Target);
+        }
+        for ((pairing, value), error) in self
+            .target
+            .parameters
+            .units
+            .iter()
+            .zip(values.entries())
+            .zip(errors.entries())
+        {
+            budget.work(1, support::AT)?;
+            let descriptor = pairing
+                .uncertainty_descriptor()
+                .ok_or(ReadingError::Meaning)?;
+            let expected =
+                PairingWitness::uncertainty(UncertaintyMode::Radius, descriptor, None, None)?;
+            if descriptor != value.descriptor()
+                || expected.uncertainty_descriptor() != Some(error.descriptor())
+            {
+                return Err(CompanionReadingError::Unit);
+            }
+        }
+        Ok(())
+    }
+}
+
+/// A complete source identity excludes output parameters and reordered or transformed readings.
+fn source_reading(
+    reading: &PhysicalReading,
+    expected: &Handle,
+    budget: &mut Budget,
+) -> Result<(), CompanionReadingError> {
+    let family = reading.family();
+    let count = u32::try_from(family.entries().len()).map_err(|_| ReadingError::Shape)?;
+    if family.root() != expected
+        || family.node() != expected
+        || reading.map() != &AffineMap::identity(count, budget)?
+        || reading.selection().indices().len() != family.entries().len()
+    {
+        return Err(CompanionReadingError::Target);
+    }
+    for (position, index) in reading.selection().indices().iter().enumerate() {
+        budget.work(1, support::AT)?;
+        let logical = u64::from(index.column) * u64::from(family.shape()[0]) + u64::from(index.row);
+        if u64::try_from(position).map_err(|_| ReadingError::Shape)? != logical {
+            return Err(CompanionReadingError::Target);
+        }
+    }
+    Ok(())
 }

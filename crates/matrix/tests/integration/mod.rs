@@ -75,4 +75,6 @@ mod reciprocal_sources;
 
 mod reciprocal_derivatives;
 
+mod companion_execution;
+
 mod phasor_execution;

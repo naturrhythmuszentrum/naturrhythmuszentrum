@@ -48,6 +48,7 @@ pub use error::OperationError;
 pub use lifecycle::{SymbolState, ValueBinding};
 pub use limits::ExecutionLimits;
 pub use live::{
+    CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
     CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, CopyDiscrepancy,
     DependencyPolicy, LiveBindingError, PhasorError, PhasorEvaluation, PhasorOperand,
     PhasorProduct, PhasorPublication, PublishedPhasor, ReadingBinding, ReadingImport,

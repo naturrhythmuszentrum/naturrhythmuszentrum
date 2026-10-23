@@ -35,9 +35,10 @@ mod shape;
 mod storage;
 
 pub use binding::{
-    AffineAdapter, CompanionAdapter, CoordinateContract, CoordinateError, CoordinateNorm,
-    CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket, LiveBindingError,
-    OperatorAdapter, PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct,
+    AffineAdapter, CompanionAdapter, CompanionEvaluation, CompanionExecution,
+    CompanionExecutionError, CompanionExecutionUsage, CoordinateContract, CoordinateError,
+    CoordinateNorm, CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket,
+    LiveBindingError, OperatorAdapter, PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct,
     PhasorPublication, PublishedPhasor, ReadingAdapter, ReadingAdapterError, ReadingBinding,
     ReadingCoverage, ReadingImport, ReadingRegion, ReciprocalDerivativeContract,
     ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,

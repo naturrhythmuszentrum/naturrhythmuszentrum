@@ -96,7 +96,12 @@ fn homogeneous(
             budget,
         ) {
             Ok(symbols) => result.push(Some(symbols)),
-            Err(nrz_bindings::AdmissionError::UnsupportedRecipe) => result.push(None),
+            // Noncoherent parameter measures remain valid general readings; only the
+            // optional coherent homogeneous recipe is unavailable for them.
+            Err(
+                nrz_bindings::AdmissionError::UnsupportedRecipe
+                | nrz_bindings::AdmissionError::ValueMismatch,
+            ) => result.push(None),
             Err(cause) => return Err(crate::HeapError::from(cause).into()),
         }
     }
