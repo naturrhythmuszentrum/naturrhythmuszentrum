@@ -65,8 +65,8 @@ pub use nrz_cas::{ExactConstant, PositiveConstant};
 pub use nrz_cas::limits::{Budget, Limits, LimitsOverride};
 
 pub use admission::{
-    AdmissionError, BindingSymbols, CompanionKind, CopyWitness, HomogeneousRecipe, QuantitySymbol,
-    SymbolBinding, SymbolKind,
+    AdmissionError, BindingSymbols, CompanionKind, CopyWitness, HomogeneousRecipe, ParameterEntry,
+    ParameterSymbol, ParameterTarget, QuantitySymbol, SymbolBinding, SymbolKind,
 };
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};

@@ -1,50 +1,165 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Numerical owner inventory matched to bindings-owned exact symbol relations.
+//! Total numerical entry coverage matched to bindings-owned exact symbol relations.
 
 use crate::heap::identity::Key;
 use crate::{Extent, Handle, Heap, HeapError, PublishedBundle, Value, ValueStamp};
 use nrz_bindings::{BindingSymbols, Budget, Descriptor, Limits, QuantitySymbol};
 use nrz_scalar::Scalar;
 
-/// One region version and its unique opaque symbol owner.
+/// A checked declaration covering every numerical entry of its allocation.
 #[derive(Clone, Debug)]
-pub(crate) struct Owner {
-    /// Exact descriptor occupation.
-    key: Key,
-    /// Value version, or exact target version for a companion.
-    stamp: ValueStamp,
-    /// Immutable bindings declaration.
-    symbol: QuantitySymbol,
+pub(crate) enum Sponsor {
+    /// Closed homogeneous recipe, covering the complete declared rectangle.
+    Homogeneous(QuantitySymbol),
+    /// Per-entry parameter meanings and their exact mathematical targets.
+    Parameter(nrz_bindings::ParameterSymbol),
+    /// Full checked entry universe with any number of proved overlapping readers.
+    Readings(std::rc::Rc<super::live::Group>),
 }
 
-/// Slot-indexed inventory; aliases resolve through their existing base owner.
+/// One allocation sponsor and the current version of each covered entry.
+#[derive(Clone, Debug)]
+pub(crate) struct RegionCover {
+    /// Actual descriptor occupation, independent of addresses.
+    pub(crate) key: Key,
+    /// Allocation sponsor revision, advanced by coarse replacement.
+    pub(crate) stamp: ValueStamp,
+    /// Complete semantic cover and the designated allocation sponsor.
+    pub(crate) sponsor: Sponsor,
+    /// Monotonic versions of the actual covered entries.
+    pub(crate) versions: Vec<std::cell::Cell<u64>>,
+    /// Additional readers admitted together with this allocation sponsor.
+    pub(crate) readers: Vec<std::rc::Rc<super::live::Group>>,
+}
+
+/// One coverage inventory for homogeneous recipes and general physical readings.
 #[derive(Debug, Default)]
-pub(crate) struct Owners {
-    /// Empty entries reserve metadata capacity without exposing planned values.
-    entries: Vec<Option<Owner>>,
+pub(crate) struct Inventory {
+    /// One full cover per occupied numerical allocation.
+    entries: Vec<Option<RegionCover>>,
+    /// Selected aliases retain the exact reading and all its structural dependencies.
+    selections: Vec<Option<(Key, super::live::selected::SelectedReading)>>,
+    /// Exact no-storage declarations still participate in structural invalidation.
+    observers: Vec<std::rc::Rc<super::live::Group>>,
 }
 
-impl Owners {
-    /// Require the one owner of this exact current region version.
-    pub(crate) fn get(&self, key: Key, stamp: ValueStamp) -> Result<&QuantitySymbol, HeapError> {
+impl Inventory {
+    /// A selected reading belongs to this inventory and resolves through its allocation sponsor.
+    pub(crate) fn selection(&self, key: Key) -> Option<&super::live::selected::SelectedReading> {
+        self.selections
+            .get(key.slot)
+            .and_then(Option::as_ref)
+            .filter(|(actual, _)| *actual == key)
+            .map(|(_, selected)| selected)
+    }
+
+    /// Reserve immutable selected-alias metadata before publishing its descriptor.
+    pub(crate) fn reserve_selection(&mut self, key: Key, limit: usize) -> Result<(), HeapError> {
+        let end = key.slot.checked_add(1).ok_or(HeapError::Capacity)?;
+        if end > limit {
+            return Err(HeapError::Capacity);
+        }
+        if end > self.selections.len() {
+            self.selections
+                .try_reserve(end - self.selections.len())
+                .map_err(|_| HeapError::Capacity)?;
+            self.selections.resize_with(end, || None);
+        }
+        Ok(())
+    }
+
+    /// Install a prepared exact selection after its numerical alias is committed.
+    pub(crate) fn publish_selection(
+        &mut self,
+        key: Key,
+        selected: super::live::selected::SelectedReading,
+    ) {
+        if let Some(slot) = self.selections.get_mut(key.slot) {
+            *slot = Some((key, selected));
+        }
+    }
+
+    /// Resolve the allocation sponsor without inferring meaning from an address.
+    pub(crate) fn cover(&self, key: Key) -> Result<&RegionCover, HeapError> {
         self.entries
             .get(key.slot)
             .and_then(Option::as_ref)
-            .filter(|entry| entry.key == key && entry.stamp == stamp)
-            .map(|entry| &entry.symbol)
-            .ok_or(HeapError::MissingSymbolOwner)
+            .filter(|entry| entry.key == key)
+            .ok_or(HeapError::MissingBinding)
     }
 
-    /// Reserve a slot before publication, refusing a second owner of the same version.
+    /// Require the homogeneous recipe interpretation of the current region version.
+    pub(crate) fn get(&self, key: Key, stamp: ValueStamp) -> Result<&QuantitySymbol, HeapError> {
+        let entry = self.cover(key)?;
+        match &entry.sponsor {
+            Sponsor::Homogeneous(symbol) if entry.stamp == stamp => Ok(symbol),
+            _ => Err(HeapError::MissingBinding),
+        }
+    }
+
+    /// Reserve a complete homogeneous cover before any numerical allocation.
     pub(crate) fn prepare(
         &mut self,
         key: Key,
         stamp: ValueStamp,
         symbol: &QuantitySymbol,
         limit: usize,
-    ) -> Result<Owner, HeapError> {
-        if self.get(key, stamp).is_ok() {
-            return Err(HeapError::DuplicateSymbolOwner);
+    ) -> Result<RegionCover, HeapError> {
+        let [rows, columns] = symbol.shape();
+        let count = u64::from(rows) * u64::from(columns);
+        self.reserve_cover(
+            key,
+            stamp,
+            Sponsor::Homogeneous(symbol.clone()),
+            usize::try_from(count).map_err(|_| HeapError::Capacity)?,
+            limit,
+        )
+    }
+
+    /// General readings have already checked total coverage and every actual intersection.
+    pub(crate) fn prepare_readings(
+        &mut self,
+        key: Key,
+        stamp: ValueStamp,
+        group: &std::rc::Rc<super::live::Group>,
+        count: usize,
+        limit: usize,
+    ) -> Result<RegionCover, HeapError> {
+        self.reserve_cover(
+            key,
+            stamp,
+            Sponsor::Readings(std::rc::Rc::clone(group)),
+            count,
+            limit,
+        )
+    }
+
+    /// Prepare a complete independently declared parameter allocation.
+    pub(crate) fn prepare_parameter(
+        &mut self,
+        key: Key,
+        symbol: nrz_bindings::ParameterSymbol,
+        limit: usize,
+    ) -> Result<RegionCover, HeapError> {
+        let count = symbol.entries().len();
+        let stamp = ValueStamp {
+            id: crate::ValueId(crate::heap::identity::identity()?),
+            version: crate::ValueVersion(1),
+        };
+        self.reserve_cover(key, stamp, Sponsor::Parameter(symbol), count, limit)
+    }
+
+    /// Reserve the single sponsor occupation and all entry versions without publishing it.
+    fn reserve_cover(
+        &mut self,
+        key: Key,
+        stamp: ValueStamp,
+        sponsor: Sponsor,
+        count: usize,
+        limit: usize,
+    ) -> Result<RegionCover, HeapError> {
+        if self.cover(key).is_ok_and(|entry| entry.stamp == stamp) {
+            return Err(HeapError::IncompatibleOverlap);
         }
         let end = key.slot.checked_add(1).ok_or(HeapError::Capacity)?;
         if end > limit {
@@ -56,15 +171,52 @@ impl Owners {
                 .map_err(|_| HeapError::Capacity)?;
             self.entries.resize_with(end, || None);
         }
-        Ok(Owner {
+        let mut versions = super::buffer(count)?;
+        versions.resize_with(count, || std::cell::Cell::new(1));
+        Ok(RegionCover {
             key,
             stamp,
-            symbol: symbol.clone(),
+            sponsor,
+            versions,
+            readers: Vec::new(),
         })
     }
 
-    /// Install only already checked entries into already reserved metadata slots.
-    pub(crate) fn publish(&mut self, prepared: Vec<Owner>) {
+    /// Reserve an exact-only observer before publishing its no-storage declaration.
+    pub(crate) fn reserve_observer(&mut self, limit: usize) -> Result<(), HeapError> {
+        if self.observers.len() >= limit {
+            return Err(HeapError::Capacity);
+        }
+        self.observers
+            .try_reserve(1)
+            .map_err(|_| HeapError::Capacity)
+    }
+
+    /// Exact-only declarations have no numerical sponsor slot but retain all proof obligations.
+    pub(crate) fn publish_observer(&mut self, group: std::rc::Rc<super::live::Group>) {
+        self.observers.push(group);
+    }
+
+    /// All groups are visited once when a write can invalidate their retained evidence.
+    pub(crate) fn groups(&self) -> Vec<std::rc::Rc<super::live::Group>> {
+        let mut groups = self.observers.clone();
+        for cover in self.entries.iter().flatten() {
+            if let Sponsor::Readings(group) = &cover.sponsor
+                && !groups.iter().any(|old| std::rc::Rc::ptr_eq(old, group))
+            {
+                groups.push(std::rc::Rc::clone(group));
+            }
+            for group in &cover.readers {
+                if !groups.iter().any(|old| std::rc::Rc::ptr_eq(old, group)) {
+                    groups.push(std::rc::Rc::clone(group));
+                }
+            }
+        }
+        groups
+    }
+
+    /// Install already checked covers into already reserved metadata slots.
+    pub(crate) fn publish(&mut self, prepared: Vec<RegionCover>) {
         for entry in prepared {
             if let Some(slot) = self.entries.get_mut(entry.key.slot) {
                 *slot = Some(entry);
@@ -101,28 +253,70 @@ pub(crate) fn declare(
     )?)
 }
 
-/// Match the fixed value/companion inventory and reserve every owner before commit.
+/// Resolve the entire future descriptor bundle before any floating slab is allocated.
+pub(crate) fn planned_bundle<P: Scalar>(
+    scope: u64,
+    keys: &[Key],
+    plan: &crate::heap::publication::SchemaPlan,
+) -> Result<PublishedBundle<P>, HeapError> {
+    let expected = 1
+        + usize::from(plan.bound.is_some())
+        + usize::from(plan.evaluation.is_some())
+        + 3 * usize::from(plan.contributions.is_some());
+    if keys.len() != expected {
+        return Err(HeapError::LengthMismatch);
+    }
+    let get = |index| keys.get(index).copied().ok_or(HeapError::Capacity);
+    let bound = plan
+        .bound
+        .map(|_| get(1).map(|key| Handle::new(scope, key)))
+        .transpose()?;
+    let evaluation = plan
+        .evaluation
+        .map(|_| get(2).map(|key| Handle::new(scope, key)))
+        .transpose()?;
+    let contributions = if plan.contributions.is_some() {
+        Some([
+            Handle::new(scope, get(3)?),
+            Handle::new(scope, get(4)?),
+            Handle::new(scope, get(5)?),
+        ])
+    } else {
+        None
+    };
+    Ok(PublishedBundle {
+        value: Handle::new(scope, get(0)?),
+        bound,
+        evaluation,
+        contributions,
+    })
+}
+
+/// Match every value and companion declaration and reserve complete covers before allocation.
 pub(crate) fn prepare<P: Scalar>(
     heap: &mut Heap,
     symbols: &BindingSymbols,
     bundle: PublishedBundle<P>,
     stamp: ValueStamp,
-) -> Result<Vec<Owner>, HeapError> {
+) -> Result<Vec<RegionCover>, HeapError> {
     let _binding = nrz_bindings::SymbolBinding::check(
         symbols.clone(),
         [
             Some(bundle.value().key),
             bundle.bound().map(|handle| handle.key),
             bundle.evaluation().map(|handle| handle.key),
-        ],
+        ]
+        .into_iter()
+        .flatten()
+        .collect(),
     )?;
     let bounds = symbols.bound().is_some() == bundle.bound().is_some();
     let errors = symbols.error().is_some() == bundle.evaluation().is_some();
     if !bounds || !errors {
         return Err(nrz_bindings::AdmissionError::CompanionMismatch.into());
     }
-    let mut owners = super::buffer(3)?;
-    owners.push(heap.symbols.prepare(
+    let mut covers = super::buffer(3)?;
+    covers.push(heap.symbols.prepare(
         bundle.value().key,
         stamp,
         symbols.value(),
@@ -134,11 +328,11 @@ pub(crate) fn prepare<P: Scalar>(
     ] {
         if let (Some(handle), Some(symbol)) = (handle, symbol) {
             if handle.key == bundle.value().key
-                || owners.iter().any(|owner| owner.key == handle.key)
+                || covers.iter().any(|owner| owner.key == handle.key)
             {
-                return Err(HeapError::DuplicateSymbolOwner);
+                return Err(HeapError::IncompatibleOverlap);
             }
-            owners.push(heap.symbols.prepare(
+            covers.push(heap.symbols.prepare(
                 handle.key,
                 stamp,
                 symbol,
@@ -146,7 +340,17 @@ pub(crate) fn prepare<P: Scalar>(
             )?);
         }
     }
-    Ok(owners)
+    if let Some(contributions) = bundle.contributions {
+        for handle in contributions {
+            let declaration = super::parameters::radii(symbols.value())?;
+            covers.push(heap.symbols.prepare_parameter(
+                handle.key,
+                declaration,
+                heap.limits.descriptors,
+            )?);
+        }
+    }
+    Ok(covers)
 }
 
 /// Resolve actual numerical ownership and target agreement before semantic checking.
@@ -154,6 +358,10 @@ pub(crate) fn capture<P: Scalar + 'static>(
     heap: &Heap,
     handle: Handle<Value, P>,
 ) -> Result<BindingSymbols, HeapError> {
+    if let Some(selected) = heap.symbols.selection(handle.key) {
+        selected.validate(heap)?;
+        return selected.symbols().cloned().ok_or(HeapError::MissingBinding);
+    }
     let base = heap.base_handle(handle)?;
     let view = heap.value(base)?;
     let stamp = view.stamp();
@@ -187,7 +395,7 @@ pub(crate) fn capture<P: Scalar + 'static>(
 
 /// Recheck the exact planned symbol inventory against every reserved numerical target.
 pub(crate) fn validate<P: Scalar>(
-    owners: &[Owner],
+    covers: &[RegionCover],
     symbols: &[BindingSymbols],
     bundles: &[PublishedBundle<P>],
     outputs: &[super::OutputReservation],
@@ -195,7 +403,9 @@ pub(crate) fn validate<P: Scalar>(
     if symbols.len() != bundles.len() || symbols.len() != outputs.len() {
         return Err(HeapError::LengthMismatch);
     }
-    let mut owners = owners.iter();
+    let mut covers = covers
+        .iter()
+        .filter(|cover| matches!(cover.sponsor, Sponsor::Homogeneous(_)));
     for ((symbols, bundle), output) in symbols.iter().zip(bundles).zip(outputs) {
         let mut expected = vec![(bundle.value().key, symbols.value())];
         for (handle, symbol) in [
@@ -209,14 +419,17 @@ pub(crate) fn validate<P: Scalar>(
             }
         }
         for (key, symbol) in expected {
-            let owner = owners.next().ok_or(HeapError::MissingSymbolOwner)?;
-            if owner.key != key || owner.stamp != output.stamp() || &owner.symbol != symbol {
-                return Err(HeapError::MissingSymbolOwner);
+            let owner = covers.next().ok_or(HeapError::MissingBinding)?;
+            if owner.key != key
+                || owner.stamp != output.stamp()
+                || !matches!(&owner.sponsor, Sponsor::Homogeneous(actual) if actual == symbol)
+            {
+                return Err(HeapError::MissingBinding);
             }
         }
     }
-    if owners.next().is_some() {
-        return Err(HeapError::DuplicateSymbolOwner);
+    if covers.next().is_some() {
+        return Err(HeapError::IncompatibleOverlap);
     }
     Ok(())
 }
@@ -227,10 +440,10 @@ mod tests {
     use crate::binding_testing::{TestResult, operation};
     use crate::{Binding, ExecutionLimits, HeapLimits, OperationError};
 
-    /// A live value cannot enter copy without exactly one current symbol owner.
-    /// ´test:unit:copy-refuses-missing-symbol-owner´
+    /// A live value cannot enter copy without its complete current binding cover.
+    /// ´test:unit:copy-refuses-missing-binding-cover´
     #[test]
-    fn copy_refuses_missing_symbol_owner() -> TestResult {
+    fn copy_refuses_missing_binding_cover() -> TestResult {
         for companion in [false, true] {
             let mut heap = Heap::new(HeapLimits::default())?;
             let source = heap.import_declared_bounds(
@@ -252,17 +465,17 @@ mod tests {
                     ExecutionLimits::default()
                 )
                 .validate(&mut heap),
-                Err(OperationError::Heap(HeapError::MissingSymbolOwner))
+                Err(OperationError::Heap(HeapError::MissingBinding))
             ));
             assert_eq!(heap.descriptors.iter().count(), 2);
         }
         Ok(())
     }
 
-    /// Equal units and bytes cannot authorize another owner of an existing version.
-    /// ´test:unit:region-version-refuses-double-symbol-owner´
+    /// Equal units and bytes cannot authorize an unrelated overlapping declaration.
+    /// ´test:unit:region-version-refuses-unrelated-overlap´
     #[test]
-    fn region_version_refuses_double_symbol_owner() -> TestResult {
+    fn region_version_refuses_unrelated_overlap() -> TestResult {
         let mut heap = Heap::new(HeapLimits::default())?;
         let source =
             heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[2.0_f64])?;
@@ -280,7 +493,7 @@ mod tests {
                 other.value(),
                 heap.limits.descriptors
             ),
-            Err(HeapError::DuplicateSymbolOwner)
+            Err(HeapError::IncompatibleOverlap)
         ));
         assert_eq!(heap.value(source.value())?.region().get(0, 0)?, 2.0);
         Ok(())
@@ -307,7 +520,7 @@ mod tests {
         heap.symbols.entries[key.slot]
             .as_mut()
             .ok_or("owner")?
-            .symbol = other.bound().ok_or("symbol")?.clone();
+            .sponsor = Sponsor::Homogeneous(other.bound().ok_or("symbol")?.clone());
         assert!(matches!(
             Binding::new(
                 operation(1, 1)?,

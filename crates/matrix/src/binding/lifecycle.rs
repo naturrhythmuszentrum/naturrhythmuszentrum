@@ -92,6 +92,8 @@ impl<P: Scalar> ValueBinding<P> {
 pub(crate) struct Plans<P: Scalar> {
     /// Complete operation-ordered bindings, prepared before execution.
     pub(crate) values: Vec<ValueBinding<P>>,
+    /// All additional result readings, sealed before numerical execution.
+    pub(crate) readings: Vec<super::live::ReadingBinding<P>>,
 }
 
 impl<P: Scalar> Plans<P> {
@@ -99,6 +101,9 @@ impl<P: Scalar> Plans<P> {
     pub(crate) fn publish(&self) {
         for value in &self.values {
             value.state.set(SymbolState::Published);
+        }
+        for reading in &self.readings {
+            reading.group.publish();
         }
     }
 }
@@ -108,6 +113,11 @@ impl<P: Scalar> Drop for Plans<P> {
         for value in &self.values {
             if value.state.get() == SymbolState::Pending {
                 value.state.set(SymbolState::Unavailable);
+            }
+        }
+        for reading in &self.readings {
+            if reading.state() == SymbolState::Pending {
+                reading.group.unavailable();
             }
         }
     }
@@ -123,7 +133,11 @@ impl Heap {
     ) -> Result<ValueBinding<P>, HeapError> {
         let symbols = super::symbols::capture(self, handle)?;
         let value = self.value(handle)?;
-        let stamp = value.stamp();
+        let stamp = if self.symbols.selection(handle.key).is_some() {
+            self.symbols.cover(self.base_handle(handle)?.key)?.stamp
+        } else {
+            value.stamp()
+        };
         let bound = self.selected_bound(handle)?;
         let error = self.selected_evaluation(handle)?;
         let regions = [
@@ -138,7 +152,7 @@ impl Heap {
                 .map(|(handle, view)| ticket(self.scope, handle.key, stamp, view.region())),
         ];
         Ok(ValueBinding {
-            exact: SymbolBinding::check(symbols, regions)?,
+            exact: SymbolBinding::check(symbols, regions.into_iter().flatten().collect())?,
             handle,
             state: Rc::new(Cell::new(SymbolState::Published)),
         })
@@ -242,8 +256,37 @@ pub(crate) fn planned<P: Scalar>(
         }
     }
     Ok(ValueBinding {
-        exact: SymbolBinding::check(symbols.clone(), regions)?,
+        exact: SymbolBinding::check(symbols.clone(), regions.into_iter().flatten().collect())?,
         handle: bundle.value(),
         state: Rc::new(Cell::new(SymbolState::Pending)),
+    })
+}
+
+/// Prepare a selected-reading facade before its alias occupation is published.
+pub(crate) fn selected<P: Scalar>(
+    scope: u64,
+    key: Key,
+    region: &super::live::RegionTicket,
+    layout: Layout,
+    symbols: &BindingSymbols,
+) -> Result<ValueBinding<P>, HeapError> {
+    let ticket = Ticket {
+        scope,
+        key,
+        stamp: crate::ValueStamp {
+            id: region.identity,
+            version: region.generation,
+        },
+        layout,
+        schema: SchemaId {
+            scope,
+            index: region.schema,
+        },
+        precision: P::PRECISION,
+    };
+    Ok(ValueBinding {
+        exact: SymbolBinding::check(symbols.clone(), vec![ticket])?,
+        handle: Handle::new(scope, key),
+        state: Rc::new(Cell::new(SymbolState::Published)),
     })
 }

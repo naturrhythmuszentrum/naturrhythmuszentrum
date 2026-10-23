@@ -60,7 +60,7 @@ pub struct Heap {
     /// Bounded operation records and source dependency graph.
     pub(crate) provenance: crate::provenance::Provenance,
     /// Opaque symbol inventory for migrated value and deterministic companion regions.
-    pub(crate) symbols: crate::binding::symbols::Owners,
+    pub(crate) symbols: crate::binding::symbols::Inventory,
     /// Immutable source relations and independent statistical companion regions.
     pub(crate) joint: crate::companions::JointStore,
     /// Source-preserving propagated statistical parameter relations.
@@ -81,7 +81,7 @@ impl Heap {
             schemas: Vec::new(),
             meanings: Vec::new(),
             provenance: crate::provenance::Provenance::new(),
-            symbols: crate::binding::symbols::Owners::default(),
+            symbols: crate::binding::symbols::Inventory::default(),
             joint: crate::companions::JointStore::default(),
             statistics: crate::statistics::Store::default(),
         })

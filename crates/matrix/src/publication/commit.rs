@@ -77,6 +77,10 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let record = self.prepare_record(candidate.token, evidence)?;
         super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
         let moments = crate::statistics::prepare(self, candidate, &record.outputs)?;
+        crate::binding::parameters::validate(
+            &self.reservations.covers,
+            &self.reservations.records,
+        )?;
         Ok((self.heap.provenance.prepare(record)?, moments))
     }
 
@@ -383,7 +387,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         self.heap.storage.publish(self.reservations.storage);
         crate::binding::schema::publish(self.heap, self.reservations.schemas);
         self.heap.descriptors.publish(self.reservations.records);
-        self.heap.symbols.publish(self.reservations.owners);
+        self.heap.symbols.publish(self.reservations.covers);
         self.heap.provenance.publish(graph);
         self.heap.statistics.records.extend(moments.records);
         self.reservations.planned.publish();

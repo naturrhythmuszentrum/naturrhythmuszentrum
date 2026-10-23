@@ -19,11 +19,24 @@ pub(crate) struct Store {
     next: u64,
 }
 
+/// Exact graph authority, either construction-owned or an immutable declared reading graph.
+#[derive(Clone, Debug)]
+pub(crate) enum Authority {
+    /// Shared construction graph for newly declared homogeneous quantities.
+    Local(Rc<RefCell<Store>>),
+    /// Immutable authority of an already defined general physical reading.
+    Reading(Rc<Cas>),
+}
+
 /// Immutable checked declaration and its actual graph relation.
 #[derive(Debug)]
 pub(crate) struct SymbolData {
     /// Retained graph owner.
-    pub(crate) graph: Rc<RefCell<Store>>,
+    pub(crate) graph: Authority,
+    /// Exact source record retained even across immutable graph authorities.
+    pub(crate) lineage: Option<QuantitySymbol>,
+    /// General physical definition when this symbol selects a derived reading.
+    pub(crate) reading: Option<crate::readings::PhysicalReading>,
     /// Actual free-symbol expression.
     pub(crate) node: Handle,
     /// Mathematical declaration sort.
@@ -69,8 +82,13 @@ pub(crate) fn declare(
         .then(|| uncertainty(UncertaintyMode::Radius, quantity, None, None))
         .transpose()?;
     let graph = match source {
-        Some(symbol) => Rc::clone(&symbol.0.graph),
-        None => Rc::new(RefCell::new(Store {
+        Some(symbol) if matches!(symbol.0.graph, Authority::Local(_)) => {
+            let Authority::Local(graph) = &symbol.0.graph else {
+                return Err(AdmissionError::ResourceLimit);
+            };
+            Rc::clone(graph)
+        }
+        _ => Rc::new(RefCell::new(Store {
             cas: Cas::new(budget.limits().clone())?,
             next: 0,
         })),
@@ -83,7 +101,8 @@ pub(crate) fn declare(
         .checked_add(1)
         .ok_or(AdmissionError::ResourceLimit)?;
     let sort = atomic(shape);
-    let plan = plan(&sort, companions, source, state.next);
+    let local_source = source.filter(|symbol| matches!(symbol.0.graph, Authority::Local(_)));
+    let plan = plan(&sort, companions, local_source, state.next);
     let handles = state.cas.admit(&plan.drafts, budget)?;
     state.next = next;
     drop(state);
@@ -220,7 +239,9 @@ fn assemble(
             Some(handle(handles, 1)?)
         };
         symbols.push(QuantitySymbol(Rc::new(SymbolData {
-            graph: Rc::clone(graph),
+            graph: Authority::Local(Rc::clone(graph)),
+            lineage: source.filter(|_| kind == SymbolKind::Value).cloned(),
+            reading: None,
             node: handle(handles, index + 1)?,
             sort: Sort::Value(atomic(shape)),
             shape,

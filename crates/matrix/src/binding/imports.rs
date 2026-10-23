@@ -29,10 +29,12 @@ struct PreparedImport<P: Scalar> {
     schemas: Vec<BindingSchema>,
     /// Complete value and optional companion descriptors.
     records: PreparedSlots<Record>,
-    /// Prepared exact symbol owners, installed with their numerical regions.
-    owners: Vec<crate::binding::symbols::Owner>,
+    /// Prepared exact symbol covers, installed with their numerical regions.
+    covers: Vec<crate::binding::symbols::RegionCover>,
     /// Future locators, returned only after publication.
     bundle: PublishedBundle<P>,
+    /// Prepared structural invalidation closure for a coarse replacement.
+    invalidations: super::live::invalidation::Invalidations,
 }
 
 impl Heap {
@@ -140,11 +142,13 @@ impl Heap {
         let descriptors = self.descriptors.prepare(count, self.limits.descriptors)?;
         let payloads = [centers, bounds.unwrap_or(&[]), errors.unwrap_or(&[])];
         let inputs = payloads.get(..count).ok_or(HeapError::LengthMismatch)?;
-        let storage = self.storage.prepare(inputs, &[], self.limits)?;
         let stamp = ValueStamp {
             id: ValueId(identity()?),
             version: ValueVersion(1),
         };
+        let bundle = super::symbols::planned_bundle::<P>(self.scope, descriptors.keys(), &schemas)?;
+        let covers = super::symbols::prepare(self, symbols, bundle, stamp)?;
+        let storage = self.storage.prepare(inputs, &[], self.limits)?;
         let mut prepared = assemble(
             self.scope,
             extent,
@@ -154,7 +158,7 @@ impl Heap {
             descriptors,
             storage,
         )?;
-        prepared.owners = crate::binding::symbols::prepare(self, symbols, prepared.bundle, stamp)?;
+        prepared.covers = covers;
         if let Some(record) = prepared.records.values.first_mut()
             && let Meaning::Value {
                 coverage: actual, ..
@@ -200,13 +204,16 @@ impl Heap {
         )?;
         let payloads = [centers, bounds.unwrap_or(&[])];
         let inputs = payloads.get(..count).ok_or(HeapError::LengthMismatch)?;
-        let storage = self
-            .storage
-            .prepare(inputs, &snapshot.regions()?, self.limits)?;
         let stamp = ValueStamp {
             id: snapshot.stamp.id,
             version: ValueVersion(next),
         };
+        let bundle =
+            super::symbols::planned_bundle::<P>(self.scope, descriptors.keys(), &schema_plan)?;
+        let covers = super::symbols::prepare(self, &symbols, bundle, stamp)?;
+        let storage = self
+            .storage
+            .prepare(inputs, &snapshot.regions()?, self.limits)?;
         let mut prepared = assemble(
             self.scope,
             extent,
@@ -216,7 +223,8 @@ impl Heap {
             descriptors,
             storage,
         )?;
-        prepared.owners = crate::binding::symbols::prepare(self, &symbols, prepared.bundle, stamp)?;
+        prepared.covers = covers;
+        prepared.invalidations = super::live::invalidation::whole(self, handle.key);
         Ok(self.publish_bundle(prepared))
     }
 
@@ -225,7 +233,8 @@ impl Heap {
         self.storage.publish(prepared.storage);
         super::schema::publish(self, prepared.schemas);
         self.descriptors.publish(prepared.records);
-        self.symbols.publish(prepared.owners);
+        self.symbols.publish(prepared.covers);
+        super::live::invalidation::publish(prepared.invalidations);
         prepared.bundle
     }
 
@@ -242,7 +251,7 @@ impl Heap {
             &mut pending,
             BindingSchema {
                 extent,
-                quantity: quantity.clone(),
+                quantity: Some(quantity.clone()),
             },
             self.limits.schemas,
         )?;
@@ -253,7 +262,7 @@ impl Heap {
                 &mut pending,
                 BindingSchema {
                     extent,
-                    quantity: radius,
+                    quantity: Some(radius),
                 },
                 self.limits.schemas,
             )?)
@@ -354,7 +363,8 @@ fn assemble<P: Scalar + 'static>(
         storage.epoch(),
     )?;
     Ok(PreparedImport {
-        owners: Vec::new(),
+        covers: Vec::new(),
+        invalidations: Vec::new(),
         storage,
         schemas: meanings,
         records: descriptors.bind(records)?,

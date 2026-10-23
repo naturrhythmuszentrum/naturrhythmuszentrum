@@ -18,6 +18,8 @@ pub(crate) struct Model {
     pub(crate) sources: Vec<SourceId>,
     /// Original source difference descriptors.
     pub(crate) quantities: Vec<Descriptor>,
+    /// Actual source declarations, preserving identities in parameter coverage.
+    pub(crate) symbols: Vec<nrz_bindings::QuantitySymbol>,
     /// Terms required for one source covariance entry.
     pub(crate) terms: usize,
 }
@@ -49,6 +51,11 @@ impl Model {
                 .sources()
                 .iter()
                 .map(|source| source.descriptor().clone())
+                .collect(),
+            symbols: model
+                .sources()
+                .iter()
+                .map(|source| source.symbol().clone())
                 .collect(),
             terms,
         })

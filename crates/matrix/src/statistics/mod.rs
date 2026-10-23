@@ -15,6 +15,7 @@ mod allocation;
 mod capture;
 pub(crate) mod contraction;
 mod cross;
+mod declarations;
 mod derivative;
 mod error;
 mod evaluate;

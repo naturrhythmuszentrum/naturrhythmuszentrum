@@ -11,7 +11,7 @@ pub(crate) struct BindingSchema {
     /// Logical rectangular extent.
     pub(crate) extent: Extent,
     /// Independent quantity descriptor.
-    pub(crate) quantity: Descriptor,
+    pub(crate) quantity: Option<Descriptor>,
 }
 
 /// Admit coherent storage while keeping discrete counts outside floating arenas.
@@ -84,7 +84,7 @@ impl crate::Heap {
         let record = self.record(handle)?;
         self.meanings
             .get(record.schema)
-            .map(|schema| &schema.quantity)
-            .ok_or(HeapError::MissingSymbolOwner)
+            .and_then(|schema| schema.quantity.as_ref())
+            .ok_or(HeapError::MissingBinding)
     }
 }

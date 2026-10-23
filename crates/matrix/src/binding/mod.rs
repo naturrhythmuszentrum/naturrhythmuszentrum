@@ -31,7 +31,9 @@ mod imports;
 pub(crate) mod kernel;
 pub(crate) mod lifecycle;
 mod limits;
+pub(crate) mod live;
 mod operation;
+pub(crate) mod parameters;
 mod reservation;
 pub(crate) mod schema;
 mod snapshot;
@@ -45,6 +47,7 @@ pub use adapters::{
 pub use error::OperationError;
 pub use lifecycle::{SymbolState, ValueBinding};
 pub use limits::ExecutionLimits;
+pub use live::{DependencyPolicy, LiveBindingError, ReadingBinding, ReadingImport, ReadingRegion};
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};
 pub use reservation::OutputReservation;

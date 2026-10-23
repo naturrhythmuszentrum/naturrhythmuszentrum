@@ -92,7 +92,7 @@ fn reading_work(
 }
 
 #[cfg(test)]
-mod fixtures;
+pub(crate) mod fixtures;
 
 #[cfg(test)]
 mod tests {

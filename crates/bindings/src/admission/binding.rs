@@ -1,53 +1,45 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Storage-neutral checked associations between exact symbols and opaque region tickets.
+//! Storage-neutral associations for the closed homogeneous recipe.
 
 use super::{AdmissionError, BindingSymbols};
 
-/// Immutable value and companion binding; tickets grant no live storage access.
+/// Immutable selected value and companion association; tickets grant no live authority.
+///
+/// Ticket equality is not an entry-set or map judgment. The numerical owner must
+/// resolve actual coverage and checked overlaps under its exclusive lease.
 #[derive(Clone, Debug)]
 pub struct SymbolBinding<T> {
-    /// Exact declared symbol inventory.
+    /// Exact homogeneous recipe declaration, not a restriction on numerical storage.
     symbols: BindingSymbols,
-    /// Value, deterministic-bound and numerical-error tickets, in that fixed order.
-    regions: [Option<T>; 3],
-}
-
-impl<T: Eq> SymbolBinding<T> {
-    /// Join declared symbols to distinct numerical-region tickets.
-    ///
-    /// The numerical owner must resolve every ticket and its current version under
-    /// an exclusive lease. This check validates only the exact binding inventory.
-    /// # Errors
-    /// Refuses missing/extra regions or a repeated region with two symbol owners.
-    pub fn check(symbols: BindingSymbols, regions: [Option<T>; 3]) -> Result<Self, AdmissionError> {
-        symbols.validate()?;
-        let presence = [true, symbols.bound().is_some(), symbols.error().is_some()];
-        for (index, (region, required)) in regions.iter().zip(presence).enumerate() {
-            if region.is_some() != required {
-                return Err(AdmissionError::RegionInventory);
-            }
-            if let Some(ticket) = region
-                && regions[..index]
-                    .iter()
-                    .flatten()
-                    .any(|earlier| earlier == ticket)
-            {
-                return Err(AdmissionError::RegionInventory);
-            }
-        }
-        Ok(Self { symbols, regions })
-    }
+    /// Present value and companion tickets in declaration order, without empty slots.
+    regions: Vec<T>,
 }
 
 impl<T> SymbolBinding<T> {
+    /// Join the complete declared recipe inventory to opaque selected-region tickets.
+    ///
+    /// Shared tickets neither establish compatibility nor constitute a refusal here:
+    /// actual entry coverage and its checked relations belong to live admission.
+    /// # Errors
+    /// Refuses missing or extra associations and invalid companion declarations.
+    pub fn check(symbols: BindingSymbols, regions: Vec<T>) -> Result<Self, AdmissionError> {
+        symbols.validate()?;
+        let required =
+            1 + usize::from(symbols.bound().is_some()) + usize::from(symbols.error().is_some());
+        if regions.len() != required {
+            return Err(AdmissionError::RegionInventory);
+        }
+        Ok(Self { symbols, regions })
+    }
+
     /// Exact declaration inventory retained by this selected binding.
     #[must_use]
     pub const fn symbols(&self) -> &BindingSymbols {
         &self.symbols
     }
-    /// Ordered opaque value, deterministic-bound and numerical-error region tickets.
+    /// Present opaque region tickets in the same order as their declared symbols.
     #[must_use]
-    pub const fn regions(&self) -> &[Option<T>; 3] {
+    pub fn regions(&self) -> &[T] {
         &self.regions
     }
 }

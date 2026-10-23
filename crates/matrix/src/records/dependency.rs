@@ -16,6 +16,8 @@ pub struct Dependency {
     pub(crate) key: Key,
     /// Base value identity and content version.
     pub(crate) stamp: ValueStamp,
+    /// Exact selected reading with per-entry and structural proof versions.
+    pub(crate) selected: Option<crate::binding::live::selected::SelectedReading>,
     /// Sealed numerical format.
     pub(crate) precision: Precision,
     /// Owning homogeneous interpretation.
@@ -52,6 +54,7 @@ impl Dependency {
             scope: input.handle().scope,
             key: input.handle().key,
             stamp: input.stamp(),
+            selected: input.selected.clone(),
             precision: P::PRECISION,
             schema: input.schema(),
             layout: input.layout().clone(),
@@ -132,7 +135,14 @@ impl Dependency {
         else {
             return Err(HeapError::CategoryMismatch);
         };
-        if stamp != self.stamp
+        if let Some(selected) = &self.selected {
+            selected.validate(heap)?;
+        }
+        let stamp_matches = self
+            .selected
+            .as_ref()
+            .map_or(stamp == self.stamp, |_| stamp.id() == self.stamp.id());
+        if !stamp_matches
             || bound != self.companion.as_ref().map(|value| value.key)
             || evaluation != self.evaluation.as_ref().map(|value| value.key)
             || contributions
@@ -221,6 +231,7 @@ impl Dependency {
             scope: bundle.value().scope,
             key: bundle.value().key,
             stamp: output.stamp(),
+            selected: None,
             precision: P::PRECISION,
             schema: output.schema(),
             layout: Layout::contiguous(output.extent())?,

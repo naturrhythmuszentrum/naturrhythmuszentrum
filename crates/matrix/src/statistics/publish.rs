@@ -117,31 +117,33 @@ fn moment<P: Scalar + 'static, Q: Scalar + 'static>(
     super::structure::output(output.shape(), payload, slot)?;
     validate_recipe(bound, payload)?;
     let quantity = output.descriptor();
+    let [covariance_symbol, sensitivity_symbol, jacobian_symbol] =
+        super::declarations::moment(bound, payload, slot)?;
     let covariance = parameter(
         &payload.covariance,
-        covariance_descriptors(quantity, quantity, payload.covariance.extent.entries())?,
+        covariance_symbol,
         None,
         regions,
         context,
     )?;
     let sensitivity = parameter(
         &payload.sensitivity,
-        source_descriptors(quantity, lineage, payload.sensitivity.extent.rows())?,
+        sensitivity_symbol,
         None,
         regions,
         context,
     )?;
-    let jacobian = parameter(
-        &payload.jacobian,
-        derivative_descriptors(quantity, &bound.operation, payload.jacobian.extent.rows())?,
-        None,
-        regions,
-        context,
-    )?;
+    let jacobian = parameter(&payload.jacobian, jacobian_symbol, None, regions, context)?;
     let means = payload
         .means
         .as_ref()
-        .map(|means| parameter(means, Vec::new(), Some(quantity), regions, context))
+        .map(|means| {
+            let declaration = crate::binding::parameters::values(
+                means.extent,
+                super::declarations::output_targets(bound, slot)?,
+            )?;
+            parameter(means, declaration, Some(quantity), regions, context)
+        })
         .transpose()?;
     Ok(PendingMoment {
         targets: [target.clone(), target],
@@ -223,7 +225,7 @@ pub(crate) fn covariance_descriptors(
     Ok(vec![EvaluationDescriptor::new(&witness); count])
 }
 /// Every source derivative retains output-over-source dimensions and both semantic kinds.
-fn source_descriptors(
+pub(super) fn source_descriptors(
     quantity: &Descriptor,
     lineage: &Lineage,
     rows: usize,
@@ -241,7 +243,7 @@ fn source_descriptors(
     Ok(result)
 }
 /// Derivative columns follow the complete concatenated logical operand order.
-fn derivative_descriptors(
+pub(super) fn derivative_descriptors(
     quantity: &Descriptor,
     operation: &crate::CheckedOperation,
     rows: usize,
@@ -263,31 +265,41 @@ fn derivative_descriptors(
 /// Enclose the actual stored candidate before creating its error-target relation.
 fn parameter<P: Scalar>(
     matrix: &Matrix<P>,
-    descriptors: Vec<EvaluationDescriptor>,
+    declaration: nrz_bindings::ParameterSymbol,
     mean: Option<&Descriptor>,
     regions: &mut Vec<RegionData<P>>,
     context: &ArithmeticContext,
 ) -> Result<PendingParameter, OperationError> {
-    if !descriptors.is_empty() && descriptors.len() != matrix.extent.entries() {
+    if declaration.entries().len() != matrix.extent.entries() {
         return Err(StatisticsError::Contract.into());
     }
     let start = regions.len();
+    let descriptors = declaration
+        .entries()
+        .iter()
+        .filter_map(|entry| entry.pairing().map(EvaluationDescriptor::new))
+        .collect();
+    let error_symbol = crate::binding::parameters::errors(&declaration)?;
     let errors = matrix.errors(context)?;
-    let quantity = mean.cloned().unwrap_or_else(Descriptor::ratio);
+    let quantity = mean.cloned();
     let radius = if let Some(mean) = mean {
-        nrz_bindings::uncertainty(UncertaintyMode::Radius, mean, None, None)
-            .map_err(crate::HeapError::from)?
+        Some(
+            nrz_bindings::uncertainty(UncertaintyMode::Radius, mean, None, None)
+                .map_err(crate::HeapError::from)?,
+        )
     } else {
-        Descriptor::ratio()
+        None
     };
     regions.push(RegionData {
         extent: matrix.extent,
         quantity,
+        declaration,
         values: matrix.centers.clone(),
     });
     regions.push(RegionData {
         extent: matrix.extent,
         quantity: radius,
+        declaration: error_symbol,
         values: errors,
     });
     Ok(PendingParameter { start, descriptors })

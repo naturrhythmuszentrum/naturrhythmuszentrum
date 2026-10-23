@@ -84,14 +84,43 @@ impl QuantitySymbol {
     /// Inspect the retained CAS graph without exposing mutation.
     /// # Errors
     /// Refuses a conflicting graph borrow.
-    pub fn cas(&self) -> Result<Ref<'_, Cas>, AdmissionError> {
-        Ok(Ref::map(
-            self.0
-                .graph
-                .try_borrow()
-                .map_err(|_| AdmissionError::ResourceLimit)?,
-            |state| &state.cas,
-        ))
+    pub fn cas(&self) -> Result<impl std::ops::Deref<Target = Cas> + '_, AdmissionError> {
+        match &self.0.graph {
+            graph::Authority::Local(graph) => Ok(CasAccess::Local(Ref::map(
+                graph
+                    .try_borrow()
+                    .map_err(|_| AdmissionError::ResourceLimit)?,
+                |state| &state.cas,
+            ))),
+            graph::Authority::Reading(graph) => Ok(CasAccess::Reading(graph)),
+        }
+    }
+    /// Exact immutable source of a fresh copy, including selected derived-reading lineage.
+    #[must_use]
+    pub fn source(&self) -> Option<&Self> {
+        self.0.lineage.as_ref()
+    }
+    /// Exact physical definition when the homogeneous recipe selected a general reading.
+    #[must_use]
+    pub fn reading(&self) -> Option<&crate::readings::PhysicalReading> {
+        self.0.reading.as_ref()
+    }
+}
+
+/// Inspection preserves the original graph's borrow discipline without exposing mutation.
+enum CasAccess<'a> {
+    /// Borrowed construction authority, retaining the dynamic immutable borrow.
+    Local(Ref<'a, Cas>),
+    /// Immutable general-reading authority.
+    Reading(&'a Cas),
+}
+impl std::ops::Deref for CasAccess<'_> {
+    type Target = Cas;
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Local(graph) => graph,
+            Self::Reading(graph) => graph,
+        }
     }
 }
 
@@ -219,7 +248,8 @@ impl BindingSymbols {
 
     /// Fresh copy results retain the exact source and the complete companion presence.
     pub(crate) fn check_source(&self, source: &Self) -> Result<(), AdmissionError> {
-        let target = self.value.target() == Some(source.value.node());
+        let target = self.value.target() == Some(source.value.node())
+            && self.value.source() == Some(source.value());
         let bounds = self.bound.is_some() == source.bound.is_some();
         let errors = self.error.is_some() == source.error.is_some();
         if target && bounds && errors {

@@ -16,13 +16,13 @@ use nrz_cas::{
 };
 
 /// Fallible public fixture and test result.
-pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 /// Unchanged production allowance for an independent fixture operation.
-pub(super) fn ledger() -> Result<Budget, nrz_cas::Fault> {
+pub(crate) fn ledger() -> Result<Budget, nrz_cas::Fault> {
     Budget::new(Limits::default())
 }
 /// Literal Real rectangle in logical column order.
-pub(super) const fn matrix(rows: u32, columns: u32) -> Sort {
+pub(crate) const fn matrix(rows: u32, columns: u32) -> Sort {
     Sort::Value(AtomicSort::Matrix {
         field: Field::Real,
         rows: Extent::Literal(rows),
@@ -30,11 +30,11 @@ pub(super) const fn matrix(rows: u32, columns: u32) -> Sort {
     })
 }
 /// Mathematical Real scalar sort.
-pub(super) const fn real() -> Sort {
+pub(crate) const fn real() -> Sort {
     Sort::Value(AtomicSort::Scalar(Field::Real))
 }
 /// Exact explicit coefficients, independently of the map's composition algorithm.
-pub(super) fn map(
+pub(crate) fn map(
     inputs: u32,
     outputs: u32,
     coefficients: &[i64],
@@ -55,7 +55,7 @@ pub(super) fn map(
     )?)
 }
 /// One physical kind with its own exact unit reference.
-pub(super) fn meaning(name: &str, dimensions: [i64; 7]) -> TestResult<EntryMeaning> {
+pub(crate) fn meaning(name: &str, dimensions: [i64; 7]) -> TestResult<EntryMeaning> {
     let descriptor = Descriptor::new(
         Kind::Named(name.into(), Box::new(Dimension::integers(dimensions)?)),
         Measure::coherent(),
@@ -70,17 +70,17 @@ pub(super) fn meaning(name: &str, dimensions: [i64; 7]) -> TestResult<EntryMeani
     )?)
 }
 /// A graph with explicit original declarations and no setup proof.
-pub(super) struct Fixture {
+pub(crate) struct Fixture {
     /// Owning exact graph.
-    pub(super) cas: Cas,
+    pub(crate) cas: Cas,
     /// Exact root context and domain.
-    pub(super) context: Handle,
+    pub(crate) context: Handle,
     /// Original declaration identities; display names deliberately coincide.
-    pub(super) symbols: Vec<(String, Handle)>,
+    pub(crate) symbols: Vec<(String, Handle)>,
 }
 impl Fixture {
     /// Construct an independent receiver without inspecting a sender's proof.
-    pub(super) fn new(declarations: &[(&str, Sort)]) -> TestResult<Self> {
+    pub(crate) fn new(declarations: &[(&str, Sort)]) -> TestResult<Self> {
         let mut cas = Cas::new(Limits::default())?;
         let environment = Environment {
             declarations: declarations
@@ -132,7 +132,7 @@ impl Fixture {
         })
     }
     /// Resolve an original declaration by fixture key, never a reading by display name.
-    pub(super) fn symbol(&self, key: &str) -> TestResult<Handle> {
+    pub(crate) fn symbol(&self, key: &str) -> TestResult<Handle> {
         self.symbols
             .iter()
             .find(|(name, _)| name == key)
@@ -140,7 +140,7 @@ impl Fixture {
             .ok_or_else(|| "missing symbol".into())
     }
     /// Admit one physical reading through the public constructor.
-    pub(super) fn define(
+    pub(crate) fn define(
         &mut self,
         family: &CoordinateFamily,
         key: &str,
@@ -163,17 +163,22 @@ impl Fixture {
     }
 }
 /// A whole reading and an independently defined component of the same family.
-pub(super) struct Case {
+pub(crate) struct Case {
     /// Complete independent graph and context.
-    pub(super) fixture: Fixture,
+    pub(crate) fixture: Fixture,
     /// The whole state or Complex interpretation.
-    pub(super) whole: PhysicalReading,
+    pub(crate) whole: PhysicalReading,
     /// A Real component reading of specified source entries.
-    pub(super) component: PhysicalReading,
+    pub(crate) component: PhysicalReading,
 }
 /// Mixed volts and amperes use one ordered two-coordinate family.
-pub(super) fn state_case() -> TestResult<Case> {
-    let mut fixture = Fixture::new(&[("z", matrix(2, 1)), ("x", matrix(2, 1)), ("v", real())])?;
+pub(crate) fn state_case() -> TestResult<Case> {
+    let mut fixture = Fixture::new(&[
+        ("z", matrix(2, 1)),
+        ("x", matrix(2, 1)),
+        ("v", real()),
+        ("i", real()),
+    ])?;
     let entries = vec![
         meaning("voltage", [2, 1, -3, -1, 0, 0, 0])?,
         meaning("current", [0, 0, 0, 1, 0, 0, 0])?,
@@ -208,7 +213,7 @@ pub(super) fn state_case() -> TestResult<Case> {
     })
 }
 /// The full block expansion retains the negative and repeated coordinates.
-pub(super) fn complex_case() -> TestResult<Case> {
+pub(crate) fn complex_case() -> TestResult<Case> {
     let mut fixture = Fixture::new(&[
         ("z", matrix(2, 1)),
         ("block", matrix(2, 2)),
@@ -260,7 +265,7 @@ pub(super) fn complex_case() -> TestResult<Case> {
 }
 
 /// Check exact Work, cumulative precharge and staged-payload boundaries without raising a limit.
-pub(super) fn boundaries(mut attempt: impl FnMut(Limits, u64) -> TestResult<u64>) -> TestResult {
+pub(crate) fn boundaries(mut attempt: impl FnMut(Limits, u64) -> TestResult<u64>) -> TestResult {
     let needed = attempt(Limits::default(), 0)?;
     assert!(needed > 0);
     assert!(

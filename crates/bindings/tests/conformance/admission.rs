@@ -160,24 +160,20 @@ fn construct(budget: &mut Budget) -> TestResult {
     Ok(())
 }
 
-/// Opaque tickets cannot omit a required region or assign one region to two symbols.
-/// ´test:integration:symbol-binding-refuses-missing-and-double-region-owners´
+/// Opaque associations require complete presence; actual overlap compatibility needs live admission.
+/// ´test:integration:symbol-binding-requires-complete-associations´
 #[test]
-fn symbol_binding_refuses_missing_and_double_region_owners() -> TestResult {
+fn symbol_binding_requires_complete_associations() -> TestResult {
     let symbols = BindingSymbols::declare(
         &Descriptor::ratio(),
         [1, 1],
         [true, true],
         &mut Budget::new(Limits::default())?,
     )?;
-    nrz_bindings::SymbolBinding::check(symbols.clone(), [Some(1), Some(2), Some(3)])?;
-    for regions in [
-        [None, Some(2), Some(3)],
-        [Some(1), None, Some(3)],
-        [Some(1), Some(2), None],
-        [Some(1), Some(1), Some(3)],
-        [Some(1), Some(2), Some(2)],
-    ] {
+    for regions in [vec![1, 2, 3], vec![1, 1, 3], vec![1, 2, 2]] {
+        nrz_bindings::SymbolBinding::check(symbols.clone(), regions)?;
+    }
+    for regions in [vec![], vec![1], vec![1, 2], vec![1, 2, 3, 4]] {
         assert!(matches!(
             nrz_bindings::SymbolBinding::check(symbols.clone(), regions),
             Err(AdmissionError::RegionInventory)

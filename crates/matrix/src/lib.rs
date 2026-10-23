@@ -35,8 +35,9 @@ mod shape;
 mod storage;
 
 pub use binding::{
-    AffineAdapter, CompanionAdapter, EntryTicket, OperatorAdapter, ReadingAdapter,
-    ReadingAdapterError, ReadingCoverage,
+    AffineAdapter, CompanionAdapter, DependencyPolicy, EntryTicket, LiveBindingError,
+    OperatorAdapter, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
+    ReadingImport, ReadingRegion,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,

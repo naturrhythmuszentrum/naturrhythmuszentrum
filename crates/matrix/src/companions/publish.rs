@@ -9,7 +9,7 @@ use crate::heap::{
 };
 use crate::storage::{Format, Region};
 use crate::{Extent, Heap, HeapError, JointError, JointLimits, JointModel, Layout};
-use nrz_bindings::{Descriptor, PairingWitness, UncertaintyMode};
+use nrz_bindings::{PairingWitness, UncertaintyMode};
 use nrz_scalar::Scalar;
 use std::{marker::PhantomData, rc::Rc};
 
@@ -92,7 +92,15 @@ impl Heap {
             .try_reserve(1)
             .map_err(|_| JointError::ResourceLimit)?;
         let evaluation = evaluation_descriptors(&draft.model)?;
-        let prepared = prepare_regions(self, draft.model.representation(), draft.means.as_ref())?;
+        let declarations =
+            super::declarations::prepare(self, &draft.model, &draft.targets, draft.means.as_ref())?;
+        let prepared = prepare_regions(
+            self,
+            draft.model.representation(),
+            draft.means.as_ref(),
+            &declarations,
+        )?;
+        crate::binding::parameters::validate(&prepared.covers, &prepared.records)?;
         let [row_target, column_target] = draft.targets;
         let record = JointRecord {
             targets: [row_target.target, column_target.target],
@@ -108,6 +116,7 @@ impl Heap {
         self.storage.publish(prepared.storage);
         crate::binding::schema::publish(self, prepared.schemas);
         self.descriptors.publish(prepared.records);
+        self.symbols.publish(prepared.covers);
         self.joint.records.push(record);
         Ok(CompanionRef {
             scope: self.scope,
@@ -197,12 +206,15 @@ struct PreparedRegions {
     records: crate::heap::slots::PreparedSlots<Record>,
     /// Future factor and weight locators.
     keys: Vec<Key>,
+    /// Full per-entry parameter declarations.
+    covers: Vec<crate::binding::symbols::RegionCover>,
 }
 /// Prepare every allocation before the metadata publication step.
 fn prepare_regions<P: Scalar + 'static>(
     heap: &mut Heap,
     covariance: &crate::CovarianceRepresentation<P>,
     means: Option<&super::MeanParameters<P>>,
+    declarations: &[nrz_bindings::ParameterSymbol],
 ) -> Result<PreparedRegions, JointError> {
     let (extents, payloads) = match covariance {
         crate::CovarianceRepresentation::Factor(factor) => (
@@ -219,12 +231,12 @@ fn prepare_regions<P: Scalar + 'static>(
     };
     let mut extents = extents.to_vec();
     let mut payloads = payloads.to_vec();
-    let mut quantities = vec![Descriptor::ratio(); 2];
+    let mut quantities = vec![None; 2];
     if let Some(means) = means {
         for (errors, descriptor) in means.errors.iter().zip(&means.descriptors) {
             extents.push(Extent::new(errors.len(), 1)?);
             payloads.push(errors.as_slice());
-            quantities.push(descriptor.clone());
+            quantities.push(Some(descriptor.clone()));
         }
     }
     let mut schemas = Vec::new();
@@ -242,6 +254,17 @@ fn prepare_regions<P: Scalar + 'static>(
         .descriptors
         .prepare(payloads.len(), heap.limits.descriptors)?;
     let keys = plan.keys().to_vec();
+    let mut covers = Vec::new();
+    if keys.len() != declarations.len() {
+        return Err(JointError::LengthMismatch);
+    }
+    for (&key, declaration) in keys.iter().zip(declarations) {
+        covers.push(heap.symbols.prepare_parameter(
+            key,
+            declaration.clone(),
+            heap.limits.descriptors,
+        )?);
+    }
     let storage = heap.storage.prepare(&payloads, &[], heap.limits)?;
     let records = region_records::<P>(&indices, &extents, storage.keys(), storage.epoch())?;
     let records = plan.bind(records)?;
@@ -250,6 +273,7 @@ fn prepare_regions<P: Scalar + 'static>(
         schemas,
         records,
         keys,
+        covers,
     })
 }
 
@@ -293,7 +317,9 @@ fn validate_selection<P: Scalar + 'static>(
         .meanings
         .get(heap.descriptors.get(target.target.key)?.schema)
         .ok_or(HeapError::InvalidLayout)?
-        .quantity;
+        .quantity
+        .as_ref()
+        .ok_or(HeapError::MissingBinding)?;
     for (position, &index) in selection.iter().enumerate() {
         for (earlier, &previous) in selection[..position].iter().enumerate() {
             if target.layout().flat_index(position)? == target.layout().flat_index(earlier)?

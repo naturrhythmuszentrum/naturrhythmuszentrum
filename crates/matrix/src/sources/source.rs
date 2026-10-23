@@ -18,6 +18,8 @@ pub struct SourceId(u64);
 pub struct Source<P: Scalar> {
     /// Immutable identity.
     id: SourceId,
+    /// Actual immutable mathematical source declaration.
+    symbol: nrz_bindings::QuantitySymbol,
     /// Immutable declaration revision.
     revision: u64,
     /// Coherent continuous difference schema.
@@ -39,6 +41,14 @@ impl<P: Scalar> Source<P> {
         }
         Ok(Self {
             id: SourceId(crate::heap::identity::identity()?),
+            symbol: crate::binding::symbols::declare(
+                descriptor,
+                crate::Extent::new(1, 1)?,
+                [false, false],
+                &mut crate::binding::symbols::budget()?,
+            )?
+            .value()
+            .clone(),
             revision,
             descriptor: descriptor.clone(),
             definition: Rc::new(RefCell::new(None)),
@@ -53,6 +63,11 @@ impl<P: Scalar> Source<P> {
             return Err(JointError::SourceConflict);
         }
         Ok(self.clone())
+    }
+    /// Actual bindings declaration retained by every clone and parameter relation.
+    #[must_use]
+    pub const fn symbol(&self) -> &nrz_bindings::QuantitySymbol {
+        &self.symbol
     }
     /// Immutable source identity.
     #[must_use]

@@ -65,8 +65,8 @@ pub(crate) struct Reservations<P: Scalar> {
     pub(crate) symbols: Vec<nrz_bindings::BindingSymbols>,
     /// Sealed bindings correspondence for each copied output.
     pub(crate) copies: Vec<nrz_bindings::CopyWitness>,
-    /// Complete opaque owners installed in the same numerical publication.
-    pub(crate) owners: Vec<super::symbols::Owner>,
+    /// Complete opaque covers installed in the same numerical publication.
+    pub(crate) covers: Vec<super::symbols::RegionCover>,
     /// Real allocated zero-initialized destination slabs, unavailable to views.
     pub(crate) storage: PreparedStorage,
     /// New immutable schemas with pre-reserved heap capacity.
@@ -89,20 +89,33 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         let specifications = specifications(inputs, operation)?;
         let (symbols, copies) = output_symbols(inputs, operation, &specifications)?;
         let (plans, schemas) = schema_plans(heap, &specifications, operation)?;
+        let count = plans.iter().try_fold(0_usize, |total, plan| {
+            total
+                .checked_add(bundle_count(plan))
+                .ok_or(HeapError::Capacity)
+        })?;
+        let slots = heap.descriptors.prepare(count, heap.limits.descriptors)?;
+        let (covers, stamps) = prepare_covers::<Q>(heap, &plans, &symbols, slots.keys())?;
         let payloads = zeros::<Q>(&specifications, &plans)?;
         let slices = payloads.iter().map(Vec::as_slice).collect::<Vec<_>>();
-        let slots = heap
-            .descriptors
-            .prepare(slices.len(), heap.limits.descriptors)?;
         let storage = heap.storage.prepare(&slices, &[], heap.limits)?;
-        let prepared = assemble_outputs(heap, &specifications, plans, &symbols, &slots, &storage)?;
+        let prepared = assemble_outputs(
+            heap.scope,
+            &specifications,
+            plans,
+            &symbols,
+            &slots,
+            &storage,
+            &stamps,
+        )?;
         Ok(Self {
             planned: super::lifecycle::Plans {
                 values: prepared.planned,
+                readings: Vec::new(),
             },
             copies,
             symbols,
-            owners: prepared.owners,
+            covers,
             storage,
             schemas,
             records: slots.bind(prepared.records)?,
@@ -118,7 +131,8 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         {
             return Err(HeapError::LengthMismatch.into());
         }
-        super::symbols::validate(&self.owners, &self.symbols, &self.bundles, &self.outputs)?;
+        super::symbols::validate(&self.covers, &self.symbols, &self.bundles, &self.outputs)?;
+        super::live::results::validate_pending(&self.planned.readings)?;
         for (copy, symbols) in self.copies.iter().zip(&self.symbols) {
             if copy.result().value() != symbols.value()
                 || copy.result().bound() != symbols.bound()
@@ -152,7 +166,7 @@ impl<Q: Scalar + 'static> Reservations<Q> {
     }
 }
 
-/// Private numerical bundles and their matching exact owners.
+/// Private numerical bundles and their matching exact covers.
 struct PreparedOutputs<P: Scalar> {
     /// Prepared selected result bindings, with no public value access.
     planned: Vec<super::ValueBinding<P>>,
@@ -162,38 +176,34 @@ struct PreparedOutputs<P: Scalar> {
     bundles: Vec<PublishedBundle<P>>,
     /// Numerical output contracts.
     outputs: Vec<OutputReservation>,
-    /// Matching exact symbol owners.
-    owners: Vec<super::symbols::Owner>,
 }
 
 /// Assemble fixed-size output bundles after the complete storage reservation.
 fn assemble_outputs<Q: Scalar + 'static>(
-    heap: &mut Heap,
+    scope: u64,
     specifications: &[OutputSpecification],
     plans: Vec<SchemaPlan>,
     symbols: &[nrz_bindings::BindingSymbols],
     slots: &crate::heap::slots::SlotPlan,
     storage: &PreparedStorage,
+    stamps: &[ValueStamp],
 ) -> Result<PreparedOutputs<Q>, OperationError> {
-    let mut owners = buffer(symbols.len().checked_mul(3).ok_or(HeapError::Capacity)?)?;
     let mut records = buffer(slots.keys().len())?;
     let mut bundles = buffer(specifications.len())?;
     let mut outputs = buffer(specifications.len())?;
     let mut planned = buffer(specifications.len())?;
-    for ((specification, plan), inventory) in specifications.iter().zip(plans).zip(symbols) {
+    for (((specification, plan), inventory), &stamp) in
+        specifications.iter().zip(plans).zip(symbols).zip(stamps)
+    {
         let start = records.len();
         let count = 1
             + usize::from(plan.bound.is_some())
             + usize::from(plan.evaluation.is_some())
             + 3 * usize::from(plan.contributions.is_some());
         let end = start.checked_add(count).ok_or(HeapError::Capacity)?;
-        let stamp = ValueStamp {
-            id: ValueId(identity()?),
-            version: ValueVersion(1),
-        };
         let extent = specification.extent;
         let (mut prepared, bundle) = prepare_records::<Q>(
-            heap.scope,
+            scope,
             extent,
             slots.keys().get(start..end).ok_or(HeapError::Capacity)?,
             storage.keys().get(start..end).ok_or(HeapError::Capacity)?,
@@ -210,7 +220,7 @@ fn assemble_outputs<Q: Scalar + 'static>(
             stamp,
             extent,
             schema: SchemaId {
-                scope: heap.scope,
+                scope,
                 index: plan.value,
             },
             coverage: specification.coverage,
@@ -218,16 +228,11 @@ fn assemble_outputs<Q: Scalar + 'static>(
             evaluation: plan.evaluation.is_some(),
             contributions: plan.contributions.is_some(),
         });
-        let schemas = [Some(plan.value), plan.bound, plan.evaluation].map(|index| {
-            index.map(|index| SchemaId {
-                scope: heap.scope,
-                index,
-            })
-        });
+        let schemas = [Some(plan.value), plan.bound, plan.evaluation]
+            .map(|index| index.map(|index| SchemaId { scope, index }));
         planned.push(super::lifecycle::planned(
-            heap.scope, bundle, stamp, extent, schemas, inventory,
+            scope, bundle, stamp, extent, schemas, inventory,
         )?);
-        owners.extend(super::symbols::prepare(heap, inventory, bundle, stamp)?);
         records.extend(prepared);
         bundles.push(bundle);
     }
@@ -236,8 +241,44 @@ fn assemble_outputs<Q: Scalar + 'static>(
         records,
         bundles,
         outputs,
-        owners,
     })
+}
+
+/// Complete numerical bundle size fixed by the checked companion declarations.
+fn bundle_count(plan: &SchemaPlan) -> usize {
+    1 + usize::from(plan.bound.is_some())
+        + usize::from(plan.evaluation.is_some())
+        + 3 * usize::from(plan.contributions.is_some())
+}
+
+/// Prepare complete value and parameter covers before destination or zero-payload allocation.
+fn prepare_covers<P: Scalar>(
+    heap: &mut Heap,
+    plans: &[SchemaPlan],
+    symbols: &[nrz_bindings::BindingSymbols],
+    keys: &[crate::heap::identity::Key],
+) -> Result<(Vec<super::symbols::RegionCover>, Vec<ValueStamp>), HeapError> {
+    let mut covers = Vec::new();
+    let mut stamps = Vec::new();
+    let mut start = 0_usize;
+    for (plan, inventory) in plans.iter().zip(symbols) {
+        let end = start
+            .checked_add(bundle_count(plan))
+            .ok_or(HeapError::Capacity)?;
+        let stamp = ValueStamp {
+            id: ValueId(identity()?),
+            version: ValueVersion(1),
+        };
+        let bundle = super::symbols::planned_bundle::<P>(
+            heap.scope,
+            keys.get(start..end).ok_or(HeapError::Capacity)?,
+            plan,
+        )?;
+        covers.extend(super::symbols::prepare(heap, inventory, bundle, stamp)?);
+        stamps.push(stamp);
+        start = end;
+    }
+    Ok((covers, stamps))
 }
 
 /// Ordered output declarations and their optional copy correspondences.
@@ -374,7 +415,7 @@ fn schema_plans(
             &mut pending,
             BindingSchema {
                 extent,
-                quantity: quantity.clone(),
+                quantity: Some(quantity.clone()),
             },
             heap.limits.schemas,
         )?;
@@ -391,7 +432,7 @@ fn schema_plans(
                 &mut pending,
                 BindingSchema {
                     extent,
-                    quantity: radius,
+                    quantity: Some(radius),
                 },
                 heap.limits.schemas,
             )?)

@@ -18,7 +18,9 @@ pub(crate) struct RegionData<P: Scalar> {
     /// Parameter-specific logical shape.
     pub(crate) extent: Extent,
     /// Homogeneous schema; paired matrices retain per-entry descriptors in their owner.
-    pub(crate) quantity: Descriptor,
+    pub(crate) quantity: Option<Descriptor>,
+    /// Complete actual symbolic targets for every parameter entry.
+    pub(crate) declaration: nrz_bindings::ParameterSymbol,
     /// Private finite numerical payload.
     pub(crate) values: Vec<P>,
 }
@@ -38,6 +40,16 @@ pub(crate) fn append<P: Scalar + 'static, Q: Scalar + 'static>(
         .prepare(payloads.len(), bound.heap.limits.descriptors)?;
     if plan.keys().get(..prefix) != Some(bound.reservations.records.keys()) {
         return Err(StatisticsError::Contract.into());
+    }
+    for (&key, region) in plan.keys().iter().skip(prefix).zip(regions) {
+        bound
+            .reservations
+            .covers
+            .push(bound.heap.symbols.prepare_parameter(
+                key,
+                region.declaration.clone(),
+                bound.heap.limits.descriptors,
+            )?);
     }
     let storage = bound
         .heap
@@ -106,12 +118,14 @@ fn ordinary<P: Scalar>(candidate: &Candidate<P>) -> Vec<&[P]> {
 
 /// All fallible allocation is finished before a standalone cross-block publication.
 pub(crate) struct Standalone {
-    /// Complete private numerical owners.
+    /// Complete private numerical covers.
     pub(crate) storage: crate::storage::PreparedStorage,
     /// Newly interned statistical schemas.
     pub(crate) schemas: Vec<BindingSchema>,
     /// Complete private descriptor occupations.
     pub(crate) records: crate::heap::slots::PreparedSlots<Record>,
+    /// Complete parameter covers, prepared before allocating their floats.
+    pub(crate) covers: Vec<crate::binding::symbols::RegionCover>,
 }
 /// Prepare a separately requested statistical block without changing visible state.
 pub(crate) fn standalone<P: Scalar + 'static>(
@@ -125,6 +139,14 @@ pub(crate) fn standalone<P: Scalar + 'static>(
     let plan = heap
         .descriptors
         .prepare(regions.len(), heap.limits.descriptors)?;
+    let mut covers = Vec::new();
+    for (&key, region) in plan.keys().iter().zip(regions) {
+        covers.push(heap.symbols.prepare_parameter(
+            key,
+            region.declaration.clone(),
+            heap.limits.descriptors,
+        )?);
+    }
     let storage = heap.storage.prepare(&payloads, &[], heap.limits)?;
     let mut schemas = Vec::new();
     let mut records = crate::binding::buffer(regions.len())?;
@@ -156,5 +178,6 @@ pub(crate) fn standalone<P: Scalar + 'static>(
         storage,
         schemas,
         records: plan.bind(records)?,
+        covers,
     })
 }

@@ -10,6 +10,7 @@
 //! A draft's optional `with_means` declares mathematical mean-parameter enclosures and constructs separate outward center-to-mean error regions before publication. Without it, `StatisticalView::means` is absent and the centers remain operating points. Repeated declarations for the same target must retain the same mean family and source map. Mean errors are numerical parameter errors, not physical-input radii. `cross_lineage` validates two current companion records, their shared model and all participating blocks, then exposes the exact source-selection rows needed by a later cross-covariance contraction. Repetitions retain dependence. These declaration APIs do not accept caller-supplied numerical Jacobians.
 
 mod access;
+mod declarations;
 mod publish;
 mod target;
 

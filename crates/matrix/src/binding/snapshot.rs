@@ -47,6 +47,8 @@ impl<P: Scalar> CompanionSnapshot<P> {
 pub struct InputSnapshot<P: Scalar> {
     /// Bindings-checked value and companion symbols for the owning base.
     pub(crate) symbols: nrz_bindings::BindingSymbols,
+    /// Selected reading and its complete shared-entry/proof dependency closure.
+    pub(crate) selected: Option<super::live::selected::SelectedReading>,
     /// Selected value occupation, possibly an alias.
     handle: Handle<Value, P>,
     /// Actual base value identity and content version.
@@ -124,8 +126,13 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
             .transpose()?;
         Ok(Self {
             symbols: super::symbols::capture(heap, handle)?,
+            selected: heap.symbols.selection(handle.key).cloned(),
             handle,
-            stamp: value.stamp(),
+            stamp: if heap.symbols.selection(handle.key).is_some() {
+                heap.symbols.cover(heap.base_handle(handle)?.key)?.stamp
+            } else {
+                value.stamp()
+            },
             schema: value.region().schema_id(),
             layout: value.region().layout().clone(),
             companion,
@@ -144,7 +151,14 @@ impl<P: Scalar + 'static> InputSnapshot<P> {
     ) -> Result<(), OperationError> {
         let value = heap.value(self.handle)?;
         let region = value.region();
-        if value.stamp() != self.stamp
+        if let Some(selected) = &self.selected {
+            selected.validate(heap)?;
+        }
+        let stamp_matches = self.selected.as_ref().map_or_else(
+            || value.stamp() == self.stamp,
+            |_| value.stamp().id() == self.stamp.id(),
+        );
+        if !stamp_matches
             || region.schema_id() != self.schema
             || region.layout() != &self.layout
             || region.extent() != contract.shape().extent()

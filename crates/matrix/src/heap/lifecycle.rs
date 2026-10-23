@@ -146,8 +146,10 @@ impl Heap {
             .change(0, None, &keys, self.limits.descriptors)?;
         let descriptors = plan.bind(Vec::new())?;
         let storage = self.storage.prepare::<P>(&[], &regions, self.limits)?;
+        let invalidations = crate::binding::live::invalidation::whole(self, snapshot.key);
         self.storage.publish(storage);
         self.descriptors.publish(descriptors);
+        crate::binding::live::invalidation::publish(invalidations);
         Ok(())
     }
 

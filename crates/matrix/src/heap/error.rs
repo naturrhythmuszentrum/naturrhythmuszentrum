@@ -7,12 +7,12 @@ pub enum HeapError {
     /// A planned symbol has no complete published numerical binding.
     #[error("symbol value is unavailable until complete publication")]
     UnavailableSymbol,
-    /// The migrated value or companion region has no current symbol owner.
-    #[error("region has no current symbol owner")]
-    MissingSymbolOwner,
-    /// A current region version already has a symbol owner.
-    #[error("region version already has a symbol owner")]
-    DuplicateSymbolOwner,
+    /// The value or parameter region lacks its current complete binding cover.
+    #[error("region has no current binding cover")]
+    MissingBinding,
+    /// An additional allocation sponsor supplies no checked overlap authority.
+    #[error("region overlap lacks compatible binding evidence")]
+    IncompatibleOverlap,
     /// Exact value, companion or result symbol admission refused.
     #[error("binding symbols: {0}")]
     Symbols(nrz_bindings::AdmissionError),

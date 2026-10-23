@@ -76,15 +76,30 @@ fn publish<P: Scalar + 'static>(
         &quantities[1],
         covariance.extent.entries(),
     )?;
+    let mut target_symbols = Vec::new();
+    for target in &targets {
+        target_symbols.push(crate::binding::parameters::dependency_targets(
+            heap, target,
+        )?);
+    }
+    let declaration = crate::binding::parameters::paired(
+        covariance.extent,
+        &descriptors,
+        &target_symbols[0],
+        &target_symbols[1],
+    )?;
+    let error_symbol = crate::binding::parameters::errors(&declaration)?;
     let regions = [
         RegionData {
             extent: covariance.extent,
-            quantity: nrz_bindings::Descriptor::ratio(),
+            quantity: None,
+            declaration,
             values: covariance.centers.clone(),
         },
         RegionData {
             extent: covariance.extent,
-            quantity: nrz_bindings::Descriptor::ratio(),
+            quantity: None,
+            declaration: error_symbol,
             values: covariance.errors(context)?,
         },
     ];
@@ -114,9 +129,11 @@ fn publish<P: Scalar + 'static>(
         index: heap.statistics.records.len(),
         marker: std::marker::PhantomData,
     };
+    crate::binding::parameters::validate(&prepared.covers, &prepared.records)?;
     heap.storage.publish(prepared.storage);
     crate::binding::schema::publish(heap, prepared.schemas);
     heap.descriptors.publish(prepared.records);
+    heap.symbols.publish(prepared.covers);
     heap.statistics.records.push(record);
     Ok(handle)
 }
