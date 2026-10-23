@@ -65,14 +65,16 @@ pub(crate) fn map<P: Scalar + 'static>(
                 }
             }
             Recipe::Linear(map) => fixed(map, &mut result, context)?,
-            Recipe::Product | Recipe::Elementwise(_) => {
+            Recipe::Product | Recipe::Elementwise(_) | Recipe::PositiveReciprocal(_) => {
                 return Err(StatisticsError::Unsupported.into());
             }
         },
         NativeRecipe::Affine(contracts) => {
             super::conversion::map(operation, contracts, slot, &mut result, context)?;
         }
-        NativeRecipe::Solve(_) => return Err(StatisticsError::Unsupported.into()),
+        NativeRecipe::Solve(_) | NativeRecipe::Reciprocal { .. } => {
+            return Err(StatisticsError::Unsupported.into());
+        }
     }
     Ok(result)
 }

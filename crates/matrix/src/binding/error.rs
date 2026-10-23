@@ -4,6 +4,12 @@
 /// A refused operation contract, binding, evaluation or publication.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum OperationError {
+    /// Exact coefficient recipe, reference or correspondence admission refused.
+    #[error("reading recipe: {0}")]
+    Reading(#[from] nrz_bindings::readings::ReadingError),
+    /// Cumulative exact construction or coefficient export resources refused.
+    #[error("recipe algebra: {0}")]
+    Exact(#[from] nrz_bindings::readings::algebra::Fault),
     /// Square solve admission, candidate generation or independent certification failed.
     #[error("solve: {0}")]
     Solve(#[from] crate::SolveError),

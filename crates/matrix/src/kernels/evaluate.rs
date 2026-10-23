@@ -30,6 +30,10 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     }
     let context = ArithmeticContext::new().map_err(KernelError::from)?;
     let (entries, contributions) = match &contract.recipe {
+        Recipe::PositiveReciprocal(schedule) => (
+            super::reciprocal::evaluate(schedule, views, &context)?,
+            None,
+        ),
         Recipe::Sum { subtract, right } => (sum(views, *subtract, right, &context)?, None),
         Recipe::Transform(map) => (
             transform(views, map)?,

@@ -5,6 +5,7 @@ mod draft;
 pub(crate) mod linear;
 mod nonlinear;
 mod product;
+mod reciprocal;
 
 use super::{CheckedOperation, ExecutionLimits, NativeRecipe, OperationError, RegionContract};
 use crate::kernels::contract::{KernelContract, Recipe};
@@ -13,6 +14,8 @@ use std::rc::Rc;
 /// Descriptor-side construction evidence, discarded from the numerical contract.
 #[derive(Clone, Debug)]
 pub(crate) struct KernelDraft {
+    /// Exact reciprocal correspondence remains outside the numerical kernel contract.
+    pub(crate) reciprocal: Option<Rc<nrz_bindings::readings::PositiveReciprocalMap>>,
     /// Ordered bindings-admitted physical inputs.
     pub(crate) inputs: Rc<[RegionContract]>,
     /// Independently admitted output meaning and structure.
@@ -35,10 +38,17 @@ impl KernelDraft {
             recipe: self.recipe,
             work: self.work,
         };
+        let recipe = match self.reciprocal {
+            Some(definition) => NativeRecipe::Reciprocal {
+                kernel: Box::new(numerical),
+                definition,
+            },
+            None => NativeRecipe::Kernel(Box::new(numerical)),
+        };
         Ok(CheckedOperation {
             inputs: self.inputs,
             outputs: vec![self.output].into(),
-            recipe: NativeRecipe::Kernel(Box::new(numerical)),
+            recipe,
             revision: 1,
         })
     }

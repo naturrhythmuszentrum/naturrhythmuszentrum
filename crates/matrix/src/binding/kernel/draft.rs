@@ -36,6 +36,7 @@ impl OperationDraft {
     #[must_use]
     pub fn linear_map(map: LinearMap) -> Self {
         kernel(KernelDraft {
+            reciprocal: None,
             inputs: vec![map.input.clone()].into(),
             output: map.output.clone(),
             work: map.work,
@@ -90,6 +91,7 @@ fn sum(
         .ok_or(OperationError::UnsupportedShape)?
         .clone();
     Ok(kernel(KernelDraft {
+        reciprocal: None,
         work: work(output.extent().entries(), 8)?,
         output: RegionContract::check(output)?,
         inputs: regions(vec![left, right])?,
@@ -107,6 +109,7 @@ fn transform(
     map: EntryMap,
 ) -> Result<OperationDraft, OperationError> {
     Ok(kernel(KernelDraft {
+        reciprocal: None,
         work: work(output.extent().entries(), 6)?,
         inputs: regions(vec![input])?,
         output: RegionContract::check(output)?,

@@ -107,3 +107,10 @@ mod reading_testing;
     reason = "exact reading fixtures are shared across the corresponding test layers"
 )]
 mod copy_testing;
+
+#[path = "../src/testing/reciprocal.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "reciprocal fixtures are shared across public conformance and integration tests"
+)]
+mod reciprocal_testing;

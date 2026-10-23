@@ -99,6 +99,15 @@ pub struct CheckedOperation {
 }
 
 impl CheckedOperation {
+    /// Exact positive reciprocal operator correspondence, when this closed recipe is selected.
+    #[must_use]
+    pub fn reciprocal_map(&self) -> Option<&nrz_bindings::readings::PositiveReciprocalMap> {
+        match &self.recipe {
+            NativeRecipe::Reciprocal { definition, .. } => Some(definition),
+            _ => None,
+        }
+    }
+
     /// Whether this sealed recipe propagates statistical coverage.
     ///
     /// Only recipes with complete source-preserving propagation report this capability.
@@ -197,6 +206,13 @@ fn unit_coordinates(axis: &Axis) -> Result<CoordinateMap, OperationError> {
 /// Closed supported recipe schedule; external code cannot install a numerical callback.
 #[derive(Clone, Debug)]
 pub(crate) enum NativeRecipe {
+    /// Exact positive reciprocal correspondence beside its meaning-free numerical contract.
+    Reciprocal {
+        /// Numerical extents, coefficient images and outward law.
+        kernel: Box<crate::kernels::KernelContract>,
+        /// Original physical references and complete exact correspondence.
+        definition: std::rc::Rc<nrz_bindings::readings::PositiveReciprocalMap>,
+    },
     /// Square solve under an independent inverse-defect and residual theorem.
     Solve(Box<crate::solve::SolveContract>),
     /// Checked deterministic multi-input region operation.

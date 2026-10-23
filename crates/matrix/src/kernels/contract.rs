@@ -11,6 +11,8 @@ use std::rc::Rc;
 /// The closed deterministic law used for a published output.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum KernelKind {
+    /// Affine coefficient assembly from strictly positive normalized reciprocals.
+    PositiveReciprocalMap,
     /// Independent sum with both operand bounds retained.
     Add,
     /// Independent difference with both operand bounds retained.
@@ -41,6 +43,8 @@ pub(crate) struct KernelContract {
 /// Kernel schedules retain exact entry maps and immutable coefficient definitions.
 #[derive(Clone, Debug)]
 pub(crate) enum Recipe {
+    /// Complete rational coefficient images and strictly positive reciprocal guards.
+    PositiveReciprocal(Box<super::reciprocal::Schedule>),
     /// An aligned binary operation; repeated handles retain multiplicity.
     Sum {
         /// Select subtraction rather than addition.
@@ -62,6 +66,7 @@ impl KernelContract {
     /// Identify the exact deterministic propagation rule.
     pub(crate) const fn kind(&self) -> KernelKind {
         match &self.recipe {
+            Recipe::PositiveReciprocal(_) => KernelKind::PositiveReciprocalMap,
             Recipe::Sum {
                 subtract: false, ..
             } => KernelKind::Add,
@@ -146,7 +151,7 @@ impl CheckedOperation {
         }
         if matches!(
             self.recipe,
-            NativeRecipe::Kernel(_) | NativeRecipe::Solve(_)
+            NativeRecipe::Kernel(_) | NativeRecipe::Reciprocal { .. } | NativeRecipe::Solve(_)
         ) {
             return Ok(0..self.inputs.len());
         }

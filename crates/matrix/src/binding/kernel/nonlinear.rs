@@ -30,6 +30,7 @@ impl OperationDraft {
             return Err(KernelError::Contract.into());
         }
         Ok(super::draft::kernel(KernelDraft {
+            reciprocal: None,
             work: work(output.shape().extent().entries(), 12)?,
             inputs: regions(vec![input])?,
             output,

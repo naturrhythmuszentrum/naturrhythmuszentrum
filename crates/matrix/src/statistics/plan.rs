@@ -134,6 +134,9 @@ fn product(factors: &[usize]) -> Result<usize, OperationError> {
 impl CheckedOperation {
     /// Capability of the currently implemented closed statistical recipes.
     pub(crate) const fn statistical_recipe(&self) -> bool {
+        if matches!(self.recipe, NativeRecipe::Reciprocal { .. }) {
+            return false;
+        }
         matches!(
             self.recipe,
             NativeRecipe::Copy

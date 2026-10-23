@@ -350,7 +350,11 @@ fn specifications<P: Scalar>(
         let numerical = !matches!(operation.recipe, super::NativeRecipe::Copy);
         let coverage = if let super::NativeRecipe::Solve(contract) = &operation.recipe {
             contract.coverage(inputs)?
-        } else if let super::NativeRecipe::Kernel(contract) = &operation.recipe {
+        } else if let super::NativeRecipe::Kernel(contract)
+        | super::NativeRecipe::Reciprocal {
+            kernel: contract, ..
+        } = &operation.recipe
+        {
             contract.coverage(inputs)?
         } else {
             input.coverage
@@ -362,7 +366,10 @@ fn specifications<P: Scalar>(
             evaluation: numerical || input.evaluation.is_some(),
             contributions: match &operation.recipe {
                 super::NativeRecipe::Copy => input.contributions.is_some(),
-                super::NativeRecipe::Kernel(contract) => {
+                super::NativeRecipe::Kernel(contract)
+                | super::NativeRecipe::Reciprocal {
+                    kernel: contract, ..
+                } => {
                     contract.kind() == crate::KernelKind::Product
                         || (contract.kind() == crate::KernelKind::TransformEntries
                             && input.contributions.is_some())

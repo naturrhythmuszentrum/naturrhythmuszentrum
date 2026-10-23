@@ -44,7 +44,11 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         if let crate::binding::NativeRecipe::Solve(contract) = &self.operation.recipe {
             return self.solve_candidate(contract, &inputs.views, token, evidence);
         }
-        if let crate::binding::NativeRecipe::Kernel(contract) = &self.operation.recipe {
+        if let crate::binding::NativeRecipe::Kernel(contract)
+        | crate::binding::NativeRecipe::Reciprocal {
+            kernel: contract, ..
+        } = &self.operation.recipe
+        {
             return self.kernel_candidate(contract, &inputs.views, token, evidence);
         }
         let mut outputs = buffer(inputs.views.len())?;
@@ -55,6 +59,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             crate::binding::NativeRecipe::Copy => None,
             crate::binding::NativeRecipe::Solve(_)
             | crate::binding::NativeRecipe::Kernel(_)
+            | crate::binding::NativeRecipe::Reciprocal { .. }
             | crate::binding::NativeRecipe::Affine(_)
             | crate::binding::NativeRecipe::Precision { .. } => {
                 Some(nrz_scalar::ArithmeticContext::new().map_err(crate::ConversionError::from)?)
@@ -94,7 +99,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         context: Option<&nrz_scalar::ArithmeticContext>,
     ) -> Result<(Payload<Q>, crate::RecipeEvidence), OperationError> {
         match &self.operation.recipe {
-            crate::binding::NativeRecipe::Solve(_) | crate::binding::NativeRecipe::Kernel(_) => {
+            crate::binding::NativeRecipe::Solve(_)
+            | crate::binding::NativeRecipe::Kernel(_)
+            | crate::binding::NativeRecipe::Reciprocal { .. } => {
                 Err(OperationError::CandidateContract)
             }
             crate::binding::NativeRecipe::Copy => {

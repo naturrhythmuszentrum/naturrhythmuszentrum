@@ -13,6 +13,7 @@ mod meaning;
 mod normalization;
 mod operations;
 mod projection;
+mod reciprocal;
 mod relation;
 mod representation;
 mod shape;
@@ -35,6 +36,7 @@ pub use operations::{
     ReadingOperationError,
 };
 pub use projection::{ProjectionSpace, ReadingProjection};
+pub use reciprocal::{PositiveReciprocalMap, ReciprocalMapDefinition};
 pub use relation::ReadingRelation;
 pub use representation::{Representation, RepresentationDefinition, RepresentationKind};
 pub use shape::{ReadingAxis, ReadingShape};

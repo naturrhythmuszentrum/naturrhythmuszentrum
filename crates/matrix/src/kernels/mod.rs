@@ -21,6 +21,7 @@ mod linear_evaluate;
 pub(crate) mod lowering;
 mod nonlinear;
 mod product;
+pub(crate) mod reciprocal;
 
 pub use crate::binding::kernel::linear::{FixedCoefficient, LinearMap};
 pub(crate) use contract::KernelContract;

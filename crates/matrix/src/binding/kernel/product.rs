@@ -22,6 +22,7 @@ impl OperationDraft {
             .and_then(|count| count.checked_add(right.extent().entries().checked_mul(2)?))
             .ok_or(OperationError::ResourceLimit)?;
         Ok(super::draft::kernel(KernelDraft {
+            reciprocal: None,
             inputs: regions(vec![left, right])?,
             output: RegionContract::check(output)?,
             recipe: Recipe::Product,

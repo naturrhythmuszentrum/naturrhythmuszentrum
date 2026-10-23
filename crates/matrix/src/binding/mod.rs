@@ -130,6 +130,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             NativeRecipe::Copy
             | NativeRecipe::Affine(_)
             | NativeRecipe::Kernel(_)
+            | NativeRecipe::Reciprocal { .. }
             | NativeRecipe::Solve(_)
                 if P::PRECISION == Q::PRECISION => {}
             _ => return Err(HeapError::PrecisionMismatch.into()),
@@ -148,7 +149,11 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         }
         let dependencies = capture(heap, &self.inputs)?;
         let entries = payload_entries(&dependencies)?;
-        if let NativeRecipe::Kernel(contract) = &self.operation.recipe {
+        if let NativeRecipe::Kernel(contract)
+        | NativeRecipe::Reciprocal {
+            kernel: contract, ..
+        } = &self.operation.recipe
+        {
             self.limits.check(self.inputs.len(), contract.work)?;
         }
         let output_entries = Reservations::<Q>::payload_entries(&dependencies, &self.operation)?;

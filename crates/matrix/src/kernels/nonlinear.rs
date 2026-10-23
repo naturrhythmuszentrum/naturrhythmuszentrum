@@ -29,6 +29,8 @@ pub enum Elementwise {
 /// A numerical domain premise that was not established for the entire selected entry box.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum DomainReason {
+    /// A recipe requires a strictly positive whole enclosure, including its lower endpoint.
+    NonpositiveInput,
     /// The reciprocal input enclosure includes zero.
     ZeroInDivisor,
     /// The square-root input enclosure contains negative values.
