@@ -37,7 +37,10 @@ pub use operations::{
     ReadingOperationError,
 };
 pub use projection::{ProjectionSpace, ReadingProjection};
-pub use reciprocal::{PositiveReciprocalMap, ReciprocalMapDefinition};
+pub use reciprocal::{
+    PositiveReciprocalMap, ReciprocalJacobian, ReciprocalJacobianCache, ReciprocalJacobianKey,
+    ReciprocalMapDefinition, SourceJacobianUsage,
+};
 pub use relation::ReadingRelation;
 pub use representation::{Representation, RepresentationDefinition, RepresentationKind};
 pub use roots::{RootCoverage, RootProblem, RootReplayUsage};

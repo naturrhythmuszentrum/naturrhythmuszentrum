@@ -81,7 +81,11 @@ pub(crate) struct Fixture {
 impl Fixture {
     /// Construct an independent receiver without inspecting a sender's proof.
     pub(crate) fn new(declarations: &[(&str, Sort)]) -> TestResult<Self> {
-        let mut cas = Cas::new(Limits::default())?;
+        Self::with_limits(declarations, Limits::default())
+    }
+    /// Explicit permanent ceilings for caller-budget measurements; ordinary fixtures keep defaults.
+    pub(crate) fn with_limits(declarations: &[(&str, Sort)], limits: Limits) -> TestResult<Self> {
+        let mut cas = Cas::new(limits)?;
         let environment = Environment {
             declarations: declarations
                 .iter()

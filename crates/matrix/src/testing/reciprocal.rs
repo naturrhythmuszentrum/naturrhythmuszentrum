@@ -27,12 +27,33 @@ pub(crate) struct FixturePlan {
 
 /// Original positive L/C stratum and the fixed state/time references precede numerical values.
 pub(crate) fn plan() -> TestResult<FixturePlan> {
-    let mut case = Fixture::new(&[
+    plan_with_policy(nrz_bindings::Limits::default(), false)
+}
+
+/// Native derivative measurements declare their complete permanent policy before constructing the graph.
+pub(crate) fn plan_with_policy(
+    limits: nrz_bindings::Limits,
+    input_readings: bool,
+) -> TestResult<FixturePlan> {
+    let mut declarations = vec![
         ("L", real()),
         ("C", real()),
         ("b", matrix(2, 2)),
         ("B", matrix(2, 2)),
-    ])?;
+    ];
+    if input_readings {
+        declarations.extend([
+            ("p", matrix(2, 1)),
+            ("storedL", real()),
+            ("storedC", real()),
+        ]);
+    }
+    let case = Fixture::with_limits(&declarations, limits)?;
+    prepare(case)
+}
+
+/// The same original recipe keeps its ordinary default fixture and explicit derivative-policy fixture.
+fn prepare(mut case: Fixture) -> TestResult<FixturePlan> {
     positive(&mut case)?;
     let state = [
         meaning("voltage", [2, 1, -3, -1, 0, 0, 0], "5")?,

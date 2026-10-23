@@ -58,6 +58,11 @@ impl EntryMeaning {
         })))
     }
 
+    /// Clones retain one immutable physical declaration without comparing descriptive payloads.
+    pub(crate) fn shares_definition(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
     /// Match complete physical coordinates, including independent reference identities.
     /// # Errors
     /// Refuses changed kinds, units, roles, references or origins by their invariant.

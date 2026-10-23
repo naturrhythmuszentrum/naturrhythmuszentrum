@@ -3,6 +3,7 @@
 
 mod build;
 mod guard;
+mod jacobian;
 mod storage;
 
 use super::{CoordinateNormalization, ReadingError, support};
@@ -13,6 +14,10 @@ use nrz_cas::{
     readings::{AffineMap, ExactAffineMap, ReuseKey},
 };
 use std::rc::Rc;
+
+pub use jacobian::{
+    ReciprocalJacobian, ReciprocalJacobianCache, ReciprocalJacobianKey, SourceJacobianUsage,
+};
 
 /// Proposed coefficient array formed from positive normalized reciprocals.
 #[derive(Clone, Debug)]
