@@ -77,3 +77,7 @@ mod dependency_refusals;
 mod map_inverses;
 
 mod map_inverse_limits;
+
+mod reuse_keys;
+
+mod reuse_limits;

@@ -28,6 +28,8 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// Portable key bytes disagree with their authenticated local retained relation.
+    ReuseKeyMismatch,
     /// An exact square map has identically zero determinant.
     ReadingSingular,
     /// The determinant is not established nonzero throughout the admitted family.

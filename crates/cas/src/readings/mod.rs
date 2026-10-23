@@ -23,6 +23,7 @@ mod inventory_write;
 mod inverse;
 mod proof;
 mod rational_inverse;
+mod reuse;
 mod selection;
 mod storage;
 pub(crate) mod syntax;
@@ -38,6 +39,7 @@ pub use inventory_model::{
 };
 pub use inverse::CheckedMapInverse;
 pub use rational_inverse::AffineInverse;
+pub use reuse::ReuseKey;
 pub use selection::{EntryIndex, EntryOrder, EntrySelection, SelectionSpec};
 
 use crate::budget::{Budget, BudgetKind};

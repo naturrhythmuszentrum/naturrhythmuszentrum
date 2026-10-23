@@ -55,3 +55,5 @@ mod dependencies;
 mod dependency_domains;
 
 mod map_inverses;
+
+mod normalization;
