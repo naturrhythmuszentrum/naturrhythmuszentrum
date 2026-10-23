@@ -243,6 +243,7 @@ pub(crate) fn check(
     draft: &ApplicationDraft,
     certificate: &CertificateProductCompleteness,
     premises: &[CheckedApplication],
+    empty: &[usize],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let Statement::Solve(statement) = &draft.conclusion else {
@@ -275,6 +276,7 @@ pub(crate) fn check(
         }
     }
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,
@@ -285,15 +287,22 @@ pub(crate) fn check(
         free: &[],
         bound: &[],
     };
-    let entries = entries(cas, coverage, budget)?;
-    membership(&evaluation, original, &entries, budget)?;
-    let product = factors(&evaluation, original, certificate, &entries, budget)?;
-    let original_polynomial = equation(&evaluation, original, budget)?;
-    identity(
-        &evaluation,
-        certificate.product,
-        &original_polynomial,
-        &product,
-        budget,
-    )
+    let exclusions = super::exclusion::values(&evaluation, empty, budget)?;
+    let evaluation = Evaluation {
+        exclusions: &exclusions.values,
+        ..evaluation
+    };
+    budget.with_retained_payload(exclusions.bytes, AT, |budget| {
+        let entries = entries(cas, coverage, budget)?;
+        membership(&evaluation, original, &entries, budget)?;
+        let product = factors(&evaluation, original, certificate, &entries, budget)?;
+        let original_polynomial = equation(&evaluation, original, budget)?;
+        identity(
+            &evaluation,
+            certificate.product,
+            &original_polynomial,
+            &product,
+            budget,
+        )
+    })
 }

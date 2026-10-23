@@ -447,3 +447,17 @@ fn mixed_square_root_sign_pieces() -> TestResult {
     }
     Ok(())
 }
+
+/// The independent full exclusion search agrees with every original success and refusal in this fixture family.
+/// ´test:crate:mixed-family-oracle-agreement´
+#[test]
+fn mixed_family_oracle_agreement() -> TestResult {
+    crate::testing::exclusion_oracle::run(|| {
+        mixed_linear_piece_replays()?;
+        mixed_quadratic_piece_replays()?;
+        mixed_cubic_piece_replays()?;
+        mixed_general_cubic_piece_replays()?;
+        mixed_square_root_sign_pieces()?;
+        Ok(())
+    })
+}

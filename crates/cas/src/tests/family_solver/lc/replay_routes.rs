@@ -58,7 +58,7 @@ fn lc_replay_default_agrees_with_full_oracle() -> TestResult {
         crate::testing::solve_blind::family_lc(&target.cas, &witness)?;
         costs.push(budget.usage().work);
     }
-    assert_eq!(costs, [1_813_435, 2_413_193]);
+    assert_eq!(costs, [1_464_494, 2_064_252]);
     Ok(())
 }
 
@@ -70,7 +70,7 @@ fn capped_replay(
     short: u64,
     prior: u64,
 ) -> TestResult {
-    let required = 1_813_435;
+    let required = 1_464_494;
     let cap = required - short;
     let (mut target, expected) = receiver(original, set)?;
     let before = target.cas.counts();
@@ -113,5 +113,31 @@ fn lc_replay_exact_work_boundaries() -> TestResult {
             }
         }
     }
+    Ok(())
+}
+
+/// Empty zero-set lemmas and the retained complete search agree on the original LC judgment.
+/// ´test:crate:lc-empty-exclusion-agrees-with-search´
+#[test]
+fn lc_empty_exclusion_agrees_with_search() -> TestResult {
+    let (original, set, bytes) = source()?;
+    let mut costs = Vec::new();
+    for oracle in [false, true] {
+        let (mut target, expected) = receiver(&original.cas, &set)?;
+        let mut budget = super::ledger()?;
+        let result = if oracle {
+            crate::testing::exclusion_oracle::run(|| {
+                target.cas.replay(&bytes, &expected, &mut budget)
+            })
+        } else {
+            target.cas.replay(&bytes, &expected, &mut budget)
+        };
+        let witness = result?;
+        assert!(witness.is_discharged());
+        assert_eq!(witness.judgment(), &expected);
+        crate::testing::solve_blind::family_lc(&target.cas, &witness)?;
+        costs.push(budget.usage().work);
+    }
+    assert_eq!(costs, [1_464_494, 1_813_435]);
     Ok(())
 }

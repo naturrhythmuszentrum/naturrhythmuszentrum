@@ -15,6 +15,8 @@ use crate::solving::coefficients::storage::{reserve, vector};
 
 /// A read-only simultaneous interpretation, shared by equations, domains and inverse compositions.
 pub(crate) struct Evaluation<'a> {
+    /// Defined nonzero values compiled from checked empty zero-set lemmas in this frame.
+    pub(crate) exclusions: &'a [Value],
     /// Owning immutable graph.
     pub(crate) cas: &'a Cas,
     /// Exact formal coefficient algebra.

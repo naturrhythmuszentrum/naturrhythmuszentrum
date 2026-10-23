@@ -115,3 +115,9 @@ pub(crate) mod replay_answer;
     reason = "crate tests attribute replay Work without changing production accounting"
 )]
 pub(crate) mod work_trace;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "agreement tests share the independent exclusion oracle"
+)]
+pub(crate) mod exclusion_oracle;

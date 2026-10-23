@@ -63,6 +63,7 @@ pub(crate) fn reconstruct(
         budget,
     )?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

@@ -5,13 +5,16 @@ mod check;
 mod facts;
 mod leaves;
 mod model;
+mod registry;
 mod trim;
 mod wire;
 
 pub(crate) use check::check;
+pub(crate) use facts::nonzero;
 pub use model::{
     EmptinessDag, EmptyEvidence, EmptyFact, EmptyFactor, EmptyFactorIdentity, EmptyLeaf, EmptyNode,
 };
+pub use registry::{EMPTY_SCHEMAS, LemmaSchema};
 pub(crate) use wire::{decode, encode, measure};
 
 use crate::error::{Fault, InvalidCode, Location};

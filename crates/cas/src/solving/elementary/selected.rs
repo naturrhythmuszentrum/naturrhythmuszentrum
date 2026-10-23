@@ -745,6 +745,7 @@ mod tests {
     impl Fixture {
         fn evaluation(&self) -> Evaluation<'_> {
             Evaluation {
+                exclusions: &[],
                 cas: &self.cas,
                 engine: Engine {
                     state: &self.cas.state,
@@ -933,6 +934,7 @@ mod tests {
         )?;
         let map = construction.mapping(&mut source.cas, &source.algebra, &images, &mut budget)?;
         let evaluation = Evaluation {
+            exclusions: &[],
             cas: &source.cas,
             engine: Engine {
                 state: &source.cas.state,
@@ -1014,6 +1016,7 @@ mod tests {
                 false,
             )?;
             let evaluation = Evaluation {
+                exclusions: &[],
                 cas: &source.cas,
                 engine: Engine {
                     state: &source.cas.state,
@@ -1122,6 +1125,7 @@ mod tests {
                 .next()
                 .ok_or("zero cell")?;
             let evaluation = Evaluation {
+                exclusions: &[],
                 cas: &source.cas,
                 engine: Engine {
                     state: &source.cas.state,

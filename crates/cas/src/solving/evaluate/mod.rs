@@ -121,6 +121,7 @@ pub(crate) fn check(
         return Err(invalid());
     }
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

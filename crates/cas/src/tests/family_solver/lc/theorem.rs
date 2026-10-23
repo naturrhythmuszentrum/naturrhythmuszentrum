@@ -24,12 +24,12 @@ fn generation(work: u64, arithmetic_steps: u64, denominator_factors: u64) -> Bud
 
 fn replay() -> BudgetUsage {
     BudgetUsage {
-        work: 1_813_435,
-        arithmetic_steps: 29_506,
+        work: 1_464_494,
+        arithmetic_steps: 15_576,
         condition_steps: 43,
         case_arms: 1,
         region_nodes: 5,
-        coefficient_ops: 33_764,
+        coefficient_ops: 19_176,
         denominator_factors: 4,
         coefficient_maps: 4,
         tower_levels: 1,
@@ -101,10 +101,10 @@ fn lc_root_theorem_separate_ledgers() -> TestResult {
     assert_eq!(
         checking.usage(),
         BudgetUsage {
-            work: 1_498_050,
-            arithmetic_steps: 29_740,
+            work: 1_149_109,
+            arithmetic_steps: 15_810,
             condition_steps: 53,
-            coefficient_ops: 34_305,
+            coefficient_ops: 19_717,
             denominator_factors: 2,
             tower_reductions: 1,
             gcd_steps: 88,
@@ -128,9 +128,9 @@ fn lc_root_theorem_separate_ledgers() -> TestResult {
             ("region.construct", 556),
             ("ctx.weaken", 3_354),
             ("ctx.weaken", 4_042),
-            ("root.select", 431_249),
+            ("root.select", 191_321),
             ("coeff.identity", 51_019),
-            ("solve.product", 202_440),
+            ("solve.product", 93_427),
         ]
     );
     Ok(())

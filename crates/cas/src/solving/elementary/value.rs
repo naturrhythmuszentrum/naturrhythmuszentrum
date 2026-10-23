@@ -426,6 +426,7 @@ mod tests {
             [(Variable::Slot(0), 1), (Variable::Slot(1), 1)]
         );
         let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            exclusions: &[],
             cas: &fixture.cas,
             engine,
             region: &fixture.region,

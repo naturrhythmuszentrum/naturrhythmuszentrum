@@ -20,6 +20,7 @@ struct Transport {
 impl Transport {
     fn evaluation(&self) -> Evaluation<'_> {
         Evaluation {
+            exclusions: &[],
             cas: &self.source.cas,
             engine: Engine {
                 state: &self.source.cas.state,

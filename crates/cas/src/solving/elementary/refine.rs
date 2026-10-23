@@ -120,6 +120,7 @@ pub(crate) fn check(
     }
     let stored = polynomial(&cas.state, &first.polynomial)?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

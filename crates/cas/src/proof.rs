@@ -50,5 +50,6 @@ pub use crate::pullback_model::{
 pub use crate::solving::{SolveCertificate, SolveStatement};
 
 pub use crate::emptiness::{
-    EmptinessDag, EmptyEvidence, EmptyFact, EmptyFactor, EmptyFactorIdentity, EmptyLeaf, EmptyNode,
+    EMPTY_SCHEMAS, EmptinessDag, EmptyEvidence, EmptyFact, EmptyFactor, EmptyFactorIdentity,
+    EmptyLeaf, EmptyNode, LemmaSchema,
 };

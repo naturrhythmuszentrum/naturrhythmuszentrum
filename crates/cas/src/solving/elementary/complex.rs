@@ -67,11 +67,13 @@ pub(crate) struct Components<'a, 'b> {
     /// Proved zero polynomials over the current real component variables.
     equations: Vec<Form>,
     /// Exact regional values already known to be nonzero.
-    nonzero: Vec<Value>,
+    nonzero: Vec<(Option<LogicalId>, Value)>,
     /// Exact regional real values already known to be strictly positive.
     positive: Vec<Value>,
     /// Explicit premise slots already imported once in this interpretation.
     imported: Vec<u32>,
+    /// An explicitly cited checked sign or empty-set premise enables shared exclusion leaves.
+    empty_leaves: bool,
     /// Current nesting across expression and scalar-map dependencies.
     depth: u64,
 }
@@ -87,6 +89,7 @@ impl<'a, 'b> Components<'a, 'b> {
             nonzero: vector(0, budget)?,
             positive: vector(0, budget)?,
             imported: vector(0, budget)?,
+            empty_leaves: false,
             depth: 0,
         };
         result.guards(budget)?;

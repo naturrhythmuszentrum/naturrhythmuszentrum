@@ -115,6 +115,7 @@ pub(crate) fn check(
         budget,
     )?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

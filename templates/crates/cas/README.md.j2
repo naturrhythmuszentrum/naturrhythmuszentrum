@@ -23,13 +23,67 @@ The implemented mixed family `z²-r=0` supports negative-radicand pieces with po
 
 The original LC determinant yields complete root/factor coverage under the two original positive guards, without a supplied reciprocal guard. The producer derives `Positive(L*C)`, transports it into the total context, and explicitly cites its local premise slot in the existing `root.select` certificate. Scalar membership interprets the original Real base map through the same checked projection dispatcher as component equality; original map identities, projection predicates and divisors remain mandatory. No inference rule or wire field is added. The original occurrence graph retains four divisor occurrences in order, and nested family arguments retain their actual bodies. Missing signs refuse as `MissingUnitProof`; missing original divisors, changed strata, missing compatibility and incomplete root/factor sets refuse exactly.
 
-`lc_original_root_factor_theorem_replays` pins 838,465 request-generation Work, 4,238 coefficient operations, four coefficient maps and a degree-two tower. Direct theorem construction uses 301,736 Work and checking uses 1,498,050 Work; the 6,140-byte coverage witness replays in a proof-free receiver with 1,813,435 Work under the unchanged 2,000,000 default. An independent rational quotient-ring oracle checks both returned tuples and the full product at four positive parameter pairs, including `L=1/40, C=1/100000`. The symbolic-lowering step in `docs/design/lc-resonance.md` can build on this original root/factor judgment while retaining the original source, context and denominator inventory. Compatibility-slot collection pins 7 Work and 8 staged bytes for the filtered fixture, including foreign contexts and other regions, and zero Work/payload for empty inputs. Scalar base transport pins 174 Work and 576 staged bytes and refuses a missing projection; each nonempty boundary is exercised at `N` and `N−1`, including prior Work.
+`lc_original_root_factor_theorem_replays` pins 838,465 request-generation Work, 4,238 coefficient operations, four coefficient maps and a degree-two tower. Direct theorem construction uses 301,736 Work and checking uses 1,149,109 Work; the 6,140-byte coverage witness replays in a proof-free receiver with 1,464,494 Work under the unchanged 2,000,000 default. An independent rational quotient-ring oracle checks both returned tuples and the full product at four positive parameter pairs, including `L=1/40, C=1/100000`. The symbolic-lowering step in `docs/design/lc-resonance.md` can build on this original root/factor judgment while retaining the original source, context and denominator inventory. Compatibility-slot collection pins 7 Work and 8 staged bytes for the filtered fixture, including foreign contexts and other regions, and zero Work/payload for empty inputs. Scalar base transport pins 174 Work and 576 staged bytes and refuses a missing projection; each nonempty boundary is exercised at `N` and `N−1`, including prior Work.
 
-Test-only exclusive Work attribution separates 221,241 Work for constructive existence and membership, 424,519 for exclusion (including strict nonvanishing), and 74,839 for rule validation and inventory. `root.select` contributes 190,520 existence, 240,057 exclusion and 672 validation Work; `solve.product` contributes 30,721 existence, 170,919 exclusion and 800 validation/inventory Work. Nonvanishing accounts for 356,038 Work, while coefficient-factor search accounts for 18,840. The full-replay oracle’s separate 1,692,594 overhead consists of 674,760 witness encoding, 474,532 wire admission, 262,466 judgment comparison, 215,651 syntax admission, 63,521 application reconstruction, 1,348 conclusion reconstruction and 316 surrounding Work. The observer changes no production accounting or proof authority; cumulative refusal and restoration tests check its collection contract. Sibling-stratum replay checks the original theorem before refusing the changed expected judgment, so its rule costs remain the same as successful replay.
+Test-only exclusive Work attribution separates 221,241 Work for constructive existence and membership, 75,578 for exclusion (including strict nonvanishing), and 74,839 for rule validation and inventory. `root.select` contributes 190,520 existence, 129 exclusion and 672 validation Work; `solve.product` contributes 30,721 existence, 61,906 exclusion and 800 validation/inventory Work. Nonvanishing and its inline sign leaves account for 7,267 Work, while coefficient-factor search accounts for 18,840. The full-replay oracle’s separate 1,692,594 overhead consists of 674,760 witness encoding, 474,532 wire admission, 262,466 judgment comparison, 215,651 syntax admission, 63,521 application reconstruction, 1,348 conclusion reconstruction and 316 surrounding Work. The observer changes no production accounting or proof authority; cumulative refusal and restoration tests check its collection contract. Sibling-stratum replay checks the original theorem before refusing the changed expected judgment, so its rule costs remain the same as successful replay.
 
 Replay compares incoming bytes with the canonical encoding independently produced while sealing the checked graph. Exact local judgment identity avoids rebuilding two portable keys; unequal local judgments retain the full portable comparison, including unordered cover members. This removes 337,380 duplicate encoding Work and replaces 262,466 judgment-comparison Work with 88, reducing overhead to 1,092,836 and total LC replay by 599,758 Work. Rule checking, construction, storage and canonical bytes remain unchanged. A test-only full-replay oracle retains the former independent encoding and comparison route and agrees on success and every changed LC premise. Exact Work and replay-Work boundaries include prior caller Work and atomic rollback. Public fallback tests accept cover permutations and reject an omitted member.
 
-Compact empty-region certificates use one child-before-parent DAG of checked-cover splits, local sign or full-factor contradictions, and earlier checked empty lemmas. Every split consumes its complete cover; each leaf requires an original zero guard and exact nonvanishing evidence, with a defined equality and the entire displayed scalar product for factor leaves. Conditions from all premises remain attached. `Cas::trim_emptiness` discards dead exploration and shares exact region identities within one fixed context and premise frame, without granting proof authority. `region.decide` version 2 checks the result independently; `NRZCAS05` is the sole witness format, and all older magic values refuse. Logical policy 10 retains its weights. `Cas::family_empty_piece` cites the checked empty region through `solve.split` version 2, retaining an explicit empty solution branch and the same `FamilyPiece` descriptor accepted by `family_cover`. The original domain and predicate remain mandatory. These certificates do not yet replace the LC nonvanishing checker or provide a cross-request lemma cache. The retained-empty-piece fixture uses 4,155 generation Work, 73,370 independent checking Work and 200,040 fresh replay Work for 1,775 bytes. Production rule checking is 703 Work; fresh replay rule checking is 2,550, including 728 in the emptiness DAG itself. The remaining costs are syntax, admission and publication, including one canonical encoding of 71,503 Work in each operation. Generation consumes an already checked empty proof while fresh replay checks its full dependency closure. The replay path already reuses the encoding produced by sealing; it performs no second canonical encoding.
+Compact empty-region certificates use one child-before-parent DAG of checked-cover splits, local sign or full-factor contradictions, and earlier checked empty lemmas. Every split consumes its complete cover; each leaf requires an original zero guard and exact nonvanishing evidence, with a defined equality and the entire displayed scalar product for factor leaves. Conditions from all premises remain attached. `Cas::trim_emptiness` discards dead exploration and shares exact region identities within one fixed context and premise frame, without granting proof authority. `region.decide` version 2 checks the result independently; `NRZCAS05` is the sole witness format, and all older magic values refuse. Logical policy 10 retains its weights. `Cas::family_empty_piece` cites the checked empty region through `solve.split` version 2, retaining an explicit empty solution branch and the same `FamilyPiece` descriptor accepted by `family_cover`. The original domain and predicate remain mandatory. LC nonvanishing uses checked sign leaves inline and shares their interpreted subjects within the exact application frame. The component route requires an explicitly cited checked sign or empty-set premise before applying the new factor implication. The shared sign-leaf checker authenticates original strict guards and premises; the monomial implication excludes zero only through covered factors and a nonzero ground coefficient. Complete factor identities and all original divisor occurrences still check. Synthetic zero-region graph records are unnecessary for these cheap derived leaves, so the original 6,140 witness bytes are unchanged. Repeated derivation is replaced by exact comparisons against anonymous local facts, while the complete earlier exclusion algorithm remains an independent test oracle. Portable keys are unnecessary for these inexpensive local consequences. The retained-empty-piece fixture uses 4,155 generation Work, 73,370 independent checking Work and 200,040 fresh replay Work for 1,775 bytes. Production rule checking is 703 Work; fresh replay rule checking is 2,550, including 728 in the emptiness DAG itself. The remaining costs are syntax, admission and publication, including one canonical encoding of 71,503 Work in each operation. Generation consumes an already checked empty proof while fresh replay checks its full dependency closure. The replay path already reuses the encoding produced by sealing; it performs no second canonical encoding.
+
+## Formal emptiness schemas · `sec:cas:empty-schemas`
+
+`proof::EMPTY_SCHEMAS` gives each formal emptiness lemma and hypothesis kind a name, semantic version, estate label, statement and premise shapes. Applications remain anonymous: their identity retains the complete original statement, declarations, context, stratum, premises, representation and proof revision. A formal schema name never substitutes for that instance identity. Qualified hypothesis frames and slots retain the original assumptions.
+
+The register describes the existing cover, sign, factor and lemma checks together with the zero-set and monomial exclusion inferences. Its metadata grants no proof authority: the closed checker reconstructs each application and retains its complete conditions. The rest of the primitive registry and other hypothesis kinds remain outside this register.
+
+**Theorem (Empty split)** · `thm:cas:empty-split`
+
+Formal schema `empty.split`, version 1. A complete exact cover of empty members has an empty parent. Required premises: Checked cover and one earlier empty node for every member.
+
+**Theorem (Empty sign)** · `thm:cas:empty-sign`
+
+Formal schema `empty.sign`, version 1. A true zero guard contradicts a strict sign or nonzero fact for the identical subject. Required premises: True zero guard and a checked containing strict fact.
+
+**Theorem (Empty factor)** · `thm:cas:empty-factor`
+
+Formal schema `empty.factor`, version 1. A defined complete product of nonzero factors cannot equal zero. Required premises: Defined full factor identity, nonzero scalar and all positive-multiplicity factors.
+
+**Theorem (Empty lemma)** · `thm:cas:empty-lemma`
+
+Formal schema `empty.lemma`, version 1. An earlier empty-region theorem proves the identical region empty. Required premises: Checked empty theorem in the identical context and premise frame.
+
+**Theorem (Empty zero set)** · `thm:cas:empty-zero-set`
+
+Formal schema `empty.zero-set`, version 1. A defined scalar whose exact zero set is empty is nonzero on its original base. Required premises: Checked empty zero set and independently checked subject definedness.
+
+**Theorem (Empty monomial)** · `thm:cas:empty-monomial`
+
+Formal schema `empty.monomial`, version 1. A nonzero monomial supplies nonzero factors for another exact monomial. Required premises: Defined nonzero monomials in one formal frame and a nonzero ground coefficient.
+
+**Assumption (Empty zero)** · `assum:cas:empty-zero`
+
+Formal schema `empty.hyp.zero`, version 1. The identical subject equals literal zero on a true ancestor guard. Required premises: Qualified region ancestry and exact subject syntax.
+
+**Assumption (Empty strict)** · `assum:cas:empty-strict`
+
+Formal schema `empty.hyp.strict`, version 1. A strictly positive or negative Real subject is defined and nonzero. Required premises: Checked strict sign or literal true strict guard on a containing region.
+
+**Assumption (Empty nonzero)** · `assum:cas:empty-nonzero`
+
+Formal schema `empty.hyp.nonzero`, version 1. The identical subject is defined and nonzero on a containing region. Required premises: Checked nonzero premise or literal true nonzero guard.
+
+**Assumption (Empty identity)** · `assum:cas:empty-identity`
+
+Formal schema `empty.hyp.identity`, version 1. The exact subject and displayed product are both defined and equal. Required premises: Checked defined equality in the identical context on a containing region.
+
+**Assumption (Empty cover)** · `assum:cas:empty-cover`
+
+Formal schema `empty.hyp.cover`, version 1. The exact parent is covered by every retained member. Required premises: Independently checked cover with no missing or duplicate member.
+
+**Assumption (Empty empty)** · `assum:cas:empty-empty`
+
+Formal schema `empty.hyp.empty`, version 1. The exact region has no assignments under the retained conditions. Required premises: Earlier checked empty-region theorem in the identical context.
 
 ## Main concepts and types · `sec:cas:concepts`
 

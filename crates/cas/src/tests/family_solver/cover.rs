@@ -292,3 +292,16 @@ fn incomplete_base_cover(fixture: &mut Fixture, proof: &VerifiedWitness) -> Test
     );
     Ok(())
 }
+
+/// The independent full exclusion search agrees with every original success and refusal in this fixture family.
+/// ´test:crate:mixed-cover-oracle-agreement´
+#[test]
+fn mixed_cover_oracle_agreement() -> TestResult {
+    crate::testing::exclusion_oracle::run(|| {
+        mixed_family_cover_pending_retains_pieces()?;
+        mixed_family_full_cover_replays()?;
+        mixed_family_omitted_zero_keeps_pieces()?;
+        mixed_family_empty_piece_retained()?;
+        Ok(())
+    })
+}

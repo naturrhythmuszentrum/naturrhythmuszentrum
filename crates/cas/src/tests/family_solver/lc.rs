@@ -2,6 +2,9 @@
 //! The original determinant retains strict divisors through checked coefficient transport.
 
 mod costs;
+mod exclusion;
+mod exclusion_empty;
+mod exclusion_storage;
 mod expected;
 mod fixture;
 mod identity;
@@ -46,7 +49,7 @@ fn lc_original_coefficient_equality_replays() -> TestResult {
             replay.usage().work,
             bytes.len()
         ),
-        (236_088, 1_100_325, 540_137, 2_479)
+        (101_354, 830_857, 405_403, 2_479)
     );
     Ok(())
 }
@@ -104,4 +107,11 @@ fn lc_coefficient_replay_retains_signs() -> TestResult {
         assert_eq!(receiver.cas.counts(), before);
     }
     Ok(())
+}
+
+/// Missing original signs and divisor occurrences retain their producer refusal under the full oracle.
+/// ´test:crate:lc-original-refusals-agree-with-search´
+#[test]
+fn lc_original_refusals_agree_with_search() -> TestResult {
+    crate::testing::exclusion_oracle::run(lc_original_missing_domain_refuses)
 }

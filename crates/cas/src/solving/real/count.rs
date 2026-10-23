@@ -97,6 +97,7 @@ pub(super) fn check(
     let _chain = super::sturm::check(cas, &relation.polynomial, certificate, premises, budget)?;
     let stored = storage::polynomial(&cas.state, &relation.polynomial)?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

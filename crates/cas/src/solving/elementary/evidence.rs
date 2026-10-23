@@ -57,7 +57,7 @@ pub(crate) fn ground_unit(value: &Coefficient, budget: &mut Budget) -> Result<bo
 }
 
 /// Formal parameter numerators and nonconstant quotient representatives remain undecided.
-fn ground_nonzero(form: &Form, budget: &mut Budget) -> Result<bool, Fault> {
+pub(crate) fn ground_nonzero(form: &Form, budget: &mut Budget) -> Result<bool, Fault> {
     let [term] = form.terms.as_slice() else {
         return Ok(false);
     };
@@ -71,6 +71,7 @@ impl Evaluation<'_> {
     /// Evidence lives in its own scope; tuple substitution must never rewrite a hypothesis.
     pub(crate) const fn unbound(&self) -> Evaluation<'_> {
         Evaluation {
+            exclusions: self.exclusions,
             cas: self.cas,
             engine: crate::solving::coefficients::arithmetic::Engine {
                 state: &self.cas.state,
@@ -125,6 +126,10 @@ impl Evaluation<'_> {
         #[cfg(test)]
         let _attribution = crate::testing::work_trace::Scope::phase("exclusion.scalar-nonzero");
         if ground_nonzero(&value.numerator, budget)? {
+            return Ok(());
+        }
+        if super::exclusion::enabled() && super::exclusion::matches(value, self.exclusions, budget)?
+        {
             return Ok(());
         }
         let original = self.unbound();

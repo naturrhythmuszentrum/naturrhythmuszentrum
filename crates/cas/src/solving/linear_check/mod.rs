@@ -128,12 +128,13 @@ pub(crate) fn check(
     let Statement::Solve(statement) = &draft.conclusion else {
         return Err(invalid());
     };
-    let inherited = conditions(cas, draft, premises, budget)?;
+    let (inherited, _) = conditions(cas, draft, premises, budget)?;
     let context = cas.state.context(cas.checked(&draft.context)?)?;
     if context.admissible != value.region.logical_id() {
         return Err(invalid());
     }
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

@@ -193,6 +193,14 @@ impl Gaussian {
         })
     }
 
+    /// Borrow exact component bit lengths for conservative retained scratch accounting.
+    pub(crate) fn component_bits(&self) -> [(u64, u64); 2] {
+        [
+            self.value.re.component_bits(),
+            self.value.im.component_bits(),
+        ]
+    }
+
     /// Copy the real part with explicit component, storage and work checks.
     pub(crate) fn real(&self, budget: &mut Budget) -> Result<Rational, Fault> {
         self.component(false, budget)

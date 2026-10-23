@@ -262,6 +262,7 @@ fn coverage(
     super::proof::region(cas, &draft.context, original, &coverage.region)?;
     super::member::contained(cas, &coverage.region, &original.region, budget)?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

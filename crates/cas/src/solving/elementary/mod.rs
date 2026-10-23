@@ -33,6 +33,11 @@ pub(crate) mod evaluate;
 pub(crate) mod evidence;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "crate tests check exact exclusion inferences and boundaries"
+)]
+pub(crate) mod exclusion;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "exact inverse evidence is shared with linear replay"
 )]
 pub(crate) mod inverse;
@@ -114,7 +119,7 @@ pub(crate) fn check(
     let crate::proof_model::Certificate::Solve(certificate) = &draft.certificate else {
         return Err(proof::invalid());
     };
-    let inherited = proof::conditions(cas, draft, premises, budget)?;
+    let (inherited, empty) = proof::conditions(cas, draft, premises, budget)?;
     match (draft.rule, certificate.as_ref()) {
         (
             crate::rule::Primitive::Solve(SolveSchema::Membership),
@@ -131,7 +136,7 @@ pub(crate) fn check(
         (
             crate::rule::Primitive::Solve(SolveSchema::ProductCompleteness),
             SolveCertificate::ProductCompleteness(value),
-        ) => product::check(cas, draft, value, premises, budget)?,
+        ) => product::check(cas, draft, value, premises, &empty, budget)?,
         (
             crate::rule::Primitive::Solve(SolveSchema::BinomialCoverage),
             SolveCertificate::BinomialCoverage(value),

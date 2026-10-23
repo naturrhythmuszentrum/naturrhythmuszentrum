@@ -443,3 +443,19 @@ fn mixed_map_rejects_changed_family() -> TestResult {
     );
     Ok(())
 }
+
+/// The independent full exclusion search agrees with every original success and refusal in this fixture family.
+/// ´test:crate:mixed-properties-oracle-agreement´
+#[test]
+fn mixed_properties_oracle_agreement() -> TestResult {
+    crate::testing::exclusion_oracle::run(|| {
+        mixed_positive_roots_conjugation_fixed()?;
+        mixed_root_pullback_requires_subset()?;
+        mixed_negative_piece_rejects_sibling_sign()?;
+        mixed_family_map_rejects_sampled_base()?;
+        mixed_piece_rejects_whole_region_widening()?;
+        mixed_map_rejects_scalar_complex_coercion()?;
+        mixed_map_rejects_changed_family()?;
+        Ok(())
+    })
+}

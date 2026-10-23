@@ -190,6 +190,7 @@ pub(crate) fn check(
     let forward = family(cas, &certificate.forward)?;
     let backward = family(cas, &certificate.backward)?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

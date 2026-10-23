@@ -96,6 +96,7 @@ fn fixture() -> TestResult<Fixture> {
 impl Fixture {
     fn evaluation(&self) -> Evaluation<'_> {
         Evaluation {
+            exclusions: &[],
             cas: &self.cas,
             engine: Engine {
                 state: &self.cas.state,

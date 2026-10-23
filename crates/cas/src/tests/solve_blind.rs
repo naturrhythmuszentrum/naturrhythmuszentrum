@@ -1188,6 +1188,7 @@ fn blind_mapped_parameter_denominator() -> TestResult {
                 .ok_or("p declaration")?,
         )?;
         let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            exclusions: &[],
             cas: &cas,
             engine: Engine {
                 state: &cas.state,
@@ -1255,6 +1256,7 @@ fn blind_mapped_parameter_field_denominator() -> TestResult {
             return Err("parameter map".into());
         };
         let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            exclusions: &[],
             cas: &cas,
             engine: Engine {
                 state: &cas.state,
@@ -1357,6 +1359,7 @@ fn blind_parameter_fraction_cell_zero() -> TestResult {
             &mut budget,
         )?));
         let evaluation = crate::solving::elementary::evaluate::Evaluation {
+            exclusions: &[],
             cas: &cas,
             engine,
             region: &region,

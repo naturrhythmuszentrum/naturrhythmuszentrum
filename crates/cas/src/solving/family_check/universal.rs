@@ -179,6 +179,7 @@ pub(crate) fn check(
     let map = family(cas, &certificate.family)?;
     shape(cas, map, original)?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

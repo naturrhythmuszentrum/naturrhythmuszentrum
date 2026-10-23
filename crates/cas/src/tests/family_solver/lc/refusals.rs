@@ -119,6 +119,11 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
             .err(),
             Some(fault),
         );
+        let mut oracle_budget = super::ledger()?;
+        let oracle = crate::testing::exclusion_oracle::run(|| {
+            receiver.cas.replay(&bytes, &expected, &mut oracle_budget)
+        });
+        assert_eq!(oracle.err(), Some(fault));
         assert_eq!(receiver.cas.counts(), before);
     }
     assert_eq!(
@@ -127,32 +132,32 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
             (
                 [0, 1],
                 true,
-                2_080_320,
-                [221_241, 424_519, 74_839, 1_359_721]
+                1_731_379,
+                [221_241, 75_578, 74_839, 1_359_721]
             ),
             (
                 [1, 0],
                 true,
-                2_078_481,
-                [221_241, 424_519, 74_839, 1_357_882]
+                1_729_540,
+                [221_241, 75_578, 74_839, 1_357_882]
             ),
             (
                 [-1, 1],
                 true,
-                2_087_240,
-                [221_241, 424_519, 74_839, 1_366_641]
+                1_738_299,
+                [221_241, 75_578, 74_839, 1_366_641]
             ),
             (
                 [1, -1],
                 true,
-                2_085_418,
-                [221_241, 424_519, 74_839, 1_364_819]
+                1_736_477,
+                [221_241, 75_578, 74_839, 1_364_819]
             ),
             (
                 [1, 1],
                 false,
-                2_074_557,
-                [221_241, 424_519, 74_839, 1_353_958]
+                1_725_616,
+                [221_241, 75_578, 74_839, 1_353_958]
             ),
         ]
     );
@@ -246,13 +251,20 @@ fn lc_root_factor_coverage_rejects_omissions() -> TestResult {
             fault,
             Fault::invalid(InvalidCode::Rule, Location::new("elementary solving"))
         );
+        let mut oracle_budget = super::ledger()?;
+        let oracle = crate::testing::exclusion_oracle::run(|| {
+            source
+                .cas
+                .check_proof(&request.context, &steps, &mut oracle_budget)
+        });
+        assert_eq!(oracle.err(), Some(fault));
         assert_eq!(source.cas.counts(), before);
     }
     assert_eq!(
         traces,
         [
-            (false, 650_338, [205_391, 322_669, 74_778, 47_500]),
-            (true, 771_144, [221_241, 427_676, 74_753, 47_474]),
+            (false, 363_897, [205_391, 36_228, 74_778, 47_500]),
+            (true, 422_203, [221_241, 78_735, 74_753, 47_474]),
         ]
     );
     Ok(())
@@ -295,6 +307,13 @@ fn lc_root_refinement_requires_product_sign() -> TestResult {
         fault,
         Fault::invalid(InvalidCode::Rule, Location::new("elementary solving"))
     );
+    let mut oracle_budget = super::ledger()?;
+    let oracle = crate::testing::exclusion_oracle::run(|| {
+        source
+            .cas
+            .check_proof(&context, &closure, &mut oracle_budget)
+    });
+    assert_eq!(oracle.err(), Some(fault));
     assert_eq!(source.cas.counts(), before);
     Ok(())
 }

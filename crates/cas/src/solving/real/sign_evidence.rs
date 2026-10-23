@@ -270,6 +270,7 @@ fn normalized(
         return Err(invalid());
     }
     let evaluation = crate::solving::elementary::evaluate::Evaluation {
+        exclusions: &[],
         cas,
         engine: crate::solving::coefficients::arithmetic::Engine {
             state: &cas.state,

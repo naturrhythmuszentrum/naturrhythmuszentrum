@@ -13,6 +13,7 @@ use crate::testing::solve_blind::{Fixture, symbolic_in_field};
 /// Local evaluation reads the actual coefficient algebra and its exact current region.
 fn evaluation(fixture: &Fixture) -> Evaluation<'_> {
     Evaluation {
+        exclusions: &[],
         cas: &fixture.cas,
         engine: Engine {
             state: &fixture.cas.state,

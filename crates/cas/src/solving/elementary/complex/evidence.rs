@@ -26,6 +26,14 @@ impl Components<'_, '_> {
             let premise = super::super::proof::premise(self.evaluation.premises, *slot)?;
             reserve(&mut self.imported, 1, budget)?;
             self.imported.push(*slot);
+            if let Some(subject) = super::super::exclusion::subject(
+                self.evaluation.cas,
+                self.evaluation.region,
+                &premise.judgment.statement,
+            )? {
+                self.empty_leaves = true;
+                self.import_empty(subject, budget)?;
+            }
             match &premise.judgment.statement {
                 Statement::Solve(statement) => match statement.as_ref() {
                     SolveStatement::RealValues(fact) if &fact.region == self.evaluation.region => {
@@ -62,11 +70,43 @@ impl Components<'_, '_> {
                 Statement::PredicateFact { predicate, region }
                     if region == self.evaluation.region =>
                 {
+                    if matches!(
+                        super::super::evidence::predicate(
+                            self.evaluation.cas,
+                            predicate.logical_id()
+                        )?,
+                        (PredicateKind::Positive | PredicateKind::NonZero, [_])
+                    ) {
+                        self.empty_leaves = self
+                            .evaluation
+                            .cas
+                            .state
+                            .region(self.evaluation.region.logical_id())?
+                            .lies_over
+                            .is_some();
+                    }
                     self.record_predicate(predicate.logical_id(), &[], budget)?;
                 }
                 _ => {}
             }
         }
+        Ok(())
+    }
+
+    /// Reuse an identical defined fact or interpret one independently checked empty zero set.
+    fn import_empty(&mut self, subject: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
+        budget.work(crate::graph::size(self.nonzero.len(), AT)?, AT)?;
+        if self
+            .nonzero
+            .iter()
+            .any(|(source, _)| *source == Some(subject))
+        {
+            return Ok(());
+        }
+        let parts = self.expression(subject, &[], budget)?;
+        self.zero(&parts.imaginary, budget)?;
+        reserve(&mut self.nonzero, 1, budget)?;
+        self.nonzero.push((Some(subject), parts.real));
         Ok(())
     }
 
@@ -183,7 +223,8 @@ impl Components<'_, '_> {
                             )?
                     };
                     reserve(&mut self.nonzero, 1, budget)?;
-                    self.nonzero.push(nonzero);
+                    self.nonzero
+                        .push((bound.is_empty().then_some(*argument), nonzero));
                 }
                 _ => {}
             }
@@ -247,6 +288,14 @@ impl Components<'_, '_> {
     pub(crate) fn nonzero(&self, value: &Value, budget: &mut Budget) -> Result<(), Fault> {
         #[cfg(test)]
         let _attribution = crate::testing::work_trace::Scope::phase("exclusion.component-nonzero");
+        if super::super::exclusion::enabled() && self.excluded(value, budget)? {
+            return Ok(());
+        }
+        self.nonzero_oracle(value, budget)
+    }
+
+    /// The retained complete search is independent of the empty-set lemma route.
+    fn nonzero_oracle(&self, value: &Value, budget: &mut Budget) -> Result<(), Fault> {
         let engine = &self.evaluation.engine;
         for candidate in [
             value.copy(engine, budget)?,
@@ -257,7 +306,7 @@ impl Components<'_, '_> {
             if super::super::product::decides(self.evaluation.nonzero(&reduced, budget))? {
                 return Ok(());
             }
-            for fact in &self.nonzero {
+            for (_, fact) in &self.nonzero {
                 if super::super::product::decides(
                     self.zero(&candidate.sub(fact, engine, budget)?, budget),
                 )? || super::super::product::decides(
@@ -268,6 +317,34 @@ impl Components<'_, '_> {
             }
         }
         Err(invalid())
+    }
+
+    /// Inline sign leaves and shared monomial factors exclude the reduced zero locus.
+    fn excluded(&self, value: &Value, budget: &mut Budget) -> Result<bool, Fault> {
+        if !self.empty_leaves || self.nonzero.is_empty() {
+            return Ok(false);
+        }
+        if super::super::evidence::ground_nonzero(&value.numerator, budget)? {
+            return Ok(true);
+        }
+        if super::super::exclusion::monomial(
+            &value.numerator,
+            &self.nonzero.iter().map(|(_, value)| value),
+            budget,
+        )? {
+            return Ok(true);
+        }
+        let reduced = self.reduced(&value.numerator, budget)?;
+        for (_, fact) in &self.nonzero {
+            if super::super::exclusion::same_form(&reduced, &fact.numerator, budget)? {
+                return Ok(true);
+            }
+        }
+        super::super::exclusion::monomial(
+            &reduced,
+            &self.nonzero.iter().map(|(_, value)| value),
+            budget,
+        )
     }
 
     /// Constructive refinement verifies constraints before selected-root predicates may be assumed.
@@ -355,6 +432,7 @@ mod tests {
             };
             let mut budget = Budget::new(Limits::blind_cubic())?;
             let evaluation = Evaluation {
+                exclusions: &[],
                 cas: &fixture.cas,
                 engine: Engine {
                     state: &fixture.cas.state,

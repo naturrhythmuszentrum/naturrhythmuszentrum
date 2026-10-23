@@ -153,6 +153,7 @@ pub(crate) fn check(
         premise(premises, *slot)?;
     }
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

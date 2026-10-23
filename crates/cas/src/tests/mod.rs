@@ -45,6 +45,7 @@ mod solve_real;
 
 mod family;
 
+mod emptiness_registry;
 mod family_solver;
 
 mod wire_answer;

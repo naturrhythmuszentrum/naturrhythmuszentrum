@@ -115,7 +115,7 @@ pub(super) fn premise(
 }
 
 /// Strict signs and positive/nonzero predicates exclude zero on their exact containing region.
-pub(super) fn nonzero(
+pub(crate) fn nonzero(
     cas: &Cas,
     region: &Handle,
     subject: &Handle,

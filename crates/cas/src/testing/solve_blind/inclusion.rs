@@ -87,6 +87,7 @@ fn application(cas: &Cas, checked: &CheckedApplication) -> TestResult {
         premises.push(crate::proof_view::application(cas, *proof, &mut budget)?);
     }
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

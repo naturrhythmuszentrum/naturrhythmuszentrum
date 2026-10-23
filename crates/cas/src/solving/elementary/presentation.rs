@@ -244,6 +244,7 @@ pub(crate) fn check(
     }
     super::proof::region(cas, &draft.context, original, &claim.region)?;
     let evaluation = Evaluation {
+        exclusions: &[],
         cas,
         engine: Engine {
             state: &cas.state,

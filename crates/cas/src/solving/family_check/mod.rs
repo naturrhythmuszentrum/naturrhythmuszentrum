@@ -125,7 +125,7 @@ pub(crate) fn check(
     else {
         return Err(invalid());
     };
-    let inherited = conditions(cas, draft, premises, budget)?;
+    let (inherited, _) = conditions(cas, draft, premises, budget)?;
     let coverage = conclusion(cas, draft, value)?;
     for slot in value
         .membership

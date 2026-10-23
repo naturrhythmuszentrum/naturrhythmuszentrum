@@ -248,3 +248,16 @@ fn mixed_family_rejects_complex_order() -> TestResult {
     );
     Ok(())
 }
+
+/// The independent full exclusion search agrees with every original success and refusal in this fixture family.
+/// ´test:crate:mixed-placement-oracle-agreement´
+#[test]
+fn mixed_placement_oracle_agreement() -> TestResult {
+    crate::testing::exclusion_oracle::run(|| {
+        mixed_placement_rejects_wrong_operand()?;
+        mixed_placement_rejects_changed_piece()?;
+        mixed_family_missing_arm_stays_undefined()?;
+        mixed_family_rejects_complex_order()?;
+        Ok(())
+    })
+}

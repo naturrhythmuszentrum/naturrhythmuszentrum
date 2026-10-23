@@ -24,7 +24,7 @@ fn lc_original_root_coverage_replays() -> TestResult {
     let mut budget = ledger()?;
     let coverage = RootCoverage::replay(&mut fixture.cas, &problem, set, bytes, &mut budget)?;
     let usage = coverage.usage();
-    assert_eq!(usage.replayed.work - usage.expected.work, 1_813_435);
+    assert_eq!(usage.replayed.work - usage.expected.work, 1_464_494);
     assert_eq!(usage.before.work, 0);
     assert_eq!(usage.expected.work, 1);
     assert_eq!(
@@ -34,7 +34,7 @@ fn lc_original_root_coverage_replays() -> TestResult {
     assert!(coverage.witness().is_discharged());
     assert_eq!(coverage.witness().hypotheses(), [] as [HypothesisRef; 0]);
     assert_eq!(coverage.export(&fixture.cas, &mut budget)?, *bytes);
-    assert_eq!(budget.usage().work, 1_819_576);
+    assert_eq!(budget.usage().work, 1_470_635);
     let repeated = RootCoverage::replay(
         &mut fixture.cas,
         &problem,
@@ -44,7 +44,7 @@ fn lc_original_root_coverage_replays() -> TestResult {
     )?;
     assert_eq!(
         repeated.usage().replayed.work - repeated.usage().expected.work,
-        1_811_422
+        1_462_481
     );
     assert_eq!(
         (
