@@ -3,6 +3,7 @@
 
 mod expected;
 mod fixture;
+mod gap;
 mod identity;
 
 use crate::limits::{Budget, Limits};
