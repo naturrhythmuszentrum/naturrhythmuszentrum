@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Sealed witness caches must agree with the authenticated retained proof root.
 
+mod expanded;
+
 use crate::budget::Limits;
 use crate::domain_model::{
     AmbientDomain, ContextDraft, HeaderDraft, HypothesisRef, RegionDraft, RegionExpr,

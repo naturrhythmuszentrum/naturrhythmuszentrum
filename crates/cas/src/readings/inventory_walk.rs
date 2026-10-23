@@ -60,6 +60,9 @@ impl Assembly<'_> {
         demand: &AffineMap,
         budget: &mut Budget,
     ) -> Result<AffineMap, Fault> {
+        if let Operator::AffineReading(map) = &self.cas.state.expression(current)?.operator {
+            return self.meter.run(budget, |budget| demand.compose(map, budget));
+        }
         self.meter.run(budget, |budget| {
             let bytes = demand.validate(budget)?;
             let previous = budget.reserve_temporary(bytes, AT)?;
