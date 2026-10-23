@@ -403,6 +403,7 @@ fn selected_reading_copy_retains_transitive_lineage() -> TestResult {
     Ok(())
 }
 
+mod bounded;
 mod checks;
 mod domain;
 mod overlap;

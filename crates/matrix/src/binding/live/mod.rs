@@ -2,6 +2,7 @@
 //! Live entry coverage, immutable exact evidence and versioned numerical selections.
 
 mod admission;
+mod bounded;
 pub(crate) mod companions;
 mod coordinates;
 mod dependencies;

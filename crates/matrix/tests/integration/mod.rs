@@ -64,3 +64,5 @@ mod exact_scale_boundaries;
 mod symbol_lifecycle;
 
 mod conversion_errors;
+
+mod bounded_readings;
