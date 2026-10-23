@@ -29,8 +29,5 @@ pub(super) fn retaining<T>(
     budget: &mut Budget,
     action: impl FnOnce(&mut Budget) -> Result<T, Fault>,
 ) -> Result<T, Fault> {
-    let previous = budget.reserve_temporary(bytes, AT)?;
-    let result = action(budget);
-    budget.restore_limits(previous);
-    result
+    budget.with_retained_payload(bytes, AT, action)
 }

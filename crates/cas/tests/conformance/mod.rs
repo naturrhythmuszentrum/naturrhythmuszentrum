@@ -86,4 +86,9 @@ mod jacobians;
 
 mod jacobian_limits;
 
+mod jacobian_cache;
+
+mod jacobian_composition;
+mod jacobian_reuse_limits;
+
 mod retained_payload;

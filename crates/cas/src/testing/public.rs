@@ -244,3 +244,10 @@ pub(crate) mod map_inverses;
     reason = "shared public Jacobian fixtures"
 )]
 pub(crate) mod jacobians;
+
+#[path = "jacobian_composition.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared reading Jacobian fixtures"
+)]
+pub(crate) mod jacobian_composition;

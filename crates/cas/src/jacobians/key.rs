@@ -104,7 +104,7 @@ impl Cas {
     }
 
     /// Fixed declarations never add a fictitious differentiation direction.
-    fn check_source_coordinates(
+    pub(super) fn check_source_coordinates(
         &self,
         context: &Handle,
         coordinates: &SourceCoordinates,

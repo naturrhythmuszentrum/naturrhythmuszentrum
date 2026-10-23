@@ -28,6 +28,8 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// A reading map coefficient depends on a reading being substituted.
+    JacobianReadingCycle,
     /// A fixed coordinate was requested as a derivative direction.
     JacobianFixedSource,
     /// A coordinate contract repeats a declaration key within one list.

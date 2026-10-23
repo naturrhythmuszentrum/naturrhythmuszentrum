@@ -76,3 +76,46 @@ fn source_jacobian_replay_retains_source_order() -> TestResult {
     );
     Ok(())
 }
+
+/// A changed declaration snapshot cannot accept the previous exact derivative witness.
+/// ´test:integration:source-jacobian-replay-rejects-declaration-change´
+#[test]
+fn source_jacobian_replay_rejects_declaration_change() -> TestResult {
+    let (mut source, original, _) = product()?;
+    let key = source.cas.source_jacobian_key(
+        &source.context,
+        &original,
+        &coordinates(),
+        &mut ledger()?,
+    )?;
+    let result = source.cas.source_jacobian(&key, &mut ledger()?)?;
+    let bytes = source
+        .cas
+        .export_witness(result.witness(), &mut ledger()?)?;
+    let mut receiver = crate::testing::map_inverses::fixture(&["x", "y", "r", "extra"])?;
+    let first = receiver.symbol("x")?;
+    let second = receiver.symbol("y")?;
+    let original = receiver.term(
+        nrz_cas::syntax::Operator::Mul,
+        crate::testing::common::real(),
+        &[first.clone(), second.clone()],
+    )?;
+    let oracle = receiver.term(
+        nrz_cas::syntax::Operator::Matrix {
+            rows: 1,
+            columns: 2,
+        },
+        crate::testing::readings::matrix(1, 2),
+        &[second, first],
+    )?;
+    let target = expected(&mut receiver, &original, &oracle)?;
+    let before = receiver.cas.counts();
+    assert!(
+        receiver
+            .cas
+            .replay(&bytes, &target, &mut ledger()?)
+            .is_err()
+    );
+    assert_eq!(receiver.cas.counts(), before);
+    Ok(())
+}

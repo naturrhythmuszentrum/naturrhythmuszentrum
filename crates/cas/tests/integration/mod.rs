@@ -61,3 +61,5 @@ mod normalization;
 mod jacobians;
 
 mod jacobian_matrices;
+
+mod jacobian_composition;
