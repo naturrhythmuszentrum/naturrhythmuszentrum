@@ -161,6 +161,7 @@ impl Conditions {
                 | Operator::Mul
                 | Operator::Matrix { .. }
                 | Operator::MatrixMultiply
+                | Operator::MatrixMap(crate::model::MatrixOperation::Determinant)
                 | Operator::Select(_)
                 | Operator::AffineReading(_)
                 | Operator::IntegerPower(_) => None,

@@ -237,7 +237,7 @@ impl AffineMap {
 }
 
 /// Dimension arithmetic cannot wrap into a smaller admitted array.
-pub(super) fn length(rows: u32, columns: u32) -> Result<usize, Fault> {
+pub(crate) fn length(rows: u32, columns: u32) -> Result<usize, Fault> {
     usize::try_from(u64::from(rows) * u64::from(columns))
         .map_err(|_| invalid(InvalidCode::ReadingShape))
 }

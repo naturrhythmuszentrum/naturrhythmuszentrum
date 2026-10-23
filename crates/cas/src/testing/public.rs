@@ -230,3 +230,10 @@ pub(crate) mod answer;
     reason = "shared reading fixtures stay crate-visible"
 )]
 pub(crate) mod readings;
+
+#[path = "map_inverses.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared exact-map fixtures stay crate-visible"
+)]
+pub(crate) mod map_inverses;

@@ -120,6 +120,10 @@ pub(crate) fn equality(
     let right = cas.checked(&step.right)?;
     let state = &cas.state;
     let valid = match step.primitive {
+        Primitive::Jets if crate::polynomial::matrix::applicable(state, left, right)? => {
+            count(step, 0)?;
+            crate::polynomial::matrix::equal(state, left, right, budget)?
+        }
         Primitive::Jets if crate::readings::check::applicable(state, left, right)? => {
             count(step, 0)?;
             crate::readings::check::equal(state, left, right, budget)?

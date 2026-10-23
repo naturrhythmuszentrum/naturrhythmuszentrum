@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Bounded finite coefficient maps reconstructed from graph syntax.
 
+pub(crate) mod matrix;
+mod matrix_determinant;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::budget::{Budget, BudgetKind};
@@ -317,6 +320,21 @@ impl Fraction {
 
 /// Convert a scalar DAG with an explicit postorder stack and no success cache from search.
 fn convert(state: &State, root: LogicalId, budget: &mut Budget) -> Result<Fraction, Fault> {
+    convert_mode(state, root, true, budget)
+}
+
+/// Matrix coefficient leaves exclude nested determinants, keeping traversal stacks explicit.
+fn convert_scalar(state: &State, root: LogicalId, budget: &mut Budget) -> Result<Fraction, Fault> {
+    convert_mode(state, root, false, budget)
+}
+
+/// A determinant root delegates once to the ordered matrix checker, whose leaves stay scalar.
+fn convert_mode(
+    state: &State,
+    root: LogicalId,
+    allow_determinant: bool,
+    budget: &mut Budget,
+) -> Result<Fraction, Fault> {
     let mut values: BTreeMap<LogicalId, Fraction> = BTreeMap::new();
     let mut pending = vec![(root, false)];
     let mut retained = 0_u64;
@@ -331,7 +349,14 @@ fn convert(state: &State, root: LogicalId, budget: &mut Budget) -> Result<Fracti
             continue;
         }
         let term = state.expression(id)?;
-        if !expanded {
+        let determinant = matches!(
+            term.operator,
+            Operator::MatrixMap(crate::model::MatrixOperation::Determinant)
+        );
+        if determinant && !allow_determinant {
+            return Err(fragment());
+        }
+        if !expanded && !determinant {
             pending
                 .try_reserve(
                     term.operands
@@ -345,7 +370,12 @@ fn convert(state: &State, root: LogicalId, budget: &mut Budget) -> Result<Fracti
             continue;
         }
         let previous = budget.reserve_temporary(retained, AT)?;
-        let value = convert_node(&term.operator, &term.operands, &values, budget);
+        let value = if determinant {
+            let source = *term.operands.first().ok_or_else(fragment)?;
+            matrix_determinant::determinant(state, source, budget)
+        } else {
+            convert_node(&term.operator, &term.operands, &values, budget)
+        };
         budget.restore_limits(previous);
         let value = value?;
         let denominator_bytes = value.denominator.bytes(budget)?;

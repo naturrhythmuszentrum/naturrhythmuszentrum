@@ -28,6 +28,10 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// An exact square map has identically zero determinant.
+    ReadingSingular,
+    /// The determinant is not established nonzero throughout the admitted family.
+    ReadingNonsingularity,
     /// A reading witness cache disagrees with its authenticated retained proof closure.
     DependencyWitness,
     /// An entry-set operation requires an admitted selection expression.

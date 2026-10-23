@@ -73,3 +73,7 @@ mod entry_sets;
 
 mod dependency_limits;
 mod dependency_refusals;
+
+mod map_inverses;
+
+mod map_inverse_limits;

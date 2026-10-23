@@ -27,8 +27,23 @@ impl Cas {
         right: &Handle,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
-        if !check::applicable(&self.state, self.checked(left)?, self.checked(right)?)? {
+        let ordered = check::applicable(&self.state, self.checked(left)?, self.checked(right)?)?;
+        let matrix = crate::polynomial::matrix::applicable(
+            &self.state,
+            self.checked(left)?,
+            self.checked(right)?,
+        )?;
+        if !ordered && !matrix {
             return Err(invalid(InvalidCode::ReadingDefinition));
+        }
+        if matrix {
+            let previous = budget.restrict_storage(&self.limits);
+            let result = (|| {
+                crate::polynomial::matrix::definition(&self.state, self.checked(left)?, budget)?;
+                crate::polynomial::matrix::definition(&self.state, self.checked(right)?, budget)
+            })();
+            budget.restore_limits(previous);
+            result?;
         }
         let step = ApplicationDraft {
             rule: Primitive::Jets,

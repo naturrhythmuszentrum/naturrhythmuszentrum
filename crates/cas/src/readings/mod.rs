@@ -6,29 +6,38 @@
 //! their first operand retains the declared symbol, and their second operand is the
 //! exact source. A bare declaration is never equated to a definition by its name.
 
-mod affine;
+pub(crate) mod affine;
 mod bases;
 pub(crate) mod check;
 mod coverage;
+mod determinant;
 mod entry_sets;
+mod exact_expand;
+mod exact_map;
 mod inventory;
 mod inventory_budget;
 mod inventory_build;
 mod inventory_model;
 mod inventory_walk;
 mod inventory_write;
+mod inverse;
 mod proof;
+mod rational_inverse;
 mod selection;
+mod storage;
 pub(crate) mod syntax;
 pub(crate) mod wire;
 
 pub use affine::AffineMap;
 pub use coverage::{EntryCoverage, EntryMultiplicity};
 pub use entry_sets::{EntrySetRelation, SharedEntry};
+pub use exact_map::ExactAffineMap;
 pub use inventory_model::{
     DependencyBase, DependencyContents, DependencyDeclaration, DependencyDefinition,
     DependencyInventory, DependencyPremise, DependencyPremiseKind, DependencySelection,
 };
+pub use inverse::CheckedMapInverse;
+pub use rational_inverse::AffineInverse;
 pub use selection::{EntryIndex, EntryOrder, EntrySelection, SelectionSpec};
 
 use crate::budget::{Budget, BudgetKind};
