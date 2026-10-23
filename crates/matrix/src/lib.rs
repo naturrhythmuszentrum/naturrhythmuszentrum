@@ -38,7 +38,8 @@ pub use binding::{
     AffineAdapter, CompanionAdapter, CoordinateContract, CoordinateError, CoordinateNorm,
     CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket, LiveBindingError,
     OperatorAdapter, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
-    ReadingImport, ReadingRegion,
+    ReadingImport, ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
+    ReciprocalDerivativeEvaluation,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,

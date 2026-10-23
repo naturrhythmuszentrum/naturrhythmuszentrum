@@ -5,6 +5,10 @@ mod admission;
 mod bounded;
 pub(crate) mod companions;
 mod coordinates;
+mod derivatives;
+pub use derivatives::{
+    ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
+};
 mod copies;
 
 pub use copies::CopyDiscrepancy;

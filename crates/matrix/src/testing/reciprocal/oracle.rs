@@ -48,6 +48,15 @@ impl Rational {
         Ok(Self(self.0.div(&other.0, &mut ledger()?)?))
     }
 
+    /// Exact endpoint containment without a rounded midpoint or radius.
+    pub(crate) fn enclosed(&self, lower: f64, upper: f64) -> TestResult<bool> {
+        let lower = Self::binary(lower)?;
+        let upper = Self::binary(upper)?;
+        let above = self.0.compare(&lower.0, &mut ledger()?)? != Ordering::Less;
+        let below = self.0.compare(&upper.0, &mut ledger()?)? != Ordering::Greater;
+        Ok(above && below)
+    }
+
     /// Compare against exact binary center plus/minus radius without rounding either endpoint.
     pub(crate) fn covered(&self, center: f64, radius: f64) -> TestResult<bool> {
         if radius < 0.0 {

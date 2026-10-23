@@ -50,6 +50,7 @@ pub use limits::ExecutionLimits;
 pub use live::{
     CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, CopyDiscrepancy,
     DependencyPolicy, LiveBindingError, ReadingBinding, ReadingImport, ReadingRegion,
+    ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
 };
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};

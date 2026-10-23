@@ -72,3 +72,5 @@ mod complex_copies;
 mod reciprocal_operator;
 
 mod reciprocal_sources;
+
+mod reciprocal_derivatives;
