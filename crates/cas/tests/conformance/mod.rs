@@ -98,3 +98,5 @@ mod witness_export;
 mod strict_sign;
 
 mod emptiness;
+
+mod formal_register;

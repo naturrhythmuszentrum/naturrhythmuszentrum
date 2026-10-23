@@ -16,6 +16,7 @@
 //! `replay(bytes, expected_judgment, budget)` reconstructs all mathematical tables through ordinary admission, checks every primitive and condition again, compares the complete canonical re-encoding, and compares the caller's expected full context, statement, domain, layer, space and guarded residual set. Expected terms cannot be reinterpreted under a different semantic header. `inspect` performs the same checking while deliberately reporting what the bytes prove without an acceptance target. A different valid theorem is rejected by `replay`; a different valid proof of the intended theorem is permitted. Truncated/extended streams, forward references, unused records, unknown rule versions, nonminimal numbers, changed guards and mismatched claims refuse without publishing a decoded prefix. The separate replay allowance covers decoding, construction, checking, publication and expected-claim comparison before work occurs.
 
 pub use crate::conditions::{ConditionStatus, GuardKind};
+pub use crate::formal_register::{PRIMITIVE_SCHEMAS, PrimitiveSchema};
 pub use crate::lemma_cache::{ANONYMOUS_LEMMA_SCHEMA, AnonymousLemmaCache};
 pub use crate::multiplicity::{GcdCertificate, SquareFreeCertificate, SquareFreeLayer};
 pub use crate::rule::{

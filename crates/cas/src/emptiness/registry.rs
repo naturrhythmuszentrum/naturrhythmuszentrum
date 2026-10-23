@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Formal schema identities are distinct from anonymous, fully scoped theorem instances.
 
-/// A named formal emptiness schema; an application keeps its own complete statement identity.
+/// A named formal schema; an application keeps its own complete statement identity.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct LemmaSchema {
     /// Formal schema name, independent of display text and local proof handles.

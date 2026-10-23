@@ -42,6 +42,7 @@ mod error;
     reason = "closed constant proof helpers stay inside private CAS modules"
 )]
 mod exact_constant;
+mod formal_register;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
