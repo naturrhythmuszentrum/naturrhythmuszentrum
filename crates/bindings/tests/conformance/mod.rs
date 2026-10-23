@@ -28,3 +28,5 @@ mod representations;
 mod reading_sources;
 
 mod reading_operations;
+
+mod coordinate_normalization;

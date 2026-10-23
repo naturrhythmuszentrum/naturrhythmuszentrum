@@ -18,3 +18,6 @@ mod exact_scales;
 mod frequency_relations;
 
 mod readings;
+
+mod coordinate_normalization;
+mod lc_coordinates;

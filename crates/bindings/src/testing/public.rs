@@ -35,3 +35,16 @@ pub(crate) mod constants;
 )]
 #[path = "readings.rs"]
 pub(crate) mod readings;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "coordinate normalization fixtures are shared by public contract and lifecycle tests"
+)]
+#[path = "normalization.rs"]
+pub(crate) mod normalization;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "fixtures are shared across public test modules"
+)]
+pub(crate) mod lc_coordinates;
