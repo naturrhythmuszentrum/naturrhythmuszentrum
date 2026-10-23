@@ -80,3 +80,5 @@ mod companion_execution;
 mod phasor_execution;
 
 mod phasor_solve;
+
+mod phasor_statistics;

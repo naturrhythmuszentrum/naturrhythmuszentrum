@@ -2,6 +2,8 @@
 //! A closed componentwise proof joins Complex multiplication to its complete Real block law.
 
 mod coefficients;
+mod covariance;
+pub use covariance::PhasorCovarianceLaw;
 mod result;
 mod solve;
 mod syntax;

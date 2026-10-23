@@ -49,6 +49,18 @@ impl<P: Scalar> CompanionExecution<P> {
                     return Err(Error::Identity);
                 }
             }
+            if let Some(law) = exact.target().phasor_law() {
+                for (target, equation) in targets.iter().zip(law.equations()) {
+                    budget.work(1, AT)?;
+                    let actual = target.phasor_solve().ok_or(Error::Identity)?;
+                    let operation =
+                        actual.correspondence().original() == equation.correspondence().original();
+                    let voltage = actual.voltage().reading() == equation.voltage().reading();
+                    if !operation || !voltage {
+                        return Err(Error::Identity);
+                    }
+                }
+            }
             Ok::<_, Error>(())
         })?;
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
@@ -108,6 +120,11 @@ fn storage<P: Scalar>(
     budget: &mut Budget,
 ) -> Result<u64, Error> {
     let mut bytes = 1024_u64;
+    if let Some(law) = exact.target().phasor_law() {
+        bytes = bytes
+            .checked_add(law.retained_payload_bytes())
+            .ok_or(HeapError::ExtentOverflow)?;
+    }
     for map in [exact.target().map(), exact.map()] {
         for value in map.coefficients().iter().chain(map.offsets()) {
             budget.work(1, AT)?;
@@ -133,8 +150,13 @@ fn storage<P: Scalar>(
                 .exported_byte_len(),
         )
         .map_err(|_| HeapError::ExtentOverflow)?;
+        let retained = if exact.target().phasor_law().is_some() {
+            size
+        } else {
+            size.checked_mul(8).ok_or(HeapError::ExtentOverflow)?
+        };
         bytes = bytes
-            .checked_add(size.checked_mul(8).ok_or(HeapError::ExtentOverflow)?)
+            .checked_add(retained)
             .and_then(|n| n.checked_add(512))
             .ok_or(HeapError::ExtentOverflow)?;
     }

@@ -40,10 +40,10 @@ pub use binding::{
     CoordinateNorm, CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket,
     LiveBindingError, OperatorAdapter, PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct,
     PhasorPublication, PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation,
-    PhasorSolvePublication, PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasor,
-    PublishedPhasorSolve, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
-    ReadingImport, ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
-    ReciprocalDerivativeEvaluation,
+    PhasorSolvePublication, PhasorStatistics, PhasorTransferBounds, PhasorTransferredResidual,
+    PublishedPhasor, PublishedPhasorSolve, ReadingAdapter, ReadingAdapterError, ReadingBinding,
+    ReadingCoverage, ReadingImport, ReadingRegion, ReciprocalDerivativeContract,
+    ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,

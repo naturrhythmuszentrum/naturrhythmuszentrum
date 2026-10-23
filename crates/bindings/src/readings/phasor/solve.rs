@@ -86,6 +86,14 @@ impl PhasorSolveDefinition {
     pub fn fixed_inputs(&self) -> &[[Option<Rational>; 2]; 2] {
         &self.0.fixed
     }
+    /// Whether both references retain the same immutable equation allocation.
+    ///
+    /// Payload composition counts shared evidence once; equal independently allocated
+    /// equations still own distinct storage and are not interchangeable for this purpose.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
     /// Conservative retained exact evidence allowance.
     #[must_use]
     pub fn retained_payload_bytes(&self) -> u64 {

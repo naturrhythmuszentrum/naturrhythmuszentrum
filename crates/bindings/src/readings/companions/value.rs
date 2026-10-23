@@ -19,6 +19,8 @@ pub struct CompanionReading {
     pub(super) targets: Vec<PhysicalReading>,
     /// Exact linear parameter transformation, with zero offsets.
     pub(super) map: AffineMap,
+    /// Optional checked original fixed-impedance equations for cross-kind affine covariance.
+    pub(super) phasor: Option<crate::readings::PhasorCovarianceLaw>,
     /// Output difference/product units in logical column order.
     pub(super) units: Vec<PairingWitness>,
 }
@@ -70,7 +72,13 @@ impl CompanionReading {
             targets: targets.to_vec(),
             map,
             units,
+            phasor: None,
         })
+    }
+    /// Original fixed-reactance equations when this covariance uses the exact affine phasor law.
+    #[must_use]
+    pub const fn phasor_law(&self) -> Option<&crate::readings::PhasorCovarianceLaw> {
+        self.phasor.as_ref()
     }
     /// Original distinct companion declaration.
     #[must_use]

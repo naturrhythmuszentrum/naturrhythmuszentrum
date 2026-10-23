@@ -9,6 +9,7 @@ mod parameters;
 mod phasor;
 pub use parameters::{
     CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
+    PhasorStatistics,
 };
 pub use phasor::{
     PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,

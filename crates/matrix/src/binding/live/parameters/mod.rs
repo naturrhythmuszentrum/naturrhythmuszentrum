@@ -2,7 +2,9 @@
 //! Execute companion maps from explicitly bound original parameters and their numerical errors.
 
 mod numeric;
+mod phasor;
 mod plan;
+pub use phasor::PhasorStatistics;
 
 pub use plan::CompanionExecution;
 
