@@ -48,3 +48,10 @@ pub(crate) mod normalization;
     reason = "fixtures are shared across public test modules"
 )]
 pub(crate) mod lc_coordinates;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "original LC fixtures serve public replay and refusal tests"
+)]
+#[path = "lc_roots/mod.rs"]
+pub(crate) mod lc_roots;
