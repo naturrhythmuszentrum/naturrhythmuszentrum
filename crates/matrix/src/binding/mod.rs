@@ -51,9 +51,10 @@ pub use live::{
     CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
     CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, CopyDiscrepancy,
     DependencyPolicy, LiveBindingError, PhasorError, PhasorEvaluation, PhasorOperand,
-    PhasorProduct, PhasorPublication, PublishedPhasor, ReadingBinding, ReadingImport,
-    ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
-    ReciprocalDerivativeEvaluation,
+    PhasorProduct, PhasorPublication, PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation,
+    PhasorSolvePublication, PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasor,
+    PublishedPhasorSolve, ReadingBinding, ReadingImport, ReadingRegion,
+    ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
 };
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};

@@ -78,3 +78,5 @@ mod reciprocal_derivatives;
 mod companion_execution;
 
 mod phasor_execution;
+
+mod phasor_solve;

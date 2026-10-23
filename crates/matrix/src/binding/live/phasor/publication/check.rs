@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed complete result layout checks bind every produced float to its exact declared interpretation.
 
-use super::super::{AT, HeapError, PhasorError, PhasorProduct};
+use super::super::{AT, HeapError, PhasorError};
 use crate::{CompanionAdapter, EntryTicket, ReadingAdapter, ReadingCoverage};
 use nrz_bindings::readings::algebra::{
     limits::BudgetKind,
@@ -10,13 +10,12 @@ use nrz_bindings::readings::algebra::{
 };
 use nrz_bindings::{
     Budget, CompanionKind,
-    readings::{CompanionReadingKind, PhasorResultDefinition, RepresentationKind},
+    readings::{CompanionReadingKind, Representation, RepresentationKind},
 };
-use nrz_scalar::Scalar;
 
 /// Require the exact whole block, the original vector selection and all four scalar copies.
-pub(super) fn coverage(
-    definition: &PhasorResultDefinition,
+pub(in crate::binding::live::phasor) fn coverage(
+    output: &Representation,
     coverage: &ReadingCoverage<usize>,
     companions: &[CompanionAdapter<usize>],
     budget: &mut Budget,
@@ -33,13 +32,13 @@ pub(super) fn coverage(
     for adapter in coverage.readings() {
         crate::binding::adapters::reading_work(adapter.reading(), budget)
             .map_err(crate::LiveBindingError::from)?;
-        if adapter.reading().family() != definition.output().reading().family() {
+        if adapter.reading().family() != output.reading().family() {
             return Err(PhasorError::Identity);
         }
         positions(adapter, budget)?;
-        whole |= adapter.reading() == definition.output().reading()
+        whole |= adapter.reading() == output.reading()
             && adapter.representation().kind() == RepresentationKind::ComplexBlock
-            && adapter.representation().reconstruction() == definition.output().reconstruction();
+            && adapter.representation().reconstruction() == output.reconstruction();
         if let Some(index) = scalar(adapter, budget)? {
             copies[index] = true;
         }
@@ -58,7 +57,7 @@ pub(super) fn coverage(
     if !whole || !vector || copies.iter().any(|present| !present) {
         return Err(PhasorError::Identity);
     }
-    parameters(definition, companions, budget)
+    parameters(output, companions, budget)
 }
 
 /// Every literal output ticket names its corresponding original selected storage position.
@@ -99,7 +98,7 @@ fn scalar(
 
 /// Two complete identity channels attach each produced radius to its own selected copy.
 fn parameters(
-    definition: &PhasorResultDefinition,
+    output: &Representation,
     companions: &[CompanionAdapter<usize>],
     budget: &mut Budget,
 ) -> Result<(), PhasorError> {
@@ -112,7 +111,7 @@ fn parameters(
         let [target] = companion.targets() else {
             return Err(PhasorError::Identity);
         };
-        if target.reading().family() != definition.output().reading().family() {
+        if target.reading().family() != output.reading().family() {
             return Err(PhasorError::Identity);
         }
         let index = scalar(target, budget)?.ok_or(PhasorError::Identity)?;
@@ -136,34 +135,28 @@ fn parameters(
     Ok(())
 }
 
-/// Retain exact declarations and all ancestors beside the complete numerical product and import.
-pub(super) fn storage<P: Scalar>(
-    product: &PhasorProduct<P>,
-    definition: &PhasorResultDefinition,
+/// Charge newly owned witnesses and source records; product and definition remain shared.
+pub(super) fn storage(
     coverage: &ReadingCoverage<usize>,
+    companions: &[CompanionAdapter<usize>],
     sources: usize,
     budget: &mut Budget,
 ) -> Result<u64, PhasorError> {
-    let mut bytes = product
-        .retained_payload_bytes()
-        .checked_add(definition.retained_payload_bytes())
-        .and_then(|size| size.checked_add(8192))
-        .ok_or(HeapError::ExtentOverflow)?;
-    for adapter in coverage.readings() {
+    let mut bytes = 8192_u64;
+    let targets = companions.iter().flat_map(CompanionAdapter::targets);
+    for adapter in coverage.readings().iter().chain(targets) {
         budget.work(1, AT)?;
         let proof = u64::try_from(adapter.representation().witness().exported_byte_len())
             .map_err(|_| HeapError::ExtentOverflow)?;
-        bytes = bytes
-            .checked_add(proof.checked_mul(8).ok_or(HeapError::ExtentOverflow)?)
-            .ok_or(HeapError::ExtentOverflow)?;
+        bytes = bytes.checked_add(proof).ok_or(HeapError::ExtentOverflow)?;
     }
-    let ancestors = u64::try_from(sources).map_err(|_| HeapError::ExtentOverflow)?;
+    let ancestors = sources
+        .checked_mul(std::mem::size_of::<
+            crate::binding::live::selected::SelectedReading,
+        >())
+        .ok_or(HeapError::ExtentOverflow)?;
     bytes = bytes
-        .checked_add(
-            ancestors
-                .checked_mul(128)
-                .ok_or(HeapError::ExtentOverflow)?,
-        )
+        .checked_add(u64::try_from(ancestors).map_err(|_| HeapError::ExtentOverflow)?)
         .ok_or(HeapError::ExtentOverflow)?;
     budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
     Ok(bytes)

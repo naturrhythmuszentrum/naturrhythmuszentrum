@@ -38,7 +38,8 @@ pub use operations::{
     ReadingOperationError,
 };
 pub use phasor::{
-    PhasorBlockCorrespondence, PhasorConjugation, PhasorConvention, PhasorResultDefinition,
+    PhasorBlockCorrespondence, PhasorConjugation, PhasorConvention, PhasorResidualNorm,
+    PhasorResidualTransfer, PhasorResultDefinition, PhasorSolveDefinition,
 };
 pub use projection::{ProjectionSpace, ReadingProjection};
 pub use reciprocal::{

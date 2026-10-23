@@ -16,7 +16,7 @@ pub(crate) struct Declarations {
 }
 
 /// Add every original result and output-parameter declaration to the shared header.
-pub(super) fn declare(declarations: &mut Vec<(String, Sort)>) {
+pub(crate) fn declare(declarations: &mut Vec<(String, Sort)>) {
     declarations.extend([
         ("output_root".to_owned(), matrix(2, 1)),
         ("output_block".to_owned(), matrix(2, 2)),
@@ -116,7 +116,7 @@ pub(super) fn prepare(
 }
 
 /// The two-coordinate current-style vector shares the actual first-column values.
-fn vector(
+pub(crate) fn vector(
     fixture: &mut Fixture,
     whole: &PhysicalReading,
     adapters: &mut Vec<ReadingAdapter<usize>>,
@@ -169,7 +169,7 @@ fn vector(
 }
 
 /// Every radius region and copy index is fixed before numerical values are produced.
-fn parameters(
+pub(crate) fn parameters(
     fixture: &mut Fixture,
     copies: &[ReadingAdapter<usize>],
 ) -> TestResult<Vec<CompanionAdapter<usize>>> {

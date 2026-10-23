@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete output declarations and their original source closure precede one atomic heap publication.
 
-mod check;
+pub(super) mod check;
 use super::{AT, Heap, HeapError, PhasorError, PhasorEvaluation, PhasorProduct};
 use crate::{
     CompanionAdapter, DependencyPolicy, Extent, ReadingCoverage, ReadingImport, ReadingRegion,
@@ -56,9 +56,9 @@ impl<P: Scalar> PhasorPublication<P> {
         {
             return Err(PhasorError::Identity);
         }
-        check::coverage(&definition, &coverage, &companions, budget)?;
-        let ancestors = sources(&product, budget)?;
-        let bytes = check::storage(&product, &definition, &coverage, ancestors.len(), budget)?;
+        check::coverage(definition.output(), &coverage, &companions, budget)?;
+        let ancestors = sources(product.operands(), budget)?;
+        let bytes = check::storage(&coverage, &companions, ancestors.len(), budget)?;
         let graph = Rc::clone(&product.operands()[0].whole().group.graph);
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
         Ok(Self(Rc::new(Plan {
@@ -160,7 +160,7 @@ impl Heap {
                 },
             ];
             let provenance = super::super::import::ImportProvenance {
-                definition: plan.definition.clone(),
+                definition: super::super::PhasorDefinition::Product(plan.definition.clone()),
                 sources: plan.sources.clone(),
                 coverage: evaluation.coverage(),
             };
@@ -182,12 +182,12 @@ impl Heap {
 }
 
 /// Flatten and deduplicate existing source ancestors under the same finite caller ledger.
-fn sources<P: Scalar>(
-    product: &PhasorProduct<P>,
+pub(super) fn sources<P: Scalar>(
+    operands: &[super::PhasorOperand<P>; 2],
     budget: &mut Budget,
 ) -> Result<Vec<super::super::selected::SelectedReading>, PhasorError> {
     let mut result: Vec<super::super::selected::SelectedReading> = Vec::new();
-    for operand in product.operands() {
+    for operand in operands {
         for binding in std::iter::once(operand.whole()).chain(operand.copies()) {
             let selected = binding.selected();
             for source in std::iter::once(&selected).chain(&binding.group.antecedents) {

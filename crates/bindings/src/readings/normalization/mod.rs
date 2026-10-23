@@ -124,6 +124,12 @@ impl CoordinateNormalization {
         Ok(())
     }
 
+    /// Conservative retained exact metadata and inverse-witness allowance.
+    #[must_use]
+    pub fn retained_payload_bytes(&self) -> u64 {
+        self.0.bytes
+    }
+
     /// Key the original restoration expression and its complete mathematical context.
     ///
     /// Consumers additionally retain `Self::entries` identities and numerical dependency,

@@ -33,7 +33,7 @@ pub(crate) struct Case<P: Scalar> {
     pub(crate) output: Option<output::Declarations>,
 }
 #[path = "phasor/output.rs"]
-mod output;
+pub(crate) mod output;
 
 impl<P: Scalar> Case<P> {
     /// Bind all predeclared result views and companions to the actual ordered input product.
@@ -182,6 +182,16 @@ fn build<P: Scalar + 'static>(
 
 /// Separate declarations for every whole operand, scalar copy and stored output parameter.
 fn declarations(publish: bool) -> TestResult<Fixture> {
+    let declarations = declaration_inventory(publish);
+    let borrowed = declarations
+        .iter()
+        .map(|(key, sort)| (key.as_str(), sort.clone()))
+        .collect::<Vec<_>>();
+    Fixture::new(&borrowed)
+}
+
+/// Complete original product declarations, including all requested publication parameters.
+fn declaration_inventory(publish: bool) -> Vec<(String, Sort)> {
     let mut declarations = vec![("root".to_owned(), matrix(4, 1))];
     for prefix in ["left", "right"] {
         declarations.push((
@@ -202,11 +212,7 @@ fn declarations(publish: bool) -> TestResult<Fixture> {
     if publish {
         output::declare(&mut declarations);
     }
-    let borrowed = declarations
-        .iter()
-        .map(|(key, sort)| (key.as_str(), sort.clone()))
-        .collect::<Vec<_>>();
-    Fixture::new(&borrowed)
+    declarations
 }
 
 /// Build both expansions from the same root without declaring independent repeated coordinates.
@@ -273,7 +279,7 @@ fn readings(
 }
 
 /// Each identity scalar view has its own proof against the specified selected storage entry.
-fn components(
+pub(crate) fn components(
     fixture: &mut Fixture,
     whole: &PhysicalReading,
     prefix: &str,
@@ -364,7 +370,7 @@ fn companions(
 }
 
 /// Literal storage positions remain independent from logical result component indices.
-fn tickets(region: usize, indices: &[u64]) -> Vec<EntryTicket<usize>> {
+pub(crate) fn tickets(region: usize, indices: &[u64]) -> Vec<EntryTicket<usize>> {
     indices
         .iter()
         .map(|&index| EntryTicket { region, index })

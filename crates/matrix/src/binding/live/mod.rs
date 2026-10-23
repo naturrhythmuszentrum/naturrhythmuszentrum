@@ -11,7 +11,9 @@ pub use parameters::{
     CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
 };
 pub use phasor::{
-    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PublishedPhasor,
+    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
+    PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorTransferBounds,
+    PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
 };
 mod derivatives;
 pub use derivatives::{
@@ -112,7 +114,18 @@ impl<P: Scalar> ReadingBinding<P> {
     /// Actual checked product definition, when this reading was initialized by phasor publication.
     #[must_use]
     pub fn phasor_result(&self) -> Option<&nrz_bindings::readings::PhasorResultDefinition> {
-        self.group.phasor_result.as_ref()
+        match self.group.phasor_result.as_ref()? {
+            PhasorDefinition::Product(value) => Some(value),
+            PhasorDefinition::Solve(_) => None,
+        }
+    }
+    /// Original checked LC equation, when certified solve publication initialized this family.
+    #[must_use]
+    pub fn phasor_solve(&self) -> Option<&nrz_bindings::readings::PhasorSolveDefinition> {
+        match self.group.phasor_result.as_ref()? {
+            PhasorDefinition::Solve(value) => Some(value),
+            PhasorDefinition::Product(_) => None,
+        }
     }
     /// Original operand assurance scopes retained by a published phasor result.
     #[must_use]
@@ -183,6 +196,15 @@ pub(crate) struct ProofDependency {
     pub(crate) readers: Vec<usize>,
 }
 
+/// A closed producer retains the exact operation that initialized its output family.
+#[derive(Clone, Debug)]
+pub(crate) enum PhasorDefinition {
+    /// Complete multiplication correspondence and physical result slot.
+    Product(nrz_bindings::readings::PhasorResultDefinition),
+    /// Original LC equation and complete current result slot.
+    Solve(nrz_bindings::readings::PhasorSolveDefinition),
+}
+
 /// Shared immutable exact plan, owned by the same inventory as homogeneous covers.
 #[derive(Debug)]
 pub(crate) struct Group {
@@ -215,7 +237,7 @@ pub(crate) struct Group {
     /// Flattened selected source closure of a checked published product.
     pub(crate) antecedents: Vec<selected::SelectedReading>,
     /// Actual checked operation that initialized a declared phasor result slot.
-    pub(crate) phasor_result: Option<nrz_bindings::readings::PhasorResultDefinition>,
+    pub(crate) phasor_result: Option<PhasorDefinition>,
     /// Original operand assurance scopes, never promoted by generated numerical radii.
     pub(crate) phasor_inputs: Option<[crate::Coverage; 2]>,
 }

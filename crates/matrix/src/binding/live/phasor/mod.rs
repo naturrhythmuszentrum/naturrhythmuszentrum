@@ -5,8 +5,13 @@ mod input;
 mod numeric;
 mod plan;
 mod publication;
+mod solve;
 pub use plan::{PhasorOperand, PhasorProduct};
 pub use publication::{PhasorPublication, PublishedPhasor};
+pub use solve::{
+    PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication,
+    PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasorSolve,
+};
 
 use super::LiveBindingError;
 use crate::{Coverage, Heap, HeapError};
@@ -42,6 +47,15 @@ pub enum PhasorError {
     /// Outward arithmetic could not produce finite complete coverage.
     #[error("phasor arithmetic: {0}")]
     Arithmetic(#[from] nrz_scalar::ArithmeticFailure),
+    /// The existing Real inverse, residual or perturbation theorem refused.
+    #[error("phasor Real solve: {0}")]
+    Solve(#[from] crate::SolveError),
+    /// Exact zero impedance is observable, but current and admittance are undefined.
+    #[error("zero impedance: current and admittance are unavailable")]
+    ZeroImpedance,
+    /// The full declared reactance box is not separated from zero.
+    #[error("reactance enclosure contains zero")]
+    ReactanceNotSeparated,
     /// Component order, group, source identity or arithmetic revision differs.
     #[error("phasor execution identity mismatch")]
     Identity,
@@ -156,9 +170,12 @@ impl Heap {
             let payload = numeric::multiply(&left, &right, context, budget)?;
             budget.check(
                 BudgetKind::OutputBytes,
-                retained
-                    .checked_add(bytes)
-                    .ok_or(HeapError::ExtentOverflow)?,
+                u64::try_from(
+                    std::mem::size_of::<PhasorEvaluation<P>>() + 2 * std::mem::size_of::<usize>(),
+                )
+                .map_err(|_| HeapError::ExtentOverflow)?
+                .checked_add(bytes)
+                .ok_or(HeapError::ExtentOverflow)?,
                 AT,
             )?;
             Ok::<_, PhasorError>((payload, [first, second]))

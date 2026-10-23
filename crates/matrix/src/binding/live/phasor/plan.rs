@@ -65,7 +65,7 @@ impl<P: Scalar> PhasorProduct<P> {
         operands: [PhasorOperand<P>; 2],
         budget: &mut Budget,
     ) -> Result<Self, PhasorError> {
-        let bytes = storage(&correspondence, &operands, budget)?;
+        let bytes = storage(&operands, budget)?;
         budget.with_retained_payload(bytes, AT, |budget| {
             correspondence.check_operands(
                 &[
@@ -93,7 +93,7 @@ impl<P: Scalar> PhasorProduct<P> {
     pub fn operands(&self) -> &[PhasorOperand<P>; 2] {
         &self.0.operands
     }
-    /// Retained exact metadata charged beside each numerical evaluation.
+    /// Owned plan allocation; correspondence and reading groups remain shared with their charged owners.
     #[must_use]
     pub fn retained_payload_bytes(&self) -> u64 {
         self.0.bytes
@@ -113,31 +113,20 @@ impl<P: Scalar + 'static> PhasorProduct<P> {
     }
 }
 
-/// Bound original physical metadata comparisons and retained representation certificates.
+/// Bound metadata comparisons and charge only the new shared plan allocation.
 fn storage<P: Scalar>(
-    law: &PhasorBlockCorrespondence,
     operands: &[PhasorOperand<P>; 2],
     budget: &mut Budget,
 ) -> Result<u64, PhasorError> {
-    let mut bytes = law
-        .retained_payload_bytes()
-        .checked_add(2048)
+    // The correspondence and all reading groups already have charged immutable owners.
+    let size = std::mem::size_of::<Plan<P>>()
+        .checked_add(2 * std::mem::size_of::<usize>())
         .ok_or(HeapError::ExtentOverflow)?;
+    let bytes = u64::try_from(size).map_err(|_| HeapError::ExtentOverflow)?;
     for operand in operands {
         for binding in std::iter::once(operand.whole()).chain(operand.copies()) {
             crate::binding::adapters::reading_work(binding.reading(), budget)
                 .map_err(super::LiveBindingError::from)?;
-            let size = u64::try_from(
-                binding
-                    .adapter()
-                    .representation()
-                    .witness()
-                    .exported_byte_len(),
-            )
-            .map_err(|_| HeapError::ExtentOverflow)?;
-            bytes = bytes
-                .checked_add(size.checked_mul(8).ok_or(HeapError::ExtentOverflow)?)
-                .ok_or(HeapError::ExtentOverflow)?;
         }
     }
     budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;

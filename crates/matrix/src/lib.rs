@@ -39,9 +39,11 @@ pub use binding::{
     CompanionExecutionError, CompanionExecutionUsage, CoordinateContract, CoordinateError,
     CoordinateNorm, CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket,
     LiveBindingError, OperatorAdapter, PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct,
-    PhasorPublication, PublishedPhasor, ReadingAdapter, ReadingAdapterError, ReadingBinding,
-    ReadingCoverage, ReadingImport, ReadingRegion, ReciprocalDerivativeContract,
-    ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
+    PhasorPublication, PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation,
+    PhasorSolvePublication, PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasor,
+    PublishedPhasorSolve, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
+    ReadingImport, ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
+    ReciprocalDerivativeEvaluation,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
@@ -295,3 +297,11 @@ mod copy_testing;
     reason = "phasor source and publication fixtures are shared across test layers"
 )]
 mod phasor_testing;
+
+#[cfg(test)]
+#[path = "testing/phasor_solve.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "physical phasor solve fixtures serve public and private tests"
+)]
+mod phasor_solve_testing;

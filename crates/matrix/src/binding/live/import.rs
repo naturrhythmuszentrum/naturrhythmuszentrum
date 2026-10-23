@@ -16,7 +16,7 @@ use std::rc::Rc;
 /// Exact operation and complete flattened source closure retained before result publication.
 pub(super) struct ImportProvenance {
     /// Checked actual native operation and fresh output declaration.
-    pub(super) definition: nrz_bindings::readings::PhasorResultDefinition,
+    pub(super) definition: super::PhasorDefinition,
     /// Every original source selection, including earlier result ancestors.
     pub(super) sources: Vec<super::selected::SelectedReading>,
     /// Original deterministic assurance scopes of the two product operands.

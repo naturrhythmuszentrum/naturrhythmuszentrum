@@ -84,6 +84,12 @@ impl PhasorResultDefinition {
             bytes,
         })))
     }
+    /// Whether two references retain the same immutable result definition allocation.
+    /// Shared evidence is counted once when composing retained output ownership.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
     /// Actual original Complex product whose execution initializes the fresh output slot.
     #[must_use]
     pub fn operation(&self) -> &Handle {
@@ -112,7 +118,7 @@ impl PhasorResultDefinition {
 }
 
 /// Numerical block multiplication consumes coherent difference coordinates.
-fn physical(
+pub(super) fn physical(
     law: &PhasorBlockCorrespondence,
     registry: &Registry,
     budget: &mut Budget,

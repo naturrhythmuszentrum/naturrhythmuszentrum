@@ -121,3 +121,10 @@ mod reciprocal_testing;
     reason = "phasor source and publication fixtures are shared across test layers"
 )]
 mod phasor_testing;
+
+#[path = "../src/testing/phasor_solve.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "physical phasor solve fixtures serve public and private tests"
+)]
+mod phasor_solve_testing;

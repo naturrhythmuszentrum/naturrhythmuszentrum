@@ -2,8 +2,11 @@
 //! Independent heap-view residual and inverse-defect enclosures, never LU reconstruction claims.
 
 use crate::binding::buffer;
-use crate::solve::RightHandSide;
-use crate::{Extent, NormalizedView, SolveError};
+use crate::{Extent, SolveError};
+
+#[path = "solve_entries.rs"]
+mod entries;
+pub(crate) use entries::SolveMatrix;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
 /// Private inverse proof in the saved, unequilibrated normalized coordinates.
@@ -55,7 +58,7 @@ impl SolveWork {
 
 /// Certify a supplied inverse candidate without consulting any backend factors.
 pub(crate) fn inverse<P: Scalar + 'static>(
-    operator: &NormalizedView<'_, P>,
+    operator: &impl SolveMatrix<P>,
     candidate: &[P],
     work: &mut SolveWork,
     context: &ArithmeticContext,
@@ -97,7 +100,7 @@ pub(crate) fn inverse<P: Scalar + 'static>(
 
 /// Enclose one row of Z times one column of A in increasing contraction order.
 fn inverse_dot<P: Scalar + 'static>(
-    operator: &NormalizedView<'_, P>,
+    operator: &impl SolveMatrix<P>,
     candidate: &[P],
     row: usize,
     column: usize,
@@ -119,8 +122,8 @@ fn inverse_dot<P: Scalar + 'static>(
 
 /// Enclose the residual over saved heap views, separately from inverse identity columns.
 pub(crate) fn center<P: Scalar + 'static>(
-    operator: &NormalizedView<'_, P>,
-    rhs: &RightHandSide<'_, '_, P>,
+    operator: &impl SolveMatrix<P>,
+    rhs: &impl SolveMatrix<P>,
     candidate: &[P],
     witness: &InverseWitness<P>,
     work: &mut SolveWork,
@@ -161,7 +164,7 @@ pub(crate) fn center<P: Scalar + 'static>(
 
 /// Independent dot products use checked candidate indices and never faer reductions.
 fn solution_dot<P: Scalar + 'static>(
-    operator: &NormalizedView<'_, P>,
+    operator: &impl SolveMatrix<P>,
     candidate: &[P],
     extent: Extent,
     row: usize,
@@ -204,8 +207,8 @@ pub(crate) struct FamilyCertificate<P: Scalar> {
 
 /// Collect only chosen total regions; evaluation and derivation regions overlap them.
 pub(crate) fn family<P: Scalar + 'static>(
-    operator: &NormalizedView<'_, P>,
-    rhs: &RightHandSide<'_, '_, P>,
+    operator: &impl SolveMatrix<P>,
+    rhs: &impl SolveMatrix<P>,
     witness: &InverseWitness<P>,
     certificate: &CenterCertificate<P>,
     context: &ArithmeticContext,
@@ -219,7 +222,7 @@ pub(crate) fn family<P: Scalar + 'static>(
     let mut rhs_bounds = buffer(rhs.extent().entries())?;
     for column in 0..rhs.extent().columns() {
         for row in 0..rhs.extent().rows() {
-            rhs_bounds.push(rhs.bound(row, column)?);
+            rhs_bounds.push(rhs.bound(row, column)?.unwrap_or(P::ZERO));
         }
     }
     perturbation(

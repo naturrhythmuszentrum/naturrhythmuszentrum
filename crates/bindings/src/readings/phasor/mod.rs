@@ -3,8 +3,12 @@
 
 mod coefficients;
 mod result;
+mod solve;
 mod syntax;
+mod transfer;
 pub use result::PhasorResultDefinition;
+pub use solve::PhasorSolveDefinition;
+pub use transfer::{PhasorResidualNorm, PhasorResidualTransfer};
 
 use super::{ReadingError, ReadingProjection, Representation, RepresentationKind, support};
 use nrz_cas::{
@@ -139,6 +143,12 @@ impl PhasorBlockCorrespondence {
             }
         }
         Ok(())
+    }
+    /// Whether two references retain the same immutable correspondence allocation.
+    /// Shared evidence is counted once when composing retained output ownership.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
     /// Complete ordered operands with their original family and reconstruction evidence.
     #[must_use]
