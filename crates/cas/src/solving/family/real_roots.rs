@@ -411,8 +411,21 @@ pub(crate) fn choose(
     if base.derived {
         real = transport::inverse_root(cas, &base.stratum, &real, budget)?;
     }
-    super::root_selection::include(cas, construction, target, &real, base.imaginary, budget)
-        .map(Some)
+    let compatibility = if base.derived {
+        transport::compatibility(construction, budget)?
+    } else {
+        Vec::new()
+    };
+    super::root_selection::include(
+        cas,
+        construction,
+        target,
+        &real,
+        base.imaginary,
+        compatibility,
+        budget,
+    )
+    .map(Some)
 }
 
 /// Existing Real identity replay compares declaration expressions with their exact base interpretation.

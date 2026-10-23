@@ -278,3 +278,30 @@ pub(super) fn lift_sign(
         });
     Ok(())
 }
+
+/// Explicit component facts use local premise slots after the construction's context filter.
+pub(super) fn compatibility(
+    construction: &crate::solving::radicals::construction::Construction,
+    budget: &mut Budget,
+) -> Result<Vec<u32>, Fault> {
+    let mut result = crate::solving::coefficients::storage::vector(0, budget)?;
+    let mut slot = 0_u32;
+    for step in &construction.steps {
+        budget.work(1, super::super::AT)?;
+        if step.context != construction.context {
+            continue;
+        }
+        if matches!(
+            &step.conclusion,
+            Statement::PredicateFact { region, .. } if *region == construction.region
+        ) {
+            crate::solving::coefficients::storage::reserve(&mut result, 1, budget)?;
+            result.push(slot);
+        }
+        slot = slot.checked_add(1).ok_or_else(super::invalid)?;
+    }
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests;

@@ -550,4 +550,4 @@ pub(crate) use real::samples as real_samples;
 
 #[path = "family_oracle.rs"]
 mod family;
-pub(crate) use family::{cubic as family_cubic, quadratic as family_quadratic};
+pub(crate) use family::{cubic as family_cubic, lc as family_lc, quadratic as family_quadratic};

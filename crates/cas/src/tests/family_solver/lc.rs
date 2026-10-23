@@ -3,8 +3,11 @@
 
 mod expected;
 mod fixture;
-mod gap;
 mod identity;
+mod refusals;
+mod replay;
+mod theorem;
+mod transport;
 
 use crate::limits::{Budget, Limits};
 use crate::request::Outcome;
@@ -52,19 +55,33 @@ fn lc_original_coefficient_equality_replays() -> TestResult {
 fn lc_original_missing_domain_refuses() -> TestResult {
     let (mut source, request) = fixture::request([1, 1], false)?;
     let outcome = source.cas.run(&request);
-    assert!(matches!(
-        outcome,
-        Outcome::Invalid {
-            fault: crate::Fault {
-                kind: crate::FaultKind::Invalid(crate::InvalidCode::Sort),
-                ..
-            },
-            ..
-        }
-    ));
-    for signs in [[0, 1], [1, 0]] {
+    let Outcome::Invalid { fault, usage } = outcome else {
+        return Err(format!("missing LC divisor inventory: {outcome:?}").into());
+    };
+    assert_eq!(
+        fault,
+        crate::Fault::invalid(
+            crate::InvalidCode::Sort,
+            crate::Location::new("solving object admission")
+        )
+    );
+    assert_eq!(usage.work, 8_563);
+    for (signs, work) in [([0, 1], 447_073), ([1, 0], 444_665)] {
         let (mut source, request) = fixture::request(signs, true)?;
-        assert!(!matches!(source.cas.run(&request), Outcome::Solved { .. }));
+        let outcome = source.cas.run(&request);
+        let Outcome::Unresolved {
+            solve_reason,
+            usage,
+            ..
+        } = outcome
+        else {
+            return Err(format!("missing LC sign: {outcome:?}").into());
+        };
+        assert_eq!(
+            solve_reason,
+            Some(crate::solving::SolveReason::MissingUnitProof)
+        );
+        assert_eq!(usage.work, work);
     }
     Ok(())
 }

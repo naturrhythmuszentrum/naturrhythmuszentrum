@@ -163,3 +163,106 @@ pub(crate) fn cubic(cas: &Cas, witness: &VerifiedWitness) -> TestResult {
     assert_eq!(products, 1);
     Ok(())
 }
+
+/// The original returned tuple entries independently satisfy the specialized LC polynomial.
+fn lc_tuples(
+    cas: &Cas,
+    witness: &VerifiedWitness,
+    value: &CertificateProductCompleteness,
+    bindings: &[(&str, Complex)],
+    constant: i64,
+) -> TestResult {
+    let scalar = coefficient(cas, &value.scalar)?;
+    let SolveView::CoefficientValue(leading) = cas.solve_view(&scalar)? else {
+        return Err("LC oracle scalar".into());
+    };
+    let SolveView::SolveProblem(problem) = cas.solve_view(&value.problem)? else {
+        return Err("LC oracle problem".into());
+    };
+    let ring = Ring::specialized(cas, &leading.domain, bindings, &problem.coefficient_domain)?;
+    let Statement::Solve(statement) = &witness.judgment().statement else {
+        return Err("LC oracle statement".into());
+    };
+    let SolveStatement::Coverage(claim) = statement.as_ref() else {
+        return Err("LC oracle claim".into());
+    };
+    let SolveView::SolutionSet(set) = cas.solve_view(&claim.set)? else {
+        return Err("LC oracle set".into());
+    };
+    for branch in &set.branches {
+        let SolveView::SolutionBranch(branch) = cas.solve_view(branch)? else {
+            return Err("LC oracle branch".into());
+        };
+        let SolutionBranchKind::Finite { tuples } = &branch.kind else {
+            return Err("LC oracle finite branch".into());
+        };
+        for tuple in tuples {
+            let SolveView::Tuple(tuple) = cas.solve_view(tuple)? else {
+                return Err("LC oracle tuple".into());
+            };
+            let [root] = tuple.entries.as_slice() else {
+                return Err("LC oracle entry".into());
+            };
+            let root = ring.value(cas, &coefficient(cas, root)?)?;
+            let mut residual = ring.mul(&root, &root)?;
+            residual[0] = residual[0].add(Rational::integer(i128::from(constant)))?;
+            assert_eq!(residual, ring.zero());
+        }
+    }
+    Ok(())
+}
+
+/// Rational LC instances check both retained roots and every factor without solver arithmetic.
+pub(crate) fn lc(cas: &Cas, witness: &VerifiedWitness) -> TestResult {
+    let steps = super::super::audit::applications(cas, witness)?;
+    for (inductance, capacitance, constant) in [
+        ((1, 40), (1, 100_000), 4_000_000),
+        ((1, 2), (1, 8), 16),
+        ((2, 3), (3, 10), 5),
+        ((4, 1), (1, 12), 3),
+    ] {
+        let inductance = Rational::new(inductance.0, inductance.1)?;
+        let capacitance = Rational::new(capacitance.0, capacitance.1)?;
+        let actual = Rational::integer(1).div(inductance.mul(capacitance)?)?;
+        assert_eq!(actual, Rational::integer(i128::from(constant)));
+        let bindings = [
+            (
+                "L",
+                Complex {
+                    real: inductance,
+                    imaginary: Rational::integer(0),
+                },
+            ),
+            (
+                "C",
+                Complex {
+                    real: capacitance,
+                    imaginary: Rational::integer(0),
+                },
+            ),
+        ];
+        cells(cas, witness, &bindings, 2)?;
+        let mut products = 0;
+        for step in &steps {
+            let Certificate::Solve(certificate) = &step.certificate else {
+                continue;
+            };
+            let SolveCertificate::ProductCompleteness(value) = certificate.as_ref() else {
+                continue;
+            };
+            assert!(specialize::region(
+                cas,
+                value.region.logical_id(),
+                &bindings
+            )?);
+            assert_eq!(
+                product(cas, value, &bindings, &[(constant, 0), (0, 0), (1, 0)])?,
+                [1, 1]
+            );
+            lc_tuples(cas, witness, value, &bindings, constant)?;
+            products += 1;
+        }
+        assert_eq!(products, 1);
+    }
+    Ok(())
+}

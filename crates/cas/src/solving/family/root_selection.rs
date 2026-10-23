@@ -119,6 +119,7 @@ pub(super) fn include(
     target: &Handle,
     real: &Handle,
     imaginary: bool,
+    compatibility: Vec<u32>,
     budget: &mut Budget,
 ) -> Result<(Handle, Handle), Fault> {
     let factor = if imaginary {
@@ -178,7 +179,7 @@ pub(super) fn include(
             target_kind: RefinementTargetKind::Selection,
             target: selection.clone(),
             witnesses: vec![witness],
-            compatibility: Vec::new(),
+            compatibility,
             form: None,
         }),
         budget,

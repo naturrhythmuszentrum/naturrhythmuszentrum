@@ -58,7 +58,7 @@ pub(crate) use source::{
 
 #[path = "solve_blind/trace.rs"]
 mod trace;
-pub(crate) use trace::{prefixes, symbolic_prefixes};
+pub(crate) use trace::{closure as family_closure, prefixes, symbolic_prefixes};
 
 #[path = "solve_blind/audit.rs"]
 mod audit;
@@ -143,7 +143,7 @@ mod real_replay;
 pub(crate) use real_replay::refusals as real_expected_refusals;
 
 // Independent family samples share only the test-side rational quotient arithmetic.
-pub(crate) use oracle::{family_cubic, family_quadratic};
+pub(crate) use oracle::{family_cubic, family_lc, family_quadratic};
 
 pub(crate) use audit::applications as family_applications;
 

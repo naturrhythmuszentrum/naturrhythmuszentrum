@@ -372,7 +372,7 @@ impl Evaluation<'_> {
             return Err(invalid());
         }
         if map.region != *self.region {
-            crate::solving::family::mapping::restrict_map(self, map, budget)?;
+            crate::solving::family::mapping::base_map(self, map, budget)?;
         }
         crate::solving::coefficients::proof::identity_map(self.cas, map, self.premises, budget)?;
         match &stored.value {
