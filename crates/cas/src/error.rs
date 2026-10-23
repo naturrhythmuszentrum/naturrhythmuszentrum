@@ -28,6 +28,8 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// A reading witness cache disagrees with its authenticated retained proof closure.
+    DependencyWitness,
     /// An entry-set operation requires an admitted selection expression.
     SelectionExpected,
     /// Entry-set operands name different declared base symbols.

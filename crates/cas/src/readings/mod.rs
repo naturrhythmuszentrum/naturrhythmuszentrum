@@ -11,6 +11,12 @@ mod bases;
 pub(crate) mod check;
 mod coverage;
 mod entry_sets;
+mod inventory;
+mod inventory_budget;
+mod inventory_build;
+mod inventory_model;
+mod inventory_walk;
+mod inventory_write;
 mod proof;
 mod selection;
 pub(crate) mod syntax;
@@ -19,6 +25,10 @@ pub(crate) mod wire;
 pub use affine::AffineMap;
 pub use coverage::{EntryCoverage, EntryMultiplicity};
 pub use entry_sets::{EntrySetRelation, SharedEntry};
+pub use inventory_model::{
+    DependencyBase, DependencyContents, DependencyDeclaration, DependencyDefinition,
+    DependencyInventory, DependencyPremise, DependencyPremiseKind, DependencySelection,
+};
 pub use selection::{EntryIndex, EntryOrder, EntrySelection, SelectionSpec};
 
 use crate::budget::{Budget, BudgetKind};

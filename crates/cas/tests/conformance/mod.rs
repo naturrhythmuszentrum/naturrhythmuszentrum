@@ -70,3 +70,6 @@ mod reading_limits;
 
 mod entry_limits;
 mod entry_sets;
+
+mod dependency_limits;
+mod dependency_refusals;

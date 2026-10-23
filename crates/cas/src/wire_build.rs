@@ -238,8 +238,24 @@ fn ready(
 /// Encoded records, root index and the exact set of referenced primitive schemas.
 type CanonicalTable = (Vec<Vec<u8>>, u32, BTreeSet<Primitive>);
 
-/// Export a canonical dependency table; no local allocation order participates in selection.
+/// Canonical record indices retained for exact dependency inventory views.
+pub(crate) type Assignments = BTreeMap<Key, (u32, Vec<u8>)>;
+
+/// One canonical table together with its already computed local-to-portable index map.
+pub(crate) type IndexedTable = (Vec<Vec<u8>>, u32, BTreeSet<Primitive>, Assignments);
+
+/// Preserve the ordinary export cost while exposing indices to inventory callers.
 fn table(cas: &Cas, root: Entity, budget: &mut Budget) -> Result<CanonicalTable, Fault> {
+    let (records, root, rules, _) = indexed_table(cas, root, budget)?;
+    Ok((records, root, rules))
+}
+
+/// Export a canonical dependency table; no local allocation order participates in selection.
+pub(crate) fn indexed_table(
+    cas: &Cas,
+    root: Entity,
+    budget: &mut Budget,
+) -> Result<IndexedTable, Fault> {
     let root_key = key(cas, &root, budget)?;
     let mut records = gather(cas, root, budget)?;
     let mut assigned = BTreeMap::new();
@@ -288,7 +304,7 @@ fn table(cas: &Cas, root: Entity, budget: &mut Budget) -> Result<CanonicalTable,
         assigned.insert(id, (index, descriptor));
     }
     let root = assigned.get(&root_key).ok_or_else(invalid)?.0;
-    Ok((bytes, root, rules))
+    Ok((bytes, root, rules, assigned))
 }
 
 /// Encode a theorem DAG with a sorted manifest; primitive indices are patched by the record
@@ -326,13 +342,19 @@ pub(crate) fn syntax_key(cas: &Cas, id: LogicalId, budget: &mut Budget) -> Resul
 }
 
 /// Frame the already canonical records with their exact primitive manifest.
-fn envelope(
-    records: Vec<Vec<u8>>,
+pub(crate) fn envelope<I>(
+    records: I,
     root: u32,
     rules: &BTreeSet<Primitive>,
     magic: &[u8],
     budget: &mut Budget,
-) -> Result<Vec<u8>, Fault> {
+) -> Result<Vec<u8>, Fault>
+where
+    I: IntoIterator,
+    I::IntoIter: ExactSizeIterator,
+    I::Item: AsRef<[u8]>,
+{
+    let records = records.into_iter();
     let mut manifest: Vec<_> = rules.iter().map(|rule| rule.specification()).collect();
     manifest.sort_by_key(|rule| rule.key);
     let mut out = Encoder::witness(budget, AT);
@@ -344,7 +366,7 @@ fn envelope(
     }
     out.count(records.len())?;
     for record in records {
-        out.raw(&record)?;
+        out.raw(record.as_ref())?;
     }
     crate::wire::index(root, &mut out)?;
     Ok(out.finish())

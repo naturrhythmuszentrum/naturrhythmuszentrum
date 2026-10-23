@@ -122,7 +122,7 @@ fn source_chain(
 }
 
 /// Every constructor preserves the already reconstructed ordered source coordinates.
-fn apply(
+pub(super) fn apply(
     state: &State,
     node: LogicalId,
     source: &AffineMap,
