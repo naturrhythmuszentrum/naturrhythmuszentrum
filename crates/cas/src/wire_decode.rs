@@ -157,8 +157,7 @@ pub(crate) fn inspect(
     let Decoded::Conclusion(witness) = records.get(root).ok_or_else(invalid)? else {
         return Err(invalid());
     };
-    let canonical = crate::wire::encode(cas, cas.checked(witness.proof())?, reader.budget)?;
-    if canonical != bytes {
+    if witness.bytes != bytes {
         return Err(invalid());
     }
     Ok(witness.clone())

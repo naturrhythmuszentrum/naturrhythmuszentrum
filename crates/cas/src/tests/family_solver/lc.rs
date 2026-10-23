@@ -7,6 +7,7 @@ mod fixture;
 mod identity;
 mod refusals;
 mod replay;
+mod replay_routes;
 mod theorem;
 mod transport;
 
@@ -45,7 +46,7 @@ fn lc_original_coefficient_equality_replays() -> TestResult {
             replay.usage().work,
             bytes.len()
         ),
-        (236_088, 1_210_414, 825_134, 2_479)
+        (236_088, 1_100_325, 540_137, 2_479)
     );
     Ok(())
 }

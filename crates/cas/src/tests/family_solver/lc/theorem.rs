@@ -24,8 +24,8 @@ fn generation(work: u64, arithmetic_steps: u64, denominator_factors: u64) -> Bud
 
 fn replay() -> BudgetUsage {
     BudgetUsage {
-        work: 2_413_193,
-        arithmetic_steps: 29_529,
+        work: 1_813_435,
+        arithmetic_steps: 29_506,
         condition_steps: 43,
         case_arms: 1,
         region_nodes: 5,

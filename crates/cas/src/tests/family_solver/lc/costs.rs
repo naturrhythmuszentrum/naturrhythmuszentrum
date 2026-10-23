@@ -47,7 +47,7 @@ fn lc_replay_work_attribution() -> TestResult {
         rows.iter().map(|row| row.work).sum::<u64>(),
         budget.usage().work
     );
-    assert_eq!(totals(rows.iter())?, [221_241, 424_519, 74_839, 1_692_594]);
+    assert_eq!(totals(rows.iter())?, [221_241, 424_519, 74_839, 1_092_836]);
     for (rule, expected) in [
         ("root.select", [190_520, 240_057, 672, 0]),
         ("solve.product", [30_721, 170_919, 800, 0]),

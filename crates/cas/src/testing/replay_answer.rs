@@ -142,3 +142,39 @@ pub(crate) fn expected(
     };
     (coverage, presentation)
 }
+
+/// The original replay oracle independently rebuilds both theorem keys and re-encodes the checked proof.
+pub(crate) fn full_replay(
+    cas: &mut Cas,
+    bytes: &[u8],
+    expected: &Judgment,
+    budget: &mut Budget,
+) -> Result<crate::proof_model::VerifiedWitness, Fault> {
+    crate::wire_decode::magic(bytes)?;
+    cas.proof_limits(budget, |cas, budget| {
+        crate::proof_check::replay_budget(budget, |budget| {
+            crate::proof_view::validate_judgment(cas, expected, budget)?;
+            let expected = crate::wire_build::judgment_key(cas, expected, budget)?;
+            cas.transaction(budget, |candidate, budget| {
+                let witness = crate::wire_decode::inspect(candidate, bytes, budget)?;
+                let canonical =
+                    crate::wire::encode(candidate, candidate.checked(witness.proof())?, budget)?;
+                if canonical != bytes {
+                    return Err(Fault::invalid(
+                        crate::error::InvalidCode::Encoding,
+                        crate::Location::new("full replay oracle"),
+                    ));
+                }
+                let actual =
+                    crate::wire_build::judgment_key(candidate, witness.judgment(), budget)?;
+                if actual != expected {
+                    return Err(Fault::invalid(
+                        crate::error::InvalidCode::EndpointMismatch,
+                        crate::Location::new("typed proof admission"),
+                    ));
+                }
+                Ok(witness)
+            })
+        })
+    })
+}

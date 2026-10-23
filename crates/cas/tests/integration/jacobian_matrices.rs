@@ -164,7 +164,7 @@ fn source_jacobian_empty_matrix_axis_is_bounded() -> TestResult {
     // Definedness, empty expansion, representation checking/replay and empty
     // Jacobian checking/replay dominate these fixed costs. Coincident zero
     // rectangles skip 133 Work through canonical sharing; unused extent does not.
-    assert_eq!(costs, [162_246, 162_379, 162_379]);
+    assert_eq!(costs, [136_789, 136_922, 136_922]);
     Ok(())
 }
 

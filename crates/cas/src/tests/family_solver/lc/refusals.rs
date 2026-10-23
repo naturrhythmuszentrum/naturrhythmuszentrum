@@ -109,6 +109,16 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
                 Location::new("typed proof admission")
             )
         );
+        assert_eq!(
+            crate::testing::replay_answer::full_replay(
+                &mut receiver.cas,
+                &bytes,
+                &expected,
+                &mut super::ledger()?,
+            )
+            .err(),
+            Some(fault),
+        );
         assert_eq!(receiver.cas.counts(), before);
     }
     assert_eq!(
@@ -117,32 +127,32 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
             (
                 [0, 1],
                 true,
-                2_417_612,
-                [221_241, 424_519, 74_839, 1_697_013]
+                2_080_320,
+                [221_241, 424_519, 74_839, 1_359_721]
             ),
             (
                 [1, 0],
                 true,
-                2_415_773,
-                [221_241, 424_519, 74_839, 1_695_174]
+                2_078_481,
+                [221_241, 424_519, 74_839, 1_357_882]
             ),
             (
                 [-1, 1],
                 true,
-                2_424_532,
-                [221_241, 424_519, 74_839, 1_703_933]
+                2_087_240,
+                [221_241, 424_519, 74_839, 1_366_641]
             ),
             (
                 [1, -1],
                 true,
-                2_422_710,
-                [221_241, 424_519, 74_839, 1_702_111]
+                2_085_418,
+                [221_241, 424_519, 74_839, 1_364_819]
             ),
             (
                 [1, 1],
                 false,
-                2_411_849,
-                [221_241, 424_519, 74_839, 1_691_250]
+                2_074_557,
+                [221_241, 424_519, 74_839, 1_353_958]
             ),
         ]
     );

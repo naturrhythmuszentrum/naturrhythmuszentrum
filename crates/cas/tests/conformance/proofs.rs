@@ -1345,3 +1345,82 @@ fn substitution_steps(
     }];
     Ok([first, second])
 }
+
+/// Two syntactically distinct regions form an exact constructor cover in the same context.
+fn replay_cover(fixture: &mut Fixture) -> TestResult<Statement> {
+    use nrz_cas::domain::{AmbientDomain, RegionDraft, RegionExpr};
+    let header = fixture.cas.context_header(&fixture.context)?;
+    let empty = crate::testing::builders::admit(
+        &mut fixture.cas,
+        Draft::Region(RegionDraft {
+            header: Reference::Existing(header.clone()),
+            scope: Vec::new(),
+            ambient: AmbientDomain::Assignments,
+            expression: RegionExpr::Empty,
+        }),
+        &mut budget()?,
+    )?;
+    let domain = crate::testing::builders::admit(
+        &mut fixture.cas,
+        Draft::Region(RegionDraft {
+            header: Reference::Existing(header),
+            scope: Vec::new(),
+            ambient: AmbientDomain::Assignments,
+            expression: RegionExpr::Union(vec![
+                Reference::Existing(fixture.domain.clone()),
+                Reference::Existing(empty.clone()),
+            ]),
+        }),
+        &mut budget()?,
+    )?;
+    Ok(Statement::Cover {
+        domain,
+        members: vec![fixture.domain.clone(), empty],
+    })
+}
+
+/// Portable comparison accepts a permuted cover but still rejects an omitted exact member.
+/// ´test:integration:replay-preserves-unordered-cover-comparison´
+#[test]
+fn replay_preserves_unordered_cover_comparison() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let conclusion = replay_cover(&mut fixture)?;
+    let step = nrz_cas::proof::ApplicationDraft {
+        rule: Primitive::RegionConstruct,
+        context: fixture.context.clone(),
+        conclusion,
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: nrz_cas::proof::Certificate::None,
+    };
+    let proof = fixture
+        .cas
+        .check_proof(&fixture.context, &[step], &mut budget()?)?;
+    let bytes = fixture.cas.export_witness(&proof, &mut budget()?)?;
+    let canonical = fixture.cas.inspect(&bytes, &mut budget()?)?;
+    let mut expected = canonical.judgment().clone();
+    let Statement::Cover { members, .. } = &mut expected.statement else {
+        return Err("cover claim".into());
+    };
+    members.reverse();
+    assert_ne!(&expected, canonical.judgment());
+    let checked = fixture.cas.replay(&bytes, &expected, &mut budget()?)?;
+    assert!(checked.is_discharged());
+    assert_eq!(fixture.cas.export_witness(&checked, &mut budget()?)?, bytes);
+    let Statement::Cover { members, .. } = &mut expected.statement else {
+        return Err("cover claim".into());
+    };
+    members.pop().ok_or("cover member")?;
+    let before = fixture.cas.counts();
+    let fault = fixture
+        .cas
+        .replay(&bytes, &expected, &mut budget()?)
+        .err()
+        .ok_or("omitted cover member accepted")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::EndpointMismatch)
+    );
+    assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}

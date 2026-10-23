@@ -218,6 +218,23 @@ pub(crate) fn check_application(
     })
 }
 
+/// Exact local handles prove identity directly; unequal local views retain portable comparison.
+fn local_judgment_equal(
+    expected: &Judgment,
+    actual: &Judgment,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    #[cfg(test)]
+    let _phase = crate::testing::work_trace::Scope::phase("overhead.judgment-comparison");
+    let length = {
+        let mut out = crate::encoding::Encoder::new(budget, AT);
+        crate::statement::judgment(expected, &mut out)?;
+        size(out.finish().len(), AT)?
+    };
+    budget.work(length, AT)?;
+    Ok(expected == actual)
+}
+
 impl Cas {
     /// Retain one checked native application; the caller owns the enclosing transaction.
     pub(crate) fn publish_scoped(
@@ -414,9 +431,12 @@ impl Cas {
         self.proof_limits(budget, |cas, budget| {
             crate::proof_check::replay_budget(budget, |budget| {
                 crate::proof_view::validate_judgment(cas, expected, budget)?;
-                let expected = crate::wire_build::judgment_key(cas, expected, budget)?;
                 cas.transaction(budget, |candidate, budget| {
                     let witness = crate::wire_decode::inspect(candidate, bytes, budget)?;
+                    if local_judgment_equal(expected, &witness.judgment, budget)? {
+                        return Ok(witness);
+                    }
+                    let expected = crate::wire_build::judgment_key(candidate, expected, budget)?;
                     let actual =
                         crate::wire_build::judgment_key(candidate, &witness.judgment, budget)?;
                     if actual != expected {
