@@ -55,7 +55,7 @@ impl StructuredExpansion {
             .iter()
             .map(|entry| FixedCoefficient {
                 quantity: coefficient.clone(),
-                value: crate::kernels::linear::CoefficientValue::Expansion(Box::new(
+                value: crate::kernels::lowering::CoefficientValue::Expansion(Box::new(
                     entry.exact_map().clone(),
                 )),
             })
@@ -65,7 +65,7 @@ impl StructuredExpansion {
             .iter()
             .map(|entry| FixedCoefficient {
                 quantity: entry.descriptor().clone(),
-                value: crate::kernels::linear::CoefficientValue::Expansion(Box::new(
+                value: crate::kernels::lowering::CoefficientValue::Expansion(Box::new(
                     entry.exact_map().clone(),
                 )),
             })

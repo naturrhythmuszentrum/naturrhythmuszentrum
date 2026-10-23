@@ -106,18 +106,18 @@ fn identity<P: Scalar>(
 
 /// Matrix multiplication by a fixed operator repeats the same map across input columns.
 fn fixed<P: Scalar + 'static>(
-    map: &crate::LinearMap,
+    map: &crate::kernels::linear::LinearSchedule,
     output: &mut Affine<P>,
     context: &ArithmeticContext,
 ) -> Result<(), OperationError> {
-    let rows = map.operator.extent().rows();
-    let contracted = map.operator.extent().columns();
-    for block in 0..map.input.shape().extent().columns() {
+    let rows = map.operator.rows();
+    let contracted = map.operator.columns();
+    for block in 0..map.input.columns() {
         for column in 0..contracted {
             for row in 0..rows {
                 let coefficient = map
                     .coefficients
-                    .get(map.operator.extent().index(row, column)?)
+                    .get(map.operator.index(row, column)?)
                     .ok_or(StatisticsError::Contract)?;
                 let lowered = crate::kernels::lowering::lower(coefficient, map.literals, context)?;
                 output.jacobian.set(

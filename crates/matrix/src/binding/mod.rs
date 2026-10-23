@@ -27,6 +27,7 @@
 
 mod adapters;
 mod error;
+pub(crate) mod kernel;
 pub(crate) mod lifecycle;
 mod limits;
 mod operation;

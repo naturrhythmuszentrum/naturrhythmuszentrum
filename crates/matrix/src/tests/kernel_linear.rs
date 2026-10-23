@@ -53,3 +53,46 @@ fn sum_consumes_conversion_total_exactly_once() -> TestResult {
     assert!(Rational::binary(prior.0)?.covered(actual.0, actual.2)?);
     Ok(())
 }
+
+/// Numerical contracts recheck every operand and result extent independently of descriptor evidence.
+/// ´test:crate:kernel-contract-rechecks-every-numerical-extent´
+#[test]
+fn kernel_contract_rechecks_every_numerical_extent() -> TestResult {
+    let declarations = owner()?;
+    let coordinate = axis(1)?;
+    let physical = shape(&declarations, &coordinate, &coordinate)?;
+    let draft = OperationDraft::add(physical.clone(), physical, ShapeLimits::default())?;
+    for position in 0..3 {
+        let mut heap = Heap::new(HeapLimits::default())?;
+        let source =
+            heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[2.0_f64])?;
+        let limits = crate::ExecutionLimits::default();
+        let mut bound = crate::Binding::new(
+            draft.clone().check(limits)?,
+            vec![source.value(); 2],
+            limits,
+        )
+        .validate(&mut heap)?;
+        let crate::binding::NativeRecipe::Kernel(contract) = &mut bound.operation.recipe else {
+            return Err("missing numerical kernel".into());
+        };
+        let changed = Extent::new(2, 1)?;
+        if position < 2 {
+            std::rc::Rc::make_mut(&mut contract.inputs)[position] = changed;
+        } else {
+            contract.output = changed;
+        }
+        let failure = bound
+            .evaluate(bound.normalized_inputs()?)
+            .err()
+            .ok_or("changed numerical extent admitted")?;
+        assert!(matches!(
+            failure.cause(),
+            crate::OperationError::Kernel(crate::KernelError::Contract)
+        ));
+        drop(bound);
+        assert_eq!(heap.descriptors.iter().count(), 1);
+        assert_eq!(heap.value(source.value())?.region().get(0, 0)?, 2.0);
+    }
+    Ok(())
+}

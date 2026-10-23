@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked kernel metadata and evidence retain operation and arithmetic identity.
 
-use super::{KernelError, LinearMap};
-use crate::binding::{NativeRecipe, buffer};
-use crate::{
-    CheckedOperation, Coverage, EntryMap, ExecutionLimits, InputSnapshot, OperationError,
-    RegionContract,
-};
+use super::KernelError;
+use super::linear::LinearSchedule;
+use crate::binding::NativeRecipe;
+use crate::{CheckedOperation, Coverage, EntryMap, Extent, InputSnapshot, OperationError};
 use nrz_scalar::{Precision, Scalar};
 use std::rc::Rc;
 
@@ -30,10 +28,10 @@ pub enum KernelKind {
 /// A private construction contract for one output and its complete ordered operands.
 #[derive(Clone, Debug)]
 pub(crate) struct KernelContract {
-    /// Checked coherent operand meanings.
-    pub(crate) inputs: Rc<[RegionContract]>,
-    /// Independently derived result meaning and extent.
-    pub(crate) output: RegionContract,
+    /// Ordered numerical operand rectangles.
+    pub(crate) inputs: Rc<[Extent]>,
+    /// Independently checked numerical result rectangle.
+    pub(crate) output: Extent,
     /// Closed numerical schedule, never a caller callback.
     pub(crate) recipe: Recipe,
     /// Conservative complete phase work and scratch admission count.
@@ -51,7 +49,7 @@ pub(crate) enum Recipe {
         right: EntryMap,
     },
     /// Fixed matrix and offsets, with no uncertain coefficient operand hidden inside.
-    Linear(Box<LinearMap>),
+    Linear(Box<LinearSchedule>),
     /// Bit-preserving logical entry transformation.
     Transform(EntryMap),
     /// Backend product with an independent outward contraction.
@@ -61,17 +59,6 @@ pub(crate) enum Recipe {
 }
 
 impl KernelContract {
-    /// Apply execution policy before constructing an executable sealed recipe.
-    pub(crate) fn check(self, limits: ExecutionLimits) -> Result<CheckedOperation, OperationError> {
-        limits.check(self.inputs.len(), self.work)?;
-        Ok(CheckedOperation {
-            inputs: Rc::clone(&self.inputs),
-            outputs: vec![self.output.clone()].into(),
-            recipe: NativeRecipe::Kernel(Box::new(self)),
-            revision: 1,
-        })
-    }
-
     /// Identify the exact deterministic propagation rule.
     pub(crate) const fn kind(&self) -> KernelKind {
         match &self.recipe {
@@ -146,17 +133,6 @@ pub(crate) fn work(entries: usize, factor: usize) -> Result<usize, OperationErro
     entries
         .checked_mul(factor)
         .ok_or(OperationError::ResourceLimit)
-}
-
-/// Collect coherent input contracts without granting numerical authority.
-pub(crate) fn regions(
-    shapes: Vec<crate::CheckedShape>,
-) -> Result<Rc<[RegionContract]>, OperationError> {
-    let mut inputs = buffer(shapes.len())?;
-    for shape in shapes {
-        inputs.push(RegionContract::check(shape)?);
-    }
-    Ok(inputs.into())
 }
 
 impl CheckedOperation {

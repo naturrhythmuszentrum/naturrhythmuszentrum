@@ -15,8 +15,13 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     views: &[NormalizedView<'_, P>],
     reservation: OutputReservation,
 ) -> Result<(Payload<Q>, RecipeEvidence), OperationError> {
+    let extents_match = views
+        .iter()
+        .zip(contract.inputs.iter())
+        .all(|(view, extent)| view.extent() == *extent);
     if views.len() != contract.inputs.len()
-        || reservation.extent() != contract.output.shape().extent()
+        || reservation.extent() != contract.output
+        || !extents_match
         || !reservation.bounded
         || !reservation.evaluation
         || P::PRECISION != Q::PRECISION

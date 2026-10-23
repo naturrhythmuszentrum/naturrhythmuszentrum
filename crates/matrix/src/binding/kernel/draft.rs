@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public native constructors derive shape relations before execution policy is checked.
 
-use super::LinearMap;
-use super::contract::{KernelContract, Recipe, regions, work};
+use super::linear::LinearMap;
+use super::{KernelDraft, regions};
+use crate::kernels::contract::{Recipe, work};
 use crate::{
     Axis, AxisAlignment, CheckedShape, EntryMap, OperationDraft, OperationError, RegionContract,
     ShapeLimits,
@@ -34,11 +35,11 @@ impl OperationDraft {
     /// Propose a checked fixed linear or affine map over one value region.
     #[must_use]
     pub fn linear_map(map: LinearMap) -> Self {
-        kernel(KernelContract {
+        kernel(KernelDraft {
             inputs: vec![map.input.clone()].into(),
             output: map.output.clone(),
             work: map.work,
-            recipe: Recipe::Linear(Box::new(map)),
+            recipe: Recipe::Linear(Box::new(map.schedule())),
         })
     }
 
@@ -88,7 +89,7 @@ fn sum(
         .first()
         .ok_or(OperationError::UnsupportedShape)?
         .clone();
-    Ok(kernel(KernelContract {
+    Ok(kernel(KernelDraft {
         work: work(output.extent().entries(), 8)?,
         output: RegionContract::check(output)?,
         inputs: regions(vec![left, right])?,
@@ -105,7 +106,7 @@ fn transform(
     output: CheckedShape,
     map: EntryMap,
 ) -> Result<OperationDraft, OperationError> {
-    Ok(kernel(KernelContract {
+    Ok(kernel(KernelDraft {
         work: work(output.extent().entries(), 6)?,
         inputs: regions(vec![input])?,
         output: RegionContract::check(output)?,
@@ -114,7 +115,7 @@ fn transform(
 }
 
 /// Fill the existing draft's closed recipe slot without exposing checked-state construction.
-pub(crate) const fn kernel(contract: KernelContract) -> OperationDraft {
+pub(crate) const fn kernel(contract: KernelDraft) -> OperationDraft {
     OperationDraft {
         inputs: Vec::new(),
         conversions: None,

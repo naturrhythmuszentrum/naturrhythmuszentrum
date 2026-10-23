@@ -18,7 +18,7 @@ pub struct OperationDraft {
     /// Optional square solve with an independent represented-center certificate.
     pub(crate) solve: Option<Box<crate::solve::SolveContract>>,
     /// Optional deterministic kernel, checked independently of representation conversions.
-    pub(crate) kernel: Option<crate::kernels::KernelContract>,
+    pub(crate) kernel: Option<super::kernel::KernelDraft>,
     /// Original checked shapes; numerical structural obligations remain pending.
     pub(crate) inputs: Vec<CheckedShape>,
     /// Optional checked numerical maps; absence selects exact copy.

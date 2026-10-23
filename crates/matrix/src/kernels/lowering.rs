@@ -1,12 +1,23 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Fixed mathematical definitions are enclosed without routing heap values through bindings.
 
-use super::linear::CoefficientValue;
-use super::{FixedCoefficient, KernelError};
+use super::KernelError;
 use crate::OperationError;
+use nrz_bindings::DescriptorConstant;
 use nrz_scalar::{
     ArithmeticContext, Enclosure, Finite, LiteralLimits, NumericLiteral, Precision, Scalar,
 };
+
+/// Definitions cross the descriptor boundary before any numerical operand is read.
+#[derive(Clone, Debug)]
+pub(crate) enum CoefficientValue {
+    /// Checked source-free structural metadata, including signed and zero exact coefficients.
+    Expansion(Box<nrz_bindings::Conversion>),
+    /// This finite binary64 value defines the exact mathematical coefficient.
+    Represented(f64),
+    /// Bindings-owned exact descriptor metadata, lowered under explicit limits.
+    Descriptor(Box<DescriptorConstant>),
+}
 
 /// A fixed coefficient's finite candidate and independent exact-definition enclosure.
 #[derive(Clone, Copy, Debug)]
@@ -23,11 +34,11 @@ pub(crate) struct Coefficient<P: Scalar> {
     reason = "exact export limits are inferred through the public bindings facade"
 )]
 pub(crate) fn lower<P: Scalar + 'static>(
-    coefficient: &FixedCoefficient,
+    coefficient: &CoefficientValue,
     limits: LiteralLimits,
     context: &ArithmeticContext,
 ) -> Result<Coefficient<P>, OperationError> {
-    match &coefficient.value {
+    match coefficient {
         CoefficientValue::Expansion(value) => {
             crate::statistics::lower_definition(value, limits, context)
         }

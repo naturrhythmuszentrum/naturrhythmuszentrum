@@ -15,7 +15,6 @@ mod arithmetic;
 mod backend_product;
 pub(crate) mod contract;
 mod contributions;
-mod draft;
 mod evaluate;
 pub(crate) mod linear;
 mod linear_evaluate;
@@ -23,13 +22,13 @@ pub(crate) mod lowering;
 mod nonlinear;
 mod product;
 
+pub use crate::binding::kernel::linear::{FixedCoefficient, LinearMap};
 pub(crate) use contract::KernelContract;
 pub use contract::{KernelEvidence, KernelKind};
 pub use contributions::ProductTerm;
 pub(crate) use contributions::{
     ContributionReservation, finish as finish_contributions, views as contribution_views,
 };
-pub use linear::{FixedCoefficient, LinearMap};
 pub use nonlinear::{DomainReason, Elementwise};
 
 /// A deterministic kernel refusal, without a partially published result.
