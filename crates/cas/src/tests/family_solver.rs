@@ -8,6 +8,7 @@ mod empty;
 mod lc;
 mod placement;
 mod properties;
+mod regional_discharge;
 
 use crate::Cas;
 use crate::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
