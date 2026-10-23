@@ -3,7 +3,10 @@
 
 mod admission;
 pub(crate) mod companions;
+mod coordinates;
 mod dependencies;
+
+pub use coordinates::{CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading};
 mod import;
 pub(crate) mod invalidation;
 pub(crate) mod results;
