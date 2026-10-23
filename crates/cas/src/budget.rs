@@ -1066,6 +1066,30 @@ impl Budget {
         previous
     }
 
+    /// Reserve caller-retained payload while a callback uses this same cumulative ledger.
+    ///
+    /// The reservation lowers only the staged-payload allowance. Nested reservations
+    /// compose, and the previous limits are restored on both successful and error
+    /// returns. Work and every other usage counter remain consumed. The callback's
+    /// error type may preserve consumer-specific failures through `From<Fault>`.
+    /// # Errors
+    /// Returns `StagedPayloadBytes` exhaustion before invoking the callback if the
+    /// reservation exceeds the remaining allowance; otherwise preserves its error.
+    pub fn with_retained_payload<T, E>(
+        &mut self,
+        bytes: u64,
+        location: Location,
+        operation: impl FnOnce(&mut Self) -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<Fault>,
+    {
+        let previous = self.reserve_temporary(bytes, location)?;
+        let result = operation(self);
+        self.restore_limits(previous);
+        result
+    }
+
     /// Reserve retained temporary maps while nested arithmetic accounts for its own scratch.
     pub(crate) fn reserve_temporary(&mut self, bytes: u64, at: Location) -> Result<Limits, Fault> {
         self.check(BudgetKind::StagedPayloadBytes, bytes, at)?;

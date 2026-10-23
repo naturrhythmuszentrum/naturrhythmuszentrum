@@ -109,6 +109,8 @@ The exact `-1/(L*C)` sign probe confirms a producer boundary: separate positive 
 
 For the independent scalar product fixture, keying costs 58,524 Work, with staged/retained/output payload boundaries 12,284/5,537/2,683 bytes; derivative construction and fresh replay cost 756,777 Work, with boundaries 56,968/21,558/16,264 bytes. Public tests exercise every boundary at `N` success and `N−1` refusal, including prior cumulative Work and rollback. Empty matrix tests pin constant costs independently of an unused literal axis.
 
+`Budget::with_retained_payload(bytes,location,callback)` reserves caller-owned live buffers while nested CAS operations use the same cumulative ledger. It lowers only the staged-payload allowance, restores prior limits on every ordinary success or error return, and retains all callback Work. Nested reservations compose; an oversized reservation returns named `StagedPayloadBytes` exhaustion before invoking the callback and leaves the ledger unchanged. The callback can preserve a consumer-specific error type through `From<Fault>`. The wrapper performs no traversal or allocation and charges no additional Work. Exact staged and cumulative Work boundaries, nested allowances, and restoration after both result paths are public-contract tests.
+
 ## Guarantees and refusals · `sec:cas:guarantees`
 
 Construction preserves exact syntax, sorts, scopes and original occurrences, and rolls back a failed publication without refunding spent work. Sharing mathematical syntax never merges distinct original uses. A coverage receipt proves that all operands were visited; it proves neither their physical validity nor their mathematical definedness. Operands beneath zero multiplication and cancellation still participate in checks.
