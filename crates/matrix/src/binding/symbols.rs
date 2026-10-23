@@ -158,7 +158,7 @@ pub(crate) fn capture<P: Scalar + 'static>(
     let view = heap.value(base)?;
     let stamp = view.stamp();
     let value = heap.symbols.get(base.key, stamp)?.clone();
-    value.check_descriptor(view.region().descriptor())?;
+    value.check_descriptor(heap.binding_quantity(base)?)?;
     if value.shape() != shape(view.region().extent())? {
         return Err(HeapError::LengthMismatch);
     }
@@ -168,7 +168,7 @@ pub(crate) fn capture<P: Scalar + 'static>(
             .map(|locator| {
                 let companion = heap.companion(locator)?;
                 let symbol = heap.symbols.get(locator.key, stamp)?.clone();
-                symbol.check_descriptor(companion.region().descriptor())?;
+                symbol.check_descriptor(heap.binding_quantity(locator)?)?;
                 if companion.target() != base || companion.target_stamp() != stamp {
                     return Err(HeapError::StaleEvidence);
                 }

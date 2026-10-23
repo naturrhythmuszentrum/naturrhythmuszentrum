@@ -56,8 +56,8 @@ impl Heap {
             Dependency::from_snapshot(&crate::InputSnapshot::capture(self, right)?),
         ];
         let quantities = [
-            self.value(left)?.region().descriptor().clone(),
-            self.value(right)?.region().descriptor().clone(),
+            self.binding_quantity(left)?.clone(),
+            self.binding_quantity(right)?.clone(),
         ];
         publish(self, targets, &quantities, lineage, &covariance, &context)
     }
@@ -115,7 +115,7 @@ fn publish<P: Scalar + 'static>(
         marker: std::marker::PhantomData,
     };
     heap.storage.publish(prepared.storage);
-    heap.schemas.extend(prepared.schemas);
+    crate::binding::schema::publish(heap, prepared.schemas);
     heap.descriptors.publish(prepared.records);
     heap.statistics.records.push(record);
     Ok(handle)

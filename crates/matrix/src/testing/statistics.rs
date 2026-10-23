@@ -18,7 +18,11 @@ pub(crate) fn attach<P: Scalar + 'static>(
     means: bool,
 ) -> TestResult<crate::test_api::CompanionRef<P>> {
     let view = heap.value(value)?;
-    let quantity = view.region().descriptor().difference();
+    let quantity = heap
+        .symbol_binding(value)?
+        .symbol()
+        .descriptor()
+        .difference();
     let centers = view.region().export()?;
     let sources = (0..centers.len())
         .map(|_| Source::new(&quantity, 1))

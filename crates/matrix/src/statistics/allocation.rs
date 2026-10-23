@@ -2,10 +2,10 @@
 //! Reprepare one complete reservation with statistical regions appended after value keys.
 
 use super::StatisticsError;
+use crate::binding::schema::{BindingSchema, intern};
 use crate::heap::{
     identity::Key,
     records::{Location, Meaning, Record},
-    schema::{Schema, intern},
 };
 use crate::storage::{Format, Region};
 use crate::{Bound, Candidate, Extent, OperationError};
@@ -49,9 +49,9 @@ pub(crate) fn append<P: Scalar + 'static, Q: Scalar + 'static>(
     let mut appended = crate::binding::buffer(regions.len())?;
     for (index, region) in regions.iter().enumerate() {
         let schema = intern(
-            &bound.heap.schemas,
+            &bound.heap.meanings,
             &mut bound.reservations.schemas,
-            Schema {
+            BindingSchema {
                 extent: region.extent,
                 quantity: region.quantity.clone(),
             },
@@ -74,11 +74,7 @@ pub(crate) fn append<P: Scalar + 'static, Q: Scalar + 'static>(
             meaning: Meaning::Statistical,
         });
     }
-    bound
-        .heap
-        .schemas
-        .try_reserve(bound.reservations.schemas.len())
-        .map_err(|_| StatisticsError::ResourceLimit)?;
+    crate::binding::schema::reserve(bound.heap, bound.reservations.schemas.len())?;
     let keys = plan
         .keys()
         .get(prefix..)
@@ -113,7 +109,7 @@ pub(crate) struct Standalone {
     /// Complete private numerical owners.
     pub(crate) storage: crate::storage::PreparedStorage,
     /// Newly interned statistical schemas.
-    pub(crate) schemas: Vec<Schema>,
+    pub(crate) schemas: Vec<BindingSchema>,
     /// Complete private descriptor occupations.
     pub(crate) records: crate::heap::slots::PreparedSlots<Record>,
 }
@@ -134,9 +130,9 @@ pub(crate) fn standalone<P: Scalar + 'static>(
     let mut records = crate::binding::buffer(regions.len())?;
     for (region, &arena) in regions.iter().zip(storage.keys()) {
         let schema = intern(
-            &heap.schemas,
+            &heap.meanings,
             &mut schemas,
-            Schema {
+            BindingSchema {
                 extent: region.extent,
                 quantity: region.quantity.clone(),
             },
@@ -155,9 +151,7 @@ pub(crate) fn standalone<P: Scalar + 'static>(
             meaning: Meaning::Statistical,
         });
     }
-    heap.schemas
-        .try_reserve(schemas.len())
-        .map_err(|_| StatisticsError::ResourceLimit)?;
+    crate::binding::schema::reserve(heap, schemas.len())?;
     Ok(Standalone {
         storage,
         schemas,

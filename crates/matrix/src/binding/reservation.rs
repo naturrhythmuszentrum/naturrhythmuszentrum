@@ -3,11 +3,11 @@
 
 use nrz_scalar::Scalar;
 
+use super::schema::{BindingSchema, intern};
 use super::{InputSnapshot, OperationError, buffer};
 use crate::heap::identity::identity;
 use crate::heap::publication::{SchemaPlan, prepare_records};
 use crate::heap::records::{Location, Record};
-use crate::heap::schema::{Schema, intern};
 use crate::heap::slots::PreparedSlots;
 use crate::storage::PreparedStorage;
 use crate::{
@@ -70,7 +70,7 @@ pub(crate) struct Reservations<P: Scalar> {
     /// Real allocated zero-initialized destination slabs, unavailable to views.
     pub(crate) storage: PreparedStorage,
     /// New immutable schemas with pre-reserved heap capacity.
-    pub(crate) schemas: Vec<Schema>,
+    pub(crate) schemas: Vec<BindingSchema>,
     /// Complete value/companion descriptors with reserved future target versions.
     pub(crate) records: PreparedSlots<Record>,
     /// Handles retained privately until the publication commit.
@@ -363,16 +363,16 @@ fn schema_plans(
     heap: &mut Heap,
     specifications: &[OutputSpecification],
     operation: &crate::CheckedOperation,
-) -> Result<(Vec<SchemaPlan>, Vec<Schema>), OperationError> {
+) -> Result<(Vec<SchemaPlan>, Vec<BindingSchema>), OperationError> {
     let mut plans = buffer(specifications.len())?;
     let mut pending = Vec::new();
     for (specification, output) in specifications.iter().zip(operation.outputs.iter()) {
         let extent = specification.extent;
         let quantity = output.descriptor().clone();
         let value = intern(
-            &heap.schemas,
+            &heap.meanings,
             &mut pending,
-            Schema {
+            BindingSchema {
                 extent,
                 quantity: quantity.clone(),
             },
@@ -387,9 +387,9 @@ fn schema_plans(
             )
             .map_err(HeapError::from)?;
             Some(intern(
-                &heap.schemas,
+                &heap.meanings,
                 &mut pending,
-                Schema {
+                BindingSchema {
                     extent,
                     quantity: radius,
                 },
@@ -399,7 +399,6 @@ fn schema_plans(
             None
         };
         plans.push(SchemaPlan {
-            pending: Vec::new(),
             value,
             bound,
             evaluation: if specification.evaluation {
@@ -414,9 +413,7 @@ fn schema_plans(
             },
         });
     }
-    heap.schemas
-        .try_reserve(pending.len())
-        .map_err(|_| HeapError::Capacity)?;
+    super::schema::reserve(heap, pending.len())?;
     Ok((plans, pending))
 }
 

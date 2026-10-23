@@ -53,7 +53,10 @@ fn physical<P: Scalar + 'static>() -> TestResult {
     )?;
     let bundle = output(&result)?;
     crate::solve_public::check(&heap, bundle, &[2.0], &[8.0], 1)?;
-    assert_eq!(heap.value(bundle.value())?.region().descriptor(), &voltage);
+    assert_eq!(
+        heap.symbol_binding(bundle.value())?.symbol().descriptor(),
+        &voltage
+    );
     let (center, radius, _) = entry(&heap, bundle, 0)?;
     assert!(Rational::new(31, 8)?.covered(center, radius)?);
     assert!(Rational::new(33, 8)?.covered(center, radius)?);

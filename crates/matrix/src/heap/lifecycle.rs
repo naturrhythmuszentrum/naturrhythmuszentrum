@@ -186,10 +186,10 @@ impl Heap {
         Ok(Snapshot {
             key: handle.key,
             stamp,
-            schema: Schema {
-                extent: view.region().extent(),
-                quantity: view.region().descriptor().clone(),
-            },
+            schema: *self
+                .schemas
+                .get(record.schema)
+                .ok_or(HeapError::InvalidLayout)?,
             region: self.owning_region(record)?,
             bound: companion,
             contributions: self.contribution_regions::<P>(

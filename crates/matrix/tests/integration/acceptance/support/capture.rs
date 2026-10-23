@@ -194,7 +194,11 @@ pub(crate) fn sample(
         name: name.into(),
         environment: record.environment().into(),
         centers: heap.value(bundle.value())?.region().export()?,
-        quantity: heap.value(bundle.value())?.region().descriptor().clone(),
+        quantity: heap
+            .symbol_binding(bundle.value())?
+            .symbol()
+            .descriptor()
+            .clone(),
         totals: heap
             .companion(bundle.bound().ok_or("total")?)?
             .region()

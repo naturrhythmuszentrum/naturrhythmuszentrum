@@ -381,7 +381,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     ) -> Outcome<Vec<PublishedBundle<Q>>> {
         let record = graph.record_id();
         self.heap.storage.publish(self.reservations.storage);
-        self.heap.schemas.extend(self.reservations.schemas);
+        crate::binding::schema::publish(self.heap, self.reservations.schemas);
         self.heap.descriptors.publish(self.reservations.records);
         self.heap.symbols.publish(self.reservations.owners);
         self.heap.provenance.publish(graph);

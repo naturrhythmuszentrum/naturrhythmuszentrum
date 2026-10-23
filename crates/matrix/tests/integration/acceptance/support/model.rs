@@ -28,7 +28,10 @@ pub(crate) fn attach(heap: &mut Heap, inputs: [Handle<Value, f64>; 2], law: &Law
         let centers = view.region().export()?;
         let first = sources.len();
         for _ in &centers {
-            sources.push(Source::new(view.region().descriptor(), 1)?);
+            sources.push(Source::new(
+                heap.symbol_binding(input)?.symbol().descriptor(),
+                1,
+            )?);
         }
         selections.push((first..sources.len()).collect::<Vec<_>>());
         means.push(

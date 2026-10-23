@@ -22,7 +22,7 @@ pub struct ParameterView<'h, P: Scalar> {
     /// Paired entry meanings; means instead use their homogeneous region descriptor.
     descriptors: &'h [EvaluationDescriptor],
     /// Explicit parameter role remains meaningful for empty matrices.
-    mean: bool,
+    mean: Option<&'h nrz_bindings::Descriptor>,
 }
 impl<P: Scalar + 'static> ParameterView<'_, P> {
     /// Complete parameter rectangle.
@@ -67,8 +67,8 @@ impl<P: Scalar + 'static> ParameterView<'_, P> {
     }
     /// Mean parameters retain the value quantity; paired matrices have per-entry descriptors.
     #[must_use]
-    pub fn mean_descriptor(&self) -> Option<&nrz_bindings::Descriptor> {
-        self.mean.then(|| self.centers.descriptor())
+    pub const fn mean_descriptor(&self) -> Option<&nrz_bindings::Descriptor> {
+        self.mean
     }
 }
 
@@ -288,7 +288,7 @@ fn parameter<'h, P: Scalar + 'static>(
         errors: heap.region_view(errors)?,
         target: center,
         descriptors: &record.descriptors,
-        mean,
+        mean: mean.then(|| heap.binding_quantity(center)).transpose()?,
     })
 }
 /// Recover the complete mathematical parameter enclosure from its own stored error.

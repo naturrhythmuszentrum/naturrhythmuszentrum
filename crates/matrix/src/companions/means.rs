@@ -64,7 +64,7 @@ pub(crate) fn prepare<P: Scalar + 'static>(
         descriptors.push(
             uncertainty(
                 UncertaintyMode::Radius,
-                value.region().descriptor(),
+                heap.binding_quantity(Handle::<Value, P>::new(heap.scope, target.target.key))?,
                 None,
                 None,
             )

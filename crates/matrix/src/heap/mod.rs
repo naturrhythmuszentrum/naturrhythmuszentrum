@@ -3,7 +3,7 @@
 //!
 //! # Numerical ownership and implemented facade
 //!
-//! `nrz-matrix` owns numerical regions in separate binary32 and binary64 faer arenas. A scalar is a 1×1 region. Values and declared absolute bounds have separate storage regions and bindings descriptors; every bound names the exact identity and version of its entire target region. Heap coordinates never enter CAS arithmetic. The facade still retains homogeneous descriptor schemas; `docs/design/descriptor-binding.md` places all meaning in checked bindings and specifies the remaining migration. See `docs/design/matrix-core-design.md` for numerical contracts.
+//! `nrz-matrix` owns numerical regions in separate binary32 and binary64 faer arenas. A scalar is a 1×1 region. Values and declared absolute bounds have separate storage regions and bindings descriptors; every bound names the exact identity and version of its entire target region. Heap coordinates never enter CAS arithmetic. The descriptor facade retains separate homogeneous interpretations; `docs/design/descriptor-binding.md` places all meaning in checked bindings and specifies the remaining migration. See `docs/design/matrix-core-design.md` for numerical contracts.
 //!
 //! The prototype `DenseSystem`, bare `certified_solve` and mutable-field solver reports remain retired. Square solving is available through the checked operation and transaction boundary documented in `src/solve/` and `src/binding/`; historical feasibility records do not supply its certificates.
 //!
@@ -42,7 +42,7 @@ use slots::Slots;
 ///
 /// Imports state represented-only or declared-bound coverage explicitly. This subset
 /// admits coherent homogeneous imports and publishes the supported checked operation results.
-/// Descriptor records are retained facade metadata pending the binding migration.
+/// Descriptor-side interpretation records are opaque to numerical storage.
 #[derive(Debug)]
 pub struct Heap {
     /// Unique process-local scope; a foreign handle is refused before indexing.
@@ -53,8 +53,10 @@ pub struct Heap {
     pub(crate) storage: Storage,
     /// Category-bearing descriptor occupations.
     pub(crate) descriptors: Slots<Record>,
-    /// Immutable schemas interned using exact descriptor equality.
+    /// Immutable numerical shapes; descriptor-side equality selects their opaque identities.
     pub(crate) schemas: Vec<Schema>,
+    /// Opaque descriptor-side interpretations, never inspected by numerical storage.
+    pub(crate) meanings: Vec<crate::binding::schema::BindingSchema>,
     /// Bounded operation records and source dependency graph.
     pub(crate) provenance: crate::provenance::Provenance,
     /// Opaque symbol inventory for migrated value and deterministic companion regions.
@@ -77,6 +79,7 @@ impl Heap {
             storage: Storage::new(),
             descriptors: Slots::new(),
             schemas: Vec::new(),
+            meanings: Vec::new(),
             provenance: crate::provenance::Provenance::new(),
             symbols: crate::binding::symbols::Owners::default(),
             joint: crate::companions::JointStore::default(),

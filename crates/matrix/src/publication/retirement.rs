@@ -40,7 +40,7 @@ impl Heap {
         Ok(Snapshot {
             key: handle.key,
             stamp,
-            schema: schema.clone(),
+            schema: *schema,
             region: self.owning_region(record)?,
             bound: companion,
             contributions: self.contribution_regions::<P>(

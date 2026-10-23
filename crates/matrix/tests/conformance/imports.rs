@@ -60,7 +60,11 @@ fn declared_bound_region_contract() -> TestResult {
     assert_eq!(companion.region().extent(), value.region().extent());
     assert_ne!(companion.region().schema_id(), value.region().schema_id());
     assert_eq!(
-        companion.region().descriptor(),
+        heap.symbol_binding(bundle.value())?
+            .symbols()
+            .bound()
+            .ok_or("bound symbol")?
+            .descriptor(),
         &uncertainty(UncertaintyMode::Radius, &quantity, None, None)?
     );
     assert_eq!(companion.region().get(0, 0)?.to_bits(), 0.125_f64.to_bits());
@@ -139,11 +143,19 @@ fn count_and_presentation_refusals() -> TestResult {
     ));
     let bundle = heap.import_declared_bounds(extent, &point.coherent(), &[1.0_f64], &[0.25])?;
     assert_eq!(
-        heap.value(bundle.value())?.region().descriptor().role(),
+        heap.symbol_binding(bundle.value())?
+            .symbol()
+            .descriptor()
+            .role(),
         Role::Point
     );
     assert_eq!(
-        heap.companion(bound(bundle)?)?.region().descriptor().role(),
+        heap.symbol_binding(bundle.value())?
+            .symbols()
+            .bound()
+            .ok_or("bound symbol")?
+            .descriptor()
+            .role(),
         Role::Difference
     );
     Ok(())
@@ -167,7 +179,10 @@ fn relative_bound_derivation_refuses() -> TestResult {
         Err(HeapError::Units(nrz_bindings::UnitError::RelativeReference))
     ));
     let bundle = heap.import_represented(extent, &relative, &[1.0_f64])?;
-    assert_eq!(heap.value(bundle.value())?.region().descriptor(), &relative);
+    assert_eq!(
+        heap.symbol_binding(bundle.value())?.symbol().descriptor(),
+        &relative
+    );
     Ok(())
 }
 
@@ -231,6 +246,9 @@ fn coherent_measure_names_stay_distinct() -> TestResult {
         heap.value(first.value())?.region().schema_id(),
         heap.value(second.value())?.region().schema_id()
     );
-    assert_eq!(heap.value(second.value())?.region().descriptor(), &alias);
+    assert_eq!(
+        heap.symbol_binding(second.value())?.symbol().descriptor(),
+        &alias
+    );
     Ok(())
 }

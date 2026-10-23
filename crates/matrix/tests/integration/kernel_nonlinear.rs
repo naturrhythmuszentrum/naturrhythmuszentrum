@@ -23,7 +23,9 @@ fn squared_voltage_region_encloses_the_worked_interaction() -> TestResult {
         vec![source.value()],
     )?;
     assert_eq!(
-        heap.value(output(&result)?.value())?.region().descriptor(),
+        heap.symbol_binding(output(&result)?.value())?
+            .symbol()
+            .descriptor(),
         &squared
     );
     for (index, (nominal, numerator, denominator)) in

@@ -2,10 +2,10 @@
 //! Prepare independent factor regions and all relation metadata before publication.
 
 use super::{CompanionRef, JointRecord, TargetMap};
+use crate::binding::schema::{BindingSchema, intern};
 use crate::heap::{
     identity::Key,
     records::{Location, Meaning, Record},
-    schema::{Schema, intern},
 };
 use crate::storage::{Format, Region};
 use crate::{Extent, Heap, HeapError, JointError, JointLimits, JointModel, Layout};
@@ -106,7 +106,7 @@ impl Heap {
             evaluation,
         };
         self.storage.publish(prepared.storage);
-        self.schemas.extend(prepared.schemas);
+        crate::binding::schema::publish(self, prepared.schemas);
         self.descriptors.publish(prepared.records);
         self.joint.records.push(record);
         Ok(CompanionRef {
@@ -192,7 +192,7 @@ struct PreparedRegions {
     /// Private numerical allocations.
     storage: crate::storage::PreparedStorage,
     /// Reserved immutable schema interpretations.
-    schemas: Vec<Schema>,
+    schemas: Vec<BindingSchema>,
     /// Fully bound descriptor slots.
     records: crate::heap::slots::PreparedSlots<Record>,
     /// Future factor and weight locators.
@@ -231,15 +231,13 @@ fn prepare_regions<P: Scalar + 'static>(
     let mut indices = Vec::new();
     for (&extent, quantity) in extents.iter().zip(quantities) {
         indices.push(intern(
-            &heap.schemas,
+            &heap.meanings,
             &mut schemas,
-            Schema { extent, quantity },
+            BindingSchema { extent, quantity },
             heap.limits.schemas,
         )?);
     }
-    heap.schemas
-        .try_reserve(schemas.len())
-        .map_err(|_| JointError::ResourceLimit)?;
+    crate::binding::schema::reserve(heap, schemas.len())?;
     let plan = heap
         .descriptors
         .prepare(payloads.len(), heap.limits.descriptors)?;
@@ -292,7 +290,7 @@ fn validate_selection<P: Scalar + 'static>(
         return Err(JointError::WrongTarget);
     }
     let schema = &heap
-        .schemas
+        .meanings
         .get(heap.descriptors.get(target.target.key)?.schema)
         .ok_or(HeapError::InvalidLayout)?
         .quantity;

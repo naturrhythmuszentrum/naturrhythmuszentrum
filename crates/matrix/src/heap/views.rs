@@ -3,22 +3,20 @@
 //!
 //! # Checked access and raw exports
 //!
-//! Opaque `Handle<Category, P>` locators carry a heap scope and descriptor occupation generation. Value and companion access checks ownership, occupation, category, precision, region bounds and target versions before lending a read-only `RegionView`. Equal schemas are interned using exact descriptor equality without merging value identities. Each arena slab owns a one-column faer matrix; logical rectangles select its entries through checked layouts. `RegionView::export` returns an owned raw copy without evidence or a declaration of source independence. Live borrows prevent heap mutation.
+//! Opaque `Handle<Category, P>` locators carry a heap scope and descriptor occupation generation. Value and companion access checks ownership, occupation, category, precision, region bounds and target versions before lending a read-only `RegionView`. Descriptor-side interning assigns opaque schema identities without merging value identities; numerical schemas contain only extents. Each arena slab owns a one-column faer matrix; logical rectangles select its entries through checked layouts. `RegionView::export` returns an owned raw copy without evidence or a declaration of source independence. Live borrows prevent heap mutation.
 
 use std::marker::PhantomData;
 
-use nrz_bindings::Descriptor;
 use nrz_scalar::Scalar;
 
 use super::records::{Meaning, Record};
-use super::schema::Schema;
 use super::{
     Category, Companion, Coverage, Extent, Handle, Heap, HeapError, SchemaId, Value, ValueStamp,
 };
 use crate::storage::{Format, Region, SlabRef};
 use crate::{Layout, PackedRegion};
 
-/// Checked, read-only physical entry selection and its owning homogeneous descriptor.
+/// Checked, read-only numerical entry selection with an opaque interpretation identity.
 #[derive(Debug)]
 pub struct RegionView<'h, P: Scalar> {
     /// Borrowed numerical owner.
@@ -29,8 +27,6 @@ pub struct RegionView<'h, P: Scalar> {
     layout: &'h Layout,
     /// Maximum entries copied into raw or backend scratch.
     packing_limit: usize,
-    /// Immutable homogeneous interpretation.
-    schema: &'h Schema,
     /// Scoped immutable schema identity.
     schema_id: SchemaId,
     /// Sealed scalar type.
@@ -42,12 +38,6 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
     #[must_use]
     pub const fn extent(&self) -> Extent {
         self.layout.extent()
-    }
-
-    /// This region's quantity descriptor, including its role and exact measure.
-    #[must_use]
-    pub const fn descriptor(&self) -> &Descriptor {
-        &self.schema.quantity
     }
 
     /// Exact owning schema identity before selection; this is not a value or source identity.
@@ -323,7 +313,6 @@ impl Heap {
             region,
             layout,
             packing_limit: self.limits.layout_work.min(self.limits.elements),
-            schema,
             schema_id: SchemaId {
                 scope: self.scope,
                 index: record.schema,

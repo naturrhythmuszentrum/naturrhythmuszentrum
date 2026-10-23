@@ -27,11 +27,13 @@
 
 mod adapters;
 mod error;
+mod imports;
 pub(crate) mod kernel;
 pub(crate) mod lifecycle;
 mod limits;
 mod operation;
 mod reservation;
+pub(crate) mod schema;
 mod snapshot;
 pub(crate) mod symbols;
 mod views;

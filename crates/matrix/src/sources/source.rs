@@ -33,7 +33,7 @@ impl<P: Scalar> Source<P> {
     /// # Errors
     /// Refuses point/count/noncoherent schemas, zero revisions or exhausted identities.
     pub fn new(descriptor: &Descriptor, revision: u64) -> Result<Self, JointError> {
-        crate::heap::schema::check_quantity(descriptor)?;
+        crate::binding::schema::check_quantity(descriptor)?;
         if descriptor.role() != Role::Difference || revision == 0 {
             return Err(JointError::InvalidSource);
         }

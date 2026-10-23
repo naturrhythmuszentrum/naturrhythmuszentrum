@@ -61,7 +61,7 @@ fn restored<P: Scalar + 'static>() -> TestResult {
         BudgetDecision::Met
     );
     assert_eq!(
-        heap.value(result.value())?.region().descriptor(),
+        heap.symbol_binding(result.value())?.symbol().descriptor(),
         &point.coherent()
     );
     Ok(())
