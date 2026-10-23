@@ -128,6 +128,8 @@ The proof kernel is closed and versioned. Callers may propose untrusted certific
 
 Portable `NRZCAS04` replay re-admits syntax, rechecks every primitive, verifies canonical bytes and compares the complete expected claim. `Cas::replay_answer` checks one presentation closure and obtains its matching reachable coverage without replaying shared applications twice. Both returned witnesses publish atomically. A different valid theorem still fails the caller's expected target. Old wire versions, changed premises, missing dependencies, foreign handles, malformed scopes and resource exhaustion refuse explicitly.
 
+`VerifiedWitness::exported_byte_len` reports the exact canonical export length without allocation or traversal. `Cas::export_witness` checks that many staged, witness and output bytes before allocating the copy, and charges one Work per copied byte on the caller's cumulative ledger. A staged refusal leaves usage unchanged. Retained exported buffers compose through `Budget::with_retained_payload`; the query measures serialized bytes, not the complete in-memory witness footprint. Public tests cover scalar, conditional and empty-matrix witnesses, exact Work and payload boundaries, retained buffers and foreign-store refusal.
+
 Search producers are bounded proposals, with separate cumulative generation and checking ledgers. Exact `N` success and `N−1` refusal are part of their contract. Failed exploration is not a theorem of impossibility; an unfinished search does not prove there is no better route. Logical search cost is distinct from measured runtime and from mathematical witness authority.
 
 ## Current scope and limits · `sec:cas:scope`

@@ -426,10 +426,13 @@ impl Cas {
         })
     }
 
-    /// Copy the one current canonical witness representation.
+    /// Copy the current canonical witness after reserving its exact staged payload.
+    ///
+    /// The copy costs one Work per byte. Use `VerifiedWitness::exported_byte_len`
+    /// before export and `Budget::with_retained_payload` while retaining other buffers.
     ///
     /// # Errors
-    /// Refuses a foreign proof or an output resource limit.
+    /// Refuses a foreign proof or a staged, witness, output or Work resource limit.
     pub fn export_witness(
         &self,
         witness: &VerifiedWitness,
@@ -441,6 +444,7 @@ impl Cas {
             let count = size(witness.bytes.len(), AT)?;
             budget.check(BudgetKind::WitnessBytes, count, AT)?;
             budget.check(BudgetKind::OutputBytes, count, AT)?;
+            budget.check(BudgetKind::StagedPayloadBytes, count, AT)?;
             budget.work(count, AT)?;
             let mut bytes = Vec::new();
             bytes

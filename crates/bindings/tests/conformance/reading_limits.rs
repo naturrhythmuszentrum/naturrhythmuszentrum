@@ -306,16 +306,28 @@ fn physical_reading_export_witness_boundaries() -> TestResult {
         .project(&mut case.fixture.cas, &[0], &mut ledger()?)?;
     let relation = ReadingRelation::prove(&mut case.fixture.cas, left, right, &mut ledger()?)?;
     let needed = u64::try_from(relation.export(&case.fixture.cas, &mut ledger()?)?.len())?;
-    for (limit, succeeds) in [(needed, true), (needed - 1, false)] {
-        let mut budget = Budget::new(Limits {
-            witness_bytes: limit,
-            staged_payload_bytes: 0,
-            ..Limits::default()
-        })?;
-        assert_eq!(
-            relation.export(&case.fixture.cas, &mut budget).is_ok(),
-            succeeds
-        );
+    for kind in [
+        nrz_cas::limits::BudgetKind::Work,
+        nrz_cas::limits::BudgetKind::StagedPayloadBytes,
+        nrz_cas::limits::BudgetKind::WitnessBytes,
+    ] {
+        for (limit, succeeds) in [(needed, true), (needed - 1, false)] {
+            let mut limits = Limits::default();
+            match kind {
+                nrz_cas::limits::BudgetKind::Work => limits.work = limit,
+                nrz_cas::limits::BudgetKind::StagedPayloadBytes => {
+                    limits.staged_payload_bytes = limit;
+                }
+                _ => limits.witness_bytes = limit,
+            }
+            let mut budget = Budget::new(limits)?;
+            assert_eq!(
+                relation.export(&case.fixture.cas, &mut budget).is_ok(),
+                succeeds
+            );
+            assert_eq!(budget.usage().work, if succeeds { needed } else { 0 });
+        }
     }
+    assert_eq!(needed, 1_144);
     Ok(())
 }

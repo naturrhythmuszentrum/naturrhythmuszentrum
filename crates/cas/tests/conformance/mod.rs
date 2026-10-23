@@ -92,3 +92,5 @@ mod jacobian_composition;
 mod jacobian_reuse_limits;
 
 mod retained_payload;
+
+mod witness_export;

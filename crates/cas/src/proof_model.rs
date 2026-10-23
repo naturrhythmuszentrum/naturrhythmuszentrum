@@ -340,6 +340,14 @@ pub struct VerifiedWitness {
 }
 
 impl VerifiedWitness {
+    /// Exact canonical export length, available without allocating or traversing the proof.
+    ///
+    /// This measures the serialized buffer, not the witness's complete in-memory footprint.
+    #[must_use]
+    pub const fn exported_byte_len(&self) -> usize {
+        self.bytes.len()
+    }
+
     /// Borrow the complete typed theorem, including every guarded residual.
     #[must_use]
     pub const fn judgment(&self) -> &Judgment {

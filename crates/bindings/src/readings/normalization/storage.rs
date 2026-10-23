@@ -36,24 +36,15 @@ pub(super) fn witness(
     retained: u64,
     budget: &mut Budget,
 ) -> Result<u64, ReadingError> {
-    // Export itself copies at most the caller's witness ceiling while the original remains live.
-    let ceiling = budget.limits().witness_bytes;
-    let reserved = retained
-        .checked_add(
-            ceiling
-                .checked_mul(8)
-                .and_then(|value| value.checked_add(1024))
-                .ok_or(ReadingError::Shape)?,
-        )
-        .ok_or(ReadingError::Shape)?;
-    let encoded = budget.with_retained_payload(reserved, support::AT, |budget| {
-        cas.export_witness(value, budget)
-    })?;
-    let size = u64::try_from(encoded.len()).map_err(|_| ReadingError::Shape)?;
+    let size = u64::try_from(value.exported_byte_len()).map_err(|_| ReadingError::Shape)?;
+    // Retain the existing native witness and metadata allowance; export meters its separate copy.
     let total = retained
         .checked_add(size.checked_mul(8).ok_or(ReadingError::Shape)?)
         .and_then(|value| value.checked_add(1024))
         .ok_or(ReadingError::Shape)?;
+    budget.with_retained_payload(total, support::AT, |budget| {
+        cas.export_witness(value, budget)
+    })?;
     budget.check(BudgetKind::StagedPayloadBytes, total, support::AT)?;
     Ok(total)
 }
@@ -65,32 +56,22 @@ pub(super) fn inverse(
     retained: u64,
     budget: &mut Budget,
 ) -> Result<u64, ReadingError> {
-    // CAS bounds the two canonical certificates together by the inverse output allowance.
-    let ceiling = budget
-        .limits()
-        .witness_bytes
-        .saturating_mul(2)
-        .min(budget.limits().output_bytes);
-    let reserved = retained
-        .checked_add(
-            ceiling
-                .checked_mul(8)
-                .and_then(|value| value.checked_add(2048))
-                .ok_or(ReadingError::Shape)?,
-        )
-        .ok_or(ReadingError::Shape)?;
-    let (identity, nonsingularity) =
-        budget.with_retained_payload(reserved, support::AT, |budget| {
-            let identity = encoded_size(cas, value.witness(), budget)?;
-            let nonsingularity = encoded_size(cas, value.nonsingularity(), budget)?;
-            Ok::<_, ReadingError>((identity, nonsingularity))
-        })?;
+    let identity =
+        u64::try_from(value.witness().exported_byte_len()).map_err(|_| ReadingError::Shape)?;
+    let nonsingularity = u64::try_from(value.nonsingularity().exported_byte_len())
+        .map_err(|_| ReadingError::Shape)?;
+    // Both native witnesses remain live; temporary exports are metered separately and dropped in turn.
     let total = identity
         .checked_add(nonsingularity)
         .and_then(|value| value.checked_mul(8))
         .and_then(|value| value.checked_add(2048))
         .and_then(|value| value.checked_add(retained))
         .ok_or(ReadingError::Shape)?;
+    budget.with_retained_payload(total, support::AT, |budget| {
+        encoded_size(cas, value.witness(), budget)?;
+        encoded_size(cas, value.nonsingularity(), budget)?;
+        Ok::<_, ReadingError>(())
+    })?;
     budget.check(BudgetKind::StagedPayloadBytes, total, support::AT)?;
     budget.check(BudgetKind::OutputBytes, total, support::AT)?;
     Ok(total)
