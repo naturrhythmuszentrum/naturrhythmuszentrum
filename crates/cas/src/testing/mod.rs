@@ -109,3 +109,9 @@ pub(crate) mod sorts;
     reason = "replay tests share ledgers and syntax-only proposals"
 )]
 pub(crate) mod replay_answer;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "crate tests attribute replay Work without changing production accounting"
+)]
+pub(crate) mod work_trace;

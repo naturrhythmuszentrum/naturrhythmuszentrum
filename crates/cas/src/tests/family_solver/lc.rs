@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The original determinant retains strict divisors through checked coefficient transport.
 
+mod costs;
 mod expected;
 mod fixture;
 mod identity;

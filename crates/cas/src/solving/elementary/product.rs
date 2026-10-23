@@ -38,6 +38,8 @@ pub(crate) fn equation(
     original: &SolveProblemData<Handle>,
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("exclusion.equation");
     let (PredicateKind::Equal, [left, right]) =
         super::evidence::predicate(evaluation.cas, original.predicate.logical_id())?
     else {
@@ -58,6 +60,8 @@ pub(crate) fn identity(
     right: &Value,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("exclusion.identity");
     let statement = &premise(evaluation.premises, slot)?.judgment.statement;
     let (first, second) = match statement {
         Statement::Equality {
@@ -92,6 +96,8 @@ pub(crate) fn entries(
     coverage: &StatementCoverage,
     budget: &mut Budget,
 ) -> Result<Vec<Handle>, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("inventory");
     let original = problem(cas, &coverage.problem)?;
     let SolveDraft::SolutionSet(set) =
         crate::solving::graph::object(&cas.state, cas.checked(&coverage.set)?)?
@@ -138,6 +144,8 @@ pub(crate) fn membership(
     entries: &[Handle],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("existence.membership");
     let unknowns = coordinates(evaluation.cas, &original.unknowns)?;
     let [coordinate] = unknowns.coordinates.as_slice() else {
         return Err(invalid());
@@ -197,6 +205,8 @@ pub(crate) fn factors(
     entries: &[Handle],
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("exclusion.factors");
     let input = super::transport::unknowns(evaluation, original, budget)?;
     let [unknown] = input.as_slice() else {
         return Err(invalid());

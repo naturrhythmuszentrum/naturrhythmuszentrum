@@ -109,6 +109,8 @@ pub(crate) fn inspect(
     bytes: &[u8],
     budget: &mut Budget,
 ) -> Result<VerifiedWitness, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("wire admission");
     magic(bytes)?;
     let mut reader = Reader::new(bytes, budget)?;
     reader.take(8)?;
@@ -215,6 +217,8 @@ fn application(
     records: &[Decoded],
     manifest: &[Primitive],
 ) -> Result<Decoded, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("application reconstruction");
     let rule = *manifest
         .get(usize::try_from(reader.index()?).map_err(|_| invalid())?)
         .ok_or_else(invalid)?;
@@ -276,6 +280,8 @@ fn conclusion(
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<Decoded, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("conclusion reconstruction");
     if !reader.boolean()? {
         return Err(invalid());
     }

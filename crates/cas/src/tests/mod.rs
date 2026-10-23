@@ -52,3 +52,5 @@ mod wire_answer;
 mod tower_closure;
 
 mod dependencies;
+
+mod work_trace;

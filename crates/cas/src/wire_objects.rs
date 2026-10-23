@@ -253,6 +253,8 @@ pub(crate) fn decode(
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<Handle, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("syntax admission");
     let previous = reader.budget.usage();
     let value = match tag {
         0 => header(cas, reader, records)?,

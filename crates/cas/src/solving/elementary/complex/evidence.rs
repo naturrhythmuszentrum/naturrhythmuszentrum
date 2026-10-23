@@ -245,6 +245,8 @@ impl Components<'_, '_> {
 
     /// Nonzero squares and exact regional nonzero facts are independent of conjugate orientation.
     pub(crate) fn nonzero(&self, value: &Value, budget: &mut Budget) -> Result<(), Fault> {
+        #[cfg(test)]
+        let _attribution = crate::testing::work_trace::Scope::phase("exclusion.component-nonzero");
         let engine = &self.evaluation.engine;
         for candidate in [
             value.copy(engine, budget)?,
@@ -311,6 +313,8 @@ impl Components<'_, '_> {
 
     /// Sign claims use a rational value or an identical earlier positive regional fact.
     fn sign(&self, value: &Value, strict: bool, budget: &mut Budget) -> Result<(), Fault> {
+        #[cfg(test)]
+        let _attribution = crate::testing::work_trace::Scope::phase("exclusion.component-sign");
         if let Some(sign) = super::selection::sign(value, budget)?
             && (sign == std::cmp::Ordering::Greater
                 || (!strict && sign == std::cmp::Ordering::Equal))

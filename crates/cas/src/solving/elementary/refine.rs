@@ -83,6 +83,8 @@ pub(crate) fn check(
     if certificate.target_kind != RefinementTargetKind::Selection || certificate.form.is_some() {
         return Err(invalid());
     }
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("existence");
     let selected = super::selected::selection(cas, &certificate.target)?;
     if !matches!(
         selected.mode,
@@ -136,6 +138,8 @@ pub(crate) fn check(
         witnesses(&evaluation, certificate, selected, budget)?;
     }
     if certificate.mode == RefinementMode::Unique {
+        #[cfg(test)]
+        let _uniqueness = crate::testing::work_trace::Scope::phase("exclusion.unique");
         unique(&evaluation, selected, budget)?;
     }
     Ok(())

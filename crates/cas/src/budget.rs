@@ -1164,6 +1164,8 @@ impl Budget {
             })?;
         self.check(BudgetKind::Work, next, at)?;
         self.usage.work = next;
+        #[cfg(test)]
+        crate::testing::work_trace::record(amount, at)?;
         Ok(())
     }
 

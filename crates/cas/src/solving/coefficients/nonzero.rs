@@ -92,6 +92,8 @@ impl Factors {
 
     /// Explore alternative exact divisions; overlapping proved factors must not make order decisive.
     fn reduces(&self, polynomial: &Polynomial, budget: &mut Budget) -> Result<bool, Fault> {
+        #[cfg(test)]
+        let _attribution = crate::testing::work_trace::Scope::phase("exclusion.factor-search");
         let mut pending = vector(1, budget)?;
         pending.push((polynomial.copy(budget)?, 0));
         while let Some((remaining, start)) = pending.pop() {
@@ -130,6 +132,8 @@ pub(crate) fn proves<'a>(
     statements: impl Iterator<Item = &'a Statement>,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("exclusion.factor-preparation");
     begin(budget)?;
     if let Some(constant) = polynomial.scalar(budget)? {
         return Ok(!constant.zero(budget)?);

@@ -77,6 +77,7 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
     let (source, _, answer) = solved()?;
     let proof = answer.coverage.as_ref().ok_or("LC coverage")?;
     let bytes = source.cas.export_witness(proof, &mut super::ledger()?)?;
+    let mut traces = Vec::new();
     for (signs, retain) in [
         ([0, 1], true),
         ([1, 0], true),
@@ -90,11 +91,17 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
         let set = retarget(&mut receiver, &request, &set)?;
         let expected = super::replay::expected(&receiver, &request, &set)?;
         let before = receiver.cas.counts();
-        let fault = receiver
-            .cas
-            .replay(&bytes, &expected, &mut super::ledger()?)
-            .err()
-            .ok_or("changed LC premises accepted")?;
+        let mut budget = super::ledger()?;
+        let (result, rows) = crate::testing::work_trace::measured(|| {
+            receiver.cas.replay(&bytes, &expected, &mut budget)
+        })?;
+        traces.push((
+            signs,
+            retain,
+            budget.usage().work,
+            super::costs::totals(rows.iter())?,
+        ));
+        let fault = result.err().ok_or("changed LC premises accepted")?;
         assert_eq!(
             fault,
             Fault::invalid(
@@ -104,6 +111,41 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
         );
         assert_eq!(receiver.cas.counts(), before);
     }
+    assert_eq!(
+        traces,
+        [
+            (
+                [0, 1],
+                true,
+                2_417_612,
+                [221_241, 424_519, 74_839, 1_697_013]
+            ),
+            (
+                [1, 0],
+                true,
+                2_415_773,
+                [221_241, 424_519, 74_839, 1_695_174]
+            ),
+            (
+                [-1, 1],
+                true,
+                2_424_532,
+                [221_241, 424_519, 74_839, 1_703_933]
+            ),
+            (
+                [1, -1],
+                true,
+                2_422_710,
+                [221_241, 424_519, 74_839, 1_702_111]
+            ),
+            (
+                [1, 1],
+                false,
+                2_411_849,
+                [221_241, 424_519, 74_839, 1_691_250]
+            ),
+        ]
+    );
     Ok(())
 }
 
@@ -155,6 +197,7 @@ fn lc_root_factor_coverage_rejects_omissions() -> TestResult {
     let proof = answer.coverage.as_ref().ok_or("LC coverage")?;
     let original = crate::testing::solve_blind::family_applications(&source.cas, proof)?;
     let reduced = incomplete(&mut source, &answer.set)?;
+    let mut traces = Vec::new();
     for remove_factor in [false, true] {
         let mut steps = original.clone();
         let step = steps.last_mut().ok_or("LC product application")?;
@@ -177,17 +220,31 @@ fn lc_root_factor_coverage_rejects_omissions() -> TestResult {
             claim.set.clone_from(&reduced);
         }
         let before = source.cas.counts();
-        let fault = source
-            .cas
-            .check_proof(&request.context, &steps, &mut super::ledger()?)
-            .err()
-            .ok_or("incomplete LC set accepted")?;
+        let mut budget = super::ledger()?;
+        let (result, rows) = crate::testing::work_trace::measured(|| {
+            source
+                .cas
+                .check_proof(&request.context, &steps, &mut budget)
+        })?;
+        traces.push((
+            remove_factor,
+            budget.usage().work,
+            super::costs::totals(rows.iter())?,
+        ));
+        let fault = result.err().ok_or("incomplete LC set accepted")?;
         assert_eq!(
             fault,
             Fault::invalid(InvalidCode::Rule, Location::new("elementary solving"))
         );
         assert_eq!(source.cas.counts(), before);
     }
+    assert_eq!(
+        traces,
+        [
+            (false, 650_338, [205_391, 322_669, 74_778, 47_500]),
+            (true, 771_144, [221_241, 427_676, 74_753, 47_474]),
+        ]
+    );
     Ok(())
 }
 

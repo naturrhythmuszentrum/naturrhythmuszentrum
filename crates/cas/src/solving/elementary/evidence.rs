@@ -122,6 +122,8 @@ impl Evaluation<'_> {
 
     /// Exact nonvanishing requires ground arithmetic or a matching regional nonzero/sign fact.
     pub(crate) fn nonzero(&self, value: &Value, budget: &mut Budget) -> Result<(), Fault> {
+        #[cfg(test)]
+        let _attribution = crate::testing::work_trace::Scope::phase("exclusion.scalar-nonzero");
         if ground_nonzero(&value.numerator, budget)? {
             return Ok(());
         }

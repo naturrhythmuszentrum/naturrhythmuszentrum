@@ -169,6 +169,8 @@ pub(crate) fn check_application(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<CheckedApplication, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::rule(draft.rule.specification().key);
     crate::proof_view::measure(cas, draft, budget)?;
     crate::solving::coefficients::scope::check(cas, draft, premises, budget)?;
     let (mut conditions, scalar_view) = rule_conditions(cas, draft, premises, budget)?;

@@ -310,6 +310,8 @@ pub(crate) fn indexed_table(
 /// Encode a theorem DAG with a sorted manifest; primitive indices are patched by the record
 /// builder.
 pub(crate) fn encode(cas: &Cas, proof: LogicalId, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("witness encoding");
     let application = crate::proof_view::application(cas, proof, budget)?;
     let root = Entity::Conclusion {
         proof: Some(proof),
@@ -326,6 +328,8 @@ pub(crate) fn judgment_key(
     judgment: &Judgment,
     budget: &mut Budget,
 ) -> Result<Vec<u8>, Fault> {
+    #[cfg(test)]
+    let _attribution = crate::testing::work_trace::Scope::phase("judgment comparison");
     let root = Entity::Conclusion {
         proof: None,
         judgment: judgment.clone(),
