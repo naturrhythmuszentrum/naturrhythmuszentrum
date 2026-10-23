@@ -28,6 +28,14 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// An entry-set operation requires an admitted selection expression.
+    SelectionExpected,
+    /// Entry-set operands name different declared base symbols.
+    SelectionBase,
+    /// One base symbol is used under different immutable declaration snapshots.
+    SelectionDeclaration,
+    /// One declared base has different retained defining expressions.
+    SelectionDefinition,
     /// A selection requires a different or nonliteral rectangle or malformed result shape.
     SelectionShape,
     /// A selected row or column lies outside its declared rectangle.
