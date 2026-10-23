@@ -165,6 +165,7 @@ mod descriptor_model;
     reason = "empty-region checking stays inside the kernel"
 )]
 mod emptiness;
+mod lemma_cache;
 mod number;
 mod parse_error;
 mod parser;
