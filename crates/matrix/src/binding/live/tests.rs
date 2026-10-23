@@ -402,3 +402,7 @@ fn selected_reading_copy_retains_transitive_lineage() -> TestResult {
     assert!(heap.value_by_symbol(planned.symbol(), &planned).is_err());
     Ok(())
 }
+
+mod checks;
+mod domain;
+mod overlap;
