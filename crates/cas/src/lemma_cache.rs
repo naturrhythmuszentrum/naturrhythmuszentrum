@@ -14,6 +14,7 @@ pub const ANONYMOUS_LEMMA_SCHEMA: crate::proof::LemmaSchema = crate::proof::Lemm
     name: "lemma.cache",
     label: "thm:cas:lemma-cache",
     version: 1,
+    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
     statement: "A sealed local theorem is reusable only under its complete canonical judgment and proof bytes.",
     premises: "Identical relation, declarations, context, stratum, ordered premises, representation, proof revisions and local proof owner.",
 };

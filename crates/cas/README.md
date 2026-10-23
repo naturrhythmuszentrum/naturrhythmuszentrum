@@ -38,55 +38,55 @@ The register describes the existing cover, sign, factor and lemma checks togethe
 
 **Theorem (Empty split)** · `thm:cas:empty-split`
 
-Formal schema `empty.split`, version 1. A complete exact cover of empty members has an empty parent. Required premises: Checked cover and one earlier empty node for every member.
+Formal schema `empty.split`, version 1. A complete exact cover of empty members has an empty parent. Required premises: Checked cover and one earlier empty node for every member. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Empty sign)** · `thm:cas:empty-sign`
 
-Formal schema `empty.sign`, version 1. A true zero guard contradicts a strict sign or nonzero fact for the identical subject. Required premises: True zero guard and a checked containing strict fact.
+Formal schema `empty.sign`, version 1. A true zero guard contradicts a strict sign or nonzero fact for the identical subject. Required premises: True zero guard and a checked containing strict fact. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Empty factor)** · `thm:cas:empty-factor`
 
-Formal schema `empty.factor`, version 1. A defined complete product of nonzero factors cannot equal zero. Required premises: Defined full factor identity, nonzero scalar and all positive-multiplicity factors.
+Formal schema `empty.factor`, version 1. A defined complete product of nonzero factors cannot equal zero. Required premises: Defined full factor identity, nonzero scalar and all positive-multiplicity factors. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Empty lemma)** · `thm:cas:empty-lemma`
 
-Formal schema `empty.lemma`, version 1. An earlier empty-region theorem proves the identical region empty. Required premises: Checked empty theorem in the identical context and premise frame.
+Formal schema `empty.lemma`, version 1. An earlier empty-region theorem proves the identical region empty. Required premises: Checked empty theorem in the identical context and premise frame. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Empty zero set)** · `thm:cas:empty-zero-set`
 
-Formal schema `empty.zero-set`, version 1. A defined scalar whose exact zero set is empty is nonzero on its original base. Required premises: Checked empty zero set and independently checked subject definedness.
+Formal schema `empty.zero-set`, version 1. A defined scalar whose exact zero set is empty is nonzero on its original base. Required premises: Checked empty zero set and independently checked subject definedness. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Empty monomial)** · `thm:cas:empty-monomial`
 
-Formal schema `empty.monomial`, version 1. A nonzero monomial supplies nonzero factors for another exact monomial. Required premises: Defined nonzero monomials in one formal frame and a nonzero ground coefficient.
+Formal schema `empty.monomial`, version 1. A nonzero monomial supplies nonzero factors for another exact monomial. Required premises: Defined nonzero monomials in one formal frame and a nonzero ground coefficient. Standing: Lemma; instances are CAS-checked.
 
 **Assumption (Empty zero)** · `assum:cas:empty-zero`
 
-Formal schema `empty.hyp.zero`, version 1. The identical subject equals literal zero on a true ancestor guard. Required premises: Qualified region ancestry and exact subject syntax.
+Formal schema `empty.hyp.zero`, version 1. The identical subject equals literal zero on a true ancestor guard. Required premises: Qualified region ancestry and exact subject syntax. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Empty strict)** · `assum:cas:empty-strict`
 
-Formal schema `empty.hyp.strict`, version 1. A strictly positive or negative Real subject is defined and nonzero. Required premises: Checked strict sign or literal true strict guard on a containing region.
+Formal schema `empty.hyp.strict`, version 1. A strictly positive or negative Real subject is defined and nonzero. Required premises: Checked strict sign or literal true strict guard on a containing region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Empty nonzero)** · `assum:cas:empty-nonzero`
 
-Formal schema `empty.hyp.nonzero`, version 1. The identical subject is defined and nonzero on a containing region. Required premises: Checked nonzero premise or literal true nonzero guard.
+Formal schema `empty.hyp.nonzero`, version 1. The identical subject is defined and nonzero on a containing region. Required premises: Checked nonzero premise or literal true nonzero guard. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Empty identity)** · `assum:cas:empty-identity`
 
-Formal schema `empty.hyp.identity`, version 1. The exact subject and displayed product are both defined and equal. Required premises: Checked defined equality in the identical context on a containing region.
+Formal schema `empty.hyp.identity`, version 1. The exact subject and displayed product are both defined and equal. Required premises: Checked defined equality in the identical context on a containing region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Empty cover)** · `assum:cas:empty-cover`
 
-Formal schema `empty.hyp.cover`, version 1. The exact parent is covered by every retained member. Required premises: Independently checked cover with no missing or duplicate member.
+Formal schema `empty.hyp.cover`, version 1. The exact parent is covered by every retained member. Required premises: Independently checked cover with no missing or duplicate member. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Empty empty)** · `assum:cas:empty-empty`
 
-Formal schema `empty.hyp.empty`, version 1. The exact region has no assignments under the retained conditions. Required premises: Earlier checked empty-region theorem in the identical context.
+Formal schema `empty.hyp.empty`, version 1. The exact region has no assignments under the retained conditions. Required premises: Earlier checked empty-region theorem in the identical context. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Theorem (Anonymous lemma reuse)** · `thm:cas:lemma-cache`
 
-Formal schema `lemma.cache`, version 1. A sealed local theorem is reusable only under its complete canonical judgment and proof bytes. Required premises: Identical relation, declarations, context, stratum, ordered premises, representation, proof revisions and local proof owner.
+Formal schema `lemma.cache`, version 1. A sealed local theorem is reusable only under its complete canonical judgment and proof bytes. Required premises: Identical relation, declarations, context, stratum, ordered premises, representation, proof revisions and local proof owner. Standing: Lemma; instances are CAS-checked.
 
 `AnonymousLemmaCache` is caller-owned retention across requests and retries. Its complete collision-free key combines the receiving-store owner with the canonical expected judgment and canonical proof bytes, including every premise, representation and used primitive revision. A hit authenticates the local proof owner and performs no rule check or graph publication. New receiving stores check their own entries. Failed, exhausted and altered proofs never enter the cache. Key construction, comparison, replay and conservative retained payload are metered under the caller and store ceilings. This contract is separate from `ReuseKey`, which deliberately omits proof derivation. Cheap sign consequences remain inline when preparing a portable cache key would cost more than deriving the consequence.
 
@@ -98,323 +98,323 @@ The entries describe the existing closed checkers and grant no new authority. Ev
 
 **Theorem (Primitive case.congruence)** · `thm:cas:primitive-case-congruence`
 
-Formal primitive `case.congruence`, version 1. Local agreement or complete case and domain congruence preserves the stated case relation. Required premises: Mode-specific ordered local equalities, compatibility and complete case/domain evidence.
+Formal primitive `case.congruence`, version 1. Local agreement or complete case and domain congruence preserves the stated case relation. Required premises: Mode-specific ordered local equalities, compatibility and complete case/domain evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive case.domain)** · `thm:cas:primitive-case-domain`
 
-Formal primitive `case.domain`, version 1. The exact defined domain of a compatible case is determined by its retained arms. Required premises: Mode-specific case compatibility and domain evidence for all retained arms.
+Formal primitive `case.domain`, version 1. The exact defined domain of a compatible case is determined by its retained arms. Required premises: Mode-specific case compatibility and domain evidence for all retained arms. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive case.eliminate)** · `thm:cas:primitive-case-eliminate`
 
-Formal primitive `case.eliminate`, version 1. A complete checked cover joins matching restricted conclusions into the stated conclusion. Required premises: A checked cover and matching closed conclusions for every member, with every inherited condition retained.
+Formal primitive `case.eliminate`, version 1. A complete checked cover joins matching restricted conclusions into the stated conclusion. Required premises: A checked cover and matching closed conclusions for every member, with every inherited condition retained. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive case.ordered)** · `thm:cas:primitive-case-ordered`
 
-Formal primitive `case.ordered`, version 1. Ordered source clauses elaborate to native cases on their exact reached regions. Required premises: Mode-specific ordered case evidence and complete source-clause, reach and association inventory.
+Formal primitive `case.ordered`, version 1. Ordered source clauses elaborate to native cases on their exact reached regions. Required premises: Mode-specific ordered case evidence and complete source-clause, reach and association inventory. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive case.select)** · `thm:cas:primitive-case-select`
 
-Formal primitive `case.select`, version 1. A selected case arm agrees locally with the case, or determines its actual point ownership. Required premises: Mode-specific association, containment and point-ownership evidence for the exact function and region.
+Formal primitive `case.select`, version 1. A selected case arm agrees locally with the case, or determines its actual point ownership. Required premises: Mode-specific association, containment and point-ownership evidence for the exact function and region. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive coeff.evaluate)** · `thm:cas:primitive-coeff-evaluate`
 
-Formal primitive `coeff.evaluate`, version 1. Exact substitution evaluates a coefficient expression to the stated value under its original domain. Required premises: Typed evaluation certificate with exact coefficient algebra, ordered substitutions and all definedness and divisor evidence.
+Formal primitive `coeff.evaluate`, version 1. Exact substitution evaluates a coefficient expression to the stated value under its original domain. Required premises: Typed evaluation certificate with exact coefficient algebra, ordered substitutions and all definedness and divisor evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive coeff.identity)** · `thm:cas:primitive-coeff-identity`
 
-Formal primitive `coeff.identity`, version 1. Identical exact coefficient values or transported coefficient expressions satisfy the stated defined identity. Required premises: Typed coefficient certificate and its ordered identity, mapping, projection and nonzero evidence, retaining every original divisor.
+Formal primitive `coeff.identity`, version 1. Identical exact coefficient values or transported coefficient expressions satisfy the stated defined identity. Required premises: Typed coefficient certificate and its ordered identity, mapping, projection and nonzero evidence, retaining every original divisor. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive complex.conjugate)** · `thm:cas:primitive-complex-conjugate`
 
-Formal primitive `complex.conjugate`, version 1. Structural complex conjugation transports the stated expression identity under the original declarations. Required premises: Typed conjugation certificate with exact expression induction and compatible selected-root evidence; independent root choices remain distinct.
+Formal primitive `complex.conjugate`, version 1. Structural complex conjugation transports the stated expression identity under the original declarations. Required premises: Typed conjugation certificate with exact expression induction and compatible selected-root evidence; independent root choices remain distinct. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive ctx.close)** · `thm:cas:primitive-ctx-close`
 
-Formal primitive `ctx.close`, version 1. Closing a local frame preserves its conclusion and every undischarged predicate as a residual. Required premises: A local theorem and its exact region-constructor theorem, followed only by consumed predicate discharge proofs.
+Formal primitive `ctx.close`, version 1. Closing a local frame preserves its conclusion and every undischarged predicate as a residual. Required premises: A local theorem and its exact region-constructor theorem, followed only by consumed predicate discharge proofs. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive ctx.hypothesis)** · `thm:cas:primitive-ctx-hypothesis`
 
-Formal primitive `ctx.hypothesis`, version 1. A qualified current or ancestor hypothesis holds under that exact frame. Required premises: No ordered proof premises; an exact introducing frame and predicate slot, or local membership slot zero.
+Formal primitive `ctx.hypothesis`, version 1. A qualified current or ancestor hypothesis holds under that exact frame. Required premises: No ordered proof premises; an exact introducing frame and predicate slot, or local membership slot zero. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive ctx.weaken)** · `thm:cas:primitive-ctx-weaken`
 
-Formal primitive `ctx.weaken`, version 1. A theorem remains valid under its checked restriction or semantic embedding. Required premises: The original theorem followed by exact subset or family projection evidence; every used assumption is retained or explicitly transported.
+Formal primitive `ctx.weaken`, version 1. A theorem remains valid under its checked restriction or semantic embedding. Required premises: The original theorem followed by exact subset or family projection evidence; every used assumption is retained or explicitly transported. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.add)** · `thm:cas:primitive-diff-add`
 
-Formal primitive `diff.add`, version 1. The derivative of an ordered sum is the ordered sum of its derivatives. Required premises: Two ordered operand derivatives on the identical domain and coordinate.
+Formal primitive `diff.add`, version 1. The derivative of an ordered sum is the ordered sum of its derivatives. Required premises: Two ordered operand derivatives on the identical domain and coordinate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.case-boundary)** · `thm:cas:primitive-diff-case-boundary`
 
-Formal primitive `diff.case-boundary`, version 1. Actual point ownership and matching incident jets determine a point derivative or its finite obstruction. Required premises: The closed boundary mode's ownership and incident jet premises for the identical function, point and sides.
+Formal primitive `diff.case-boundary`, version 1. Actual point ownership and matching incident jets determine a point derivative or its finite obstruction. Required premises: The closed boundary mode's ownership and incident jet premises for the identical function, point and sides. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.case-interior)** · `thm:cas:primitive-diff-case-interior`
 
-Formal primitive `diff.case-interior`, version 1. A checked local case equality transports a derivative on an interior region. Required premises: The closed boundary mode's local equality, incidence and derivative premises on the exact region.
+Formal primitive `diff.case-interior`, version 1. A checked local case equality transports a derivative on an interior region. Required premises: The closed boundary mode's local equality, incidence and derivative premises on the exact region. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.constant)** · `thm:cas:primitive-diff-constant`
 
-Formal primitive `diff.constant`, version 1. A rational or named constant has zero derivative in a declared Real coordinate. Required premises: No ordered proof premises; the exact constant and declared coordinate.
+Formal primitive `diff.constant`, version 1. A rational or named constant has zero derivative in a declared Real coordinate. Required premises: No ordered proof premises; the exact constant and declared coordinate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.integer-power)** · `thm:cas:primitive-diff-integer-power`
 
-Formal primitive `diff.integer-power`, version 1. A fixed integer power has the checked power-rule derivative on its strict domain. Required premises: One base derivative on the identical domain and coordinate, with literal exponent and strict base requirements.
+Formal primitive `diff.integer-power`, version 1. A fixed integer power has the checked power-rule derivative on its strict domain. Required premises: One base derivative on the identical domain and coordinate, with literal exponent and strict base requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.jacobian)** · `thm:cas:primitive-diff-jacobian`
 
-Formal primitive `diff.jacobian`, version 1. An ordered matrix of checked partial derivatives is the Jacobian of the ordered output vector. Required premises: One ordered derivative premise per output and coordinate cell, with matching declarations and domain.
+Formal primitive `diff.jacobian`, version 1. An ordered matrix of checked partial derivatives is the Jacobian of the ordered output vector. Required premises: One ordered derivative premise per output and coordinate cell, with matching declarations and domain. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.neg)** · `thm:cas:primitive-diff-neg`
 
-Formal primitive `diff.neg`, version 1. The derivative of a negation is the negated derivative. Required premises: One derivative of the original operand on the identical domain and coordinate.
+Formal primitive `diff.neg`, version 1. The derivative of a negation is the negated derivative. Required premises: One derivative of the original operand on the identical domain and coordinate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.product)** · `thm:cas:primitive-diff-product`
 
-Formal primitive `diff.product`, version 1. The derivative of a scalar product is the sum of the two ordered product-rule terms. Required premises: Two ordered operand derivatives on the identical domain and coordinate, retaining original definedness.
+Formal primitive `diff.product`, version 1. The derivative of a scalar product is the sum of the two ordered product-rule terms. Required premises: Two ordered operand derivatives on the identical domain and coordinate, retaining original definedness. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.quotient)** · `thm:cas:primitive-diff-quotient`
 
-Formal primitive `diff.quotient`, version 1. The derivative of a quotient is the quotient-rule numerator over the squared denominator. Required premises: Two ordered operand derivatives on the identical domain and coordinate, retaining the original nonzero denominator.
+Formal primitive `diff.quotient`, version 1. The derivative of a quotient is the quotient-rule numerator over the squared denominator. Required premises: Two ordered operand derivatives on the identical domain and coordinate, retaining the original nonzero denominator. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.sub)** · `thm:cas:primitive-diff-sub`
 
-Formal primitive `diff.sub`, version 1. The derivative of an ordered difference is the ordered difference of its derivatives. Required premises: Two ordered operand derivatives on the identical domain and coordinate.
+Formal primitive `diff.sub`, version 1. The derivative of an ordered difference is the ordered difference of its derivatives. Required premises: Two ordered operand derivatives on the identical domain and coordinate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.transport)** · `thm:cas:primitive-diff-transport`
 
-Formal primitive `diff.transport`, version 1. A derivative result can be replaced by a defined equal result. Required premises: One derivative followed by a defined equality from its result, on the same domain.
+Formal primitive `diff.transport`, version 1. A derivative result can be replaced by a defined equal result. Required premises: One derivative followed by a defined equality from its result, on the same domain. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive diff.variable)** · `thm:cas:primitive-diff-variable`
 
-Formal primitive `diff.variable`, version 1. A declared scalar coordinate has derivative one in itself and zero in another declared Real coordinate. Required premises: No ordered proof premises; exact declaration identities and coordinate.
+Formal primitive `diff.variable`, version 1. A declared scalar coordinate has derivative one in itself and zero in another declared Real coordinate. Required premises: No ordered proof premises; exact declaration identities and coordinate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.ae)** · `thm:cas:primitive-dist-ae`
 
-Formal primitive `dist.ae`, version 1. Functions equal away from a checked finite exceptional set induce equal regular distributions. Required premises: Closed almost-everywhere mode evidence for both regular embeddings and the complete finite exceptional-set equality.
+Formal primitive `dist.ae`, version 1. Functions equal away from a checked finite exceptional set induce equal regular distributions. Required premises: Closed almost-everywhere mode evidence for both regular embeddings and the complete finite exceptional-set equality. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.affine-pullback)** · `thm:cas:primitive-dist-affine-pullback`
 
-Formal primitive `dist.affine-pullback`, version 1. An invertible affine change pulls a delta back with the reciprocal absolute Jacobian. Required premises: No ordered proof premises; both exact spaces, affine inverse, support point and nonzero slope certificate.
+Formal primitive `dist.affine-pullback`, version 1. An invertible affine change pulls a delta back with the reciprocal absolute Jacobian. Required premises: No ordered proof premises; both exact spaces, affine inverse, support point and nonzero slope certificate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.delta-multiply)** · `thm:cas:primitive-dist-delta-multiply`
 
-Formal primitive `dist.delta-multiply`, version 1. Multiplication of a delta derivative by a smooth function obeys the finite signed derivative formula. Required premises: Closed multiplication-mode smoothness and support evidence, including every required derivative at the exact support point.
+Formal primitive `dist.delta-multiply`, version 1. Multiplication of a delta derivative by a smooth function obeys the finite signed derivative formula. Required premises: Closed multiplication-mode smoothness and support evidence, including every required derivative at the exact support point. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.delta-pair)** · `thm:cas:primitive-dist-delta-pair`
 
-Formal primitive `dist.delta-pair`, version 1. A delta derivative paired with a smooth test equals the signed test derivative at its support point. Required premises: Closed pairing-mode membership and smooth test evidence at the exact interior support point and derivative order.
+Formal primitive `dist.delta-pair`, version 1. A delta derivative paired with a smooth test equals the signed test derivative at its support point. Required premises: Closed pairing-mode membership and smooth test evidence at the exact interior support point and derivative order. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.derivative)** · `thm:cas:primitive-dist-derivative`
 
-Formal primitive `dist.derivative`, version 1. Distribution differentiation respects the checked linear derivative identities in the stated space. Required premises: Closed derivative-mode ordered distribution and derivative premises with exact positive order and coordinate.
+Formal primitive `dist.derivative`, version 1. Distribution differentiation respects the checked linear derivative identities in the stated space. Required premises: Closed derivative-mode ordered distribution and derivative premises with exact positive order and coordinate. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.jump)** · `thm:cas:primitive-dist-jump`
 
-Formal primitive `dist.jump`, version 1. The distribution derivative of a piecewise polynomial includes the exact jumps at its retained boundaries. Required premises: Closed jump-mode regular embedding, complete partition and oriented jet premises for every contributing boundary.
+Formal primitive `dist.jump`, version 1. The distribution derivative of a piecewise polynomial includes the exact jumps at its retained boundaries. Required premises: Closed jump-mode regular embedding, complete partition and oriented jet premises for every contributing boundary. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.linear)** · `thm:cas:primitive-dist-linear`
 
-Formal primitive `dist.linear`, version 1. Exact linear combinations preserve distribution membership, equality and scalar action in one space. Required premises: Closed linear-mode ordered membership, equality or action premises with exact scalar coefficients.
+Formal primitive `dist.linear`, version 1. Exact linear combinations preserve distribution membership, equality and scalar action in one space. Required premises: Closed linear-mode ordered membership, equality or action premises with exact scalar coefficients. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.primitive-unique)** · `thm:cas:primitive-dist-primitive-unique`
 
-Formal primitive `dist.primitive-unique`, version 1. Distributions with equal first derivatives on a connected open interval differ by a constant distribution. Required premises: Two derivative premises, with a third equality premise exactly when their derivative expressions differ.
+Formal primitive `dist.primitive-unique`, version 1. Distributions with equal first derivatives on a connected open interval differ by a constant distribution. Required premises: Two derivative premises, with a third equality premise exactly when their derivative expressions differ. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.regular)** · `thm:cas:primitive-dist-regular`
 
-Formal primitive `dist.regular`, version 1. A function with checked local integrability defines a regular distribution on its exact space. Required premises: Closed regularity-mode evidence for the original function and space, including every required partition or jet premise.
+Formal primitive `dist.regular`, version 1. A function with checked local integrability defines a regular distribution on its exact space. Required premises: Closed regularity-mode evidence for the original function and space, including every required partition or jet premise. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.simple-zero-pullback)** · `thm:cas:primitive-dist-simple-zero-pullback`
 
-Formal primitive `dist.simple-zero-pullback`, version 1. A polynomial delta pullback is the sum over all simple preimages weighted by reciprocal absolute slopes. Required premises: No ordered proof premises; complete rational-root factorization, distinct simple preimages, exact spaces and inverse-Jacobian evidence.
+Formal primitive `dist.simple-zero-pullback`, version 1. A polynomial delta pullback is the sum over all simple preimages weighted by reciprocal absolute slopes. Required premises: No ordered proof premises; complete rational-root factorization, distinct simple preimages, exact spaces and inverse-Jacobian evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.smooth)** · `thm:cas:primitive-dist-smooth`
 
-Formal primitive `dist.smooth`, version 1. A checked smooth function is an admissible distribution multiplier on its exact space. Required premises: Closed smoothness-mode polynomial or jet evidence with the required domain and order.
+Formal primitive `dist.smooth`, version 1. A checked smooth function is an admissible distribution multiplier on its exact space. Required premises: Closed smoothness-mode polynomial or jet evidence with the required domain and order. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive dist.support-action)** · `thm:cas:primitive-dist-support-action`
 
-Formal primitive `dist.support-action`, version 1. A supported distribution acts only through the checked test data on its exact support. Required premises: Closed support-action mode premises for the distribution, test function and exact support relation.
+Formal primitive `dist.support-action`, version 1. A supported distribution acts only through the checked test data on its exact support. Required premises: Closed support-action mode premises for the distribution, test function and exact support relation. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.add-associate)** · `thm:cas:primitive-eq-add-associate`
 
-Formal primitive `eq.add-associate`, version 1. An ordered scalar sum equals its right-associated form. Required premises: No ordered proof premises; three original scalar operands and their domain requirements.
+Formal primitive `eq.add-associate`, version 1. An ordered scalar sum equals its right-associated form. Required premises: No ordered proof premises; three original scalar operands and their domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.add-commute)** · `thm:cas:primitive-eq-add-commute`
 
-Formal primitive `eq.add-commute`, version 1. Scalar addition commutes on the common defined domain. Required premises: No ordered proof premises; both original scalar operands and their domain requirements.
+Formal primitive `eq.add-commute`, version 1. Scalar addition commutes on the common defined domain. Required premises: No ordered proof premises; both original scalar operands and their domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.add-inverse)** · `thm:cas:primitive-eq-add-inverse`
 
-Formal primitive `eq.add-inverse`, version 1. A scalar plus its negation equals zero on its defined domain. Required premises: No ordered proof premises; the identical original scalar and its negation.
+Formal primitive `eq.add-inverse`, version 1. A scalar plus its negation equals zero on its defined domain. Required premises: No ordered proof premises; the identical original scalar and its negation. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.add-zero)** · `thm:cas:primitive-eq-add-zero`
 
-Formal primitive `eq.add-zero`, version 1. Adding a right zero preserves a defined scalar. Required premises: No ordered proof premises; the original scalar and literal zero.
+Formal primitive `eq.add-zero`, version 1. Adding a right zero preserves a defined scalar. Required premises: No ordered proof premises; the original scalar and literal zero. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.cancel)** · `thm:cas:primitive-eq-cancel`
 
-Formal primitive `eq.cancel`, version 1. The quotient of an identical nonzero numerator and denominator equals one. Required premises: No ordered proof premises; the identical original scalar with its nonzero requirement.
+Formal primitive `eq.cancel`, version 1. The quotient of an identical nonzero numerator and denominator equals one. Required premises: No ordered proof premises; the identical original scalar with its nonzero requirement. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.congruence)** · `thm:cas:primitive-eq-congruence`
 
-Formal primitive `eq.congruence`, version 1. Replacing an operand by a defined equal operand preserves the enclosing scalar expression. Required premises: One equality and an exact ordered operand path, with all original domain requirements.
+Formal primitive `eq.congruence`, version 1. Replacing an operand by a defined equal operand preserves the enclosing scalar expression. Required premises: One equality and an exact ordered operand path, with all original domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.distribute)** · `thm:cas:primitive-eq-distribute`
 
-Formal primitive `eq.distribute`, version 1. A left scalar factor distributes over a sum. Required premises: No ordered proof premises; the original factor and summands with their domain requirements.
+Formal primitive `eq.distribute`, version 1. A left scalar factor distributes over a sum. Required premises: No ordered proof premises; the original factor and summands with their domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.integer-power)** · `thm:cas:primitive-eq-integer-power`
 
-Formal primitive `eq.integer-power`, version 1. Strict integer powers obey the checked recurrence on their original defined domain. Required premises: No ordered proof premises; literal integer exponent and all strict base requirements, including a nonzero base for exponent zero.
+Formal primitive `eq.integer-power`, version 1. Strict integer powers obey the checked recurrence on their original defined domain. Required premises: No ordered proof premises; literal integer exponent and all strict base requirements, including a nonzero base for exponent zero. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.mul-associate)** · `thm:cas:primitive-eq-mul-associate`
 
-Formal primitive `eq.mul-associate`, version 1. An ordered scalar product equals its right-associated form. Required premises: No ordered proof premises; three original scalar operands and their domain requirements.
+Formal primitive `eq.mul-associate`, version 1. An ordered scalar product equals its right-associated form. Required premises: No ordered proof premises; three original scalar operands and their domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.mul-commute)** · `thm:cas:primitive-eq-mul-commute`
 
-Formal primitive `eq.mul-commute`, version 1. Scalar multiplication commutes on the common defined domain. Required premises: No ordered proof premises; both original scalar operands and their domain requirements.
+Formal primitive `eq.mul-commute`, version 1. Scalar multiplication commutes on the common defined domain. Required premises: No ordered proof premises; both original scalar operands and their domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.mul-one)** · `thm:cas:primitive-eq-mul-one`
 
-Formal primitive `eq.mul-one`, version 1. Multiplying by a right one preserves a defined scalar. Required premises: No ordered proof premises; the original scalar and literal one.
+Formal primitive `eq.mul-one`, version 1. Multiplying by a right one preserves a defined scalar. Required premises: No ordered proof premises; the original scalar and literal one. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.mul-zero)** · `thm:cas:primitive-eq-mul-zero`
 
-Formal primitive `eq.mul-zero`, version 1. A defined scalar multiplied by a right zero equals zero. Required premises: No ordered proof premises; the original scalar remains required to be defined.
+Formal primitive `eq.mul-zero`, version 1. A defined scalar multiplied by a right zero equals zero. Required premises: No ordered proof premises; the original scalar remains required to be defined. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.refl)** · `thm:cas:primitive-eq-refl`
 
-Formal primitive `eq.refl`, version 1. Every expression equals itself wherever its original operands are defined. Required premises: No ordered proof premises; original definedness requirements.
+Formal primitive `eq.refl`, version 1. Every expression equals itself wherever its original operands are defined. Required premises: No ordered proof premises; original definedness requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.substitute)** · `thm:cas:primitive-eq-substitute`
 
-Formal primitive `eq.substitute`, version 1. Simultaneous substitution preserves an equality together with all transported domain requirements. Required premises: One equality and a simultaneous substitution of its endpoints and every original requirement.
+Formal primitive `eq.substitute`, version 1. Simultaneous substitution preserves an equality together with all transported domain requirements. Required premises: One equality and a simultaneous substitution of its endpoints and every original requirement. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.sym)** · `thm:cas:primitive-eq-sym`
 
-Formal primitive `eq.sym`, version 1. Defined equality is symmetric on the same domain. Required premises: One defined equality with the endpoints reversed.
+Formal primitive `eq.sym`, version 1. Defined equality is symmetric on the same domain. Required premises: One defined equality with the endpoints reversed. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive eq.trans)** · `thm:cas:primitive-eq-trans`
 
-Formal primitive `eq.trans`, version 1. Two defined equalities with the same middle expression compose on the same domain. Required premises: Two ordered equalities with identical middle expression and domain.
+Formal primitive `eq.trans`, version 1. Two defined equalities with the same middle expression compose on the same domain. Required premises: Two ordered equalities with identical middle expression and domain. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive exact.rational)** · `thm:cas:primitive-exact-rational`
 
-Formal primitive `exact.rational`, version 1. A supported operation on rational literals equals its exact rational result. Required premises: No ordered proof premises; exact literal operands and defined arithmetic.
+Formal primitive `exact.rational`, version 1. A supported operation on rational literals equals its exact rational result. Required premises: No ordered proof premises; exact literal operands and defined arithmetic. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive extension.adjoin)** · `thm:cas:primitive-extension-adjoin`
 
-Formal primitive `extension.adjoin`, version 1. Adjoining a checked root satisfies its monic defining polynomial in the exact extension. Required premises: Typed root-adjunction certificate with exact base algebra, defining polynomial and selected generator evidence.
+Formal primitive `extension.adjoin`, version 1. Adjoining a checked root satisfies its monic defining polynomial in the exact extension. Required premises: Typed root-adjunction certificate with exact base algebra, defining polynomial and selected generator evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive extension.split)** · `thm:cas:primitive-extension-split`
 
-Formal primitive `extension.split`, version 1. A complete coprime factorization splits the exact extension into its stated components. Required premises: Typed split certificate with complete factor identity, coprimality and component projection evidence.
+Formal primitive `extension.split`, version 1. A complete coprime factorization splits the exact extension into its stated components. Required premises: Typed split certificate with complete factor identity, coprimality and component projection evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive extension.unit)** · `thm:cas:primitive-extension-unit`
 
-Formal primitive `extension.unit`, version 1. A checked inverse product or Bezout identity proves an extension element is a unit. Required premises: Typed unit certificate with exact algebra, candidate inverse and independently checked product or Bezout evidence.
+Formal primitive `extension.unit`, version 1. A checked inverse product or Bezout identity proves an extension element is a unit. Required premises: Typed unit certificate with exact algebra, candidate inverse and independently checked product or Bezout evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive integral.case-split)** · `thm:cas:primitive-integral-case-split`
 
-Formal primitive `integral.case-split`, version 1. A complete finite polynomial interval partition integrates to the sum of its endpoint differences. Required premises: No ordered proof premises; complete cover, finite-point extensions, polynomial antiderivatives and exact endpoint certificates.
+Formal primitive `integral.case-split`, version 1. A complete finite polynomial interval partition integrates to the sum of its endpoint differences. Required premises: No ordered proof premises; complete cover, finite-point extensions, polynomial antiderivatives and exact endpoint certificates. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive jet.polynomial)** · `thm:cas:primitive-jet-polynomial`
 
-Formal primitive `jet.polynomial`, version 1. Exact polynomial pieces determine a complete finite partition and oriented jets. Required premises: Mode-specific partition, incidence and polynomial coefficient evidence with exact side and boundary roles.
+Formal primitive `jet.polynomial`, version 1. Exact polynomial pieces determine a complete finite partition and oriented jets. Required premises: Mode-specific partition, incidence and polynomial coefficient evidence with exact side and boundary roles. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive limit.case-restrict)** · `thm:cas:primitive-limit-case-restrict`
 
-Formal primitive `limit.case-restrict`, version 1. Matching polynomial traces on all required approaches determine the stated finite punctured limit. Required premises: One checked trace per required side, with identical function, boundary, order and value.
+Formal primitive `limit.case-restrict`, version 1. Matching polynomial traces on all required approaches determine the stated finite punctured limit. Required premises: One checked trace per required side, with identical function, boundary, order and value. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive linear.equivalent)** · `thm:cas:primitive-linear-equivalent`
 
-Formal primitive `linear.equivalent`, version 1. Exact reversible row and coordinate transformations preserve the original linear solution set. Required premises: Typed linear certificate with full matrices, checked inverse transformations, unit pivots and strict original domains.
+Formal primitive `linear.equivalent`, version 1. Exact reversible row and coordinate transformations preserve the original linear solution set. Required premises: Typed linear certificate with full matrices, checked inverse transformations, unit pivots and strict original domains. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive orbit.cover)** · `thm:cas:primitive-orbit-cover`
 
-Formal primitive `orbit.cover`, version 1. Checked permutation images of retained representatives cover the stated solution orbit. Required premises: Typed orbit certificate with exact action, representatives, every image and complete coverage evidence.
+Formal primitive `orbit.cover`, version 1. Checked permutation images of retained representatives cover the stated solution orbit. Required premises: Typed orbit certificate with exact action, representatives, every image and complete coverage evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive poly.jets-equal)** · `thm:cas:primitive-poly-jets-equal`
 
-Formal primitive `poly.jets-equal`, version 1. Matching finite coefficient maps prove defined equality in the supported scalar, ordered matrix or affine reading grammar. Required premises: No ordered proof premises; independently reconstructed original expressions and all domain requirements.
+Formal primitive `poly.jets-equal`, version 1. Matching finite coefficient maps prove defined equality in the supported scalar, ordered matrix or affine reading grammar. Required premises: No ordered proof premises; independently reconstructed original expressions and all domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive poly.rational-equal)** · `thm:cas:primitive-poly-rational-equal`
 
-Formal primitive `poly.rational-equal`, version 1. Equal cross-multiplied finite coefficient maps prove equality of defined rational expressions. Required premises: No ordered proof premises; every original divisor remains a nonzero requirement.
+Formal primitive `poly.rational-equal`, version 1. Equal cross-multiplied finite coefficient maps prove equality of defined rational expressions. Required premises: No ordered proof premises; every original divisor remains a nonzero requirement. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive poly.square-free)** · `thm:cas:primitive-poly-square-free`
 
-Formal primitive `poly.square-free`, version 1. Exact coprime square-free layers reconstruct the original polynomial with their stated multiplicities. Required premises: No ordered proof premises; exact polynomial identities, GCD and Bezout certificates, and original domain requirements.
+Formal primitive `poly.square-free`, version 1. Exact coprime square-free layers reconstruct the original polynomial with their stated multiplicities. Required premises: No ordered proof premises; exact polynomial identities, GCD and Bezout certificates, and original domain requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive real.cell-exists)** · `thm:cas:primitive-real-cell-exists`
 
-Formal primitive `real.cell-exists`, version 1. A checked Real root count establishes existence of a selected root in its exact cell. Required premises: Typed cell-existence certificate with the corresponding checked count, exact cell and root selection.
+Formal primitive `real.cell-exists`, version 1. A checked Real root count establishes existence of a selected root in its exact cell. Required premises: Typed cell-existence certificate with the corresponding checked count, exact cell and root selection. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive real.root-count)** · `thm:cas:primitive-real-root-count`
 
-Formal primitive `real.root-count`, version 1. An exact Sturm variation certificate determines the number of Real polynomial roots in the stated cell. Required premises: Typed root-count certificate with exact polynomial, endpoint signs, variation evidence and all unit requirements.
+Formal primitive `real.root-count`, version 1. An exact Sturm variation certificate determines the number of Real polynomial roots in the stated cell. Required premises: Typed root-count certificate with exact polynomial, endpoint signs, variation evidence and all unit requirements. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive real.sign)** · `thm:cas:primitive-real-sign`
 
-Formal primitive `real.sign`, version 1. Checked ordered-field sign inferences establish the stated sign of a defined Real subject. Required premises: Typed sign certificate with exact ordered sign premises, original strict guards and supported arithmetic or polynomial evidence.
+Formal primitive `real.sign`, version 1. Checked ordered-field sign inferences establish the stated sign of a defined Real subject. Required premises: Typed sign certificate with exact ordered sign premises, original strict guards and supported arithmetic or polynomial evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive region.construct)** · `thm:cas:primitive-region-construct`
 
-Formal primitive `region.construct`, version 1. A region constructor satisfies its exact defining membership law. Required premises: No ordered proof premises; the original typed region constructor.
+Formal primitive `region.construct`, version 1. A region constructor satisfies its exact defining membership law. Required premises: No ordered proof premises; the original typed region constructor. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive region.decide)** · `thm:cas:primitive-region-decide`
 
-Formal primitive `region.decide`, version 2. Exact finite cells or a checked emptiness DAG establish the stated regional relation. Required premises: Zero or more earlier proofs consumed by the certificate, including complete covers and qualified sign, equality or empty-region facts.
+Formal primitive `region.decide`, version 2. Exact finite cells or a checked emptiness DAG establish the stated regional relation. Required premises: Zero or more earlier proofs consumed by the certificate, including complete covers and qualified sign, equality or empty-region facts. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive root.binomial)** · `thm:cas:primitive-root-binomial`
 
-Formal primitive `root.binomial`, version 1. A checked binomial root construction supplies the complete stated finite root set. Required premises: Typed binomial certificate with exact order, leading coefficient, root selections and complete zero or nonzero radicand evidence.
+Formal primitive `root.binomial`, version 1. A checked binomial root construction supplies the complete stated finite root set. Required premises: Typed binomial certificate with exact order, leading coefficient, root selections and complete zero or nonzero radicand evidence. Standing: Lemma; instances are CAS-checked.
 
 **Assumption (Primitive root.isolate)** · `assum:cas:primitive-root-isolate`
 
-Formal primitive `root.isolate`, version 1. The represented isolation schema would certify exact Real root intervals and their order. Required premises: Reserved typed isolation evidence; no application is accepted because this schema has no executable checker.
+Formal primitive `root.isolate`, version 1. The represented isolation schema would certify exact Real root intervals and their order. Required premises: Reserved typed isolation evidence; no application is accepted because this schema has no executable checker. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Theorem (Primitive root.select)** · `thm:cas:primitive-root-select`
 
-Formal primitive `root.select`, version 1. Exact selection refinement preserves a root with checked existence and its defining relation. Required premises: Typed refinement certificate with original root selection, existence, coefficient relation and every required sign or compatibility premise.
+Formal primitive `root.select`, version 1. Exact selection refinement preserves a root with checked existence and its defining relation. Required premises: Typed refinement certificate with original root selection, existence, coefficient relation and every required sign or compatibility premise. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive series.case-restrict)** · `thm:cas:primitive-series-case-restrict`
 
-Formal primitive `series.case-restrict`, version 1. Checked side jets and exact polynomial remainders determine the stated finite series. Required premises: One jet per required approach, centre ownership when required, and exact polynomial remainder certificates.
+Formal primitive `series.case-restrict`, version 1. Checked side jets and exact polynomial remainders determine the stated finite series. Required premises: One jet per required approach, centre ownership when required, and exact polynomial remainder certificates. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive solve.family)** · `thm:cas:primitive-solve-family`
 
-Formal primitive `solve.family`, version 1. Exact parameter images with checked domains and complete branches cover the original family relation. Required premises: Typed family certificate with universal substitution, exact maps, parameter domains, original predicate and complete coverage evidence.
+Formal primitive `solve.family`, version 1. Exact parameter images with checked domains and complete branches cover the original family relation. Required premises: Typed family certificate with universal substitution, exact maps, parameter domains, original predicate and complete coverage evidence. Standing: Lemma; instances are CAS-checked.
 
 **Assumption (Primitive solve.local-branch)** · `assum:cas:primitive-solve-local-branch`
 
-Formal primitive `solve.local-branch`, version 1. The represented implicit-function schema would certify a local solution branch under its regularity hypotheses. Required premises: Reserved typed branch and regularity evidence; no application is accepted because this schema has no executable checker.
+Formal primitive `solve.local-branch`, version 1. The represented implicit-function schema would certify a local solution branch under its regularity hypotheses. Required premises: Reserved typed branch and regularity evidence; no application is accepted because this schema has no executable checker. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Theorem (Primitive solve.member)** · `thm:cas:primitive-solve-member`
 
-Formal primitive `solve.member`, version 1. A substituted tuple belongs to the original solution set when its predicate, domain and original divisors hold. Required premises: Typed membership certificate with ordered tuple, original predicate and domain evidence, selected-root existence and every divisor requirement.
+Formal primitive `solve.member`, version 1. A substituted tuple belongs to the original solution set when its predicate, domain and original divisors hold. Required premises: Typed membership certificate with ordered tuple, original predicate and domain evidence, selected-root existence and every divisor requirement. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive solve.multiplicity)** · `thm:cas:primitive-solve-multiplicity`
 
-Formal primitive `solve.multiplicity`, version 1. The first nonzero derivative order at a root determines its polynomial multiplicity. Required premises: Typed derivative-multiplicity certificate with exact membership and every derivative through the first nonzero order.
+Formal primitive `solve.multiplicity`, version 1. The first nonzero derivative order at a root determines its polynomial multiplicity. Required premises: Typed derivative-multiplicity certificate with exact membership and every derivative through the first nonzero order. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive solve.product)** · `thm:cas:primitive-solve-product`
 
-Formal primitive `solve.product`, version 1. A complete polynomial factor identity and checked root memberships exhaust the admissible roots. Required premises: Typed product certificate with every positive-multiplicity factor, original divisor inventory and exact exclusion evidence for discarded roots.
+Formal primitive `solve.product`, version 1. A complete polynomial factor identity and checked root memberships exhaust the admissible roots. Required premises: Typed product certificate with every positive-multiplicity factor, original divisor inventory and exact exclusion evidence for discarded roots. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive solve.split)** · `thm:cas:primitive-solve-split`
 
-Formal primitive `solve.split`, version 2. A total predicate partition or checked empty region yields complete regional solution coverage. Required premises: Typed split certificate with definedness and complete branch evidence, or the exact checked empty-region premise.
+Formal primitive `solve.split`, version 2. A total predicate partition or checked empty region yields complete regional solution coverage. Required premises: Typed split certificate with definedness and complete branch evidence, or the exact checked empty-region premise. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive solve.substitute)** · `thm:cas:primitive-solve-substitute`
 
-Formal primitive `solve.substitute`, version 1. Checked inverse coordinate maps transport membership and complete solution coverage. Required premises: Typed transport certificate with both map directions, inverse compositions, strict domains and original solution evidence.
+Formal primitive `solve.substitute`, version 1. Checked inverse coordinate maps transport membership and complete solution coverage. Required premises: Typed transport certificate with both map directions, inverse compositions, strict domains and original solution evidence. Standing: Lemma; instances are CAS-checked.
 
 **Theorem (Primitive sum.case-split)** · `thm:cas:primitive-sum-case-split`
 
-Formal primitive `sum.case-split`, version 1. A complete finite inclusive integer partition sums to the checked forward-difference endpoint expression. Required premises: No ordered proof premises; complete range cover, exact forward differences and endpoint certificates.
+Formal primitive `sum.case-split`, version 1. A complete finite inclusive integer partition sums to the checked forward-difference endpoint expression. Required premises: No ordered proof premises; complete range cover, exact forward differences and endpoint certificates. Standing: Lemma; instances are CAS-checked.
 
 ## Formal hypothesis kinds · `sec:cas:hypothesis-kinds`
 
@@ -426,183 +426,183 @@ Kinds are derived views of the existing qualified records, so no redundant kind 
 
 **Assumption (Hypothesis domain guard)** · `assum:cas:hyp-domain-guard`
 
-Formal hypothesis `hyp.domain-guard`, version 1. The original operands are defined on the stated region. Required premises: Exact original operands, context, scope and region.
+Formal hypothesis `hyp.domain-guard`, version 1. The original operands are defined on the stated region. Required premises: Exact original operands, context, scope and region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis nonzero)** · `assum:cas:hyp-nonzero`
 
-Formal hypothesis `hyp.nonzero`, version 1. The exact scalar subject is defined and nonzero. Required premises: Original subject and qualified containing region.
+Formal hypothesis `hyp.nonzero`, version 1. The exact scalar subject is defined and nonzero. Required premises: Original subject and qualified containing region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis strict sign)** · `assum:cas:hyp-strict-sign`
 
-Formal hypothesis `hyp.strict-sign`, version 1. The exact Real subject is strictly positive or strictly negative. Required premises: Original Real subject, stated sign and qualified containing region.
+Formal hypothesis `hyp.strict-sign`, version 1. The exact Real subject is strictly positive or strictly negative. Required premises: Original Real subject, stated sign and qualified containing region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis nonnegative)** · `assum:cas:hyp-nonnegative`
 
-Formal hypothesis `hyp.nonnegative`, version 1. The exact Real subject is nonnegative. Required premises: Original Real subject and qualified containing region.
+Formal hypothesis `hyp.nonnegative`, version 1. The exact Real subject is nonnegative. Required premises: Original Real subject and qualified containing region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis integer range)** · `assum:cas:hyp-integer-range`
 
-Formal hypothesis `hyp.integer-range`, version 1. The exact integer belongs to the stated half-open interval. Required premises: Original integer expression and exact interval bounds.
+Formal hypothesis `hyp.integer-range`, version 1. The exact integer belongs to the stated half-open interval. Required premises: Original integer expression and exact interval bounds. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis differentiable)** · `assum:cas:hyp-differentiable`
 
-Formal hypothesis `hyp.differentiable`, version 1. The original function has the stated differentiability. Required premises: Exact function, coordinate, order and region.
+Formal hypothesis `hyp.differentiable`, version 1. The original function has the stated differentiability. Required premises: Exact function, coordinate, order and region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis equality)** · `assum:cas:hyp-equality`
 
-Formal hypothesis `hyp.equality`, version 1. The two exact expressions agree under the stated definedness contract. Required premises: Original endpoints, context and domain with their definedness requirements.
+Formal hypothesis `hyp.equality`, version 1. The two exact expressions agree under the stated definedness contract. Required premises: Original endpoints, context and domain with their definedness requirements. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis declared zero)** · `assum:cas:hyp-declared-zero`
 
-Formal hypothesis `hyp.declared-zero`, version 1. The exact subject equals zero. Required premises: Original equality operands with an exact rational zero, or a scalar zero-sign conclusion, on the qualified region.
+Formal hypothesis `hyp.declared-zero`, version 1. The exact subject equals zero. Required premises: Original equality operands with an exact rational zero, or a scalar zero-sign conclusion, on the qualified region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis symmetric)** · `assum:cas:hyp-symmetric`
 
-Formal hypothesis `hyp.symmetric`, version 1. The original matrix is symmetric. Required premises: Exact ordered matrix expression and declaration snapshot.
+Formal hypothesis `hyp.symmetric`, version 1. The original matrix is symmetric. Required premises: Exact ordered matrix expression and declaration snapshot. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis conjunction)** · `assum:cas:hyp-conjunction`
 
-Formal hypothesis `hyp.conjunction`, version 1. Every retained conjunct holds. Required premises: The complete original ordered predicate operands.
+Formal hypothesis `hyp.conjunction`, version 1. Every retained conjunct holds. Required premises: The complete original ordered predicate operands. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis disjunction)** · `assum:cas:hyp-disjunction`
 
-Formal hypothesis `hyp.disjunction`, version 1. At least one retained disjunct holds. Required premises: The complete original ordered predicate operands.
+Formal hypothesis `hyp.disjunction`, version 1. At least one retained disjunct holds. Required premises: The complete original ordered predicate operands. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis negation)** · `assum:cas:hyp-negation`
 
-Formal hypothesis `hyp.negation`, version 1. The retained predicate is false. Required premises: The exact original predicate and its qualified region.
+Formal hypothesis `hyp.negation`, version 1. The retained predicate is false. Required premises: The exact original predicate and its qualified region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis universal)** · `assum:cas:hyp-universal`
 
-Formal hypothesis `hyp.universal`, version 1. The retained predicate holds for all values of its declared binders. Required premises: Exact binder sorts, body and outer scope.
+Formal hypothesis `hyp.universal`, version 1. The retained predicate holds for all values of its declared binders. Required premises: Exact binder sorts, body and outer scope. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis named)** · `assum:cas:hyp-named`
 
-Formal hypothesis `hyp.named`, version 1. The explicitly named mathematical predicate is assumed true. Required premises: Exact predicate name, ordered arguments and introducing frame.
+Formal hypothesis `hyp.named`, version 1. The explicitly named mathematical predicate is assumed true. Required premises: Exact predicate name, ordered arguments and introducing frame. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis boolean)** · `assum:cas:hyp-boolean`
 
-Formal hypothesis `hyp.boolean`, version 1. The exact Boolean expression is defined and true. Required premises: Original Boolean expression, declaration snapshot and region.
+Formal hypothesis `hyp.boolean`, version 1. The exact Boolean expression is defined and true. Required premises: Original Boolean expression, declaration snapshot and region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis region membership)** · `assum:cas:hyp-region-membership`
 
-Formal hypothesis `hyp.region-membership`, version 1. Every point of the stated source region belongs to the exact containing region. Required premises: Exact source and containing regions, including the local membership binder when used.
+Formal hypothesis `hyp.region-membership`, version 1. Every point of the stated source region belongs to the exact containing region. Required premises: Exact source and containing regions, including the local membership binder when used. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis empty region)** · `assum:cas:hyp-empty-region`
 
-Formal hypothesis `hyp.empty-region`, version 1. The stated region has no assignments under the retained conditions. Required premises: Exact region and complete qualified conditions.
+Formal hypothesis `hyp.empty-region`, version 1. The stated region has no assignments under the retained conditions. Required premises: Exact region and complete qualified conditions. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis cover)** · `assum:cas:hyp-cover`
 
-Formal hypothesis `hyp.cover`, version 1. Every point of the exact domain belongs to a retained cover member. Required premises: Complete exact domain and unordered member inventory.
+Formal hypothesis `hyp.cover`, version 1. Every point of the exact domain belongs to a retained cover member. Required premises: Complete exact domain and unordered member inventory. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis disjoint)** · `assum:cas:hyp-disjoint`
 
-Formal hypothesis `hyp.disjoint`, version 1. The two exact regions have empty intersection. Required premises: Both original regions under the same qualified interpretation.
+Formal hypothesis `hyp.disjoint`, version 1. The two exact regions have empty intersection. Required premises: Both original regions under the same qualified interpretation. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis constructor)** · `assum:cas:hyp-constructor`
 
-Formal hypothesis `hyp.constructor`, version 1. The retained region satisfies its exact defining membership law. Required premises: Original region constructor and stated law.
+Formal hypothesis `hyp.constructor`, version 1. The retained region satisfies its exact defining membership law. Required premises: Original region constructor and stated law. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis defined domain)** · `assum:cas:hyp-defined-domain`
 
-Formal hypothesis `hyp.defined-domain`, version 1. The original function is defined on exactly the stated domain. Required premises: Original function and exact region, including every operand requirement.
+Formal hypothesis `hyp.defined-domain`, version 1. The original function is defined on exactly the stated domain. Required premises: Original function and exact region, including every operand requirement. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis compatibility)** · `assum:cas:hyp-compatibility`
 
-Formal hypothesis `hyp.compatibility`, version 1. The two original case associations agree in value and definedness on their overlap. Required premises: Exact associations and stated overlap region.
+Formal hypothesis `hyp.compatibility`, version 1. The two original case associations agree in value and definedness on their overlap. Required premises: Exact associations and stated overlap region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis elaboration)** · `assum:cas:hyp-elaboration`
 
-Formal hypothesis `hyp.elaboration`, version 1. The ordered source form elaborates to the stated native expression. Required premises: Complete source form, result and exact defined domain.
+Formal hypothesis `hyp.elaboration`, version 1. The ordered source form elaborates to the stated native expression. Required premises: Complete source form, result and exact defined domain. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis incidence)** · `assum:cas:hyp-incidence`
 
-Formal hypothesis `hyp.incidence`, version 1. The stated side of a boundary has the exact incident neighborhood. Required premises: Original region, boundary, oriented side and neighborhood.
+Formal hypothesis `hyp.incidence`, version 1. The stated side of a boundary has the exact incident neighborhood. Required premises: Original region, boundary, oriented side and neighborhood. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis ownership)** · `assum:cas:hyp-ownership`
 
-Formal hypothesis `hyp.ownership`, version 1. The exact function owns the stated point value or is absent there. Required premises: Original function, boundary and explicit presence or absence claim.
+Formal hypothesis `hyp.ownership`, version 1. The exact function owns the stated point value or is absent there. Required premises: Original function, boundary and explicit presence or absence claim. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis derivative)** · `assum:cas:hyp-derivative`
 
-Formal hypothesis `hyp.derivative`, version 1. The stated expression is the derivative of the original function on the exact domain. Required premises: Original function, derivative, declared coordinate and domain.
+Formal hypothesis `hyp.derivative`, version 1. The stated expression is the derivative of the original function on the exact domain. Required premises: Original function, derivative, declared coordinate and domain. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis jacobian)** · `assum:cas:hyp-jacobian`
 
-Formal hypothesis `hyp.jacobian`, version 1. The ordered matrix contains the stated partial derivatives. Required premises: Original output column, matrix, ordered distinct coordinates and domain.
+Formal hypothesis `hyp.jacobian`, version 1. The ordered matrix contains the stated partial derivatives. Required premises: Original output column, matrix, ordered distinct coordinates and domain. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis square free)** · `assum:cas:hyp-square-free`
 
-Formal hypothesis `hyp.square-free`, version 1. The displayed layers reconstruct the polynomial with their exact multiplicities. Required premises: Original polynomial, factors, declared variable, coefficient field and domain.
+Formal hypothesis `hyp.square-free`, version 1. The displayed layers reconstruct the polynomial with their exact multiplicities. Required premises: Original polynomial, factors, declared variable, coefficient field and domain. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis jet)** · `assum:cas:hyp-jet`
 
-Formal hypothesis `hyp.jet`, version 1. The original function has the stated oriented finite jet. Required premises: Exact region, boundary, side and ordered derivative values.
+Formal hypothesis `hyp.jet`, version 1. The original function has the stated oriented finite jet. Required premises: Exact region, boundary, side and ordered derivative values. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis jump)** · `assum:cas:hyp-jump`
 
-Formal hypothesis `hyp.jump`, version 1. The stated value is the right trace minus the left trace at the exact boundary. Required premises: Original function, boundary, derivative order and both actual traces.
+Formal hypothesis `hyp.jump`, version 1. The stated value is the right trace minus the left trace at the exact boundary. Required premises: Original function, boundary, derivative order and both actual traces. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis boundary partition)** · `assum:cas:hyp-boundary-partition`
 
-Formal hypothesis `hyp.boundary-partition`, version 1. The retained pieces form the stated complete finite boundary partition. Required premises: Complete selector pieces, point ownership and exact boundary inventory.
+Formal hypothesis `hyp.boundary-partition`, version 1. The retained pieces form the stated complete finite boundary partition. Required premises: Complete selector pieces, point ownership and exact boundary inventory. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis case derivative)** · `assum:cas:hyp-case-derivative`
 
-Formal hypothesis `hyp.case-derivative`, version 1. The case has the stated positive-order classical derivative. Required premises: Original case, coordinate, order, domain and boundary evidence.
+Formal hypothesis `hyp.case-derivative`, version 1. The case has the stated positive-order classical derivative. Required premises: Original case, coordinate, order, domain and boundary evidence. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis derivative at)** · `assum:cas:hyp-derivative-at`
 
-Formal hypothesis `hyp.derivative-at`, version 1. The function has the stated classical derivative at its owned point. Required premises: Original function, point ownership and incident finite jets.
+Formal hypothesis `hyp.derivative-at`, version 1. The function has the stated classical derivative at its owned point. Required premises: Original function, point ownership and incident finite jets. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis derivative nonexistence)** · `assum:cas:hyp-derivative-nonexistence`
 
-Formal hypothesis `hyp.derivative-nonexistence`, version 1. The stated finite obstruction excludes the point derivative. Required premises: Original function, owned point and exact nonexistence evidence.
+Formal hypothesis `hyp.derivative-nonexistence`, version 1. The stated finite obstruction excludes the point derivative. Required premises: Original function, owned point and exact nonexistence evidence. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis trace)** · `assum:cas:hyp-trace`
 
-Formal hypothesis `hyp.trace`, version 1. The original function has the stated oriented trace. Required premises: Exact function, boundary, side, derivative order and value.
+Formal hypothesis `hyp.trace`, version 1. The original function has the stated oriented trace. Required premises: Exact function, boundary, side, derivative order and value. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis solve evidence)** · `assum:cas:hyp-solve-evidence`
 
-Formal hypothesis `hyp.solve-evidence`, version 1. The retained typed solution, coefficient, root, family or Real fact holds. Required premises: The complete solving statement and ordered evidence selected by its certificate subtype and mode.
+Formal hypothesis `hyp.solve-evidence`, version 1. The retained typed solution, coefficient, root, family or Real fact holds. Required premises: The complete solving statement and ordered evidence selected by its certificate subtype and mode. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis distribution evidence)** · `assum:cas:hyp-distribution-evidence`
 
-Formal hypothesis `hyp.distribution-evidence`, version 1. The retained distribution or analytic fact holds in its exact declared space. Required premises: The complete typed statement and ordered evidence selected by its closed mode.
+Formal hypothesis `hyp.distribution-evidence`, version 1. The retained distribution or analytic fact holds in its exact declared space. Required premises: The complete typed statement and ordered evidence selected by its closed mode. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis boundary evidence)** · `assum:cas:hyp-boundary-evidence`
 
-Formal hypothesis `hyp.boundary-evidence`, version 1. The retained boundary-calculus facts hold with their exact oriented roles. Required premises: Exactly the ordered premises consumed by the closed boundary mode.
+Formal hypothesis `hyp.boundary-evidence`, version 1. The retained boundary-calculus facts hold with their exact oriented roles. Required premises: Exactly the ordered premises consumed by the closed boundary mode. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis case evidence)** · `assum:cas:hyp-case-evidence`
 
-Formal hypothesis `hyp.case-evidence`, version 1. The retained case facts hold on their exact regions. Required premises: Exactly the ordered premises consumed by the closed case mode.
+Formal hypothesis `hyp.case-evidence`, version 1. The retained case facts hold on their exact regions. Required premises: Exactly the ordered premises consumed by the closed case mode. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis exact premises)** · `assum:cas:hyp-exact-premises`
 
-Formal hypothesis `hyp.exact-premises`, version 1. Every member of the exact ordered premise sequence holds. Required premises: Exactly the arity stored in the associated premise shape; each slot retains its typed statement and conditions.
+Formal hypothesis `hyp.exact-premises`, version 1. Every member of the exact ordered premise sequence holds. Required premises: Exactly the arity stored in the associated premise shape; each slot retains its typed statement and conditions. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis discharge premises)** · `assum:cas:hyp-discharge-premises`
 
-Formal hypothesis `hyp.discharge-premises`, version 1. The fixed premise prefix and every explicitly consumed discharge fact hold. Required premises: The minimum prefix arity stored in the associated premise shape, followed only by consumed evidence.
+Formal hypothesis `hyp.discharge-premises`, version 1. The fixed premise prefix and every explicitly consumed discharge fact hold. Required premises: The minimum prefix arity stored in the associated premise shape, followed only by consumed evidence. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis jacobian cells)** · `assum:cas:hyp-jacobian-cells`
 
-Formal hypothesis `hyp.jacobian-cells`, version 1. Every ordered output and coordinate cell has its required derivative fact. Required premises: One derivative premise for every cell, with the original row and coordinate order.
+Formal hypothesis `hyp.jacobian-cells`, version 1. Every ordered output and coordinate cell has its required derivative fact. Required premises: One derivative premise for every cell, with the original row and coordinate order. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis nonpositive)** · `assum:cas:hyp-nonpositive`
 
-Formal hypothesis `hyp.nonpositive`, version 1. The exact Real subject is nonpositive. Required premises: Original Real subject and qualified containing region.
+Formal hypothesis `hyp.nonpositive`, version 1. The exact Real subject is nonpositive. Required premises: Original Real subject and qualified containing region. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis germ evidence)** · `assum:cas:hyp-germ-evidence`
 
-Formal hypothesis `hyp.germ-evidence`, version 1. The original function has the stated finite limit or series on its exact approach. Required premises: Exact function, boundary, approach, mode and finite coefficients or limit.
+Formal hypothesis `hyp.germ-evidence`, version 1. The original function has the stated finite limit or series on its exact approach. Required premises: Exact function, boundary, approach, mode and finite coefficients or limit. Standing: Hypothesis; every undischarged use remains conditional.
 
 **Assumption (Hypothesis split evidence)** · `assum:cas:hyp-split-evidence`
 
-Formal hypothesis `hyp.split-evidence`, version 1. The original function has the stated finite integral or sum. Required premises: Exact function, domain or inclusive integer range and endpoint value.
+Formal hypothesis `hyp.split-evidence`, version 1. The original function has the stated finite integral or sum. Required premises: Exact function, domain or inclusive integer range and endpoint value. Standing: Hypothesis; every undischarged use remains conditional.
 
 ## Checked proof citations · `sec:cas:proof-citations`
 
@@ -611,6 +611,14 @@ Formal hypothesis `hyp.split-evidence`, version 1. The original function has the
 The query authenticates the proof handle and reads graph-owned applications. It never trusts a caller-supplied primitive, recomputes a theorem, clones a certificate or publishes a record. Scalar and native applications use the same citation interface. Metadata copies grant no proof authority. Frame closure can replace a local assumption by an open residual; both collections must be empty before a consumer treats a conclusion as independent of assumptions. A proved premise's kind describes its mathematical shape and does not itself add an assumption.
 
 Extraction visits only reachable proof edges. It prepays each visited-set scan, one Work per edge or inspected metadata item, the square of the reachable-node count for sorting, scalar root-frame visits and full provenance-key comparisons. Every reserved vector element adds its byte size to Work and to a conservative simultaneous staged/output reservation that includes traversal scratch. Caller and store ceilings intersect without resetting prior Work; refusals leave the graph unchanged. Primitive versions, checker behavior, witness bytes and existing construction/replay pins are unchanged.
+
+## Formal standing and retained assumptions · `sec:cas:formal-standing`
+
+Every `LemmaSchema` records `Standing::Lemma` with `LemmaProvenance`, or `Standing::Hypothesis`. Executable primitive and emptiness schemas and anonymous lemma reuse have CAS-checked instance provenance. Hypothesis kinds and unavailable primitive schemas remain assumed. The external-certificate provenance form retains a citation and its verification origin, but no register entry uses it and no external certificate reader or checker authority is added.
+
+`VerifiedWitness::is_unconditional` is true only when both the qualified used-hypothesis closure and the guarded residual set are empty. `is_discharged` retains its narrower meaning of no residuals. A theorem can therefore be discharged and still depend on an assumed strict sign. These queries preserve the theorem's exact stated region and make no consistency claim. Direct checked premise kinds are shapes of already proved facts; their assumption labels do not create new assumptions.
+
+The existing checker composes complete qualified frame/slot sets, and local-frame closure either consumes exact discharge evidence or retains a guarded residual. Kind labels are reconstructed from those exact records. Composition tests keep both distinct hypothesis labels, fresh replay keeps them, and an expected claim that drops their context refuses. Metadata cannot erase a condition or turn an assumption into a theorem.
 
 ## Main concepts and types · `sec:cas:concepts`
 

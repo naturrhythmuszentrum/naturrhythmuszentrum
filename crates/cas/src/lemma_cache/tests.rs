@@ -293,8 +293,12 @@ fn lemma_cache_authenticates_receiving_store() -> TestResult {
 fn lemma_cache_schema_is_documented() {
     let schema = super::ANONYMOUS_LEMMA_SCHEMA;
     let expected = format!(
-        "Formal schema `{}`, version {}. {} Required premises: {}",
-        schema.name, schema.version, schema.statement, schema.premises
+        "Formal schema `{}`, version {}. {} Required premises: {} Standing: {}",
+        schema.name,
+        schema.version,
+        schema.statement,
+        schema.premises,
+        schema.standing.description()
     );
     let head = format!("**Theorem (Anonymous lemma reuse)** · `{}`", schema.label);
     for document in [

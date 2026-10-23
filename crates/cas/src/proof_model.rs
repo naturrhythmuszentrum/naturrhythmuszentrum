@@ -368,6 +368,16 @@ impl VerifiedWitness {
         self.judgment.residuals.is_empty()
     }
 
+    /// Whether this theorem has neither used context assumptions nor open guarded residuals.
+    ///
+    /// The stated domain remains part of the theorem; context consistency remains unknown.
+    #[must_use]
+    pub const fn is_unconditional(&self) -> bool {
+        let no_hypotheses = self.hypotheses.is_empty();
+        let no_residuals = self.judgment.residuals.is_empty();
+        no_hypotheses && no_residuals
+    }
+
     /// Read the store-scoped proof root without exposing its private constructor.
     #[must_use]
     pub const fn proof(&self) -> &Handle {

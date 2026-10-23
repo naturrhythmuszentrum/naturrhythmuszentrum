@@ -61,8 +61,12 @@ fn formal_hypothesis_kinds_are_documented() {
         .iter()
         .map(|schema| {
             format!(
-                "Formal hypothesis `{}`, version {}. {} Required premises: {}",
-                schema.name, schema.version, schema.statement, schema.premises,
+                "Formal hypothesis `{}`, version {}. {} Required premises: {} Standing: {}",
+                schema.name,
+                schema.version,
+                schema.statement,
+                schema.premises,
+                schema.standing.description(),
             )
         })
         .collect();

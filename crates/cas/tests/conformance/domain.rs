@@ -449,14 +449,30 @@ fn qualified_local_closure() -> TestResult {
         }]
     );
     assert_eq!(witness.hypotheses(), []);
+    assert!(!witness.is_unconditional());
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
     let mut fresh = Cas::new(budget()?.limits().clone())?;
     let replayed = fresh.inspect(&bytes, &mut budget()?)?;
     assert!(!replayed.is_discharged());
+    assert!(!replayed.is_unconditional());
     assert_eq!(fresh.export_witness(&replayed, &mut budget()?)?, bytes);
     let mut wrong = witness.judgment().clone();
     wrong.residuals.clear();
     assert!(fixture.cas.replay(&bytes, &wrong, &mut budget()?).is_err());
+    reject_sibling_hypothesis(
+        &mut fixture,
+        region,
+        steps.first().ok_or("missing hypothesis step")?,
+    )?;
+    Ok(())
+}
+
+/// The same numeric hypothesis slot in a sibling frame cannot replace its introducing frame.
+fn reject_sibling_hypothesis(
+    fixture: &mut Fixture,
+    region: Handle,
+    source: &ApplicationDraft,
+) -> TestResult {
     let sibling = admit(
         &mut fixture.cas,
         Draft::Context(ContextDraft::Local {
@@ -466,8 +482,8 @@ fn qualified_local_closure() -> TestResult {
         }),
         &mut budget()?,
     )?;
-    let mut stolen = steps.first().ok_or("missing hypothesis step")?.clone();
-    stolen.context = sibling.clone();
+    let mut stolen = source.clone();
+    stolen.context.clone_from(&sibling);
     assert!(
         fixture
             .cas

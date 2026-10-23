@@ -104,3 +104,5 @@ mod formal_register;
 mod hypothesis_kinds;
 
 mod proof_citations;
+
+mod schema_standing;

@@ -83,6 +83,7 @@ mod rule_check;
         unreachable_pub"
 )]
 mod scalar_model;
+mod schema_standing;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "mixed roots share the bounded sign producer"

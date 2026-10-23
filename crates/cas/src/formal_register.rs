@@ -27,6 +27,11 @@ const fn named(
             name: rule.key,
             label,
             version: rule.version,
+            standing: if rule.available {
+                crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked)
+            } else {
+                crate::proof::Standing::Hypothesis
+            },
             statement,
             premises,
         },

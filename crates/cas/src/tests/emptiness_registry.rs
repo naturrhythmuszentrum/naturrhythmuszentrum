@@ -32,8 +32,12 @@ fn emptiness_schema_register_is_documented() {
         .iter()
         .map(|schema| {
             format!(
-                "Formal schema `{}`, version {}. {} Required premises: {}",
-                schema.name, schema.version, schema.statement, schema.premises,
+                "Formal schema `{}`, version {}. {} Required premises: {} Standing: {}",
+                schema.name,
+                schema.version,
+                schema.statement,
+                schema.premises,
+                schema.standing.description(),
             )
         })
         .collect();

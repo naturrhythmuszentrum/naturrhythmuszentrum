@@ -31,8 +31,12 @@ fn formal_primitive_register_is_complete() {
 fn paragraph(schema: &PrimitiveSchema) -> String {
     let lemma = schema.lemma;
     format!(
-        "Formal primitive `{}`, version {}. {} Required premises: {}",
-        lemma.name, lemma.version, lemma.statement, lemma.premises,
+        "Formal primitive `{}`, version {}. {} Required premises: {} Standing: {}",
+        lemma.name,
+        lemma.version,
+        lemma.statement,
+        lemma.premises,
+        lemma.standing.description(),
     )
 }
 
