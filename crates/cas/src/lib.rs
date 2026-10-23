@@ -82,6 +82,11 @@ mod rule_check;
 mod scalar_model;
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "mixed roots share the bounded sign producer"
+)]
+mod strict_sign;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
         unreachable_pub"
 )]

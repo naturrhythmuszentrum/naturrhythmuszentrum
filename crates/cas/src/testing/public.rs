@@ -251,3 +251,9 @@ pub(crate) mod jacobians;
     reason = "shared reading Jacobian fixtures"
 )]
 pub(crate) mod jacobian_composition;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared public strict sign fixtures"
+)]
+pub(crate) mod strict_sign;

@@ -28,6 +28,8 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// A factor has no established strict sign in the requested region.
+    StrictSignUnavailable,
     /// A reading map coefficient depends on a reading being substituted.
     JacobianReadingCycle,
     /// A fixed coordinate was requested as a derivative direction.
