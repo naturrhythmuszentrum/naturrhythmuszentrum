@@ -3,7 +3,6 @@
 
 use super::{StatisticsError, matrix::Matrix};
 use crate::{JointLimits, JointModel, ModelId, OperationError, SourceId};
-use nrz_bindings::Descriptor;
 use nrz_scalar::{ArithmeticContext, Scalar};
 use std::{any::Any, rc::Rc};
 
@@ -16,10 +15,6 @@ pub(crate) struct Model {
     pub(crate) id: ModelId,
     /// Ordered source identities.
     pub(crate) sources: Vec<SourceId>,
-    /// Original source difference descriptors.
-    pub(crate) quantities: Vec<Descriptor>,
-    /// Actual source declarations, preserving identities in parameter coverage.
-    pub(crate) symbols: Vec<nrz_bindings::QuantitySymbol>,
     /// Terms required for one source covariance entry.
     pub(crate) terms: usize,
 }
@@ -47,18 +42,24 @@ impl Model {
             data: Rc::clone(data),
             id: model.id(),
             sources: model.sources().iter().map(crate::Source::id).collect(),
-            quantities: model
-                .sources()
-                .iter()
-                .map(|source| source.descriptor().clone())
-                .collect(),
-            symbols: model
-                .sources()
-                .iter()
-                .map(|source| source.symbol().clone())
-                .collect(),
             terms,
         })
+    }
+    /// Borrow the original model-owned source declaration instead of copying its descriptor and symbol.
+    pub(crate) fn source(
+        &self,
+        index: usize,
+    ) -> Result<(&nrz_bindings::Descriptor, &nrz_bindings::QuantitySymbol), OperationError> {
+        if let Some(model) = self.data.downcast_ref::<JointModel<f32>>() {
+            declarations(model, index)
+        } else {
+            declarations(
+                self.data
+                    .downcast_ref::<JointModel<f64>>()
+                    .ok_or(StatisticsError::Contract)?,
+                index,
+            )
+        }
     }
     /// Require the entire selected block in its original precision before numerical allocation.
     pub(crate) fn require(
@@ -74,18 +75,6 @@ impl Model {
             return Err(StatisticsError::Contract.into());
         }
         Ok(())
-    }
-    /// Materialize the original joint covariance, then outward-convert its parameter enclosure.
-    pub(crate) fn covariance<P: Scalar + 'static>(
-        &self,
-        sources: &[usize],
-        context: &ArithmeticContext,
-        limits: JointLimits,
-    ) -> Result<Matrix<P>, OperationError> {
-        self.require(sources, limits)?;
-        let mut result = Matrix::zeros(sources.len(), sources.len())?;
-        self.fill_covariance(sources, context, limits, &mut result)?;
-        Ok(result)
     }
     /// Fill declared caller-owned parameter channels under the same original model.
     pub(crate) fn covariance_into<P: Scalar + 'static>(
@@ -117,6 +106,17 @@ impl Model {
             Err(StatisticsError::Contract.into())
         }
     }
+}
+/// Project only precision-independent declarations from the original typed source owner.
+fn declarations<P: Scalar>(
+    model: &JointModel<P>,
+    index: usize,
+) -> Result<(&nrz_bindings::Descriptor, &nrz_bindings::QuantitySymbol), OperationError> {
+    let source = model
+        .sources()
+        .get(index)
+        .ok_or(StatisticsError::Contract)?;
+    Ok((source.descriptor(), source.symbol()))
 }
 /// Every target format evaluates the same immutable source model and retains its original IDs.
 fn materialize<P: Scalar + 'static, Q: Scalar + 'static>(

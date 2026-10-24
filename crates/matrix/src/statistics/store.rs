@@ -54,10 +54,12 @@ pub(crate) struct Parameter {
 /// Moments retain both exact target selections.
 #[derive(Debug)]
 pub(crate) struct Record {
+    /// Completed allocation history; it retains no covered temporary numerical owners.
+    pub(crate) inventory: std::rc::Rc<super::StatisticsInventory>,
     /// Equal for full covariance; distinct for cross blocks.
     pub(crate) targets: [Dependency; 2],
     /// Original identities and dependence.
-    pub(crate) lineage: Lineage,
+    pub(crate) lineage: std::rc::Rc<Lineage>,
     /// Full covariance, never a diagonal substitute.
     pub(crate) covariance: Parameter,
     /// Composed source sensitivity, absent for cross blocks.

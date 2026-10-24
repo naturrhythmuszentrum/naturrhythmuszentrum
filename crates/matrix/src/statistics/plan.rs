@@ -21,14 +21,18 @@ pub(crate) struct Plan<P: Scalar> {
     pub(crate) points: Vec<super::matrix::Matrix<P>>,
     /// Replayed bindings-owned native derivative relation, when required.
     pub(crate) derivative: Option<std::rc::Rc<nrz_bindings::CheckedSensitivity>>,
+    /// Original statistical allocation plan, absent only for source-free operations.
+    pub(crate) inventory: Option<super::inventory::Run>,
 }
 impl<P: Scalar + 'static> Plan<P> {
     /// Replace unconditional refusal with complete source, recipe and work validation.
-    pub(crate) fn capture(
+    pub(crate) fn capture<Q: Scalar + 'static>(
         heap: &Heap,
         operation: &CheckedOperation,
         handles: &[Handle<Value, P>],
         limits: ExecutionLimits,
+        trace: &crate::execution::Trace,
+        budget: &nrz_bindings::Budget,
     ) -> Result<Self, OperationError> {
         let joint = JointLimits::new(limits.scratch, limits.scratch, limits.work);
         let mut result = Self {
@@ -38,6 +42,7 @@ impl<P: Scalar + 'static> Plan<P> {
             limits: joint,
             points: Vec::new(),
             derivative: None,
+            inventory: None,
         };
         let mut present = false;
         for &handle in handles {
@@ -58,19 +63,41 @@ impl<P: Scalar + 'static> Plan<P> {
             return Err(crate::HeapError::MissingCoverage.into());
         }
         let context = ArithmeticContext::new()?;
+        let mut bindings = crate::binding::buffer(handles.len())?;
         for (slot, &handle) in handles.iter().enumerate() {
-            let input = super::capture::input(heap, handle, slot, joint, &context)?;
-            result.merge(&input.lineage)?;
-            result.inputs.push(input);
+            let binding = super::capture::inspect(heap, handle, slot, joint)?;
+            result.merge(&binding.lineage)?;
+            bindings.push(binding);
         }
         let lineage = result.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         result.work = phase_work(operation, lineage)?;
         limits.check(handles.len(), result.work)?;
         lineage.model.require(&lineage.columns, joint)?;
-        super::structure::inputs(operation, &result.inputs, &context, joint)?;
-        result.points = super::operating::capture(heap, handles, &context)?;
         result.derivative = super::derivative::check(operation)?;
+        let run = super::inventory::Run::new::<Q>(bindings, Some(operation), trace, budget)?;
+        if !matches!(operation.recipe, NativeRecipe::Solve(_)) {
+            run.backend_allowance(result.work, size_of::<Q>())?;
+        }
+        for slot in 0..handles.len() {
+            result
+                .inputs
+                .push(super::capture::input(heap, slot, &run, &context)?);
+        }
+        super::structure::inputs(operation, &result.inputs, &context, joint, &run)?;
+        result.points = super::operating::capture(heap, handles, &context, &run)?;
+        result.inventory = Some(run);
         result.classify(operation, &context)?;
+        result
+            .inventory
+            .as_ref()
+            .ok_or(StatisticsError::Contract)?
+            .law(
+                result
+                    .lineage
+                    .as_ref()
+                    .ok_or(StatisticsError::Contract)?
+                    .assurance,
+            );
         Ok(result)
     }
     /// Require one model; union ordered source indices without inferring independence.

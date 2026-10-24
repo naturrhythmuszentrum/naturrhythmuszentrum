@@ -14,6 +14,7 @@ pub(crate) fn map<P: Scalar + 'static, Q: Scalar + 'static>(
     operation: &CheckedOperation,
     points: &[Matrix<P>],
     context: &ArithmeticContext,
+    run: &super::inventory::Run,
 ) -> Result<Affine<Q>, OperationError> {
     let left = points.first().ok_or(StatisticsError::Contract)?;
     let right = points.get(1).ok_or(StatisticsError::Contract)?;
@@ -35,8 +36,16 @@ pub(crate) fn map<P: Scalar + 'static, Q: Scalar + 'static>(
         .checked_add(right.centers.len())
         .ok_or(StatisticsError::ResourceLimit)?;
     let mut result = Affine {
-        jacobian: Matrix::zeros(output.entries(), columns)?,
-        offsets: Matrix::zeros(output.entries(), 1)?,
+        jacobian: run.matrix_at(
+            super::inventory::Role::Jacobian,
+            0,
+            crate::Extent::new(output.entries(), columns)?,
+        )?,
+        offsets: run.matrix_at(
+            super::inventory::Role::Offsets,
+            0,
+            crate::Extent::new(output.entries(), 1)?,
+        )?,
     };
     for column in 0..output.columns() {
         for row in 0..output.rows() {

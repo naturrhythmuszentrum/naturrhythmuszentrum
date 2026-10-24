@@ -23,6 +23,7 @@ pub(crate) fn map<P: Scalar + 'static>(
     operation: &CheckedOperation,
     slot: usize,
     context: &ArithmeticContext,
+    run: &super::inventory::Run,
 ) -> Result<Affine<P>, OperationError> {
     let rows = operation
         .outputs()
@@ -36,8 +37,16 @@ pub(crate) fn map<P: Scalar + 'static>(
             .ok_or(StatisticsError::ResourceLimit)
     })?;
     let mut result = Affine {
-        jacobian: Matrix::zeros(rows, columns)?,
-        offsets: Matrix::zeros(rows, 1)?,
+        jacobian: run.matrix_at(
+            super::inventory::Role::Jacobian,
+            slot,
+            crate::Extent::new(rows, columns)?,
+        )?,
+        offsets: run.matrix_at(
+            super::inventory::Role::Offsets,
+            slot,
+            crate::Extent::new(rows, 1)?,
+        )?,
     };
     match &operation.recipe {
         NativeRecipe::Copy | NativeRecipe::Precision { .. } => {

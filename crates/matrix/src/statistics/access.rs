@@ -87,9 +87,14 @@ pub struct MomentView<'h, P: Scalar> {
     means: Option<ParameterView<'h, P>>,
 }
 impl<P: Scalar> MomentView<'_, P> {
+    /// Completed input capture, contraction and publication allocation evidence.
+    #[must_use]
+    pub fn allocation_inventory(&self) -> &super::StatisticsInventory {
+        &self.record.inventory
+    }
     /// Statistical law without any promotion to deterministic assurance.
     #[must_use]
-    pub const fn assurance(&self) -> MomentAssurance {
+    pub fn assurance(&self) -> MomentAssurance {
         self.record.lineage.assurance
     }
     /// Exact row and column target versions.
@@ -107,7 +112,7 @@ impl<P: Scalar> MomentView<'_, P> {
     }
     /// Original immutable joint-model identity.
     #[must_use]
-    pub const fn model(&self) -> crate::ModelId {
+    pub fn model(&self) -> crate::ModelId {
         self.record.lineage.model.id
     }
     /// Original source IDs; selected columns are identified by `source_indices`.
@@ -291,26 +296,33 @@ fn parameter<'h, P: Scalar + 'static>(
         mean: mean.then(|| heap.binding_quantity(center)).transpose()?,
     })
 }
-/// Recover the complete mathematical parameter enclosure from its own stored error.
-pub(crate) fn matrix<P: Scalar + 'static>(
+/// Read selected parameter rows directly into preplanned owners, avoiding a redundant full reload.
+pub(crate) fn selected_into<P: Scalar + 'static>(
     heap: &Heap,
     record: &Parameter,
+    rows: &[usize],
     context: &ArithmeticContext,
-) -> Result<Matrix<P>, OperationError> {
+    result: &mut Matrix<P>,
+) -> Result<(), OperationError> {
     let view = parameter::<P>(heap, record, false)?;
-    let mut result = Matrix::zeros(view.extent().rows(), view.extent().columns())?;
+    if result.extent != crate::Extent::new(rows.len(), view.extent().columns())? {
+        return Err(StatisticsError::Contract.into());
+    }
+    if result.extent.entries() == 0 {
+        return Ok(());
+    }
     for column in 0..view.extent().columns() {
-        for row in 0..view.extent().rows() {
-            let center = view.get(row, column)?;
+        for (row, &original) in rows.iter().enumerate() {
+            let center = view.get(original, column)?;
             result.set(
                 row,
                 column,
                 center,
-                enclosed(center, view.error(row, column)?, context)?,
+                enclosed(center, view.error(original, column)?, context)?,
             )?;
         }
     }
-    Ok(result)
+    Ok(())
 }
 
 impl Heap {

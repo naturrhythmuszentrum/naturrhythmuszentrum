@@ -76,6 +76,7 @@ fn kernel_contract_rechecks_every_numerical_extent() -> TestResult {
         let crate::binding::NativeRecipe::Kernel(contract) = &mut bound.operation.recipe else {
             return Err("missing numerical kernel".into());
         };
+        let contract = std::rc::Rc::make_mut(contract);
         let changed = Extent::new(2, 1)?;
         if position < 2 {
             std::rc::Rc::make_mut(&mut contract.inputs)[position] = changed;

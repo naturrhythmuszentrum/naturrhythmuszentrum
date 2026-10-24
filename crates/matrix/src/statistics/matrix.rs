@@ -2,6 +2,7 @@
 //! Finite parameter centers and independent interval truth in logical column order.
 
 use super::StatisticsError;
+#[cfg(test)]
 use crate::binding::buffer;
 use crate::{Extent, OperationError};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
@@ -18,6 +19,7 @@ pub(crate) struct Matrix<P: Scalar> {
 }
 impl<P: Scalar> Matrix<P> {
     /// Allocate exact zeros after the operation's work preflight.
+    #[cfg(test)]
     pub(crate) fn zeros(rows: usize, columns: usize) -> Result<Self, OperationError> {
         let extent = Extent::new(rows, columns)?;
         let mut centers = buffer(extent.entries())?;
@@ -28,6 +30,14 @@ impl<P: Scalar> Matrix<P> {
             extent,
             centers: centers.into(),
             truth: truth.into(),
+        })
+    }
+    /// Transfer each actual owner into the unpublished candidate without detaching its permit.
+    pub(crate) fn into_candidate(self) -> Result<Self, OperationError> {
+        Ok(Self {
+            extent: self.extent,
+            centers: self.centers.into_candidate()?,
+            truth: self.truth.into_candidate()?,
         })
     }
     /// Install a finite candidate and its established enclosure.
@@ -53,32 +63,13 @@ impl<P: Scalar> Matrix<P> {
             .get(self.extent.index(row, column)?)
             .ok_or(StatisticsError::Contract)?)
     }
-    /// Bound each candidate's numerical displacement independently.
-    pub(crate) fn errors(&self, context: &ArithmeticContext) -> Result<Vec<P>, OperationError> {
-        if (self.centers.len(), self.truth.len()) != (self.extent.entries(), self.extent.entries())
-        {
-            return Err(StatisticsError::Contract.into());
-        }
-        let mut errors = buffer(self.centers.len())?;
-        for (&center, &truth) in self.centers.iter().zip(&self.truth) {
-            errors.push(
-                truth
-                    .displacement_from(Finite::new(center)?, context)?
-                    .get(),
-            );
-        }
-        Ok(errors)
-    }
-    /// Transpose both parameter candidates and their enclosures without arithmetic.
-    pub(crate) fn transpose(&self) -> Result<Self, OperationError> {
-        let mut result = Self::zeros(self.extent.columns(), self.extent.rows())?;
-        self.transpose_into(&mut result)?;
-        Ok(result)
-    }
     /// Fill an already allocated and declared transpose without another numerical owner.
     pub(crate) fn transpose_into(&self, result: &mut Self) -> Result<(), OperationError> {
         if result.extent != Extent::new(self.extent.columns(), self.extent.rows())? {
             return Err(StatisticsError::Contract.into());
+        }
+        if self.extent.entries() == 0 {
+            return Ok(());
         }
         for column in 0..self.extent.columns() {
             for row in 0..self.extent.rows() {

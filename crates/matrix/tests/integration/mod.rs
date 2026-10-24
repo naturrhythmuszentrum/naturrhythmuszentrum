@@ -41,6 +41,8 @@ mod solve_adversarial;
 
 mod solve_physical;
 mod statistics_affine;
+mod statistics_allocations;
+mod statistics_inventory_lifecycle;
 
 mod statistics_nonlinear;
 mod statistics_physical;
@@ -56,6 +58,7 @@ mod solve_sensitivity;
 
 mod solve_mixed_precision;
 
+mod execution_resources;
 mod factor_allocations;
 mod solve_allocations;
 mod solve_factor_reuse;

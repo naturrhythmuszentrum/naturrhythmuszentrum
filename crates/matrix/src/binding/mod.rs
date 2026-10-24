@@ -191,8 +191,24 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         }
         let execution = ExecutionId(identity()?);
         let resources = crate::execution::Lease::new(execution, budget)?;
-        let statistics =
-            crate::statistics::Plan::capture(heap, &self.operation, &self.inputs, self.limits)?;
+        let statistics = crate::statistics::Plan::capture::<Q>(
+            heap,
+            &self.operation,
+            &self.inputs,
+            self.limits,
+            &resources.trace,
+            budget,
+        )?;
+        if !matches!(self.operation.recipe, NativeRecipe::Solve(_)) {
+            resources.completed_backend(
+                0,
+                0,
+                statistics
+                    .work
+                    .checked_mul(size_of::<Q>())
+                    .ok_or(OperationError::ResourceLimit)?,
+            )?;
+        }
         let reservations = Reservations::prepare(heap, &dependencies, &self.operation)?;
         reservations.validate(heap)?;
         Ok(Bound {

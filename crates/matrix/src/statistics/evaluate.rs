@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Compose source sensitivities before contracting the complete joint covariance.
 
+use super::inventory::Role;
 use super::{
     MomentPayload, Plan, StatisticsError,
     contraction::{Work, multiply},
@@ -10,71 +11,155 @@ use crate::solve::scratch::{Attempt, Stage};
 use crate::{CheckedOperation, OperationError};
 use nrz_scalar::{ArithmeticContext, Scalar};
 
+/// Shared contraction operands are released immediately after the final output consumes them.
+struct Operands<P: Scalar> {
+    /// Complete stacked original source sensitivities.
+    inputs: Option<Matrix<P>>,
+    /// Complete original model covariance.
+    covariance: Option<Matrix<P>>,
+    /// Optional explicitly declared affine means.
+    means: Option<Matrix<P>>,
+}
+
 impl<P: Scalar + 'static> Plan<P> {
     /// Evaluate complete moments only after the deterministic candidate succeeds.
     pub(crate) fn evaluate<Q: Scalar + 'static>(
         &self,
         operation: &CheckedOperation,
+        token: u64,
     ) -> Result<Vec<MomentPayload<Q>>, OperationError> {
         let Some(lineage) = &self.lineage else {
             return Ok(Vec::new());
         };
+        let run = self.inventory.as_ref().ok_or(StatisticsError::Contract)?;
+        run.validate_operation(operation)?;
+        run.associate(token)?;
         let context = ArithmeticContext::new()?;
         let mut work = Work::new(self.work);
         let inputs = self.stacked::<Q>(&context)?;
-        let covariance = lineage
+        let mut covariance = run.matrix(Role::Model, 0)?;
+        lineage
             .model
-            .covariance(&lineage.columns, &context, self.limits)?;
+            .covariance_into(&lineage.columns, &context, self.limits, &mut covariance)?;
         let means = if lineage.assurance == super::MomentAssurance::AffineMoments {
             self.means::<Q>(&context)?
         } else {
             None
         };
+        let mut operands = Operands {
+            inputs: Some(inputs),
+            covariance: Some(covariance),
+            means,
+        };
         let mut result = crate::binding::buffer(operation.outputs().len())?;
         for slot in 0..operation.outputs().len() {
-            let affine = super::nonlinear::map(
-                operation,
-                slot,
-                &self.points,
-                self.derivative.as_deref(),
-                &context,
-            )?;
-            let sensitivity = multiply(&affine.jacobian, &inputs, &context, &mut work)?;
-            let first = multiply(&sensitivity, &covariance, &context, &mut work)?;
-            let output = multiply(&first, &sensitivity.transpose()?, &context, &mut work)?;
-            let mean = means
-                .as_ref()
-                .map(|means| {
-                    let mut output = multiply(&affine.jacobian, means, &context, &mut work)?;
-                    for row in 0..output.extent.rows() {
-                        let center = *output.centers.get(row).ok_or(StatisticsError::Contract)?
-                            + *affine
-                                .offsets
-                                .centers
-                                .get(row)
-                                .ok_or(StatisticsError::Contract)?;
-                        output.set(
-                            row,
-                            0,
-                            center,
-                            output
-                                .entry(row, 0)?
-                                .add(affine.offsets.entry(row, 0)?, &context)?,
-                        )?;
-                    }
-                    Ok::<_, OperationError>(output)
-                })
-                .transpose()?;
-            result.push(MomentPayload {
-                lineage: lineage.clone(),
-                sensitivity,
-                covariance: output,
-                jacobian: affine.jacobian,
-                derivative: self.derivative.clone(),
-                means: mean,
-            });
+            result.push(self.output(operation, slot, &mut operands, &context, &mut work)?);
         }
         Ok(result)
+    }
+    /// One original output role owns its derivative, complete covariance and optional affine mean.
+    fn output<Q: Scalar + 'static>(
+        &self,
+        operation: &CheckedOperation,
+        slot: usize,
+        operands: &mut Operands<Q>,
+        context: &ArithmeticContext,
+        work: &mut Work,
+    ) -> Result<MomentPayload<Q>, OperationError> {
+        let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
+        let run = self.inventory.as_ref().ok_or(StatisticsError::Contract)?;
+        let affine = super::nonlinear::map(
+            operation,
+            slot,
+            &self.points,
+            self.derivative.as_deref(),
+            context,
+            run,
+        )?;
+        let sensitivity = multiply(
+            &affine.jacobian,
+            operands.inputs.as_ref().ok_or(StatisticsError::Contract)?,
+            context,
+            work,
+            run.request(Role::Sensitivity, slot),
+        )?;
+        let mean = self.output_mean(&affine, operands.means.as_ref(), slot, context, work)?;
+        drop(affine.offsets);
+        if slot + 1 == operation.outputs().len() {
+            drop(operands.means.take());
+        }
+        let first = multiply(
+            &sensitivity,
+            operands
+                .covariance
+                .as_ref()
+                .ok_or(StatisticsError::Contract)?,
+            context,
+            work,
+            run.request(Role::CovarianceProduct, slot),
+        )?;
+        if slot + 1 == operation.outputs().len() {
+            drop(operands.inputs.take());
+            drop(operands.covariance.take());
+        }
+        let mut transposed = run.matrix(Role::Transpose, slot)?;
+        sensitivity.transpose_into(&mut transposed)?;
+        let covariance = multiply(
+            &first,
+            &transposed,
+            context,
+            work,
+            run.request(Role::Covariance, slot),
+        )?;
+        drop(first);
+        drop(transposed);
+        Ok(MomentPayload {
+            lineage: lineage.clone(),
+            sensitivity: sensitivity.into_candidate()?,
+            covariance: covariance.into_candidate()?,
+            jacobian: affine.jacobian.into_candidate()?,
+            derivative: self.derivative.clone(),
+            means: mean,
+        })
+    }
+    /// Compute only an explicitly declared expectation while offsets and shared means are still needed.
+    fn output_mean<Q: Scalar + 'static>(
+        &self,
+        affine: &super::Affine<Q>,
+        means: Option<&Matrix<Q>>,
+        slot: usize,
+        context: &ArithmeticContext,
+        work: &mut Work,
+    ) -> Result<Option<Matrix<Q>>, OperationError> {
+        let run = self.inventory.as_ref().ok_or(StatisticsError::Contract)?;
+        means
+            .map(|means| {
+                let mut output = multiply(
+                    &affine.jacobian,
+                    means,
+                    context,
+                    work,
+                    run.request(Role::Mean, slot),
+                )?;
+                for row in 0..output.extent.rows() {
+                    let center = *output.centers.get(row).ok_or(StatisticsError::Contract)?
+                        + *affine
+                            .offsets
+                            .centers
+                            .get(row)
+                            .ok_or(StatisticsError::Contract)?;
+                    output.set(
+                        row,
+                        0,
+                        center,
+                        output
+                            .entry(row, 0)?
+                            .add(affine.offsets.entry(row, 0)?, context)?,
+                    )?;
+                }
+                output.into_candidate()
+            })
+            .transpose()
     }
     /// Concatenate operand rows while remapping every column to its original joint source.
     fn stacked<Q: Scalar + 'static>(
@@ -86,7 +171,12 @@ impl<P: Scalar + 'static> Plan<P> {
             sum.checked_add(input.sensitivity.extent.rows())
                 .ok_or(StatisticsError::ResourceLimit)
         })?;
-        let mut result = Matrix::zeros(rows, lineage.columns.len())?;
+        let run = self.inventory.as_ref().ok_or(StatisticsError::Contract)?;
+        let mut result = run.matrix_at(
+            Role::Inputs,
+            0,
+            crate::Extent::new(rows, lineage.columns.len())?,
+        )?;
         self.stack_into(&mut result, context)?;
         Ok(result)
     }
@@ -99,6 +189,9 @@ impl<P: Scalar + 'static> Plan<P> {
         let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         let mut start = 0;
         for input in &self.inputs {
+            if input.sensitivity.extent.entries() == 0 {
+                continue;
+            }
             for (original, source) in input.lineage.columns.iter().enumerate() {
                 let column = lineage
                     .columns
@@ -134,7 +227,8 @@ impl<P: Scalar + 'static> Plan<P> {
             sum.checked_add(input.sensitivity.extent.rows())
                 .ok_or(StatisticsError::ResourceLimit)
         })?;
-        let mut result = Matrix::zeros(rows, 1)?;
+        let run = self.inventory.as_ref().ok_or(StatisticsError::Contract)?;
+        let mut result = run.matrix_at(Role::Means, 0, crate::Extent::new(rows, 1)?)?;
         self.means_into(&mut result, context)?;
         Ok(Some(result))
     }

@@ -141,7 +141,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> crate::Bound<'_, P, Q> {
             .map_err(|_| crate::HeapError::Capacity)?;
         outputs.push(payload);
         evidence.push(claim);
-        let statistics = self.statistics.evaluate(&self.operation)?;
+        let statistics = self.statistics.evaluate(&self.operation, token)?;
         self.issued.set(Some(token));
         Ok(crate::Candidate {
             execution: self.execution,

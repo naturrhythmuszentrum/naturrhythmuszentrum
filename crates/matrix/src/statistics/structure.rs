@@ -11,6 +11,7 @@ pub(crate) fn inputs<P: Scalar + 'static>(
     inputs: &[Input<P>],
     context: &ArithmeticContext,
     limits: JointLimits,
+    run: &super::inventory::Run,
 ) -> Result<(), OperationError> {
     for (slot, (contract, input)) in operation.inputs().iter().zip(inputs).enumerate() {
         let shape = contract.shape();
@@ -19,11 +20,13 @@ pub(crate) fn inputs<P: Scalar + 'static>(
         {
             continue;
         }
-        let covariance =
-            input
-                .lineage
-                .model
-                .covariance::<P>(&input.lineage.columns, context, limits)?;
+        let mut covariance = run.matrix(super::inventory::Role::StructureCovariance, slot)?;
+        input.lineage.model.covariance_into::<P>(
+            &input.lineage.columns,
+            context,
+            limits,
+            &mut covariance,
+        )?;
         for (entry, meaning) in shape.entries().iter().enumerate() {
             if !meaning.is_zero() {
                 continue;

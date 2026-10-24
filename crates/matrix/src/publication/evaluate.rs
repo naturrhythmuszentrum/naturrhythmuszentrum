@@ -40,6 +40,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         if inputs.views.len() != self.operation.inputs.len() {
             return Err(OperationError::InputCount);
         }
+        if let Some(run) = &self.statistics.inventory {
+            run.validate_operation(&self.operation)?;
+        }
         let token = allocate()?;
         if let crate::binding::NativeRecipe::Solve(contract) = &self.operation.recipe {
             return self.solve_candidate(contract, &inputs.views, token, evidence);
@@ -77,7 +80,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             evidence.push(claim);
             outputs.push(payload);
         }
-        let statistics = self.statistics.evaluate(&self.operation)?;
+        let statistics = self.statistics.evaluate(&self.operation, token)?;
         self.issued.set(Some(token));
         Ok(Candidate {
             execution: self.execution,

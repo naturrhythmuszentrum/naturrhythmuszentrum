@@ -13,13 +13,18 @@ pub(crate) fn capture<P: Scalar + 'static>(
     heap: &Heap,
     values: &[Handle<Value, P>],
     context: &ArithmeticContext,
+    run: &super::inventory::Run,
 ) -> Result<Vec<Matrix<P>>, OperationError> {
     let mut result = crate::binding::buffer(values.len())?;
-    for &handle in values {
+    for (slot, &handle) in values.iter().enumerate() {
         let value = heap.value(handle)?;
         let bounds = heap.selected_bound(handle)?;
         let extent = value.region().extent();
-        let mut point = Matrix::zeros(extent.rows(), extent.columns())?;
+        let mut point = run.matrix_at(super::inventory::Role::OperatingPoint, slot, extent)?;
+        if extent.entries() == 0 {
+            result.push(point);
+            continue;
+        }
         for column in 0..extent.columns() {
             for row in 0..extent.rows() {
                 let center = value.region().get(row, column)?;
@@ -86,11 +91,14 @@ impl<P: Scalar + 'static> Plan<P> {
         {
             return Ok(false);
         }
-        let covariance =
-            input
-                .lineage
-                .model
-                .covariance::<P>(&input.lineage.columns, context, self.limits)?;
+        let run = self.inventory.as_ref().ok_or(StatisticsError::Contract)?;
+        let mut covariance = run.matrix(super::inventory::Role::FixedCovariance, slot)?;
+        input.lineage.model.covariance_into::<P>(
+            &input.lineage.columns,
+            context,
+            self.limits,
+            &mut covariance,
+        )?;
         for column in 0..input.sensitivity.extent.columns() {
             let variance = covariance.entry(column, column)?;
             if variance.lower().get() == P::ZERO && variance.upper().get() == P::ZERO {

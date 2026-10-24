@@ -23,10 +23,13 @@ pub(crate) fn map<P: Scalar + 'static, Q: Scalar + 'static>(
     points: &[Matrix<P>],
     derivative: Option<&CheckedSensitivity>,
     context: &ArithmeticContext,
+    run: &super::inventory::Run,
 ) -> Result<Affine<Q>, OperationError> {
     if let NativeRecipe::Kernel(contract) = &operation.recipe {
         match contract.kind() {
-            crate::KernelKind::Product => return super::product::map(operation, points, context),
+            crate::KernelKind::Product => {
+                return super::product::map(operation, points, context, run);
+            }
             crate::KernelKind::Elementwise(function) => {
                 let proof = derivative.ok_or(StatisticsError::Contract)?;
                 return elementwise(
@@ -34,12 +37,13 @@ pub(crate) fn map<P: Scalar + 'static, Q: Scalar + 'static>(
                     function,
                     proof,
                     context,
+                    run,
                 );
             }
             _ => {}
         }
     }
-    super::affine::map(operation, slot, context)
+    super::affine::map(operation, slot, context, run)
 }
 
 /// One replayed scalar proof authorizes each diagonal entry, with separately checked typed zeros.
@@ -48,6 +52,7 @@ fn elementwise<P: Scalar + 'static, Q: Scalar + 'static>(
     function: Elementwise,
     proof: &CheckedSensitivity,
     context: &ArithmeticContext,
+    run: &super::inventory::Run,
 ) -> Result<Affine<Q>, OperationError> {
     let count = point.extent.entries();
     let kernel = proof
@@ -56,8 +61,16 @@ fn elementwise<P: Scalar + 'static, Q: Scalar + 'static>(
         .ok_or(StatisticsError::Contract)?
         .kernel();
     let mut result = Affine {
-        jacobian: Matrix::zeros(count, count)?,
-        offsets: Matrix::zeros(count, 1)?,
+        jacobian: run.matrix_at(
+            super::inventory::Role::Jacobian,
+            0,
+            crate::Extent::new(count, count)?,
+        )?,
+        offsets: run.matrix_at(
+            super::inventory::Role::Offsets,
+            0,
+            crate::Extent::new(count, 1)?,
+        )?,
     };
     for (entry, (&center, &domain)) in point.centers.iter().zip(&point.truth).enumerate() {
         smooth(center, domain, function, entry)?;

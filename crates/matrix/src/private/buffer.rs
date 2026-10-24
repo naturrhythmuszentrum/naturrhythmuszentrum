@@ -15,6 +15,8 @@ enum Authority<T> {
     Reciprocal(Permit<T>),
     /// Deterministic solve stages retain original source and output bindings.
     Solve(crate::solve::scratch::Permit),
+    /// Statistical inputs, contractions and parameter copies retain their original model and role.
+    Statistics(crate::statistics::inventory::Permit),
 }
 /// Candidate storage retains its original typed permit; covered recipes require it at publication.
 #[derive(Debug)]
@@ -62,6 +64,21 @@ impl<T> Buffer<T> {
             values,
         })
     }
+    /// The statistical planner checks the concrete scalar or enclosure type before allocation.
+    pub(crate) fn allocate_statistics(
+        permit: crate::statistics::inventory::Permit,
+    ) -> Result<Self, OperationError> {
+        let values = crate::binding::buffer(permit.entries())?;
+        let bytes = values
+            .capacity()
+            .checked_mul(size_of::<T>())
+            .ok_or(OperationError::ResourceLimit)?;
+        permit.allocated(bytes)?;
+        Ok(Self {
+            permit: Authority::Statistics(permit),
+            values,
+        })
+    }
     /// Initialize a planned element without permitting vector growth or a hidden allocation.
     pub(crate) fn push(&mut self, value: T) -> Result<(), OperationError> {
         let count = match &self.permit {
@@ -74,6 +91,7 @@ impl<T> Buffer<T> {
                 .binding
                 .entries(),
             Authority::Solve(permit) => permit.entries(),
+            Authority::Statistics(permit) => permit.entries(),
         };
         if self.values.len() >= count {
             return Err(Error::IncompleteCoverage.into());
@@ -97,6 +115,7 @@ impl<T> Buffer<T> {
                 entry.state.set(State::Candidate);
             }
             Authority::Solve(permit) => permit.candidate(self.values.len())?,
+            Authority::Statistics(permit) => permit.candidate(self.values.len())?,
         }
         Ok(self)
     }
@@ -115,6 +134,22 @@ impl<T> Buffer<T> {
     /// Borrow the plan retained by a live solve owner without manufacturing another permit.
     pub(crate) const fn solve_plan(&self) -> Option<&Rc<crate::solve::scratch::Plan>> {
         if let Authority::Solve(permit) = &self.permit {
+            Some(permit.plan())
+        } else {
+            None
+        }
+    }
+    /// Statistical publication authenticates the original plan and exact request of this owner.
+    pub(crate) fn matches_statistics(
+        &self,
+        plan: &Rc<crate::statistics::inventory::Plan>,
+        slot: usize,
+    ) -> bool {
+        matches!(&self.permit, Authority::Statistics(permit) if permit.matches(plan, slot))
+    }
+    /// Borrow the plan without manufacturing another allocation permit.
+    pub(crate) const fn statistics_plan(&self) -> Option<&Rc<crate::statistics::inventory::Plan>> {
+        if let Authority::Statistics(permit) = &self.permit {
             Some(permit.plan())
         } else {
             None
@@ -168,6 +203,7 @@ impl<T> Drop for Buffer<T> {
                 }
             }
             Authority::Solve(permit) => permit.release(self.values.len()),
+            Authority::Statistics(permit) => permit.release(self.values.len()),
             Authority::Untracked => {}
         }
     }

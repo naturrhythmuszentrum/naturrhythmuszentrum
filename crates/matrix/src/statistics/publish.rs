@@ -89,9 +89,21 @@ pub(crate) fn prepare<P: Scalar + 'static, Q: Scalar + 'static>(
         .map_err(|_| StatisticsError::ResourceLimit)?;
     let keys = super::allocation::append(bound, candidate, &regions)?;
     drop(regions);
+    let run = bound
+        .statistics
+        .inventory
+        .as_ref()
+        .ok_or(StatisticsError::Contract)?;
+    run.validate_operation(&bound.operation)?;
+    let inventory = bound
+        .statistics
+        .inventory
+        .as_ref()
+        .ok_or(StatisticsError::Contract)?
+        .complete(&bound.statistics, candidate)?;
     let records = pending
         .into_iter()
-        .map(|draft| finish(draft, &keys))
+        .map(|draft| finish(draft, &keys, std::rc::Rc::clone(&inventory)))
         .collect::<Result<_, _>>()?;
     Ok(PreparedMoments { records })
 }
@@ -243,11 +255,7 @@ pub(super) fn source_descriptors(
 ) -> Result<Vec<EvaluationDescriptor>, OperationError> {
     let mut result = Vec::new();
     for &column in &lineage.columns {
-        let source = lineage
-            .model
-            .quantities
-            .get(column)
-            .ok_or(StatisticsError::Contract)?;
+        let source = lineage.model.source(column)?.0;
         let descriptor = EvaluationDescriptor::new(&PairingWitness::sensitivity(quantity, source)?);
         result.extend(std::iter::repeat_n(descriptor, rows));
     }
@@ -323,10 +331,7 @@ fn parameter_copies<P: Scalar + 'static>(
     context: &ArithmeticContext,
 ) -> Result<[crate::private::Buffer<P>; 2], OperationError> {
     let Some(run) = crate::solve::scratch::Run::from_parameter(matrix) else {
-        return Ok([
-            matrix.centers.to_vec().into(),
-            matrix.errors(context)?.into(),
-        ]);
+        return super::inventory::Run::copies(matrix, index, context);
     };
     if matrix.centers.len() != matrix.extent.entries()
         || matrix.truth.len() != matrix.extent.entries()
@@ -347,10 +352,15 @@ fn parameter_copies<P: Scalar + 'static>(
     Ok([centers, errors])
 }
 /// Bind all prepared numerical error regions to their own parameter occupations.
-fn finish(draft: PendingMoment, keys: &[Key]) -> Result<Record, OperationError> {
+fn finish(
+    draft: PendingMoment,
+    keys: &[Key],
+    inventory: std::rc::Rc<super::StatisticsInventory>,
+) -> Result<Record, OperationError> {
     Ok(Record {
+        inventory,
         targets: draft.targets,
-        lineage: draft.lineage,
+        lineage: std::rc::Rc::new(draft.lineage),
         covariance: bind(draft.covariance, keys)?,
         sensitivity: Some(bind(draft.sensitivity, keys)?),
         jacobian: Some(bind(draft.jacobian, keys)?),

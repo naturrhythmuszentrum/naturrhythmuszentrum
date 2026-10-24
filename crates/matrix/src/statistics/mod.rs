@@ -19,8 +19,13 @@ mod declarations;
 mod derivative;
 mod error;
 mod evaluate;
+pub(crate) mod inventory;
 mod matrix;
 pub(crate) use affine::Affine;
+pub use inventory::{
+    StatisticsAllocation, StatisticsAllocationChannel, StatisticsAllocationRole,
+    StatisticsInventory,
+};
 pub(crate) use matrix::{Matrix, enclosed, singleton};
 mod model;
 mod nonlinear;

@@ -32,12 +32,7 @@ pub(super) fn moment<P: Scalar, Q: Scalar>(
         .columns
         .iter()
         .map(|&index| {
-            let symbol = payload
-                .lineage
-                .model
-                .symbols
-                .get(index)
-                .ok_or(StatisticsError::Contract)?;
+            let symbol = payload.lineage.model.source(index)?.1;
             ParameterTarget::new(symbol.clone(), 0)
                 .map_err(crate::HeapError::from)
                 .map_err(OperationError::from)

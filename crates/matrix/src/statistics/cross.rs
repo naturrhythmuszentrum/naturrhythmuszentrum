@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Materialize cross-output blocks only from retained checked source lineages.
 
+use super::inventory::{Role, Run};
 use super::{
     StatisticsError,
     allocation::RegionData,
@@ -26,41 +27,98 @@ impl Heap {
         right: Handle<Value, Q>,
         limits: JointLimits,
     ) -> Result<MomentRef<P>, OperationError> {
-        let context = ArithmeticContext::new()?;
-        let first = super::capture::input(self, left, 0, limits, &context)?;
-        let second = super::capture::input(self, right, 1, limits, &context)?;
-        if first.lineage.model.id != second.lineage.model.id {
-            return Err(StatisticsError::MissingJointModel.into());
-        }
-        let mut lineage = first.lineage.clone();
-        lineage.columns.extend_from_slice(&second.lineage.columns);
-        lineage.columns.sort_unstable();
-        lineage.columns.dedup();
+        let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
+        self.materialize_cross_covariance_with_inventory_budget(left, right, limits, &budget)
+    }
+    /// Publish cross covariance with explicit staged and retained inventory byte ceilings.
+    /// # Errors
+    /// Refuses missing coverage, foreign models, stale selections or metadata exhaustion before numerical allocation.
+    pub fn materialize_cross_covariance_with_inventory_budget<
+        P: Scalar + 'static,
+        Q: Scalar + 'static,
+    >(
+        &mut self,
+        left: Handle<Value, P>,
+        right: Handle<Value, Q>,
+        limits: JointLimits,
+        budget: &nrz_bindings::Budget,
+    ) -> Result<MomentRef<P>, OperationError> {
+        let bindings = vec![
+            super::capture::inspect(self, left, 0, limits)?,
+            super::capture::inspect(self, right, 1, limits)?,
+        ];
+        let trace =
+            crate::execution::Trace::new(crate::ExecutionId(crate::heap::identity::identity()?));
+        let run = Run::new::<P>(bindings, None, &trace, budget)?;
+        let first = run.binding(0)?;
+        let second = run.binding(1)?;
+        let work = preflight(first, second, run.columns().len(), limits)?;
+        let mut lineage = (*first.lineage).clone();
+        lineage.columns = run.columns().to_vec();
         lineage.roots.extend_from_slice(&second.lineage.roots);
         lineage.roots.sort_unstable();
         lineage.roots.dedup();
         if second.lineage.assurance == super::MomentAssurance::LinearizedMoments {
             lineage.assurance = super::MomentAssurance::LinearizedMoments;
         }
-        let work = preflight(&first, &second, lineage.columns.len(), limits)?;
-        let mut work = Work::new(work);
-        let source = lineage
-            .model
-            .covariance(&lineage.columns, &context, limits)?;
-        let first = align::<P, P>(&first, &lineage.columns, &context)?;
-        let second = align::<Q, P>(&second, &lineage.columns, &context)?;
-        let intermediate = multiply(&first, &source, &context, &mut work)?;
-        let covariance = multiply(&intermediate, &second.transpose()?, &context, &mut work)?;
-        let targets = [
-            Dependency::from_snapshot(&crate::InputSnapshot::capture(self, left)?),
-            Dependency::from_snapshot(&crate::InputSnapshot::capture(self, right)?),
-        ];
+        lineage.model.require(&lineage.columns, limits)?;
+        run.backend_allowance(work, size_of::<P>())?;
+        run.law(lineage.assurance);
+        let context = ArithmeticContext::new()?;
+        let covariance = evaluate::<P, Q>(self, &run, limits, &context, work)?;
+        let targets = [first.dependency.clone(), second.dependency.clone()];
         let quantities = [
             self.binding_quantity(left)?.clone(),
             self.binding_quantity(right)?.clone(),
         ];
-        publish(self, targets, &quantities, lineage, &covariance, &context)
+        publish(
+            self,
+            targets,
+            &quantities,
+            lineage,
+            &covariance,
+            &context,
+            &run,
+        )
     }
+}
+/// All selected captures and temporary contractions drop before publication copies are allocated.
+fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
+    heap: &Heap,
+    run: &Run,
+    limits: JointLimits,
+    context: &ArithmeticContext,
+    work: usize,
+) -> Result<Matrix<P>, OperationError> {
+    let first = super::capture::input::<P>(heap, 0, run, context)?;
+    let aligned_left = align::<P, P>(&first, run.columns(), context, run, false)?;
+    drop(first);
+    let mut source = run.matrix(Role::Model, 0)?;
+    run.binding(0)?
+        .lineage
+        .model
+        .covariance_into(run.columns(), context, limits, &mut source)?;
+    let mut work = Work::new(work);
+    let intermediate = multiply(
+        &aligned_left,
+        &source,
+        context,
+        &mut work,
+        run.request(Role::CovarianceProduct, 0),
+    )?;
+    drop(aligned_left);
+    drop(source);
+    let second = super::capture::input::<Q>(heap, 1, run, context)?;
+    let transposed = align::<Q, P>(&second, run.columns(), context, run, true)?;
+    drop(second);
+    multiply(
+        &intermediate,
+        &transposed,
+        context,
+        &mut work,
+        run.request(Role::Covariance, 0),
+    )?
+    .into_candidate()
 }
 /// Prepare both target maps and all independent numerical regions before any visible append.
 fn publish<P: Scalar + 'static>(
@@ -70,7 +128,12 @@ fn publish<P: Scalar + 'static>(
     lineage: super::store::Lineage,
     covariance: &Matrix<P>,
     context: &ArithmeticContext,
+    run: &Run,
 ) -> Result<MomentRef<P>, OperationError> {
+    if !run.matches(covariance, Role::Covariance, 0) {
+        return Err(crate::PrivateAllocationError::ForeignInventory.into());
+    }
+    run.validate_lineage(&lineage)?;
     let descriptors = super::publish::covariance_descriptors(
         &quantities[0],
         &quantities[1],
@@ -89,18 +152,19 @@ fn publish<P: Scalar + 'static>(
         &target_symbols[1],
     )?;
     let error_symbol = crate::binding::parameters::errors(&declaration)?;
+    let [centers, errors] = Run::copies(covariance, 0, context)?;
     let regions = [
         RegionData {
             extent: covariance.extent,
             quantity: None,
             declaration,
-            values: covariance.centers.to_vec().into(),
+            values: centers,
         },
         RegionData {
             extent: covariance.extent,
             quantity: None,
             declaration: error_symbol,
-            values: covariance.errors(context)?.into(),
+            values: errors,
         },
     ];
     heap.statistics
@@ -108,10 +172,13 @@ fn publish<P: Scalar + 'static>(
         .try_reserve(1)
         .map_err(|_| StatisticsError::ResourceLimit)?;
     let prepared = super::allocation::standalone(heap, &regions)?;
+    drop(regions);
+    let inventory = run.finish(None, |role, index| run.matches(covariance, role, index))?;
     let keys = prepared.records.keys();
     let record = Record {
+        inventory,
         targets,
-        lineage,
+        lineage: std::rc::Rc::new(lineage),
         covariance: Parameter {
             regions: [
                 *keys.first().ok_or(StatisticsError::Contract)?,
@@ -138,14 +205,14 @@ fn publish<P: Scalar + 'static>(
     Ok(handle)
 }
 /// Bound complete dense storage and both matrix contractions before their allocations.
-fn preflight<P: Scalar, Q: Scalar>(
-    left: &Input<P>,
-    right: &Input<Q>,
+fn preflight(
+    left: &super::capture::InputBinding,
+    right: &super::capture::InputBinding,
     sources: usize,
     limits: JointLimits,
 ) -> Result<usize, OperationError> {
-    let rows = left.sensitivity.extent.rows();
-    let columns = right.sensitivity.extent.rows();
+    let rows = left.rows.len();
+    let columns = right.rows.len();
     limits.matrix(rows, columns)?;
     limits.matrix(rows, sources)?;
     limits.matrix(columns, sources)?;
@@ -172,13 +239,24 @@ fn align<P: Scalar + 'static, Q: Scalar + 'static>(
     input: &Input<P>,
     sources: &[usize],
     context: &ArithmeticContext,
+    run: &Run,
+    transpose: bool,
 ) -> Result<Matrix<Q>, OperationError> {
-    let mut result = Matrix::zeros(input.sensitivity.extent.rows(), sources.len())?;
+    let rows = input.sensitivity.extent.rows();
+    let (role, extent) = if transpose {
+        (Role::Transpose, crate::Extent::new(sources.len(), rows)?)
+    } else {
+        (Role::Aligned, crate::Extent::new(rows, sources.len())?)
+    };
+    let mut result = run.matrix_at(role, 0, extent)?;
+    if result.extent.entries() == 0 {
+        return Ok(result);
+    }
     for (original, source) in input.lineage.columns.iter().enumerate() {
         let column = sources
             .binary_search(source)
             .map_err(|_| StatisticsError::Contract)?;
-        for row in 0..result.extent.rows() {
+        for row in 0..rows {
             let index = input.sensitivity.extent.index(row, original)?;
             let (center, truth) = super::precision::entry(
                 *input
@@ -189,7 +267,12 @@ fn align<P: Scalar + 'static, Q: Scalar + 'static>(
                 input.sensitivity.entry(row, original)?,
                 context,
             )?;
-            result.set(row, column, center, truth)?;
+            let target = if transpose {
+                (column, row)
+            } else {
+                (row, column)
+            };
+            result.set(target.0, target.1, center, truth)?;
         }
     }
     Ok(result)

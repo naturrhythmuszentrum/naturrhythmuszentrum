@@ -40,10 +40,10 @@ impl KernelDraft {
         };
         let recipe = match self.reciprocal {
             Some(definition) => NativeRecipe::Reciprocal {
-                kernel: Box::new(numerical),
+                kernel: std::rc::Rc::new(numerical),
                 definition,
             },
-            None => NativeRecipe::Kernel(Box::new(numerical)),
+            None => NativeRecipe::Kernel(std::rc::Rc::new(numerical)),
         };
         Ok(CheckedOperation {
             inputs: self.inputs,

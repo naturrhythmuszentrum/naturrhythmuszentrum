@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Faer candidates and independent increasing-index interval contractions.
 
+use super::inventory::{Channel, Request};
 use super::{StatisticsError, matrix::Matrix};
-use crate::{OperationError, binding::buffer};
+use crate::OperationError;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
 /// Charge before every independent scalar contraction term.
@@ -31,18 +32,24 @@ pub(crate) fn multiply<P: Scalar + 'static>(
     right: &Matrix<P>,
     context: &ArithmeticContext,
     work: &mut Work,
+    request: Request<'_>,
 ) -> Result<Matrix<P>, OperationError> {
     let extent = product_extent(left, right)?;
+    if request.extent(Channel::Centers)? != extent {
+        return Err(crate::PrivateAllocationError::ForeignInventory.into());
+    }
     let centers = match P::PRECISION {
-        nrz_scalar::Precision::F32 => single(left, right)?,
-        nrz_scalar::Precision::F64 => double(left, right)?,
+        nrz_scalar::Precision::F32 => single(left, right, request)?,
+        nrz_scalar::Precision::F64 => double(left, right, request)?,
     };
-    let mut truth = buffer(extent.entries())?;
-    truth.resize(extent.entries(), Enclosure::singleton(Finite::<P>::ZERO));
+    let mut truth = request.buffer(Channel::Truth)?;
+    for _ in 0..extent.entries() {
+        truth.push(Enclosure::singleton(Finite::<P>::ZERO))?;
+    }
     let mut result = Matrix {
         extent,
-        centers: centers.into(),
-        truth: truth.into(),
+        centers,
+        truth,
     };
     verify(left, right, &mut result, context, work)?;
     Ok(result)
@@ -145,16 +152,23 @@ macro_rules! backend {
         fn $name<P: Scalar + 'static>(
             left: &Matrix<P>,
             right: &Matrix<P>,
-        ) -> Result<Vec<P>, OperationError> {
-            let first = $pack(left)?;
-            let second = $pack(right)?;
-            let candidate = &first * &second;
+            request: Request<'_>,
+        ) -> Result<crate::private::Buffer<P>, OperationError> {
+            if request.extent(Channel::BackendLeft)? != left.extent
+                || request.extent(Channel::BackendRight)? != right.extent
+            {
+                return Err(crate::PrivateAllocationError::ForeignInventory.into());
+            }
+            let first = request.backend(Channel::BackendLeft, || $pack(left))?;
+            let second = request.backend(Channel::BackendRight, || $pack(right))?;
+            let candidate =
+                request.backend(Channel::BackendResult, || Ok(first.get() * second.get()))?;
             let extent = product_extent(left, right)?;
-            let mut result = buffer(extent.entries())?;
+            let mut result = request.buffer(Channel::Centers)?;
             for index in 0..extent.entries() {
                 result.push(crate::conversion::same_format(
-                    candidate[(index % extent.rows(), index / extent.rows())],
-                )?);
+                    candidate.get()[(index % extent.rows(), index / extent.rows())],
+                )?)?;
             }
             Ok(result)
         }

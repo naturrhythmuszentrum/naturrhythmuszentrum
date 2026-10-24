@@ -267,7 +267,10 @@ mod solve_twins;
     reason = "statistical transaction evidence is shared across private matrix modules"
 )]
 mod statistics;
-pub use statistics::{MomentAssurance, MomentRef, MomentView, ParameterView, StatisticsError};
+pub use statistics::{
+    MomentAssurance, MomentRef, MomentView, ParameterView, StatisticsAllocation,
+    StatisticsAllocationChannel, StatisticsAllocationRole, StatisticsError, StatisticsInventory,
+};
 
 #[cfg(test)]
 #[path = "testing/solve_statistics.rs"]

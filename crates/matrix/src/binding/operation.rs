@@ -211,14 +211,14 @@ pub(crate) enum NativeRecipe {
     /// Exact positive reciprocal correspondence beside its meaning-free numerical contract.
     Reciprocal {
         /// Numerical extents, coefficient images and outward law.
-        kernel: Box<crate::kernels::KernelContract>,
+        kernel: Rc<crate::kernels::KernelContract>,
         /// Original physical references and complete exact correspondence.
         definition: std::rc::Rc<nrz_bindings::readings::PositiveReciprocalMap>,
     },
     /// Square solve under an independent inverse-defect and residual theorem.
     Solve(Rc<crate::solve::SolveContract>),
     /// Checked deterministic multi-input region operation.
-    Kernel(Box<crate::kernels::KernelContract>),
+    Kernel(Rc<crate::kernels::KernelContract>),
     /// Bit-preserving copy with independent equality verification.
     Copy,
     /// Checked exact affine descriptor maps, in output order.
