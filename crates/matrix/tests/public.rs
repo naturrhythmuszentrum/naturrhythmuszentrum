@@ -135,3 +135,10 @@ mod phasor_solve_testing;
     reason = "spectral fixtures serve public contract tests"
 )]
 mod spectral_testing;
+
+#[path = "../src/testing/mapped.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "mapped companion fixtures serve public tests and standalone measurements"
+)]
+mod mapped_testing;

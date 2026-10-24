@@ -373,7 +373,7 @@ fn selected_reading_copy_retains_transitive_lineage() -> TestResult {
     )?;
     let voltage = imported.bindings().get(1).ok_or("voltage")?;
     let current = imported.bindings().get(2).ok_or("current")?;
-    let selected = heap.select_reading(voltage)?;
+    let selected = heap.select_reading(voltage, &mut ledger()?)?;
     assert_eq!(selected.symbol().reading(), Some(voltage.reading()));
     let limits = crate::ExecutionLimits::default();
     let operation = crate::binding_testing::operation(1, 1)?;

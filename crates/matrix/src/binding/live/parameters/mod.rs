@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Execute companion maps from explicitly bound original parameters and their numerical errors.
 
-mod numeric;
+pub(super) mod numeric;
 mod phasor;
 mod plan;
 pub use phasor::PhasorStatistics;

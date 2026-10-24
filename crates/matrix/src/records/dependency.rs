@@ -104,8 +104,33 @@ impl Dependency {
     }
     /// Whether declared-bound evidence forms part of this exact dependency key.
     #[must_use]
-    pub const fn carries_bound(&self) -> bool {
+    pub fn carries_bound(&self) -> bool {
         self.companion.is_some()
+            || self.selected.as_ref().is_some_and(|reading| {
+                reading
+                    .radius(nrz_bindings::CompanionKind::DeterministicBound)
+                    .is_ok_and(|value| value.is_some())
+            })
+    }
+
+    /// Original physical reading selected by this dependency, when it came from general storage.
+    #[must_use]
+    pub fn reading(&self) -> Option<&nrz_bindings::readings::PhysicalReading> {
+        self.selected
+            .as_ref()
+            .map(crate::binding::live::selected::SelectedReading::reading)
+    }
+    /// Every selected original companion with its exact ordered targets and source lineage.
+    pub fn reading_companions(&self) -> impl Iterator<Item = &crate::CompanionAdapter<usize>> {
+        self.selected
+            .iter()
+            .flat_map(crate::binding::live::selected::SelectedReading::companions)
+    }
+    /// Every actual repeated copy in the original family and its retained discrepancy.
+    pub fn copy_discrepancies(&self) -> impl Iterator<Item = &crate::CopyDiscrepancy> {
+        self.selected
+            .iter()
+            .flat_map(crate::binding::live::selected::SelectedReading::copies)
     }
 
     /// Check raw descriptors without recursively entering public provenance access.
@@ -150,7 +175,11 @@ impl Dependency {
                     .contributions
                     .as_ref()
                     .map(|parts| parts.each_ref().map(|part| part.key))
-            || coverage != self.coverage
+            || self
+                .selected
+                .as_ref()
+                .map_or(coverage, |selected| selected.coverage(coverage))
+                != self.coverage
         {
             return Err(HeapError::StaleEvidence);
         }

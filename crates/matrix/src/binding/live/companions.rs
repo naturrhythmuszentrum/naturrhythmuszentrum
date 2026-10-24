@@ -173,3 +173,76 @@ pub(super) fn validate_native(group: &Group, heap: &Heap) -> Result<(), HeapErro
     }
     Ok(())
 }
+
+impl Heap {
+    /// Replace one selected companion's stored output parameters and invalidate every dependent reading.
+    ///
+    /// Equal-value writes advance versions too. The replacement is a new declaration;
+    /// earlier computation evidence and every old dependent view become unavailable.
+    /// # Errors
+    /// Refuses stale or unrelated targets, incomplete/nonfinite parameters, negative radii,
+    /// numerical errors outside the corresponding total, and allocation or resource failure.
+    pub fn replace_reading_companion_entries<P: Scalar + 'static>(
+        &mut self,
+        binding: &super::ReadingBinding<P>,
+        index: usize,
+        values: &[P],
+        budget: &mut Budget,
+    ) -> Result<(), LiveBindingError> {
+        self.validate_reading(binding)?;
+        let companion = binding
+            .companions()
+            .get(index)
+            .ok_or(crate::ReadingAdapterError::Target)?;
+        let targeted = companion
+            .targets()
+            .iter()
+            .any(|target| target.reading() == binding.reading());
+        if !targeted || values.len() != companion.entries().len() || values.is_empty() {
+            return Err(crate::ReadingAdapterError::Target.into());
+        }
+        replacement_radii(self, binding, companion, values)?;
+        super::write::replace(self, &binding.group, companion.entries(), values, budget)
+    }
+}
+
+/// Total and numerical channels remain separate declarations about one exact selected target.
+fn replacement_radii<P: Scalar + 'static>(
+    heap: &Heap,
+    binding: &super::ReadingBinding<P>,
+    companion: &CompanionAdapter<usize>,
+    values: &[P],
+) -> Result<(), LiveBindingError> {
+    let CompanionReadingKind::Radius(kind) = companion.companion().kind() else {
+        return Ok(());
+    };
+    for (index, value) in values.iter().enumerate() {
+        if *value < P::ZERO {
+            return Err(HeapError::InvalidBound { index }.into());
+        }
+    }
+    let opposite = match kind {
+        CompanionKind::DeterministicBound => CompanionKind::NumericalError,
+        CompanionKind::NumericalError => CompanionKind::DeterministicBound,
+    };
+    let other = binding.companions().iter().position(|candidate| {
+        candidate.companion().kind() == CompanionReadingKind::Radius(opposite)
+            && candidate.companion().targets() == companion.companion().targets()
+    });
+    if let Some(index) = other {
+        let previous = heap.reading_companion_entries(binding, index)?;
+        let invalid = values
+            .iter()
+            .zip(previous)
+            .any(|(value, other)| match kind {
+                CompanionKind::DeterministicBound => *value < other,
+                CompanionKind::NumericalError => *value > other,
+            });
+        if invalid {
+            return Err(crate::ReadingAdapterError::Target.into());
+        }
+    } else if kind == CompanionKind::NumericalError {
+        return Err(crate::ReadingAdapterError::Target.into());
+    }
+    Ok(())
+}

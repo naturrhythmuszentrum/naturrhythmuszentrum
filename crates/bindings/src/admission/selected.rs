@@ -94,3 +94,89 @@ fn identity(reading: &PhysicalReading, budget: &mut Budget) -> Result<(), Admiss
     }
     Ok(())
 }
+
+impl BindingSymbols {
+    /// Attach the original identity radius definitions to a selected homogeneous reading.
+    ///
+    /// Parameter storage contains these output coordinates; a nonidentity source map
+    /// requires its separately checked execution and cannot be read as an identity.
+    /// # Errors
+    /// Refuses substituted targets, duplicate kinds, nonidentity maps and missing totals.
+    pub fn with_reading_companions(
+        mut self,
+        companions: &[&crate::readings::CompanionReading],
+        budget: &mut Budget,
+    ) -> Result<Self, AdmissionError> {
+        for companion in companions {
+            budget.work(1, Location::new("selected companion inventory"))?;
+            let kind = match companion.kind() {
+                crate::readings::CompanionReadingKind::Radius(kind) => kind,
+                crate::readings::CompanionReadingKind::Covariance => {
+                    return Err(AdmissionError::UnsupportedRecipe);
+                }
+            };
+            let channel = match kind {
+                super::CompanionKind::DeterministicBound => &mut self.bound,
+                super::CompanionKind::NumericalError => &mut self.error,
+            };
+            if channel.is_some() {
+                return Err(AdmissionError::CompanionMismatch);
+            }
+            *channel = Some(radius_symbol(&self.value, companion, kind, budget)?);
+        }
+        if self.error.is_some() && self.bound.is_none() {
+            return Err(AdmissionError::CompanionMismatch);
+        }
+        Rc::make_mut(&mut self.value.0).companions = [self.bound.is_some(), self.error.is_some()];
+        self.validate()?;
+        Ok(self)
+    }
+}
+
+/// Preserve the exact parameter definition and target, independently of the numerical ticket.
+fn radius_symbol(
+    value: &QuantitySymbol,
+    companion: &crate::readings::CompanionReading,
+    kind: super::CompanionKind,
+    budget: &mut Budget,
+) -> Result<QuantitySymbol, AdmissionError> {
+    let reading = value.reading().ok_or(AdmissionError::UnsupportedRecipe)?;
+    let [target] = companion.targets() else {
+        return Err(AdmissionError::CompanionMismatch);
+    };
+    let count = companion
+        .map()
+        .coefficients()
+        .len()
+        .checked_add(companion.map().offsets().len())
+        .ok_or(AdmissionError::ResourceLimit)?;
+    budget.work(
+        u64::try_from(count).map_err(|_| AdmissionError::ResourceLimit)?,
+        Location::new("selected companion map"),
+    )?;
+    if target != reading || companion.map() != reading.map() || value.shape()[1] != 1 {
+        return Err(AdmissionError::UnsupportedRecipe);
+    }
+    Ok(QuantitySymbol(Rc::new(graph::SymbolData {
+        graph: value.0.graph.clone(),
+        node: companion.node().clone(),
+        sort: Sort::Value(AtomicSort::Matrix {
+            field: Field::Real,
+            rows: Extent::Literal(value.shape()[0]),
+            columns: Extent::Literal(1),
+        }),
+        shape: value.shape(),
+        quantity: crate::uncertainty(
+            crate::UncertaintyMode::Radius,
+            value.descriptor(),
+            None,
+            None,
+        )?,
+        kind: SymbolKind::Companion(kind),
+        companions: [false, false],
+        relation: Some(companion.node().clone()),
+        target: Some(value.node().clone()),
+        lineage: None,
+        reading: None,
+    })))
+}

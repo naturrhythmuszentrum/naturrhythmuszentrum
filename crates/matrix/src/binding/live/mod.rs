@@ -5,6 +5,8 @@ mod admission;
 mod bounded;
 pub(crate) mod companions;
 mod coordinates;
+mod mapped;
+pub use mapped::{MappedReading, ReadingSelection};
 mod parameters;
 mod phasor;
 mod spectral;

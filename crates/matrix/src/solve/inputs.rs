@@ -15,7 +15,7 @@ pub(crate) enum RightHandSide<'a, 'b, P: Scalar> {
 
 impl<P: Scalar + 'static> RightHandSide<'_, '_, P> {
     /// Logical RHS extent after semantic square-solve admission.
-    pub(crate) const fn extent(&self) -> Extent {
+    pub(crate) fn extent(&self) -> Extent {
         match self {
             Self::Physical(view) => view.extent(),
             Self::Identity(shape) => shape.extent(),

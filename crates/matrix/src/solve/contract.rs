@@ -121,7 +121,7 @@ impl SolveContract {
             if input.coverage != coverage {
                 return Err(SolveError::CoverageMismatch.into());
             }
-            if coverage == Coverage::DeclaredBounds && input.companion().is_none() {
+            if coverage == Coverage::DeclaredBounds && !input.carries_bound() {
                 return Err(SolveError::MissingCoverage { slot }.into());
             }
         }

@@ -5,7 +5,7 @@
 //!
 //! Opaque `Handle<Category, P>` locators carry a heap scope and descriptor occupation generation. Value and companion access checks ownership, occupation, category, precision, region bounds and target versions before lending a read-only `RegionView`. Descriptor-side interning assigns opaque schema identities without merging value identities; numerical schemas contain only extents. Each arena slab owns a one-column faer matrix; logical rectangles select its entries through checked layouts. `RegionView::export` returns an owned raw copy without evidence or a declaration of source independence. Live borrows prevent heap mutation.
 
-use std::marker::PhantomData;
+use std::{borrow::Cow, marker::PhantomData};
 
 use nrz_scalar::Scalar;
 
@@ -24,7 +24,7 @@ pub struct RegionView<'h, P: Scalar> {
     /// Checked allocated range.
     region: Region,
     /// Checked logical map into the allocated range.
-    layout: &'h Layout,
+    layout: Cow<'h, Layout>,
     /// Maximum entries copied into raw or backend scratch.
     packing_limit: usize,
     /// Scoped immutable schema identity.
@@ -36,7 +36,7 @@ pub struct RegionView<'h, P: Scalar> {
 impl<P: Scalar + 'static> RegionView<'_, P> {
     /// Logical extents, independent of backend padding.
     #[must_use]
-    pub const fn extent(&self) -> Extent {
+    pub fn extent(&self) -> Extent {
         self.layout.extent()
     }
 
@@ -78,8 +78,8 @@ impl<P: Scalar + 'static> RegionView<'_, P> {
 
     /// The selected logical entries, relative to the owning region.
     #[must_use]
-    pub const fn layout(&self) -> &Layout {
-        self.layout
+    pub fn layout(&self) -> &Layout {
+        &self.layout
     }
 
     /// Pack into a fresh, contiguous, privately owned faer slab in logical column order.
@@ -229,7 +229,10 @@ impl Heap {
             bound: bound.map(|key| Handle::new(self.scope, key)),
             evaluation: evaluation.map(|key| Handle::new(self.scope, key)),
             contributions: contributions.map(|keys| keys.map(|key| Handle::new(self.scope, key))),
-            coverage,
+            coverage: self
+                .symbols
+                .selection(handle.key)
+                .map_or(coverage, |selected| selected.coverage(coverage)),
         })
     }
 
@@ -311,7 +314,7 @@ impl Heap {
         Ok(RegionView {
             slab: self.storage.resolve(region)?,
             region,
-            layout,
+            layout: Cow::Borrowed(layout),
             packing_limit: self.limits.layout_work.min(self.limits.elements),
             schema_id: SchemaId {
                 scope: self.scope,
@@ -332,6 +335,9 @@ impl Heap {
         &self,
         handle: Handle<Value, P>,
     ) -> Result<Option<CompanionView<'_, P>>, HeapError> {
+        if self.symbols.selection(handle.key).is_some() {
+            return self.reading_radius(handle, nrz_bindings::CompanionKind::DeterministicBound);
+        }
         let value = self.value(handle)?;
         let Some(bound) = value.bound() else {
             return Ok(None);
@@ -350,6 +356,9 @@ impl Heap {
         &self,
         handle: Handle<Value, P>,
     ) -> Result<Option<CompanionView<'_, P>>, HeapError> {
+        if self.symbols.selection(handle.key).is_some() {
+            return self.reading_radius(handle, nrz_bindings::CompanionKind::NumericalError);
+        }
         let value = self.value(handle)?;
         let Some(evaluation) = value.evaluation() else {
             return Ok(None);
@@ -358,5 +367,31 @@ impl Heap {
         companion.region =
             self.mapped_region(self.record(evaluation)?, &self.record(handle)?.layout)?;
         Ok(Some(companion))
+    }
+}
+
+impl Heap {
+    /// General parameter storage carries its own map while the selected group validates all targets.
+    fn reading_radius<P: Scalar + 'static>(
+        &self,
+        handle: Handle<Value, P>,
+        kind: nrz_bindings::CompanionKind,
+    ) -> Result<Option<CompanionView<'_, P>>, HeapError> {
+        let selected = self
+            .symbols
+            .selection(handle.key)
+            .ok_or(HeapError::MissingBinding)?;
+        selected.validate(self)?;
+        let Some((ticket, layout)) = selected.radius_layout(kind, self.limits.layout_work)? else {
+            return Ok(None);
+        };
+        let record = self.descriptors.get(ticket.key)?;
+        let mut region = self.region_view(record)?;
+        region.layout = Cow::Owned(layout);
+        Ok(Some(CompanionView {
+            region,
+            target: handle,
+            stamp: self.value(handle)?.stamp(),
+        }))
     }
 }

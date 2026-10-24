@@ -27,7 +27,7 @@ pub struct ParameterView<'h, P: Scalar> {
 impl<P: Scalar + 'static> ParameterView<'_, P> {
     /// Complete parameter rectangle.
     #[must_use]
-    pub const fn extent(&self) -> crate::Extent {
+    pub fn extent(&self) -> crate::Extent {
         self.centers.extent()
     }
     /// Exact parameter occupation targeted by the numerical error.

@@ -51,43 +51,60 @@ impl Heap {
             }
             super::admission::block(values)?;
         }
-        charge::<P>(values.len(), budget)?;
-        let replacements = prepare(self, binding, values, budget)?;
-        let writes = replacements
-            .iter()
-            .map(|item| (item.key, item.indices.clone()))
-            .collect::<Vec<_>>();
-        let invalidated = super::invalidation::prepare(self, &writes, budget)?;
-        let payloads = replacements
-            .iter()
-            .map(|item| item.values.as_slice())
-            .collect::<Vec<_>>();
-        let retired = replacements.iter().map(|item| item.old).collect::<Vec<_>>();
-        let storage = self.storage.prepare(&payloads, &retired, self.limits)?;
-        let locations = locations::<P>(&replacements, storage.keys(), storage.epoch())?;
-        self.storage.publish(storage);
-        advance_entries(self, &replacements);
-        commit(self, &replacements, &locations);
-        super::invalidation::publish(invalidated);
-        Ok(())
+        replace(
+            self,
+            &binding.group,
+            binding.adapter().entries(),
+            values,
+            budget,
+        )
     }
+}
+
+/// The same checked transaction updates companion parameters without inventing a value reading.
+pub(super) fn replace<P: Scalar + 'static>(
+    heap: &mut Heap,
+    group: &super::Group,
+    entries: &[crate::EntryTicket<usize>],
+    values: &[P],
+    budget: &mut Budget,
+) -> Result<(), LiveBindingError> {
+    charge::<P>(values.len(), budget)?;
+    let replacements = prepare(heap, group, entries, values, budget)?;
+    let writes = replacements
+        .iter()
+        .map(|item| (item.key, item.indices.clone()))
+        .collect::<Vec<_>>();
+    let invalidated = super::invalidation::prepare(heap, &writes, budget)?;
+    let payloads = replacements
+        .iter()
+        .map(|item| item.values.as_slice())
+        .collect::<Vec<_>>();
+    let retired = replacements.iter().map(|item| item.old).collect::<Vec<_>>();
+    let storage = heap.storage.prepare(&payloads, &retired, heap.limits)?;
+    let locations = locations::<P>(&replacements, storage.keys(), storage.epoch())?;
+    heap.storage.publish(storage);
+    advance_entries(heap, &replacements);
+    commit(heap, &replacements, &locations);
+    super::invalidation::publish(invalidated);
+    Ok(())
 }
 
 /// Copy only affected bases; reject every invalid element before any publication.
 fn prepare<P: Scalar + 'static>(
     heap: &Heap,
-    binding: &ReadingBinding<P>,
+    group: &super::Group,
+    entries: &[crate::EntryTicket<usize>],
     values: &[P],
     budget: &mut Budget,
 ) -> Result<Vec<Replacement<P>>, LiveBindingError> {
     let mut replacements: Vec<Replacement<P>> = Vec::new();
-    for (entry, &value) in binding.adapter().entries().iter().zip(values) {
+    for (entry, &value) in entries.iter().zip(values) {
         let index = usize::try_from(entry.index).map_err(|_| HeapError::InvalidLayout)?;
         if !value.is_finite() {
             return Err(HeapError::NonFinite { index }.into());
         }
-        let ticket = binding
-            .group
+        let ticket = group
             .tickets
             .get(entry.region)
             .ok_or(HeapError::InvalidLayout)?;

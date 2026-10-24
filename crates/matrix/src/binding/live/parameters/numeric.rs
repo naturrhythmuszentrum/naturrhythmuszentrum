@@ -90,7 +90,7 @@ fn check<P: Scalar>(
 }
 
 /// Rational spelling is prepaid under the same finite caller ledger as the contraction.
-fn coefficients<P: Scalar>(
+pub(in crate::binding::live) fn coefficients<P: Scalar>(
     values: &[Rational],
     policy: LiteralLimits,
     context: &ArithmeticContext,
@@ -116,7 +116,7 @@ fn coefficients<P: Scalar>(
 }
 
 /// Enclose each coefficient import and source numerical error before summing in fixed order.
-fn contraction<P: Scalar>(
+pub(in crate::binding::live) fn contraction<P: Scalar>(
     coefficients: &[DecodedLiteral<P>],
     values: &[P],
     errors: &[P],

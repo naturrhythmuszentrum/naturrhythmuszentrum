@@ -242,3 +242,28 @@ fn capture_contributions<P: Scalar + 'static>(
     });
     Ok(Some([first?, second?, interaction?]))
 }
+
+impl<P: Scalar> InputSnapshot<P> {
+    /// Whether the selected exact inventory carries a total radius in either storage form.
+    #[must_use]
+    pub const fn carries_bound(&self) -> bool {
+        self.symbols.bound().is_some()
+    }
+    /// Whether the selected exact inventory carries a distinct numerical radius.
+    #[must_use]
+    pub const fn carries_evaluation(&self) -> bool {
+        self.symbols.error().is_some()
+    }
+    /// Complete original general companion definitions, including their exact target selections.
+    pub fn reading_companions(&self) -> impl Iterator<Item = &crate::CompanionAdapter<usize>> {
+        self.selected
+            .iter()
+            .flat_map(super::live::selected::SelectedReading::companions)
+    }
+    /// Actual repeated copies and their discrepancy evidence in the selected family.
+    pub fn copy_discrepancies(&self) -> impl Iterator<Item = &crate::CopyDiscrepancy> {
+        self.selected
+            .iter()
+            .flat_map(super::live::selected::SelectedReading::copies)
+    }
+}

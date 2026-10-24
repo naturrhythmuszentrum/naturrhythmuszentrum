@@ -53,7 +53,7 @@ fn live_none_never_covers_varying_storage() -> TestResult {
     )?;
     let selected = imported.bindings().first().ok_or("none")?;
     assert_eq!(heap.reading_entries(selected)?, [] as [f64; 0]);
-    assert!(heap.select_reading(selected).is_err());
+    assert!(heap.select_reading(selected, &mut ledger()?).is_err());
     assert!(
         heap.replace_reading_entries(selected, &[], &mut ledger()?)
             .is_err()
@@ -347,6 +347,10 @@ fn live_bounded_value_only_write_refuses() -> TestResult {
     let (mut heap, readings) = solved()?;
     let reading = &readings[0];
     assert_eq!(reading.group.native.len(), 2);
+    assert!(matches!(
+        heap.select_reading(reading, &mut ledger()?),
+        Err(LiveBindingError::Heap(HeapError::MissingCoverage))
+    ));
     assert_eq!(heap.reading_entries(reading)?, vec![1.0, 2.0]);
     assert!(matches!(
         heap.replace_reading_entries(reading, &[3.0, 4.0], &mut ledger()?),
@@ -475,10 +479,10 @@ fn live_companion_map_retained_through_write() -> TestResult {
     Ok(())
 }
 
-/// Until companion map lowering exists, the homogeneous facade refuses a companion-bearing general reading.
-/// ´test:unit:live-homogeneous-facade-refuses-general-companions´
+/// Identity radius maps preserve their exact symbols and separate channels through selection.
+/// ´test:unit:live-homogeneous-facade-selects-general-companions´
 #[test]
-fn live_homogeneous_facade_refuses_general_companions() -> TestResult {
+fn live_homogeneous_facade_selects_general_companions() -> TestResult {
     let ((graph, coverage), companions) = companion_plan()?;
     let extent = Extent::new(2, 1)?;
     let regions = [
@@ -504,10 +508,28 @@ fn live_homogeneous_facade_refuses_general_companions() -> TestResult {
         DependencyPolicy::Entries,
         &mut ledger()?,
     )?;
-    assert!(matches!(
-        heap.select_reading(&imported.bindings()[0]),
-        Err(LiveBindingError::Heap(HeapError::MissingCoverage))
-    ));
+    let selected = heap
+        .select_reading(&imported.bindings()[0], &mut ledger()?)
+        .map_err(|e| format!("selection: {e:?}"))?;
+    let original = imported.bindings()[0].companions();
+    assert_eq!(
+        selected.symbols().bound().ok_or("total symbol")?.node(),
+        original[0].companion().node()
+    );
+    assert_eq!(
+        selected.symbols().error().ok_or("error symbol")?.node(),
+        original[1].companion().node()
+    );
+    let total = heap
+        .selected_bound(selected.handle())
+        .map_err(|e| format!("total view: {e:?}"))?
+        .ok_or("total view missing")?;
+    assert_eq!(total.region().get(0, 0)?.to_bits(), 1.0_f64.to_bits());
+    let error = heap
+        .selected_evaluation(selected.handle())
+        .map_err(|e| format!("error view: {e:?}"))?
+        .ok_or("error view missing")?;
+    assert_eq!(error.region().get(0, 0)?.to_bits(), 0.25_f64.to_bits());
     assert_eq!(heap.reading_entries(&imported.bindings()[0])?, vec![3.0; 2]);
     Ok(())
 }

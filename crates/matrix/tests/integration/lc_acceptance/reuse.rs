@@ -137,9 +137,10 @@ fn execute_operator(
     heap: &mut Heap,
     sources: &[nrz_matrix::ReadingBinding<f64>; 2],
 ) -> TestResult<nrz_matrix::Handle<nrz_matrix::Value, f64>> {
+    let mut selection_budget = ledger()?;
     let selected = sources
         .iter()
-        .map(|source| heap.select_reading(source))
+        .map(|source| heap.select_reading(source, &mut selection_budget))
         .collect::<Result<Vec<_>, _>>()?;
     let bound =
         Binding::from_symbols(operation, selected, ExecutionLimits::default()).validate(heap)?;

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Source-bound parameter maps retain original symbols, two-sided covariance and live versions.
 
-mod fixture;
+use crate::mapped_testing as fixture;
+mod selection;
 
 use crate::reading_testing::{TestResult, ledger};
 use nrz_matrix::{CompanionExecution, CompanionExecutionError};

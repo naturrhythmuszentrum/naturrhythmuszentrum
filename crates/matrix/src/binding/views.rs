@@ -77,7 +77,7 @@ impl<P: Scalar + 'static> NormalizedView<'_, P> {
     }
     /// Logical input rectangle.
     #[must_use]
-    pub const fn extent(&self) -> Extent {
+    pub fn extent(&self) -> Extent {
         self.value.region().extent()
     }
     /// Retained physical contract and exact unit-reference normalization.

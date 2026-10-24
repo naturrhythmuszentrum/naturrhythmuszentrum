@@ -29,7 +29,7 @@ pub(crate) enum Authority {
 }
 
 /// Immutable checked declaration and its actual graph relation.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct SymbolData {
     /// Retained graph owner.
     pub(crate) graph: Authority,

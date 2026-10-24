@@ -132,6 +132,25 @@ impl Heap {
         handle: Handle<Value, P>,
     ) -> Result<ValueBinding<P>, HeapError> {
         let symbols = super::symbols::capture(self, handle)?;
+        if let Some(reading) = self.symbols.selection(handle.key) {
+            let record = self.record(handle)?;
+            let base = self.base_handle(handle)?;
+            let region = reading
+                .group
+                .tickets
+                .iter()
+                .find(|ticket| ticket.key == base.key)
+                .ok_or(HeapError::MissingBinding)?;
+            return selected(
+                self.scope,
+                handle.key,
+                region,
+                record.layout.clone(),
+                reading,
+                &symbols,
+                self.limits.layout_work,
+            );
+        }
         let value = self.value(handle)?;
         let stamp = if self.symbols.selection(handle.key).is_some() {
             self.symbols.cover(self.base_handle(handle)?.key)?.stamp
@@ -268,7 +287,9 @@ pub(crate) fn selected<P: Scalar>(
     key: Key,
     region: &super::live::RegionTicket,
     layout: Layout,
+    reading: &super::live::selected::SelectedReading,
     symbols: &BindingSymbols,
+    limit: usize,
 ) -> Result<ValueBinding<P>, HeapError> {
     let ticket = Ticket {
         scope,
@@ -284,8 +305,30 @@ pub(crate) fn selected<P: Scalar>(
         },
         precision: P::PRECISION,
     };
+    let mut regions = vec![ticket];
+    for kind in [
+        nrz_bindings::CompanionKind::DeterministicBound,
+        nrz_bindings::CompanionKind::NumericalError,
+    ] {
+        if let Some((parameter, layout)) = reading.radius_layout(kind, limit)? {
+            regions.push(Ticket {
+                scope,
+                key: parameter.key,
+                stamp: ValueStamp {
+                    id: parameter.identity,
+                    version: parameter.generation,
+                },
+                layout,
+                schema: SchemaId {
+                    scope,
+                    index: parameter.schema,
+                },
+                precision: P::PRECISION,
+            });
+        }
+    }
     Ok(ValueBinding {
-        exact: SymbolBinding::check(symbols.clone(), vec![ticket])?,
+        exact: SymbolBinding::check(symbols.clone(), regions)?,
         handle: Handle::new(scope, key),
         state: Rc::new(Cell::new(SymbolState::Published)),
     })

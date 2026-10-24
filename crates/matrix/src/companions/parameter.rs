@@ -33,7 +33,7 @@ impl<P: Scalar> ParameterErrorView<'_, P> {
 impl<P: Scalar + 'static> ParameterErrorView<'_, P> {
     /// Shape of the independently stored parameter-error region.
     #[must_use]
-    pub const fn extent(&self) -> crate::Extent {
+    pub fn extent(&self) -> crate::Extent {
         self.region.extent()
     }
     /// Read an outward numerical error on a covariance parameter.
@@ -62,7 +62,7 @@ pub struct CovarianceParameterView<'h, P: Scalar> {
 impl<P: Scalar + 'static> CovarianceParameterView<'_, P> {
     /// Shape of the full source covariance.
     #[must_use]
-    pub const fn extent(&self) -> crate::Extent {
+    pub fn extent(&self) -> crate::Extent {
         self.region.extent()
     }
     /// Read one displayed covariance parameter.

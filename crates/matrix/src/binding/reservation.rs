@@ -362,8 +362,8 @@ fn specifications<P: Scalar>(
         result.push(OutputSpecification {
             extent: output.shape().extent(),
             coverage,
-            bounded: numerical || input.companion().is_some(),
-            evaluation: numerical || input.evaluation.is_some(),
+            bounded: numerical || input.carries_bound(),
+            evaluation: numerical || input.carries_evaluation(),
             contributions: match &operation.recipe {
                 super::NativeRecipe::Copy => input.contributions.is_some(),
                 super::NativeRecipe::Kernel(contract)

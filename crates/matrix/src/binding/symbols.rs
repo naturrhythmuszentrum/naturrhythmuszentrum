@@ -38,9 +38,20 @@ pub(crate) struct Inventory {
     /// One full cover per occupied numerical allocation.
     entries: Vec<Option<RegionCover>>,
     /// Selected aliases retain the exact reading and all its structural dependencies.
-    selections: Vec<Option<(Key, super::live::selected::SelectedReading)>>,
+    selections: Vec<Option<Selection>>,
     /// Exact no-storage declarations still participate in structural invalidation.
     observers: Vec<std::rc::Rc<super::live::Group>>,
+}
+
+/// An alias retains the symbols constructed only for its selected companion inventory.
+#[derive(Debug)]
+struct Selection {
+    /// Exact descriptor occupation.
+    key: Key,
+    /// Original reading and complete live dependency closure.
+    reading: super::live::selected::SelectedReading,
+    /// Selected value and radius identities, prepared before alias publication.
+    symbols: BindingSymbols,
 }
 
 impl Inventory {
@@ -49,8 +60,17 @@ impl Inventory {
         self.selections
             .get(key.slot)
             .and_then(Option::as_ref)
-            .filter(|(actual, _)| *actual == key)
-            .map(|(_, selected)| selected)
+            .filter(|selected| selected.key == key)
+            .map(|selected| &selected.reading)
+    }
+
+    /// Resolve the exact selected companion inventory without rebuilding its declarations.
+    pub(crate) fn selection_symbols(&self, key: Key) -> Option<&BindingSymbols> {
+        self.selections
+            .get(key.slot)
+            .and_then(Option::as_ref)
+            .filter(|selected| selected.key == key)
+            .map(|selected| &selected.symbols)
     }
 
     /// Reserve immutable selected-alias metadata before publishing its descriptor.
@@ -73,9 +93,14 @@ impl Inventory {
         &mut self,
         key: Key,
         selected: super::live::selected::SelectedReading,
+        symbols: BindingSymbols,
     ) {
         if let Some(slot) = self.selections.get_mut(key.slot) {
-            *slot = Some((key, selected));
+            *slot = Some(Selection {
+                key,
+                reading: selected,
+                symbols,
+            });
         }
     }
 
@@ -360,7 +385,11 @@ pub(crate) fn capture<P: Scalar + 'static>(
 ) -> Result<BindingSymbols, HeapError> {
     if let Some(selected) = heap.symbols.selection(handle.key) {
         selected.validate(heap)?;
-        return selected.symbols().cloned().ok_or(HeapError::MissingBinding);
+        return heap
+            .symbols
+            .selection_symbols(handle.key)
+            .cloned()
+            .ok_or(HeapError::MissingBinding);
     }
     let base = heap.base_handle(handle)?;
     let view = heap.value(base)?;

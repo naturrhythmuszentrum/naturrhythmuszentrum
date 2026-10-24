@@ -7,6 +7,8 @@ use crate::{Heap, HeapError, Layout, SymbolState};
 use nrz_scalar::Scalar;
 use std::rc::Rc;
 
+mod parameters;
+
 /// Precision-erased selected reading retained in aliases, snapshots and provenance.
 #[derive(Clone, Debug)]
 pub(crate) struct SelectedReading {
@@ -143,13 +145,14 @@ impl Heap {
     pub fn select_reading<P: Scalar + 'static>(
         &mut self,
         binding: &ReadingBinding<P>,
+        budget: &mut nrz_bindings::Budget,
     ) -> Result<crate::ValueBinding<P>, LiveBindingError> {
         self.validate_reading(binding)?;
-        if !binding.group.native.is_empty() || !binding.group.companions.is_empty() {
+        if !binding.group.native.is_empty() {
             return Err(HeapError::MissingCoverage.into());
         }
         let selected = binding.selected();
-        let symbols = selected.symbols().ok_or(HeapError::MissingBinding)?;
+        let symbols = selected.companion_symbols(budget)?;
         let first = binding
             .adapter()
             .entries()
@@ -189,8 +192,15 @@ impl Heap {
         let key = *plan.keys().first().ok_or(HeapError::Capacity)?;
         self.symbols
             .reserve_selection(key, self.limits.descriptors)?;
-        let value =
-            super::super::lifecycle::selected(self.scope, key, ticket, layout.clone(), symbols)?;
+        let value = super::super::lifecycle::selected(
+            self.scope,
+            key,
+            ticket,
+            layout.clone(),
+            &selected,
+            &symbols,
+            self.limits.layout_work,
+        )?;
         let record = Record {
             schema: ticket.schema,
             location: Location::Alias,
@@ -199,7 +209,7 @@ impl Heap {
         };
         let prepared = plan.bind(vec![record])?;
         self.descriptors.publish(prepared);
-        self.symbols.publish_selection(key, selected);
+        self.symbols.publish_selection(key, selected, symbols);
         Ok(value)
     }
 }

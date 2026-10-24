@@ -51,12 +51,12 @@ pub use live::{
     CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
     CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, CopyDiscrepancy,
     DependencyPolicy, LcSpectralEvaluation, LcSpectralPublication, LcSpectrum, LiveBindingError,
-    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
-    PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorStatistics,
-    PhasorTransferBounds, PhasorTransferredResidual, PublishedLcSpectrum, PublishedPhasor,
-    PublishedPhasorSolve, ReadingBinding, ReadingImport, ReadingRegion,
-    ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
-    SpectralError, SpectralValue,
+    MappedReading, PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication,
+    PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication,
+    PhasorStatistics, PhasorTransferBounds, PhasorTransferredResidual, PublishedLcSpectrum,
+    PublishedPhasor, PublishedPhasorSolve, ReadingBinding, ReadingImport, ReadingRegion,
+    ReadingSelection, ReciprocalDerivativeContract, ReciprocalDerivativeError,
+    ReciprocalDerivativeEvaluation, SpectralError, SpectralValue,
 };
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};
@@ -253,8 +253,8 @@ fn payload_entries<P: Scalar>(inputs: &[InputSnapshot<P>]) -> Result<usize, Oper
             .extent()
             .entries()
             .checked_mul(
-                1 + usize::from(input.companion().is_some())
-                    + usize::from(input.evaluation.is_some())
+                1 + usize::from(input.carries_bound())
+                    + usize::from(input.carries_evaluation())
                     + 3 * usize::from(input.contributions.is_some()),
             )
             .ok_or(OperationError::ResourceLimit)?;

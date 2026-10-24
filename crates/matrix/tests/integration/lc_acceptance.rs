@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Shared original LC bindings exercise the operator and complete spectral publication together.
 
+mod companions;
 mod construction_costs;
 mod costs;
 mod oracle_regression;
@@ -38,9 +39,10 @@ fn lc_acceptance_shared_operator_spectrum() -> TestResult {
     let sources = represented(&fixture, &mut heap)?;
     let spectrum = fixture.plan(sources.clone(), &mut ledger()?)?;
     let publication = fixture.publication(spectrum, &mut ledger()?)?;
+    let mut selection_budget = ledger()?;
     let selected = sources
         .iter()
-        .map(|input| heap.select_reading(input))
+        .map(|input| heap.select_reading(input, &mut selection_budget))
         .collect::<Result<Vec<_>, _>>()?;
     let mut bound = Binding::from_symbols(operation, selected, ExecutionLimits::default())
         .validate(&mut heap)?;
