@@ -115,6 +115,6 @@ fn fixture() -> TestResult<Run> {
     };
     let input = bound.dependencies.first().ok_or("factor plan input")?;
     let dependency = FactorDependency::capture(input, contract, 1);
-    Run::new(bound.execution(), input, contract, &dependency)
+    Run::new(&bound.resources.trace, input, contract, &dependency)
         .map_err(|e| format!("factor plan allocation: {e}").into())
 }

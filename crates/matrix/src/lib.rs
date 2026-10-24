@@ -10,6 +10,12 @@
     reason = "transaction evidence is shared across private matrix modules"
 )]
 mod binding;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "resource leases are shared across private execution modules"
+)]
+mod execution;
+pub use execution::{ExecutionInventory, SharedFactorAllocation};
 
 #[path = "coordinates/schema.rs"]
 mod coordinate_schema;

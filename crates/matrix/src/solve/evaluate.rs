@@ -85,8 +85,38 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .dependencies
             .first()
             .ok_or(OperationError::InputCount)?;
-        let factor = super::factor::build(operator, self.execution, input, contract)?;
+        self.resources
+            .admit_factor(FactorRef::<P>::shared_header_bytes())?;
+        let factor = super::factor::build(operator, &self.resources.trace, input, contract)?;
+        self.resources.retain(
+            factor.shared_resource(),
+            factor.allocation_inventory().backend_allowance_bytes(),
+            None,
+        )?;
         self.finish_solve(views, &factor, token, evidence, None)
+    }
+
+    /// Transfer an independently retained exact factor share only after numerical success.
+    pub(super) fn retain_consumer(
+        &self,
+        factor: &FactorRef<P>,
+        contract: &SolveContract,
+        token: u64,
+    ) -> Result<(), OperationError> {
+        let original = factor.allocation_inventory().backend_allowance_bytes();
+        let current = contract
+            .work
+            .checked_mul(size_of::<P>())
+            .ok_or(OperationError::ResourceLimit)?;
+        let statistical = self
+            .statistics
+            .work
+            .checked_mul(size_of::<P>())
+            .ok_or(OperationError::ResourceLimit)?;
+        self.resources
+            .completed_backend(original, current, statistical)?;
+        self.resources
+            .retain(factor.shared_resource(), original, Some(token))
     }
 
     /// Preserve a valid over-budget proof in the failure record without issuing a candidate.
@@ -101,6 +131,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let crate::binding::NativeRecipe::Solve(contract) = &self.operation.recipe else {
             return Err(SolveError::Contract.into());
         };
+        self.resources
+            .admit_consumer(factor.shared_resource().as_ref())?;
         let default = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
         let run = Run::new(self, token, budget.unwrap_or(&default))?;
         let reservation = *self
@@ -142,6 +174,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             super::sensitivity::evaluate(self, contract, views, factor, evidence, &run)?;
         let mut outputs = buffer(1)?;
         outputs.push(restored.payload(reservation, &run)?);
+        self.retain_consumer(factor, contract, token)?;
         self.issued.set(Some(token));
         Ok(Candidate {
             execution: self.execution,
@@ -188,7 +221,7 @@ pub(crate) fn initial<P: Scalar + 'static>(
     } else {
         RightHandSide::Physical(views.get(1).ok_or(OperationError::InputCount)?)
     };
-    factor.backend.solve_planned(&rhs, run)
+    factor.resource.backend.solve_planned(&rhs, run)
 }
 
 /// Recompute every proof stage after each correction; residual improvement alone never accepts.
@@ -213,7 +246,7 @@ pub(crate) fn certify<P: Scalar + 'static>(
         operator,
         &rhs,
         &centers,
-        &factor.witness,
+        &factor.resource.witness,
         &mut residuals,
         &mut SolveWork::new(contract.work),
         &context,
@@ -225,7 +258,7 @@ pub(crate) fn certify<P: Scalar + 'static>(
     evidence.push(RecipeEvidence::Solve(Box::new(SolveEvidence::represented(
         contract,
         reservation,
-        &factor.witness,
+        &factor.resource.witness,
         &certificate,
         context.revision(),
     ))));
@@ -237,7 +270,7 @@ pub(crate) fn certify<P: Scalar + 'static>(
     let family = crate::solve_verification::family_with_bounds(
         operator,
         &rhs,
-        &factor.witness,
+        &factor.resource.witness,
         &certificate,
         [&mut operator_bounds, &mut rhs_bounds],
         &context,

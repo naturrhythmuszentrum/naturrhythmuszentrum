@@ -3,7 +3,7 @@
 
 use super::{Backend, Buffer, FactorAllocation, FactorAllocationStage as Stage, FactorInventory};
 use crate::{
-    ExecutionId, FactorDependency, InputSnapshot, OperationError, PrivateAllocationError as Error,
+    FactorDependency, InputSnapshot, OperationError, PrivateAllocationError as Error,
     PrivateAllocationTicket, RegionContract,
 };
 use nrz_bindings::BindingSymbols;
@@ -32,7 +32,7 @@ pub(super) struct Plan {
     /// Exact selected operator and algorithm revision.
     pub(super) dependency: FactorDependency,
     /// Origin execution, independent of the storage address.
-    execution: ExecutionId,
+    pub(super) trace: crate::execution::Trace,
     /// Unique factor attempt, including repeated factor requests before publication.
     token: u64,
     /// Positive square order checked before the first numerical allocation.
@@ -83,7 +83,7 @@ impl Run {
     }
     /// Reuse checked exact source declarations and admit the complete factor schedule.
     pub(crate) fn new<P: Scalar + 'static>(
-        execution: ExecutionId,
+        trace: &crate::execution::Trace,
         input: &InputSnapshot<P>,
         contract: &super::super::SolveContract,
         dependency: &FactorDependency,
@@ -118,7 +118,7 @@ impl Run {
             inputs: Rc::clone(&contract.inputs),
             source: input.symbols.clone(),
             dependency: dependency.clone(),
-            execution,
+            trace: trace.clone(),
             token: crate::heap::identity::identity()?,
             order: extent.rows(),
             entries: extent.entries(),
@@ -162,7 +162,7 @@ impl Run {
         if self.0.states[slot].get() != State::Planned {
             return Err(Error::DuplicateTicket.into());
         }
-        let ticket = PrivateAllocationTicket::new(self.0.execution, self.0.token, slot);
+        let ticket = PrivateAllocationTicket::new(self.0.trace.execution(), self.0.token, slot);
         self.0.states[slot].set(State::Issued);
         Ok(Permit {
             plan: Rc::clone(&self.0),
@@ -176,7 +176,7 @@ impl Run {
         inline: usize,
         ticket: PrivateAllocationTicket,
     ) -> Result<FactorInventory, OperationError> {
-        if ticket != PrivateAllocationTicket::new(self.0.execution, self.0.token, 1) {
+        if ticket != PrivateAllocationTicket::new(self.0.trace.execution(), self.0.token, 1) {
             return Err(Error::ForeignInventory.into());
         }
         for (slot, stage) in Stage::ALL.into_iter().enumerate() {
@@ -197,7 +197,7 @@ impl Run {
             allocations: std::array::from_fn(|slot| FactorAllocation {
                 plan: Rc::clone(&self.0),
                 stage: Stage::ALL[slot],
-                ticket: PrivateAllocationTicket::new(self.0.execution, self.0.token, slot),
+                ticket: PrivateAllocationTicket::new(self.0.trace.execution(), self.0.token, slot),
                 bytes: self.0.bytes[slot].get(),
             }),
             backend: self.0.backend,

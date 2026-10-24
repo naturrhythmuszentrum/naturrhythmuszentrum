@@ -284,6 +284,7 @@ pub(crate) fn enclosed_solve<P: Scalar + 'static>(
     attempt: Attempt<'_>,
 ) -> Result<(Matrix<P>, SensitivityEvidence), OperationError> {
     let centers = factor
+        .resource
         .backend
         .solve_entries(rhs.extent, &rhs.centers, attempt)?;
     let mut residuals = attempt.buffer(Stage::SensitivityResiduals)?;

@@ -163,6 +163,7 @@ impl<T> Drop for Buffer<T> {
         match &self.permit {
             Authority::Reciprocal(permit) => {
                 if let Some(entry) = permit.plan.specifications.get(permit.slot) {
+                    permit.plan.trace.released(entry.bytes.get());
                     entry.state.set(State::Released(self.values.len()));
                 }
             }

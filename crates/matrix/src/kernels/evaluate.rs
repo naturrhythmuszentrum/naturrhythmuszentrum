@@ -130,7 +130,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> crate::Bound<'_, P, Q> {
             .ok_or(OperationError::CandidateContract)?;
         let private = match &self.operation.recipe {
             crate::binding::NativeRecipe::Reciprocal { definition, .. } => Some(
-                crate::private::Run::new::<P>(self.execution, token, definition)?,
+                crate::private::Run::new::<P>(&self.resources.trace, token, definition)?,
             ),
             _ => None,
         };

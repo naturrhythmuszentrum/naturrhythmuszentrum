@@ -47,6 +47,7 @@ impl<T> Buffer<T> {
             .capacity()
             .checked_mul(size_of::<T>())
             .ok_or(OperationError::ResourceLimit)?;
+        permit.plan.trace.allocated(bytes)?;
         permit.plan.bytes[permit.slot].set(Some(bytes));
         permit.plan.states[permit.slot].set(State::Live);
         Ok(Self { values, permit })
@@ -73,6 +74,10 @@ impl<T> std::ops::DerefMut for Buffer<T> {
 }
 impl<T> Drop for Buffer<T> {
     fn drop(&mut self) {
+        self.permit
+            .plan
+            .trace
+            .released(self.permit.plan.bytes[self.permit.slot].get().unwrap_or(0));
         self.permit.plan.states[self.permit.slot].set(State::Released(self.values.len()));
     }
 }

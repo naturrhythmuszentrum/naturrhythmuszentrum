@@ -18,8 +18,12 @@ fn private_allocation_rejects_unplanned_meaning_and_representation() -> TestResu
         crate::reciprocal_testing::proved().map_err(|e| format!("allocation definition: {e}"))?;
     let (_, foreign) = crate::reciprocal_testing::proved()
         .map_err(|e| format!("foreign allocation definition: {e}"))?;
-    let run = Run::new::<f64>(ExecutionId(1), 2, &definition)
-        .map_err(|e| format!("private plan: {e}"))?;
+    let run = Run::new::<f64>(
+        &crate::execution::Trace::new(ExecutionId(1)),
+        2,
+        &definition,
+    )
+    .map_err(|e| format!("private plan: {e}"))?;
     assert!(matches!(
         run.grant::<DecodedLiteral<f64>>(&foreign.allocation(ReciprocalStage::References)),
         Err(OperationError::PrivateAllocation(
@@ -133,8 +137,12 @@ fn private_allocation_requires_complete_publication_coverage() -> TestResult {
 fn private_allocation_appends_cannot_grow_unplanned_storage() -> TestResult {
     let (_, definition) =
         crate::reciprocal_testing::proved().map_err(|e| format!("append definition: {e}"))?;
-    let run =
-        Run::new::<f64>(ExecutionId(3), 4, &definition).map_err(|e| format!("append plan: {e}"))?;
+    let run = Run::new::<f64>(
+        &crate::execution::Trace::new(ExecutionId(3)),
+        4,
+        &definition,
+    )
+    .map_err(|e| format!("append plan: {e}"))?;
     let mut values = run
         .buffer::<f64>(ReciprocalStage::Centers)
         .map_err(|e| format!("append allocation: {e}"))?;
@@ -176,7 +184,7 @@ fn private_allocation_rejects_foreign_inventory() -> TestResult {
         .checked_add(1)
         .ok_or("foreign inventory token")?;
     candidate.private = Some(
-        Run::new::<f64>(bound.execution(), token, &definition)
+        Run::new::<f64>(&bound.resources.trace, token, &definition)
             .map_err(|e| format!("foreign inventory plan: {e}"))?,
     );
     let failure = bound

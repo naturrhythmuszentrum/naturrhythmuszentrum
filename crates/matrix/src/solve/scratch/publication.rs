@@ -20,7 +20,7 @@ impl Run {
             .centers
             .solve_plan()
             .ok_or(Error::UnticketedBuffer)?;
-        if plan.execution != bound.execution
+        if plan.trace.execution() != bound.execution
             || plan.token != candidate.token
             || plan.precision != Q::PRECISION
             || !Rc::ptr_eq(&plan.contract, contract)

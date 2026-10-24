@@ -2,7 +2,7 @@
 //! Immutable meanings and mutable permit states are shared by actual numerical owners.
 
 use super::Stage;
-use crate::{Dependency, ExecutionId, Extent, OperationError, PrivateAllocationError as Error};
+use crate::{Dependency, Extent, OperationError, PrivateAllocationError as Error};
 use nrz_bindings::BindingSymbols;
 use nrz_scalar::Precision;
 use std::{any::TypeId, cell::Cell, rc::Rc};
@@ -39,7 +39,7 @@ pub(super) struct Specification {
 #[derive(Debug)]
 pub(crate) struct Plan {
     /// Original validated numerical execution.
-    pub(super) execution: ExecutionId,
+    pub(super) trace: crate::execution::Trace,
     /// Unique candidate attempt identity independent of storage addresses.
     pub(super) token: u64,
     /// Shared original checked solve equation, axes and exact restoration.
@@ -109,6 +109,7 @@ impl Permit {
                     Ok(sum)
                 }
             })?;
+        self.plan.trace.allocated(bytes)?;
         entry.bytes.set(Some(bytes));
         entry.state.set(State::Live);
         self.plan.peak.set(self.plan.peak.get().max(live));
@@ -128,9 +129,11 @@ impl Permit {
     }
     /// Record destruction without moving or cloning the authority away from its owner.
     pub(crate) fn release(&self, len: usize) {
-        self.plan.specifications[self.slot]
-            .state
-            .set(State::Released(len));
+        let entry = &self.plan.specifications[self.slot];
+        if matches!(entry.state.get(), State::Live | State::Candidate) {
+            self.plan.trace.released(entry.bytes.get().unwrap_or(0));
+        }
+        entry.state.set(State::Released(len));
     }
 }
 /// Actual aligned reference-counted allocation header, excluding shared exact declarations.

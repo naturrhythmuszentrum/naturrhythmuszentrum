@@ -46,7 +46,7 @@ pub(super) struct Specification {
 #[derive(Debug)]
 pub(super) struct Plan {
     /// Unique originating execution.
-    execution: ExecutionId,
+    pub(super) trace: crate::execution::Trace,
     /// Unique attempt token; failed retries cannot reuse allocation tickets.
     candidate: u64,
     /// One complete closed schedule in declaration order.
@@ -77,7 +77,7 @@ pub(super) struct Permit<T> {
 impl Run {
     /// Prepare every exact meaning and concrete element size before the numerical schedule.
     pub(crate) fn new<P: Scalar + 'static>(
-        execution: ExecutionId,
+        trace: &crate::execution::Trace,
         candidate: u64,
         definition: &PositiveReciprocalMap,
     ) -> Result<Self, OperationError> {
@@ -93,7 +93,7 @@ impl Run {
             specification::<P>(definition, Stage::Errors)?,
         ];
         Ok(Self(Rc::new(Plan {
-            execution,
+            trace: trace.clone(),
             candidate,
             specifications,
             precision: P::PRECISION,
@@ -157,7 +157,7 @@ impl Run {
         payload: &crate::publication::Payload<P>,
     ) -> Result<(), OperationError> {
         let expected = definition.allocation(ReciprocalStage::References);
-        if self.0.execution != execution
+        if self.0.trace.execution() != execution
             || self.0.candidate != candidate
             || self.0.precision != P::PRECISION
             || !self.0.specifications[0].binding.same_binding(&expected)
@@ -195,7 +195,7 @@ impl Run {
                 PrivateAllocation {
                     binding: entry.binding.clone(),
                     ticket: PrivateAllocationTicket {
-                        execution: self.0.execution,
+                        execution: self.0.trace.execution(),
                         candidate: self.0.candidate,
                         slot,
                     },
@@ -287,6 +287,7 @@ impl Plan {
                     .ok_or(OperationError::ResourceLimit)?;
             }
         }
+        self.trace.allocated(bytes)?;
         entry.bytes.set(bytes);
         entry.state.set(State::Live);
         self.peak.set(self.peak.get().max(live));

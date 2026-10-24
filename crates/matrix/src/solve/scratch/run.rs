@@ -73,7 +73,7 @@ impl Run {
             .and_then(|work| work.checked_mul(size_of::<P>()))
             .ok_or(OperationError::ResourceLimit)?;
         Ok(Plan {
-            execution: bound.execution,
+            trace: bound.resources.trace.clone(),
             token,
             contract: Rc::clone(contract),
             derivative: bound.statistics.derivative.clone(),

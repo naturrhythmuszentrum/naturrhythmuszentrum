@@ -134,6 +134,18 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
     /// # Errors
     /// Refuses stale/foreign/category/precision mismatches, schemas, structure or limits.
     pub fn validate(self, heap: &mut Heap) -> Result<Bound<'_, P, Q>, OperationError> {
+        let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
+        self.validate_with_resource_budget(heap, &budget)
+    }
+
+    /// Validate with explicit staged and retained ceilings for execution resource metadata.
+    /// # Errors
+    /// Refuses metadata exhaustion or any ordinary checked binding failure before a factor escapes.
+    pub fn validate_with_resource_budget<'h>(
+        self,
+        heap: &'h mut Heap,
+        budget: &nrz_bindings::Budget,
+    ) -> Result<Bound<'h, P, Q>, OperationError> {
         match self.operation.recipe {
             NativeRecipe::Precision { source, target }
                 if source == P::PRECISION && target == Q::PRECISION => {}
@@ -177,9 +189,10 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             dependency.validate(heap, contract, slot)?;
             heap.validate_bound_shape(dependency.handle(), contract, slot)?;
         }
+        let execution = ExecutionId(identity()?);
+        let resources = crate::execution::Lease::new(execution, budget)?;
         let statistics =
             crate::statistics::Plan::capture(heap, &self.operation, &self.inputs, self.limits)?;
-        let execution = ExecutionId(identity()?);
         let reservations = Reservations::prepare(heap, &dependencies, &self.operation)?;
         reservations.validate(heap)?;
         Ok(Bound {
@@ -188,6 +201,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             dependencies,
             statistics,
             execution,
+            resources,
             reservations,
             issued: std::cell::Cell::new(None),
         })
@@ -207,6 +221,8 @@ pub struct Bound<'h, P: Scalar, Q: Scalar = P> {
     pub(crate) statistics: crate::statistics::Plan<P>,
     /// Unforgeable association between a binding and its borrowed numerical inputs.
     pub(crate) execution: ExecutionId,
+    /// Independent numerical resource shares exist before any factor can escape this binding.
+    pub(crate) resources: crate::execution::Lease,
     /// Fully private output storage and descriptor occupations.
     pub(crate) reservations: Reservations<Q>,
     /// The one issued candidate token, unavailable before successful evaluation.

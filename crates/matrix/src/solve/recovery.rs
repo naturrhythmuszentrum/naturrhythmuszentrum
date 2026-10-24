@@ -349,9 +349,11 @@ pub(crate) fn correction<P: Scalar + 'static>(
             rhs.push(residual_center(residual, &context)?)?;
         }
     }
-    let delta = factor
-        .backend
-        .correction_planned(extent, &rhs, attempt.run, attempt.index)?;
+    let delta =
+        factor
+            .resource
+            .backend
+            .correction_planned(extent, &rhs, attempt.run, attempt.index)?;
     let mut updated = attempt.buffer(Stage::UpdatedCenters)?;
     for (&center, &update) in centers.iter().zip(&delta) {
         updated.push(

@@ -11,6 +11,7 @@ use super::backend::Lu;
 use crate::solve_verification::{InverseWitness, SolveWork};
 use crate::{Bound, ExecutionId, Failure, NormalizedView, OperationError, SolveError, ValueStamp};
 use nrz_scalar::{ArithmeticContext, Scalar};
+use std::rc::Rc;
 
 /// Opaque LU and independently validated inverse witness for one unchanged checked operator.
 ///
@@ -21,12 +22,39 @@ pub struct FactorRef<P: Scalar> {
     pub(crate) execution: ExecutionId,
     /// Exact operator identity and version in that execution.
     dependency: FactorDependency,
-    /// Private faer factors and permutation.
+    /// External ownership is independent of origin and completed consumer leases.
+    pub(crate) resource: Rc<Resource<P>>,
+}
+/// Numerical factor ownership is separate from immutable historical allocation receipts.
+#[derive(Debug)]
+pub(crate) struct Resource<P: Scalar> {
+    /// Actual backend owner retains its original non-cloneable permit.
     pub(crate) backend: Lu,
-    /// Independent inverse-defect proof against the saved heap operator.
+    /// Original independently checked inverse proof fields.
     pub(crate) witness: InverseWitness<P>,
-    /// Original allocation binding and complete factor-construction receipts.
-    inventory: super::FactorInventory,
+    /// Original allocating definitions, with no reverse reference to this numerical owner.
+    inventory: Rc<super::FactorInventory>,
+}
+/// Aligned shared numerical allocation header and its existing factor payload.
+#[repr(C)]
+struct RcLayout<P: Scalar> {
+    /// Strong reference count.
+    strong: usize,
+    /// Weak reference count.
+    weak: usize,
+    /// Backend and inverse witness payload.
+    value: Resource<P>,
+}
+impl<P: Scalar> crate::execution::ErasedFactor for Resource<P> {
+    fn ticket(&self) -> crate::PrivateAllocationTicket {
+        self.backend.ticket()
+    }
+    fn header_bytes(&self) -> usize {
+        FactorRef::<P>::shared_header_bytes()
+    }
+    fn inventory(&self) -> &Rc<super::FactorInventory> {
+        &self.inventory
+    }
 }
 
 impl<P: Scalar> std::fmt::Debug for FactorRef<P> {
@@ -42,8 +70,8 @@ impl<P: Scalar> std::fmt::Debug for FactorRef<P> {
 impl<P: Scalar> FactorRef<P> {
     /// Complete factor-construction receipts; later RHS solve allocations are separate owners.
     #[must_use]
-    pub const fn allocation_inventory(&self) -> &super::FactorInventory {
-        &self.inventory
+    pub fn allocation_inventory(&self) -> &super::FactorInventory {
+        &self.resource.inventory
     }
 
     /// Execution that owns the factor's normalized coordinate contract.
@@ -58,8 +86,8 @@ impl<P: Scalar> FactorRef<P> {
     }
     /// Independently certified inverse spectral norm in the execution's coordinates.
     #[must_use]
-    pub const fn inverse_norm(&self) -> P {
-        self.witness.inverse
+    pub fn inverse_norm(&self) -> P {
+        self.resource.witness.inverse
     }
 }
 
@@ -105,28 +133,36 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .dependencies
             .first()
             .ok_or(OperationError::InputCount)?;
-        budget.map_or_else(
-            || build(operator, self.execution, input, contract),
-            |budget| build_with_budget(operator, self.execution, input, contract, budget),
-        )
+        self.resources
+            .admit_factor(FactorRef::<P>::shared_header_bytes())?;
+        let factor = budget.map_or_else(
+            || build(operator, &self.resources.trace, input, contract),
+            |budget| build_with_budget(operator, &self.resources.trace, input, contract, budget),
+        )?;
+        self.resources.retain(
+            factor.shared_resource(),
+            factor.allocation_inventory().backend_allowance_bytes(),
+            None,
+        )?;
+        Ok(factor)
     }
 }
 
 /// The candidate inverse remains local and is discarded after its independent proof.
 pub(crate) fn build<P: Scalar + 'static>(
     operator: &NormalizedView<'_, P>,
-    execution: ExecutionId,
+    trace: &crate::execution::Trace,
     input: &crate::InputSnapshot<P>,
     contract: &super::SolveContract,
 ) -> Result<FactorRef<P>, OperationError> {
     let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
-    build_with_budget(operator, execution, input, contract, &budget)
+    build_with_budget(operator, trace, input, contract, &budget)
 }
 
 /// The caller's existing byte policy admits metadata before any numerical owner is created.
 fn build_with_budget<P: Scalar + 'static>(
     operator: &NormalizedView<'_, P>,
-    execution: ExecutionId,
+    trace: &crate::execution::Trace,
     input: &crate::InputSnapshot<P>,
     contract: &super::SolveContract,
     budget: &nrz_bindings::Budget,
@@ -134,7 +170,7 @@ fn build_with_budget<P: Scalar + 'static>(
     let context = ArithmeticContext::new().map_err(SolveError::from)?;
     let dependency = FactorDependency::capture(input, contract, context.revision());
     super::allocations::Run::check_budget(&dependency, budget)?;
-    let run = super::allocations::Run::new(execution, input, contract, &dependency)?;
+    let run = super::allocations::Run::new(trace, input, contract, &dependency)?;
     let backend = Lu::factor(operator, &run)?;
     let candidate = backend.inverse_witness::<P>(operator.extent().rows(), &run)?;
     let mut defects = run.buffer(super::FactorAllocationStage::InverseDefects)?;
@@ -152,11 +188,13 @@ fn build_with_budget<P: Scalar + 'static>(
     drop(candidate);
     let inventory = run.complete(backend.inline_bytes(), backend.ticket())?;
     Ok(FactorRef {
-        execution,
+        execution: trace.execution(),
         dependency,
-        backend,
-        witness,
-        inventory,
+        resource: Rc::new(Resource {
+            backend,
+            witness,
+            inventory: Rc::new(inventory),
+        }),
     })
 }
 
@@ -234,6 +272,8 @@ impl FactorDependency {
 /// Factor origin and validated dependency association retained by each new solve certificate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct FactorUse {
+    /// Exact original factor allocation, independent of equal dependency keys.
+    ticket: crate::PrivateAllocationTicket,
     /// Original factorization execution, never a previous RHS certificate.
     origin: ExecutionId,
     /// Execution that checked reuse and recomputed its own solve proof.
@@ -242,6 +282,11 @@ pub struct FactorUse {
     dependency: FactorDependency,
 }
 impl FactorUse {
+    /// Original backend allocation whose numerical owner the consumer retained.
+    #[must_use]
+    pub const fn ticket(&self) -> crate::PrivateAllocationTicket {
+        self.ticket
+    }
     /// Original factor-producing execution.
     #[must_use]
     pub const fn origin(&self) -> ExecutionId {
@@ -284,10 +329,25 @@ impl<P: Scalar> FactorRef<P> {
     /// A successful key comparison is recorded separately from any numerical solve proof.
     pub(crate) fn used_by(&self, execution: ExecutionId) -> FactorUse {
         FactorUse {
+            ticket: self.resource.backend.ticket(),
             origin: self.execution,
             execution,
             dependency: self.dependency.clone(),
         }
+    }
+}
+
+impl<P: Scalar> FactorRef<P> {
+    /// Retain the same actual backend and witness without copying any numerical fields.
+    pub(crate) fn shared_resource(&self) -> Rc<dyn crate::execution::ErasedFactor>
+    where
+        P: 'static,
+    {
+        self.resource.clone()
+    }
+    /// Newly allocated shared owner header; the pre-existing payload is already scoped separately.
+    pub(crate) const fn shared_header_bytes() -> usize {
+        size_of::<RcLayout<P>>() - size_of::<Resource<P>>() + 2 * size_of::<usize>()
     }
 }
 

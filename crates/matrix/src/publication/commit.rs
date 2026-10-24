@@ -27,7 +27,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         let prepared = self.prepare_publication(&candidate, &mut evidence);
         drop(candidate);
         match prepared {
-            Ok((graph, moments)) => Ok(self.commit(graph, moments)),
+            Ok((graph, moments, resources)) => Ok(self.commit(graph, moments, resources)),
             Err(cause) => Err(self.failure(cause, evidence)),
         }
     }
@@ -37,7 +37,14 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         &mut self,
         candidate: &Candidate<Q>,
         evidence: &mut Vec<crate::RecipeEvidence>,
-    ) -> Result<(PreparedGraph, crate::statistics::PreparedMoments), OperationError> {
+    ) -> Result<
+        (
+            PreparedGraph,
+            crate::statistics::PreparedMoments,
+            crate::ExecutionInventory,
+        ),
+        OperationError,
+    > {
         if candidate.execution != self.execution || self.issued.get() != Some(candidate.token) {
             return Err(OperationError::ForeignCandidate);
         }
@@ -87,7 +94,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             &self.reservations.covers,
             &self.reservations.records,
         )?;
-        Ok((self.heap.provenance.prepare(record)?, moments))
+        let resources = self.heap.executions.prepare(&self.resources, candidate)?;
+        Ok((self.heap.provenance.prepare(record)?, moments, resources))
     }
 
     /// Match the private proof to the exact closed operation before committing any output.
@@ -393,6 +401,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         self,
         graph: PreparedGraph,
         moments: crate::statistics::PreparedMoments,
+        resources: crate::ExecutionInventory,
     ) -> Outcome<Vec<PublishedBundle<Q>>> {
         let record = graph.record_id();
         self.heap.storage.publish(self.reservations.storage);
@@ -400,6 +409,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         self.heap.descriptors.publish(self.reservations.records);
         self.heap.symbols.publish(self.reservations.covers);
         self.heap.provenance.publish(graph);
+        self.heap
+            .executions
+            .publish(record, self.resources, resources);
         self.heap.statistics.records.extend(moments.records);
         self.reservations.planned.publish();
         Outcome {

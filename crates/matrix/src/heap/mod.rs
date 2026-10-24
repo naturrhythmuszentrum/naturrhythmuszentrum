@@ -65,6 +65,8 @@ pub struct Heap {
     pub(crate) joint: crate::companions::JointStore,
     /// Source-preserving propagated statistical parameter relations.
     pub(crate) statistics: crate::statistics::Store,
+    /// Completed execution resource leases, separate from immutable operation history.
+    pub(crate) executions: crate::execution::Registry,
 }
 
 impl Heap {
@@ -84,6 +86,7 @@ impl Heap {
             symbols: crate::binding::symbols::Inventory::default(),
             joint: crate::companions::JointStore::default(),
             statistics: crate::statistics::Store::default(),
+            executions: crate::execution::Registry::default(),
         })
     }
 }

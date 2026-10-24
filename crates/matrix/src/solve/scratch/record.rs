@@ -209,7 +209,7 @@ impl SolveAllocation {
     /// Historical allocation authority, never permission to allocate or read a live region.
     #[must_use]
     pub fn ticket(&self) -> PrivateAllocationTicket {
-        PrivateAllocationTicket::new(self.plan.execution, self.plan.token, self.slot)
+        PrivateAllocationTicket::new(self.plan.trace.execution(), self.plan.token, self.slot)
     }
     /// Publication creates projections only for valid slots whose allocation observation is final.
     fn specification(&self) -> &super::plan::Specification {
@@ -253,7 +253,7 @@ pub struct SolveInventory {
 }
 impl PartialEq for SolveInventory {
     fn eq(&self, other: &Self) -> bool {
-        self.plan.execution == other.plan.execution
+        self.plan.trace.execution() == other.plan.trace.execution()
             && self.plan.token == other.plan.token
             && self.allocations == other.allocations
             && self.peak == other.peak

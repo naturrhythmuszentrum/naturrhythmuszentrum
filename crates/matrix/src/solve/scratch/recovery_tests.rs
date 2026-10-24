@@ -11,35 +11,8 @@ use nrz_bindings::Descriptor;
 #[test]
 fn solve_correction_inventory_publishes_complete_attempt_prefix() -> TestResult {
     let mut heap = Heap::new(HeapLimits::default())?;
-    let operator = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[3.0_f32])?;
-    let rhs = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f32])?;
-    let limits = ExecutionLimits::default();
-    let operation = draft(1, 1)?
-        .with_solve_policy(crate::recovery_testing::policy(
-            0.001,
-            2,
-            nrz_accuracy::Promotion::Never,
-            nrz_accuracy::Limits::new(3, 1_000_000),
-        )?)?
-        .check(limits)?;
-    let bound =
-        Binding::new(operation, vec![operator.value(), rhs.value()], limits).validate(&mut heap)?;
-    let token = crate::heap::identity::identity()?;
-    let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
-    let run = Run::new(&bound, token, &budget)?;
-    let factor = bound.factor()?;
-    let (restored, evidence) = corrected(&bound, &factor, &run)?;
-    let reservation = *bound.output_reservations().first().ok_or("reservation")?;
-    let candidate = Candidate {
-        execution: bound.execution(),
-        token,
-        revision: bound.operation.revision(),
-        outputs: vec![restored.payload(reservation, &run)?],
-        evidence,
-        statistics: Vec::new(),
-        private: None,
-    };
-    bound.issued.set(Some(token));
+    let bound = binding(&mut heap)?;
+    let candidate = corrected_candidate(&bound)?;
     let outcome = bound.publish(candidate)?;
     let receipt = heap
         .operation_record(outcome.record())?
@@ -74,6 +47,79 @@ fn solve_correction_inventory_publishes_complete_attempt_prefix() -> TestResult 
         crate::kernel_oracle::Rational::new(1, 3)?.covered(f64::from(value), f64::from(error))?
     );
     Ok(())
+}
+/// A genuine foreign correction inventory is refused even with equal final numerical values.
+/// ´test:unit:solve-correction-publication-refuses-foreign-inventory´
+#[test]
+fn solve_correction_publication_refuses_foreign_inventory() -> TestResult {
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let bound = binding(&mut heap)?;
+    let mut candidate = corrected_candidate(&bound)?;
+    let mut foreign_heap = Heap::new(HeapLimits::default())?;
+    let foreign = binding(&mut foreign_heap)?;
+    let mut foreign_candidate = corrected_candidate(&foreign)?;
+    assert_ne!(candidate.execution, foreign_candidate.execution);
+    let output = candidate.outputs.first_mut().ok_or("output")?;
+    let other = foreign_candidate
+        .outputs
+        .first_mut()
+        .ok_or("foreign output")?;
+    std::mem::swap(&mut output.centers, &mut other.centers);
+    let planned = bound.result_bindings().to_vec();
+    let failure = bound
+        .publish(candidate)
+        .err()
+        .ok_or("foreign correction admitted")?;
+    assert!(matches!(
+        failure.cause(),
+        crate::OperationError::PrivateAllocation(crate::PrivateAllocationError::ForeignInventory)
+    ));
+    assert!(
+        planned
+            .iter()
+            .all(|binding| binding.state() == crate::SymbolState::Unavailable)
+    );
+    assert_eq!(heap.descriptors.iter().count(), 2);
+    Ok(())
+}
+/// Construct the same finite correction policy over independent numerical inputs.
+fn binding(heap: &mut Heap) -> TestResult<crate::Bound<'_, f32>> {
+    let operator = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[3.0_f32])?;
+    let rhs = heap.import_represented(Extent::new(1, 1)?, &Descriptor::ratio(), &[1.0_f32])?;
+    let limits = ExecutionLimits::default();
+    let operation = draft(1, 1)?
+        .with_solve_policy(crate::recovery_testing::policy(
+            0.001,
+            2,
+            nrz_accuracy::Promotion::Never,
+            nrz_accuracy::Limits::new(3, 1_000_000),
+        )?)?
+        .check(limits)?;
+    Ok(Binding::new(operation, vec![operator.value(), rhs.value()], limits).validate(heap)?)
+}
+/// The deliberately altered iterate uses the production resource handoff before publication.
+fn corrected_candidate(bound: &crate::Bound<'_, f32>) -> TestResult<Candidate<f32>> {
+    let token = crate::heap::identity::identity()?;
+    let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
+    let run = Run::new(bound, token, &budget)?;
+    let factor = bound.factor()?;
+    let (restored, evidence) = corrected(bound, &factor, &run)?;
+    let reservation = *bound.output_reservations().first().ok_or("reservation")?;
+    let crate::binding::NativeRecipe::Solve(contract) = &bound.operation.recipe else {
+        return Err("contract".into());
+    };
+    let candidate = Candidate {
+        execution: bound.execution(),
+        token,
+        revision: bound.operation.revision(),
+        outputs: vec![restored.payload(reservation, &run)?],
+        evidence,
+        statistics: Vec::new(),
+        private: None,
+    };
+    bound.retain_consumer(&factor, contract, token)?;
+    bound.issued.set(Some(token));
+    Ok(candidate)
 }
 /// Two independent certificates use copied iterates; only the corrected complete proof may publish.
 fn corrected(
