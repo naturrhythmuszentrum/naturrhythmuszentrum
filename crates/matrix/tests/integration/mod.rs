@@ -86,3 +86,4 @@ mod phasor_statistics;
 mod spectral;
 
 mod spectral_publication;
+mod spectral_varied;
