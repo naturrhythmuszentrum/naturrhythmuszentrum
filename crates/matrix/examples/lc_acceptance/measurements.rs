@@ -10,6 +10,8 @@ use std::time::Instant;
 pub(crate) fn measure(name: &str) -> TestResult<Vec<Observation>> {
     match name {
         "vector-covariance" => vector(),
+        "driven-entries" => driven(nrz_matrix::DependencyPolicy::Entries),
+        "driven-whole-base" => driven(nrz_matrix::DependencyPolicy::WholeBase),
         "overlap-replay" => replay(),
         name => owner(name),
     }
@@ -125,4 +127,57 @@ fn evaluate(
                 usage.after.work - usage.before_evaluation.work, execution.retained_payload_bytes(), budget.usage().work) });
     }
     Ok(())
+}
+
+/// Admission owns a separate request; the numerical lifecycle shares one unchanged default ledger.
+fn driven(policy: nrz_matrix::DependencyPolicy) -> TestResult<Vec<Observation>> {
+    let mut admission = super::budget()?;
+    let start = Instant::now();
+    let mut case = fixture::lifecycle_case(policy, &mut admission)?;
+    let mut result = vec![Observation {
+        phase: "driven-admission".into(),
+        work: admission.usage().work,
+        seconds: start.elapsed().as_secs_f64(),
+        accounting: "clock_includes_exact_setup input_payload_bytes=176 caller_work_limit=16000000"
+            .into(),
+    }];
+    let mut resources = ledger()?;
+    let start = Instant::now();
+    let means = case.means(&mut resources)?;
+    result.push(Observation {
+        phase: "driven-means".into(),
+        work: resources.usage().work,
+        seconds: start.elapsed().as_secs_f64(),
+        accounting: "output_payload_bytes=192".into(),
+    });
+    let before = resources.usage().work;
+    let start = Instant::now();
+    let executions = case.executions(&means, &mut resources)?;
+    let context = nrz_scalar::ArithmeticContext::new()?;
+    let statistics = case
+        .heap
+        .evaluate_phasor_statistics(&executions, &context, &mut resources)?;
+    result.push(Observation {
+        phase: "driven-statistics".into(),
+        work: resources.usage().work - before,
+        seconds: start.elapsed().as_secs_f64(),
+        accounting: format!(
+            "retained_allowance_bytes={}",
+            statistics.retained_payload_bytes()
+        ),
+    });
+    let mut write = ledger()?;
+    let values = case.heap.reading_entries(&case.bindings[15])?;
+    let start = Instant::now();
+    case.heap
+        .replace_reading_entries(&case.bindings[15], &values, &mut write)?;
+    result.push(Observation {
+        phase: "driven-parameter-write".into(),
+        work: write.usage().work,
+        seconds: start.elapsed().as_secs_f64(),
+        accounting:
+            "equal_bit_replacement=true replacement_value_bytes=8 retained_payload_delta_bytes=0"
+                .into(),
+    });
+    Ok(result)
 }

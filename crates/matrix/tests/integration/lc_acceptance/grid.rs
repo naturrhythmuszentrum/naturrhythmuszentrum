@@ -202,3 +202,26 @@ fn versions(grid: &Grid) -> TestResult<Vec<nrz_matrix::ValueStamp>> {
         })
         .collect()
 }
+
+/// Each independent grid solve retains the measured certificate and scoped execution inventory.
+/// ´test:integration:lc-grid-consumer-resource-owners´
+#[test]
+fn lc_grid_consumer_resource_owners() -> TestResult {
+    let grid = prepare(&ArithmeticContext::new()?)?;
+    let mut profiles = Vec::new();
+    for consumer in &grid.consumers {
+        let record = grid.heap.operation_record(consumer.record)?;
+        let evidence = record.solve_evidence().ok_or("grid solve evidence")?;
+        let inventory = grid.heap.execution_inventory(consumer.record)?;
+        profiles.push([
+            evidence.work(),
+            inventory.observed_allocations(),
+            inventory.cumulative_payload_bytes(),
+            inventory.peak_payload_bytes(),
+            inventory.metadata_bytes(),
+            inventory.backend_allowance_bytes(),
+        ]);
+    }
+    assert_eq!(profiles, [[1536, 11, 224, 64, 240, 12_288]; 3]);
+    Ok(())
+}
