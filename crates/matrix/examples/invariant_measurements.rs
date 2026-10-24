@@ -95,6 +95,40 @@ fn main() -> reading_testing::TestResult {
         result.value().owned_bytes(),
         result.avoided_evaluation_work()
     )?;
+    write_inventory(&mut output, &heap, result.value().record(), result.reused())?;
     output.flush()?;
+    Ok(())
+}
+
+/// Scratch receipts are historical allocation facts of the original materialization on either path.
+fn write_inventory(
+    output: &mut impl Write,
+    heap: &Heap,
+    record: nrz_matrix::RecordId,
+    reused: bool,
+) -> reading_testing::TestResult {
+    let inventory = heap
+        .operation_record(record)?
+        .reciprocal_inventory()
+        .ok_or("missing reciprocal inventory")?;
+    let source = if reused { "cached" } else { "fresh" };
+    for allocation in inventory.allocations() {
+        writeln!(
+            output,
+            "owner=reciprocal-kernel source={source} stage={:?} logical_entries={} float_entries={} owned_bytes={}",
+            allocation.binding().stage(),
+            allocation.entries(),
+            allocation.float_entries(),
+            allocation.owned_bytes(),
+        )?;
+    }
+    writeln!(
+        output,
+        "scope=reciprocal-kernel source={source} peak_payload_bytes={} planning_bytes={} receipt_bytes={} candidate_metadata_bytes={} backend_allowance=not-applicable",
+        inventory.peak_payload_bytes(),
+        inventory.planning_bytes(),
+        inventory.metadata_bytes(),
+        inventory.candidate_metadata_bytes(),
+    )?;
     Ok(())
 }

@@ -2,6 +2,7 @@
 //! Public LC recipe fixtures; original similarity and numerical oracle are constructed independently.
 
 use crate::reading_testing::{Fixture, TestResult, ledger, map, matrix, real};
+use crate::test_api::{CheckedShape, OperationDraft};
 use nrz_bindings::readings::algebra::{
     ExactConstant, Handle, Rational, Reference,
     domain::{AssumptionDraft, ContextDraft},
@@ -12,7 +13,6 @@ use nrz_bindings::readings::{
     CoordinateNormalization, EntryMeaning, PositiveReciprocalMap, ReciprocalMapDefinition,
 };
 use nrz_bindings::{Descriptor, Dimension, Kind, Measure, ReferenceDefinition, Role, Scale};
-use nrz_matrix::{CheckedShape, OperationDraft};
 use nrz_scalar::LiteralLimits;
 
 /// Exact graph, physical input references and independently written original LC similarity.

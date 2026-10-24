@@ -5,7 +5,9 @@ use super::{
     DomainReason, Elementwise, KernelError,
     arithmetic::{Entry, singleton},
 };
-use crate::{NormalizedView, OperationError, binding::buffer};
+use crate::private::{Buffer, Run};
+use crate::{NormalizedView, OperationError};
+use nrz_bindings::readings::ReciprocalStage;
 use nrz_scalar::{
     ArithmeticContext, DecodedLiteral, Enclosure, Finite, LiteralLimits, NumericLiteral, Scalar,
 };
@@ -25,7 +27,7 @@ pub(crate) struct Schedule {
 
 /// Three images retain the original nominal target separately from its deterministic family.
 #[derive(Clone, Copy, Debug)]
-struct Image<P: Scalar> {
+pub(crate) struct Image<P: Scalar> {
     /// Rounded numerical candidate.
     center: P,
     /// Complete deterministic image.
@@ -39,7 +41,8 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
     schedule: &Schedule,
     inputs: &[NormalizedView<'_, P>],
     context: &ArithmeticContext,
-) -> Result<Vec<Entry<P>>, OperationError> {
+    allocations: &Run,
+) -> Result<Buffer<Entry<P>>, OperationError> {
     let count = inputs.iter().try_fold(0_usize, |total, input| {
         total
             .checked_add(input.extent().entries())
@@ -48,18 +51,36 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
     if count != schedule.references.len() {
         return Err(KernelError::Contract.into());
     }
-    let references = decode::<P>(&schedule.references, schedule.literals, context)?;
-    let coefficients = decode::<P>(&schedule.coefficients, schedule.literals, context)?;
-    let offsets = decode::<P>(&schedule.offsets, schedule.literals, context)?;
-    let mut reciprocals = buffer(count)?;
+    let references = decode::<P>(
+        &schedule.references,
+        schedule.literals,
+        context,
+        allocations,
+        ReciprocalStage::References,
+    )?;
+    let coefficients = decode::<P>(
+        &schedule.coefficients,
+        schedule.literals,
+        context,
+        allocations,
+        ReciprocalStage::Coefficients,
+    )?;
+    let offsets = decode::<P>(
+        &schedule.offsets,
+        schedule.literals,
+        context,
+        allocations,
+        ReciprocalStage::Offsets,
+    )?;
+    let mut reciprocals = allocations.buffer(ReciprocalStage::Images)?;
     for input in inputs {
         for index in 0..input.extent().entries() {
             let entry = reciprocals.len();
             let numerator = *references.get(entry).ok_or(KernelError::Contract)?;
-            reciprocals.push(reciprocal(input, index, numerator, entry, context)?);
+            reciprocals.push(reciprocal(input, index, numerator, entry, context)?)?;
         }
     }
-    let mut output = buffer(offsets.len())?;
+    let mut output = allocations.buffer(ReciprocalStage::Contracted)?;
     for (row, offset) in offsets.iter().enumerate() {
         let start = row
             .checked_mul(count)
@@ -68,7 +89,7 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
             .checked_add(count)
             .ok_or(OperationError::ResourceLimit)?;
         let factors = coefficients.get(start..end).ok_or(KernelError::Contract)?;
-        output.push(contract(&reciprocals, factors, *offset, context)?);
+        output.push(contract(&reciprocals, factors, *offset, context)?)?;
     }
     Ok(output)
 }
@@ -161,12 +182,14 @@ fn box_image<P: Scalar>(
 }
 
 /// Rational spelling scans and primitive decoding fit the predeclared finite schedule.
-fn decode<P: Scalar>(
+fn decode<P: Scalar + 'static>(
     values: &[String],
     limits: LiteralLimits,
     context: &ArithmeticContext,
-) -> Result<Vec<DecodedLiteral<P>>, OperationError> {
-    let mut result = buffer(values.len())?;
+    allocations: &Run,
+    stage: ReciprocalStage,
+) -> Result<Buffer<DecodedLiteral<P>>, OperationError> {
+    let mut result = allocations.buffer(stage)?;
     for text in values {
         let work = u64::try_from(text.len())
             .map_err(|_| OperationError::ResourceLimit)?
@@ -183,7 +206,7 @@ fn decode<P: Scalar>(
                 .map_err(KernelError::from)?
                 .decode(context)
                 .map_err(KernelError::from)?,
-        );
+        )?;
     }
     Ok(result)
 }

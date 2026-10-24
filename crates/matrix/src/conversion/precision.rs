@@ -144,9 +144,9 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
         Payload {
             extent,
             target: output.stamp(),
-            centers,
-            bounds: Some(totals),
-            evaluation: Some(errors),
+            centers: centers.into(),
+            bounds: Some(totals.into()),
+            evaluation: Some(errors.into()),
             contributions: None,
         },
         RecipeEvidence::Precision(claim),

@@ -129,6 +129,9 @@ impl Provenance {
         let mut usage = self.usage;
         usage.records = add(usage.records, add(nodes.len(), 1)?)?;
         usage.bytes = add(usage.bytes, size_of::<OperationRecord>())?;
+        if let Some(inventory) = record.reciprocal_inventory() {
+            usage.bytes = add(usage.bytes, inventory.metadata_bytes())?;
+        }
         for (output, node) in record.outputs.iter().zip(nodes) {
             let range = record.operation.input_slots(node.slot)?;
             usage.depth = usage.depth.max(node.depth);

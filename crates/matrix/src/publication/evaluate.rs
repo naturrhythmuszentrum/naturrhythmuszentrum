@@ -86,6 +86,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             outputs,
             evidence: evidence.clone(),
             statistics,
+            private: None,
         })
     }
 
@@ -210,9 +211,9 @@ fn copy_view<P: Scalar + 'static, Q: Scalar + 'static>(
     Ok(Payload {
         extent,
         target: reservation.stamp(),
-        centers,
-        bounds,
-        evaluation,
+        centers: centers.into(),
+        bounds: bounds.map(Into::into),
+        evaluation: evaluation.map(Into::into),
         contributions,
     })
 }

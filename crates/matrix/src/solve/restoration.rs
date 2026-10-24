@@ -132,9 +132,9 @@ impl<P: Scalar + 'static> Restored<P> {
         Ok(Payload {
             extent: reservation.extent(),
             target: reservation.stamp(),
-            centers: transfer(self.centers)?,
-            bounds: Some(transfer(self.totals)?),
-            evaluation: Some(transfer(self.evaluation)?),
+            centers: transfer(self.centers)?.into(),
+            bounds: Some(transfer(self.totals)?.into()),
+            evaluation: Some(transfer(self.evaluation)?.into()),
             contributions: None,
         })
     }

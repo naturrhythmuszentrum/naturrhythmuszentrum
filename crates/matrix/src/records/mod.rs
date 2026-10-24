@@ -60,9 +60,19 @@ pub struct OperationRecord {
     pub(crate) evidence: Vec<crate::RecipeEvidence>,
     /// Representation of the copied coordinates and companions.
     pub(crate) precision: Precision,
+    /// Scoped complete reciprocal-kernel scratch receipts; other paths are not inventoried here.
+    pub(crate) private: Option<Box<crate::ReciprocalInventory>>,
 }
 
 impl OperationRecord {
+    /// Completed reciprocal-kernel allocation inventory, including all candidate channels.
+    ///
+    /// Absence means this operation does not yet expose a private allocation inventory.
+    /// Reserved destinations and solve resources remain separate from this scoped inventory.
+    #[must_use]
+    pub fn reciprocal_inventory(&self) -> Option<&crate::ReciprocalInventory> {
+        self.private.as_deref()
+    }
     /// Scoped immutable record identity.
     #[must_use]
     pub const fn id(&self) -> RecordId {

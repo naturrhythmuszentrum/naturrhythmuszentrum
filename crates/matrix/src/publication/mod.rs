@@ -32,6 +32,8 @@ pub struct Candidate<P: Scalar> {
     pub(crate) evidence: Vec<crate::RecipeEvidence>,
     /// Complete private statistical parameters, published in the same transaction.
     pub(crate) statistics: Vec<crate::statistics::MomentPayload<P>>,
+    /// Ticket authority follows the original candidate arrays until their destruction.
+    pub(crate) private: Option<crate::private::Run>,
 }
 
 impl<P: Scalar> Candidate<P> {
@@ -55,11 +57,11 @@ pub(crate) struct Payload<P: Scalar> {
     /// Exact reserved output identity and version.
     pub(crate) target: ValueStamp,
     /// Unpublished column-ordered centers.
-    pub(crate) centers: Vec<P>,
+    pub(crate) centers: crate::private::Buffer<P>,
     /// Unpublished complete declared-bound region, if carried by the input.
-    pub(crate) bounds: Option<Vec<P>>,
+    pub(crate) bounds: Option<crate::private::Buffer<P>>,
     /// Separate numerical evaluation radii, already included in total bounds.
-    pub(crate) evaluation: Option<Vec<P>>,
+    pub(crate) evaluation: Option<crate::private::Buffer<P>>,
     /// Three overlapping product derivation regions, when carried or computed.
     pub(crate) contributions: Option<[Vec<P>; 3]>,
 }

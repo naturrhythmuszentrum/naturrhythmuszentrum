@@ -14,26 +14,18 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     contract: &KernelContract,
     views: &[NormalizedView<'_, P>],
     reservation: OutputReservation,
+    private: Option<&crate::private::Run>,
 ) -> Result<(Payload<Q>, RecipeEvidence), OperationError> {
-    let extents_match = views
-        .iter()
-        .zip(contract.inputs.iter())
-        .all(|(view, extent)| view.extent() == *extent);
-    if views.len() != contract.inputs.len()
-        || reservation.extent() != contract.output
-        || !extents_match
-        || !reservation.bounded
-        || !reservation.evaluation
-        || P::PRECISION != Q::PRECISION
-    {
-        return Err(KernelError::Contract.into());
-    }
+    validate::<P, Q>(contract, views, reservation)?;
     let context = ArithmeticContext::new().map_err(KernelError::from)?;
+    if let Recipe::PositiveReciprocal(schedule) = &contract.recipe {
+        let allocations = private.ok_or(crate::PrivateAllocationError::IncompleteCoverage)?;
+        let entries = super::reciprocal::evaluate(schedule, views, &context, allocations)?;
+        let payload = reciprocal_payload(&entries, reservation, allocations)?;
+        return Ok((payload, claim::<Q>(contract, reservation, &context)));
+    }
     let (entries, contributions) = match &contract.recipe {
-        Recipe::PositiveReciprocal(schedule) => (
-            super::reciprocal::evaluate(schedule, views, &context)?,
-            None,
-        ),
+        Recipe::PositiveReciprocal(_) => return Err(KernelError::Contract.into()),
         Recipe::Sum { subtract, right } => (sum(views, *subtract, right, &context)?, None),
         Recipe::Transform(map) => (
             transform(views, map)?,
@@ -63,24 +55,16 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
         totals.push(crate::conversion::same_format(entry.total)?);
         errors.push(crate::conversion::same_format(entry.error)?);
     }
-    let evidence = KernelEvidence {
-        kind: contract.kind(),
-        entries: reservation.extent().entries(),
-        coverage: reservation.coverage(),
-        precision: Q::PRECISION,
-        revision: context.revision(),
-        work: contract.work,
-    };
     Ok((
         Payload {
             extent: reservation.extent(),
             target: reservation.stamp(),
-            centers,
-            bounds: Some(totals),
-            evaluation: Some(errors),
+            centers: centers.into(),
+            bounds: Some(totals.into()),
+            evaluation: Some(errors.into()),
             contributions,
         },
-        RecipeEvidence::Kernel(evidence),
+        claim::<Q>(contract, reservation, &context),
     ))
 }
 
@@ -144,7 +128,13 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> crate::Bound<'_, P, Q> {
             .outputs
             .first()
             .ok_or(OperationError::CandidateContract)?;
-        let (payload, claim) = evaluate(contract, views, reservation)?;
+        let private = match &self.operation.recipe {
+            crate::binding::NativeRecipe::Reciprocal { definition, .. } => Some(
+                crate::private::Run::new::<P>(self.execution, token, definition)?,
+            ),
+            _ => None,
+        };
+        let (payload, claim) = evaluate(contract, views, reservation, private.as_ref())?;
         let mut outputs = buffer(1)?;
         evidence
             .try_reserve(1)
@@ -160,6 +150,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> crate::Bound<'_, P, Q> {
             outputs,
             evidence: evidence.clone(),
             statistics,
+            private,
         })
     }
 }
@@ -221,4 +212,67 @@ fn transformed_contributions<P: Scalar + 'static, Q: Scalar + 'static>(
         }
     }
     Ok(Some(result))
+}
+
+/// Transfer every reciprocal channel through its own planned allocation and live ticket.
+fn reciprocal_payload<P: Scalar + 'static, Q: Scalar + 'static>(
+    entries: &[Entry<P>],
+    reservation: OutputReservation,
+    allocations: &crate::private::Run,
+) -> Result<Payload<Q>, OperationError> {
+    use nrz_bindings::readings::ReciprocalStage;
+    let mut centers = allocations.buffer(ReciprocalStage::Centers)?;
+    let mut totals = allocations.buffer(ReciprocalStage::Totals)?;
+    let mut errors = allocations.buffer(ReciprocalStage::Errors)?;
+    for entry in entries {
+        centers.push(crate::conversion::same_format(entry.center)?)?;
+        totals.push(crate::conversion::same_format(entry.total)?)?;
+        errors.push(crate::conversion::same_format(entry.error)?)?;
+    }
+    Ok(Payload {
+        extent: reservation.extent(),
+        target: reservation.stamp(),
+        centers: centers.into_candidate()?,
+        bounds: Some(totals.into_candidate()?),
+        evaluation: Some(errors.into_candidate()?),
+        contributions: None,
+    })
+}
+
+/// Evidence retains the same conservative numerical phase allowance for both buffer paths.
+const fn claim<Q: Scalar>(
+    contract: &KernelContract,
+    reservation: OutputReservation,
+    context: &ArithmeticContext,
+) -> RecipeEvidence {
+    RecipeEvidence::Kernel(KernelEvidence {
+        kind: contract.kind(),
+        entries: reservation.extent().entries(),
+        coverage: reservation.coverage(),
+        precision: Q::PRECISION,
+        revision: context.revision(),
+        work: contract.work,
+    })
+}
+
+/// Check the complete numerical shape and format before either allocation path starts.
+fn validate<P: Scalar + 'static, Q: Scalar>(
+    contract: &KernelContract,
+    views: &[NormalizedView<'_, P>],
+    reservation: OutputReservation,
+) -> Result<(), OperationError> {
+    let extents_match = views
+        .iter()
+        .zip(contract.inputs.iter())
+        .all(|(view, extent)| view.extent() == *extent);
+    if views.len() != contract.inputs.len()
+        || reservation.extent() != contract.output
+        || !extents_match
+        || !reservation.bounded
+        || !reservation.evaluation
+        || P::PRECISION != Q::PRECISION
+    {
+        return Err(KernelError::Contract.into());
+    }
+    Ok(())
 }

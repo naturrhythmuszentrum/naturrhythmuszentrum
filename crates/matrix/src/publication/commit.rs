@@ -74,7 +74,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             }
             evidence.push(claim.clone());
         }
-        let record = self.prepare_record(candidate.token, evidence)?;
+        let private = crate::private::Run::publication(self, candidate)?;
+        let record = self.prepare_record(candidate.token, evidence, private)?;
         super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
         let moments = crate::statistics::prepare(self, candidate, &record.outputs)?;
         crate::binding::parameters::validate(
@@ -278,6 +279,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         &self,
         token: u64,
         evidence: &[crate::RecipeEvidence],
+        private: Option<Box<crate::ReciprocalInventory>>,
     ) -> Result<OperationRecord, OperationError> {
         let mut inputs = buffer(self.dependencies.len())?;
         for input in &self.dependencies {
@@ -298,6 +300,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             outputs,
             evidence: claims,
             precision: Q::PRECISION,
+            private,
         })
     }
 

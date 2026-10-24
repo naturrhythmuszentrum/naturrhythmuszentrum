@@ -124,6 +124,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             outputs,
             evidence: evidence.clone(),
             statistics,
+            private: None,
         })
     }
 }

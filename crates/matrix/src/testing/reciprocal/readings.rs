@@ -2,12 +2,12 @@
 //! Complete normalized operator result readings are declared before numerical execution.
 
 use crate::reading_testing::{Fixture, TestResult, ledger};
+use crate::test_api::{EntryTicket, ReadingAdapter, ReadingCoverage};
 use nrz_bindings::readings::algebra::readings::{AffineMap, SelectionSpec};
 use nrz_bindings::{
     Descriptor, ReferenceDefinition,
     readings::{CoordinateFamily, EntryMeaning, Representation, RepresentationDefinition},
 };
-use nrz_matrix::{EntryTicket, ReadingAdapter, ReadingCoverage};
 
 /// One four-entry ratio reading covers the entire result, including both typed structural zeros.
 pub(crate) fn coverage(case: &mut Fixture) -> TestResult<ReadingCoverage<usize>> {

@@ -4,6 +4,9 @@
 /// A refused operation contract, binding, evaluation or publication.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum OperationError {
+    /// Private numerical allocation did not satisfy its prepared exact inventory.
+    #[error("private allocation: {0}")]
+    PrivateAllocation(#[from] crate::PrivateAllocationError),
     /// Exact coefficient recipe, reference or correspondence admission refused.
     #[error("reading recipe: {0}")]
     Reading(#[from] nrz_bindings::readings::ReadingError),

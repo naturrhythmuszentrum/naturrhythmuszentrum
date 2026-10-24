@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! A closed dimensionless coefficient recipe retains its original exact operator correspondence.
 
+mod allocations;
 mod build;
 mod guard;
 mod jacobian;
@@ -14,6 +15,10 @@ use nrz_cas::{
     readings::{AffineMap, ExactAffineMap, ReuseKey},
 };
 use std::rc::Rc;
+
+pub use allocations::{
+    ReciprocalAllocation, ReciprocalComponent, ReciprocalEntry, ReciprocalStage,
+};
 
 pub use jacobian::{
     ReciprocalJacobian, ReciprocalJacobianCache, ReciprocalJacobianKey, SourceJacobianUsage,

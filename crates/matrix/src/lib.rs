@@ -308,3 +308,24 @@ mod phasor_testing;
     reason = "physical phasor solve fixtures serve public and private tests"
 )]
 mod phasor_solve_testing;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "private allocation authority is shared by numerical kernels and publication"
+)]
+mod private;
+pub use private::{
+    PrivateAllocation, PrivateAllocationError, PrivateAllocationTicket, ReciprocalInventory,
+};
+
+#[cfg(test)]
+#[path = "testing/reciprocal.rs"]
+#[allow(
+    dead_code,
+    reason = "unit tests use the private-allocation subset of shared public fixtures"
+)]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "reciprocal fixtures are shared across test layers"
+)]
+mod reciprocal_testing;

@@ -74,9 +74,9 @@ fn region<P: Scalar + 'static, Q: Scalar + 'static>(
     Ok(Payload {
         extent,
         target: reservation.stamp(),
-        centers,
-        bounds: Some(totals),
-        evaluation: Some(errors),
+        centers: centers.into(),
+        bounds: Some(totals.into()),
+        evaluation: Some(errors.into()),
         contributions: None,
     })
 }

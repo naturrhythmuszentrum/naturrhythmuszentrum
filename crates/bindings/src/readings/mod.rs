@@ -44,8 +44,9 @@ pub use phasor::{
 };
 pub use projection::{ProjectionSpace, ReadingProjection};
 pub use reciprocal::{
-    PositiveReciprocalMap, ReciprocalJacobian, ReciprocalJacobianCache, ReciprocalJacobianKey,
-    ReciprocalMapDefinition, SourceJacobianUsage,
+    PositiveReciprocalMap, ReciprocalAllocation, ReciprocalComponent, ReciprocalEntry,
+    ReciprocalJacobian, ReciprocalJacobianCache, ReciprocalJacobianKey, ReciprocalMapDefinition,
+    ReciprocalStage, SourceJacobianUsage,
 };
 pub use relation::ReadingRelation;
 pub use representation::{Representation, RepresentationDefinition, RepresentationKind};

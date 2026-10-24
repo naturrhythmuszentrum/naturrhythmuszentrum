@@ -26,3 +26,5 @@ mod lc_roots;
 mod phasor_blocks;
 
 mod spectral;
+
+mod reciprocal_allocations;
