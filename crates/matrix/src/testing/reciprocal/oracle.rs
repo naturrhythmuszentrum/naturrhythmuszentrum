@@ -27,8 +27,14 @@ impl Rational {
         } else {
             (fraction | (1_u64 << 52), i64::try_from(field)? - 1075)
         };
+        if mantissa == 0 {
+            return Ok(Self(Exact::zero()));
+        }
+        let trailing = mantissa.trailing_zeros();
+        let significant = mantissa >> trailing;
+        let exponent = exponent + i64::from(trailing);
         let sign = if bits >> 63 == 0 { 1 } else { -1 };
-        let numerator = Exact::from_ratio(sign * i64::try_from(mantissa)?, 1, &mut ledger()?)?;
+        let numerator = Exact::from_ratio(sign * i64::try_from(significant)?, 1, &mut ledger()?)?;
         let scale = Exact::from_ratio(2, 1, &mut ledger()?)?.pow(exponent, &mut ledger()?)?;
         Ok(Self(numerator.mul(&scale, &mut ledger()?)?))
     }
@@ -46,6 +52,11 @@ impl Rational {
     /// Exact physical reciprocal ratio, independent of the executed coefficient schedule.
     pub(crate) fn divide(&self, other: &Self) -> TestResult<Self> {
         Ok(Self(self.0.div(&other.0, &mut ledger()?)?))
+    }
+
+    /// Exact ordering supports squared-norm comparisons without fixed-width cross products.
+    pub(crate) fn at_most(&self, other: &Self) -> TestResult<bool> {
+        Ok(self.0.compare(&other.0, &mut ledger()?)? != Ordering::Greater)
     }
 
     /// Exact endpoint containment without a rounded midpoint or radius.

@@ -87,3 +87,5 @@ mod spectral;
 
 mod spectral_publication;
 mod spectral_varied;
+
+mod lc_acceptance;

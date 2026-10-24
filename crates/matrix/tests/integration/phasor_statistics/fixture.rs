@@ -31,6 +31,8 @@ pub(super) struct Case<P: Scalar> {
     pub(super) bindings: Vec<ReadingBinding<P>>,
     /// Predeclared exact variance/cross/variance error transports.
     pub(super) exact: [Rc<ParameterErrorReading>; 3],
+    /// Actual scalar or complete vector target selected before numerical execution.
+    target: usize,
 }
 
 impl<P: Scalar + 'static> Case<P> {
@@ -59,8 +61,8 @@ impl<P: Scalar + 'static> Case<P> {
                 Rc::clone(&self.exact[index]),
                 [self.bindings[15].clone(), self.bindings[16].clone()],
                 vec![
-                    means[left].readings().bindings()[2].clone(),
-                    means[right].readings().bindings()[2].clone(),
+                    means[left].readings().bindings()[self.target].clone(),
+                    means[right].readings().bindings()[self.target].clone(),
                 ],
                 LiteralLimits::default(),
                 budget,
@@ -79,7 +81,28 @@ pub(super) fn case<P: Scalar + 'static>() -> TestResult<Case<P>> {
 
 /// One caller ledger covers both equations, all covariance laws and complete source/publication admission.
 pub(super) fn case_with_budget<P: Scalar + 'static>(resources: &mut Budget) -> TestResult<Case<P>> {
-    let mut fixture = declarations()?;
+    build(resources, false, DependencyPolicy::WholeBase)
+}
+
+/// Full two-coordinate targets exercise both covariance axes without a scalar statistics facade.
+pub(super) fn vector_case<P: Scalar + 'static>() -> TestResult<Case<P>> {
+    vector_case_with_budget(&mut budget()?)
+}
+
+/// Measure the complete vector-target construction on the caller's cumulative ledger.
+pub(super) fn vector_case_with_budget<P: Scalar + 'static>(
+    resources: &mut Budget,
+) -> TestResult<Case<P>> {
+    build(resources, true, DependencyPolicy::WholeBase)
+}
+
+/// Scalar and vector requests retain their complete inventories before importing any values.
+fn build<P: Scalar + 'static>(
+    resources: &mut Budget,
+    full: bool,
+    dependencies: DependencyPolicy,
+) -> TestResult<Case<P>> {
+    let mut fixture = declarations(full)?;
     let voltage = meaning("voltage", [2, 1, -3, -1, 0, 0, 0])?;
     let impedance = meaning("impedance", [2, 1, -3, -2, 0, 0, 0])?;
     let current = meaning("current", [0, 0, 0, 1, 0, 0, 0])?;
@@ -96,9 +119,10 @@ pub(super) fn case_with_budget<P: Scalar + 'static>(resources: &mut Budget) -> T
     ];
     let definitions = equations(&mut fixture, &inputs, &outputs, resources)?;
     let equation_work = resources.usage().work;
+    let target = if full { 5 } else { 2 };
     let targets = [
-        outputs[0].adapters[2].reading().clone(),
-        outputs[1].adapters[2].reading().clone(),
+        outputs[0].adapters[target].reading().clone(),
+        outputs[1].adapters[target].reading().clone(),
     ];
     let (parameters, exact) = parameters::prepare(&mut fixture, &definitions, &targets, resources)?;
     let covariance_work = resources.usage().work;
@@ -117,7 +141,8 @@ pub(super) fn case_with_budget<P: Scalar + 'static>(resources: &mut Budget) -> T
         )?,
     ];
     let metric_work = resources.usage().work;
-    let (mut heap, bindings) = import::<P>(fixture, &inputs, &parameters, resources)?;
+    let (mut heap, bindings) = import::<P>(fixture, &inputs, &parameters, dependencies, resources)
+        .map_err(|error| format!("source admission ({dependencies:?}): {error}"))?;
     let publications = publications(&definitions, &outputs, &bindings, &frames, resources)?;
     heap.compact()?;
     let construction = [
@@ -132,11 +157,12 @@ pub(super) fn case_with_budget<P: Scalar + 'static>(resources: &mut Budget) -> T
         publications,
         bindings,
         exact,
+        target,
     })
 }
 
 /// Every exact symbol is available in the shared graph before any numerical computation.
-fn declarations() -> TestResult<Fixture> {
+fn declarations(full: bool) -> TestResult<Fixture> {
     let mut declarations = Vec::new();
     for prefix in ["below", "above", "voltage"] {
         blocks::declare(&mut declarations, prefix, 1, false);
@@ -147,7 +173,7 @@ fn declarations() -> TestResult<Fixture> {
     for prefix in ["below", "above"] {
         blocks::error_declarations(&mut declarations, prefix);
     }
-    parameters::declare(&mut declarations);
+    parameters::declare(&mut declarations, full);
     let borrowed = declarations
         .iter()
         .map(|(key, sort)| (key.as_str(), sort.clone()))
@@ -204,6 +230,7 @@ fn import<P: Scalar + 'static>(
     fixture: Fixture,
     inputs: &[blocks::Block; 3],
     parameters: &[nrz_matrix::ReadingAdapter<usize>; 2],
+    dependencies: DependencyPolicy,
     budget: &mut Budget,
 ) -> TestResult<(Heap, Vec<ReadingBinding<P>>)> {
     let mut adapters = inputs
@@ -276,7 +303,7 @@ fn import<P: Scalar + 'static>(
             .flat_map(|block| block.companions.iter().cloned())
             .collect(),
         &regions,
-        DependencyPolicy::WholeBase,
+        dependencies,
         budget,
     )?;
     Ok((heap, imported.bindings().to_vec()))

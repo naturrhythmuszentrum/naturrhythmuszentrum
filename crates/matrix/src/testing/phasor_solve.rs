@@ -140,6 +140,23 @@ pub(crate) fn case<P: Scalar + 'static>(
     rounded: bool,
     budget: &mut Budget,
 ) -> TestResult<Case<P>> {
+    case_in_heap(
+        reactance,
+        radius,
+        rounded,
+        Heap::new(HeapLimits::default())?,
+        budget,
+    )
+}
+
+/// Keep unrelated live experiments in the same numerical owner while preparing a driven equation.
+pub(crate) fn case_in_heap<P: Scalar + 'static>(
+    reactance: P,
+    radius: P,
+    rounded: bool,
+    mut heap: Heap,
+    budget: &mut Budget,
+) -> TestResult<Case<P>> {
     let mut fixture = declarations::fixture()?;
     let (adapters, relations, current, coverage, companions) =
         declarations::readings(&mut fixture)?;
@@ -167,7 +184,6 @@ pub(crate) fn case<P: Scalar + 'static>(
         .flat_map(|region| crate::phasor_testing::tickets(region, &[0, 1, 2, 3]))
         .collect();
     let source_coverage = ReadingCoverage::new(universe, adapters, relations, &mut ledger()?)?;
-    let mut heap = Heap::new(HeapLimits::default())?;
     let imported = heap.import_readings(
         Rc::new(fixture.cas),
         source_coverage,

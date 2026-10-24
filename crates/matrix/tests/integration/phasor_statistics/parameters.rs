@@ -18,7 +18,7 @@ use nrz_matrix::{EntryTicket, ReadingAdapter};
 use std::rc::Rc;
 
 /// The original variance/error and all three output covariance/error symbols are distinct.
-pub(super) fn declare(declarations: &mut Vec<(String, Sort)>) {
+pub(super) fn declare(declarations: &mut Vec<(String, Sort)>, full: bool) {
     for key in [
         "variance",
         "variance_error",
@@ -29,7 +29,9 @@ pub(super) fn declare(declarations: &mut Vec<(String, Sort)>) {
         "cross_error",
         "above_error",
     ] {
-        declarations.push((key.to_owned(), matrix(1, 1)));
+        let source = matches!(key, "variance" | "variance_error");
+        let side = if full && !source { 2 } else { 1 };
+        declarations.push((key.to_owned(), matrix(side, side)));
     }
 }
 

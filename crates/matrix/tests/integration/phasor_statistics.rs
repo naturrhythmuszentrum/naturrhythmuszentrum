@@ -4,6 +4,7 @@
 mod blocks;
 mod costs;
 mod fixture;
+mod lc_acceptance;
 mod parameters;
 mod refusals;
 use crate::reading_testing::{TestResult, ledger};

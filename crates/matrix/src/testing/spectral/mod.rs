@@ -151,8 +151,17 @@ impl Fixture {
         budget: &mut Budget,
     ) -> TestResult<(Heap, [ReadingBinding<P>; 2])> {
         let mut heap = Heap::new(HeapLimits::default())?;
-        let bindings = inputs::import(&mut heap, self, values, budget)?;
+        let bindings = self.import_into(&mut heap, values, budget)?;
         Ok((heap, bindings))
+    }
+    /// Independent experiments can share a heap without copying the original physical inputs.
+    pub(crate) fn import_into<P: Scalar + 'static>(
+        &self,
+        heap: &mut Heap,
+        values: [[P; 3]; 2],
+        budget: &mut Budget,
+    ) -> TestResult<[ReadingBinding<P>; 2]> {
+        inputs::import(heap, self, values, budget)
     }
     pub(crate) fn plan<P: Scalar>(
         &self,
