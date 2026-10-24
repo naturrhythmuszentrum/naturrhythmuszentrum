@@ -231,9 +231,10 @@ mod contractions;
 )]
 mod solve;
 pub use solve::{
-    FactorDependency, FactorRef, FactorUse, RecoveredSolve, RecoveryFailure, SensitivityEvidence,
-    SolveAttempt, SolveBudget, SolveError, SolveEvidence, SolveFailure, SolveFailureRecord,
-    SolvePolicy, SolveRecordKeys, SolveRecoveryEvidence, SolveStage, SolveStop,
+    FactorAllocation, FactorAllocationStage, FactorDependency, FactorInventory, FactorRef,
+    FactorUse, RecoveredSolve, RecoveryFailure, SensitivityEvidence, SolveAttempt, SolveBudget,
+    SolveError, SolveEvidence, SolveFailure, SolveFailureRecord, SolvePolicy, SolveRecordKeys,
+    SolveRecoveryEvidence, SolveStage, SolveStop,
 };
 
 #[path = "verification/solve.rs"]

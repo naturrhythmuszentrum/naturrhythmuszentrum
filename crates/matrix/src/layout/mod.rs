@@ -45,6 +45,14 @@ enum Map {
 }
 
 impl Layout {
+    /// Actual separately owned selection storage, excluding the inline layout header.
+    pub(crate) const fn owned_bytes(&self) -> usize {
+        match &self.map {
+            Map::Gather(indices) => indices.capacity() * size_of::<usize>(),
+            Map::Empty | Map::Affine(_) => 0,
+        }
+    }
+
     /// Construct the full contiguous column-ordered map for an extent.
     ///
     /// # Errors

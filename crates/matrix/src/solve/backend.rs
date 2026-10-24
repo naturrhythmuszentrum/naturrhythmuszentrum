@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Safe faer candidates stay opaque and carry no accuracy claim.
 
+use super::allocations::{Backend, Buffer, FactorAllocationStage as Stage, Run};
 use crate::binding::buffer;
 use crate::{NormalizedView, OperationError, SolveError};
 use faer::prelude::*;
@@ -10,15 +11,16 @@ use nrz_scalar::{Precision, Scalar};
 #[derive(Debug)]
 pub(crate) enum Lu {
     /// Partial-pivoted binary32 factors and their permutation.
-    Single(faer::linalg::solvers::PartialPivLu<f32>),
+    Single(Backend<faer::linalg::solvers::PartialPivLu<f32>>),
     /// Partial-pivoted binary64 factors and their permutation.
-    Double(faer::linalg::solvers::PartialPivLu<f64>),
+    Double(Backend<faer::linalg::solvers::PartialPivLu<f64>>),
 }
 
 impl Lu {
     /// Pack only a validated positive square normalized operator.
     pub(crate) fn factor<P: Scalar + 'static>(
         view: &NormalizedView<'_, P>,
+        run: &Run,
     ) -> Result<Self, OperationError> {
         let order = view.extent().rows();
         if order == 0 || order != view.extent().columns() {
@@ -26,13 +28,15 @@ impl Lu {
         }
         match P::PRECISION {
             Precision::F32 => {
-                let factor = pack_single(view)?.partial_piv_lu();
-                check_single(&factor, order)?;
+                let packed = run.backend(Stage::PackedOperator, || pack_single(view))?;
+                let factor = run.backend(Stage::Factors, || Ok(packed.get().partial_piv_lu()))?;
+                check_single(factor.get(), order)?;
                 Ok(Self::Single(factor))
             }
             Precision::F64 => {
-                let factor = pack_double(view)?.partial_piv_lu();
-                check_double(&factor, order)?;
+                let packed = run.backend(Stage::PackedOperator, || pack_double(view))?;
+                let factor = run.backend(Stage::Factors, || Ok(packed.get().partial_piv_lu()))?;
+                check_double(factor.get(), order)?;
                 Ok(Self::Double(factor))
             }
         }
@@ -45,12 +49,12 @@ impl Lu {
     ) -> Result<Vec<P>, OperationError> {
         match self {
             Self::Single(factor) => {
-                check_single(factor, rhs.extent().rows())?;
-                copy_single(&factor.solve(&pack_single(rhs)?))
+                check_single(factor.get(), rhs.extent().rows())?;
+                copy_single(&factor.get().solve(&pack_single(rhs)?))
             }
             Self::Double(factor) => {
-                check_double(factor, rhs.extent().rows())?;
-                copy_double(&factor.solve(&pack_double(rhs)?))
+                check_double(factor.get(), rhs.extent().rows())?;
+                copy_double(&factor.get().solve(&pack_double(rhs)?))
             }
         }
     }
@@ -62,12 +66,20 @@ impl Lu {
     ) -> Result<Vec<P>, OperationError> {
         match self {
             Self::Single(factor) => {
-                check_single(factor, order)?;
-                copy_single(&factor.solve(&faer::Mat::<f32>::identity(order, order)))
+                check_single(factor.get(), order)?;
+                copy_single(
+                    &factor
+                        .get()
+                        .solve(&faer::Mat::<f32>::identity(order, order)),
+                )
             }
             Self::Double(factor) => {
-                check_double(factor, order)?;
-                copy_double(&factor.solve(&faer::Mat::<f64>::identity(order, order)))
+                check_double(factor.get(), order)?;
+                copy_double(
+                    &factor
+                        .get()
+                        .solve(&faer::Mat::<f64>::identity(order, order)),
+                )
             }
         }
     }
@@ -142,12 +154,12 @@ impl Lu {
         }
         match self {
             Self::Single(factor) => {
-                check_single(factor, extent.rows())?;
-                copy_single(&factor.solve(&entries_single(extent, entries)?))
+                check_single(factor.get(), extent.rows())?;
+                copy_single(&factor.get().solve(&entries_single(extent, entries)?))
             }
             Self::Double(factor) => {
-                check_double(factor, extent.rows())?;
-                copy_double(&factor.solve(&entries_double(extent, entries)?))
+                check_double(factor.get(), extent.rows())?;
+                copy_double(&factor.get().solve(&entries_double(extent, entries)?))
             }
         }
     }
@@ -178,3 +190,73 @@ macro_rules! entries_adapter {
 }
 entries_adapter!(entries_single, f32);
 entries_adapter!(entries_double, f64);
+
+impl Lu {
+    /// The factor's actual owner keeps its pre-allocation ticket through every later reuse.
+    pub(crate) const fn ticket(&self) -> crate::PrivateAllocationTicket {
+        match self {
+            Self::Single(factor) => factor.ticket(),
+            Self::Double(factor) => factor.ticket(),
+        }
+    }
+    /// Inline backend object storage excludes all opaque heap storage and workspace.
+    pub(crate) const fn inline_bytes(&self) -> usize {
+        match self {
+            Self::Single(factor) => size_of_val(factor.get()),
+            Self::Double(factor) => size_of_val(factor.get()),
+        }
+    }
+    /// Factor construction inventories the identity solve independently of later physical RHS solves.
+    pub(crate) fn inverse_witness<P: Scalar + 'static>(
+        &self,
+        order: usize,
+        run: &Run,
+    ) -> Result<Buffer<P>, OperationError> {
+        match self {
+            Self::Single(factor) => {
+                check_single(factor.get(), order)?;
+                let identity = run.backend(Stage::Identity, || {
+                    Ok(faer::Mat::<f32>::identity(order, order))
+                })?;
+                let result = run.backend(Stage::InverseResult, || {
+                    Ok(factor.get().solve(identity.get()))
+                })?;
+                copy_factor_single(result.get(), run)
+            }
+            Self::Double(factor) => {
+                check_double(factor.get(), order)?;
+                let identity = run.backend(Stage::Identity, || {
+                    Ok(faer::Mat::<f64>::identity(order, order))
+                })?;
+                let result = run.backend(Stage::InverseResult, || {
+                    Ok(factor.get().solve(identity.get()))
+                })?;
+                copy_factor_double(result.get(), run)
+            }
+        }
+    }
+}
+/// Copy backend inverse candidates into independently owned, pre-ticketed scalar buffers.
+macro_rules! factor_copy {
+    ($name:ident, $format:ty) => {
+        /// Preserve the exact admitted scalar format and refuse nonfinite candidates before proof.
+        fn $name<P: Scalar + 'static>(
+            matrix: &faer::Mat<$format>,
+            run: &Run,
+        ) -> Result<Buffer<P>, OperationError> {
+            let mut result = run.buffer(Stage::InverseCandidate)?;
+            for column in 0..matrix.ncols() {
+                for row in 0..matrix.nrows() {
+                    let value = matrix[(row, column)];
+                    if !value.is_finite() {
+                        return Err(SolveError::CandidateFailure.into());
+                    }
+                    result.push(crate::conversion::same_format(value)?)?;
+                }
+            }
+            Ok(result)
+        }
+    };
+}
+factor_copy!(copy_factor_single, f32);
+factor_copy!(copy_factor_double, f64);

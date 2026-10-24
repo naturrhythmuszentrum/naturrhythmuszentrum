@@ -63,21 +63,35 @@ pub(crate) fn inverse<P: Scalar + 'static>(
     work: &mut SolveWork,
     context: &ArithmeticContext,
 ) -> Result<InverseWitness<P>, SolveError> {
+    let mut defects = buffer(candidate.len())?;
+    defects.resize(candidate.len(), P::ZERO);
+    inverse_with_defects(operator, candidate, &mut defects, work, context)
+}
+
+/// The same verifier fills caller-owned planned defect storage without allocating another array.
+pub(crate) fn inverse_with_defects<P: Scalar + 'static>(
+    operator: &impl SolveMatrix<P>,
+    candidate: &[P],
+    defects: &mut [P],
+    work: &mut SolveWork,
+    context: &ArithmeticContext,
+) -> Result<InverseWitness<P>, SolveError> {
     let extent = operator.extent();
     if extent.rows() == 0
         || (extent.rows(), candidate.len()) != (extent.columns(), extent.entries())
+        || defects.len() != candidate.len()
     {
         return Err(SolveError::Contract);
     }
-    let mut defects = buffer(candidate.len())?;
     for column in 0..extent.columns() {
         for row in 0..extent.rows() {
             let dot = inverse_dot(operator, candidate, row, column, work, context)?;
             let identity = if row == column { P::ONE } else { P::ZERO };
-            defects.push(point(identity)?.sub(dot, context)?.abs().upper().get());
+            defects[extent.index(row, column)?] =
+                point(identity)?.sub(dot, context)?.abs().upper().get();
         }
     }
-    let defect = nrz_scalar::norm_upper(&defects, context)?.get();
+    let defect = nrz_scalar::norm_upper(defects, context)?.get();
     if defect >= P::ONE {
         return Err(SolveError::CannotCertifyInverse);
     }

@@ -17,6 +17,14 @@ pub struct PrivateAllocationTicket {
 }
 
 impl PrivateAllocationTicket {
+    /// Internal closed executors draw a ticket only after admitting its allocating plan.
+    pub(crate) const fn new(execution: ExecutionId, candidate: u64, slot: usize) -> Self {
+        Self {
+            execution,
+            candidate,
+            slot,
+        }
+    }
     /// Execution that sponsored this allocation.
     #[must_use]
     pub const fn execution(self) -> ExecutionId {

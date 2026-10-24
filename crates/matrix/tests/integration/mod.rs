@@ -56,6 +56,7 @@ mod solve_sensitivity;
 
 mod solve_mixed_precision;
 
+mod factor_allocations;
 mod solve_factor_reuse;
 
 mod acceptance;

@@ -25,6 +25,8 @@ pub struct FactorRef<P: Scalar> {
     pub(crate) backend: Lu,
     /// Independent inverse-defect proof against the saved heap operator.
     pub(crate) witness: InverseWitness<P>,
+    /// Original allocation binding and complete factor-construction receipts.
+    inventory: super::FactorInventory,
 }
 
 impl<P: Scalar> std::fmt::Debug for FactorRef<P> {
@@ -38,6 +40,12 @@ impl<P: Scalar> std::fmt::Debug for FactorRef<P> {
 }
 
 impl<P: Scalar> FactorRef<P> {
+    /// Complete factor-construction receipts; later RHS solve allocations are separate owners.
+    #[must_use]
+    pub const fn allocation_inventory(&self) -> &super::FactorInventory {
+        &self.inventory
+    }
+
     /// Execution that owns the factor's normalized coordinate contract.
     #[must_use]
     pub const fn execution(&self) -> ExecutionId {
@@ -64,12 +72,29 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
     /// # Errors
     /// Refuses another recipe, backend failure or an unresolved inverse defect.
     pub fn factor(&self) -> Result<FactorRef<P>, Failure<P>> {
-        self.make_factor()
+        self.make_factor(None)
+            .map_err(|cause| self.failure(cause, Vec::new()))
+    }
+
+    /// Factor with an explicit caller ceiling for the newly owned allocation plan and receipt.
+    ///
+    /// Both staged and retained output byte limits are checked before backend allocation. The
+    /// numerical work/scratch policy and the caller's other exact-construction limits are unchanged.
+    /// # Errors
+    /// Refuses exhausted metadata bytes or any ordinary factorization/certification failure.
+    pub fn factor_with_inventory_budget(
+        &self,
+        budget: &nrz_bindings::Budget,
+    ) -> Result<FactorRef<P>, Failure<P>> {
+        self.make_factor(Some(budget))
             .map_err(|cause| self.failure(cause, Vec::new()))
     }
 
     /// Keep normalized borrowing and factor construction behind the checked solve recipe.
-    fn make_factor(&self) -> Result<FactorRef<P>, OperationError> {
+    fn make_factor(
+        &self,
+        budget: Option<&nrz_bindings::Budget>,
+    ) -> Result<FactorRef<P>, OperationError> {
         let crate::binding::NativeRecipe::Solve(contract) = &self.operation.recipe else {
             return Err(SolveError::Contract.into());
         };
@@ -80,7 +105,10 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .dependencies
             .first()
             .ok_or(OperationError::InputCount)?;
-        build(operator, self.execution, input, contract)
+        budget.map_or_else(
+            || build(operator, self.execution, input, contract),
+            |budget| build_with_budget(operator, self.execution, input, contract, budget),
+        )
     }
 }
 
@@ -91,20 +119,44 @@ pub(crate) fn build<P: Scalar + 'static>(
     input: &crate::InputSnapshot<P>,
     contract: &super::SolveContract,
 ) -> Result<FactorRef<P>, OperationError> {
+    let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
+    build_with_budget(operator, execution, input, contract, &budget)
+}
+
+/// The caller's existing byte policy admits metadata before any numerical owner is created.
+fn build_with_budget<P: Scalar + 'static>(
+    operator: &NormalizedView<'_, P>,
+    execution: ExecutionId,
+    input: &crate::InputSnapshot<P>,
+    contract: &super::SolveContract,
+    budget: &nrz_bindings::Budget,
+) -> Result<FactorRef<P>, OperationError> {
     let context = ArithmeticContext::new().map_err(SolveError::from)?;
-    let backend = Lu::factor(operator)?;
-    let candidate = backend.inverse::<P>(operator.extent().rows())?;
-    let witness = crate::solve_verification::inverse(
+    let dependency = FactorDependency::capture(input, contract, context.revision());
+    super::allocations::Run::check_budget(&dependency, budget)?;
+    let run = super::allocations::Run::new(execution, input, contract, &dependency)?;
+    let backend = Lu::factor(operator, &run)?;
+    let candidate = backend.inverse_witness::<P>(operator.extent().rows(), &run)?;
+    let mut defects = run.buffer(super::FactorAllocationStage::InverseDefects)?;
+    for _ in 0..candidate.len() {
+        defects.push(P::ZERO)?;
+    }
+    let witness = crate::solve_verification::inverse_with_defects(
         operator,
         &candidate,
+        &mut defects,
         &mut SolveWork::new(contract.work),
         &context,
     )?;
+    drop(defects);
+    drop(candidate);
+    let inventory = run.complete(backend.inline_bytes(), backend.ticket())?;
     Ok(FactorRef {
         execution,
-        dependency: FactorDependency::capture(input, contract, context.revision()),
+        dependency,
         backend,
         witness,
+        inventory,
     })
 }
 
@@ -128,7 +180,7 @@ pub struct FactorDependency {
 }
 impl FactorDependency {
     /// Capture only operator dependencies, excluding every RHS, companion and output policy.
-    fn capture<P: Scalar>(
+    pub(super) fn capture<P: Scalar>(
         input: &crate::InputSnapshot<P>,
         contract: &super::SolveContract,
         arithmetic: u32,
