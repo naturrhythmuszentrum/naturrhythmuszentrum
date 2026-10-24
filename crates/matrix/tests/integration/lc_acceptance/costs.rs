@@ -7,12 +7,12 @@ use nrz_bindings::readings::algebra::readings::DependencyInventory;
 use nrz_bindings::{Budget, Limits};
 
 const OWNERS: [[u64; 3]; 6] = [
-    [169, 2952, 0],
-    [994_090, 27_846, 13_336],
-    [2574, 616, 0],
-    [43_026, 63_178, 63_386],
-    [39_953, 63_642, 63_850],
-    [40_001, 127_012, 127_188],
+    [169, 2_952, 0],
+    [593_488, 65_170, 13_336],
+    [2_574, 616, 0],
+    [41_888, 63_178, 63_386],
+    [38_815, 63_642, 63_850],
+    [38_863, 127_012, 127_188],
 ];
 
 /// Each operation charges its measured Work and refuses immediately below each positive resource boundary.
@@ -44,17 +44,21 @@ fn lc_acceptance_owner_costs_and_boundaries() -> TestResult {
 fn lc_acceptance_inventory_costs_reconcile() -> TestResult {
     let case = Case::new()?;
     let expected = [
-        [104_440, 7, 786],
-        [191_984, 13, 1065],
-        [76_686, 7, 671],
-        [135_506, 13, 895],
-        [76_686, 7, 671],
-        [135_506, 13, 895],
-        [55_922, 10, 667],
-        [55_922, 10, 667],
-        [79_432, 6, 660],
-        [79_432, 6, 660],
+        [71_986, 7, 786],
+        [137_837, 13, 1_065],
+        [46_315, 7, 671],
+        [86_616, 13, 895],
+        [46_315, 7, 671],
+        [86_616, 13, 895],
+        [43_288, 10, 667],
+        [43_288, 10, 667],
+        [48_835, 6, 660],
+        [48_835, 6, 660],
     ];
+    let shared_costs = [
+        71_986, 126_002, 40_000, 77_115, 40_112, 77_115, 35_501, 35_741, 43_671, 43_671,
+    ];
+    let mut shared = ledger()?;
     let mut total = 0;
     for (index, profile) in expected.into_iter().enumerate() {
         let mut budget = ledger()?;
@@ -69,18 +73,25 @@ fn lc_acceptance_inventory_costs_reconcile() -> TestResult {
             ],
             profile
         );
-        total += budget.usage().work;
+        let before = shared.usage().work;
+        let repeated = inventory(&case.plan, index, &mut shared)?;
+        assert_eq!(dependency.contents(), repeated.contents());
+        let delta = shared.usage().work - before;
+        assert_eq!(delta, shared_costs[index]);
+        assert!(delta <= profile[0]);
+        total += delta;
         inventory_boundary(&case.plan, index, profile[0])?;
     }
     let mut entries = ledger()?;
     let mut whole = ledger()?;
     case.run(1, &mut entries)?;
     case.run(2, &mut whole)?;
-    assert_eq!(total, 991_516);
+    assert_eq!(total, 590_914);
     assert_eq!(entries.usage().work, whole.usage().work + total);
     Ok(())
 }
 
+/// Cold inventory Work succeeds exactly at its measured boundary, including prior-ledger refusal.
 fn inventory_boundary(plan: &Plan, index: usize, needed: u64) -> TestResult {
     for (limit, prior, success) in [
         (needed, 0, true),

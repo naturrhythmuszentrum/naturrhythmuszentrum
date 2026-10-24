@@ -30,7 +30,7 @@ fn lc_spectral_original_transport() -> TestResult {
             law.retained_payload_bytes(),
             fixture.construction_work
         ),
-        (66_696, 832, 1_557_249)
+        (65_588, 832, 1_463_735)
     );
     Ok(())
 }

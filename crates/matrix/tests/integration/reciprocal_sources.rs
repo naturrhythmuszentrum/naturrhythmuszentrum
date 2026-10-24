@@ -58,7 +58,7 @@ fn reciprocal_source_jacobian_reuses_original_graph() -> TestResult {
             budget.usage().work - first.usage().after.work,
             first.retained_payload_bytes()
         ),
-        (879_345, 381_309, 4_986_140, 7_579, 108_158)
+        (810_646, 323_789, 4_762_190, 7_579, 108_158)
     );
     Ok(())
 }
@@ -68,8 +68,8 @@ fn reciprocal_source_jacobian_reuses_original_graph() -> TestResult {
 #[test]
 fn reciprocal_source_jacobian_keeps_fixed_input_domains() -> TestResult {
     let limits = Limits {
-        work: 8_574_487,
-        replay_work: 8_574_487,
+        work: 8_074_706,
+        replay_work: 8_074_706,
         ..Limits::default()
     };
     let mut prepared = plan_with_policy(limits.clone(), false)?;
@@ -115,7 +115,7 @@ fn reciprocal_source_jacobian_keeps_fixed_input_domains() -> TestResult {
     assert_eq!(cache.len(), 2);
     assert_eq!(
         (costs, budget.usage().work),
-        (vec![3_996_054, 3_053_317], 8_574_487)
+        (vec![3_813_962, 2_911_429], 8_074_706)
     );
     Ok(())
 }
@@ -127,7 +127,7 @@ fn reciprocal_source_jacobian_cumulative_boundary() -> TestResult {
     let mut measured = Budget::new(policy())?;
     pipeline(&mut measured)?;
     let required = measured.usage().work;
-    assert_eq!(required, 6_254_373);
+    assert_eq!(required, 5_904_204);
     for ceiling in [required, required - 1] {
         let mut budget = Budget::new(Limits {
             work: ceiling,
@@ -164,8 +164,8 @@ fn pipeline(budget: &mut Budget) -> TestResult {
 /// Exact measured recipe, key, native derivative and one cache hit, including 17 prior Work.
 fn policy() -> Limits {
     Limits {
-        work: 6_254_373,
-        replay_work: 6_254_373,
+        work: 5_904_204,
+        replay_work: 5_904_204,
         ..Limits::default()
     }
 }
@@ -204,6 +204,6 @@ fn reciprocal_source_jacobian_fresh_witness_costs() -> TestResult {
         assert_eq!(expected.as_bytes(), actual.as_bytes());
         costs.push((bytes.len(), cost));
     }
-    assert_eq!(costs, vec![(1_981, 712_637), (3_796, 965_024)]);
+    assert_eq!(costs, vec![(1_981, 695_696), (3_796, 894_870)]);
     Ok(())
 }

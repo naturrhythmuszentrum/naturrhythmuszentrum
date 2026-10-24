@@ -25,6 +25,7 @@ impl Cas {
         reading: &Handle,
         budget: &mut Budget,
     ) -> Result<DependencyInventory, Fault> {
+        budget.witness_records.enabled = true;
         self.inventory_limits(budget, |budget| {
             let id = self.checked(reading)?;
             if !check::applicable(&self.state, id, id)? {
@@ -48,6 +49,7 @@ impl Cas {
         witness: &VerifiedWitness,
         budget: &mut Budget,
     ) -> Result<DependencyInventory, Fault> {
+        budget.witness_records.enabled = true;
         self.inventory_limits(budget, |budget| {
             let table = self.reading_witness_table(witness, budget)?;
             build(self, witness.proof(), table, budget)

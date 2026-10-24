@@ -1043,6 +1043,10 @@ pub struct Budget {
     usage: BudgetUsage,
     /// Independently reconstructed exact partitions shared by this ledger only.
     pub(crate) region_partitions: crate::region_cache::Cache,
+    /// Canonical typed records shared by this request, with complete immutable graph dependencies.
+    pub(crate) witness_records: crate::wire_memo::Cache,
+    /// Exact checked reading statements cite original evidence within this ledger.
+    pub(crate) reading_proofs: crate::reading_memo::Cache,
 }
 
 impl Budget {
@@ -1056,6 +1060,8 @@ impl Budget {
             limits,
             usage: BudgetUsage::default(),
             region_partitions: crate::region_cache::Cache::default(),
+            witness_records: crate::wire_memo::Cache::default(),
+            reading_proofs: crate::reading_memo::Cache::default(),
         })
     }
 
@@ -1140,7 +1146,17 @@ impl Budget {
     pub const fn check(&self, kind: BudgetKind, needed: u64, at: Location) -> Result<(), Fault> {
         let limit = self.limits.get(kind);
         let needed = if matches!(kind, BudgetKind::StagedPayloadBytes) {
-            match needed.checked_add(self.region_partitions.bytes) {
+            let Some(retained) = self
+                .region_partitions
+                .bytes
+                .checked_add(self.witness_records.bytes)
+            else {
+                return Err(Fault::capacity(kind, at));
+            };
+            let Some(retained) = retained.checked_add(self.reading_proofs.bytes) else {
+                return Err(Fault::capacity(kind, at));
+            };
+            match needed.checked_add(retained) {
                 Some(total) => total,
                 None => return Err(Fault::capacity(kind, at)),
             }

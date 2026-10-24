@@ -81,7 +81,7 @@ pub(super) fn case<P: Scalar + 'static>() -> TestResult<Case<P>> {
 
 /// One caller ledger covers both equations, all covariance laws and complete source/publication admission.
 pub(super) fn case_with_budget<P: Scalar + 'static>(resources: &mut Budget) -> TestResult<Case<P>> {
-    build(resources, false, DependencyPolicy::WholeBase)
+    build(resources, false, DependencyPolicy::WholeBase, None)
 }
 
 /// Full two-coordinate targets exercise both covariance axes without a scalar statistics facade.
@@ -93,7 +93,7 @@ pub(super) fn vector_case<P: Scalar + 'static>() -> TestResult<Case<P>> {
 pub(super) fn vector_case_with_budget<P: Scalar + 'static>(
     resources: &mut Budget,
 ) -> TestResult<Case<P>> {
-    build(resources, true, DependencyPolicy::WholeBase)
+    build(resources, true, DependencyPolicy::WholeBase, None)
 }
 
 /// Scalar and vector requests retain their complete inventories before importing any values.
@@ -101,6 +101,7 @@ fn build<P: Scalar + 'static>(
     resources: &mut Budget,
     full: bool,
     dependencies: DependencyPolicy,
+    admission: Option<&mut Budget>,
 ) -> TestResult<Case<P>> {
     let mut fixture = declarations(full)?;
     let voltage = meaning("voltage", [2, 1, -3, -1, 0, 0, 0])?;
@@ -141,8 +142,15 @@ fn build<P: Scalar + 'static>(
         )?,
     ];
     let metric_work = resources.usage().work;
-    let (mut heap, bindings) = import::<P>(fixture, &inputs, &parameters, dependencies, resources)
-        .map_err(|error| format!("source admission ({dependencies:?}): {error}"))?;
+    let (mut heap, bindings) = import::<P>(
+        fixture,
+        &inputs,
+        &parameters,
+        dependencies,
+        resources,
+        admission,
+    )
+    .map_err(|error| format!("source admission ({dependencies:?}): {error}"))?;
     let publications = publications(&definitions, &outputs, &bindings, &frames, resources)?;
     heap.compact()?;
     let construction = [
@@ -232,6 +240,7 @@ fn import<P: Scalar + 'static>(
     parameters: &[nrz_matrix::ReadingAdapter<usize>; 2],
     dependencies: DependencyPolicy,
     budget: &mut Budget,
+    admission: Option<&mut Budget>,
 ) -> TestResult<(Heap, Vec<ReadingBinding<P>>)> {
     let mut adapters = inputs
         .iter()
@@ -295,6 +304,29 @@ fn import<P: Scalar + 'static>(
             values: vec![import_error; 4],
         },
     ];
+    let bindings = admit_group(
+        &mut heap,
+        fixture,
+        coverage,
+        inputs,
+        &regions,
+        dependencies,
+        admission.unwrap_or(budget),
+    )?;
+    Ok((heap, bindings))
+}
+
+/// The isolated admission uses the same graph, regions and policy as the cumulative fixture.
+fn admit_group<P: Scalar + 'static>(
+    heap: &mut Heap,
+    fixture: Fixture,
+    coverage: ReadingCoverage<usize>,
+    inputs: &[blocks::Block; 3],
+    regions: &[ReadingRegion<P>],
+    dependencies: DependencyPolicy,
+    budget: &mut Budget,
+) -> TestResult<Vec<ReadingBinding<P>>> {
+    let before = format!("{heap:?}");
     let imported = heap.import_readings(
         Rc::new(fixture.cas),
         coverage,
@@ -302,11 +334,28 @@ fn import<P: Scalar + 'static>(
             .iter()
             .flat_map(|block| block.companions.iter().cloned())
             .collect(),
-        &regions,
+        regions,
         dependencies,
         budget,
-    )?;
-    Ok((heap, imported.bindings().to_vec()))
+    );
+    if imported.is_err() {
+        assert_eq!(format!("{heap:?}"), before);
+    }
+    if dependencies == DependencyPolicy::Entries && imported.is_err() {
+        assert!(matches!(
+            &imported,
+            Err(nrz_matrix::LiveBindingError::Exact(
+                nrz_bindings::readings::algebra::Fault {
+                    kind: nrz_bindings::readings::algebra::FaultKind::Exhausted {
+                        budget: nrz_bindings::readings::algebra::limits::BudgetKind::Work,
+                        ..
+                    },
+                    ..
+                }
+            ))
+        ));
+    }
+    Ok(imported?.bindings().to_vec())
 }
 
 /// Both solves read the same complete voltage operand without declaring another uncertain source.
@@ -360,4 +409,31 @@ fn operand<P: Scalar>(
             .map_err(|_| "four copies")?,
         budget,
     )?)
+}
+
+/// Fine admission fits the unchanged caller policy, succeeds exactly at N and refuses atomically at N−1.
+/// ´test:integration:driven-entries-admission-work-boundary´
+#[test]
+fn driven_entries_admission_work_boundary() -> TestResult {
+    let needed = 13_771_404;
+    for (work, success) in [(16_000_000, true), (needed, true), (needed - 1, false)] {
+        let mut admission = Budget::new(nrz_bindings::Limits { work, ..policy() })?;
+        let result = build::<f64>(
+            &mut budget()?,
+            false,
+            DependencyPolicy::Entries,
+            Some(&mut admission),
+        );
+        assert_eq!(
+            result.is_ok(),
+            success,
+            "admission at {work}: {:?}",
+            result.as_ref().err()
+        );
+        if success {
+            assert_eq!(result?.bindings.len(), 17);
+            assert_eq!(admission.usage().work, needed);
+        }
+    }
+    Ok(())
 }

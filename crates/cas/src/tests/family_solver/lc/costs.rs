@@ -54,7 +54,7 @@ fn lc_replay_work_attribution() -> TestResult {
             totals(rows.iter().filter(|row| row.rule == "solve.product"))?
         ],
         [
-            [221_241, 75_578, 74_839, 1_062_125],
+            [221_241, 75_578, 74_839, 1_009_509],
             [190_520, 129, 672, 0],
             [30_721, 61_906, 800, 0]
         ]

@@ -212,7 +212,7 @@ fn family_emptiness_resource_measurements() -> TestResult {
             replay.usage().work,
             u64::try_from(bytes.len())?
         ],
-        [4_155, 73_370, 193_575, 1_775]
+        [4_155, 63_854, 184_059, 1_775]
     );
     assert_eq!(
         production_rows.iter().map(|row| row.work).sum::<u64>(),

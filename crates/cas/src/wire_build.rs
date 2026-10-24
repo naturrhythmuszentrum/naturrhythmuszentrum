@@ -2,6 +2,7 @@
 //! Canonical Kahn ordering of the reachable typed witness dependency DAG.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use crate::budget::{Budget, BudgetKind};
 use crate::domain_model::Layer;
@@ -69,6 +70,28 @@ pub(crate) struct Record {
     pub(crate) rule: Option<Primitive>,
 }
 
+/// Table-local indices never enter the request's immutable record cache.
+#[derive(Debug)]
+struct PendingRecord {
+    /// Complete canonical source record with all original semantic and evidence edges.
+    source: Arc<Record>,
+    /// Manifest position, assigned independently for this table.
+    rule_index: Option<u32>,
+    /// Complete framed bytes once every child has an immutable index in this table.
+    canonical: Option<Vec<u8>>,
+}
+
+impl PendingRecord {
+    /// Retain one shared source without copying its payload or dependency arrays.
+    const fn new(source: Arc<Record>) -> Self {
+        Self {
+            source,
+            rule_index: None,
+            canonical: None,
+        }
+    }
+}
+
 /// Construct bounded local lookup keys without using them as canonical order keys.
 pub(crate) fn key(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result<Key, Fault> {
     let mut out = Encoder::new(budget, AT);
@@ -108,7 +131,12 @@ pub(crate) fn key(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result<Key,
 }
 
 /// Discover dependencies with an explicit bounded worklist.
-fn gather(cas: &Cas, root: Entity, budget: &mut Budget) -> Result<BTreeMap<Key, Record>, Fault> {
+fn gather(
+    cas: &Cas,
+    root: Entity,
+    budget: &mut Budget,
+) -> Result<BTreeMap<Key, PendingRecord>, Fault> {
+    crate::wire_memo::prepare(cas, budget);
     let mut records = BTreeMap::new();
     let mut pending = vec![root];
     let mut retained = 0_u64;
@@ -124,16 +152,19 @@ fn gather(cas: &Cas, root: Entity, budget: &mut Budget) -> Result<BTreeMap<Key, 
                 .ok_or_else(invalid)?,
             AT,
         )?;
-        let record = crate::wire_records::describe(cas, &entity, budget)?;
-        let footprint = size(record.payload.len(), AT)?
-            .checked_mul(16)
-            .and_then(|value| {
-                value.checked_add(size(record.references.len(), AT).ok()?.checked_mul(256)?)
-            })
-            .ok_or_else(invalid)?;
+        let record = crate::wire_memo::record(cas, &entity, &id, budget)?;
+        let footprint = if budget.witness_records.enabled {
+            crate::wire_memo::key_bytes(&id)?
+                .checked_add(128)
+                .ok_or_else(invalid)?
+        } else {
+            crate::wire_memo::footprint(&record)?
+        };
         retained = retained.checked_add(footprint).ok_or_else(invalid)?;
         budget.check(BudgetKind::StagedPayloadBytes, retained, AT)?;
-        budget.work(footprint, AT)?;
+        if budget.witness_records.enabled {
+            budget.work(1, AT)?;
+        }
         let count = record
             .references
             .len()
@@ -154,7 +185,7 @@ fn gather(cas: &Cas, root: Entity, budget: &mut Budget) -> Result<BTreeMap<Key, 
                 .map_err(|_| Fault::allocation(AT))?;
             pending.extend(members.iter().cloned());
         }
-        records.insert(id, record);
+        records.insert(id, PendingRecord::new(record));
     }
     Ok(records)
 }
@@ -164,6 +195,7 @@ fn ready(
     cas: &Cas,
     record: &Record,
     assigned: &BTreeMap<Key, (u32, Vec<u8>)>,
+    rule_index: Option<u32>,
     budget: &mut Budget,
 ) -> Result<Option<Vec<u8>>, Fault> {
     let mut indices = Vec::new();
@@ -191,6 +223,12 @@ fn ready(
         .try_reserve_exact(record.payload.len())
         .map_err(|_| Fault::allocation(AT))?;
     payload.extend_from_slice(&record.payload);
+    if let Some(index) = rule_index {
+        payload
+            .get_mut(..4)
+            .ok_or_else(invalid)?
+            .copy_from_slice(&index.to_le_bytes());
+    }
     for positions in &record.sets {
         let mut values = Vec::new();
         values
@@ -261,37 +299,24 @@ pub(crate) fn indexed_table(
     let mut assigned = BTreeMap::new();
     let mut unique = BTreeMap::new();
     let mut bytes = Vec::new();
-    let rules: BTreeSet<_> = records.values().filter_map(|record| record.rule).collect();
+    let rules: BTreeSet<_> = records
+        .values()
+        .filter_map(|record| record.source.rule)
+        .collect();
     let mut manifest: Vec<_> = rules.iter().copied().collect();
     manifest.sort_by_key(|rule| rule.specification().key);
     for record in records.values_mut() {
-        if let Some(rule) = record.rule {
+        if let Some(rule) = record.source.rule {
             let index = manifest
                 .iter()
                 .position(|value| *value == rule)
                 .ok_or_else(invalid)?;
             let index = u32::try_from(index).map_err(|_| invalid())?;
-            record
-                .payload
-                .get_mut(..4)
-                .ok_or_else(invalid)?
-                .copy_from_slice(&index.to_le_bytes());
+            record.rule_index = Some(index);
         }
     }
     while !records.is_empty() {
-        let mut least: Option<(Key, Vec<u8>)> = None;
-        for (id, record) in &records {
-            budget.work(1, AT)?;
-            if let Some(candidate) = ready(cas, record, &assigned, budget)?
-                && least
-                    .as_ref()
-                    .is_none_or(|(_, previous)| candidate < *previous)
-            {
-                least = Some((id.clone(), candidate));
-            }
-        }
-        let (id, descriptor) = least.ok_or_else(invalid)?;
-        records.remove(&id).ok_or_else(invalid)?;
+        let (id, descriptor) = take_ready(cas, &mut records, &assigned, budget)?;
         let index = if let Some(index) = unique.get(&descriptor) {
             *index
         } else {
@@ -307,8 +332,36 @@ pub(crate) fn indexed_table(
     Ok((bytes, root, rules, assigned))
 }
 
-/// Encode a theorem DAG with a sorted manifest; primitive indices are patched by the record
-/// builder.
+/// A ready descriptor is immutable: later assignments cannot change any earlier child index.
+/// Reuse its complete bytes through subsequent minimum scans, including every evidence edge.
+fn take_ready(
+    cas: &Cas,
+    records: &mut BTreeMap<Key, PendingRecord>,
+    assigned: &Assignments,
+    budget: &mut Budget,
+) -> Result<(Key, Vec<u8>), Fault> {
+    let mut least: Option<(&Key, &Vec<u8>)> = None;
+    for (id, record) in records.iter_mut() {
+        budget.work(1, AT)?;
+        if record.canonical.is_none() {
+            record.canonical = ready(cas, &record.source, assigned, record.rule_index, budget)?;
+        }
+        if let Some(candidate) = &record.canonical
+            && least.is_none_or(|(_, previous)| candidate < previous)
+        {
+            least = Some((id, candidate));
+        }
+    }
+    let id = least.ok_or_else(invalid)?.0.clone();
+    let descriptor = records
+        .remove(&id)
+        .ok_or_else(invalid)?
+        .canonical
+        .ok_or_else(invalid)?;
+    Ok((id, descriptor))
+}
+
+/// Encode a theorem DAG with a sorted manifest; table-local framing patches primitive indices.
 pub(crate) fn encode(cas: &Cas, proof: LogicalId, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
     #[cfg(test)]
     let _attribution = crate::testing::work_trace::Scope::phase("witness encoding");
@@ -430,6 +483,7 @@ mod tests {
     use crate::domain_model::Layer;
     use crate::graph::{Cas, LogicalId, VertexKind};
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     /// Ready descriptors use child structural bytes rather than local serial order.
     /// ´test:unit:ready-reference-order´
@@ -457,14 +511,121 @@ mod tests {
         };
         let mut assigned = BTreeMap::new();
         assigned.insert(Key::Object(left), (7, vec![2]));
-        assert!(ready(&cas, &record, &assigned, &mut budget)?.is_none());
+        assert!(ready(&cas, &record, &assigned, None, &mut budget)?.is_none());
         assigned.insert(Key::Object(right), (4, vec![1]));
         let descriptor =
-            ready(&cas, &record, &assigned, &mut budget)?.ok_or("ready record withheld")?;
+            ready(&cas, &record, &assigned, None, &mut budget)?.ok_or("ready record withheld")?;
         assert_eq!(
             descriptor.get(11..),
             Some([4, 0, 0, 0, 7, 0, 0, 0].as_slice())
         );
         Ok(())
+    }
+
+    /// Independent ready records retain their complete descriptors until their canonical turn.
+    /// ´test:unit:ready-descriptor-reuse-keeps-exact-bytes´
+    #[test]
+    fn ready_descriptor_reuse_keeps_exact_bytes() -> Result<(), Box<dyn std::error::Error>> {
+        let cas = Cas::new(Limits::default())?;
+        let mut records = BTreeMap::new();
+        let mut expected = Vec::new();
+        let assigned = BTreeMap::new();
+        for tag in [1, 2, 3] {
+            let record = independent_record(tag);
+            expected.push(
+                ready(
+                    &cas,
+                    &record,
+                    &assigned,
+                    None,
+                    &mut Budget::new(Limits::default())?,
+                )?
+                .ok_or("descriptor")?,
+            );
+            records.insert(
+                Key::Guard(vec![tag]),
+                super::PendingRecord::new(Arc::new(record)),
+            );
+        }
+        let (_, first) = super::take_ready(
+            &cas,
+            &mut records,
+            &assigned,
+            &mut Budget::new(Limits::default())?,
+        )?;
+        assert_eq!(first, expected[0]);
+        for (index, ceiling) in [(1, 2), (2, 1)] {
+            let mut refused = Budget::new(Limits {
+                work: ceiling - 1,
+                ..Limits::default()
+            })?;
+            assert!(super::take_ready(&cas, &mut records, &assigned, &mut refused).is_err());
+            let mut exact = Budget::new(Limits {
+                work: ceiling,
+                ..Limits::default()
+            })?;
+            let (_, actual) = super::take_ready(&cas, &mut records, &assigned, &mut exact)?;
+            assert_eq!(actual, expected[index]);
+            assert_eq!(exact.usage().work, ceiling);
+        }
+        Ok(())
+    }
+
+    /// Complete payload and layer differences remain different even after both records become ready.
+    /// ´test:unit:ready-descriptor-reuse-separates-content´
+    #[test]
+    fn ready_descriptor_reuse_separates_content() -> Result<(), Box<dyn std::error::Error>> {
+        let cas = Cas::new(Limits::default())?;
+        let mut records = BTreeMap::new();
+        let assigned = BTreeMap::new();
+        let mut expected = Vec::new();
+        for change in 0_u8..4 {
+            let mut record = independent_record(1);
+            record.payload[0] = change;
+            if change == 3 {
+                record.layer = Layer::Pointwise;
+            }
+            expected.push(
+                ready(
+                    &cas,
+                    &record,
+                    &assigned,
+                    None,
+                    &mut Budget::new(Limits::default())?,
+                )?
+                .ok_or("descriptor")?,
+            );
+            records.insert(
+                Key::Guard(vec![change]),
+                super::PendingRecord::new(Arc::new(record)),
+            );
+        }
+        expected.sort();
+        expected.dedup();
+        assert_eq!(expected.len(), 4);
+        for descriptor in expected {
+            let (_, actual) = super::take_ready(
+                &cas,
+                &mut records,
+                &assigned,
+                &mut Budget::new(Limits::default())?,
+            )?;
+            assert_eq!(actual, descriptor);
+        }
+        Ok(())
+    }
+
+    /// Synthetic independent records isolate ordering from graph admission.
+    fn independent_record(tag: u8) -> Record {
+        Record {
+            tag,
+            layer: Layer::Logic,
+            space: None,
+            payload: vec![tag; 64],
+            references: Vec::new(),
+            sets: Vec::new(),
+            row_sets: Vec::new(),
+            rule: None,
+        }
     }
 }

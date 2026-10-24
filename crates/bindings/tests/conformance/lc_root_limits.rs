@@ -31,13 +31,13 @@ fn lc_root_original_admission_cumulative_boundary() -> TestResult {
             assert_eq!(fixture.cas.counts(), before);
         }
     }
-    let required = 1_444_411;
+    let required = 1_391_795;
     for ceiling in [required, required - 1] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
         let mut budget = Budget::new(Limits {
             work: ceiling,
-            replay_work: 1_433_783,
+            replay_work: 1_381_167,
             ..Limits::default()
         })?;
         budget.work(19, Location::new("prior caller work"))?;
@@ -89,8 +89,8 @@ fn replay_limit(theorem: &Theorem, kind: BudgetKind, limit: u64, prior: u64) -> 
     let set = proposal(&mut fixture, theorem)?;
     let problem = RootProblem::check(&mut fixture.cas, request, &mut ledger()?)?;
     let mut limits = Limits {
-        work: 1_433_784,
-        replay_work: 1_433_783,
+        work: 1_381_168,
+        replay_work: 1_381_167,
         ..Limits::default()
     };
     match kind {

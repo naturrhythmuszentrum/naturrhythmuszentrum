@@ -58,6 +58,9 @@ impl Cas {
             substitutions: Vec::new(),
             certificate: Certificate::None,
         };
+        if ordered {
+            return crate::reading_memo::prove(self, &step, budget);
+        }
         self.check_proof(context, &[step], budget)
     }
 }

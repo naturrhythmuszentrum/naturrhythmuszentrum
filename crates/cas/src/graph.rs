@@ -1072,6 +1072,10 @@ pub struct GraphCounts {
 
 /// The independently owned symbolic store; it has no engine-package dependency.
 pub struct Cas {
+    /// Runtime owner of request-local canonical records, excluded from mathematical identity.
+    pub(crate) memo_owner: Arc<()>,
+    /// Cache namespace generation advances on rollback independently of mathematical state.
+    pub(crate) memo_epoch: u64,
     /// Runtime identity excluded from canonical outputs.
     token: Arc<StoreToken>,
     /// Permanent storage ceilings.
@@ -1098,6 +1102,8 @@ impl Cas {
     pub fn new(limits: Limits) -> Result<Self, Fault> {
         limits.validate()?;
         Ok(Self {
+            memo_owner: Arc::new(()),
+            memo_epoch: 0,
             token: Arc::new(StoreToken::default()),
             limits,
             state: State::new(),
@@ -1127,6 +1133,9 @@ impl Cas {
         let checkpoint = self.state.begin();
         let result = f(self, budget);
         self.state.finish(checkpoint, result.is_ok());
+        if result.is_err() {
+            self.memo_epoch = self.memo_epoch.saturating_add(1);
+        }
         budget.restore_limits(previous);
         result
     }
@@ -1146,6 +1155,8 @@ impl Cas {
     #[cfg(test)]
     pub(crate) fn full_copy_for_test(&self) -> Self {
         Self {
+            memo_owner: Arc::new(()),
+            memo_epoch: 0,
             token: Arc::clone(&self.token),
             limits: self.limits.clone(),
             state: self.state.clone(),
@@ -1291,6 +1302,9 @@ impl Cas {
         let checkpoint = staged.begin();
         let result = self.admit_staged(&mut staged, drafts, reserved, budget);
         staged.finish(checkpoint, result.is_ok());
+        if result.is_err() {
+            self.memo_epoch = self.memo_epoch.saturating_add(1);
+        }
         self.state = staged;
         result
     }

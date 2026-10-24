@@ -523,7 +523,7 @@ fn positive_cofactor_work_boundary() -> TestResult {
         .check_proof(&baseline.base.context, &baseline.steps, &mut measured)?;
     let required = measured.usage().work;
     // NRZCAS04 adds 9,059 witness-DAG Work and 138 record-encoding Work; arithmetic is unchanged.
-    assert_eq!(required, 294_727);
+    assert_eq!(required, 287_291);
     for cap in [
         required,
         required.checked_sub(1).ok_or("empty positive ledger")?,
@@ -598,7 +598,7 @@ fn real_witness_work_boundary() -> TestResult {
         .check_proof(&fixture.base.context, &fixture.steps, &mut measured)?;
     let required = measured.usage().work;
     // NRZCAS04 adds 5,731 witness-DAG Work and 100 record-encoding Work; arithmetic is unchanged.
-    assert_eq!(required, 127_145);
+    assert_eq!(required, 123_884);
     for cap in [
         required,
         required.checked_sub(1).ok_or("empty inclusion ledger")?,

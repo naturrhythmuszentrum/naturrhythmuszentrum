@@ -55,3 +55,7 @@ mod tower_closure;
 mod dependencies;
 
 mod work_trace;
+
+mod wire_memo;
+
+mod reading_memo;

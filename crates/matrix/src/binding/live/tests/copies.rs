@@ -174,7 +174,10 @@ fn complex_copies_fine_import_budget_refusal_is_atomic() -> TestResult {
         prepared.companions,
         &regions,
         DependencyPolicy::Entries,
-        &mut ledger()?,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits {
+            work: 1_438_556,
+            ..nrz_bindings::Limits::default()
+        })?,
     );
     assert!(matches!(
         result,

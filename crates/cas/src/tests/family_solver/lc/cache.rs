@@ -32,6 +32,6 @@ fn lc_anonymous_lemma_cache_retains_coverage() -> TestResult {
     }
     assert_eq!(cache.len(), 1);
     costs.push(cache.retained_bytes());
-    assert_eq!(costs, [1_639_388, 140_423, 74_056]);
+    assert_eq!(costs, [1_563_060, 116_711, 74_056]);
     Ok(())
 }

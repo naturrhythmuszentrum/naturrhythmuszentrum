@@ -51,7 +51,7 @@ fn lc_original_coefficient_equality_replays() -> TestResult {
             replay.usage().work,
             bytes.len()
         ),
-        (101_354, 817_786, 392_332, 2_479)
+        (101_354, 747_253, 373_361, 2_479)
     );
     Ok(())
 }

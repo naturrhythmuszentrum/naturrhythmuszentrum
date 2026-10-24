@@ -253,9 +253,7 @@ impl Assembly<'_> {
             return Err(invalid(InvalidCode::ReadingDefinition));
         };
         let node = index(self.assigned, id, budget)?;
-        let snapshot = self.meter.run(budget, |budget| {
-            crate::wire_build::syntax_key(self.cas, declaration.header, budget)
-        })?;
+        let snapshot = self.snapshot(declaration.header, budget)?;
         self.meter.keep(size(snapshot.len(), AT)?, budget)?;
         let definition = self.meter.run(budget, |budget| {
             crate::wire_build::syntax_key(self.cas, id, budget)
@@ -278,6 +276,24 @@ impl Assembly<'_> {
             budget,
         )?;
         Ok(position)
+    }
+
+    /// Reuse the complete canonical declaration snapshot already retained by this read-only DAG.
+    /// Exact graph identity includes every ancestor header and declaration; names alone never match.
+    fn snapshot(&self, header: LogicalId, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
+        for base in &self.bases {
+            budget.work(1, AT)?;
+            if bases::declaration(self.cas, base.id)?.header == header {
+                return self.meter.run(budget, |budget| {
+                    let mut out = Encoder::witness(budget, AT);
+                    out.raw(&base.value.snapshot)?;
+                    Ok(out.finish())
+                });
+            }
+        }
+        self.meter.run(budget, |budget| {
+            crate::wire_build::syntax_key(self.cas, header, budget)
+        })
     }
 
     /// Portable sorting happens only after every source and premise has been traversed.

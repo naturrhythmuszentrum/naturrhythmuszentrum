@@ -50,7 +50,7 @@ fn integrated_full_ladder_retains_symbolic_work_refusal() -> ResultOf {
     assert_eq!(fault.location.operation, "typed witness DAG");
     assert_eq!(
         format!("{:?}", fault.kind),
-        "Exhausted { reason: Limit, budget: ReplayWork, limit: 2000000, needed: 2000003 }"
+        "Exhausted { reason: Limit, budget: ReplayWork, limit: 2000000, needed: 2000017 }"
     );
     assert_eq!(heap.provenance_usage().records(), 0);
     Ok(())

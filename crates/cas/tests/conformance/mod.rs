@@ -65,6 +65,7 @@ mod wire_answer;
 mod readings;
 
 mod reading_proofs;
+mod reading_sharing;
 
 mod reading_limits;
 

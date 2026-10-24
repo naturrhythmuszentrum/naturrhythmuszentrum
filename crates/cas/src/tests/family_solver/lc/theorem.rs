@@ -24,7 +24,7 @@ fn generation(work: u64, arithmetic_steps: u64, denominator_factors: u64) -> Bud
 
 fn replay() -> BudgetUsage {
     BudgetUsage {
-        work: 1_433_783,
+        work: 1_381_167,
         arithmetic_steps: 15_576,
         condition_steps: 43,
         case_arms: 1,
@@ -109,7 +109,7 @@ fn lc_root_theorem_separate_ledgers() -> TestResult {
         (
             generation(272_477, 3_346, 2),
             BudgetUsage {
-                work: 1_149_109,
+                work: 1_043_830,
                 arithmetic_steps: 15_810,
                 condition_steps: 53,
                 coefficient_ops: 19_717,

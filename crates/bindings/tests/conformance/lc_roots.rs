@@ -76,9 +76,9 @@ fn lc_root_replay_exact_work_boundaries() -> TestResult {
     let theorem = proof()?;
     let bytes = &theorem.bytes;
     for (work, replay, accepted) in [
-        (1_433_784, 1_433_783, true),
-        (1_433_783, 1_433_783, false),
-        (1_433_784, 1_433_782, false),
+        (1_381_168, 1_381_167, true),
+        (1_381_167, 1_381_167, false),
+        (1_381_168, 1_381_166, false),
     ] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
@@ -105,13 +105,13 @@ fn lc_root_replay_exact_work_boundaries() -> TestResult {
 fn lc_root_replay_carries_requests_and_retries() -> TestResult {
     let theorem = proof()?;
     let bytes = &theorem.bytes;
-    for ceiling in [2_865_572, 2_865_571] {
+    for ceiling in [2_760_340, 2_760_339] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
         let problem = RootProblem::check(&mut fixture.cas, request, &mut ledger()?)?;
         let mut budget = Budget::new(Limits {
             work: ceiling,
-            replay_work: 1_433_783,
+            replay_work: 1_381_167,
             ..Limits::default()
         })?;
         budget.work(17, Location::new("earlier symbolic work"))?;
@@ -123,7 +123,7 @@ fn lc_root_replay_carries_requests_and_retries() -> TestResult {
             Location::new("retained earlier coverage"),
             |budget| RootCoverage::replay(&mut fixture.cas, &problem, set.clone(), bytes, budget),
         );
-        assert_eq!(second.is_ok(), ceiling == 2_865_572);
+        assert_eq!(second.is_ok(), ceiling == 2_760_340);
         if second.is_err() {
             exhausted(&second, &[BudgetKind::Work])?;
             let spent = budget.usage();

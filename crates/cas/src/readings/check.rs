@@ -36,6 +36,11 @@ pub(crate) fn equal(
 ) -> Result<bool, Fault> {
     let (family, first) = normalize(state, left, budget)?;
     let retained = first.validate(budget)?;
+    // The complete original chain has been checked once in this fixed application frame.
+    // Identical canonical source nodes share that derivation, including unsupported-source refusals.
+    if left == right {
+        return Ok(true);
+    }
     let previous = budget.reserve_temporary(retained, AT)?;
     let second = normalize(state, right, budget);
     budget.restore_limits(previous);

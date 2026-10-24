@@ -145,11 +145,11 @@ fn coordinate_normalization_output_boundaries() -> TestResult {
 /// Measured default-profile Work, staged bytes and output bytes for the independent mixed reference fixture.
 const fn profiles() -> [[u64; 3]; 7] {
     [
-        [278_545, 72_030, 15_664],
-        [97_035, 65_062, 23_961],
-        [94_987, 65_062, 23_961],
-        [231_905, 81_838, 42_964],
-        [71_487, 65_190, 3_327],
+        [272_941, 72_030, 15_664],
+        [93_621, 65_062, 23_961],
+        [91_573, 65_062, 23_961],
+        [220_193, 81_838, 42_964],
+        [68_073, 65_190, 3_327],
         [1_024, 24_689, 560],
         [19, 16, 0],
     ]

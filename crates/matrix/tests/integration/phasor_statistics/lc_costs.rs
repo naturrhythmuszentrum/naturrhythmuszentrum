@@ -15,17 +15,17 @@ fn lc_acceptance_vector_covariance_costs_are_pinned() -> TestResult {
     assert_eq!(
         complete(crate::phasor_solve_testing::policy(), 0)?,
         (
-            [441_084, 1_677_092, 2_659_010, 2_704_467],
+            [441_084, 1_677_092, 2_657_028, 2_702_485],
             17_092,
             2727,
             vec![[396, 49, 199_286], [408, 49, 355_537], [396, 49, 199_316]],
-            2_725_633
+            2_723_651
         )
     );
     for (work, prior, success) in [
-        (2_725_633, 0, true),
-        (2_725_632, 0, false),
-        (2_725_633, 1, false),
+        (2_723_651, 0, true),
+        (2_723_650, 0, false),
+        (2_723_651, 1, false),
     ] {
         let limits = Limits {
             work,

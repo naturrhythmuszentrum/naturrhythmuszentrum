@@ -90,7 +90,7 @@ fn strict_sign_work_boundary() -> TestResult {
     let (result, full) = run(Limits::default().work, BudgetKind::Work, 0)?;
     result?;
     let cost = full.usage().work;
-    assert_eq!(cost, 33_895);
+    assert_eq!(cost, 32_803);
     run(cost, BudgetKind::Work, 0)?.0?;
     let fault = run(cost - 1, BudgetKind::Work, 0)?
         .0

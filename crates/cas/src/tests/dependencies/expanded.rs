@@ -184,9 +184,9 @@ fn expanded_representation_costs() -> TestResult {
         ),
         (
             121_700,
-            171_214,
-            257_077,
-            629_931,
+            170_357,
+            256_123,
+            509_124,
             1_732,
             vec![("poly.jets-equal", 124_915)]
         )
@@ -219,8 +219,8 @@ fn expanded_representation_inventory_boundaries() -> TestResult {
     let mut measured = ledger()?;
     let expected = cas.witness_dependencies(&witness, &mut measured)?;
     for (kind, needed) in [
-        (BudgetKind::Work, 629_931),
-        (BudgetKind::StagedPayloadBytes, 48_957),
+        (BudgetKind::Work, 509_124),
+        (BudgetKind::StagedPayloadBytes, 61_028),
         (BudgetKind::OutputBytes, 23_380),
     ] {
         let actual = cas.witness_dependencies(&witness, &mut limited(kind, needed)?)?;

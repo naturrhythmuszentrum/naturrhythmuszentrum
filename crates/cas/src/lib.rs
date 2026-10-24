@@ -70,6 +70,11 @@ mod proof_citations;
         unreachable_pub"
 )]
 mod proof_storage;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "request memo stays internal to the proof producer"
+)]
+mod reading_memo;
 mod rule;
 #[expect(
     clippy::redundant_pub_crate,
@@ -95,6 +100,11 @@ mod strict_sign;
         unreachable_pub"
 )]
 mod wire;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "request-local witness records are shared by the encoder and ledger"
+)]
+mod wire_memo;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
