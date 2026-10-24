@@ -11,6 +11,17 @@ use nrz_bindings::{
 };
 use std::{cell::Cell, rc::Rc};
 
+/// Retained exact admission evidence or the flattened actual operand closure.
+#[derive(Debug)]
+pub(crate) enum ReadDependencies {
+    /// Any write in the shared graph invalidates every reading.
+    WholeBase,
+    /// One authenticated dependency inventory per admitted reading.
+    Entries(Vec<DependencyInventory>),
+    /// Every published reading depends on all selected antecedents of its solve.
+    Operands,
+}
+
 /// Prepare all exact closures before storage allocation or result evaluation.
 pub(super) fn prepare(
     graph: Rc<Cas>,
@@ -69,7 +80,10 @@ pub(super) fn prepare(
         coverage,
         tickets,
         states,
-        reads: (policy == DependencyPolicy::Entries).then_some(reads),
+        reads: match policy {
+            DependencyPolicy::Entries => ReadDependencies::Entries(reads),
+            DependencyPolicy::WholeBase => ReadDependencies::WholeBase,
+        },
         proofs,
         homogeneous,
         companions,

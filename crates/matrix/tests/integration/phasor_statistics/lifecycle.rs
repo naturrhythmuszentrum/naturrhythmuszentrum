@@ -6,22 +6,22 @@ use crate::reading_testing::{TestResult, ledger};
 use nrz_bindings::readings::algebra::readings::EntryIndex;
 use nrz_scalar::ArithmeticContext;
 
-/// Input entry precision does not silently change the published families' whole-base policy.
-/// ´test:integration:driven-parameter-publication-boundary´
+/// Published means inherit their actual operand closure and preserve disjoint parameter writes.
+/// ´test:integration:driven-entries-parameter-isolation´
 #[test]
-fn driven_parameter_publication_boundary() -> TestResult {
+fn driven_entries_parameter_isolation() -> TestResult {
     for policy in [
         nrz_matrix::DependencyPolicy::Entries,
         nrz_matrix::DependencyPolicy::WholeBase,
     ] {
         for changed in [15, 16] {
-            parameter_boundary(policy, changed)?;
+            parameter_isolation(policy, changed)?;
         }
     }
     Ok(())
 }
 
-fn parameter_boundary(policy: nrz_matrix::DependencyPolicy, changed: usize) -> TestResult {
+fn parameter_isolation(policy: nrz_matrix::DependencyPolicy, changed: usize) -> TestResult {
     let mut case = fixture::lifecycle_case(policy, &mut super::budget()?)?;
     let means = case.means(&mut ledger()?)?;
     let executions = case.executions(&means, &mut ledger()?)?;
@@ -40,6 +40,8 @@ fn parameter_boundary(policy: nrz_matrix::DependencyPolicy, changed: usize) -> T
         .value_by_symbol(selected.symbol(), &selected)?
         .stamp();
     let roots = independent_spectrum(&mut case.heap)?;
+    let published = mean_bits(&case.heap, &means)?;
+    case.heap.compact()?;
     let original = case.heap.reading_entries(&case.bindings[changed])?;
     case.heap
         .replace_reading_entries(&case.bindings[changed], &original, &mut ledger()?)?;
@@ -55,10 +57,22 @@ fn parameter_boundary(policy: nrz_matrix::DependencyPolicy, changed: usize) -> T
             fine
         );
         for reading in mean.readings().bindings() {
-            unavailable(&case.heap, reading);
+            assert_eq!(case.heap.reading_entries(reading).is_ok(), fine);
+            assert_eq!(
+                reading.state(),
+                if fine {
+                    nrz_matrix::SymbolState::Published
+                } else {
+                    nrz_matrix::SymbolState::Unavailable
+                }
+            );
+            if !fine {
+                unavailable(&case.heap, reading);
+            }
         }
     }
     if fine {
+        assert_eq!(mean_bits(&case.heap, &means)?, published);
         assert_eq!(
             case.heap
                 .value_by_symbol(selected.symbol(), &selected)?
@@ -70,6 +84,23 @@ fn parameter_boundary(policy: nrz_matrix::DependencyPolicy, changed: usize) -> T
     assert!(statistics.moments(&case.heap, &context).is_err());
     assert!(statistics.parameter_errors(&case.heap, &context).is_err());
     spectrum_survives(&case.heap, &roots, &context)
+}
+
+fn mean_bits(
+    heap: &nrz_matrix::Heap,
+    means: &[nrz_matrix::PublishedPhasorSolve<f64>; 2],
+) -> TestResult<Vec<Vec<u64>>> {
+    means
+        .iter()
+        .flat_map(|mean| mean.readings().bindings())
+        .map(|reading| {
+            Ok(heap
+                .reading_entries(reading)?
+                .into_iter()
+                .map(f64::to_bits)
+                .collect())
+        })
+        .collect()
 }
 
 fn unavailable(heap: &nrz_matrix::Heap, reading: &nrz_matrix::ReadingBinding<f64>) {
@@ -201,7 +232,7 @@ fn spectrum_survives(
     Ok(())
 }
 
-/// Reading and representation closures are checked independently against the actual variance root.
+/// Fresh output slots omit operand provenance; their empty closures cannot authorize publication isolation.
 fn closures(
     case: &fixture::Case<f64>,
     means: &[nrz_matrix::PublishedPhasorSolve<f64>; 2],
@@ -260,4 +291,59 @@ pub(super) fn fingerprint(
             ))
         })
         .collect()
+}
+
+/// Every consumed impedance radius invalidates its own solve while the other mean survives.
+/// ´test:integration:driven-operand-companion-writes-stale-dependent-means´
+#[test]
+fn driven_operand_companion_writes_stale_dependent_means() -> TestResult {
+    for start in [0, 5] {
+        for copy in [2, 3] {
+            for channel in 0..2 {
+                companion_write(start, copy, channel)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn companion_write(start: usize, copy: usize, channel: usize) -> TestResult {
+    let mut case = fixture::entries_case()?;
+    let means = case.means(&mut ledger()?)?;
+    let binding = &case.bindings[start + copy];
+    let parameters = binding
+        .companions()
+        .iter()
+        .enumerate()
+        .filter(|(_, companion)| {
+            companion
+                .targets()
+                .iter()
+                .any(|target| target.reading() == binding.reading())
+        })
+        .map(|(index, _)| index)
+        .collect::<Vec<_>>();
+    assert_eq!(parameters.len(), 2);
+    let original = case
+        .heap
+        .reading_companion_entries(binding, parameters[channel])?;
+    case.heap.replace_reading_companion_entries(
+        binding,
+        parameters[channel],
+        &original,
+        &mut ledger()?,
+    )?;
+    for (index, mean) in means.iter().enumerate() {
+        let survives = index != start / 5;
+        assert_eq!(
+            mean.evaluation()
+                .centers(&case.heap, &ArithmeticContext::new()?)
+                .is_ok(),
+            survives,
+        );
+        for reading in mean.readings().bindings() {
+            assert_eq!(case.heap.reading_entries(reading).is_ok(), survives);
+        }
+    }
+    Ok(())
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Map actual writes to declared families and query every retained reading and proof inventory.
 
-use super::{Group, LiveBindingError, admission::charge};
+use super::{Group, LiveBindingError, admission::charge, dependencies::ReadDependencies};
 use crate::heap::identity::Key;
 use crate::{Heap, HeapError};
 use nrz_bindings::{
@@ -47,6 +47,7 @@ pub(crate) fn prepare(
         let affected = affected(&group, &mapped, budget)?;
         result.push((group, affected));
     }
+    inherit(&mut result, budget)?;
     Ok(result)
 }
 
@@ -189,8 +190,10 @@ fn affected(
         .iter()
         .filter(|write| Rc::ptr_eq(&write.graph, &group.graph))
     {
-        let Some(reads) = &group.reads else {
-            return Ok((0..group.states.len()).collect());
+        let reads = match &group.reads {
+            ReadDependencies::WholeBase => return Ok((0..group.states.len()).collect()),
+            ReadDependencies::Entries(reads) => reads,
+            ReadDependencies::Operands => continue,
         };
         for (index, inventory) in reads.iter().enumerate() {
             touched[index] |= intersects(group, inventory, write, budget)?;
@@ -248,3 +251,52 @@ pub(crate) fn publish(prepared: Invalidations) {
         }
     }
 }
+
+/// Reuse each source's authenticated intersections, including companions and proof predicates.
+/// Flattened antecedents make the union independent of heap group visitation order.
+fn inherit(
+    prepared: &mut [(Rc<Group>, Vec<usize>)],
+    budget: &mut Budget,
+) -> Result<(), LiveBindingError> {
+    for position in 0..prepared.len() {
+        let group = &prepared[position].0;
+        let inherits = matches!(group.reads, ReadDependencies::Operands);
+        let complete = prepared[position].1.len() == group.states.len();
+        if inherits && !complete && source_touched(group, prepared, budget)? {
+            prepared[position].1 = (0..group.states.len()).collect();
+        }
+    }
+    Ok(())
+}
+
+/// Missing source authority cannot establish disjointness; retained sources are never re-extracted.
+fn source_touched(
+    group: &Group,
+    prepared: &[(Rc<Group>, Vec<usize>)],
+    budget: &mut Budget,
+) -> Result<bool, LiveBindingError> {
+    for source in &group.antecedents {
+        let mut found = false;
+        for (original, indices) in prepared {
+            budget.work(1, super::admission::AT)?;
+            if Rc::ptr_eq(original, &source.group) {
+                budget.work(
+                    u64::try_from(indices.len()).map_err(|_| HeapError::ExtentOverflow)?,
+                    super::admission::AT,
+                )?;
+                if indices.contains(&source.index) {
+                    return Ok(true);
+                }
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+#[cfg(test)]
+mod tests;

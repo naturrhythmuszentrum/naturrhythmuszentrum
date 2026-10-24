@@ -19,6 +19,8 @@ pub(super) struct ImportProvenance {
     pub(super) definition: super::ResultDefinition,
     /// Every original source selection, including earlier result ancestors.
     pub(super) sources: Vec<super::selected::SelectedReading>,
+    /// Fine results inherit their actual operand closure; coarse producers retain the fallback.
+    pub(super) dependencies: DependencyPolicy,
     /// Original deterministic assurance scopes of the two product operands.
     pub(super) coverage: [crate::Coverage; 2],
 }
@@ -82,6 +84,9 @@ impl Heap {
         let mutable = Rc::get_mut(&mut group).ok_or(HeapError::Capacity)?;
         mutable.copies = copies;
         if let Some(provenance) = provenance {
+            if provenance.dependencies == DependencyPolicy::Entries {
+                mutable.reads = super::dependencies::ReadDependencies::Operands;
+            }
             mutable.antecedents = provenance.sources;
             mutable.result_definition = Some(provenance.definition);
             mutable.phasor_inputs = Some(provenance.coverage);

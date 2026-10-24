@@ -161,7 +161,7 @@ fn phasor_restoration_shares_evidence_and_bounds_output() -> TestResult {
         needed,
         u64::try_from(
             8192 + witnesses
-                + sources.len()
+                + sources.readings.len()
                     * std::mem::size_of::<crate::binding::live::selected::SelectedReading>()
         )?
     );

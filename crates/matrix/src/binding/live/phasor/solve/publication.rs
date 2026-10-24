@@ -25,6 +25,8 @@ struct Plan<P: Scalar> {
     companions: Vec<CompanionAdapter<usize>>,
     /// Flattened source versions, including all earlier result ancestors.
     sources: Vec<crate::binding::live::selected::SelectedReading>,
+    /// Coarse admission stays coarse; fine sources authorize the operand closure.
+    dependencies: DependencyPolicy,
     /// Retained exact metadata allowance beside evaluation and publication scratch.
     bytes: u64,
 }
@@ -52,6 +54,7 @@ impl<P: Scalar> PhasorSolvePublication<P> {
             bytes = bytes.checked_add(proof).ok_or(HeapError::ExtentOverflow)?;
         }
         let ancestors = sources
+            .readings
             .len()
             .checked_mul(std::mem::size_of::<
                 crate::binding::live::selected::SelectedReading,
@@ -66,7 +69,8 @@ impl<P: Scalar> PhasorSolvePublication<P> {
             solve,
             coverage,
             companions,
-            sources,
+            sources: sources.readings,
+            dependencies: sources.dependencies,
             bytes,
         })))
     }
@@ -115,6 +119,9 @@ impl<P: Scalar> PublishedPhasorSolve<P> {
 
 impl Heap {
     /// Certify and atomically publish all restored current views and deterministic companions.
+    ///
+    /// Every output inherits the validated operands' reading, proof and companion closure.
+    /// Fine admission preserves disjoint entries; a whole-base operand remains conservative.
     /// # Errors
     /// Refuses bound output roots, poles, unresolved reactance, stale sources, failed proof and capacity.
     pub fn publish_phasor_solve<P: Scalar + 'static>(
@@ -146,8 +153,11 @@ impl Heap {
                     plan.solve.definition().clone(),
                 ),
                 sources: plan.sources.clone(),
+                dependencies: plan.dependencies,
                 coverage: evaluation.coverage(),
             };
+            // Fresh output declarations have no operand edges. Sealed solve provenance
+            // installs the actual source closure before the atomic import publishes.
             let readings = self.import_readings_with_provenance(
                 Rc::clone(&plan.solve.operands()[0].whole().group.graph),
                 plan.coverage.clone(),

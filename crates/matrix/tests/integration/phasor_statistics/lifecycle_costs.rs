@@ -14,10 +14,11 @@ use nrz_scalar::ArithmeticContext;
 /// ´test:integration:driven-lifecycle-write-owner-boundaries´
 #[test]
 fn driven_lifecycle_write_owner_boundaries() -> TestResult {
+    // Fine writes add forty charged source-selection comparisons across the two solve closures.
     for (dependencies, profiles) in [
         (
             DependencyPolicy::Entries,
-            [[2272, 17, 8], [2757, 17, 8], [37, 32, 0]],
+            [[2312, 17, 8], [2797, 17, 8], [37, 32, 0]],
         ),
         (
             DependencyPolicy::WholeBase,

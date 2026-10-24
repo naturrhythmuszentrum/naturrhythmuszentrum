@@ -241,8 +241,8 @@ pub(crate) struct Group {
     pub(crate) tickets: Vec<RegionTicket>,
     /// Transaction and structural validity of every selected reading.
     pub(crate) states: Vec<Cell<SymbolState>>,
-    /// One cached dependency inventory per immutable reading, or explicit coarse fallback.
-    pub(crate) reads: Option<Vec<DependencyInventory>>,
+    /// Exact admitted reading inventories, coarse fallback or actual solve operand closure.
+    pub(crate) reads: dependencies::ReadDependencies,
     /// Cached closed-recipe restrictions for exactly identity-coordinate readings.
     pub(crate) homogeneous: Vec<Option<nrz_bindings::BindingSymbols>>,
     /// Complete reconstruction and overlap proof dependencies.

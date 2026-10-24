@@ -277,6 +277,7 @@ fn commit<P: Scalar + 'static>(
     let provenance = crate::binding::live::import::ImportProvenance {
         definition: crate::binding::live::ResultDefinition::Spectral(plan.definition.clone()),
         sources: plan.sources.clone(),
+        dependencies: DependencyPolicy::WholeBase,
         coverage: evaluation.coverage(),
     };
     let readings = heap.import_readings_with_provenance(

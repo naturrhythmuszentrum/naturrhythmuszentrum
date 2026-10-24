@@ -58,7 +58,7 @@ impl<P: Scalar> PhasorPublication<P> {
         }
         check::coverage(definition.output(), &coverage, &companions, budget)?;
         let ancestors = sources(product.operands(), budget)?;
-        let bytes = check::storage(&coverage, &companions, ancestors.len(), budget)?;
+        let bytes = check::storage(&coverage, &companions, ancestors.readings.len(), budget)?;
         let graph = Rc::clone(&product.operands()[0].whole().group.graph);
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
         Ok(Self(Rc::new(Plan {
@@ -67,7 +67,7 @@ impl<P: Scalar> PhasorPublication<P> {
             graph,
             coverage,
             companions,
-            sources: ancestors,
+            sources: ancestors.readings,
             bytes,
         })))
     }
@@ -162,6 +162,7 @@ impl Heap {
             let provenance = super::super::import::ImportProvenance {
                 definition: super::super::ResultDefinition::Product(plan.definition.clone()),
                 sources: plan.sources.clone(),
+                dependencies: DependencyPolicy::WholeBase,
                 coverage: evaluation.coverage(),
             };
             let readings = self.import_readings_with_provenance(
@@ -181,28 +182,51 @@ impl Heap {
     }
 }
 
+/// Selected source authority and its honest least precise admission policy.
+#[derive(Debug)]
+pub(super) struct SourceClosure {
+    /// Flattened original selections, including all retained result ancestors.
+    pub(super) readings: Vec<super::super::selected::SelectedReading>,
+    /// Any coarse source keeps the complete result conservative.
+    pub(super) dependencies: DependencyPolicy,
+}
+
 /// Flatten and deduplicate existing source ancestors under the same finite caller ledger.
 pub(super) fn sources<P: Scalar>(
     operands: &[super::PhasorOperand<P>; 2],
     budget: &mut Budget,
-) -> Result<Vec<super::super::selected::SelectedReading>, PhasorError> {
-    let mut result: Vec<super::super::selected::SelectedReading> = Vec::new();
+) -> Result<SourceClosure, PhasorError> {
+    let mut result = SourceClosure {
+        readings: Vec::new(),
+        dependencies: DependencyPolicy::Entries,
+    };
     for operand in operands {
         for binding in std::iter::once(operand.whole()).chain(operand.copies()) {
             let selected = binding.selected();
             for source in std::iter::once(&selected).chain(&binding.group.antecedents) {
                 let count = result
+                    .readings
                     .len()
                     .checked_add(1)
                     .ok_or(HeapError::ExtentOverflow)?;
                 super::super::admission::charge::<super::super::selected::SelectedReading>(
                     count, budget,
                 )?;
-                if !result.iter().any(|prior| {
+                // The existing per-source allowance covers this policy check beside deduplication.
+                if matches!(
+                    source.group.reads,
+                    super::super::dependencies::ReadDependencies::WholeBase
+                ) {
+                    result.dependencies = DependencyPolicy::WholeBase;
+                }
+                if !result.readings.iter().any(|prior| {
                     Rc::ptr_eq(&prior.group, &source.group) && prior.index == source.index
                 }) {
-                    result.try_reserve(1).map_err(|_| HeapError::Capacity)?;
-                    result.push(source.clone());
+                    result
+                        .readings
+                        .try_reserve(1)
+                        .map_err(|_| HeapError::Capacity)?;
+                    result.readings.push(source.clone());
                 }
             }
         }
