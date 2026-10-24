@@ -7,14 +7,14 @@ use crate::{Extent, OperationError};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
 /// Temporary enclosed matrix; parameter errors never describe physical input support.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Matrix<P: Scalar> {
     /// Checked logical rectangle.
     pub(crate) extent: Extent,
     /// Candidate entries independent of interval verification.
-    pub(crate) centers: Vec<P>,
+    pub(crate) centers: crate::private::Buffer<P>,
     /// Mathematical parameter enclosures.
-    pub(crate) truth: Vec<Enclosure<P>>,
+    pub(crate) truth: crate::private::Buffer<Enclosure<P>>,
 }
 impl<P: Scalar> Matrix<P> {
     /// Allocate exact zeros after the operation's work preflight.
@@ -26,8 +26,8 @@ impl<P: Scalar> Matrix<P> {
         truth.resize(extent.entries(), Enclosure::singleton(Finite::ZERO));
         Ok(Self {
             extent,
-            centers,
-            truth,
+            centers: centers.into(),
+            truth: truth.into(),
         })
     }
     /// Install a finite candidate and its established enclosure.
@@ -72,6 +72,14 @@ impl<P: Scalar> Matrix<P> {
     /// Transpose both parameter candidates and their enclosures without arithmetic.
     pub(crate) fn transpose(&self) -> Result<Self, OperationError> {
         let mut result = Self::zeros(self.extent.columns(), self.extent.rows())?;
+        self.transpose_into(&mut result)?;
+        Ok(result)
+    }
+    /// Fill an already allocated and declared transpose without another numerical owner.
+    pub(crate) fn transpose_into(&self, result: &mut Self) -> Result<(), OperationError> {
+        if result.extent != Extent::new(self.extent.columns(), self.extent.rows())? {
+            return Err(StatisticsError::Contract.into());
+        }
         for column in 0..self.extent.columns() {
             for row in 0..self.extent.rows() {
                 let index = self.extent.index(row, column)?;
@@ -83,7 +91,7 @@ impl<P: Scalar> Matrix<P> {
                 )?;
             }
         }
-        Ok(result)
+        Ok(())
     }
 }
 /// Admit a represented number without assigning a random source.

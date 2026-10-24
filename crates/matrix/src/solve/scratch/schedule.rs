@@ -75,8 +75,8 @@ pub(super) fn count(contract: &super::super::SolveContract) -> Result<usize, Ope
 /// Every ordered coordinate follows the original checked operator or solution rectangle.
 pub(super) fn specifications(
     contract: &super::super::SolveContract,
-) -> Result<Vec<Specification>, OperationError> {
-    let mut result = crate::binding::buffer(count(contract)?)?;
+    result: &mut Vec<Specification>,
+) -> Result<(), OperationError> {
     let operator = contract
         .inputs
         .first()
@@ -99,11 +99,15 @@ pub(super) fn specifications(
     for stage in Stage::OUTPUT {
         result.push(specification(stage, None, solution));
     }
-    Ok(result)
+    Ok(())
 }
 
 /// Metadata has a complete meaning even while its numerical stage remains unissued.
-const fn specification(stage: Stage, iteration: Option<usize>, extent: Extent) -> Specification {
+pub(super) const fn specification(
+    stage: Stage,
+    iteration: Option<usize>,
+    extent: Extent,
+) -> Specification {
     Specification {
         stage,
         iteration,

@@ -44,6 +44,12 @@ pub(crate) struct Plan {
     pub(super) token: u64,
     /// Shared original checked solve equation, axes and exact restoration.
     pub(super) contract: Rc<super::super::SolveContract>,
+    /// Original checked differential equation retained before any sensitivity arrays.
+    pub(super) derivative: Option<Rc<nrz_bindings::CheckedSensitivity>>,
+    /// Concrete enclosure representation with two endpoints per logical coordinate.
+    pub(super) enclosure: TypeId,
+    /// Original source model, exact selection and statistical law for the finite contractions.
+    pub(super) statistics: Option<Box<super::statistics::Binding>>,
     /// Selected source versions and their original value/companion declarations.
     pub(super) sources: Vec<(Dependency, BindingSymbols)>,
     /// Predeclared final result and companion symbols.
@@ -111,7 +117,10 @@ impl Permit {
     /// Only fully initialized output channels can change into candidate ownership.
     pub(crate) fn candidate(&self, len: usize) -> Result<(), OperationError> {
         let entry = &self.plan.specifications[self.slot];
-        if entry.iteration.is_some() || len != self.entries() || entry.state.get() != State::Live {
+        if !entry.stage.is_candidate_at(entry.iteration)
+            || len != self.entries()
+            || entry.state.get() != State::Live
+        {
             return Err(Error::IncompleteCoverage.into());
         }
         entry.state.set(State::Candidate);

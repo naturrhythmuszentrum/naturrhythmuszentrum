@@ -151,6 +151,13 @@ impl<'a, T> IntoIterator for &'a Buffer<T> {
         self.values.iter()
     }
 }
+impl<'a, T> IntoIterator for &'a mut Buffer<T> {
+    type Item = &'a mut T;
+    type IntoIter = std::slice::IterMut<'a, T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.values.iter_mut()
+    }
+}
 impl<T> Drop for Buffer<T> {
     fn drop(&mut self) {
         match &self.permit {

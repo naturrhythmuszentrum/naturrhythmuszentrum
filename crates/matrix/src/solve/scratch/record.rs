@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Historical deterministic solve requests distinguish opaque storage from observable arrays.
+//! Historical solve requests distinguish opaque storage from observable arrays.
 
 use crate::{Dependency, Extent, PrivateAllocationTicket, RegionContract};
 use nrz_bindings::BindingSymbols;
@@ -41,84 +41,202 @@ pub enum SolveAllocationStage {
     OutputTotals,
     /// Same-format copy of final numerical radii, owned by the unpublished candidate.
     OutputErrors,
+    /// Represented nominal RHS or a checked differential RHS center.
+    SensitivityRightHandSide,
+    /// Exact nominal or differential RHS parameter enclosure, with two endpoints per entry.
+    SensitivityRightHandSideTruth,
+    /// Backend copy of the nominal or differential RHS.
+    SensitivityPackedRightHandSide,
+    /// Opaque nominal or differential backend solution candidate.
+    SensitivityBackendResult,
+    /// Matrix-owned nominal or differential solution centers.
+    SensitivityCenters,
+    /// Independent absolute residual endpoints including RHS parameter error.
+    SensitivityResiduals,
+    /// Independently certified exact nominal or differential solution enclosure.
+    SensitivityTruth,
+    /// Local Jacobian centers in concatenated original operator/RHS coordinate order.
+    JacobianCenters,
+    /// Local Jacobian parameter enclosures in the same original coordinate order.
+    JacobianTruth,
+    /// Affine offset centers, including an optional exact restoration origin.
+    OffsetCenters,
+    /// Affine offset parameter enclosures after optional restoration.
+    OffsetTruth,
+    /// Same-format local Jacobian centers retained by the statistical candidate.
+    OutputJacobianCenters,
+    /// Same-format local Jacobian enclosures retained by the statistical candidate.
+    OutputJacobianTruth,
+    /// Same-format offsets consumed by statistical mean propagation.
+    OutputOffsetCenters,
+    /// Same-format offset enclosures consumed by statistical mean propagation.
+    OutputOffsetTruth,
+    /// Original captured input sensitivities remapped into the common source order.
+    StatisticalInputs,
+    /// Independent parameter enclosures for the stacked input sensitivities.
+    StatisticalInputsTruth,
+    /// The original model covariance restricted to the exact common source order.
+    StatisticalModel,
+    /// Independent source covariance parameter enclosures.
+    StatisticalModelTruth,
+    /// Transposed composed source sensitivity used by the final covariance contraction.
+    StatisticalTranspose,
+    /// Transposed source sensitivity parameter enclosures.
+    StatisticalTransposeTruth,
+    /// Explicit input expectations in original concatenated input order.
+    StatisticalMeans,
+    /// Independent explicit input expectation enclosures.
+    StatisticalMeansTruth,
+    /// First backend operand of a predeclared statistical contraction.
+    ContractionLeft,
+    /// Second backend operand of a predeclared statistical contraction.
+    ContractionRight,
+    /// Opaque backend product of the two predeclared statistical operands.
+    ContractionResult,
+    /// Matrix-owned statistical product candidate, without a redundant zero-center allocation.
+    ContractionCenters,
+    /// Independently accumulated statistical product parameter enclosures.
+    ContractionTruth,
+    /// Final parameter-center copy for publication; the index selects its exact parameter role.
+    ParameterCenters,
+    /// Final numerical parameter-error copy for publication, targeting that same parameter.
+    ParameterErrors,
 }
 impl SolveAllocationStage {
     /// Opaque backend requests expose logical rectangles, never fabricated allocator capacities.
     #[must_use]
     pub const fn is_backend(self) -> bool {
-        matches!(self, Self::PackedRightHandSide | Self::BackendResult)
+        matches!(
+            self,
+            Self::PackedRightHandSide
+                | Self::BackendResult
+                | Self::SensitivityPackedRightHandSide
+                | Self::SensitivityBackendResult
+                | Self::ContractionLeft
+                | Self::ContractionRight
+                | Self::ContractionResult
+        )
     }
 }
-/// One completed request from the original finite schedule.
-#[derive(Clone, Debug, Eq, PartialEq)]
+/// One completed request projects its immutable meaning and observed capacity from the original plan.
+#[derive(Clone)]
 pub struct SolveAllocation {
-    /// Closed allocating role in the original checked coordinates.
-    pub(super) stage: SolveAllocationStage,
-    /// Initial/correction attempt or final transfer.
-    pub(super) iteration: Option<usize>,
-    /// Complete logical request shape.
-    pub(super) extent: Extent,
-    /// Historical authority drawn before allocation.
-    pub(super) ticket: PrivateAllocationTicket,
-    /// Requested logical scalar bytes without backend padding.
-    pub(super) logical: usize,
-    /// Observed vector capacity, or absence for an opaque backend owner.
-    pub(super) bytes: Option<usize>,
+    /// Original shared definition and allocation observation; no duplicate schedule is retained.
+    pub(super) plan: Rc<super::Plan>,
+    /// Exact finite stage consumed by the original non-cloneable owner.
+    pub(super) slot: usize,
 }
 impl SolveAllocation {
     /// Mathematical role of each coordinate, interpreted through the inventory's original bindings.
     #[must_use]
-    pub const fn stage(&self) -> SolveAllocationStage {
-        self.stage
+    pub fn stage(&self) -> SolveAllocationStage {
+        self.specification().stage
     }
-    /// Certificate attempt, with zero denoting the initial solve and absence denoting final transfer.
+    /// Certificate attempt, with zero denoting the initial solve and absence for other phases.
     #[must_use]
-    pub const fn iteration(&self) -> Option<usize> {
-        self.iteration
+    pub fn iteration(&self) -> Option<usize> {
+        let stage = self.stage();
+        if stage.is_sensitivity() || stage.is_statistical() {
+            None
+        } else {
+            self.specification().iteration
+        }
+    }
+    /// Nominal solve is zero; later values are one plus the original differentiated input coordinate.
+    #[must_use]
+    pub fn sensitivity_solve(&self) -> Option<usize> {
+        if self.stage().is_sensitivity() {
+            self.specification().iteration
+        } else {
+            None
+        }
+    }
+    /// Statistical contraction: zero composes sources, one multiplies their covariance, two completes covariance, three propagates means.
+    #[must_use]
+    pub fn contraction(&self) -> Option<usize> {
+        if self.stage().is_contraction() {
+            self.specification().iteration
+        } else {
+            None
+        }
+    }
+    /// Published parameter: zero covariance, one source sensitivity, two local Jacobian, three means.
+    #[must_use]
+    pub fn parameter(&self) -> Option<usize> {
+        if matches!(
+            self.stage(),
+            SolveAllocationStage::ParameterCenters | SolveAllocationStage::ParameterErrors
+        ) {
+            self.specification().iteration
+        } else {
+            None
+        }
     }
     /// Complete logical request rectangle in column order.
     #[must_use]
-    pub const fn extent(&self) -> Extent {
-        self.extent
+    pub fn extent(&self) -> Extent {
+        self.specification().extent
     }
     /// Ordered logical coordinate for one requested entry; hidden backend padding is never an entry.
     #[must_use]
-    pub const fn coordinate(&self, index: usize) -> Option<[usize; 2]> {
-        if index >= self.extent.entries() {
+    pub fn coordinate(&self, index: usize) -> Option<[usize; 2]> {
+        if index >= self.entries() {
             None
         } else {
-            Some([index % self.extent.rows(), index / self.extent.rows()])
+            Some([index % self.extent().rows(), index / self.extent().rows()])
         }
     }
-    /// Number of logical coordinates requested; each coordinate has one scalar component.
+    /// Number of logical coordinates requested, independently of enclosure endpoint count.
     #[must_use]
-    pub const fn entries(&self) -> usize {
-        self.extent.entries()
+    pub fn entries(&self) -> usize {
+        self.extent().entries()
     }
     /// Primitive floats requested, excluding hidden backend padding and workspace.
     #[must_use]
-    pub const fn float_entries(&self) -> usize {
-        self.entries()
+    pub fn float_entries(&self) -> usize {
+        self.entries() * self.stage().components()
     }
-    /// Exact logical scalar bytes requested, independent of actual backend allocation.
+    /// Exact logical scalar bytes, checked before a completed projection is exposed.
     #[must_use]
-    pub const fn logical_bytes(&self) -> usize {
-        self.logical
+    pub fn logical_bytes(&self) -> usize {
+        self.float_entries() * self.plan.width
     }
     /// Actual vector capacity times scalar width; opaque backend requests return absence.
     #[must_use]
-    pub const fn owned_bytes(&self) -> Option<usize> {
-        self.bytes
+    pub fn owned_bytes(&self) -> Option<usize> {
+        self.specification().bytes.get()
     }
     /// Historical allocation authority, never permission to allocate or read a live region.
     #[must_use]
-    pub const fn ticket(&self) -> PrivateAllocationTicket {
-        self.ticket
+    pub fn ticket(&self) -> PrivateAllocationTicket {
+        PrivateAllocationTicket::new(self.plan.execution, self.plan.token, self.slot)
+    }
+    /// Publication creates projections only for valid slots whose allocation observation is final.
+    fn specification(&self) -> &super::plan::Specification {
+        &self.plan.specifications[self.slot]
     }
 }
-/// Complete deterministic RHS, certificate, restoration and recovery array inventory.
+impl PartialEq for SolveAllocation {
+    fn eq(&self, other: &Self) -> bool {
+        self.ticket() == other.ticket()
+    }
+}
+impl Eq for SolveAllocation {}
+impl std::fmt::Debug for SolveAllocation {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SolveAllocation")
+            .field("stage", &self.stage())
+            .field("index", &self.specification().iteration)
+            .field("extent", &self.extent())
+            .field("ticket", &self.ticket())
+            .field("owned_bytes", &self.owned_bytes())
+            .finish()
+    }
+}
+/// Scoped general solve, recovery, sensitivity and moment array inventory.
 ///
-/// Factor construction, inline scalar proof fields, statistics and reserved destination slabs
+/// Factor construction, inline scalar proof fields, captured input parameters and destination slabs
 /// have separate owners. This scoped receipt does not claim a complete execution footprint.
 #[derive(Clone)]
 pub struct SolveInventory {
@@ -184,6 +302,24 @@ impl SolveInventory {
     pub fn completed_attempts(&self) -> usize {
         self.plan.completed.get()
     }
+    /// Original model identity for statistical contractions, absent for deterministic-only solves.
+    #[must_use]
+    pub fn model(&self) -> Option<crate::ModelId> {
+        self.plan.statistics.as_ref().map(|v| v.id)
+    }
+    /// Original selected source-column order used by every statistical contraction.
+    #[must_use]
+    pub fn statistical_sources(&self) -> &[usize] {
+        self.plan
+            .statistics
+            .as_ref()
+            .map_or(&[], |v| v.columns.as_slice())
+    }
+    /// Original bindings-owned nominal/differential equation, when statistics are present.
+    #[must_use]
+    pub fn derivative(&self) -> Option<&nrz_bindings::CheckedSensitivity> {
+        self.plan.derivative.as_deref()
+    }
     /// Candidate scalar representation shared by all requests.
     #[must_use]
     pub fn precision(&self) -> Precision {
@@ -199,10 +335,11 @@ impl SolveInventory {
     pub const fn metadata_bytes(&self) -> usize {
         self.bytes
     }
-    /// Named backend reservation shared with factor construction, never added to it as measured memory.
+    /// Named backend reservation: the factor/solve allowance plus existing statistical work admission, never measured memory.
     #[must_use]
     pub fn backend_allowance_bytes(&self) -> usize {
-        self.plan.contract.work * self.plan.width
+        (self.plan.contract.work + self.plan.statistics.as_ref().map_or(0, |v| v.work))
+            * self.plan.width
     }
     /// Aligned shared plan and its actual finite schedule allocation.
     #[must_use]
@@ -220,6 +357,10 @@ impl SolveInventory {
                 .iter()
                 .map(|(source, _)| source.layout().owned_bytes())
                 .sum::<usize>()
+            + self.plan.statistics.as_ref().map_or(0, |v| {
+                size_of_val(v.as_ref())
+                    + (v.columns.capacity() + v.roots.capacity()) * size_of::<usize>()
+            })
     }
     /// Aligned shared historical receipt and its actual request-vector capacity.
     #[must_use]

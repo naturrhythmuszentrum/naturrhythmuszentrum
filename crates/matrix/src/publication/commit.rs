@@ -75,13 +75,14 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             evidence.push(claim.clone());
         }
         let private = crate::private::Run::publication(self, candidate)?;
+        let outputs = self.output_records()?;
+        super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
+        let moments = crate::statistics::prepare(self, candidate, &outputs)?;
         let solve = crate::solve::scratch::Run::publication(self, candidate)?;
         if let Some(crate::RecipeEvidence::Solve(claim)) = evidence.first_mut() {
             claim.inventory = solve;
         }
-        let record = self.prepare_record(candidate.token, evidence, private)?;
-        super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
-        let moments = crate::statistics::prepare(self, candidate, &record.outputs)?;
+        let record = self.prepare_record(candidate.token, evidence, private, outputs)?;
         crate::binding::parameters::validate(
             &self.reservations.covers,
             &self.reservations.records,
@@ -284,12 +285,12 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         token: u64,
         evidence: &[crate::RecipeEvidence],
         private: Option<Box<crate::ReciprocalInventory>>,
+        outputs: Vec<OutputRecord>,
     ) -> Result<OperationRecord, OperationError> {
         let mut inputs = buffer(self.dependencies.len())?;
         for input in &self.dependencies {
             inputs.push(Dependency::from_snapshot(input));
         }
-        let outputs = self.output_records()?;
         let mut claims = buffer(evidence.len())?;
         claims.extend_from_slice(evidence);
         Ok(OperationRecord {

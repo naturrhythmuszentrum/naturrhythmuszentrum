@@ -93,7 +93,7 @@ fn inventory<P: Scalar + 'static>(bytes: usize, peak: usize) -> TestResult {
             receipt.receipt_bytes(),
             receipt.candidate_metadata_bytes()
         ),
-        (3_200, 1_048, 1_024, 1_128, 280)
+        (2_352, 1_080, 1_024, 248, 280)
     );
     Ok(())
 }
@@ -103,7 +103,7 @@ fn inventory<P: Scalar + 'static>(bytes: usize, peak: usize) -> TestResult {
 #[test]
 fn solve_array_inventory_metadata_boundaries() -> TestResult {
     let bytes = budget_attempt(None)?.ok_or("default inventory")?;
-    assert_eq!(bytes, 3_200);
+    assert_eq!(bytes, 2_352);
     for staged in [false, true] {
         assert_eq!(budget_attempt(Some((staged, bytes)))?, Some(bytes));
         assert_eq!(budget_attempt(Some((staged, bytes - 1)))?, None);

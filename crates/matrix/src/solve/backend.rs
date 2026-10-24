@@ -2,7 +2,6 @@
 //! Safe faer candidates stay opaque and carry no accuracy claim.
 
 use super::allocations::{Backend, Buffer, FactorAllocationStage as Stage, Run};
-use crate::binding::buffer;
 use crate::{NormalizedView, OperationError, SolveError};
 use faer::prelude::*;
 use nrz_scalar::{Precision, Scalar};
@@ -45,7 +44,7 @@ impl Lu {
 
 /// Concrete adapters keep safe matrix indexing behind checked dimensions and precision gates.
 macro_rules! adapter {
-    ($pack:ident, $copy:ident, $check:ident, $format:ty) => {
+    ($pack:ident, $check:ident, $format:ty) => {
         /// Discharge every backend solve assertion and reject zero or nonfinite pivots.
         fn $check(
             factor: &faer::linalg::solvers::PartialPivLu<$format>,
@@ -77,28 +76,10 @@ macro_rules! adapter {
             }
             Ok(result)
         }
-
-        /// Nonfinite backend output is a candidate failure before certification or publication.
-        fn $copy<P: Scalar + 'static>(
-            matrix: &faer::Mat<$format>,
-        ) -> Result<Vec<P>, OperationError> {
-            let extent = crate::Extent::new(matrix.nrows(), matrix.ncols())?;
-            let mut values = buffer(extent.entries())?;
-            for column in 0..extent.columns() {
-                for row in 0..extent.rows() {
-                    let value = matrix[(row, column)];
-                    if !value.is_finite() {
-                        return Err(SolveError::CandidateFailure.into());
-                    }
-                    values.push(crate::conversion::same_format(value)?);
-                }
-            }
-            Ok(values)
-        }
     };
 }
-adapter!(pack_single, copy_single, check_single, f32);
-adapter!(pack_double, copy_double, check_double, f64);
+adapter!(pack_single, check_single, f32);
+adapter!(pack_double, check_double, f64);
 
 impl Lu {
     /// Reuse the same factors for finite private differential or correction columns.
@@ -106,18 +87,52 @@ impl Lu {
         &self,
         extent: crate::Extent,
         entries: &[P],
-    ) -> Result<Vec<P>, OperationError> {
+        attempt: super::scratch::Attempt<'_>,
+    ) -> Result<crate::private::Buffer<P>, OperationError> {
+        use super::scratch::Stage;
         if entries.len() != extent.entries() || extent.columns() == 0 {
             return Err(SolveError::Contract.into());
         }
         match self {
             Self::Single(factor) => {
                 check_single(factor.get(), extent.rows())?;
-                copy_single(&factor.get().solve(&entries_single(extent, entries)?))
+                let packed = attempt.run.backend(
+                    Stage::SensitivityPackedRightHandSide,
+                    attempt.index,
+                    || entries_single(extent, entries),
+                )?;
+                let result =
+                    attempt
+                        .run
+                        .backend(Stage::SensitivityBackendResult, attempt.index, || {
+                            Ok(factor.get().solve(packed.get()))
+                        })?;
+                planned_copy_single(
+                    result.get(),
+                    attempt.run,
+                    attempt.index,
+                    Stage::SensitivityCenters,
+                )
             }
             Self::Double(factor) => {
                 check_double(factor.get(), extent.rows())?;
-                copy_double(&factor.get().solve(&entries_double(extent, entries)?))
+                let packed = attempt.run.backend(
+                    Stage::SensitivityPackedRightHandSide,
+                    attempt.index,
+                    || entries_double(extent, entries),
+                )?;
+                let result =
+                    attempt
+                        .run
+                        .backend(Stage::SensitivityBackendResult, attempt.index, || {
+                            Ok(factor.get().solve(packed.get()))
+                        })?;
+                planned_copy_double(
+                    result.get(),
+                    attempt.run,
+                    attempt.index,
+                    Stage::SensitivityCenters,
+                )
             }
         }
     }
@@ -237,15 +252,16 @@ macro_rules! planned_solve {
                 )),
             })?;
             let result = run.backend(Stage::BackendResult, 0, || Ok(factor.solve(packed.get())))?;
-            $copy(result.get(), run, 0)
+            $copy(result.get(), run, 0, Stage::Centers)
         }
         /// Copy finite values without detaching allocation authority or allowing unplanned growth.
         fn $copy<P: Scalar + 'static>(
             matrix: &faer::Mat<$format>,
             run: &super::scratch::Run,
             iteration: usize,
+            stage: super::scratch::Stage,
         ) -> Result<crate::private::Buffer<P>, OperationError> {
-            let mut result = run.buffer(super::scratch::Stage::Centers, Some(iteration))?;
+            let mut result = run.buffer(stage, Some(iteration))?;
             for column in 0..matrix.ncols() {
                 for row in 0..matrix.nrows() {
                     let value = matrix[(row, column)];
@@ -301,7 +317,7 @@ impl Lu {
                 let result = run.backend(Stage::BackendResult, iteration, || {
                     Ok(factor.get().solve(packed.get()))
                 })?;
-                planned_copy_single(result.get(), run, iteration)
+                planned_copy_single(result.get(), run, iteration, Stage::Centers)
             }
             Self::Double(factor) => {
                 check_double(factor.get(), extent.rows())?;
@@ -311,7 +327,7 @@ impl Lu {
                 let result = run.backend(Stage::BackendResult, iteration, || {
                     Ok(factor.get().solve(packed.get()))
                 })?;
-                planned_copy_double(result.get(), run, iteration)
+                planned_copy_double(result.get(), run, iteration, Stage::Centers)
             }
         }
     }

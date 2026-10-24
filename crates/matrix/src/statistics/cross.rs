@@ -94,13 +94,13 @@ fn publish<P: Scalar + 'static>(
             extent: covariance.extent,
             quantity: None,
             declaration,
-            values: covariance.centers.clone(),
+            values: covariance.centers.to_vec().into(),
         },
         RegionData {
             extent: covariance.extent,
             quantity: None,
             declaration: error_symbol,
-            values: covariance.errors(context)?,
+            values: covariance.errors(context)?.into(),
         },
     ];
     heap.statistics

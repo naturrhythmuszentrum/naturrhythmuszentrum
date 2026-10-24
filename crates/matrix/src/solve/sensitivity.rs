@@ -7,12 +7,14 @@
 //!
 //! A modeled operator with zero variation and its exact mean at the operating point preserves `AffineMoments` in the right-hand sides. A variable operator yields `LinearizedMoments`, including common-operator cross-column covariance and every supplied operator/RHS cross block. Missing joint models, selected source rows or cross blocks refuse before evaluation. Statistical inverses use the typed identity as source-free RHS columns. Bindings retains the checked solve-equation derivative relation; floating derivative solves discharge its invertibility and exact-nominal-solution obligations. Optional homogeneous restoration scales sensitivities and both covariance axes and shifts only means. Statistical work includes all derivative columns, their certificates and complete parameter storage; deterministic totals still consume overlapping contributions once.
 
+use super::scratch::{Attempt, Run, Stage};
 use super::{FactorRef, SolveContract, SolveError};
 use crate::statistics::contraction::Work;
 use crate::statistics::{Affine, Matrix, MomentPayload, enclosed, singleton};
 use crate::{Bound, NormalizedView, OperationError, RecipeEvidence, StatisticsError};
 use nrz_bindings::{CheckedSensitivity, Context, Declaration, Descriptor, Evidence, SolveSymbols};
-use nrz_scalar::{ArithmeticContext, Enclosure, Scalar};
+use nrz_scalar::{ArithmeticContext, Scalar};
+mod storage;
 use std::rc::Rc;
 
 /// Independent residual and forward bounds for one exact nominal differential direction.
@@ -141,6 +143,7 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     views: &[NormalizedView<'_, P>],
     factor: &FactorRef<P>,
     evidence: &mut [RecipeEvidence],
+    run: &Run,
 ) -> Result<Vec<MomentPayload<Q>>, OperationError> {
     if bound.statistics.lineage.is_none() {
         return Ok(Vec::new());
@@ -150,12 +153,14 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     }
     let context = ArithmeticContext::new()?;
     let mut certificates = Vec::new();
-    let map = differential(contract, views, factor, &context, &mut certificates);
+    let map = differential(contract, views, factor, &context, &mut certificates, run);
     let Some(RecipeEvidence::Solve(claim)) = evidence.last_mut() else {
         return Err(SolveError::Contract.into());
     };
     claim.sensitivities = certificates;
-    bound.statistics.solve_moments(transfer(map?)?, &context)
+    bound
+        .statistics
+        .solve_moments(storage::transfer(map?, run)?, &context, run)
 }
 
 /// Retain each certified differential even if a later direction or covariance contraction refuses.
@@ -165,21 +170,41 @@ fn differential<P: Scalar + 'static>(
     factor: &FactorRef<P>,
     context: &ArithmeticContext,
     certificates: &mut Vec<SensitivityEvidence>,
+    run: &Run,
 ) -> Result<Affine<P>, OperationError> {
     let operator = views.first().ok_or(SolveError::Contract)?;
     let mut counter = Work::new(work(contract)?);
-    let rhs = nominal_rhs(contract, views)?;
-    let (nominal, _) = enclosed_solve(operator, &rhs, factor, &mut counter, context)?;
+    let attempt = Attempt { run, index: 0 };
+    let rhs = nominal_rhs(contract, views, attempt)?;
+    let (nominal, _) = enclosed_solve(operator, &rhs, factor, &mut counter, context, attempt)?;
+    drop(rhs);
     let columns = input_entries(contract)?;
     let mut map = Affine {
-        jacobian: Matrix::zeros(nominal.extent.entries(), columns)?,
-        offsets: Matrix::zeros(nominal.extent.entries(), 1)?,
+        jacobian: storage::zeros(
+            run,
+            Stage::JacobianCenters,
+            Stage::JacobianTruth,
+            None,
+            crate::Extent::new(nominal.extent.entries(), columns)?,
+        )?,
+        offsets: storage::zeros(
+            run,
+            Stage::OffsetCenters,
+            Stage::OffsetTruth,
+            None,
+            crate::Extent::new(nominal.extent.entries(), 1)?,
+        )?,
     };
     *certificates = crate::binding::buffer(columns)?;
     for direction in 0..columns {
-        let rhs = differential_rhs(&nominal, direction)?;
+        let attempt = Attempt {
+            run,
+            index: direction + 1,
+        };
+        let mut rhs = storage::rhs(attempt, nominal.extent)?;
+        differential_rhs(&nominal, direction, &mut rhs)?;
         let (derivative, mut proof) =
-            enclosed_solve(operator, &rhs, factor, &mut counter, context)?;
+            enclosed_solve(operator, &rhs, factor, &mut counter, context, attempt)?;
         proof.direction = direction;
         certificates.push(proof);
         for (row, (&center, &truth)) in derivative.centers.iter().zip(&derivative.truth).enumerate()
@@ -207,9 +232,10 @@ fn differential<P: Scalar + 'static>(
 fn nominal_rhs<P: Scalar + 'static>(
     contract: &SolveContract,
     views: &[NormalizedView<'_, P>],
+    attempt: Attempt<'_>,
 ) -> Result<Matrix<P>, OperationError> {
     let extent = contract.solution.shape().extent();
-    let mut result = Matrix::zeros(extent.rows(), extent.columns())?;
+    let mut result = storage::rhs(attempt, extent)?;
     for column in 0..extent.columns() {
         for row in 0..extent.rows() {
             let center = if contract.identity.is_some() {
@@ -226,10 +252,10 @@ fn nominal_rhs<P: Scalar + 'static>(
 fn differential_rhs<P: Scalar>(
     nominal: &Matrix<P>,
     direction: usize,
-) -> Result<Matrix<P>, OperationError> {
+    result: &mut Matrix<P>,
+) -> Result<(), OperationError> {
     let order = nominal.extent.rows();
     let square = order.checked_mul(order).ok_or(SolveError::ResourceLimit)?;
-    let mut result = Matrix::zeros(order, nominal.extent.columns())?;
     if direction < square {
         for column in 0..nominal.extent.columns() {
             let index = nominal.extent.index(direction / order, column)?;
@@ -245,7 +271,7 @@ fn differential_rhs<P: Scalar>(
         let entry = direction - square;
         result.set(entry % order, entry / order, P::ONE, singleton(P::ONE)?)?;
     }
-    Ok(result)
+    Ok(())
 }
 
 /// A parameter RHS is enclosed independently; the same inverse proof bounds its exact solution.
@@ -255,9 +281,12 @@ pub(crate) fn enclosed_solve<P: Scalar + 'static>(
     factor: &FactorRef<P>,
     work: &mut Work,
     context: &ArithmeticContext,
+    attempt: Attempt<'_>,
 ) -> Result<(Matrix<P>, SensitivityEvidence), OperationError> {
-    let centers = factor.backend.solve_entries(rhs.extent, &rhs.centers)?;
-    let mut residuals = crate::binding::buffer(centers.len())?;
+    let centers = factor
+        .backend
+        .solve_entries(rhs.extent, &rhs.centers, attempt)?;
+    let mut residuals = attempt.buffer(Stage::SensitivityResiduals)?;
     for column in 0..rhs.extent.columns() {
         for row in 0..rhs.extent.rows() {
             let mut residual = rhs.entry(row, column)?;
@@ -271,7 +300,7 @@ pub(crate) fn enclosed_solve<P: Scalar + 'static>(
                     context,
                 )?;
             }
-            residuals.push(residual.abs().upper().get());
+            residuals.push(residual.abs().upper().get())?;
         }
     }
     let residual = nrz_scalar::norm_upper(&residuals, context)?.get();
@@ -279,10 +308,11 @@ pub(crate) fn enclosed_solve<P: Scalar + 'static>(
         .mul(singleton(residual)?, context)?
         .upper()
         .get();
-    let truth = centers
-        .iter()
-        .map(|&center| enclosed(center, radius, context))
-        .collect::<Result<_, _>>()?;
+    drop(residuals);
+    let mut truth = attempt.buffer(Stage::SensitivityTruth)?;
+    for &center in &centers {
+        truth.push(enclosed(center, radius, context)?)?;
+    }
     Ok((
         Matrix {
             extent: rhs.extent,
@@ -324,41 +354,6 @@ fn restore<P: Scalar>(
     }
     Ok(())
 }
-/// Publication keeps the statically distinct output format while refusing implicit conversion.
-fn transfer<P: Scalar + 'static, Q: Scalar + 'static>(
-    map: Affine<P>,
-) -> Result<Affine<Q>, OperationError> {
-    Ok(Affine {
-        jacobian: transfer_matrix(map.jacobian)?,
-        offsets: transfer_matrix(map.offsets)?,
-    })
-}
-/// Same-format endpoints are copied exactly; f32/f64 promotion is a separate transaction.
-fn transfer_matrix<P: Scalar + 'static, Q: Scalar + 'static>(
-    matrix: Matrix<P>,
-) -> Result<Matrix<Q>, OperationError> {
-    let centers = matrix
-        .centers
-        .into_iter()
-        .map(crate::conversion::same_format)
-        .collect::<Result<_, _>>()?;
-    let truth = matrix
-        .truth
-        .into_iter()
-        .map(|entry| {
-            Ok::<_, OperationError>(Enclosure::new(
-                crate::conversion::same_format(entry.lower().get())?,
-                crate::conversion::same_format(entry.upper().get())?,
-            )?)
-        })
-        .collect::<Result<_, _>>()?;
-    Ok(Matrix {
-        extent: matrix.extent,
-        centers,
-        truth,
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::differential_rhs;
@@ -374,7 +369,8 @@ mod tests {
         let mut nominal = Matrix::zeros(1, 2)?;
         nominal.set(0, 0, 1.0_f64, enclosed(1.0, 0.25, &context)?)?;
         nominal.set(0, 1, 2.0, enclosed(2.0, 0.25, &context)?)?;
-        let rhs = differential_rhs(&nominal, 0)?;
+        let mut rhs = Matrix::zeros(1, 2)?;
+        differential_rhs(&nominal, 0, &mut rhs)?;
         for column in 0..2 {
             assert_eq!(rhs.entry(0, column)?, nominal.entry(0, column)?.negated());
         }

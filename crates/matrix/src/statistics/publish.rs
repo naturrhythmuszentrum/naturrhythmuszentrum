@@ -8,6 +8,7 @@ use super::{
     store::{Lineage, Parameter, Record},
 };
 use crate::heap::identity::Key;
+use crate::solve::scratch::Stage;
 use crate::{Bound, Candidate, Dependency, OperationError, OutputRecord};
 use nrz_bindings::{Descriptor, EvaluationDescriptor, PairingWitness, UncertaintyMode};
 use nrz_scalar::{ArithmeticContext, Scalar};
@@ -87,6 +88,7 @@ pub(crate) fn prepare<P: Scalar + 'static, Q: Scalar + 'static>(
         .try_reserve(pending.len())
         .map_err(|_| StatisticsError::ResourceLimit)?;
     let keys = super::allocation::append(bound, candidate, &regions)?;
+    drop(regions);
     let records = pending
         .into_iter()
         .map(|draft| finish(draft, &keys))
@@ -122,6 +124,7 @@ fn moment<P: Scalar + 'static, Q: Scalar + 'static>(
     let covariance = parameter(
         &payload.covariance,
         covariance_symbol,
+        0,
         None,
         regions,
         context,
@@ -129,11 +132,19 @@ fn moment<P: Scalar + 'static, Q: Scalar + 'static>(
     let sensitivity = parameter(
         &payload.sensitivity,
         sensitivity_symbol,
+        1,
         None,
         regions,
         context,
     )?;
-    let jacobian = parameter(&payload.jacobian, jacobian_symbol, None, regions, context)?;
+    let jacobian = parameter(
+        &payload.jacobian,
+        jacobian_symbol,
+        2,
+        None,
+        regions,
+        context,
+    )?;
     let means = payload
         .means
         .as_ref()
@@ -142,7 +153,7 @@ fn moment<P: Scalar + 'static, Q: Scalar + 'static>(
                 means.extent,
                 super::declarations::output_targets(bound, slot)?,
             )?;
-            parameter(means, declaration, Some(quantity), regions, context)
+            parameter(means, declaration, 3, Some(quantity), regions, context)
         })
         .transpose()?;
     Ok(PendingMoment {
@@ -263,9 +274,10 @@ pub(super) fn derivative_descriptors(
     Ok(result)
 }
 /// Enclose the actual stored candidate before creating its error-target relation.
-fn parameter<P: Scalar>(
+fn parameter<P: Scalar + 'static>(
     matrix: &Matrix<P>,
     declaration: nrz_bindings::ParameterSymbol,
+    index: usize,
     mean: Option<&Descriptor>,
     regions: &mut Vec<RegionData<P>>,
     context: &ArithmeticContext,
@@ -280,7 +292,7 @@ fn parameter<P: Scalar>(
         .filter_map(|entry| entry.pairing().map(EvaluationDescriptor::new))
         .collect();
     let error_symbol = crate::binding::parameters::errors(&declaration)?;
-    let errors = matrix.errors(context)?;
+    let [centers, errors] = parameter_copies(matrix, index, context)?;
     let quantity = mean.cloned();
     let radius = if let Some(mean) = mean {
         Some(
@@ -294,7 +306,7 @@ fn parameter<P: Scalar>(
         extent: matrix.extent,
         quantity,
         declaration,
-        values: matrix.centers.clone(),
+        values: centers,
     });
     regions.push(RegionData {
         extent: matrix.extent,
@@ -303,6 +315,36 @@ fn parameter<P: Scalar>(
         values: errors,
     });
     Ok(PendingParameter { start, descriptors })
+}
+/// Solves draw the two planned publication copies while ordinary routes retain their own allocation path.
+fn parameter_copies<P: Scalar + 'static>(
+    matrix: &Matrix<P>,
+    index: usize,
+    context: &ArithmeticContext,
+) -> Result<[crate::private::Buffer<P>; 2], OperationError> {
+    let Some(run) = crate::solve::scratch::Run::from_parameter(matrix) else {
+        return Ok([
+            matrix.centers.to_vec().into(),
+            matrix.errors(context)?.into(),
+        ]);
+    };
+    if matrix.centers.len() != matrix.extent.entries()
+        || matrix.truth.len() != matrix.extent.entries()
+        || run.extent(Stage::ParameterCenters, Some(index))? != matrix.extent
+    {
+        return Err(StatisticsError::Contract.into());
+    }
+    let mut centers = run.buffer(Stage::ParameterCenters, Some(index))?;
+    let mut errors = run.buffer(Stage::ParameterErrors, Some(index))?;
+    for (&center, &truth) in matrix.centers.iter().zip(&matrix.truth) {
+        centers.push(center)?;
+        errors.push(
+            truth
+                .displacement_from(nrz_scalar::Finite::new(center)?, context)?
+                .get(),
+        )?;
+    }
+    Ok([centers, errors])
 }
 /// Bind all prepared numerical error regions to their own parameter occupations.
 fn finish(draft: PendingMoment, keys: &[Key]) -> Result<Record, OperationError> {

@@ -83,15 +83,39 @@ impl Model {
         limits: JointLimits,
     ) -> Result<Matrix<P>, OperationError> {
         self.require(sources, limits)?;
-        self.data.downcast_ref::<JointModel<f32>>().map_or_else(
-            || {
-                self.data.downcast_ref::<JointModel<f64>>().map_or_else(
-                    || Err(StatisticsError::Contract.into()),
-                    |model| materialize(model, sources, context, limits),
-                )
-            },
-            |model| materialize(model, sources, context, limits),
-        )
+        let mut result = Matrix::zeros(sources.len(), sources.len())?;
+        self.fill_covariance(sources, context, limits, &mut result)?;
+        Ok(result)
+    }
+    /// Fill declared caller-owned parameter channels under the same original model.
+    pub(crate) fn covariance_into<P: Scalar + 'static>(
+        &self,
+        sources: &[usize],
+        context: &ArithmeticContext,
+        limits: JointLimits,
+        result: &mut Matrix<P>,
+    ) -> Result<(), OperationError> {
+        self.require(sources, limits)?;
+        if result.extent != crate::Extent::new(sources.len(), sources.len())? {
+            return Err(StatisticsError::Contract.into());
+        }
+        self.fill_covariance(sources, context, limits, result)
+    }
+    /// Dispatch only after the original model and destination rectangle have been checked.
+    fn fill_covariance<P: Scalar + 'static>(
+        &self,
+        sources: &[usize],
+        context: &ArithmeticContext,
+        limits: JointLimits,
+        result: &mut Matrix<P>,
+    ) -> Result<(), OperationError> {
+        if let Some(model) = self.data.downcast_ref::<JointModel<f32>>() {
+            materialize(model, sources, context, limits, result)
+        } else if let Some(model) = self.data.downcast_ref::<JointModel<f64>>() {
+            materialize(model, sources, context, limits, result)
+        } else {
+            Err(StatisticsError::Contract.into())
+        }
     }
 }
 /// Every target format evaluates the same immutable source model and retains its original IDs.
@@ -100,8 +124,8 @@ fn materialize<P: Scalar + 'static, Q: Scalar + 'static>(
     sources: &[usize],
     context: &ArithmeticContext,
     limits: JointLimits,
-) -> Result<Matrix<Q>, OperationError> {
-    let mut result = Matrix::zeros(sources.len(), sources.len())?;
+    result: &mut Matrix<Q>,
+) -> Result<(), OperationError> {
     for (column, &source_column) in sources.iter().enumerate() {
         for (row, &source_row) in sources.iter().enumerate() {
             let truth = model.covariance(source_row, source_column, context, limits)?;
@@ -109,5 +133,5 @@ fn materialize<P: Scalar + 'static, Q: Scalar + 'static>(
             result.set(row, column, center, truth)?;
         }
     }
-    Ok(result)
+    Ok(())
 }

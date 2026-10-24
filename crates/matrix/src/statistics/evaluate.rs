@@ -6,6 +6,7 @@ use super::{
     contraction::{Work, multiply},
     matrix::Matrix,
 };
+use crate::solve::scratch::{Attempt, Stage};
 use crate::{CheckedOperation, OperationError};
 use nrz_scalar::{ArithmeticContext, Scalar};
 
@@ -86,6 +87,16 @@ impl<P: Scalar + 'static> Plan<P> {
                 .ok_or(StatisticsError::ResourceLimit)
         })?;
         let mut result = Matrix::zeros(rows, lineage.columns.len())?;
+        self.stack_into(&mut result, context)?;
+        Ok(result)
+    }
+    /// Fill planned source-sensitivity channels without changing the original source order.
+    fn stack_into<Q: Scalar + 'static>(
+        &self,
+        result: &mut Matrix<Q>,
+        context: &ArithmeticContext,
+    ) -> Result<(), OperationError> {
+        let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         let mut start = 0;
         for input in &self.inputs {
             for (original, source) in input.lineage.columns.iter().enumerate() {
@@ -109,7 +120,7 @@ impl<P: Scalar + 'static> Plan<P> {
             }
             start += input.sensitivity.extent.rows();
         }
-        Ok(result)
+        Ok(())
     }
     /// A nominal operating center is never silently promoted to an expectation.
     fn means<Q: Scalar + 'static>(
@@ -124,6 +135,15 @@ impl<P: Scalar + 'static> Plan<P> {
                 .ok_or(StatisticsError::ResourceLimit)
         })?;
         let mut result = Matrix::zeros(rows, 1)?;
+        self.means_into(&mut result, context)?;
+        Ok(Some(result))
+    }
+    /// Fill planned explicit means; a missing mean is still a typed refusal.
+    fn means_into<Q: Scalar + 'static>(
+        &self,
+        result: &mut Matrix<Q>,
+        context: &ArithmeticContext,
+    ) -> Result<(), OperationError> {
         let mut start = 0;
         for input in &self.inputs {
             let means = input.means.as_ref().ok_or(StatisticsError::Contract)?;
@@ -137,7 +157,7 @@ impl<P: Scalar + 'static> Plan<P> {
             }
             start += means.extent.rows();
         }
-        Ok(Some(result))
+        Ok(())
     }
 }
 
@@ -147,25 +167,93 @@ impl<P: Scalar + 'static> Plan<P> {
         &self,
         affine: super::Affine<Q>,
         context: &ArithmeticContext,
+        run: &crate::solve::scratch::Run,
     ) -> Result<Vec<MomentPayload<Q>>, OperationError> {
         let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         let mut work = Work::new(self.work);
-        let inputs = self.stacked::<Q>(context)?;
-        let covariance = lineage
+        let mut inputs = run.matrix(
+            Stage::StatisticalInputs,
+            Stage::StatisticalInputsTruth,
+            None,
+        )?;
+        self.stack_into(&mut inputs, context)?;
+        let mut covariance =
+            run.matrix(Stage::StatisticalModel, Stage::StatisticalModelTruth, None)?;
+        lineage
             .model
-            .covariance(&lineage.columns, context, self.limits)?;
-        let sensitivity = multiply(&affine.jacobian, &inputs, context, &mut work)?;
-        let first = multiply(&sensitivity, &covariance, context, &mut work)?;
-        let output = multiply(&first, &sensitivity.transpose()?, context, &mut work)?;
+            .covariance_into(&lineage.columns, context, self.limits, &mut covariance)?;
+        let sensitivity = super::contraction::multiply_planned(
+            &affine.jacobian,
+            &inputs,
+            context,
+            &mut work,
+            Attempt { run, index: 0 },
+        )?;
+        drop(inputs);
+        let first = super::contraction::multiply_planned(
+            &sensitivity,
+            &covariance,
+            context,
+            &mut work,
+            Attempt { run, index: 1 },
+        )?;
+        drop(covariance);
+        let mut transposed = run.matrix(
+            Stage::StatisticalTranspose,
+            Stage::StatisticalTransposeTruth,
+            None,
+        )?;
+        sensitivity.transpose_into(&mut transposed)?;
+        let output = super::contraction::multiply_planned(
+            &first,
+            &transposed,
+            context,
+            &mut work,
+            Attempt { run, index: 2 },
+        )?;
+        drop(first);
+        drop(transposed);
+        let means = self.planned_means(&affine, context, &mut work, run)?;
+        Ok(vec![MomentPayload {
+            lineage: lineage.clone(),
+            sensitivity,
+            covariance: output,
+            jacobian: affine.jacobian,
+            derivative: self.derivative.clone(),
+            means,
+        }])
+    }
+    /// Explicit affine means retain their own planned source parameters and numerical errors.
+    fn planned_means<Q: Scalar + 'static>(
+        &self,
+        affine: &super::Affine<Q>,
+        context: &ArithmeticContext,
+        work: &mut Work,
+        run: &crate::solve::scratch::Run,
+    ) -> Result<Option<Matrix<Q>>, OperationError> {
+        let lineage = self.lineage.as_ref().ok_or(StatisticsError::Contract)?;
         let means = if lineage.assurance == super::MomentAssurance::AffineMoments {
-            self.means::<Q>(context)?
+            if self.inputs.iter().all(|input| input.means.is_some()) {
+                let mut means =
+                    run.matrix(Stage::StatisticalMeans, Stage::StatisticalMeansTruth, None)?;
+                self.means_into(&mut means, context)?;
+                Some(means)
+            } else {
+                None
+            }
         } else {
             None
         };
-        let means = means
+        means
             .as_ref()
             .map(|means| {
-                let mut output = multiply(&affine.jacobian, means, context, &mut work)?;
+                let mut output = super::contraction::multiply_planned(
+                    &affine.jacobian,
+                    means,
+                    context,
+                    work,
+                    Attempt { run, index: 3 },
+                )?;
                 for row in 0..output.extent.rows() {
                     let center = *output.centers.get(row).ok_or(StatisticsError::Contract)?
                         + *affine
@@ -184,14 +272,6 @@ impl<P: Scalar + 'static> Plan<P> {
                 }
                 Ok::<_, OperationError>(output)
             })
-            .transpose()?;
-        Ok(vec![MomentPayload {
-            lineage: lineage.clone(),
-            sensitivity,
-            covariance: output,
-            jacobian: affine.jacobian,
-            derivative: self.derivative.clone(),
-            means,
-        }])
+            .transpose()
     }
 }

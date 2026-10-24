@@ -28,7 +28,7 @@ mod operating;
 mod plan;
 mod product;
 mod publish;
-mod store;
+pub(crate) mod store;
 mod structure;
 
 pub use access::{MomentView, ParameterView};

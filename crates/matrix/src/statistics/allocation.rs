@@ -22,7 +22,7 @@ pub(crate) struct RegionData<P: Scalar> {
     /// Complete actual symbolic targets for every parameter entry.
     pub(crate) declaration: nrz_bindings::ParameterSymbol,
     /// Private finite numerical payload.
-    pub(crate) values: Vec<P>,
+    pub(crate) values: crate::private::Buffer<P>,
 }
 
 /// Preserve every reserved value key while preparing all numerical storage in one change.

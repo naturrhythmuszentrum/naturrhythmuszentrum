@@ -28,7 +28,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             .map_err(|cause| self.failure(cause, evidence))
     }
 
-    /// Evaluate a reusable factor with an explicit ceiling for new deterministic inventory metadata.
+    /// Evaluate a reusable factor with an explicit ceiling for new solve inventory metadata.
     ///
     /// Numerical work, scratch, factor construction and statistical policies are unchanged.
     /// # Errors
@@ -138,7 +138,8 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             BudgetDecision::Unresolved => return Err(SolveError::BudgetUnresolved.into()),
             BudgetDecision::Met | BudgetDecision::NotRequested => {}
         }
-        let statistics = super::sensitivity::evaluate(self, contract, views, factor, evidence)?;
+        let statistics =
+            super::sensitivity::evaluate(self, contract, views, factor, evidence, &run)?;
         let mut outputs = buffer(1)?;
         outputs.push(restored.payload(reservation, &run)?);
         self.issued.set(Some(token));

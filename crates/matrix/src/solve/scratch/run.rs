@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Admit finite exact meanings and metadata before any deterministic solve array is allocated.
+//! Admit finite exact meanings and metadata before any covered solve array is allocated.
 
 use super::plan::{RcLayout, Specification};
 use super::{Backend, Permit, Plan, Stage, State};
@@ -24,14 +24,38 @@ impl Run {
         if TypeId::of::<P>() != TypeId::of::<Q>() {
             return Err(Error::Representation.into());
         }
-        let count = super::schedule::count(contract)?;
+        let sensitivity = bound.statistics.derivative.is_some();
+        let count = super::schedule::count(contract)?
+            .checked_add(super::sensitivity::count(contract, sensitivity)?)
+            .and_then(|n| n.checked_add(super::statistics::count(&bound.statistics)))
+            .ok_or(OperationError::ResourceLimit)?;
         let maps = bound.dependencies.iter().try_fold(0_usize, |sum, input| {
             sum.checked_add(input.layout().owned_bytes())
                 .ok_or(OperationError::ResourceLimit)
         })?;
-        let predicted = metadata(count, bound.dependencies.len(), maps)?;
+        let predicted = metadata(count, bound.dependencies.len(), maps)?
+            .checked_add(super::statistics::Binding::predicted(&bound.statistics)?)
+            .ok_or(OperationError::ResourceLimit)?;
         check_budget(predicted, budget)?;
-        let specifications = super::schedule::specifications(contract)?;
+        let plan = Self::construct(bound, token, count)?;
+        check_budget(plan.metadata, budget)?;
+        Ok(Self(Rc::new(plan)))
+    }
+    /// Allocate admitted metadata only; every numerical allocator remains behind a later permit.
+    fn construct<P: Scalar + 'static, Q: Scalar + 'static>(
+        bound: &Bound<'_, P, Q>,
+        token: u64,
+        count: usize,
+    ) -> Result<Plan, OperationError> {
+        let crate::binding::NativeRecipe::Solve(contract) = &bound.operation.recipe else {
+            return Err(Error::UnplannedMeaning.into());
+        };
+        let sensitivity = bound.statistics.derivative.is_some();
+        let mut specifications = crate::binding::buffer(count)?;
+        super::schedule::specifications(contract, &mut specifications)?;
+        super::sensitivity::specifications(contract, sensitivity, &mut specifications)?;
+        super::statistics::specifications(contract, &bound.statistics, &mut specifications)?;
+        let statistics = super::statistics::Binding::capture(&bound.statistics)?;
         let mut sources = crate::binding::buffer(bound.dependencies.len())?;
         for input in &bound.dependencies {
             sources.push((Dependency::from_snapshot(input), input.symbols.clone()));
@@ -40,16 +64,21 @@ impl Run {
             sum.checked_add(dependency.layout().owned_bytes())
                 .ok_or(OperationError::ResourceLimit)
         })?;
-        let bytes = metadata(specifications.capacity(), sources.capacity(), owned_maps)?;
-        check_budget(bytes, budget)?;
+        let bytes = metadata(specifications.capacity(), sources.capacity(), owned_maps)?
+            .checked_add(statistics.as_ref().map_or(Ok(0), |v| v.owned_bytes())?)
+            .ok_or(OperationError::ResourceLimit)?;
         contract
             .work
-            .checked_mul(size_of::<P>())
+            .checked_add(bound.statistics.work)
+            .and_then(|work| work.checked_mul(size_of::<P>()))
             .ok_or(OperationError::ResourceLimit)?;
-        Ok(Self(Rc::new(Plan {
+        Ok(Plan {
             execution: bound.execution,
             token,
             contract: Rc::clone(contract),
+            derivative: bound.statistics.derivative.clone(),
+            statistics,
+            enclosure: TypeId::of::<nrz_scalar::Enclosure<P>>(),
             sources,
             output: bound
                 .reservations
@@ -64,7 +93,7 @@ impl Run {
             peak: Cell::new(0),
             completed: Cell::new(0),
             metadata: bytes,
-        })))
+        })
     }
     /// Match the exact finite role before drawing any numerical authority.
     pub(super) fn grant(
@@ -89,12 +118,17 @@ impl Run {
         })
     }
     /// Concrete scalar type is checked before the fallible owned-vector allocation.
-    pub(crate) fn buffer<P: Scalar + 'static>(
+    pub(crate) fn buffer<P: 'static>(
         &self,
         stage: Stage,
         iteration: Option<usize>,
     ) -> Result<crate::private::Buffer<P>, OperationError> {
-        if stage.is_backend() || TypeId::of::<P>() != self.0.kind {
+        let kind = if stage.components() == 2 {
+            self.0.enclosure
+        } else {
+            self.0.kind
+        };
+        if stage.is_backend() || TypeId::of::<P>() != kind {
             return Err(Error::Representation.into());
         }
         crate::private::Buffer::allocate_solve(self.grant(stage, iteration)?)
@@ -160,7 +194,7 @@ impl Run {
 fn check_budget(bytes: usize, budget: &Budget) -> Result<(), OperationError> {
     use nrz_bindings::readings::algebra::{Location, limits::BudgetKind};
     let bytes = u64::try_from(bytes).map_err(|_| OperationError::ResourceLimit)?;
-    let at = Location::new("deterministic solve allocation inventory");
+    let at = Location::new("general solve allocation inventory");
     budget.check(BudgetKind::StagedPayloadBytes, bytes, at)?;
     budget.check(BudgetKind::OutputBytes, bytes, at)?;
     Ok(())
@@ -189,7 +223,7 @@ pub(crate) struct Attempt<'a> {
 }
 impl Attempt<'_> {
     /// Draw the exact stage for this certificate attempt.
-    pub(crate) fn buffer<P: Scalar + 'static>(
+    pub(crate) fn buffer<P: 'static>(
         self,
         stage: Stage,
     ) -> Result<crate::private::Buffer<P>, OperationError> {
