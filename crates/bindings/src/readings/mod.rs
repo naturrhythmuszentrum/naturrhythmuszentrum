@@ -20,6 +20,7 @@ mod representation;
 mod roots;
 mod shape;
 mod sources;
+mod spectral;
 mod support;
 mod value;
 
@@ -51,6 +52,7 @@ pub use representation::{Representation, RepresentationDefinition, Representatio
 pub use roots::{RootCoverage, RootProblem, RootReplayUsage};
 pub use shape::{ReadingAxis, ReadingShape};
 pub use sources::{JointSources, ReadingSource, SourceEdge, SourceError, SourceKnowledge};
+pub use spectral::{LcSpectralLaw, SpectralLawError};
 pub use value::{PhysicalReading, ReadingDefinition};
 
 /// A refused physical reading or exact relation.

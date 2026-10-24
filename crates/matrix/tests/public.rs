@@ -128,3 +128,10 @@ mod phasor_testing;
     reason = "physical phasor solve fixtures serve public and private tests"
 )]
 mod phasor_solve_testing;
+
+#[path = "../src/testing/spectral/mod.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "spectral fixtures serve public contract tests"
+)]
+mod spectral_testing;

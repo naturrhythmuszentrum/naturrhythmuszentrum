@@ -35,6 +35,18 @@ pub(crate) fn original(signs: [i8; 2], budget: &mut Budget) -> TestResult<(Fixtu
     changed(signs, [1, 1], false, budget)
 }
 
+/// Build the identical original request in the caller's permanent store policy.
+/// Physical continuations use production defaults instead of the separate blind-solver profile.
+pub(crate) fn original_with_policy(
+    limits: Limits,
+    budget: &mut Budget,
+) -> TestResult<(Fixture, Request)> {
+    let mut fixture = family::store(limits, budget)?;
+    let frame = family::build(&mut fixture, [1, 1], budget)?;
+    let request = request::build(&mut fixture, &frame, [1, 1], false, budget)?;
+    Ok((fixture, request))
+}
+
 /// Independently rebuild a changed physical coefficient or an invalid operand beneath zero.
 pub(crate) fn changed(
     signs: [i8; 2],
@@ -42,7 +54,7 @@ pub(crate) fn changed(
     invalid_zero: bool,
     budget: &mut Budget,
 ) -> TestResult<(Fixture, Request)> {
-    let mut fixture = family::store(budget)?;
+    let mut fixture = family::store(Limits::blind_cubic(), budget)?;
     let frame = family::build(&mut fixture, signs, budget)?;
     let request = request::build(&mut fixture, &frame, scales, invalid_zero, budget)?;
     Ok((fixture, request))

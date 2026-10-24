@@ -7,6 +7,7 @@ pub(crate) mod companions;
 mod coordinates;
 mod parameters;
 mod phasor;
+mod spectral;
 pub use parameters::{
     CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
     PhasorStatistics,
@@ -16,6 +17,7 @@ pub use phasor::{
     PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorTransferBounds,
     PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
 };
+pub use spectral::{LcSpectralEvaluation, LcSpectrum, SpectralError, SpectralValue};
 mod derivatives;
 pub use derivatives::{
     ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,

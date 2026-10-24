@@ -24,3 +24,5 @@ mod lc_coordinates;
 mod lc_roots;
 
 mod phasor_blocks;
+
+mod spectral;

@@ -55,3 +55,10 @@ pub(crate) mod lc_coordinates;
 )]
 #[path = "lc_roots/mod.rs"]
 pub(crate) mod lc_roots;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "spectral fixtures serve public exact-law tests"
+)]
+#[path = "spectral.rs"]
+pub(crate) mod spectral;

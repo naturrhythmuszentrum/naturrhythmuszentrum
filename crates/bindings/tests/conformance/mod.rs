@@ -32,3 +32,5 @@ mod reading_operations;
 mod coordinate_normalization;
 mod lc_root_limits;
 mod lc_roots;
+
+mod spectral;

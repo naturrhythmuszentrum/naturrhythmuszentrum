@@ -65,3 +65,5 @@ mod solve_records;
 mod dependencies;
 
 mod reciprocal_operator;
+
+mod spectral;
