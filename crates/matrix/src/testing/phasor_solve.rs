@@ -7,13 +7,14 @@ mod declarations;
 mod inputs;
 #[path = "phasor_solve/voltage.rs"]
 mod voltage;
+use crate::reading_testing;
 use crate::reading_testing::{TestResult, ledger};
 use crate::test_api::{
     CompanionAdapter, Heap, HeapLimits, PhasorOperand, PhasorSolve, PhasorSolvePublication,
     ReadingBinding, ReadingCoverage,
 };
 use nrz_bindings::{
-    Budget, Limits,
+    Budget,
     readings::{
         CoordinateNormalization, PhasorResidualNorm, PhasorResidualTransfer, PhasorSolveDefinition,
     },
@@ -21,17 +22,9 @@ use nrz_bindings::{
 use nrz_scalar::{LiteralLimits, Scalar};
 use std::rc::Rc;
 
-/// Explicit cumulative caller policy for correspondence, equation, references and publication.
-pub(crate) fn policy() -> Limits {
-    Limits {
-        work: 16_000_000,
-        ..Limits::default()
-    }
-}
-/// One cumulative operation ledger; fixture declaration scaffolding retains its separate setup costs.
-pub(crate) fn budget() -> TestResult<Budget> {
-    Ok(Budget::new(policy())?)
-}
+#[path = "phasor_solve/policy.rs"]
+mod resources;
+pub(crate) use resources::{budget, policy};
 
 /// Complete original sources and a fresh predeclared output family.
 pub(crate) struct Case<P: Scalar> {

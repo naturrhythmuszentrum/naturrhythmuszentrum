@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! One original voltage variance and its own numerical-error source supply every current moment.
 
-use crate::reading_testing::{Fixture, TestResult, ledger, matrix};
+use super::reading_testing::{Fixture, TestResult, ledger, matrix};
 use nrz_bindings::{
     Budget, PairingWitness, ReferenceDefinition, UncertaintyMode,
     readings::{

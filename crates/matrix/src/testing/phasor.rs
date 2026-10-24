@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Two declared phasors share one source graph and atomic scalar-copy/companion admission.
 
+use crate::reading_testing;
 use crate::reading_testing::{Fixture, TestResult, ledger, map, matrix, meaning, real};
 use crate::test_api::{
     CompanionAdapter, DependencyPolicy, EntryTicket, Extent, Heap, HeapLimits, PhasorOperand,
     PhasorProduct, ReadingAdapter, ReadingBinding, ReadingCoverage, ReadingRegion,
 };
 use nrz_bindings::readings::algebra::{
-    readings::{AffineMap, EntryIndex, SelectionSpec},
+    readings::{AffineMap, SelectionSpec},
     syntax::{AtomicSort, Field, Sort},
 };
 use nrz_bindings::{
@@ -20,6 +21,10 @@ use nrz_bindings::{
 };
 use nrz_scalar::Scalar;
 use std::rc::Rc;
+
+#[path = "phasor/components.rs"]
+mod copies;
+pub(crate) use copies::{components, tickets};
 
 /// Complete admitted numerical family and its predeclared exact product.
 pub(crate) struct Case<P: Scalar> {
@@ -278,54 +283,6 @@ fn readings(
     Ok((adapters, relations))
 }
 
-/// Each identity scalar view has its own proof against the specified selected storage entry.
-pub(crate) fn components(
-    fixture: &mut Fixture,
-    whole: &PhysicalReading,
-    prefix: &str,
-    region: usize,
-    adapters: &mut Vec<ReadingAdapter<usize>>,
-    relations: &mut Vec<ReadingRelation>,
-) -> TestResult {
-    for index in 0..4 {
-        let key = format!("{prefix}_{index}");
-        let reading = fixture.define(
-            whole.family(),
-            &key,
-            SelectionSpec::Entry(EntryIndex {
-                row: index % 2,
-                column: index / 2,
-            }),
-            AffineMap::identity(1, &mut ledger()?)?,
-            vec![whole.entries()[0].clone()],
-        )?;
-        let symbol = fixture.symbol(&key)?;
-        let representation = Representation::prove(
-            &mut fixture.cas,
-            &reading,
-            RepresentationDefinition::Defined {
-                symbol,
-                expansion: AffineMap::identity(1, &mut ledger()?)?,
-            },
-            &mut ledger()?,
-        )?;
-        let left = whole.project_selected(&mut fixture.cas, &[index], &mut ledger()?)?;
-        let right = reading.project_selected(&mut fixture.cas, &[0], &mut ledger()?)?;
-        relations.push(ReadingRelation::prove(
-            &mut fixture.cas,
-            left,
-            right,
-            &mut ledger()?,
-        )?);
-        adapters.push(ReadingAdapter::new(
-            representation,
-            tickets(region, &[u64::from(index)]),
-            &mut ledger()?,
-        )?);
-    }
-    Ok(())
-}
-
 /// Identity output parameters are distinct per copy and coverage channel.
 fn companions(
     fixture: &mut Fixture,
@@ -367,14 +324,6 @@ fn companions(
         }
     }
     Ok(result)
-}
-
-/// Literal storage positions remain independent from logical result component indices.
-pub(crate) fn tickets(region: usize, indices: &[u64]) -> Vec<EntryTicket<usize>> {
-    indices
-        .iter()
-        .map(|&index| EntryTicket { region, index })
-        .collect()
 }
 
 /// Different repeated and negative copies are covered by their separate quarter-unit errors.

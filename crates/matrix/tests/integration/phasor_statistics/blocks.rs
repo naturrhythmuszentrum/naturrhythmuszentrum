@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete source and result phasor inventories are constructed before importing any means.
 
-use crate::phasor_testing::{components, tickets};
-use crate::reading_testing::{Fixture, TestResult, ledger, map, matrix, real};
+use super::reading_testing::{Fixture, TestResult, ledger, map, matrix, real};
+use super::{components, tickets};
 use nrz_bindings::{
     CompanionKind,
     readings::{

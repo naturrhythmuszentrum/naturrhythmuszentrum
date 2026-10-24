@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Two certified current means share one actual original voltage reading and one covariance parameter.
 
+use super::reading_testing::{Fixture, TestResult, ledger, meaning};
 use super::{blocks, parameters};
-use crate::phasor_solve_testing::{budget, policy};
-use crate::reading_testing::{Fixture, TestResult, ledger, meaning};
+use super::{budget, policy};
 use nrz_bindings::{
     BinaryOp, Budget, ExponentPolicy, Registry,
     readings::{

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public mixed-state declarations keep shared references, selected coordinates and complete coverage.
 
-use crate::reading_testing::{Fixture, TestResult, ledger, matrix, real};
+use super::reading_testing::{Fixture, TestResult, ledger, matrix, real};
 use nrz_bindings::{
     CompanionKind,
     readings::{
@@ -22,20 +22,26 @@ use nrz_scalar::LiteralLimits;
 use std::rc::Rc;
 
 /// Every exact value, overlap and radius declaration exists before numerical input access.
-pub(super) struct Plan {
-    pub(super) graph: Rc<Cas>,
-    pub(super) coverage: ReadingCoverage<usize>,
-    pub(super) companions: Vec<CompanionAdapter<usize>>,
-    pub(super) contract: CoordinateContract,
+pub(crate) struct Plan {
+    /// Exact declaration authority retained by every imported reader.
+    pub(crate) graph: Rc<Cas>,
+    /// Complete value-entry universe and all selected overlaps.
+    pub(crate) coverage: ReadingCoverage<usize>,
+    /// Original total and numerical-only radius declarations.
+    pub(crate) companions: Vec<CompanionAdapter<usize>>,
+    /// Named state references and both exact coordinate images.
+    pub(crate) contract: CoordinateContract,
+    /// Cumulative relation, frame and image-preparation Work.
+    pub(crate) construction: [u64; 4],
 }
 
 /// The state takes the spectral law's original voltage/current reference identities.
-pub(super) fn plan(entries: &[EntryMeaning]) -> TestResult<Plan> {
+pub(crate) fn plan(entries: &[EntryMeaning]) -> TestResult<Plan> {
     plan_with_budget(entries, &mut ledger()?)
 }
 
-/// Relation proofs, frame construction and lowering share a caller ledger; declarations are separate.
-pub(super) fn plan_with_budget(
+/// Relation proofs, frame construction and exact images share a caller ledger; declarations are separate.
+pub(crate) fn plan_with_budget(
     entries: &[EntryMeaning],
     resources: &mut nrz_bindings::Budget,
 ) -> TestResult<Plan> {
@@ -71,21 +77,27 @@ pub(super) fn plan_with_budget(
         adapter(&mut case, &current, "i", &[1])?,
     ];
     let first = relation(&mut case, &whole, &voltage, 0, resources)?;
+    let first_work = resources.usage().work;
     let second = relation(&mut case, &whole, &current, 1, resources)?;
+    let second_work = resources.usage().work;
     let overlaps = vec![first, second];
-    let companions = companions(&mut case, &readings[0])?;
+    let companions = prepare_companions(&mut case, &readings[0])?;
     let coverage = ReadingCoverage::new(tickets(0, &[0, 1]), readings, overlaps, &mut ledger()?)?;
     let frame = CoordinateNormalization::new(&mut case.cas, &case.context, entries, resources)?;
+    let frame_work = resources.usage().work;
     let contract =
         CoordinateContract::new(&mut case.cas, &frame, LiteralLimits::default(), resources)?;
+    let construction = [first_work, second_work, frame_work, resources.usage().work];
     Ok(Plan {
         graph: Rc::new(case.cas),
         coverage,
         companions,
         contract,
+        construction,
     })
 }
 
+/// Select one original state coordinate without creating an independent source.
 fn component(
     case: &mut Fixture,
     whole: &PhysicalReading,
@@ -101,6 +113,7 @@ fn component(
     )
 }
 
+/// Authenticate every selected storage copy against its exact representation.
 fn adapter(
     case: &mut Fixture,
     reading: &PhysicalReading,
@@ -124,6 +137,7 @@ fn adapter(
     )?)
 }
 
+/// Prove a whole-to-component overlap under the retained state context.
 fn relation(
     case: &mut Fixture,
     whole: &PhysicalReading,
@@ -141,7 +155,8 @@ fn relation(
     )?)
 }
 
-fn companions(
+/// Declare separate complete total and numerical-only radius maps.
+fn prepare_companions(
     case: &mut Fixture,
     target: &ReadingAdapter<usize>,
 ) -> TestResult<Vec<CompanionAdapter<usize>>> {
@@ -176,6 +191,7 @@ fn companions(
     Ok(result)
 }
 
+/// Enumerate the exact ordered positions owned by one numerical region.
 fn tickets(region: usize, indices: &[u64]) -> Vec<EntryTicket<usize>> {
     indices
         .iter()
@@ -187,7 +203,7 @@ fn tickets(region: usize, indices: &[u64]) -> Vec<EntryTicket<usize>> {
 }
 
 /// Companion radii describe a source-free state family, independent of driven voltage statistics.
-pub(super) fn import(
+pub(crate) fn import(
     plan: &Plan,
     heap: &mut Heap,
     policy: DependencyPolicy,
@@ -196,7 +212,7 @@ pub(super) fn import(
 }
 
 /// Measure storage admission independently from exact declarations and numerical restoration.
-pub(super) fn import_with_budget(
+pub(crate) fn import_with_budget(
     plan: &Plan,
     heap: &mut Heap,
     policy: DependencyPolicy,

@@ -1,10 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Shared original LC bindings exercise the operator and complete spectral publication together.
 
+mod construction_costs;
+mod costs;
 mod oracle_regression;
 mod reuse;
 mod state;
-mod state_fixture;
+#[allow(
+    dead_code,
+    reason = "support also supplies standalone owner measurement entry points"
+)]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "private support is shared with the measurement example"
+)]
+mod support;
+use support::{owners, state_fixture};
 
 use crate::reading_testing::{TestResult, ledger};
 use crate::reciprocal_testing::oracle::Rational;
