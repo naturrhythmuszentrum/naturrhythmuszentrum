@@ -52,7 +52,7 @@ pub use representation::{Representation, RepresentationDefinition, Representatio
 pub use roots::{RootCoverage, RootProblem, RootReplayUsage};
 pub use shape::{ReadingAxis, ReadingShape};
 pub use sources::{JointSources, ReadingSource, SourceEdge, SourceError, SourceKnowledge};
-pub use spectral::{LcSpectralLaw, SpectralLawError};
+pub use spectral::{LcSpectralLaw, LcSpectralResultDefinition, SpectralLawError};
 pub use value::{PhysicalReading, ReadingDefinition};
 
 /// A refused physical reading or exact relation.

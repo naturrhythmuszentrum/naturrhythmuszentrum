@@ -4,7 +4,9 @@
 mod input;
 mod numeric;
 mod plan;
+mod publication;
 pub use plan::LcSpectrum;
+pub use publication::{LcSpectralPublication, PublishedLcSpectrum};
 
 use super::LiveBindingError;
 use crate::{Coverage, Heap, HeapError};

@@ -76,7 +76,7 @@ pub(super) fn prepare(
         companion_reads,
         native: Vec::new(),
         antecedents: Vec::new(),
-        phasor_result: None,
+        result_definition: None,
         phasor_inputs: None,
         copies: Vec::new(),
     }))

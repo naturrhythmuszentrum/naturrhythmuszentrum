@@ -11,7 +11,11 @@ use nrz_bindings::readings::algebra::{
 };
 
 /// Explicitly construct the whole positive real base, retaining distinct original parameter handles.
-pub(crate) fn context(source: &mut Fixture, budget: &mut Budget) -> TestResult<Handle> {
+pub(crate) fn context(
+    source: &mut Fixture,
+    with_outputs: bool,
+    budget: &mut Budget,
+) -> TestResult<Handle> {
     let mut declarations: Vec<_> = ["L", "C"]
         .into_iter()
         .map(|key| Declaration {
@@ -21,6 +25,9 @@ pub(crate) fn context(source: &mut Fixture, budget: &mut Budget) -> TestResult<H
         })
         .collect();
     declarations.extend(super::super::declarations::inventory());
+    if with_outputs {
+        declarations.extend(super::super::outputs::inventory());
+    }
     let header = admit(
         &mut source.cas,
         Draft::Header(HeaderDraft::Core(Environment {

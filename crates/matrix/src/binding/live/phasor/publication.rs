@@ -160,7 +160,7 @@ impl Heap {
                 },
             ];
             let provenance = super::super::import::ImportProvenance {
-                definition: super::super::PhasorDefinition::Product(plan.definition.clone()),
+                definition: super::super::ResultDefinition::Product(plan.definition.clone()),
                 sources: plan.sources.clone(),
                 coverage: evaluation.coverage(),
             };

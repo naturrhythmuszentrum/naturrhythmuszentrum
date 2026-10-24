@@ -16,7 +16,7 @@ use std::rc::Rc;
 /// Exact operation and complete flattened source closure retained before result publication.
 pub(super) struct ImportProvenance {
     /// Checked actual native operation and fresh output declaration.
-    pub(super) definition: super::PhasorDefinition,
+    pub(super) definition: super::ResultDefinition,
     /// Every original source selection, including earlier result ancestors.
     pub(super) sources: Vec<super::selected::SelectedReading>,
     /// Original deterministic assurance scopes of the two product operands.
@@ -83,7 +83,7 @@ impl Heap {
         mutable.copies = copies;
         if let Some(provenance) = provenance {
             mutable.antecedents = provenance.sources;
-            mutable.phasor_result = Some(provenance.definition);
+            mutable.result_definition = Some(provenance.definition);
             mutable.phasor_inputs = Some(provenance.coverage);
         }
         if regions.is_empty() {

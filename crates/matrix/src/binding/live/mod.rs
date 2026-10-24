@@ -17,7 +17,10 @@ pub use phasor::{
     PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorTransferBounds,
     PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
 };
-pub use spectral::{LcSpectralEvaluation, LcSpectrum, SpectralError, SpectralValue};
+pub use spectral::{
+    LcSpectralEvaluation, LcSpectralPublication, LcSpectrum, PublishedLcSpectrum, SpectralError,
+    SpectralValue,
+};
 mod derivatives;
 pub use derivatives::{
     ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
@@ -117,17 +120,27 @@ impl<P: Scalar> ReadingBinding<P> {
     /// Actual checked product definition, when this reading was initialized by phasor publication.
     #[must_use]
     pub fn phasor_result(&self) -> Option<&nrz_bindings::readings::PhasorResultDefinition> {
-        match self.group.phasor_result.as_ref()? {
-            PhasorDefinition::Product(value) => Some(value),
-            PhasorDefinition::Solve(_) => None,
+        match self.group.result_definition.as_ref()? {
+            ResultDefinition::Product(value) => Some(value),
+            ResultDefinition::Solve(_) | ResultDefinition::Spectral(_) => None,
         }
     }
     /// Original checked LC equation, when certified solve publication initialized this family.
     #[must_use]
     pub fn phasor_solve(&self) -> Option<&nrz_bindings::readings::PhasorSolveDefinition> {
-        match self.group.phasor_result.as_ref()? {
-            PhasorDefinition::Solve(value) => Some(value),
-            PhasorDefinition::Product(_) => None,
+        match self.group.result_definition.as_ref()? {
+            ResultDefinition::Solve(value) => Some(value),
+            ResultDefinition::Product(_) | ResultDefinition::Spectral(_) => None,
+        }
+    }
+    /// Original complete LC spectral law and all six output views that initialized this family.
+    #[must_use]
+    pub fn lc_spectral_result(
+        &self,
+    ) -> Option<&nrz_bindings::readings::LcSpectralResultDefinition> {
+        match self.group.result_definition.as_ref()? {
+            ResultDefinition::Spectral(value) => Some(value),
+            ResultDefinition::Product(_) | ResultDefinition::Solve(_) => None,
         }
     }
     /// Original operand assurance scopes retained by a published phasor result.
@@ -201,11 +214,13 @@ pub(crate) struct ProofDependency {
 
 /// A closed producer retains the exact operation that initialized its output family.
 #[derive(Clone, Debug)]
-pub(crate) enum PhasorDefinition {
+pub(crate) enum ResultDefinition {
     /// Complete multiplication correspondence and physical result slot.
     Product(nrz_bindings::readings::PhasorResultDefinition),
     /// Original LC equation and complete current result slot.
     Solve(nrz_bindings::readings::PhasorSolveDefinition),
+    /// Both conjugate roots and their checked physical components.
+    Spectral(nrz_bindings::readings::LcSpectralResultDefinition),
 }
 
 /// Shared immutable exact plan, owned by the same inventory as homogeneous covers.
@@ -240,7 +255,7 @@ pub(crate) struct Group {
     /// Flattened selected source closure of a checked published product.
     pub(crate) antecedents: Vec<selected::SelectedReading>,
     /// Actual checked operation that initialized a declared phasor result slot.
-    pub(crate) phasor_result: Option<PhasorDefinition>,
+    pub(crate) result_definition: Option<ResultDefinition>,
     /// Original operand assurance scopes, never promoted by generated numerical radii.
     pub(crate) phasor_inputs: Option<[crate::Coverage; 2]>,
 }

@@ -154,7 +154,7 @@ impl Heap {
                 },
             ];
             let provenance = crate::binding::live::import::ImportProvenance {
-                definition: crate::binding::live::PhasorDefinition::Solve(
+                definition: crate::binding::live::ResultDefinition::Solve(
                     plan.solve.definition().clone(),
                 ),
                 sources: plan.sources.clone(),

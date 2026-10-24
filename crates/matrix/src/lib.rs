@@ -38,12 +38,12 @@ pub use binding::{
     AffineAdapter, CompanionAdapter, CompanionEvaluation, CompanionExecution,
     CompanionExecutionError, CompanionExecutionUsage, CoordinateContract, CoordinateError,
     CoordinateNorm, CoordinateReading, CopyDiscrepancy, DependencyPolicy, EntryTicket,
-    LcSpectralEvaluation, LcSpectrum, LiveBindingError, OperatorAdapter, PhasorError,
-    PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
+    LcSpectralEvaluation, LcSpectralPublication, LcSpectrum, LiveBindingError, OperatorAdapter,
+    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
     PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorStatistics,
-    PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
-    ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage, ReadingImport,
-    ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
+    PhasorTransferBounds, PhasorTransferredResidual, PublishedLcSpectrum, PublishedPhasor,
+    PublishedPhasorSolve, ReadingAdapter, ReadingAdapterError, ReadingBinding, ReadingCoverage,
+    ReadingImport, ReadingRegion, ReciprocalDerivativeContract, ReciprocalDerivativeError,
     ReciprocalDerivativeEvaluation, SpectralError, SpectralValue,
 };
 pub use binding::{

@@ -45,6 +45,21 @@ pub(super) fn recipe(
     time: &EntryMeaning,
     budget: &mut Budget,
 ) -> TestResult<PositiveReciprocalMap> {
+    let (frame, definition) = proposal(source, context, state, time, budget)?;
+    Ok(
+        PositiveReciprocalMap::prove(&mut source.cas, &frame, definition, budget)
+            .map_err(|error| format!("reciprocal correspondence: {error:?}"))?,
+    )
+}
+
+/// Prepare the original exact operator separately for isolated correspondence measurements.
+pub(super) fn proposal(
+    source: &mut Fixture,
+    context: &Handle,
+    state: &CoordinateNormalization,
+    time: &EntryMeaning,
+    budget: &mut Budget,
+) -> TestResult<(CoordinateNormalization, ReciprocalMapDefinition)> {
     let entries = [
         meaning("inductance", [2, 1, -2, -2, 0, 0, 0], "1/40", budget)?,
         meaning("capacitance", [-2, -1, 4, 2, 0, 0, 0], "1/100000", budget)?,
@@ -100,10 +115,7 @@ pub(super) fn recipe(
         map,
         original,
     };
-    Ok(
-        PositiveReciprocalMap::prove(&mut source.cas, &frame, definition, budget)
-            .map_err(|error| format!("reciprocal correspondence: {error:?}"))?,
-    )
+    Ok((frame, definition))
 }
 
 /// Exact `t*S^(-1)*A*S` uses native map composition independently of flattened recipe rows.

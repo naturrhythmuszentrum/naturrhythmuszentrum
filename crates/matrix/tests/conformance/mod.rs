@@ -67,3 +67,5 @@ mod dependencies;
 mod reciprocal_operator;
 
 mod spectral;
+
+mod spectral_publication;

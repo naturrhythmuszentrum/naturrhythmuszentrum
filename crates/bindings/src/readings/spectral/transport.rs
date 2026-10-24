@@ -94,7 +94,7 @@ fn physical(
 }
 
 /// Compare every exact dimension exponent on the caller's ledger without a hidden default reset.
-fn meaning(
+pub(super) fn meaning(
     entry: &EntryMeaning,
     name: &str,
     dimensions: [i64; 7],

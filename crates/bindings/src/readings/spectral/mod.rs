@@ -3,6 +3,9 @@
 
 mod hypotheses;
 mod original;
+mod output_context;
+mod result;
+pub use result::LcSpectralResultDefinition;
 mod transport;
 
 use super::{
@@ -133,6 +136,11 @@ impl LcSpectralLaw {
             usage: [before, budget.usage()],
             bytes,
         })))
+    }
+    /// Whether both references retain the same immutable original spectral law allocation.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
     }
     /// Whether both original coverage and the retained transport require no assumptions.
     #[must_use]

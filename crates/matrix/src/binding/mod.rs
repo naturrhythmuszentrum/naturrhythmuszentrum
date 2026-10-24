@@ -50,12 +50,13 @@ pub use limits::ExecutionLimits;
 pub use live::{
     CompanionEvaluation, CompanionExecution, CompanionExecutionError, CompanionExecutionUsage,
     CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, CopyDiscrepancy,
-    DependencyPolicy, LcSpectralEvaluation, LcSpectrum, LiveBindingError, PhasorError,
-    PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
+    DependencyPolicy, LcSpectralEvaluation, LcSpectralPublication, LcSpectrum, LiveBindingError,
+    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
     PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorStatistics,
-    PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
-    ReadingBinding, ReadingImport, ReadingRegion, ReciprocalDerivativeContract,
-    ReciprocalDerivativeError, ReciprocalDerivativeEvaluation, SpectralError, SpectralValue,
+    PhasorTransferBounds, PhasorTransferredResidual, PublishedLcSpectrum, PublishedPhasor,
+    PublishedPhasorSolve, ReadingBinding, ReadingImport, ReadingRegion,
+    ReciprocalDerivativeContract, ReciprocalDerivativeError, ReciprocalDerivativeEvaluation,
+    SpectralError, SpectralValue,
 };
 pub(crate) use operation::NativeRecipe;
 pub use operation::{CheckedOperation, OperationDraft, RegionContract};
