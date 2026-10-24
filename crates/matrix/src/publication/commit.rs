@@ -75,6 +75,10 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             evidence.push(claim.clone());
         }
         let private = crate::private::Run::publication(self, candidate)?;
+        let solve = crate::solve::scratch::Run::publication(self, candidate)?;
+        if let Some(crate::RecipeEvidence::Solve(claim)) = evidence.first_mut() {
+            claim.inventory = solve;
+        }
         let record = self.prepare_record(candidate.token, evidence, private)?;
         super::fill::fill(&mut self.reservations.storage, &candidate.outputs)?;
         let moments = crate::statistics::prepare(self, candidate, &record.outputs)?;

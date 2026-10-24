@@ -65,6 +65,18 @@ pub struct OperationRecord {
 }
 
 impl OperationRecord {
+    /// Completed RHS, certificate, restoration and recovery array inventory, excluding statistics.
+    #[must_use]
+    pub fn solve_inventory(&self) -> Option<&crate::SolveInventory> {
+        self.evidence.iter().find_map(|evidence| {
+            if let crate::RecipeEvidence::Solve(claim) = evidence {
+                claim.allocation_inventory()
+            } else {
+                None
+            }
+        })
+    }
+
     /// Completed reciprocal-kernel allocation inventory, including all candidate channels.
     ///
     /// Absence means this operation does not yet expose a private allocation inventory.

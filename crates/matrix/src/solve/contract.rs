@@ -84,7 +84,7 @@ impl SolveContract {
         Ok(CheckedOperation {
             inputs: Rc::clone(&self.inputs),
             outputs: vec![self.output.clone()].into(),
-            recipe: NativeRecipe::Solve(self),
+            recipe: NativeRecipe::Solve(Rc::from(self)),
             revision: 1,
         })
     }
@@ -170,7 +170,7 @@ fn estimate_work(order: usize, columns: usize) -> Result<usize, OperationError> 
 impl CheckedOperation {
     /// Conservative solve work/scratch requirement, absent for another native recipe.
     #[must_use]
-    pub const fn solve_work(&self) -> Option<usize> {
+    pub fn solve_work(&self) -> Option<usize> {
         match &self.recipe {
             NativeRecipe::Solve(contract) => Some(contract.work),
             _ => None,

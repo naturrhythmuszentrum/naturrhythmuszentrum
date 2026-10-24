@@ -285,7 +285,7 @@ impl crate::OperationRecord {
 impl CheckedOperation {
     /// Optional client identities for this solve request, unrelated to numerical cache eligibility.
     #[must_use]
-    pub const fn solve_record_keys(&self) -> Option<&SolveRecordKeys> {
+    pub fn solve_record_keys(&self) -> Option<&SolveRecordKeys> {
         match &self.recipe {
             NativeRecipe::Solve(contract) => contract.policy.record_keys(),
             _ => None,

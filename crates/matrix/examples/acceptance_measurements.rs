@@ -185,6 +185,9 @@ fn write_solve(output: &mut impl Write, proof: &nrz_matrix::SolveEvidence) -> Re
         proof.arithmetic_revision(),
         proof.is_complete()
     )?;
+    if let Some(inventory) = proof.allocation_inventory() {
+        write_inventory(output, inventory)?;
+    }
     writeln!(
         output,
         "q={:?} h={:?} inverse_margin={:?} g={:?} residual={:?} candidate_norm={:?}",
@@ -217,6 +220,33 @@ fn write_solve(output: &mut impl Write, proof: &nrz_matrix::SolveEvidence) -> Re
             .fold(0.0_f64, f64::max),
         proof.factor_use().map(nrz_matrix::FactorUse::reused),
         proof.recovery()
+    )?;
+    Ok(())
+}
+
+/// Scoped observable capacities remain separate from the named shared backend allowance and process RSS.
+fn write_inventory(output: &mut impl Write, inventory: &nrz_matrix::SolveInventory) -> ResultOf {
+    let allocations = inventory.allocations();
+    writeln!(
+        output,
+        "solve_array_requests={} logical_entries={} float_entries={} observable_cumulative_bytes={} observable_peak_bytes={} metadata_bytes={} backend_name={:?} shared_backend_allowance_bytes={}",
+        allocations.len(),
+        allocations
+            .iter()
+            .map(nrz_matrix::SolveAllocation::entries)
+            .sum::<usize>(),
+        allocations
+            .iter()
+            .map(nrz_matrix::SolveAllocation::float_entries)
+            .sum::<usize>(),
+        allocations
+            .iter()
+            .filter_map(nrz_matrix::SolveAllocation::owned_bytes)
+            .sum::<usize>(),
+        inventory.peak_payload_bytes(),
+        inventory.metadata_bytes(),
+        nrz_matrix::SolveInventory::BACKEND_NAME,
+        inventory.backend_allowance_bytes()
     )?;
     Ok(())
 }

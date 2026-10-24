@@ -7,6 +7,8 @@
 //!
 //! The homogeneous copy admission comes from bindings `HomogeneousRecipe` and a retained `CopyWitness` over actual value, deterministic-bound, numerical-error and planned result symbols. Matrix resolves each numerical region's unique opaque owner and checks live extents, selected layouts, finite payloads, versions and companion targets. Missing or double owners and mismatched companion/result symbols refuse. `RegionContract::check` delegates its physical homogeneity decision to bindings; the duplicate matrix descriptor comparison is replaced by the declared symbol check.
 
+use std::rc::Rc;
+
 use nrz_bindings::{Descriptor, HomogeneousRecipe};
 
 use super::{ExecutionLimits, OperationError};
@@ -214,7 +216,7 @@ pub(crate) enum NativeRecipe {
         definition: std::rc::Rc<nrz_bindings::readings::PositiveReciprocalMap>,
     },
     /// Square solve under an independent inverse-defect and residual theorem.
-    Solve(Box<crate::solve::SolveContract>),
+    Solve(Rc<crate::solve::SolveContract>),
     /// Checked deterministic multi-input region operation.
     Kernel(Box<crate::kernels::KernelContract>),
     /// Bit-preserving copy with independent equality verification.

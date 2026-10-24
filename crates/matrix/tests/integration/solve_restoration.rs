@@ -56,6 +56,7 @@ fn restored<P: Scalar + 'static>() -> TestResult {
         return Err("solve proof".into());
     };
     assert!(proof.restoration().is_some());
+    check_inventory::<P>(record.solve_inventory().ok_or("restoration inventory")?);
     assert_eq!(
         proof.budget().ok_or("budget assessment")?.decision(),
         BudgetDecision::Met
@@ -98,4 +99,19 @@ fn restoration_operation() -> TestResult<(OperationDraft, Descriptor)> {
     .restore_solution(conversion)?
     .with_solve_policy(policy)?;
     Ok((operation, point))
+}
+
+/// The mapped path owns new centers and discrepancy arrays in addition to the three final transfers.
+fn check_inventory<P: Scalar>(inventory: &nrz_matrix::SolveInventory) {
+    assert!(inventory.restoration().is_some());
+    assert_eq!(inventory.allocations().len(), 13);
+    assert_eq!(
+        inventory
+            .allocations()
+            .iter()
+            .filter_map(nrz_matrix::SolveAllocation::owned_bytes)
+            .sum::<usize>(),
+        11 * size_of::<P>()
+    );
+    assert_eq!(inventory.peak_payload_bytes(), 5 * size_of::<P>());
 }

@@ -59,6 +59,7 @@ fn inverse<P: Scalar + 'static>() -> TestResult {
     }
     let record = heap.operation_record(outcome.record())?;
     assert_eq!(record.inputs().len(), 1);
+    check_inventory::<P>(record.solve_inventory().ok_or("inverse array inventory")?);
     let restored = record
         .operation()
         .outputs()
@@ -77,4 +78,28 @@ fn inverse<P: Scalar + 'static>() -> TestResult {
         0.0_f64.to_bits()
     );
     Ok(())
+}
+
+/// Source-free identity requests retain the original operator while each candidate stage is distinct.
+fn check_inventory<P: Scalar>(inventory: &nrz_matrix::SolveInventory) {
+    assert!(inventory.is_inverse());
+    assert_eq!(inventory.sources().len(), 1);
+    assert_eq!(inventory.allocations().len(), 11);
+    assert_eq!(
+        inventory
+            .allocations()
+            .iter()
+            .map(nrz_matrix::SolveAllocation::entries)
+            .sum::<usize>(),
+        44
+    );
+    assert_eq!(
+        inventory
+            .allocations()
+            .iter()
+            .filter_map(nrz_matrix::SolveAllocation::owned_bytes)
+            .sum::<usize>(),
+        36 * size_of::<P>()
+    );
+    assert_eq!(inventory.peak_payload_bytes(), 16 * size_of::<P>());
 }

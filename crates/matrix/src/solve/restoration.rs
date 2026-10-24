@@ -5,9 +5,10 @@
 //!
 //! `OperationDraft::restore_solution` attaches a checked homogeneous `ConversionContract` to the solve before publication. Its source shape must be the derived solution shape. The exact affine map restores every center and scales differences with the absolute coefficient enclosure; shifts and origins enter only centers. Coefficient lowering and restoration evaluation errors are included once in each overlapping total/numerical view. The joint Frobenius bound uses the scale times the original joint radius plus the norm of the new restoration errors. The result, complete companions, exact map evidence and both original dependencies publish atomically. Coherent unit-reference restoration remains exact when no additional map is requested.
 
+use super::scratch::{Attempt, Run, Stage};
 use super::{SolveContract, SolveError};
-use crate::binding::buffer;
 use crate::coordinate_numeric::LoweredMap;
+use crate::private::Buffer;
 use crate::publication::Payload;
 use crate::{ConversionEvidence, OperationError, OutputReservation};
 use nrz_accuracy::Nonnegative;
@@ -17,11 +18,11 @@ use nrz_scalar::{ArithmeticContext, Scalar};
 #[derive(Debug)]
 pub(crate) struct Restored<P: Scalar> {
     /// Finite solution coordinates in the final output interpretation.
-    centers: Vec<P>,
+    centers: Buffer<P>,
     /// Complete conservative entrywise total bounds.
-    totals: Vec<P>,
+    totals: Buffer<P>,
     /// Overlapping represented-center numerical bounds.
-    evaluation: Vec<P>,
+    evaluation: Buffer<P>,
     /// Joint Frobenius total bound, before any entrywise expansion loses tightness.
     pub(crate) total_norm: P,
     /// Joint Frobenius numerical-only bound in the same output coordinates.
@@ -35,23 +36,34 @@ pub(crate) struct Restored<P: Scalar> {
 /// Identity unit-reference restoration is exact; other maps use checked coefficient enclosures.
 pub(crate) fn restore<P: Scalar + 'static>(
     contract: &SolveContract,
-    centers: Vec<P>,
+    centers: Buffer<P>,
     total: P,
     numerical: P,
     reservation: OutputReservation,
     context: &ArithmeticContext,
+    attempt: Attempt<'_>,
 ) -> Result<Restored<P>, OperationError> {
     if centers.len() != reservation.extent().entries() {
         return Err(SolveError::Contract.into());
     }
     if let Some(conversion) = &contract.restoration {
         let map = LoweredMap::new(&conversion.map, conversion.literals, context)?;
-        return mapped(centers, total, numerical, reservation, &map, context);
+        return mapped(
+            centers,
+            total,
+            numerical,
+            reservation,
+            &map,
+            context,
+            attempt,
+        );
     }
-    let mut totals = buffer(centers.len())?;
-    let mut evaluation = buffer(centers.len())?;
-    totals.resize(centers.len(), total);
-    evaluation.resize(centers.len(), numerical);
+    let mut totals = attempt.buffer(Stage::Totals)?;
+    let mut evaluation = attempt.buffer(Stage::Errors)?;
+    for _ in 0..centers.len() {
+        totals.push(total)?;
+        evaluation.push(numerical)?;
+    }
     Ok(Restored {
         centers,
         totals,
@@ -64,13 +76,14 @@ pub(crate) fn restore<P: Scalar + 'static>(
 }
 
 /// Uniform homogeneous affine restoration preserves the joint norm via its scale plus new error.
-fn mapped<P: Scalar>(
-    centers: Vec<P>,
+fn mapped<P: Scalar + 'static>(
+    centers: Buffer<P>,
     total: P,
     numerical: P,
     reservation: OutputReservation,
     map: &LoweredMap<P>,
     context: &ArithmeticContext,
+    attempt: Attempt<'_>,
 ) -> Result<Restored<P>, OperationError> {
     let scale =
         Nonnegative::new(map.scale.enclosure().abs().upper().get()).map_err(SolveError::from)?;
@@ -79,9 +92,9 @@ fn mapped<P: Scalar>(
         .scale(scale, context)
         .map_err(SolveError::from)?;
     let mut result = Restored {
-        centers: buffer(centers.len())?,
-        totals: buffer(centers.len())?,
-        evaluation: buffer(centers.len())?,
+        centers: attempt.buffer(Stage::RestoredCenters)?,
+        totals: attempt.buffer(Stage::Totals)?,
+        evaluation: attempt.buffer(Stage::Errors)?,
         total_norm: total,
         numerical_norm: numerical,
         evidence: Some(ConversionEvidence::new(
@@ -92,17 +105,18 @@ fn mapped<P: Scalar>(
         )),
         revision: context.revision(),
     };
-    let mut errors = buffer(centers.len())?;
-    for center in centers {
+    let mut errors = attempt.buffer(Stage::RestorationErrors)?;
+    for &center in &centers {
         let converted = map.evaluate(center, total, context)?;
         let error = Nonnegative::new(converted.evaluation).map_err(SolveError::from)?;
-        result.centers.push(converted.center);
-        result.totals.push(converted.total);
+        result.centers.push(converted.center)?;
+        result.totals.push(converted.total)?;
         result
             .evaluation
-            .push(carried.add(error, context).map_err(SolveError::from)?.get());
-        errors.push(converted.evaluation);
+            .push(carried.add(error, context).map_err(SolveError::from)?.get())?;
+        errors.push(converted.evaluation)?;
     }
+    drop(centers);
     let new_error = Nonnegative::new(
         nrz_scalar::norm_upper(&errors, context)
             .map_err(SolveError::from)?
@@ -128,13 +142,14 @@ impl<P: Scalar + 'static> Restored<P> {
     pub(crate) fn payload<Q: Scalar + 'static>(
         self,
         reservation: OutputReservation,
+        run: &Run,
     ) -> Result<Payload<Q>, OperationError> {
         Ok(Payload {
             extent: reservation.extent(),
             target: reservation.stamp(),
-            centers: transfer(self.centers)?.into(),
-            bounds: Some(transfer(self.totals)?.into()),
-            evaluation: Some(transfer(self.evaluation)?.into()),
+            centers: transfer(self.centers, run, Stage::OutputCenters)?,
+            bounds: Some(transfer(self.totals, run, Stage::OutputTotals)?),
+            evaluation: Some(transfer(self.evaluation, run, Stage::OutputErrors)?),
             contributions: None,
         })
     }
@@ -142,11 +157,14 @@ impl<P: Scalar + 'static> Restored<P> {
 
 /// Same-format transfer never silently narrows a certified upper endpoint.
 fn transfer<P: Scalar + 'static, Q: Scalar + 'static>(
-    values: Vec<P>,
-) -> Result<Vec<Q>, OperationError> {
-    let mut result = buffer(values.len())?;
-    for value in values {
-        result.push(crate::conversion::same_format(value)?);
+    values: Buffer<P>,
+    run: &Run,
+    stage: Stage,
+) -> Result<Buffer<Q>, OperationError> {
+    let mut result = run.buffer(stage, None)?;
+    for &value in &values {
+        result.push(crate::conversion::same_format(value)?)?;
     }
-    Ok(result)
+    drop(values);
+    result.into_candidate()
 }

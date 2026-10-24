@@ -98,6 +98,20 @@ fn resource<P: Scalar + 'static>() -> TestResult {
                 .ok_or("recovery")?;
             assert_eq!(recovery.work(), required);
             assert_eq!(recovery.stop(), SolveStop::BudgetMet);
+            let inventory = heap
+                .operation_record(outcome.record())?
+                .solve_inventory()
+                .ok_or("recovery inventory")?;
+            assert_eq!(inventory.completed_attempts(), 1);
+            assert_eq!(inventory.allocations().len(), 12);
+            assert_eq!(
+                inventory
+                    .allocations()
+                    .iter()
+                    .filter_map(nrz_matrix::SolveAllocation::owned_bytes)
+                    .sum::<usize>(),
+                10 * size_of::<P>()
+            );
         }
     }
     Ok(())

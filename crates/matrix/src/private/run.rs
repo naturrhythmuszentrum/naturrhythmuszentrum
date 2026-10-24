@@ -66,8 +66,10 @@ pub(crate) struct Run(pub(super) Rc<Plan>);
 pub(super) struct Permit<T> {
     /// Shared complete plan, prepared before this ticket was drawn.
     pub(super) plan: Rc<Plan>,
-    /// Opaque ticket drawn before the numerical allocator can be called.
-    pub(super) ticket: PrivateAllocationTicket,
+    /// Finite stage identity; the shared plan retains the original execution and candidate token.
+    pub(super) slot: usize,
+    /// Exact initialized entry universe sealed when this typed permit is drawn.
+    pub(super) entries: usize,
     /// Representation checked when the ticket was drawn.
     marker: std::marker::PhantomData<T>,
 }
@@ -137,15 +139,11 @@ impl Run {
         if entry.state.get() != State::Planned {
             return Err(Error::DuplicateTicket.into());
         }
-        let ticket = PrivateAllocationTicket {
-            execution: self.0.execution,
-            candidate: self.0.candidate,
-            slot,
-        };
         entry.state.set(State::Issued);
         Ok(Permit {
             plan: Rc::clone(&self.0),
-            ticket,
+            slot,
+            entries: entry.binding.entries(),
             marker: std::marker::PhantomData,
         })
     }

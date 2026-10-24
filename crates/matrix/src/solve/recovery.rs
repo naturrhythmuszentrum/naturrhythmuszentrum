@@ -5,7 +5,9 @@
 //!
 //! `SolvePolicy::with_recovery` authorizes a finite accuracy `RecoveryPolicy` and cumulative `Limits`. Each correction reuses the LU factors, forms an independently enclosed f64 residual, selects a finite correction RHS, and updates in the declared candidate format. The full inverse, residual, input-family, restoration and budget interpretation remains mandatory. `SolveEvidence::recovery` exposes every completed attempt, both precisions, certified residual and total radius, charged work and the explicit `SolveStop`. A refinement limit, stagnation or exhausted work returns a refusal with available evidence; the last iterate is never published as a success. Zero corrections and disabled promotion are supported.
 
+use super::scratch::{Attempt, Stage};
 use super::{FactorRef, SolveContract, SolveError, restoration::Restored};
+use crate::private::Buffer;
 use crate::{NormalizedView, OperationError, OutputReservation, RecipeEvidence};
 use nrz_accuracy::{BudgetDecision, RecoveryPolicy, WorkBudget};
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Precision, Scalar};
@@ -112,6 +114,8 @@ impl SolveRecoveryEvidence {
 }
 /// Mutable state stays private until the final certificate or explicit refusal is recorded.
 struct Run {
+    /// Full per-attempt work admitted on the cumulative recovery ledger.
+    cost: u64,
     /// Finite configured correction limits.
     policy: RecoveryPolicy,
     /// Cumulative checked resource counter.
@@ -132,6 +136,7 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
     reservation: OutputReservation,
     statistical_work: usize,
     evidence: &mut Vec<RecipeEvidence>,
+    scratch: &super::scratch::Run,
 ) -> Result<(Restored<P>, BudgetDecision), OperationError> {
     let (policy, limits) = contract.policy.recovery().ok_or(SolveError::Contract)?;
     let cost = contract
@@ -140,6 +145,7 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
         .ok_or(SolveError::ResourceLimit)?;
     let cost = u64::try_from(cost).map_err(|_| SolveError::ResourceLimit)?;
     let mut run = Run {
+        cost,
         policy,
         budget: limits.start(),
         best: None,
@@ -156,9 +162,9 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
         views,
         factor,
         reservation,
-        cost,
         &mut run,
         evidence,
+        scratch,
     );
     if let Err(cause) = &result {
         run.evidence.stop = stop_for(cause);
@@ -176,24 +182,33 @@ fn iterations<P: Scalar + 'static>(
     views: &[NormalizedView<'_, P>],
     factor: &FactorRef<P>,
     reservation: OutputReservation,
-    cost: u64,
     run: &mut Run,
     evidence: &mut Vec<RecipeEvidence>,
+    scratch: &super::scratch::Run,
 ) -> Result<(Restored<P>, BudgetDecision), OperationError> {
     run.budget
-        .reserve_attempt(cost)
+        .reserve_attempt(run.cost)
         .map_err(|_| SolveError::ResourceLimit)?;
-    let mut centers = super::evaluate::initial(contract, views, factor)?;
+    let mut centers = super::evaluate::initial(contract, views, factor, scratch)?;
     let mut iteration = 0;
     loop {
+        let attempt = Attempt {
+            run: scratch,
+            index: usize::try_from(iteration).map_err(|_| SolveError::ResourceLimit)?,
+        };
+        let mut retained = attempt.buffer(Stage::RetainedCenters)?;
+        for &value in &centers {
+            retained.push(value)?;
+        }
         let mut current = Vec::new();
         let result = super::evaluate::certify(
             contract,
             views,
             factor,
-            centers.clone(),
+            retained,
             reservation,
             &mut current,
+            attempt,
         );
         if !current.is_empty() {
             *evidence = current;
@@ -212,10 +227,20 @@ fn iterations<P: Scalar + 'static>(
             };
         }
         run.budget
-            .reserve_attempt(cost)
+            .reserve_attempt(run.cost)
             .map_err(|_| SolveError::ResourceLimit)?;
-        centers = correction(contract, views, factor, &centers)?;
+        drop(restored);
         iteration = iteration.checked_add(1).ok_or(SolveError::ResourceLimit)?;
+        centers = correction(
+            contract,
+            views,
+            factor,
+            &centers,
+            Attempt {
+                run: scratch,
+                index: usize::try_from(iteration).map_err(|_| SolveError::ResourceLimit)?,
+            },
+        )?;
     }
 }
 impl Run {
@@ -291,11 +316,12 @@ pub(crate) fn correction<P: Scalar + 'static>(
     views: &[NormalizedView<'_, P>],
     factor: &FactorRef<P>,
     centers: &[P],
-) -> Result<Vec<P>, OperationError> {
+    attempt: Attempt<'_>,
+) -> Result<Buffer<P>, OperationError> {
     let extent = contract.solution.shape().extent();
     let context = ArithmeticContext::new().map_err(SolveError::from)?;
     let operator = views.first().ok_or(SolveError::Contract)?;
-    let mut rhs = crate::binding::buffer(extent.entries())?;
+    let mut rhs = attempt.buffer(Stage::CorrectionRightHandSide)?;
     for column in 0..extent.columns() {
         for row in 0..extent.rows() {
             let initial = if contract.identity.is_some() {
@@ -320,19 +346,21 @@ pub(crate) fn correction<P: Scalar + 'static>(
                     )
                     .map_err(SolveError::from)?;
             }
-            rhs.push(residual_center(residual, &context)?);
+            rhs.push(residual_center(residual, &context)?)?;
         }
     }
-    let delta = factor.backend.solve_entries(extent, &rhs)?;
-    centers
-        .iter()
-        .zip(delta)
-        .map(|(&center, update)| {
+    let delta = factor
+        .backend
+        .correction_planned(extent, &rhs, attempt.run, attempt.index)?;
+    let mut updated = attempt.buffer(Stage::UpdatedCenters)?;
+    for (&center, &update) in centers.iter().zip(&delta) {
+        updated.push(
             Finite::new(center + update)
-                .map(Finite::get)
-                .map_err(|cause| SolveError::from(cause).into())
-        })
-        .collect()
+                .map_err(SolveError::from)?
+                .get(),
+        )?;
+    }
+    Ok(updated)
 }
 /// A finite endpoint of the enclosed residual is an eligible private correction candidate.
 fn residual_center<P: Scalar + 'static>(
@@ -388,6 +416,7 @@ mod tests {
     #[test]
     fn solve_recovery_success_precedes_stagnation_and_limit() -> TestResult {
         let run = Run {
+            cost: 1,
             policy: RecoveryPolicy::new(0, 1, Promotion::Never)?,
             budget: Limits::new(1, 1).start(),
             evidence: SolveRecoveryEvidence {

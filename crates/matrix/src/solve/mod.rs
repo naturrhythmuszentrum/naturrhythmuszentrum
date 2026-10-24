@@ -11,6 +11,8 @@
 //!
 //! `cargo test -p nrz-matrix --test public integration::acceptance` checks exact rational targets, refusal stages and charged work/storage counts. `cargo run -p nrz-matrix --locked --example acceptance_measurements -- truss` prints the shared fixture's observed timings and public evidence; replace `truss` with `resistor`, `certificate-edge`, `shared-a-b`, `stale-factor` or `bounded-refinement` for the other committed cases. The measurements in `docs/records/matrix-core-acceptance.md` name their release-profile environment; they do not describe runs using the workspace dev profile (`opt-level = 2`). Tests do not print measurements or assert runtime thresholds. Region payload counts exclude backend padding and allocator overhead; server peak resident memory is recorded separately. The truss's illustrative moment model and its deterministic import enclosure are separate conditional scenarios, and a covariance never supplies its deterministic radius.
 
+pub(crate) mod scratch;
+pub use scratch::{SolveAllocation, SolveAllocationStage, SolveInventory};
 mod allocations;
 pub use allocations::{FactorAllocation, FactorAllocationStage, FactorInventory};
 mod backend;

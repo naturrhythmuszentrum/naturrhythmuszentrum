@@ -261,7 +261,7 @@ fn promote(
         failure.cause = SolveError::Contract.into();
         return Err(failure);
     };
-    contract.policy = contract
+    std::rc::Rc::make_mut(contract).policy = contract
         .policy
         .clone()
         .with_recovery(policy, Limits::new(attempts, remaining - conversion_work));

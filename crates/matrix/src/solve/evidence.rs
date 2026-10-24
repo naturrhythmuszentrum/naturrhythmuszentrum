@@ -17,6 +17,8 @@ use nrz_scalar::{Precision, Scalar};
 /// Independent common-operator solve certificate with separately scoped numerical evidence.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SolveEvidence {
+    /// Completed deterministic allocation receipt, attached only after live publication validation.
+    pub(crate) inventory: Option<std::rc::Rc<super::SolveInventory>>,
     /// Complete solution rectangle, including all common right-hand sides.
     pub(crate) extent: Extent,
     /// Named deterministic problem covered by the total companion.
@@ -59,6 +61,7 @@ impl SolveEvidence {
         revision: u32,
     ) -> Self {
         Self {
+            inventory: None,
             extent: reservation.extent(),
             coverage: Coverage::RepresentedInputs,
             work: contract.work,
@@ -245,5 +248,13 @@ impl SolveEvidence {
     #[must_use]
     pub const fn factor_use(&self) -> Option<&super::FactorUse> {
         self.factor.as_ref()
+    }
+}
+
+impl SolveEvidence {
+    /// Completed deterministic solve array coverage; absent before successful publication validation.
+    #[must_use]
+    pub fn allocation_inventory(&self) -> Option<&super::SolveInventory> {
+        self.inventory.as_deref()
     }
 }

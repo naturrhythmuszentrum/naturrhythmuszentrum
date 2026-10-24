@@ -143,27 +143,48 @@ pub(crate) fn center<P: Scalar + 'static>(
     work: &mut SolveWork,
     context: &ArithmeticContext,
 ) -> Result<CenterCertificate<P>, SolveError> {
+    let mut residuals = buffer(candidate.len())?;
+    residuals.resize(candidate.len(), P::ZERO);
+    center_with_residuals(
+        operator,
+        rhs,
+        candidate,
+        witness,
+        &mut residuals,
+        work,
+        context,
+    )
+}
+
+/// Fill caller-owned planned residual storage without allocating an untracked verifier array.
+pub(crate) fn center_with_residuals<P: Scalar + 'static>(
+    operator: &impl SolveMatrix<P>,
+    rhs: &impl SolveMatrix<P>,
+    candidate: &[P],
+    witness: &InverseWitness<P>,
+    residuals: &mut [P],
+    work: &mut SolveWork,
+    context: &ArithmeticContext,
+) -> Result<CenterCertificate<P>, SolveError> {
     let extent = rhs.extent();
     if extent.rows() != operator.extent().rows()
         || extent.columns() == 0
         || candidate.len() != extent.entries()
+        || residuals.len() != candidate.len()
     {
         return Err(SolveError::Contract);
     }
-    let mut residuals = buffer(candidate.len())?;
     for column in 0..extent.columns() {
         for row in 0..extent.rows() {
             let dot = solution_dot(operator, candidate, extent, row, column, work, context)?;
-            residuals.push(
-                point(rhs.get(row, column)?)?
-                    .sub(dot, context)?
-                    .abs()
-                    .upper()
-                    .get(),
-            );
+            residuals[extent.index(row, column)?] = point(rhs.get(row, column)?)?
+                .sub(dot, context)?
+                .abs()
+                .upper()
+                .get();
         }
     }
-    let residual = nrz_scalar::norm_upper(&residuals, context)?.get();
+    let residual = nrz_scalar::norm_upper(residuals, context)?.get();
     let magnitude = nrz_scalar::norm_upper(candidate, context)?.get();
     let radius = point(witness.inverse)?
         .mul(point(residual)?, context)?
@@ -228,24 +249,55 @@ pub(crate) fn family<P: Scalar + 'static>(
     context: &ArithmeticContext,
 ) -> Result<FamilyCertificate<P>, SolveError> {
     let mut operator_bounds = buffer(operator.extent().entries())?;
-    for column in 0..operator.extent().columns() {
-        for row in 0..operator.extent().rows() {
-            operator_bounds.push(operator.bound(row, column)?.unwrap_or(P::ZERO));
-        }
-    }
+    operator_bounds.resize(operator.extent().entries(), P::ZERO);
     let mut rhs_bounds = buffer(rhs.extent().entries())?;
-    for column in 0..rhs.extent().columns() {
-        for row in 0..rhs.extent().rows() {
-            rhs_bounds.push(rhs.bound(row, column)?.unwrap_or(P::ZERO));
-        }
-    }
+    rhs_bounds.resize(rhs.extent().entries(), P::ZERO);
+    family_with_bounds(
+        operator,
+        rhs,
+        witness,
+        certificate,
+        [&mut operator_bounds, &mut rhs_bounds],
+        context,
+    )
+}
+
+/// Caller-owned selected radii carry their own exact allocation bindings and permits.
+pub(crate) fn family_with_bounds<P: Scalar + 'static>(
+    operator: &impl SolveMatrix<P>,
+    rhs: &impl SolveMatrix<P>,
+    witness: &InverseWitness<P>,
+    certificate: &CenterCertificate<P>,
+    bounds: [&mut [P]; 2],
+    context: &ArithmeticContext,
+) -> Result<FamilyCertificate<P>, SolveError> {
+    let [operator_bounds, rhs_bounds] = bounds;
+    select_bounds(operator, operator_bounds)?;
+    select_bounds(rhs, rhs_bounds)?;
     perturbation(
         witness.inverse,
         certificate,
-        nrz_scalar::norm_upper(&operator_bounds, context)?.get(),
-        nrz_scalar::norm_upper(&rhs_bounds, context)?.get(),
+        nrz_scalar::norm_upper(operator_bounds, context)?.get(),
+        nrz_scalar::norm_upper(rhs_bounds, context)?.get(),
         context,
     )
+}
+
+/// Write every selected radius in logical column order, including exact identity zeros.
+fn select_bounds<P: Scalar>(
+    source: &impl SolveMatrix<P>,
+    values: &mut [P],
+) -> Result<(), SolveError> {
+    let extent = source.extent();
+    if values.len() != extent.entries() {
+        return Err(SolveError::Contract);
+    }
+    for (index, value) in values.iter_mut().enumerate() {
+        *value = source
+            .bound(index % extent.rows(), index / extent.rows())?
+            .unwrap_or(P::ZERO);
+    }
+    Ok(())
 }
 
 /// Apply the full common-RHS theorem with an outward numerator and a lower denominator.

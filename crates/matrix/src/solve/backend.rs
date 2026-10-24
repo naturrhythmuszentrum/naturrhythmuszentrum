@@ -41,48 +41,6 @@ impl Lu {
             }
         }
     }
-
-    /// Solve physical RHS columns separately from the witness identity columns.
-    pub(crate) fn solve<P: Scalar + 'static>(
-        &self,
-        rhs: &NormalizedView<'_, P>,
-    ) -> Result<Vec<P>, OperationError> {
-        match self {
-            Self::Single(factor) => {
-                check_single(factor.get(), rhs.extent().rows())?;
-                copy_single(&factor.get().solve(&pack_single(rhs)?))
-            }
-            Self::Double(factor) => {
-                check_double(factor.get(), rhs.extent().rows())?;
-                copy_double(&factor.get().solve(&pack_double(rhs)?))
-            }
-        }
-    }
-
-    /// Obtain a private inverse candidate by a separate normalized identity solve.
-    pub(crate) fn inverse<P: Scalar + 'static>(
-        &self,
-        order: usize,
-    ) -> Result<Vec<P>, OperationError> {
-        match self {
-            Self::Single(factor) => {
-                check_single(factor.get(), order)?;
-                copy_single(
-                    &factor
-                        .get()
-                        .solve(&faer::Mat::<f32>::identity(order, order)),
-                )
-            }
-            Self::Double(factor) => {
-                check_double(factor.get(), order)?;
-                copy_double(
-                    &factor
-                        .get()
-                        .solve(&faer::Mat::<f64>::identity(order, order)),
-                )
-            }
-        }
-    }
 }
 
 /// Concrete adapters keep safe matrix indexing behind checked dimensions and precision gates.
@@ -260,3 +218,101 @@ macro_rules! factor_copy {
 }
 factor_copy!(copy_factor_single, f32);
 factor_copy!(copy_factor_double, f64);
+
+/// The actual RHS owner retains its pre-allocation permit until the backend result is copied.
+macro_rules! planned_solve {
+    ($name:ident, $copy:ident, $pack:ident, $format:ty) => {
+        /// Ticket both backend rectangles and the matrix-owned scalar copy.
+        fn $name<P: Scalar + 'static>(
+            factor: &faer::linalg::solvers::PartialPivLu<$format>,
+            rhs: &super::RightHandSide<'_, '_, P>,
+            run: &super::scratch::Run,
+        ) -> Result<crate::private::Buffer<P>, OperationError> {
+            use super::scratch::Stage;
+            let packed = run.backend(Stage::PackedRightHandSide, 0, || match rhs {
+                super::RightHandSide::Physical(view) => $pack(view),
+                super::RightHandSide::Identity(shape) => Ok(faer::Mat::<$format>::identity(
+                    shape.extent().rows(),
+                    shape.extent().columns(),
+                )),
+            })?;
+            let result = run.backend(Stage::BackendResult, 0, || Ok(factor.solve(packed.get())))?;
+            $copy(result.get(), run, 0)
+        }
+        /// Copy finite values without detaching allocation authority or allowing unplanned growth.
+        fn $copy<P: Scalar + 'static>(
+            matrix: &faer::Mat<$format>,
+            run: &super::scratch::Run,
+            iteration: usize,
+        ) -> Result<crate::private::Buffer<P>, OperationError> {
+            let mut result = run.buffer(super::scratch::Stage::Centers, Some(iteration))?;
+            for column in 0..matrix.ncols() {
+                for row in 0..matrix.nrows() {
+                    let value = matrix[(row, column)];
+                    if !value.is_finite() {
+                        return Err(SolveError::CandidateFailure.into());
+                    }
+                    result.push(crate::conversion::same_format(value)?)?;
+                }
+            }
+            Ok(result)
+        }
+    };
+}
+planned_solve!(planned_single, planned_copy_single, pack_single, f32);
+planned_solve!(planned_double, planned_copy_double, pack_double, f64);
+
+impl Lu {
+    /// Physical and typed-identity solves use the same predeclared normalized coordinate schedule.
+    pub(crate) fn solve_planned<P: Scalar + 'static>(
+        &self,
+        rhs: &super::RightHandSide<'_, '_, P>,
+        run: &super::scratch::Run,
+    ) -> Result<crate::private::Buffer<P>, OperationError> {
+        match self {
+            Self::Single(factor) => {
+                check_single(factor.get(), rhs.extent().rows())?;
+                planned_single(factor.get(), rhs, run)
+            }
+            Self::Double(factor) => {
+                check_double(factor.get(), rhs.extent().rows())?;
+                planned_double(factor.get(), rhs, run)
+            }
+        }
+    }
+    /// A finite correction has distinct planned RHS, result and copied-coordinate owners.
+    pub(crate) fn correction_planned<P: Scalar + 'static>(
+        &self,
+        extent: crate::Extent,
+        entries: &[P],
+        run: &super::scratch::Run,
+        iteration: usize,
+    ) -> Result<crate::private::Buffer<P>, OperationError> {
+        use super::scratch::Stage;
+        if entries.len() != extent.entries() || extent.columns() == 0 {
+            return Err(SolveError::Contract.into());
+        }
+        match self {
+            Self::Single(factor) => {
+                check_single(factor.get(), extent.rows())?;
+                let packed = run.backend(Stage::PackedRightHandSide, iteration, || {
+                    entries_single(extent, entries)
+                })?;
+                let result = run.backend(Stage::BackendResult, iteration, || {
+                    Ok(factor.get().solve(packed.get()))
+                })?;
+                planned_copy_single(result.get(), run, iteration)
+            }
+            Self::Double(factor) => {
+                check_double(factor.get(), extent.rows())?;
+                let packed = run.backend(Stage::PackedRightHandSide, iteration, || {
+                    entries_double(extent, entries)
+                })?;
+                let result = run.backend(Stage::BackendResult, iteration, || {
+                    Ok(factor.get().solve(packed.get()))
+                })?;
+                planned_copy_double(result.get(), run, iteration)
+            }
+        }
+    }
+}

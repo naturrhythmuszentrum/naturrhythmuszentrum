@@ -18,9 +18,9 @@ fn mixed_residual_correction_reuses_the_certified_factor() -> TestResult {
         draft(1, 1)?
             .with_solve_policy(crate::recovery_testing::policy(
                 1.0,
-                0,
+                1,
                 nrz_accuracy::Promotion::Never,
-                nrz_accuracy::Limits::new(1, 1_000_000),
+                nrz_accuracy::Limits::new(2, 1_000_000),
             )?)?
             .check(limits)?,
         vec![operator.value(), rhs.value()],
@@ -32,15 +32,28 @@ fn mixed_residual_correction_reuses_the_certified_factor() -> TestResult {
     let crate::binding::NativeRecipe::Solve(contract) = &bound.operation.recipe else {
         return Err("solve contract".into());
     };
-    let corrected = crate::solve::recovery::correction(contract, views.views(), &factor, &[0.25])?;
+    let budget = nrz_bindings::Budget::new(nrz_bindings::Limits::default())?;
+    let inventory = crate::solve::scratch::Run::new(&bound, 0, &budget)?;
+    inventory.certified(0)?;
+    let attempt = crate::solve::scratch::Attempt {
+        run: &inventory,
+        index: 1,
+    };
+    let corrected =
+        crate::solve::recovery::correction(contract, views.views(), &factor, &[0.25], attempt)?;
+    let mut retained = attempt.buffer(crate::solve::scratch::Stage::RetainedCenters)?;
+    for &value in &corrected {
+        retained.push(value)?;
+    }
     let mut evidence = Vec::new();
     crate::solve::evaluate::certify(
         contract,
         views.views(),
         &factor,
-        corrected.clone(),
+        retained,
         *bound.output_reservations().first().ok_or("reservation")?,
         &mut evidence,
+        attempt,
     )?;
     let radius = crate::recovery_testing::proof(&evidence)?.numerical_radius();
     assert!(
