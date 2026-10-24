@@ -117,7 +117,7 @@ fn lc_acceptance_rejects_unrelated_overlap_inventory() -> TestResult {
     Ok(())
 }
 
-fn restored_oracle(restored: &nrz_matrix::CoordinateReading<f64>) -> TestResult {
+pub(super) fn restored_oracle(restored: &nrz_matrix::CoordinateReading<f64>) -> TestResult {
     for (index, endpoints) in [[(5, 2), (7, 2)], [(3, 16), (5, 16)]]
         .into_iter()
         .enumerate()
@@ -133,7 +133,7 @@ fn restored_oracle(restored: &nrz_matrix::CoordinateReading<f64>) -> TestResult 
     Ok(())
 }
 
-fn norms(
+pub(super) fn norms(
     heap: &Heap,
     restored: &nrz_matrix::CoordinateReading<f64>,
     contract: &nrz_matrix::CoordinateContract,

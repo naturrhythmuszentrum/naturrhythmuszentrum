@@ -21,6 +21,8 @@ use std::rc::Rc;
 
 /// A complete statistical request with every exact result and companion declared before execution.
 pub(super) struct Case<P: Scalar> {
+    /// Original graph permits independent dependency-inventory inspection.
+    pub(super) graph: Rc<nrz_bindings::readings::algebra::Cas>,
     /// Cumulative operation Work after equations, covariance laws, metrics and input/publication plans.
     pub(super) construction: [u64; 4],
     /// Numerical owner of the shared source, both means and all parameter versions.
@@ -96,6 +98,19 @@ pub(super) fn vector_case_with_budget<P: Scalar + 'static>(
     build(resources, true, DependencyPolicy::WholeBase, None)
 }
 
+/// Isolate fine admission on its unchanged caller policy before numerical lifecycle requests.
+pub(super) fn entries_case() -> TestResult<Case<f64>> {
+    lifecycle_case(DependencyPolicy::Entries, &mut budget()?)
+}
+
+/// Keep one intended storage admission on its own supplied cumulative ledger.
+pub(super) fn lifecycle_case(
+    dependencies: DependencyPolicy,
+    admission: &mut Budget,
+) -> TestResult<Case<f64>> {
+    build(&mut budget()?, false, dependencies, Some(admission))
+}
+
 /// Scalar and vector requests retain their complete inventories before importing any values.
 fn build<P: Scalar + 'static>(
     resources: &mut Budget,
@@ -142,7 +157,7 @@ fn build<P: Scalar + 'static>(
         )?,
     ];
     let metric_work = resources.usage().work;
-    let (mut heap, bindings) = import::<P>(
+    let (mut heap, bindings, graph) = import::<P>(
         fixture,
         &inputs,
         &parameters,
@@ -160,6 +175,7 @@ fn build<P: Scalar + 'static>(
         resources.usage().work,
     ];
     Ok(Case {
+        graph,
         construction,
         heap,
         publications,
@@ -233,6 +249,13 @@ fn equations(
         .map_err(|_| "two exact solves".into())
 }
 
+/// Storage owner, selected original inputs and their exact dependency authority.
+type Imported<P> = (
+    Heap,
+    Vec<ReadingBinding<P>>,
+    Rc<nrz_bindings::readings::algebra::Cas>,
+);
+
 /// Source means and both original parameter channels enter one complete atomic input group.
 fn import<P: Scalar + 'static>(
     fixture: Fixture,
@@ -241,7 +264,7 @@ fn import<P: Scalar + 'static>(
     dependencies: DependencyPolicy,
     budget: &mut Budget,
     admission: Option<&mut Budget>,
-) -> TestResult<(Heap, Vec<ReadingBinding<P>>)> {
+) -> TestResult<Imported<P>> {
     let mut adapters = inputs
         .iter()
         .flat_map(|block| block.adapters.iter().cloned())
@@ -304,22 +327,23 @@ fn import<P: Scalar + 'static>(
             values: vec![import_error; 4],
         },
     ];
+    let graph = Rc::new(fixture.cas);
     let bindings = admit_group(
         &mut heap,
-        fixture,
+        Rc::clone(&graph),
         coverage,
         inputs,
         &regions,
         dependencies,
         admission.unwrap_or(budget),
     )?;
-    Ok((heap, bindings))
+    Ok((heap, bindings, graph))
 }
 
 /// The isolated admission uses the same graph, regions and policy as the cumulative fixture.
 fn admit_group<P: Scalar + 'static>(
     heap: &mut Heap,
-    fixture: Fixture,
+    graph: Rc<nrz_bindings::readings::algebra::Cas>,
     coverage: ReadingCoverage<usize>,
     inputs: &[blocks::Block; 3],
     regions: &[ReadingRegion<P>],
@@ -328,7 +352,7 @@ fn admit_group<P: Scalar + 'static>(
 ) -> TestResult<Vec<ReadingBinding<P>>> {
     let before = format!("{heap:?}");
     let imported = heap.import_readings(
-        Rc::new(fixture.cas),
+        graph,
         coverage,
         inputs
             .iter()

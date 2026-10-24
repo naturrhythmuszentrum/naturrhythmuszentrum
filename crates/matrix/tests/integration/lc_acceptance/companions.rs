@@ -261,3 +261,131 @@ fn lc_acceptance_companion_selection_cost_boundary() -> TestResult {
     }
     Ok(())
 }
+
+/// Dropped allocating imports preserve every surviving original-source result and named state norm.
+/// ´test:integration:lc-acceptance-original-lineage-lifetime-and-refusals´
+#[test]
+fn lc_acceptance_original_lineage_lifetime_and_refusals() -> TestResult {
+    let fixture = Fixture::with_outputs(["5", "1/10", "1/2000"])?;
+    let mut heap = Heap::new(nrz_matrix::HeapLimits::default())?;
+    let imported = retained_import(&fixture, &mut heap)?;
+    let sources: [ReadingBinding<f64>; 2] = imported
+        .bindings()
+        .to_vec()
+        .try_into()
+        .map_err(|_| "original pair")?;
+    let (outcome, readings) = execute(&fixture, &mut heap, &sources)?;
+    let bundle = crate::kernel_testing::output(&outcome)?;
+    let plan = fixture.plan(sources.clone(), &mut ledger()?)?;
+    let publication = fixture.publication(plan, &mut ledger()?)?;
+    let context = ArithmeticContext::new()?;
+    let roots = heap.publish_lc_spectrum(&publication, &context, &mut ledger()?)?;
+    let original = heap.value(bundle.value())?.stamp();
+    foreign_and_wrong(&fixture, &heap, &sources, &context)?;
+    assert!(
+        heap.replace_reading_companion_entries(&sources[0], 0, &[-1.0], &mut ledger()?)
+            .is_err()
+    );
+    drop(imported);
+    heap.compact()?;
+    assert_eq!(heap.value(bundle.value())?.stamp(), original);
+    assert!(heap.operation_record(outcome.record()).is_ok());
+    assert!(heap.reading_entries(&readings[0]).is_ok());
+    operator_oracle(&heap, bundle)?;
+    spectral_oracle(&heap, &roots, &context)?;
+    assert_eq!(roots.evaluation().coverage(), [Coverage::DeclaredBounds; 2]);
+    state_survives_parameter_change(&fixture, &mut heap, &sources, &context)?;
+    assert!(heap.operation_record(outcome.record()).is_err());
+    assert!(heap.reading_entries(&readings[0]).is_err());
+    for index in 0..2 {
+        assert!(
+            roots
+                .reading(index, &heap, &context, &mut ledger()?)
+                .is_err()
+        );
+    }
+    Ok(())
+}
+
+fn retained_import(
+    fixture: &Fixture,
+    heap: &mut Heap,
+) -> TestResult<nrz_matrix::ReadingImport<f64>> {
+    let regions = [
+        nrz_matrix::ReadingRegion {
+            extent: nrz_matrix::Extent::new(1, 1)?,
+            values: vec![0.25],
+        },
+        nrz_matrix::ReadingRegion {
+            extent: nrz_matrix::Extent::new(1, 1)?,
+            values: vec![0.0625],
+        },
+        nrz_matrix::ReadingRegion {
+            extent: nrz_matrix::Extent::new(4, 1)?,
+            values: vec![0.015_625, 0.000_976_562_5, 0.003_906_25, 0.000_244_140_625],
+        },
+    ];
+    Ok(heap.import_readings(
+        std::rc::Rc::clone(&fixture.graph),
+        fixture.coverage.clone(),
+        fixture.companions.clone(),
+        &regions,
+        DependencyPolicy::WholeBase,
+        &mut ledger()?,
+    )?)
+}
+
+fn foreign_and_wrong(
+    fixture: &Fixture,
+    heap: &Heap,
+    sources: &[ReadingBinding<f64>; 2],
+    context: &ArithmeticContext,
+) -> TestResult {
+    assert!(
+        fixture
+            .plan([sources[1].clone(), sources[0].clone()], &mut ledger()?)
+            .is_err()
+    );
+    let (_foreign_heap, foreign) = fixture.import([[0.25_f64, 0.0, 0.0], [0.0625, 0.0, 0.0]])?;
+    let plan = fixture.plan(foreign, &mut ledger()?)?;
+    let before = format!("{heap:?}");
+    assert!(matches!(
+        heap.evaluate_lc_spectrum(&plan, context, &mut ledger()?),
+        Err(nrz_matrix::SpectralError::Live(
+            nrz_matrix::LiveBindingError::Heap(nrz_matrix::HeapError::ForeignHandle)
+        ))
+    ));
+    assert_eq!(format!("{heap:?}"), before);
+    Ok(())
+}
+
+fn state_survives_parameter_change(
+    fixture: &Fixture,
+    heap: &mut Heap,
+    sources: &[ReadingBinding<f64>; 2],
+    context: &ArithmeticContext,
+) -> TestResult {
+    let entries = fixture.law.state().entries();
+    let plan = super::state_fixture::plan(entries)?;
+    let imported = super::state_fixture::import(&plan, heap, DependencyPolicy::Entries)?;
+    let state = imported.bindings()[0].clone();
+    let normalized = heap.normalize_reading(&state, &plan.contract, context, &mut ledger()?)?;
+    let restored = heap.restore_reading(&normalized, context, &mut ledger()?)?;
+    drop(imported);
+    heap.compact()?;
+    heap.replace_reading_companion_entries(&sources[0], 0, &[0.03125], &mut ledger()?)?;
+    super::state::restored_oracle(&restored)?;
+    super::state::norms(heap, &restored, &plan.contract, entries, context)?;
+    heap.replace_reading_entries(&state, &[3.0, 0.25], &mut ledger()?)?;
+    assert!(
+        heap.coordinate_norm(
+            &restored,
+            &plan.contract,
+            nrz_accuracy::NormKind::One,
+            context,
+            &mut ledger()?
+        )
+        .is_err()
+    );
+    Ok(())
+}

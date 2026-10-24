@@ -6,6 +6,7 @@ mod costs;
 mod fixture;
 mod lc_acceptance;
 mod lc_costs;
+mod lifecycle;
 mod parameters;
 mod refusals;
 use crate::phasor_solve_testing::{budget, policy};

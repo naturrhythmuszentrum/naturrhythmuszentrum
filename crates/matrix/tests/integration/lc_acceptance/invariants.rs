@@ -169,7 +169,11 @@ fn lc_invariant_rechecks_every_source_and_companion_version() -> TestResult {
 }
 
 /// Equal-bit replacements still advance the actual source or companion version.
-fn mutate(heap: &mut Heap, sources: &[ReadingBinding<f64>; 2], change: usize) -> TestResult {
+pub(super) fn mutate(
+    heap: &mut Heap,
+    sources: &[ReadingBinding<f64>; 2],
+    change: usize,
+) -> TestResult {
     if change < 2 {
         let values = heap
             .reading_entries(&sources[change])
@@ -507,7 +511,7 @@ fn foreign_owner(
 }
 
 /// Original value and companion selections remain the fixed declarations of every request.
-fn selections<P: Scalar + 'static>(
+pub(super) fn selections<P: Scalar + 'static>(
     heap: &mut Heap,
     sources: &[ReadingBinding<P>; 2],
 ) -> TestResult<Vec<ValueBinding<P>>> {
@@ -522,7 +526,7 @@ fn selections<P: Scalar + 'static>(
 }
 
 /// Grid inputs are deliberately absent: this coefficient depends only on its fixed source versions.
-fn request<P: Scalar + 'static>(
+pub(super) fn request<P: Scalar + 'static>(
     operation: &CheckedOperation,
     sources: &[ValueBinding<P>],
 ) -> Binding<P> {

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Shared original LC bindings exercise the operator and complete spectral publication together.
 
+mod boundaries;
 mod companions;
 mod construction_costs;
 mod costs;
+mod grid;
 mod invariants;
 mod oracle_regression;
 mod reuse;
