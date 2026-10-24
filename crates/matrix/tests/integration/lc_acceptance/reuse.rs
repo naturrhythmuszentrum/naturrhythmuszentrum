@@ -150,7 +150,7 @@ fn execute_operator(
 }
 
 /// Solve axes retain the actual published operator identities instead of equal fresh declarations.
-fn solve_from_operator(
+pub(super) fn solve_from_operator(
     operator: &nrz_matrix::CheckedShape,
 ) -> TestResult<nrz_matrix::CheckedOperation> {
     let limits = nrz_matrix::ShapeLimits::default();

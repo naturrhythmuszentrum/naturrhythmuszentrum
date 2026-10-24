@@ -49,8 +49,9 @@ pub use binding::{
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
-    InputSnapshot, NormalizedInputs, NormalizedView, OperationDraft, OperationError,
-    OutputReservation, PhysicalView, RegionContract, SymbolState, ValueBinding,
+    InputSnapshot, InvariantCache, InvariantError, InvariantUse, InvariantValue, NormalizedInputs,
+    NormalizedView, OperationDraft, OperationError, OutputReservation, PhysicalView,
+    RegionContract, SymbolState, ValueBinding,
 };
 
 pub use layout::{Layout, PackedRegion};

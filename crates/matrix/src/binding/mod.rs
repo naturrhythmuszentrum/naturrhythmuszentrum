@@ -28,6 +28,8 @@
 mod adapters;
 mod error;
 mod imports;
+mod invariant;
+pub use invariant::{InvariantCache, InvariantError, InvariantUse, InvariantValue};
 pub(crate) mod kernel;
 pub(crate) mod lifecycle;
 mod limits;

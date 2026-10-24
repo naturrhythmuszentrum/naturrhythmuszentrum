@@ -35,7 +35,7 @@ pub struct Dependency {
 }
 
 /// Exact independent companion dependency; no scalar carries this evidence.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct BoundDependency {
     /// Captured companion occupation, including generation.
     key: Key,
@@ -48,6 +48,28 @@ pub(crate) struct BoundDependency {
 }
 
 impl Dependency {
+    /// Compare actual value identities, selections and versions, independently of alias descriptors.
+    /// The globally unique value identity names the base occupation; aliases cannot create new sources.
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
+        let selected = match (&self.selected, &other.selected) {
+            (Some(left), Some(right)) => {
+                left.index == right.index && std::rc::Rc::ptr_eq(&left.group, &right.group)
+            }
+            (None, None) => true,
+            _ => false,
+        };
+        selected
+            && self.scope == other.scope
+            && self.stamp == other.stamp
+            && self.precision == other.precision
+            && self.schema == other.schema
+            && self.layout == other.layout
+            && self.companion == other.companion
+            && self.evaluation == other.evaluation
+            && self.contributions == other.contributions
+            && self.coverage == other.coverage
+    }
+
     /// Capture a precision-erased graph relation without converting any numerical data.
     pub(crate) fn from_snapshot<P: Scalar>(input: &InputSnapshot<P>) -> Self {
         Self {

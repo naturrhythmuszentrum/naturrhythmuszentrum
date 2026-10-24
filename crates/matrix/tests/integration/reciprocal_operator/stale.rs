@@ -11,7 +11,7 @@ use std::rc::Rc;
 #[test]
 fn normalized_lc_operator_retains_capacitance_version() -> TestResult {
     let (mut prepared, recipe) = proved()?;
-    let coverage = crate::reciprocal_testing::coverage(&mut prepared.case)?;
+    let coverage = crate::reciprocal_testing::readings::coverage(&mut prepared.case)?;
     let operation = draft(&prepared, &recipe)?.check(ExecutionLimits::default())?;
     let mut heap = Heap::new(HeapLimits::default())?;
     let mut inputs = Vec::new();

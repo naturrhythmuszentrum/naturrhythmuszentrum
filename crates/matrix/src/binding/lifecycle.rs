@@ -87,6 +87,11 @@ impl<P: Scalar> ValueBinding<P> {
     }
 }
 
+/// Owned ticket array and shared availability cell retained by a contiguous bounded result.
+pub(crate) const fn bounded_binding_payload_bytes() -> usize {
+    3 * std::mem::size_of::<Ticket>() + std::mem::size_of::<(usize, usize, Cell<SymbolState>)>()
+}
+
 /// Unique transaction owner of all pending result states.
 #[derive(Debug)]
 pub(crate) struct Plans<P: Scalar> {

@@ -17,7 +17,7 @@ use nrz_matrix::{
 #[test]
 fn positive_reciprocal_box_refusal_is_atomic() -> TestResult {
     let (mut prepared, recipe) = proved()?;
-    let coverage = crate::reciprocal_testing::coverage(&mut prepared.case)?;
+    let coverage = crate::reciprocal_testing::readings::coverage(&mut prepared.case)?;
     let operation = draft(&prepared, &recipe)?.check(ExecutionLimits::default())?;
     let graph = std::rc::Rc::new(prepared.case.cas);
     for (center, radius) in [(0.01, 0.01), (-0.01, 0.001)] {

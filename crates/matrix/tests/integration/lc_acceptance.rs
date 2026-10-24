@@ -4,6 +4,7 @@
 mod companions;
 mod construction_costs;
 mod costs;
+mod invariants;
 mod oracle_regression;
 mod reuse;
 mod state;
@@ -122,7 +123,7 @@ fn operator_inventory() -> TestResult<(
         ("b", crate::reading_testing::matrix(2, 2)),
         ("B", crate::reading_testing::matrix(2, 2)),
     ])?;
-    let coverage = crate::reciprocal_testing::coverage(&mut output_graph)?;
+    let coverage = crate::reciprocal_testing::readings::coverage(&mut output_graph)?;
     Ok((Rc::new(output_graph.cas), coverage))
 }
 

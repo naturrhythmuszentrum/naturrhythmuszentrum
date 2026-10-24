@@ -223,7 +223,7 @@ pub(crate) fn proved() -> TestResult<(FixturePlan, PositiveReciprocalMap)> {
 pub(crate) fn shapes(
     recipe: &PositiveReciprocalMap,
 ) -> TestResult<(Vec<CheckedShape>, CheckedShape)> {
-    let owner = crate::conversion_testing::owner()?;
+    let owner = crate::kernel_testing::owner()?;
     let inputs = recipe
         .frame()
         .entries()
@@ -323,8 +323,7 @@ fn block_original(case: &mut Fixture) -> TestResult<ExactAffineMap> {
 }
 
 #[path = "reciprocal/readings.rs"]
-mod readings;
-pub(crate) use readings::coverage;
+pub(crate) mod readings;
 
 /// An original zero term keeps an undeclared denominator even though coefficient equality cancels it.
 pub(crate) fn hidden_denominator() -> TestResult<(FixturePlan, ExactAffineMap)> {

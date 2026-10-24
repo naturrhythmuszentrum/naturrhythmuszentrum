@@ -25,7 +25,7 @@ fn varying_lc_reciprocal_operator_publishes_complete_readings() -> TestResult {
 /// A complete descriptor family and every native companion remain pending until the same commit.
 fn lifecycle<P: Scalar + 'static>() -> TestResult {
     let (mut prepared, recipe) = proved()?;
-    let coverage = crate::reciprocal_testing::coverage(&mut prepared.case)?;
+    let coverage = crate::reciprocal_testing::readings::coverage(&mut prepared.case)?;
     let operation = draft(&prepared, &recipe)?.check(ExecutionLimits::default())?;
     let graph = Rc::new(prepared.case.cas);
     for multiplier in [[1, 1], [2, 1], [1, 2], [4, 4]] {
