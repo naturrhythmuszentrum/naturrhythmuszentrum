@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independent heap-view residual and inverse-defect enclosures, never LU reconstruction claims.
 
+#[cfg(test)]
 use crate::binding::buffer;
 use crate::{Extent, SolveError};
 
@@ -57,6 +58,7 @@ impl SolveWork {
 }
 
 /// Certify a supplied inverse candidate without consulting any backend factors.
+#[cfg(test)]
 pub(crate) fn inverse<P: Scalar + 'static>(
     operator: &impl SolveMatrix<P>,
     candidate: &[P],
@@ -135,6 +137,7 @@ fn inverse_dot<P: Scalar + 'static>(
 }
 
 /// Enclose the residual over saved heap views, separately from inverse identity columns.
+#[cfg(test)]
 pub(crate) fn center<P: Scalar + 'static>(
     operator: &impl SolveMatrix<P>,
     rhs: &impl SolveMatrix<P>,
@@ -238,28 +241,6 @@ pub(crate) struct FamilyCertificate<P: Scalar> {
     pub(crate) margin: P,
     /// Normalized total radius including the represented-center error once.
     pub(crate) radius: P,
-}
-
-/// Collect only chosen total regions; evaluation and derivation regions overlap them.
-pub(crate) fn family<P: Scalar + 'static>(
-    operator: &impl SolveMatrix<P>,
-    rhs: &impl SolveMatrix<P>,
-    witness: &InverseWitness<P>,
-    certificate: &CenterCertificate<P>,
-    context: &ArithmeticContext,
-) -> Result<FamilyCertificate<P>, SolveError> {
-    let mut operator_bounds = buffer(operator.extent().entries())?;
-    operator_bounds.resize(operator.extent().entries(), P::ZERO);
-    let mut rhs_bounds = buffer(rhs.extent().entries())?;
-    rhs_bounds.resize(rhs.extent().entries(), P::ZERO);
-    family_with_bounds(
-        operator,
-        rhs,
-        witness,
-        certificate,
-        [&mut operator_bounds, &mut rhs_bounds],
-        context,
-    )
 }
 
 /// Caller-owned selected radii carry their own exact allocation bindings and permits.

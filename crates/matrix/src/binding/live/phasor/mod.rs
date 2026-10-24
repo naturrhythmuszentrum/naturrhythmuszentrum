@@ -9,8 +9,9 @@ mod solve;
 pub use plan::{PhasorOperand, PhasorProduct};
 pub use publication::{PhasorPublication, PublishedPhasor};
 pub use solve::{
-    PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication,
-    PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasorSolve,
+    PhasorAllocation, PhasorAllocationChannel, PhasorAllocationStage, PhasorInventory, PhasorSolve,
+    PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorTransferBounds,
+    PhasorTransferredResidual, PublishedPhasorSolve,
 };
 
 use super::LiveBindingError;
@@ -50,6 +51,9 @@ pub enum PhasorError {
     /// The existing Real inverse, residual or perturbation theorem refused.
     #[error("phasor Real solve: {0}")]
     Solve(#[from] crate::SolveError),
+    /// A private numerical owner lacks its original complete allocation authority.
+    #[error("phasor private allocation: {0}")]
+    Inventory(#[from] crate::PrivateAllocationError),
     /// Exact zero impedance is observable, but current and admittance are undefined.
     #[error("zero impedance: current and admittance are unavailable")]
     ZeroImpedance,

@@ -8,8 +8,8 @@ use super::{
 use nrz_bindings::Budget;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
-/// Optional exact real/imaginary enclosures for both original operands.
-pub(super) type Fixed<P> = [[Option<Enclosure<P>>; 2]; 2];
+/// Compact exact enclosures in original operand/component order; absent components allocate nothing.
+pub(super) type Fixed<P> = Vec<Enclosure<P>>;
 
 /// Exact coefficient import precedes the first numerical source read on the same caller ledger.
 pub(super) fn lower<P: Scalar>(
@@ -17,13 +17,15 @@ pub(super) fn lower<P: Scalar>(
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> Result<Fixed<P>, PhasorError> {
-    let mut result = [[None; 2]; 2];
-    for (operand, definitions) in result.iter_mut().zip(plan.definition().fixed_inputs()) {
-        for (component, exact) in operand.iter_mut().zip(definitions) {
-            if let Some(value) = exact {
-                *component = Some(transfer::literal(value, plan.literals(), context, budget)?);
-            }
-        }
+    let definitions = plan.definition().fixed_inputs();
+    let count = definitions
+        .iter()
+        .flatten()
+        .filter(|value| value.is_some())
+        .count();
+    let mut result = crate::binding::buffer(count)?;
+    for exact in definitions.iter().flatten().flatten() {
+        result.push(transfer::literal(exact, plan.literals(), context, budget)?);
     }
     Ok(result)
 }
@@ -31,15 +33,27 @@ pub(super) fn lower<P: Scalar>(
 /// Every fixed repeated, negative or zero copy must enclose the original exact constant in its own error.
 pub(super) fn check<P: Scalar>(
     inputs: &[&Values<P>; 2],
-    fixed: &Fixed<P>,
+    fixed: &[Enclosure<P>],
+    present: [[bool; 2]; 2],
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> Result<(), PhasorError> {
-    for (operand, definitions) in inputs.iter().zip(fixed) {
+    let mut next = 0;
+    for (operand, definitions) in inputs.iter().zip(present) {
+        let selected = definitions.map(|present| {
+            if present {
+                let index = next;
+                next += 1;
+                Some(index)
+            } else {
+                None
+            }
+        });
         for (index, component) in [0, 1, 1, 0].into_iter().enumerate() {
             budget.work(8, AT)?;
-            if let Some(value) = definitions[component] {
-                let value = if index == 2 { value.negated() } else { value };
+            if let Some(slot) = selected[component] {
+                let value = fixed.get(slot).ok_or(PhasorError::Identity)?;
+                let value = if index == 2 { value.negated() } else { *value };
                 let required = value
                     .displacement_from(Finite::new(operand.centers[index])?, context)?
                     .get();
@@ -48,6 +62,9 @@ pub(super) fn check<P: Scalar>(
                 }
             }
         }
+    }
+    if next != fixed.len() {
+        return Err(PhasorError::Identity);
     }
     Ok(())
 }

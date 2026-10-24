@@ -5,10 +5,7 @@ use super::{
     super::{AT, PhasorError, publication},
     PhasorSolve, PhasorSolveEvaluation,
 };
-use crate::{
-    CompanionAdapter, DependencyPolicy, Extent, Heap, HeapError, ReadingCoverage, ReadingImport,
-    ReadingRegion,
-};
+use crate::{CompanionAdapter, DependencyPolicy, Heap, HeapError, ReadingCoverage, ReadingImport};
 use nrz_bindings::{Budget, readings::algebra::limits::BudgetKind};
 use nrz_scalar::{ArithmeticContext, Scalar};
 use std::rc::Rc;
@@ -138,21 +135,12 @@ impl Heap {
             }
         }
         budget.with_retained_payload(plan.bytes, AT, |budget| {
-            let evaluation = self.evaluate_phasor_solve(&plan.solve, context, budget)?;
-            let regions = vec![
-                ReadingRegion {
-                    extent: Extent::new(2, 2)?,
-                    values: evaluation.centers(self, context)?.to_vec(),
-                },
-                ReadingRegion {
-                    extent: Extent::new(4, 1)?,
-                    values: evaluation.totals(self, context)?.to_vec(),
-                },
-                ReadingRegion {
-                    extent: Extent::new(4, 1)?,
-                    values: evaluation.errors(self, context)?.to_vec(),
-                },
-            ];
+            plan.solve.validate(self)?;
+            let run = super::inventory::Run::new(&plan.solve, true, budget)?;
+            let mut evaluation =
+                super::execution::evaluate(self, &plan.solve, &run, context, budget)?;
+            let regions = run.regions(&evaluation.contents)?;
+            evaluation.inventory = run.published(&evaluation.contents, &regions)?;
             let provenance = crate::binding::live::import::ImportProvenance {
                 definition: crate::binding::live::ResultDefinition::Solve(
                     plan.solve.definition().clone(),
@@ -164,7 +152,7 @@ impl Heap {
                 Rc::clone(&plan.solve.operands()[0].whole().group.graph),
                 plan.coverage.clone(),
                 plan.companions.clone(),
-                &regions,
+                regions.values(&run)?,
                 DependencyPolicy::WholeBase,
                 Some(provenance),
                 budget,

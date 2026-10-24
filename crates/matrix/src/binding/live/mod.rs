@@ -15,9 +15,10 @@ pub use parameters::{
     PhasorStatistics,
 };
 pub use phasor::{
-    PhasorError, PhasorEvaluation, PhasorOperand, PhasorProduct, PhasorPublication, PhasorSolve,
-    PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication, PhasorTransferBounds,
-    PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
+    PhasorAllocation, PhasorAllocationChannel, PhasorAllocationStage, PhasorError,
+    PhasorEvaluation, PhasorInventory, PhasorOperand, PhasorProduct, PhasorPublication,
+    PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication,
+    PhasorTransferBounds, PhasorTransferredResidual, PublishedPhasor, PublishedPhasorSolve,
 };
 pub use spectral::{
     LcSpectralEvaluation, LcSpectralPublication, LcSpectrum, PublishedLcSpectrum, SpectralError,

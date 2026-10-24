@@ -2,6 +2,10 @@
 //! The existing Real inverse/residual/perturbation theorem certifies every original block copy.
 
 use super::super::{AT, PhasorError, numeric::Values};
+use super::{
+    PhasorAllocationStage as Stage,
+    inventory::{Owner, Run},
+};
 use crate::{
     Extent, SolveError,
     solve_verification::{self as verify, SolveMatrix, SolveWork},
@@ -21,6 +25,9 @@ pub struct PhasorSolveCertificate<P: Scalar> {
     /// Joint block Frobenius numerical and total radii, respectively; they overlap.
     pub radii: [P; 2],
 }
+
+/// Final numerical owners share the same complete original allocation plan.
+type Solution<P> = (Owner<P, Values<P>>, Owner<P, PhasorSolveCertificate<P>>);
 
 /// One finite block and a selected overlapping radius channel, borrowed for verification.
 struct Block<'a, P: Scalar> {
@@ -69,9 +76,10 @@ pub(super) fn domain<P: Scalar>(
 pub(super) fn solve<P: Scalar + 'static>(
     impedance: &Values<P>,
     voltage: &Values<P>,
+    run: &Run<P>,
     context: &ArithmeticContext,
     budget: &mut Budget,
-) -> Result<(Values<P>, PhasorSolveCertificate<P>), PhasorError> {
+) -> Result<Solution<P>, PhasorError> {
     // Fixed upper schedule covers candidate arithmetic, both norms and every verifier contraction.
     budget.work(2048, AT)?;
     let extent = Extent::new(2, 2)?;
@@ -85,12 +93,15 @@ pub(super) fn solve<P: Scalar + 'static>(
         radii: &voltage.totals,
         extent,
     };
-    let approximate = inverse(&impedance.centers)?;
-    let centers = candidate(&approximate, &voltage.centers)?;
+    let approximate = run.inline(Stage::InverseCandidate, || inverse(&impedance.centers))?;
+    let centers = run.inline(Stage::CurrentCandidate, || {
+        candidate(&approximate, &voltage.centers)
+    })?;
     let mut work = SolveWork::new(16);
-    let witness = verify::inverse(&operator, &approximate, &mut work, context)?;
-    let center = verify::center(&operator, &rhs, &centers, &witness, &mut work, context)?;
-    let family = verify::family(&operator, &rhs, &witness, &center, context)?;
+    let verifier = super::verification::Verifier { run, context };
+    let witness = verifier.inverse(&operator, &approximate[..], &mut work)?;
+    let center = verifier.center(&operator, &rhs, &centers[..], &witness, &mut work)?;
+    let family = verifier.family(&operator, &rhs, &witness, &center, false)?;
     let numerical_operator = Block {
         radii: &impedance.errors,
         ..operator
@@ -99,30 +110,41 @@ pub(super) fn solve<P: Scalar + 'static>(
         radii: &voltage.errors,
         ..rhs
     };
-    let numerical = verify::family(
-        &numerical_operator,
-        &numerical_rhs,
-        &witness,
-        &center,
-        context,
-    )?;
+    let numerical =
+        verifier.family(&numerical_operator, &numerical_rhs, &witness, &center, true)?;
+    solution(&centers, &witness, &center, &family, &numerical, run)
+}
+
+/// Final arrays and certificate facts are constructed under their own publication meanings.
+fn solution<P: Scalar + 'static>(
+    centers: &[P; 4],
+    witness: &verify::InverseWitness<P>,
+    center: &verify::CenterCertificate<P>,
+    family: &verify::FamilyCertificate<P>,
+    numerical: &verify::FamilyCertificate<P>,
+    run: &Run<P>,
+) -> Result<Solution<P>, PhasorError> {
     let total = if family.radius < numerical.radius {
         numerical.radius
     } else {
         family.radius
     };
-    let certificate = PhasorSolveCertificate {
-        inverse: [witness.defect, witness.margin, witness.inverse],
-        residual: [center.residual, center.radius],
-        margins: [numerical.margin, family.margin],
-        radii: [numerical.radius, total],
-    };
+    let certificate = run.inline(Stage::Certificate, || {
+        Ok(PhasorSolveCertificate {
+            inverse: [witness.defect, witness.margin, witness.inverse],
+            residual: [center.residual, center.radius],
+            margins: [numerical.margin, family.margin],
+            radii: [numerical.radius, total],
+        })
+    })?;
     Ok((
-        Values {
-            centers,
-            totals: [total; 4],
-            errors: [numerical.radius; 4],
-        },
+        run.inline(Stage::Result, || {
+            Ok(Values {
+                centers: *centers,
+                totals: [total; 4],
+                errors: [numerical.radius; 4],
+            })
+        })?,
         certificate,
     ))
 }

@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Fresh result coordinates, vector/scalar views and parameter declarations precede numerical input.
 
-use super::*;
+use super::{
+    AffineMap, AtomicSort, CompanionAdapter, CompanionKind, CompanionParameters, CompanionReading,
+    CompanionReadingKind, CoordinateFamily, Field, Fixture, PhasorBlockCorrespondence,
+    PhysicalReading, ReadingAdapter, ReadingCoverage, ReadingRelation, Representation,
+    RepresentationDefinition, Scalar, SelectionSpec, Sort, TestResult, components, ledger, map,
+    matrix, meaning, real, tickets,
+};
 use crate::test_api::{PhasorProduct, PhasorPublication};
 use nrz_bindings::{BinaryOp, ExponentPolicy, Registry, readings::PhasorResultDefinition};
 

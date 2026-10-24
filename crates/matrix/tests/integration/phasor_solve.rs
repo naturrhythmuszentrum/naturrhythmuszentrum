@@ -361,3 +361,61 @@ fn squared_norm(enclosure: nrz_scalar::Enclosure<f64>, operator: f64) -> TestRes
     assert!(squared.at_most(upper.multiply(upper)?)?);
     Ok(())
 }
+
+/// Public receipts retain the original ordered physical sources and share meanings across clones.
+/// ´test:integration:lc-phasor-inventory-retains-original-selections´
+#[test]
+fn lc_phasor_inventory_retains_original_selections() -> TestResult {
+    inventory_sources::<f32>()?;
+    inventory_sources::<f64>()
+}
+
+/// Source roles distinguish repeated and negated storage copies and their own-target parameters.
+fn inventory_sources<P: Scalar + 'static>() -> TestResult {
+    let mut case = fixture::case(-P::from_u8(75), P::ZERO, false, &mut fixture::budget()?)?;
+    let publication = case.publication(&mut ledger()?)?;
+    let context = ArithmeticContext::new()?;
+    let result = case
+        .heap
+        .publish_phasor_solve(&publication, &context, &mut ledger()?)?;
+    let inventory = result.evaluation().inventory();
+    assert!(inventory.includes_publication());
+    assert_eq!(inventory.precision(), P::PRECISION);
+    let clone = inventory.clone();
+    let mut copies = 0;
+    for (original, shared) in inventory.allocations().zip(clone.allocations()) {
+        assert!(original.same_binding(&shared));
+        assert_eq!(original.ticket(), shared.ticket());
+        assert!(
+            original
+                .plan()
+                .definition()
+                .shares_allocation(&case.definition)
+        );
+        if let nrz_matrix::PhasorAllocationStage::InputCopy { operand, copy, .. } =
+            original.stage()?
+        {
+            assert_eq!(
+                original.plan().operands()[operand].copies()[copy].reading(),
+                case.bindings[operand * 5 + copy + 1].reading()
+            );
+            copies += 1;
+        }
+    }
+    assert_eq!(copies, 24);
+    let fresh = case
+        .heap
+        .evaluate_phasor_solve(publication.solve(), &context, &mut ledger()?)?;
+    let first = inventory
+        .allocations()
+        .next()
+        .ok_or("first original allocation")?;
+    let second = fresh
+        .inventory()
+        .allocations()
+        .next()
+        .ok_or("first fresh allocation")?;
+    assert!(!first.same_binding(&second));
+    assert_ne!(first.ticket().execution(), second.ticket().execution());
+    Ok(())
+}

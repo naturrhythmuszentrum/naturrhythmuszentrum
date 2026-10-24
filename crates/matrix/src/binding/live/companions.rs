@@ -127,6 +127,9 @@ impl Heap {
             return Err(crate::ReadingAdapterError::Target.into());
         }
         let mut result = Vec::new();
+        result
+            .try_reserve_exact(companion.entries().len())
+            .map_err(|_| HeapError::Capacity)?;
         for entry in companion.entries() {
             let ticket = binding
                 .group

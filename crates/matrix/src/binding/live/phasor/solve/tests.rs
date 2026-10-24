@@ -164,7 +164,8 @@ fn phasor_solve_costs_are_pinned() -> TestResult {
 fn phasor_solve_refuses_uncovered_fixed_components() -> TestResult {
     let context = ArithmeticContext::new()?;
     let zero = nrz_scalar::Enclosure::singleton(nrz_scalar::Finite::new(0.0_f64)?);
-    let fixed = [[Some(zero), None], [None, Some(zero)]];
+    let fixed = [zero, zero];
+    let present = [[true, false], [false, true]];
     let voltage = super::super::numeric::Values {
         centers: [3.0, 0.0, 0.0, 3.0],
         totals: [0.0; 4],
@@ -176,7 +177,13 @@ fn phasor_solve_refuses_uncovered_fixed_components() -> TestResult {
         errors: [0.0; 4],
     };
     assert!(matches!(
-        super::constants::check(&[&impedance, &voltage], &fixed, &context, &mut ledger()?),
+        super::constants::check(
+            &[&impedance, &voltage],
+            &fixed,
+            present,
+            &context,
+            &mut ledger()?
+        ),
         Err(crate::PhasorError::Live(
             crate::LiveBindingError::UncoveredCopy
         ))
@@ -184,12 +191,27 @@ fn phasor_solve_refuses_uncovered_fixed_components() -> TestResult {
     impedance.errors = [2.0, 0.0, 0.0, 2.0];
     impedance.totals = [2.0; 4];
     assert!(
-        super::constants::check(&[&impedance, &voltage], &fixed, &context, &mut ledger()?).is_ok()
+        super::constants::check(
+            &[&impedance, &voltage],
+            &fixed,
+            present,
+            &context,
+            &mut ledger()?
+        )
+        .is_ok()
     );
     let constant = nrz_scalar::Enclosure::singleton(nrz_scalar::Finite::new(76.0_f64)?);
-    let fixed = [[None, Some(constant)], [None, None]];
+    let fixed = [constant];
+    let present = [[false, true], [false, false]];
     assert!(
-        super::constants::check(&[&impedance, &voltage], &fixed, &context, &mut ledger()?).is_err()
+        super::constants::check(
+            &[&impedance, &voltage],
+            &fixed,
+            present,
+            &context,
+            &mut ledger()?
+        )
+        .is_err()
     );
     Ok(())
 }

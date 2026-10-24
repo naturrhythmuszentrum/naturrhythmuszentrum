@@ -2,23 +2,26 @@
 //! Certified LC current blocks reuse the Real solve theorem and retain the original source closure.
 
 mod constants;
+mod execution;
+mod inventory;
+pub use inventory::{
+    PhasorAllocation, PhasorAllocationChannel, PhasorAllocationStage, PhasorInventory,
+};
 mod numeric;
 mod residual;
 pub use residual::PhasorTransferredResidual;
 mod plan;
 mod publication;
 mod transfer;
+mod verification;
 pub use numeric::PhasorSolveCertificate;
 pub use plan::PhasorSolve;
 pub use publication::{PhasorSolvePublication, PublishedPhasorSolve};
 pub use transfer::PhasorTransferBounds;
 
-use super::{AT, PhasorError, input};
-use crate::{Coverage, Heap, HeapError};
-use nrz_bindings::{
-    Budget,
-    readings::algebra::limits::{BudgetKind, BudgetUsage},
-};
+use super::{AT, PhasorError};
+use crate::{Coverage, Heap};
+use nrz_bindings::{Budget, readings::algebra::limits::BudgetUsage};
 use nrz_scalar::{ArithmeticContext, Scalar};
 use std::rc::Rc;
 
@@ -28,19 +31,28 @@ pub struct PhasorSolveEvaluation<P: Scalar> {
     /// Original checked operation and every live source version.
     plan: PhasorSolve<P>,
     /// Independently evaluated current copies and both overlapping radius channels.
-    payload: Rc<super::numeric::Values<P>>,
-    /// Existing Real inverse, residual and common-operator perturbation proof.
-    certificate: PhasorSolveCertificate<P>,
-    /// Matching exact norm/reference transport, evaluated outward on the full reactance box.
-    transfer: PhasorTransferBounds<P>,
-    /// Reconstructed physical residual and matching current metric bounds.
-    residual: PhasorTransferredResidual<P>,
+    contents: Rc<Contents<P>>,
+    /// Complete immutable native allocation receipt, sharing original meanings.
+    inventory: PhasorInventory<P>,
     /// Original impedance and voltage assurance scopes.
     coverage: [Coverage; 2],
     /// Arithmetic theorem revision.
     revision: u32,
     /// Before lowering, before numerical access and after complete solve, on one caller ledger.
     usage: [BudgetUsage; 3],
+}
+
+/// Final numerical owners are shared together; cloning an evaluation creates no floating copies.
+#[derive(Debug)]
+struct Contents<P: Scalar> {
+    /// Four current centers and both overlapping radius channels.
+    payload: inventory::Owner<P, super::numeric::Values<P>>,
+    /// Real inverse, residual and perturbation proof fields.
+    certificate: inventory::Owner<P, PhasorSolveCertificate<P>>,
+    /// Matching exact metric transport enclosures.
+    transfer: inventory::Owner<P, PhasorTransferBounds<P>>,
+    /// Reconstructed residual and current bounds.
+    residual: inventory::Owner<P, PhasorTransferredResidual<P>>,
 }
 
 impl<P: Scalar + 'static> PhasorSolveEvaluation<P> {
@@ -53,7 +65,7 @@ impl<P: Scalar + 'static> PhasorSolveEvaluation<P> {
         context: &ArithmeticContext,
     ) -> Result<&'a [P; 4], PhasorError> {
         self.validate(heap, context)?;
-        Ok(&self.payload.centers)
+        Ok(&self.contents.payload.centers)
     }
     /// Complete deterministic radii including numerical errors once.
     /// # Errors
@@ -64,7 +76,7 @@ impl<P: Scalar + 'static> PhasorSolveEvaluation<P> {
         context: &ArithmeticContext,
     ) -> Result<&'a [P; 4], PhasorError> {
         self.validate(heap, context)?;
-        Ok(&self.payload.totals)
+        Ok(&self.contents.payload.totals)
     }
     /// Numerical-only radii, including every input copy discrepancy and the solve error.
     /// # Errors
@@ -75,22 +87,27 @@ impl<P: Scalar + 'static> PhasorSolveEvaluation<P> {
         context: &ArithmeticContext,
     ) -> Result<&'a [P; 4], PhasorError> {
         self.validate(heap, context)?;
-        Ok(&self.payload.errors)
+        Ok(&self.contents.payload.errors)
     }
     /// Historical Real solve evidence; further execution still requires live dependencies.
     #[must_use]
-    pub const fn certificate(&self) -> &PhasorSolveCertificate<P> {
-        &self.certificate
+    pub fn certificate(&self) -> &PhasorSolveCertificate<P> {
+        &self.contents.certificate
     }
     /// Enclosed norm factors with the exact convention retained by `Self::plan`.
     #[must_use]
-    pub const fn transfer(&self) -> &PhasorTransferBounds<P> {
-        &self.transfer
+    pub fn transfer(&self) -> &PhasorTransferBounds<P> {
+        &self.contents.transfer
     }
     /// Reconstructed physical residual and its current component bound in the named metrics.
     #[must_use]
-    pub const fn transferred_residual(&self) -> &PhasorTransferredResidual<P> {
-        &self.residual
+    pub fn transferred_residual(&self) -> &PhasorTransferredResidual<P> {
+        &self.contents.residual
+    }
+    /// Completed native array, source-copy and verifier inventory with exact observed bytes.
+    #[must_use]
+    pub const fn inventory(&self) -> &PhasorInventory<P> {
+        &self.inventory
     }
     /// Original prescribed equation, metrics and all source copies.
     #[must_use]
@@ -130,52 +147,8 @@ impl Heap {
         budget: &mut Budget,
     ) -> Result<PhasorSolveEvaluation<P>, PhasorError> {
         plan.validate(self)?;
-        let before = budget.usage();
-        let bytes = plan
-            .retained_payload_bytes()
-            .checked_add(4096)
-            .ok_or(HeapError::ExtentOverflow)?;
-        let (payload, certificate, transport, residual, coverage, lowered) = budget
-            .with_retained_payload(bytes, AT, |budget| {
-                let references = transfer::lower(plan, context, budget)?;
-                let constants = constants::lower(plan, context, budget)?;
-                let lowered = budget.usage();
-                let (impedance, operator_scope) =
-                    input::capture(self, &plan.operands()[0], budget)?;
-                let (voltage, voltage_scope) = input::capture(self, &plan.operands()[1], budget)?;
-                constants::check(&[&impedance, &voltage], &constants, context, budget)?;
-                let reactance = numeric::domain(&impedance, context, budget)?;
-                let transport =
-                    transfer::evaluate(plan, references[0], reactance, context, budget)?;
-                let (payload, certificate) = numeric::solve(&impedance, &voltage, context, budget)?;
-                let residual = residual::evaluate(
-                    plan,
-                    &[impedance, voltage],
-                    &payload.centers,
-                    &references,
-                    context,
-                    budget,
-                )?;
-                budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-                Ok::<_, PhasorError>((
-                    payload,
-                    certificate,
-                    transport,
-                    residual,
-                    [operator_scope, voltage_scope],
-                    lowered,
-                ))
-            })?;
-        Ok(PhasorSolveEvaluation {
-            plan: plan.clone(),
-            payload: Rc::new(payload),
-            certificate,
-            transfer: transport,
-            residual,
-            coverage,
-            revision: context.revision(),
-            usage: [before, lowered, budget.usage()],
-        })
+        let run = inventory::Run::new(plan, false, budget)?;
+        execution::evaluate(self, plan, &run, context, budget)
     }
 }
 

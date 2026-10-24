@@ -5,6 +5,10 @@ use super::{
     super::{AT, PhasorError, numeric::Values},
     PhasorSolve,
 };
+use super::{
+    PhasorAllocationStage as Stage,
+    inventory::{Owner, Run},
+};
 use nrz_bindings::Budget;
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
@@ -21,40 +25,46 @@ pub struct PhasorTransferredResidual<P: Scalar> {
 }
 
 /// The true impedance is `i*X`; reconstruction uses that exact law and encloses original input copies.
-pub(super) fn evaluate<P: Scalar>(
+pub(super) fn evaluate<P: Scalar + 'static>(
     plan: &PhasorSolve<P>,
-    inputs: &[Values<P>; 2],
+    inputs: &[&Values<P>; 2],
     candidate: &[P; 4],
     references: &[Enclosure<P>; 2],
+    run: &Run<P>,
     context: &ArithmeticContext,
     budget: &mut Budget,
-) -> Result<PhasorTransferredResidual<P>, PhasorError> {
+) -> Result<Owner<P, PhasorTransferredResidual<P>>, PhasorError> {
     budget.work(256, AT)?;
-    let mut residuals = [P::ZERO; 2];
-    let mut currents = [P::ZERO; 2];
+    let mut result = run.inline(Stage::TransferredResidual, || {
+        Ok(PhasorTransferredResidual {
+            residuals: [P::ZERO; 2],
+            currents: [P::ZERO; 2],
+        })
+    })?;
     let weight = point(P::from_u8(plan.transfer().weight()))?.sqrt(context)?;
     for (channel, numerical) in [true, false].into_iter().enumerate() {
-        let impedance = coordinate(&inputs[0], 1, numerical, context)?;
-        let real = coordinate(&inputs[1], 0, numerical, context)?
+        let impedance = coordinate(inputs[0], 1, numerical, context)?;
+        let real = coordinate(inputs[1], 0, numerical, context)?
             .add(impedance.mul(point(candidate[1])?, context)?, context)?;
-        let imaginary = coordinate(&inputs[1], 1, numerical, context)?
+        let imaginary = coordinate(inputs[1], 1, numerical, context)?
             .sub(impedance.mul(point(candidate[0])?, context)?, context)?;
-        let magnitude = nrz_scalar::norm_upper(
-            &[real.abs().upper().get(), imaginary.abs().upper().get()],
-            context,
-        )?
-        .get();
+        let stage = if numerical {
+            Stage::NumericalNorm
+        } else {
+            Stage::TotalNorm
+        };
+        let norm = run.inline(stage, || {
+            Ok([real.abs().upper().get(), imaginary.abs().upper().get()])
+        })?;
+        let magnitude = nrz_scalar::norm_upper(&norm[..], context)?.get();
         let normalized = point(magnitude)?
             .div(references[1], context)?
             .mul(weight, context)?;
         let factor = references[0].div(impedance.abs().mul(weight, context)?, context)?;
-        residuals[channel] = normalized.upper().get();
-        currents[channel] = normalized.mul(factor, context)?.upper().get();
+        result.residuals[channel] = normalized.upper().get();
+        result.currents[channel] = normalized.mul(factor, context)?.upper().get();
     }
-    Ok(PhasorTransferredResidual {
-        residuals,
-        currents,
-    })
+    Ok(result)
 }
 
 /// Preserve the original copy's selected total or numerical channel without double counting.
