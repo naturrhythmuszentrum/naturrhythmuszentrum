@@ -341,6 +341,8 @@ After the client has accepted that original input, it may call run with a mathem
 
 The call order is therefore admit original input, walk original, validate physically in bindings, request a derivation, replay/accept its mathematical conditions, materialize derived occurrences, and validate that derived input physically. The first implementation supplied these CAS calls and generic mock-visitor tests without changing consumers. Bindings and docgen now build on nrz-cas, parse against semantic headers and preserve original diagnostics; the descriptor experiment is retired. The unused nrz-algebra package has been removed; nrz-cas is the engine's sole algebra implementation. A generic CAS receipt proves graph coverage only (`rule:vision:check-before-normalization`), (`rule:vision:layer-enforcement`).
 
+The pure rational cut query `Cas::check_case_cut` checks a supplied closed box against the actual native association and case domain using exact affine extrema. It has no graph publication, hypothesis or witness result; the enclosure origin, complete partition and qualified introduction required by (`rule:nrz:decision-exact-certificate`) and (`thm:nrz:decision-membership-introduction`) remain open. Its new checks consume only their caller's Work and staged payload; ordinary proof routes retain their existing costs, primitive manifest and wire format.
+
 ## Verification and bounded implementation · `sec:nrz:cas-design-implementation`
 
 **Table (Independent laws and refusal tests)** · `tab:nrz:cas-design-tests`

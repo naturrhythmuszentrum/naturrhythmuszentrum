@@ -28,6 +28,18 @@ impl Location {
 /// The reason a value cannot be admitted.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InvalidCode {
+    /// No admitted exact certificate checker supports this predicate or arithmetic origin.
+    UnsupportedCertificate,
+    /// The proposed option is not an association of the exact native case.
+    DecisionOptionMismatch,
+    /// The rational box is empty, repeats coordinates or has reversed endpoints.
+    DecisionBox,
+    /// The entire box cannot be assigned to one side of an exact region boundary.
+    DecisionBoundaryIntersection,
+    /// The entire box is excluded from a required case domain or option region.
+    DecisionOutsideRegion,
+    /// The selected value or its explicit option range is not an admissible integer cell.
+    DecisionIntegerRange,
     /// A factor has no established strict sign in the requested region.
     StrictSignUnavailable,
     /// A reading map coefficient depends on a reading being substituted.

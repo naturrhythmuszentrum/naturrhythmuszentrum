@@ -15,22 +15,22 @@ use nrz_cas::syntax::{Draft, Field, Operator, PredicateKind};
 use nrz_cas::{Cas, FaultKind, Handle, InvalidCode, Location, Rational, Reference};
 
 #[derive(Clone, Copy, Debug)]
-enum Example {
+pub(super) enum Example {
     Integer,
     Sign,
     Phase,
 }
 
-struct Fixture {
-    cas: Cas,
-    header: Handle,
-    context: Handle,
-    ambient: Handle,
-    kind: AmbientDomain,
+pub(super) struct Fixture {
+    pub(super) cas: Cas,
+    pub(super) header: Handle,
+    pub(super) context: Handle,
+    pub(super) ambient: Handle,
+    pub(super) kind: AmbientDomain,
 }
 
 impl Fixture {
-    fn new(example: Example) -> TestResult<Self> {
+    pub(super) fn new(example: Example) -> TestResult<Self> {
         let (keys, kind) = match example {
             Example::Integer | Example::Sign => (vec!["x"], AmbientDomain::Real("x".into())),
             Example::Phase => (vec!["a", "b"], AmbientDomain::Assignments),
@@ -69,7 +69,7 @@ impl Fixture {
         })
     }
 
-    fn term(&mut self, op: Operator, operands: &[Handle]) -> TestResult<Handle> {
+    pub(super) fn term(&mut self, op: Operator, operands: &[Handle]) -> TestResult<Handle> {
         expression(
             &mut self.cas,
             &self.context,
@@ -80,14 +80,14 @@ impl Fixture {
         )
     }
 
-    fn number(&mut self, n: i64, d: u64) -> TestResult<Handle> {
+    pub(super) fn number(&mut self, n: i64, d: u64) -> TestResult<Handle> {
         self.term(
             Operator::Rational(Rational::from_ratio(n, d, &mut ledger()?)?),
             &[],
         )
     }
 
-    fn region(&mut self, value: RegionExpr) -> TestResult<Handle> {
+    pub(super) fn region(&mut self, value: RegionExpr) -> TestResult<Handle> {
         admit(
             &mut self.cas,
             Draft::Region(RegionDraft {
@@ -100,7 +100,11 @@ impl Fixture {
         )
     }
 
-    fn guard(&mut self, kind: PredicateKind, arguments: &[Handle]) -> TestResult<Handle> {
+    pub(super) fn guard(
+        &mut self,
+        kind: PredicateKind,
+        arguments: &[Handle],
+    ) -> TestResult<Handle> {
         let predicate = admit(
             &mut self.cas,
             Draft::Condition {
@@ -117,13 +121,13 @@ impl Fixture {
         })
     }
 
-    fn meet(&mut self, values: Vec<Handle>) -> TestResult<Handle> {
+    pub(super) fn meet(&mut self, values: Vec<Handle>) -> TestResult<Handle> {
         self.region(RegionExpr::Meet(
             values.into_iter().map(Reference::Existing).collect(),
         ))
     }
 
-    fn interval(
+    pub(super) fn interval(
         &mut self,
         x: &Handle,
         lower: (i64, u64),
@@ -146,7 +150,7 @@ impl Fixture {
         self.meet(vec![lo, hi])
     }
 
-    fn regions(&mut self, example: Example) -> TestResult<(Handle, Handle)> {
+    pub(super) fn regions(&mut self, example: Example) -> TestResult<(Handle, Handle)> {
         match example {
             Example::Integer => {
                 let x = self.term(Operator::Free("x".into()), &[])?;
@@ -165,7 +169,7 @@ impl Fixture {
         }
     }
 
-    fn phase(&mut self) -> TestResult<(Handle, Handle)> {
+    pub(super) fn phase(&mut self) -> TestResult<(Handle, Handle)> {
         let a = self.term(Operator::Free("a".into()), &[])?;
         let b = self.term(Operator::Free("b".into()), &[])?;
         let horizontal = self.interval(&a, (-7, 4), (-5, 4), false)?;

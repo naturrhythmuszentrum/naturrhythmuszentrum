@@ -24,6 +24,13 @@ mod conditions;
         unreachable_pub"
 )]
 mod context;
+/// Exact rational cut questions for existing native case associations.
+pub mod decision;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the pure cut implementation stays private"
+)]
+mod decision_cut;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
