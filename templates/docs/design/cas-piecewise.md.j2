@@ -19,7 +19,11 @@ Native first-match lists and partition-only lists are rejected alternatives. The
 
 A region identifies a mathematical ambient domain, coordinate/scope and membership predicate. Predicates remain existing Boolean expression nodes, including equality, positivity, nonnegativity, integer ranges, And, Or, Not and quantification; a typed named predicate supplies no theorem by its spelling. A region is distinct from its predicate because it is an object participating in subset, meet, union, complement, boundary and cover relations. Complement is relative to a stated ambient region. Construction and membership obligations account for partial predicates; undefined membership is never read as false.
 
+**Definition (Typed case associations and local definedness)** · `def:nrz:cas-piecewise-case-associations`
+
 A case F links its domain D and one explicitly checked AmbientSpace to finitely many region/value associations. Every arm retains one result category and mathematical shape. An ordinary arm's value has that ambient's space; a placed arm instead retains its original local expression and the canonical `(original operand, ScalarPiece)` associations checked against registered placement signatures. There is no unrestricted union of differently shaped values or cross-sort substitution. Its defined part is the union of arm regions intersected with local value-definedness. Overlaps require agreement of placed values and definedness on their intersection; conflict blocks a function claim and unknown compatibility stays an obligation. Admission provides typed syntax, not membership or totality (`dec:nrz:cas-symbol-sorts-partial-views`), (`tab:nrz:cas-symbol-sorts-objects`).
+
+**Rule (Case identities and explicit family binders)** · `rule:nrz:cas-piecewise-case-identities`
 
 Regions and boundaries share exact structural keys in their ambient, header and scope; cases and arms additionally retain exact placement definitions and local binding signatures. Equivalent predicates need checked identity/refinement evidence. Cases add no hidden binder: placed arms explicitly reference existing local frames and incidence premises. An unbounded graph-option range is an explicitly bound family of finite cases with checked projection, cover and uniqueness, not an infinite association vector or a topology-valued scalar arm (`rule:nrz:decision-option-ranges`). Substitution transports guards, regions, values and placement uses capture-safely, preserving declaration and slot spaces. Own-space Real r is complete in Real with no placement cases; a Complex use has a separate case for the registered Real-in-Complex piece. Sharing r does not make its original node intrinsically piecewise (`def:nrz:cas-symbol-sorts-declarations`), (`def:nrz:cas-symbol-sorts-real-placement`).
 
@@ -82,6 +86,8 @@ A proof on `E_i` with residual `P_i` contributes the scoped obligation that `P_i
 **Rule (Case elimination, refinement and union)** · `rule:nrz:cas-piecewise-case-elimination`
 
 Case elimination checks that a region family covers D and that every member proves the same requested relation under its local hypotheses. It discharges only those hypotheses and retains guarded residuals. Boundary singletons are included when pointwise claims require them. Certified numerical memberships contribute only on their proved regions; one point, one box or a grid of samples cannot replace the cover premise or discharge unvisited alternatives (`rule:nrz:decision-hypothesis-use`). Equality requires both endpoints defined and equal on the claimed domain; it is not equality of complete definedness sets. A domain-preserving replacement additionally proves both definedness directions.
+
+**Rule (Empty requested domains do not prove function results)** · `rule:nrz:cas-piecewise-empty-domain`
 
 A proved empty requested domain or refuted original definedness produces the existing refuted-domain blocker, not an ordinary equality result justified only by vacuity. Refuting an empty cell within a nonempty covered domain is a different local step. This preserves strict arithmetic refusal while allowing region proofs to prune impossible alternatives.
 
