@@ -123,6 +123,10 @@ output = "docs/design/descriptor-binding.md"
 requires = []
 
 [[document]]
+output = "docs/design/decision-nodes.md"
+requires = []
+
+[[document]]
 output = "crates/scalar/src/README.md"
 requires = []
 
