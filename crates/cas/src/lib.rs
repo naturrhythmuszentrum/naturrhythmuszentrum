@@ -34,6 +34,7 @@ mod decision_cut;
 mod decision_enclosure;
 mod decision_introduction;
 mod decision_selection;
+mod decision_sign;
 mod decision_wire;
 #[expect(
     clippy::redundant_pub_crate,

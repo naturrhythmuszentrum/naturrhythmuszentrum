@@ -138,7 +138,15 @@ fn rule_conditions(
         | Primitive::CaseEliminate => crate::case_check::check(cas, draft, premises, budget)?,
         Primitive::ContextHypothesis => crate::context_check::hypothesis(cas, draft, budget)?,
         Primitive::ContextWeaken => crate::context_check::weaken(cas, draft, premises, budget)?,
+        Primitive::ContextClose if draft.certificate == Certificate::DecisionDischarge => {
+            crate::decision_sign::discharge(cas, draft, premises, budget)?
+        }
         Primitive::ContextClose => crate::context_check::close(cas, draft, premises, budget)?,
+        Primitive::RegionDecide
+            if matches!(&draft.certificate, Certificate::DecisionNonZero(_)) =>
+        {
+            crate::decision_sign::check(cas, draft, premises, budget)?
+        }
         Primitive::RegionDecide if matches!(&draft.certificate, Certificate::Decision(_)) => {
             crate::decision_introduction::check(cas, draft, premises, budget)?
         }

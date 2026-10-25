@@ -194,6 +194,9 @@ pub(crate) fn certificate(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Certificate::DecisionNonZero(_) | Certificate::DecisionDischarge => {
+            crate::decision_wire::sign(value, out, &mut write)
+        }
         Certificate::Decision(value) => {
             out.byte(14)?;
             crate::decision_wire::encode(value, out, &mut write)

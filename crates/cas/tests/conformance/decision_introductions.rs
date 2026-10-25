@@ -18,6 +18,8 @@ mod refusals;
 mod resources;
 #[path = "decision_introductions/selection.rs"]
 mod selection;
+#[path = "decision_introductions/sign.rs"]
+mod sign;
 #[path = "decision_introductions/wire.rs"]
 mod wire;
 

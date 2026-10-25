@@ -221,3 +221,55 @@ fn decode_enclosure(
         origin,
     })
 }
+
+/// Encode the two closed strict-sign consequences with independent semantic versions.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the statement encoder shares auxiliary decision certificates"
+)]
+pub(crate) fn sign(
+    value: &crate::proof_model::Certificate,
+    out: &mut Encoder<'_>,
+    write: &mut impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
+) -> Result<(), Fault> {
+    use crate::proof_model::Certificate;
+    match value {
+        Certificate::DecisionNonZero(reference) => {
+            out.byte(15)?;
+            out.unsigned(1)?;
+            write(&reference.context, out)?;
+            out.unsigned(u64::from(reference.slot))
+        }
+        Certificate::DecisionDischarge => {
+            out.byte(16)?;
+            out.unsigned(1)
+        }
+        _ => Err(invalid()),
+    }
+}
+
+/// Refuse unknown consequence versions before reading their qualified references.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the wire statement decoder shares auxiliary decision certificates"
+)]
+pub(crate) fn decode_sign(
+    tag: u8,
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<crate::proof_model::Certificate, Fault> {
+    use crate::proof_model::Certificate;
+    if reader.unsigned()? != 1 {
+        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+    }
+    match tag {
+        15 => Ok(Certificate::DecisionNonZero(
+            crate::domain_model::HypothesisRef {
+                context: object(reader, records)?,
+                slot: reader.small()?,
+            },
+        )),
+        16 => Ok(Certificate::DecisionDischarge),
+        _ => Err(invalid()),
+    }
+}

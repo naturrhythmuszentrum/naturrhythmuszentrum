@@ -309,7 +309,7 @@ fn decision_introduction_register() -> TestResult {
     Ok(())
 }
 
-fn positive_fixture() -> TestResult<IntroductionFixture> {
+pub(super) fn positive_fixture() -> TestResult<IntroductionFixture> {
     let mut fixture = super::prepared_introduction(Example::Sign, false)?;
     let target = evidence(&mut fixture)?.enclosures[0].target.clone();
     let target = fixture

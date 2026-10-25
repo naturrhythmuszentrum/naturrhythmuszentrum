@@ -256,11 +256,29 @@ pub struct DecisionIntroduction {
 }
 
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
-pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 1] = [crate::proof::LemmaSchema {
-    name: "decision.enclosure-membership",
-    label: "thm:cas:decision-enclosure-membership",
-    version: 1,
-    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
-    statement: "Exact target enclosures and box inclusion establish membership in the declared option.",
-    premises: "Complete partition, exact original-target replay, cut and ordered coordinate-to-target equalities on the whole source family, retaining every used hypothesis.",
-}];
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 3] = [
+    crate::proof::LemmaSchema {
+        name: "decision.enclosure-membership",
+        label: "thm:cas:decision-enclosure-membership",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "Exact target enclosures and box inclusion establish membership in the declared option.",
+        premises: "Complete partition, exact original-target replay, cut and ordered coordinate-to-target equalities on the whole source family, retaining every used hypothesis.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.membership-nonzero",
+        label: "thm:cas:decision-membership-nonzero",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "Certified strict positive or negative membership makes the identical free coordinate defined and nonzero.",
+        premises: "Exact certified membership slot and its checked local membership premise, strict selected guard and unchanged subject, retaining every source hypothesis.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.nonzero-discharge",
+        label: "thm:cas:decision-nonzero-discharge",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "A checked certified sign consequence discharges one original nonzero requirement without changing the local equality or its retained requirements.",
+        premises: "Original conditional defined-and-equal statement with exactly one pointwise nonzero residual and a checked decision.membership-nonzero fact on the identical context, region and predicate, retaining every source hypothesis.",
+    },
+];

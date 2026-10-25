@@ -248,6 +248,10 @@ pub struct Judgment {
 pub enum Certificate {
     /// Complete rational decision introduction with independently checked source equalities.
     Decision(Box<crate::decision::DecisionIntroduction>),
+    /// Strict-sign consequence of an exact certified membership slot.
+    DecisionNonZero(HypothesisRef),
+    /// Discharge one original nonzero residual using a checked certified sign consequence.
+    DecisionDischarge,
     /// A trimmed graph of exact covers, local contradictions and checked empty lemmas.
     Emptiness(Box<crate::emptiness::EmptinessDag>),
     /// Untrusted typed solving evidence.

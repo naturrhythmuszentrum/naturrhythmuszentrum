@@ -100,3 +100,21 @@ fn decision_certified_wire_version() -> TestResult {
     }
     Err("missing introduction certificate".into())
 }
+
+pub(super) fn unknown_version(original: &[u8], certificate: u8) -> TestResult {
+    let mut bytes = original.to_vec();
+    for (tag, start, _) in wire_inventory(&bytes)? {
+        if tag != 11 {
+            continue;
+        }
+        let mut position = start + 14;
+        let premises = number(&bytes, &mut position)?;
+        position += 4 * premises;
+        assert_eq!(number(&bytes, &mut position)?, 0);
+        if bytes[position] == certificate {
+            bytes[position + 1..position + 9].copy_from_slice(&2_u64.to_le_bytes());
+            return refuses(&bytes);
+        }
+    }
+    Err("missing consequence certificate".into())
+}

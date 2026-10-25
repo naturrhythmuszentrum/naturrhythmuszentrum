@@ -55,17 +55,16 @@ impl ProofCitation {
         &self,
         cas: &Cas,
     ) -> Result<Option<&'static crate::proof::LemmaSchema>, Fault> {
-        Ok(match Source::read(cas, cas.checked(&self.proof)?)? {
-            Source::Scoped(value)
-                if matches!(
-                    value.certificate,
-                    crate::proof_model::Certificate::Decision(_)
-                ) =>
-            {
-                Some(&crate::decision::DECISION_SCHEMAS[0])
-            }
-            _ => None,
-        })
+        let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof)?)? else {
+            return Ok(None);
+        };
+        let index = match value.certificate {
+            crate::proof_model::Certificate::Decision(_) => 0,
+            crate::proof_model::Certificate::DecisionNonZero(_) => 1,
+            crate::proof_model::Certificate::DecisionDischarge => 2,
+            _ => return Ok(None),
+        };
+        Ok(Some(&crate::decision::DECISION_SCHEMAS[index]))
     }
 
     /// Borrow the exact formal lemma, version and ordered-premise contract.
