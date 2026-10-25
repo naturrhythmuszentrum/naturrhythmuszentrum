@@ -36,6 +36,7 @@ fn association(
     region: Handle,
     value: Handle,
 ) -> TestResult<(Handle, Handle)> {
+    let sort = fixture.cas.expression(&value)?.1.clone();
     let arm = admit(
         &mut fixture.cas,
         Draft::CaseArm(CaseArmDraft {
@@ -50,6 +51,7 @@ fn association(
     let function = admit(
         &mut fixture.cas,
         Draft::Cases(CasesDraft {
+            sort,
             header: Reference::Existing(fixture.header.clone()),
             scope: Vec::new(),
             domain: Reference::Existing(fixture.ambient.clone()),
@@ -67,7 +69,11 @@ fn fixture(example: Example) -> TestResult<(Fixture, CaseCut)> {
         &mut source.cas,
         &source.context,
         Operator::Rational(rational(3, 1)?),
-        real(),
+        if matches!(example, Example::Integer) {
+            Sort::Value(AtomicSort::Integer)
+        } else {
+            real()
+        },
         &[],
         &mut ledger()?,
     )?;
@@ -153,7 +159,14 @@ fn decision_cut_integer_cell() -> TestResult {
     let fraction = source.number(3, 2)?;
     (cut.function, cut.association) = association(&mut source, region.clone(), fraction)?;
     refuse(&source, &cut, InvalidCode::DecisionIntegerRange)?;
-    let other_index = source.number(1, 1)?;
+    let other_index = expression(
+        &mut source.cas,
+        &source.context,
+        Operator::Rational(rational(1, 1)?),
+        Sort::Value(AtomicSort::Integer),
+        &[],
+        &mut ledger()?,
+    )?;
     (cut.function, cut.association) = association(&mut source, region, other_index)?;
     refuse(&source, &cut, InvalidCode::DecisionBoundaryIntersection)
 }
@@ -406,31 +419,25 @@ fn decision_cut_cumulative_ledger() -> TestResult {
     Ok(())
 }
 
-/// The cut query does not extend native scalar associations into Integer-sorted count results.
-/// ´test:integration:decision-cut-integer-result-remains-unsupported´
+/// Integer options retain their declared sort and refuse even an integral Real replacement.
+/// ´test:integration:decision-cut-integer-result´
 #[test]
-fn decision_cut_integer_result_remains_unsupported() -> TestResult {
-    let (mut source, _) = fixture(Example::Integer)?;
-    let integer = expression(
-        &mut source.cas,
-        &source.context,
-        Operator::Rational(rational(3, 1)?),
-        Sort::Value(AtomicSort::Integer),
-        &[],
-        &mut ledger()?,
-    )?;
-    let draft = Draft::CaseArm(CaseArmDraft {
-        placements: Vec::new(),
-        header: Reference::Existing(source.header.clone()),
-        scope: Vec::new(),
-        region: Reference::Existing(source.ambient.clone()),
-        value: Reference::Existing(integer),
-    });
-    let before = source.cas.counts();
-    assert!(source.cas.admit(&[draft], &mut ledger()?).is_err());
-    assert_eq!(source.cas.counts(), before);
-    Ok(())
+fn decision_cut_integer_result() -> TestResult {
+    let (mut source, mut cut) = fixture(Example::Integer)?;
+    assert_eq!(
+        source.cas.expression(&cut.function)?.1,
+        &Sort::Value(AtomicSort::Integer)
+    );
+    assert_eq!(source.cas.scalar_ambient(&cut.function)?, None);
+    accept(&source, &cut)?;
+    let (_, region) = source.regions(Example::Integer)?;
+    let value = source.number(3, 1)?;
+    (cut.function, cut.association) = association(&mut source, region, value)?;
+    refuse(&source, &cut, InvalidCode::DecisionIntegerRange)
 }
+
+#[path = "integer_family.rs"]
+mod integer_family;
 
 /// A changed declaration header and a narrowed case domain cannot reuse the same box cut.
 /// ´test:integration:decision-cut-scope-and-domain´
@@ -463,6 +470,7 @@ fn decision_cut_scope_and_domain() -> TestResult {
     changed.function = admit(
         &mut source.cas,
         Draft::Cases(CasesDraft {
+            sort: real(),
             header: Reference::Existing(source.header.clone()),
             scope: Vec::new(),
             domain: Reference::Existing(positive),

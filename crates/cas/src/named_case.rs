@@ -100,6 +100,9 @@ fn definition(
     case_syntax::admit(
         cas,
         Draft::Cases(CasesDraft {
+            sort: crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
+                crate::model::Field::Real,
+            )),
             header: Reference::Existing(cas.handle(metadata.header)),
             scope: metadata.scope,
             domain: Reference::Existing(domain.clone()),

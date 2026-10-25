@@ -175,7 +175,7 @@ fn integer(
     let Operator::Rational(integer) = &value.operator else {
         return Err(unsupported());
     };
-    if value.sort != Sort::Value(AtomicSort::Scalar(Field::Real)) || !integer.is_integer() {
+    if value.sort != Sort::Value(AtomicSort::Integer) || !integer.is_integer() {
         return Err(Fault::invalid(InvalidCode::DecisionIntegerRange, AT));
     }
     check_range(integer, range, budget)?;

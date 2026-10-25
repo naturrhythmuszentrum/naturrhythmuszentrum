@@ -620,6 +620,7 @@ fn native_case_admission_boundary() -> TestResult {
         &mut budget()?,
     )?;
     let cases = Draft::Cases(CasesDraft {
+        sort: real(),
         header: Reference::Existing(fixture.header.clone()),
         scope: Vec::new(),
         domain: Reference::Existing(fixture.ambient.clone()),

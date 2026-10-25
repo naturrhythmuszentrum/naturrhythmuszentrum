@@ -75,6 +75,7 @@ fn expression(
     }
     if let Some(domain) = v.domain {
         return Ok(Draft::Cases(CasesDraft {
+            sort: v.sort.clone(),
             header,
             scope,
             domain: resolve(domain)?,

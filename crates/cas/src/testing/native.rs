@@ -60,6 +60,7 @@ impl Fixture {
         let cases = admit(
             &mut cas,
             Draft::Cases(CasesDraft {
+                sort: real(),
                 header: Reference::Existing(header.clone()),
                 scope: Vec::new(),
                 domain: Reference::Existing(domain.clone()),
@@ -188,6 +189,7 @@ pub(crate) fn scoped_cases(f: &mut Fixture) -> TestResult<(Handle, Handle)> {
     let cases = admit(
         &mut f.cas,
         Draft::Cases(CasesDraft {
+            sort: real(),
             header: Reference::Existing(f.header.clone()),
             scope: scope.clone(),
             domain: Reference::Existing(domain),

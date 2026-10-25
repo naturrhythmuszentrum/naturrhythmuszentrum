@@ -472,12 +472,10 @@ impl Cas {
         let region = state.region(domain)?;
         region_context(state, domain, header, &draft.scope, &region.ambient, budget)?;
         let arms = self.case_arms(state, draft, locals, budget)?;
-        let first = state.arm(
-            *arms
-                .first()
-                .ok_or_else(|| Fault::invalid(InvalidCode::Sort, at))?,
-        )?;
-        let sort = first.sort.clone();
+        if arms.is_empty() {
+            return Err(Fault::invalid(InvalidCode::Sort, at));
+        }
+        let sort = draft.sort.clone();
         let (domain_depth, domain_size) = crate::descriptor::measure(state, domain, budget)?;
         let mut depth = domain_depth
             .checked_add(1)
@@ -491,8 +489,10 @@ impl Cas {
             .map_err(|_| Fault::allocation(at))?;
         for (position, arm) in arms.iter().enumerate() {
             let value = state.arm(*arm)?;
-            if value.sort != sort
-                || value.scope != draft.scope
+            if value.sort != sort {
+                return Err(Fault::invalid(InvalidCode::SymbolSortMismatch, at));
+            }
+            if value.scope != draft.scope
                 || !crate::header::embeds(state, value.header, header, budget)?
             {
                 return Err(Fault::invalid(InvalidCode::Sort, at));

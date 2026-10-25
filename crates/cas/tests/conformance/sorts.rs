@@ -162,6 +162,7 @@ fn scalar_family_arm_retains_original_operands() -> TestResult {
     let cases = admit(
         &mut fixture.cas,
         Draft::Cases(CasesDraft {
+            sort: Sort::Value(AtomicSort::Scalar(Field::Complex)),
             header: reference(&fixture.header),
             scope: Vec::new(),
             domain: reference(&shape.region),

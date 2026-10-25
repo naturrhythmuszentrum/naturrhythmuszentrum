@@ -95,6 +95,7 @@ fn build(
     admit(
         cas,
         &Draft::Cases(CasesDraft {
+            sort: resolved.result,
             header: Reference::Existing(header),
             scope,
             domain: Reference::Existing(resolved.region),

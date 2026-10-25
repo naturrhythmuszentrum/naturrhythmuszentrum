@@ -129,6 +129,7 @@ impl Scheduler<'_, '_> {
                 )?));
             }
             let draft = Draft::Cases(CasesDraft {
+                sort: value.sort.clone(),
                 header: Reference::Existing(self.cas.handle(value.header)),
                 scope: value.scope,
                 domain: Reference::Existing(self.cas.handle(domain)),
@@ -422,6 +423,7 @@ impl Scheduler<'_, '_> {
         }
         let value = self.cas.state.expression(job.expression)?;
         let draft = Draft::Cases(CasesDraft {
+            sort: value.sort.clone(),
             header: Reference::Existing(self.cas.handle(value.header)),
             scope: value.scope.clone(),
             domain: Reference::Existing(domain),

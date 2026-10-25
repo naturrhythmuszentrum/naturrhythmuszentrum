@@ -53,10 +53,25 @@ fn decision_certified_selection_costs() -> TestResult {
         let source = &mut fixture.partition.source;
         let outcome = source.cas.run(&request);
         if let Outcome::Proved { result, .. } = &outcome {
-            let Statement::Equality { domain, .. } = &result.witness.judgment().statement else {
+            let Statement::Equality { domain, right, .. } = &result.witness.judgment().statement
+            else {
                 return Err("selected equality".into());
             };
             assert_eq!(*domain, source.cas.admissible_region(&request.context)?);
+            if matches!(example, Example::Integer) {
+                let (operator, sort) = source.cas.expression(right)?;
+                assert_eq!(
+                    *sort,
+                    nrz_cas::syntax::Sort::Value(nrz_cas::syntax::AtomicSort::Integer)
+                );
+                assert_eq!(
+                    *operator,
+                    nrz_cas::syntax::Operator::Rational(
+                        super::super::decision_partitions::rational(3, 1)?
+                    )
+                );
+                assert_eq!(source.cas.scalar_ambient(right)?, None);
+            }
             let kinds = result
                 .witness
                 .hypotheses()
@@ -73,7 +88,7 @@ fn decision_certified_selection_costs() -> TestResult {
         [
             (
                 "Integer".into(),
-                ("proved".into(), 383_104, 1_309_667, 2_972)
+                ("proved".into(), 383_318, 1_353_635, 3_186)
             ),
             ("Sign".into(), ("proved".into(), 124_250, 594_593, 1_844)),
             ("Phase".into(), ("pending".into(), 127_532, 0, 0)),
@@ -277,7 +292,7 @@ fn decision_certified_selection_boundaries() -> TestResult {
     for (example, amounts) in [
         (
             Example::Integer,
-            [376_470, 1_309_667, 162_478, 90_432, 2_972],
+            [376_470, 1_353_635, 162_478, 92_422, 3_186],
         ),
         (Example::Sign, [118_744, 594_593, 159_172, 45_336, 1_844]),
         (Example::Phase, [127_532, 0, 90_427, 87_846, 0]),
@@ -332,5 +347,67 @@ fn decision_certified_selection_no_elimination_cover() -> TestResult {
         fault.kind,
         nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::Rule)
     );
+    Ok(())
+}
+
+fn integer_expected(
+    fixture: &mut super::IntroductionFixture,
+    supplied: &Request,
+) -> TestResult<nrz_cas::proof::Judgment> {
+    let source = &mut fixture.partition.source;
+    let three = crate::testing::builders::expression(
+        &mut source.cas,
+        &source.context,
+        nrz_cas::syntax::Operator::Rational(super::super::decision_partitions::rational(3, 1)?),
+        nrz_cas::syntax::Sort::Value(nrz_cas::syntax::AtomicSort::Integer),
+        &[],
+        &mut ledger()?,
+    )?;
+    Ok(nrz_cas::proof::Judgment {
+        context: supplied.context.clone(),
+        layer: nrz_cas::domain::Layer::Pointwise,
+        space: None,
+        residuals: Vec::new(),
+        statement: Statement::Equality {
+            left: fixture.partition.question.function.clone(),
+            right: three,
+            domain: source.cas.admissible_region(&supplied.context)?,
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
+    })
+}
+
+/// Fresh expected-judgment replay retains Integer 3 and rejects a Real replacement atomically.
+/// ´test:integration:decision-integer-selection-replay´
+#[test]
+fn decision_integer_selection_replay() -> TestResult {
+    let (mut original, supplied) = request(Example::Integer)?;
+    let Outcome::Proved { result, .. } = original.partition.source.cas.run(&supplied) else {
+        return Err("Integer selection failed".into());
+    };
+    let bytes = original
+        .partition
+        .source
+        .cas
+        .export_witness(&result.witness, &mut ledger()?)?;
+    let (mut receiver, expected_request) = request(Example::Integer)?;
+    let mut expected = integer_expected(&mut receiver, &expected_request)?;
+    let source = &mut receiver.partition.source;
+    let checked = source.cas.replay(&bytes, &expected, &mut ledger()?)?;
+    assert_eq!(checked.judgment(), &expected);
+    assert_eq!(source.cas.export_witness(&checked, &mut ledger()?)?, bytes);
+    let replacement = source.number(3, 1)?;
+    let Statement::Equality { right, .. } = &mut expected.statement else {
+        return Err("expected Integer equality".into());
+    };
+    *right = replacement;
+    let before = source.cas.counts();
+    assert!(
+        source
+            .cas
+            .replay(&bytes, &expected, &mut ledger()?)
+            .is_err()
+    );
+    assert_eq!(source.cas.counts(), before);
     Ok(())
 }

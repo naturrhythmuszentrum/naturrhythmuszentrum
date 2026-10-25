@@ -437,6 +437,7 @@ pub(crate) fn family_witness() -> TestResult<(Cas, crate::test_api::proof::Verif
     let cases = admit(
         &mut fixture.cas,
         Draft::Cases(CasesDraft {
+            sort: Sort::Value(AtomicSort::Scalar(Field::Complex)),
             header: reference(&fixture.header),
             scope: Vec::new(),
             domain: reference(&shape.region),

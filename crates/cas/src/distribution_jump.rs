@@ -215,6 +215,9 @@ pub(crate) fn regular_output(
     crate::case_syntax::admit(
         cas,
         crate::graph::Draft::Cases(crate::domain_model::CasesDraft {
+            sort: crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
+                crate::model::Field::Real,
+            )),
             header: crate::graph::Reference::Existing(header),
             scope: Vec::new(),
             domain: crate::graph::Reference::Existing(domain),

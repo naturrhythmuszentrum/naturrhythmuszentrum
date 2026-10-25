@@ -27,6 +27,7 @@ pub(super) struct Fixture {
     pub(super) context: Handle,
     pub(super) ambient: Handle,
     pub(super) kind: AmbientDomain,
+    pub(super) result: nrz_cas::syntax::Sort,
 }
 
 impl Fixture {
@@ -66,6 +67,7 @@ impl Fixture {
             context,
             ambient,
             kind,
+            result: real(),
         })
     }
 
@@ -197,6 +199,7 @@ impl Fixture {
         admit(
             &mut self.cas,
             Draft::Cases(CasesDraft {
+                sort: real(),
                 header: Reference::Existing(self.header.clone()),
                 scope: Vec::new(),
                 domain: Reference::Existing(self.ambient.clone()),

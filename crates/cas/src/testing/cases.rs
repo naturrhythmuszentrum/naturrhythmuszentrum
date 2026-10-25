@@ -144,6 +144,7 @@ impl Fixture {
         admit(
             &mut self.cas,
             Draft::Cases(CasesDraft {
+                sort: real(),
                 header: Reference::Existing(self.header.clone()),
                 scope: Vec::new(),
                 domain: Reference::Existing(self.domain.clone()),

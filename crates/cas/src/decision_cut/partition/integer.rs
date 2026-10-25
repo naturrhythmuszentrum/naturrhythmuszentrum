@@ -10,7 +10,7 @@ use crate::budget::Budget;
 use crate::decision::{CasePartition, IntegerCellRange};
 use crate::error::{Fault, InvalidCode};
 use crate::graph::{Cas, LogicalId, size};
-use crate::model::{AtomicSort, Field, Operator, Sort};
+use crate::model::{AtomicSort, Operator, Sort};
 use crate::number::Rational;
 
 /// Exact cell-index ranges for the finite declared integer domain and every option.
@@ -105,13 +105,13 @@ fn endpoints<'a>(
     Ok((lower, upper))
 }
 
-/// Accept only the original association's exactly integral Real rational literal.
+/// Accept only the original association's Integer-sorted rational literal.
 fn option(cas: &Cas, association: LogicalId) -> Result<&Rational, Fault> {
     let value = cas.state.expression(cas.state.arm(association)?.value)?;
     let Operator::Rational(index) = &value.operator else {
         return Err(invalid(InvalidCode::DecisionIntegerRange));
     };
-    if value.sort != Sort::Value(AtomicSort::Scalar(Field::Real)) || !index.is_integer() {
+    if value.sort != Sort::Value(AtomicSort::Integer) || !index.is_integer() {
         return Err(invalid(InvalidCode::DecisionIntegerRange));
     }
     Ok(index)

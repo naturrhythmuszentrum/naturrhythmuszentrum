@@ -131,7 +131,7 @@ pub struct CaseArmDraft {
     pub scope: Scope,
     /// Region where this value applies.
     pub region: Reference,
-    /// Earlier scalar value expression.
+    /// Earlier Integer or scalar value expression.
     pub value: Reference,
 }
 
@@ -249,7 +249,7 @@ pub(crate) struct CaseArm {
     pub(crate) region: LogicalId,
     /// Value expression.
     pub(crate) value: LogicalId,
-    /// Checked scalar result sort.
+    /// Checked Integer or scalar result sort.
     pub(crate) sort: Sort,
 }
 
@@ -299,6 +299,8 @@ impl Side {
 /// A native unordered case expression, with a domain that still requires cover evidence.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CasesDraft {
+    /// Exact declared result sort; every association must match without promotion.
+    pub sort: Sort,
     /// Actual immutable header.
     pub header: Reference,
     /// Explicit binder scope.

@@ -229,6 +229,7 @@ impl Query<'_> {
     fn view(&mut self, body: &Handle) -> Result<Handle, Fault> {
         use crate::domain_model::{CaseArmDraft, CasesDraft};
         let local = super::body(self.cas, body.logical_id())?.ok_or_else(invalid)?;
+        let result = local.result.clone();
         let operands =
             crate::solving::sorts::placement_operands(&self.cas.state, local, self.generation)?;
         let placements = operands
@@ -252,6 +253,7 @@ impl Query<'_> {
         admit(
             self.cas,
             &Draft::Cases(CasesDraft {
+                sort: result,
                 header: Reference::Existing(self.header.clone()),
                 scope: self.scope.clone(),
                 domain: Reference::Existing(self.region.clone()),

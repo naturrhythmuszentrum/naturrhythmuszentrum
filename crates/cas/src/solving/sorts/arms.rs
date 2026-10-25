@@ -41,7 +41,10 @@ pub(crate) fn arm(
     }
     let sort = match state.node(value)? {
         Vertex::Expression(term)
-            if matches!(term.sort, Sort::Value(AtomicSort::Scalar(_))) && placements.is_empty() =>
+            if matches!(
+                term.sort,
+                Sort::Value(AtomicSort::Integer | AtomicSort::Scalar(_))
+            ) && placements.is_empty() =>
         {
             term.sort.clone()
         }

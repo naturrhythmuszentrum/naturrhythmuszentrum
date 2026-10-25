@@ -260,11 +260,11 @@ fn decision_introduction_lifecycle_integer() -> TestResult {
     lifecycle(
         Example::Integer,
         &[
-            ("introduction", 317_496, 2_820, 2_561),
+            ("introduction", 322_565, 2_820, 2_775),
             ("frame", 1_648, 1_255, 0),
             ("interned", 1_646, 0, 0),
-            ("membership", 108_555, 1_060, 2_713),
-            ("import", 512_082, 31_912, 2_713),
+            ("membership", 113_794, 1_060, 2_927),
+            ("import", 538_289, 33_902, 2_927),
         ],
     )
 }

@@ -26,6 +26,7 @@ pub(super) fn case(source: &mut Fixture, domain: &Handle, arms: &[Handle]) -> Te
     admit(
         &mut source.cas,
         Draft::Cases(CasesDraft {
+            sort: source.result.clone(),
             header: Reference::Existing(source.header.clone()),
             scope: Vec::new(),
             domain: Reference::Existing(domain.clone()),
@@ -36,7 +37,14 @@ pub(super) fn case(source: &mut Fixture, domain: &Handle, arms: &[Handle]) -> Te
 }
 
 fn association(source: &mut Fixture, region: Handle, value: i64) -> TestResult<Handle> {
-    let value = source.number(value, 1)?;
+    let value = crate::testing::builders::expression(
+        &mut source.cas,
+        &source.context,
+        Operator::Rational(rational(value, 1)?),
+        source.result.clone(),
+        &[],
+        &mut ledger()?,
+    )?;
     admit(
         &mut source.cas,
         Draft::CaseArm(CaseArmDraft {
@@ -76,6 +84,9 @@ fn phase(source: &mut Fixture, coordinates: &[Handle]) -> TestResult<Vec<Handle>
 
 pub(super) fn prepared(example: Example) -> TestResult<PartitionFixture> {
     let mut source = Fixture::new(example)?;
+    if matches!(example, Example::Integer) {
+        source.result = nrz_cas::syntax::Sort::Value(nrz_cas::syntax::AtomicSort::Integer);
+    }
     let keys = if matches!(example, Example::Phase) {
         vec!["a", "b"]
     } else {
@@ -701,4 +712,23 @@ fn decision_partition_atomic_lifecycle() -> TestResult {
         assert_eq!(fixture.source.cas.counts(), before);
     }
     Ok(())
+}
+
+/// Integral Real labels cannot satisfy a declared Integer option family.
+/// ´test:integration:decision-partition-rejects-real-options´
+#[test]
+fn decision_partition_rejects_real_options() -> TestResult {
+    let mut fixture = prepared(Example::Integer)?;
+    fixture.source.result = crate::testing::common::real();
+    let coordinate = fixture.question.coordinates[0].clone();
+    let mut arms = Vec::new();
+    for index in 0..5 {
+        let region = fixture
+            .source
+            .interval(&coordinate, (index, 1), (index + 1, 1), true)?;
+        arms.push(association(&mut fixture.source, region, index)?);
+    }
+    let domain = fixture.source.interval(&coordinate, (0, 1), (5, 1), true)?;
+    fixture.question.function = case(&mut fixture.source, &domain, &arms)?;
+    refuses(&fixture, InvalidCode::DecisionIntegerRange)
 }

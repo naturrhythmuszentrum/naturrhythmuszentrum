@@ -24,8 +24,8 @@ pub struct CoordinateInterval {
 
 /// An explicit integer option range attached to one cut question.
 ///
-/// The index is the association's exact Real rational literal, checked integral. This range
-/// is pure declaration data, not an `Integer` case result, admitted partition or physical count.
+/// The index is the association's exact `Integer`-sorted rational literal. An integral
+/// Real literal refuses; this range does not itself admit a partition or physical count.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntegerCellRange {
     /// Coordinate whose box must lie in the selected integer's half-open cell.

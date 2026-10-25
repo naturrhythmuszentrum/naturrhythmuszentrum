@@ -150,6 +150,17 @@ impl Build {
             return Err(invalid());
         }
         let draft = Draft::Cases(CasesDraft {
+            sort: cas
+                .state
+                .arm(
+                    self.certificate
+                        .arms
+                        .first()
+                        .ok_or_else(invalid)?
+                        .logical_id(),
+                )?
+                .sort
+                .clone(),
             header: Reference::Existing(cas.handle(form.header)),
             scope: form.scope.clone(),
             domain: Reference::Existing(cas.handle(form.domain)),

@@ -471,6 +471,9 @@ fn wrapped(
     admit(
         &mut fixture.cas,
         Draft::Cases(CasesDraft {
+            sort: crate::test_api::syntax::Sort::Value(
+                crate::test_api::syntax::AtomicSort::Scalar(Field::Complex),
+            ),
             header: reference(&fixture.header),
             scope: Vec::new(),
             domain: reference(&shape.region),

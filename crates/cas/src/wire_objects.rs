@@ -401,6 +401,7 @@ fn expression(
             return Err(invalid());
         }
         Draft::Cases(crate::domain_model::CasesDraft {
+            sort: sort.clone(),
             header,
             scope: scope.clone(),
             domain: Reference::Existing(domain.ok_or_else(invalid)?),

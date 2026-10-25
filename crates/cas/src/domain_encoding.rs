@@ -5,6 +5,7 @@ use crate::domain_model::{AmbientDomain, ContextDraft, HeaderDraft, RegionExpr};
 use crate::encoding::{self, Encoder};
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Draft, LogicalId, Reference, Vertex, encode_id};
+use crate::model::{AtomicSort, Field, Sort};
 use crate::source_model::SourceFormKind;
 
 /// Encode a draft reference without trusting it as a graph lookup.
@@ -175,10 +176,25 @@ pub(crate) const fn source_kind(value: SourceFormKind) -> u8 {
     }
 }
 
+/// Fixed result enums fit the draft's prepaid 256-byte record; owned names still require a bound.
+/// This sink measures draft storage, not identity: the expression key always encodes the full sort.
+fn case_result_payload(value: &Sort, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    match value {
+        Sort::Value(
+            AtomicSort::Integer
+            | AtomicSort::Scalar(
+                Field::Real | Field::Complex | Field::Rational | Field::PositiveCharacteristic(_),
+            ),
+        ) => Ok(()),
+        _ => encoding::sort(value, out),
+    }
+}
+
 /// Bound every new draft payload before graph or owned collection copies.
 pub(crate) fn draft(value: &Draft, out: &mut Encoder<'_>) -> Result<(), Fault> {
     match value {
         Draft::Cases(value) => {
+            case_result_payload(&value.sort, out)?;
             reference(&value.header, out)?;
             encoding::scope(&value.scope, out)?;
             reference(&value.domain, out)?;
