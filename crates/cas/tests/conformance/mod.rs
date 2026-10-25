@@ -112,4 +112,5 @@ mod decision_baseline;
 
 mod decision_cuts;
 
+mod decision_enclosures;
 mod decision_partitions;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Exact rational cuts and reusable finite decision partitions.
+//! Exact rational cuts, reusable finite decision partitions and closed rational enclosures.
 //!
-//! These checks establish cut and partition premises. They admit no enclosure origin,
+//! These checks establish cut, partition and closed rational enclosure premises. They admit no
 //! selected value, proof record or certified-membership hypothesis.
 //! A consumer must separately establish the target enclosure and complete decision
 //! contract before using this calculation in a checked introduction rule.
@@ -148,6 +148,94 @@ impl Cas {
     ) -> Result<(), Fault> {
         let previous = budget.restrict_storage(&self.limits);
         let result = crate::decision_cut::partition::reuse(self, partition, cut, budget);
+        budget.restore_limits(previous);
+        result
+    }
+}
+
+/// A closed replay origin; numerical kernel and unverified claims have no authority.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum EnclosureOrigin {
+    /// Replay every original operand through the existing exact-constant checker.
+    ExactRational {
+        /// Exact expression being replayed; must be identical to the requested target.
+        expression: Handle,
+        /// Untrusted rational result, checked against exact CAS normalization.
+        value: Rational,
+    },
+    /// Scalar numerical certificates require a separate, presently unsupported checker.
+    ScalarKernel,
+    /// Matrix numerical certificates require a separate, presently unsupported checker.
+    MatrixKernel,
+    /// A provenance label, success flag or finite radius alone establishes no enclosure.
+    Unverified,
+}
+
+/// An untrusted rational enclosure of an exact target in its original context.
+///
+/// The supported replay is a closed expression with an exactly rational result.
+/// Its bound holds throughout the stated family without using any input assumption.
+/// Free-input interval arguments and non-rational remainder bounds are unsupported.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RationalEnclosure {
+    /// Exact original expression, including operands that normalization could erase.
+    pub target: Handle,
+    /// Original context, retained without closing or discharging its hypotheses.
+    pub context: Handle,
+    /// Exact admitted region of that context; a substituted or widened region refuses.
+    pub input_family: Handle,
+    /// Included lower rational endpoint.
+    pub lower: Rational,
+    /// Included upper rational endpoint.
+    pub upper: Rational,
+    /// Original-expression replay and its untrusted candidate result.
+    pub origin: EnclosureOrigin,
+}
+
+/// Sealed caller-owned evidence for one closed rational enclosure contract.
+///
+/// This has no proof, wire, hypothesis or case-selection authority. The context
+/// remains part of its exact contract; no consistency or nonemptiness is inferred.
+#[derive(Clone, Debug)]
+pub struct CheckedRationalEnclosure {
+    /// Complete checked target, context, family, box and replay identity.
+    pub(crate) contract: RationalEnclosure,
+    /// Conservative prepaid returned ownership, excluding shared immutable graph syntax.
+    pub(crate) bytes: u64,
+}
+
+impl CheckedRationalEnclosure {
+    /// Borrow the exact original contract whose replay and rational bounds were checked.
+    #[must_use]
+    pub const fn contract(&self) -> &RationalEnclosure {
+        &self.contract
+    }
+
+    /// Conservative logical bytes retained by this caller-owned check.
+    #[must_use]
+    pub const fn retained_bytes(&self) -> u64 {
+        self.bytes
+    }
+}
+
+impl Cas {
+    /// Replay a closed original expression and check its exact result against a rational box.
+    ///
+    /// Existing exact-constant rules check finiteness before normalization and
+    /// independently check the normalized equality. Named constants are accepted
+    /// only when that exact normalization produces a rational result, such as `Pi/Pi`.
+    /// All original operands are checked even when cancellation could hide them.
+    /// # Errors
+    /// Refuses foreign identities, changed targets or input families, false results,
+    /// reversed or excluding boxes, unsupported origins, free inputs, non-rational
+    /// results and unproved original divisor domains. No caller graph state changes.
+    pub fn check_rational_enclosure(
+        &self,
+        contract: &RationalEnclosure,
+        budget: &mut Budget,
+    ) -> Result<CheckedRationalEnclosure, Fault> {
+        let previous = budget.restrict_storage(&self.limits);
+        let result = crate::decision_enclosure::check(self, contract, budget);
         budget.restore_limits(previous);
         result
     }

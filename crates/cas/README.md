@@ -844,7 +844,7 @@ A caller retains one `CheckedCasePartition` per immutable case revision (`def:ca
 
 **Rule (Partition authority boundary)** · `rule:cas:decision-partition-authority`
 
-The sealed partition is a prerequisite calculation, not a `VerifiedWitness`, local hypothesis or portable cover lemma. It has no wire encoding and cannot enter case elimination. Rational enclosure replay for the original target and admitted input family, the certified-membership kind and introduction lemma, retained source assumptions and the sign-to-nonzero consequence remain open. A valid negative cut under a checked partition still leaves the original reciprocal's `NonZero` premise open (`test:integration:decision-partition-no-membership-authority`). Existing formal registration, proof selection, wire and budget defaults retain their behavior and costs.
+The sealed partition is a prerequisite calculation, not a `VerifiedWitness`, local hypothesis or portable cover lemma. It has no wire encoding and cannot enter case elimination. General input-family interval replay, the certified-membership kind and introduction lemma, retained introduction proofs and the sign-to-nonzero consequence remain open. The closed rational replay subset establishes only its exact target bound (`rule:cas:decision-enclosure-replay`). A valid negative cut under a checked partition still leaves the original reciprocal's `NonZero` premise open (`test:integration:decision-partition-no-membership-authority`). Existing formal registration, proof selection, wire and budget defaults retain their behavior and costs.
 
 **Procedure (Finite partition conformance)** · `alg:cas:decision-partition-conformance`
 
@@ -865,3 +865,35 @@ The seven phase charts require 48,944 Work, 67,112 staged bytes and 256 returned
 **Rule (Finite partition resource ownership)** · `rule:cas:decision-partition-resources`
 
 Work and staging cover traversal, total affine reconstruction, exact cuts, cell ownership and retained copies. Returned and caller-retained bytes are the same bound; added graph bytes and reuse output are zero. Reuse staging includes the retained contract plus the full current box-cut scratch (`rule:cas:decision-partition-reuse`). These thresholds are conservative accounted bounds, not allocator measurements. Literal N/N−1 tests pin admission Work, staging, output and Cartesian cells, prior Work and one retained input byte (`test:integration:decision-partition-resource-boundaries`); reuse Work, staging and cumulative exhaustion (`test:integration:decision-partition-reuse-boundaries`); and combined admission/reuse with atomic refusal and a widened box (`test:integration:decision-partition-atomic-lifecycle`). No permanent test searches a byte threshold, and spent Work remains spent on refusal.
+
+**Definition (Closed rational enclosure contract)** · `def:cas:decision-enclosure-contract`
+
+`nrz_cas::decision::RationalEnclosure` names the original `target`, exact `context`, that context's actual `input_family`, rational `lower` and `upper`, and an `EnclosureOrigin`. `ExactRational { expression, value }` is an untrusted candidate; `expression` must be the identical original target. `Cas::check_rational_enclosure` returns a sealed `CheckedRationalEnclosure` retaining the complete contract and its `retained_bytes()` bound. Context identity remains part of the contract even though a closed target needs no input assumption (`test:integration:decision-enclosure-qualified-family`).
+
+**Rule (Closed original-expression replay)** · `rule:cas:decision-enclosure-replay`
+
+The checker delegates to `ExactConstant::from_expression`, which inspects every original operand, establishes finite-real divisor domains before normalization and independently checks equality to the normalized result. It requires an exactly rational result equal to the candidate, then checks both included rational endpoints. Rational arithmetic and integer powers use the existing exact-constant rules; named constants participate only when exact normalization yields a rational, as in `Pi/Pi` (`test:integration:decision-enclosure-named-constant-boundary`). No approximate constant bounds or floating comparisons enter this path. The supported examples and singleton boxes pass independently (`test:integration:decision-enclosure-closed-examples`).
+
+**Rule (Closed replay refusals)** · `rule:cas:decision-enclosure-refusals`
+
+Foreign replay handles, another target and a false rational result refuse (`test:integration:decision-enclosure-original-target`); reversed or excluding boxes refuse (`test:integration:decision-enclosure-false-boxes`); substituting a wider input family refuses (`test:integration:decision-enclosure-qualified-family`). `ScalarKernel`, `MatrixKernel` and `Unverified` origins return `UnsupportedCertificate` (`test:integration:decision-enclosure-unsupported-origins`). A hidden zero divisor remains `RefutedDomain` even under multiplication by zero or quotient cancellation (`test:integration:decision-enclosure-hidden-domain`). Free inputs, including a canceled free input, remain unsupported (`test:integration:decision-enclosure-free-input-boundary`).
+
+**Rule (Closed enclosure authority)** · `rule:cas:decision-enclosure-authority`
+
+The sealed result proves the supported constant's interval bound on the exact retained family; it does not establish family nonemptiness or context consistency. It creates no `VerifiedWitness`, local frame, hypothesis, selected value or portable proof bytes. It does not connect a closed target to a separate case coordinate. That connection, original input-family interval proofs, the complete certified-membership register and retained introduction rule, qualified slot use and the sign-to-nonzero consequence remain obligations of `docs/design/decision-nodes.md`. Ordinary proof routes and their costs remain unchanged; a caller cannot use this value as a cover witness. A reciprocal of an independent free coordinate retains its original nonzero residual after a successful closed replay (`test:integration:decision-enclosure-no-membership-authority`).
+
+**Example (Closed rational decision targets)** · `ex:cas:decision-enclosure-examples`
+
+The original driven expression `1000*(1/40)-1/(1000*(1/100000))` normalizes exactly to −75 and passes `[−301/4,−299/4]`; the nominal phase components −3/2 and 3/8 pass `[−7/4,−5/4]` and `[1/4,1/2]` (`test:integration:decision-enclosure-closed-examples`). The actual LC cycle target `10/Pi` refuses because the existing exact-constant rules do not produce a rational result; supplying 51/16 as a candidate cannot replace a rational π bound and its proof (`test:integration:decision-enclosure-named-constant-boundary`). Refusing the actual `10/Pi` target spends 28,201 Work, so callers must budget for unsupported attempts as well as successful replay. These are exact nominal target checks, with no numerical kernel-origin admission or whole-family physical-model claim.
+
+**Example (Closed sign replay costs)** · `ex:cas:decision-enclosure-sign-costs`
+
+Replaying the original driven rational expression costs 53,628 Work, 29,187 staged bytes, 5,696 temporary private-graph payload bytes and 800 returned/retained bytes. The caller's graph remains unchanged. These are complete original-target replay costs for the sign reference (`ex:cas:decision-enclosure-examples`), pinned at literal N/N−1 boundaries (`test:integration:decision-enclosure-resource-boundaries`).
+
+**Example (Closed phase component replay costs)** · `ex:cas:decision-enclosure-phase-costs`
+
+The nominal real component −3/2 costs 8,785 Work and the nominal imaginary component 3/8 costs 9,361 Work. Each separately requires 22,856 staged bytes, 1,539 temporary private-graph payload bytes and 792 returned/retained bytes. These measurements authenticate the original component targets (`ex:cas:decision-enclosure-examples`); they exclude a Complex projection theorem, joint retained-result storage and chart introduction. Each boundary is pinned independently (`test:integration:decision-enclosure-resource-boundaries`).
+
+**Rule (Closed replay lifecycle accounting)** · `rule:cas:decision-enclosure-resources`
+
+The caller's cumulative ledger pays for retained request ownership, bounded rational scratch, temporary exact-constant graph construction, original-domain checking, normalization equality, endpoint comparisons and copying the returned contract. The returned ownership excludes shared source syntax; temporary private graph payload is distinct from new caller graph bytes, which are zero. No cache is consulted. Work stays spent on refusal and temporary limits are restored; literal tests cover prior Work, one retained input byte, repeated replay and exhausted replay with unchanged graph occupancy (`test:integration:decision-enclosure-resource-boundaries`), (`test:integration:decision-enclosure-cumulative-ledger`).
