@@ -19,6 +19,14 @@ pub(crate) struct SelectedReading {
 }
 
 impl SelectedReading {
+    /// Complete original restoration retained beside every native selected descendant.
+    pub(crate) fn restored(&self) -> Option<&dyn super::coordinates::selection::RestoredSource> {
+        match &self.group.result_definition {
+            Some(super::ResultDefinition::Coordinate(source)) => Some(source.snapshot.as_ref()),
+            _ => None,
+        }
+    }
+
     /// Exact homogeneous interpretation, available only for an identity-coordinate reading.
     pub(crate) fn symbols(&self) -> Option<&nrz_bindings::BindingSymbols> {
         self.group

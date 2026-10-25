@@ -260,6 +260,14 @@ impl<P: Scalar> InputSnapshot<P> {
             .iter()
             .flat_map(super::live::selected::SelectedReading::companions)
     }
+    /// Original coordinate references when this input selects a restored snapshot.
+    #[must_use]
+    pub fn coordinate_contract(&self) -> Option<&crate::CoordinateContract> {
+        self.selected
+            .as_ref()
+            .and_then(super::live::selected::SelectedReading::restored)
+            .map(super::live::coordinates::selection::RestoredSource::contract)
+    }
     /// Actual repeated copies and their discrepancy evidence in the selected family.
     pub fn copy_discrepancies(&self) -> impl Iterator<Item = &crate::CopyDiscrepancy> {
         self.selected

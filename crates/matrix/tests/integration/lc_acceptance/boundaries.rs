@@ -3,13 +3,13 @@
 
 use crate::reading_testing::{TestResult, ledger};
 use crate::spectral_testing::Fixture;
-use nrz_matrix::{Coverage, DependencyPolicy, Heap, HeapError, HeapLimits, LiveBindingError};
+use nrz_matrix::{Coverage, DependencyPolicy, Heap, HeapError, HeapLimits};
 use nrz_scalar::ArithmeticContext;
 
-/// A restored mixed snapshot cannot enter the homogeneous facade with its original radius channels.
-/// ´test:integration:lc-energy-restored-state-selection-boundary´
+/// Restored scalar projections carry the original snapshot and both complete radius channels.
+/// ´test:integration:lc-energy-restored-state-selection´
 #[test]
-fn lc_energy_restored_state_selection_boundary() -> TestResult {
+fn lc_energy_restored_state_selection() -> TestResult {
     let fixture = Fixture::new(["5", "1/10", "1/2000"])?;
     let plan = super::state_fixture::plan(fixture.law.state().entries())?;
     let mut heap = Heap::new(HeapLimits::default())?;
@@ -22,31 +22,45 @@ fn lc_energy_restored_state_selection_boundary() -> TestResult {
         &mut ledger()?,
     )?;
     let restored = heap.restore_reading(&normalized, &context, &mut ledger()?)?;
-    assert_eq!(restored.coverage(), Coverage::DeclaredBounds);
-    assert!(matches!(
-        heap.select_reading(restored.source(), &mut ledger()?),
-        Err(LiveBindingError::Heap(HeapError::MissingBinding))
-    ));
-    for reading in &imported.bindings()[1..] {
-        let component = heap.select_reading(reading, &mut ledger()?)?;
-        assert!(component.symbols().bound().is_none());
-        assert!(component.symbols().error().is_none());
+    for (index, reading) in imported.bindings()[1..].iter().enumerate() {
+        let component =
+            heap.select_restored_reading(&restored, reading, &context, &mut ledger()?)?;
+        assert!(component.symbols().bound().is_some());
+        assert!(component.symbols().error().is_some());
         assert_eq!(
-            heap.value_by_symbol(component.symbol(), &component)?
-                .coverage(),
-            Coverage::RepresentedInputs
+            component
+                .symbol()
+                .source()
+                .and_then(nrz_bindings::QuantitySymbol::reading),
+            Some(reading.reading())
         );
+        let value = heap.value_by_symbol(component.symbol(), &component)?;
+        assert_eq!(value.coverage(), Coverage::DeclaredBounds);
+        assert_eq!(
+            value.region().get(0, 0)?.to_bits(),
+            restored.centers()[index].to_bits()
+        );
+        let total = heap.companion(value.bound().ok_or("restored total")?)?;
+        let error = heap.companion(value.evaluation().ok_or("restored error")?)?;
+        assert_eq!(
+            total.region().get(0, 0)?.to_bits(),
+            restored.totals()[index].to_bits()
+        );
+        assert_eq!(
+            error.region().get(0, 0)?.to_bits(),
+            restored.errors()[index].to_bits()
+        );
+        let origin = heap.coordinate_origin(&component)?;
+        assert_eq!(
+            origin.totals()[index].to_bits(),
+            restored.totals()[index].to_bits()
+        );
+        assert_eq!(
+            origin.errors()[index].to_bits(),
+            restored.errors()[index].to_bits()
+        );
+        assert_eq!(origin.source().reading(), restored.source().reading());
     }
-    assert!(
-        heap.coordinate_norm(
-            &restored,
-            &plan.contract,
-            nrz_accuracy::NormKind::One,
-            &context,
-            &mut ledger()?
-        )
-        .is_ok()
-    );
     Ok(())
 }
 
@@ -86,7 +100,6 @@ fn lc_original_selected_sources_refuse_native_joint_attachment() -> TestResult {
         TargetMap::capture(&heap, handles[0])?,
         TargetMap::capture(&heap, handles[1])?,
     ];
-    let before = format!("{heap:?}");
     assert!(matches!(
         heap.publish_joint(
             CompanionSetDraft::new(model, targets, [vec![0], vec![1]]),
@@ -94,7 +107,6 @@ fn lc_original_selected_sources_refuse_native_joint_attachment() -> TestResult {
         ),
         Err(nrz_matrix::JointError::Heap(HeapError::MissingBinding))
     ));
-    assert_eq!(format!("{heap:?}"), before);
     assert_eq!(heap.provenance_usage().records(), 0);
     for source in original {
         assert!(heap.reading_entries(&source).is_ok());

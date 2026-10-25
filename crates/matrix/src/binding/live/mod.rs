@@ -4,7 +4,7 @@
 mod admission;
 mod bounded;
 pub(crate) mod companions;
-mod coordinates;
+pub(crate) mod coordinates;
 mod mapped;
 pub use mapped::{MappedReading, ReadingSelection};
 mod parameters;
@@ -31,7 +31,7 @@ pub use derivatives::{
 mod copies;
 
 pub use copies::CopyDiscrepancy;
-mod dependencies;
+pub(crate) mod dependencies;
 
 pub use coordinates::{CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading};
 mod import;
@@ -125,7 +125,9 @@ impl<P: Scalar> ReadingBinding<P> {
     pub fn phasor_result(&self) -> Option<&nrz_bindings::readings::PhasorResultDefinition> {
         match self.group.result_definition.as_ref()? {
             ResultDefinition::Product(value) => Some(value),
-            ResultDefinition::Solve(_) | ResultDefinition::Spectral(_) => None,
+            ResultDefinition::Solve(_)
+            | ResultDefinition::Spectral(_)
+            | ResultDefinition::Coordinate(_) => None,
         }
     }
     /// Original checked LC equation, when certified solve publication initialized this family.
@@ -133,7 +135,9 @@ impl<P: Scalar> ReadingBinding<P> {
     pub fn phasor_solve(&self) -> Option<&nrz_bindings::readings::PhasorSolveDefinition> {
         match self.group.result_definition.as_ref()? {
             ResultDefinition::Solve(value) => Some(value),
-            ResultDefinition::Product(_) | ResultDefinition::Spectral(_) => None,
+            ResultDefinition::Product(_)
+            | ResultDefinition::Spectral(_)
+            | ResultDefinition::Coordinate(_) => None,
         }
     }
     /// Original complete LC spectral law and all six output views that initialized this family.
@@ -143,7 +147,9 @@ impl<P: Scalar> ReadingBinding<P> {
     ) -> Option<&nrz_bindings::readings::LcSpectralResultDefinition> {
         match self.group.result_definition.as_ref()? {
             ResultDefinition::Spectral(value) => Some(value),
-            ResultDefinition::Product(_) | ResultDefinition::Solve(_) => None,
+            ResultDefinition::Product(_)
+            | ResultDefinition::Solve(_)
+            | ResultDefinition::Coordinate(_) => None,
         }
     }
     /// Original operand assurance scopes retained by a published phasor result.
@@ -218,6 +224,8 @@ pub(crate) struct ProofDependency {
 /// A closed producer retains the exact operation that initialized its output family.
 #[derive(Clone, Debug)]
 pub(crate) enum ResultDefinition {
+    /// Original restored snapshot, references, companions and numerical source closure.
+    Coordinate(Rc<coordinates::selection::Origin>),
     /// Complete multiplication correspondence and physical result slot.
     Product(nrz_bindings::readings::PhasorResultDefinition),
     /// Original LC equation and complete current result slot.

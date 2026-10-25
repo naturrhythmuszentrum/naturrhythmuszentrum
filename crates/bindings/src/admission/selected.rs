@@ -180,3 +180,46 @@ fn radius_symbol(
         reading: None,
     })))
 }
+
+impl BindingSymbols {
+    /// Declare a restored homogeneous projection of the original mixed coordinate reading.
+    ///
+    /// Both maps are identities and every selected position retains the original family,
+    /// entry meaning and fixed reference. The numerical owner must execute restoration,
+    /// retain its original companions and publish both generated radius channels together.
+    /// # Errors
+    /// Refuses unrelated families, reordered or substituted positions, unsupported meanings
+    /// and exhausted exact resources. These derived declarations cannot be imported.
+    pub fn restored_reading(
+        graph: Rc<Cas>,
+        original: &PhysicalReading,
+        selected: &PhysicalReading,
+        positions: &[usize],
+        budget: &mut Budget,
+    ) -> Result<Self, AdmissionError> {
+        identity(original, budget)?;
+        if original.family() != selected.family() || positions.len() != selected.entries().len() {
+            return Err(AdmissionError::ValueMismatch);
+        }
+        for ((&position, entry), index) in positions
+            .iter()
+            .zip(selected.entries())
+            .zip(selected.selection().indices())
+        {
+            budget.work(1, Location::new("restored reading projection"))?;
+            if original.entries().get(position) != Some(entry)
+                || original.selection().indices().get(position) != Some(index)
+            {
+                return Err(AdmissionError::ValueMismatch);
+            }
+        }
+        let source = Self::from_reading(graph, selected, budget)?;
+        graph::declare(
+            source.value().descriptor(),
+            source.value().shape(),
+            [true, true],
+            Some(source.value()),
+            budget,
+        )
+    }
+}

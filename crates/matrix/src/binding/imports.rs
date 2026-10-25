@@ -7,6 +7,8 @@
 //!
 //! `HeapLimits` bounds descriptor slots, elements per precision (including companions), and immutable schemas. Preparation scans and validates the complete bundle, reserves metadata capacity and builds every slab before an allocation-free publication step. Replacement scratch is bounded by the same element limit as the new live bundle; old and prepared storage may coexist, so peak heap-owned addressable elements can reach twice that limit, in addition to backend padding and metadata. A refusal publishes no partial value or companion. Rust allocator aborts remain outside the recoverable-capacity contract. Process-local identities never wrap and make no persistence promise.
 
+mod coordinates;
+
 use nrz_bindings::{Descriptor, UncertaintyMode, uncertainty};
 use nrz_scalar::Scalar;
 
@@ -87,7 +89,8 @@ impl Heap {
         errors: Option<&[P]>,
         coverage: crate::Coverage,
     ) -> Result<crate::ValueBinding<P>, HeapError> {
-        let prepared = self.prepare_symbol_import(symbols, centers, bounds, errors, coverage)?;
+        symbols.check_import()?;
+        let prepared = self.prepare_symbol_bundle(symbols, centers, bounds, errors, coverage)?;
         let binding = imported_binding(self.scope, &prepared, symbols)?;
         self.publish_bundle(prepared);
         binding.publish();
@@ -114,12 +117,12 @@ impl Heap {
         } else {
             crate::Coverage::RepresentedInputs
         };
-        let prepared = self.prepare_symbol_import(&symbols, centers, bounds, None, coverage)?;
+        let prepared = self.prepare_symbol_bundle(&symbols, centers, bounds, None, coverage)?;
         Ok(self.publish_bundle(prepared))
     }
 
     /// Finish every fallible symbol, payload and allocation check before publication.
-    fn prepare_symbol_import<P: Scalar + 'static>(
+    fn prepare_symbol_bundle<P: Scalar + 'static>(
         &mut self,
         symbols: &nrz_bindings::BindingSymbols,
         centers: &[P],
@@ -127,7 +130,6 @@ impl Heap {
         errors: Option<&[P]>,
         coverage: crate::Coverage,
     ) -> Result<PreparedImport<P>, HeapError> {
-        symbols.check_import()?;
         let quantity = symbols.value().descriptor();
         check_quantity(quantity)?;
         let [rows, columns] = symbols.value().shape();

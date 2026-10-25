@@ -2,9 +2,11 @@
 //! Shared original LC bindings exercise the operator and complete spectral publication together.
 
 mod boundaries;
+mod bridge;
 mod companions;
 mod construction_costs;
 mod costs;
+mod energy;
 mod grid;
 mod invariants;
 mod oracle_regression;

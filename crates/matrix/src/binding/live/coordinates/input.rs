@@ -14,7 +14,7 @@ pub(super) fn check<P: Scalar>(
     binding: &ReadingBinding<P>,
     contract: &CoordinateContract,
     budget: &mut Budget,
-) -> Result<(), CoordinateError> {
+) -> Result<Vec<usize>, CoordinateError> {
     let reading = binding.reading();
     if reading.family().context() != contract.frame().context() {
         return Err(CoordinateError::Identity);
@@ -31,25 +31,29 @@ pub(super) fn check<P: Scalar>(
     if !binding.group.native.is_empty() {
         return Err(CoordinateError::UnsupportedCompanion);
     }
-    for companion in binding.companions() {
+    let mut covariance = Vec::new();
+    for (index, companion) in binding.companions().iter().enumerate() {
         if companion
             .targets()
             .iter()
             .any(|target| target.reading() == reading)
         {
-            if !matches!(
+            if matches!(
                 companion.companion().kind(),
-                CompanionReadingKind::Radius(
-                    CompanionKind::DeterministicBound | CompanionKind::NumericalError
-                )
+                CompanionReadingKind::Radius(_)
             ) {
-                return Err(CoordinateError::UnsupportedCompanion);
+                identity(companion.companion().map(), budget)
+                    .map_err(|_| CoordinateError::UnsupportedCompanion)?;
+            } else {
+                crate::binding::live::admission::charge::<usize>(covariance.len() + 1, budget)?;
+                covariance
+                    .try_reserve_exact(1)
+                    .map_err(|_| crate::HeapError::Capacity)?;
+                covariance.push(index);
             }
-            identity(companion.companion().map(), budget)
-                .map_err(|_| CoordinateError::UnsupportedCompanion)?;
         }
     }
-    Ok(())
+    Ok(covariance)
 }
 
 /// Nonidentity maps need their own executed image and cannot silently become raw identity data.

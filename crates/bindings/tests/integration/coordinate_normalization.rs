@@ -205,3 +205,100 @@ fn coordinate_empty_frame_is_exact() -> TestResult {
     assert_eq!(map.offsets(), [] as [nrz_cas::Rational; 0]);
     Ok(())
 }
+
+/// Restored component declarations retain their original reading and require checked publication.
+/// ´test:integration:restored-reading-symbols-retain-original-projection´
+#[test]
+fn restored_reading_symbols_retain_original_projection() -> TestResult {
+    use crate::testing::readings::state_case;
+    use nrz_bindings::{AdmissionError, BindingSymbols};
+    use std::rc::Rc;
+    for index in [0, 1] {
+        let case = state_case(index)?;
+        let graph = Rc::new(case.fixture.cas);
+        let selected = BindingSymbols::restored_reading(
+            Rc::clone(&graph),
+            &case.whole,
+            &case.component,
+            &[usize::try_from(index)?],
+            &mut ledger()?,
+        )?;
+        assert_eq!(
+            selected
+                .value()
+                .source()
+                .and_then(nrz_bindings::QuantitySymbol::reading),
+            Some(&case.component)
+        );
+        assert_eq!(
+            selected.value().descriptor(),
+            case.component.entries()[0].descriptor()
+        );
+        assert_eq!(
+            selected.bound().ok_or("total")?.target(),
+            Some(selected.value().node())
+        );
+        assert_eq!(
+            selected.error().ok_or("error")?.target(),
+            Some(selected.value().node())
+        );
+        assert!(matches!(
+            selected.check_import(),
+            Err(AdmissionError::ResultMismatch)
+        ));
+        assert!(
+            BindingSymbols::restored_reading(
+                Rc::clone(&graph),
+                &case.whole,
+                &case.component,
+                &[usize::try_from(1 - index)?],
+                &mut ledger()?
+            )
+            .is_err()
+        );
+        assert!(
+            BindingSymbols::restored_reading(
+                Rc::clone(&graph),
+                &case.whole,
+                &case.whole,
+                &[0, 1],
+                &mut ledger()?
+            )
+            .is_err()
+        );
+        assert!(
+            BindingSymbols::restored_reading(
+                graph,
+                &case.whole,
+                &case.component,
+                &[],
+                &mut ledger()?
+            )
+            .is_err()
+        );
+    }
+    Ok(())
+}
+
+/// Identical dimensions and equal source values cannot replace the original exact family or references.
+/// ´test:integration:restored-reading-symbols-refuse-substituted-family´
+#[test]
+fn restored_reading_symbols_refuse_substituted_family() -> TestResult {
+    use crate::testing::readings::state_case;
+    use nrz_bindings::BindingSymbols;
+    use std::rc::Rc;
+    let original = state_case(0)?;
+    let other = state_case(0)?;
+    let graph = Rc::new(original.fixture.cas);
+    assert!(
+        BindingSymbols::restored_reading(
+            graph,
+            &original.whole,
+            &other.component,
+            &[0],
+            &mut ledger()?
+        )
+        .is_err()
+    );
+    Ok(())
+}

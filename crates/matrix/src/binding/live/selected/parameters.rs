@@ -12,6 +12,9 @@ impl SelectedReading {
         budget: &mut nrz_bindings::Budget,
     ) -> Result<nrz_bindings::BindingSymbols, HeapError> {
         let symbols = self.symbols().ok_or(HeapError::MissingBinding)?.clone();
+        if self.restored().is_some() {
+            return Ok(symbols);
+        }
         let companions = self
             .companions()
             .map(CompanionAdapter::companion)
@@ -30,11 +33,15 @@ impl SelectedReading {
 
     /// Every original companion targeting this selection, including both covariance sides.
     pub(crate) fn companions(&self) -> impl Iterator<Item = &CompanionAdapter<usize>> {
-        self.group.companions.iter().filter(|companion| {
+        let (companions, reading) = self.restored().map_or_else(
+            || (&self.group.companions[..], self.reading()),
+            |source| (source.companions(), source.reading()),
+        );
+        companions.iter().filter(move |companion| {
             companion
                 .targets()
                 .iter()
-                .any(|target| target.reading() == self.reading())
+                .any(|target| target.reading() == reading)
         })
     }
 
@@ -75,6 +82,9 @@ impl SelectedReading {
 
     /// Separate physical assurance follows the selected declaration and original producer.
     pub(crate) fn coverage(&self, fallback: Coverage) -> Coverage {
+        if let Some(source) = self.restored() {
+            return source.coverage();
+        }
         let declared = self
             .radius(CompanionKind::DeterministicBound)
             .is_ok_and(|value| value.is_some());
@@ -95,6 +105,18 @@ impl SelectedReading {
         kind: CompanionKind,
         limit: usize,
     ) -> Result<Option<(&super::super::RegionTicket, Layout)>, HeapError> {
+        if self.restored().is_some() {
+            let index = match kind {
+                CompanionKind::DeterministicBound => 1,
+                CompanionKind::NumericalError => 2,
+            };
+            let ticket = self
+                .group
+                .tickets
+                .get(index)
+                .ok_or(HeapError::MissingCoverage)?;
+            return Ok(Some((ticket, ticket.layout.clone())));
+        }
         let Some(companion) = self.radius(kind)? else {
             return Ok(None);
         };

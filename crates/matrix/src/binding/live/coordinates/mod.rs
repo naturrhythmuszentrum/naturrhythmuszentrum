@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Read-only mixed coordinate execution retains exact maps, selected copies and all deterministic errors.
+//! Mixed coordinate execution and native selections retain exact maps, selected copies and errors.
 
+mod covariance;
 mod input;
 mod lowering;
 mod norm;
 mod numeric;
+pub(crate) mod selection;
 
 pub use norm::CoordinateNorm;
 
@@ -43,7 +45,7 @@ pub enum CoordinateError {
     /// This evaluation requires an identity stored-coordinate reading and coherent physical input.
     #[error("unsupported coordinate reading map")]
     UnsupportedReading,
-    /// Statistical or nonidentity companion maps require a separately checked execution recipe.
+    /// Unsupported companion maps require a separately checked execution recipe.
     #[error("unsupported coordinate companion map")]
     UnsupportedCompanion,
     /// The recorded direction, exact references or arithmetic revision differs.
@@ -140,6 +142,8 @@ struct Snapshot<P: Scalar> {
     contract: CoordinateContract,
     /// Complete center, total and numerical-only arrays in the declared entry order.
     payload: numeric::Entries<P>,
+    /// Original covariance parameters transformed on both matching coordinate axes.
+    covariance: Vec<covariance::Parameter<P>>,
     /// Exact image and enclosed coefficients actually executed.
     lowered: Rc<lowering::Lowered<P>>,
     /// Distinguish dimensionless normalized coordinates from restored coherent coordinates.
@@ -171,6 +175,35 @@ impl<P: Scalar> CoordinateReading<P> {
     #[must_use]
     pub fn errors(&self) -> &[P] {
         &self.0.payload.errors
+    }
+    /// Number of retained covariance parameter arrays, in original companion order.
+    #[must_use]
+    pub fn covariance_count(&self) -> usize {
+        self.0.covariance.len()
+    }
+    /// Original covariance definition with both ordered target maps and shared source identity.
+    #[must_use]
+    pub fn covariance_definition(&self, index: usize) -> Option<&crate::CompanionAdapter<usize>> {
+        self.0
+            .covariance
+            .get(index)
+            .and_then(|parameter| self.source().companions().get(parameter.index))
+    }
+    /// Covariance centers in logical column order after both coordinate factors.
+    #[must_use]
+    pub fn covariance_centers(&self, index: usize) -> Option<&[P]> {
+        self.0
+            .covariance
+            .get(index)
+            .map(|parameter| parameter.centers.as_slice())
+    }
+    /// Separate numerical errors of the covariance parameters; never deterministic support bounds.
+    #[must_use]
+    pub fn covariance_errors(&self, index: usize) -> Option<&[P]> {
+        self.0
+            .covariance
+            .get(index)
+            .map(|parameter| parameter.errors.as_slice())
     }
     /// Actual ordered stored copies; duplicate storage never implies a fresh physical source.
     #[must_use]
@@ -211,7 +244,7 @@ impl Heap {
     /// Coefficients and all three output arrays are prepared privately before a result is returned.
     /// # Errors
     /// Refuses stale inputs, changed references, noncoherent input measures, nonidentity readings,
-    /// unsupported statistical companions, non-rational export, overflow and finite resources.
+    /// unsupported companion maps, non-rational export, overflow and finite resources.
     pub fn normalize_reading<P: Scalar + 'static>(
         &self,
         binding: &ReadingBinding<P>,
@@ -220,7 +253,7 @@ impl Heap {
         budget: &mut Budget,
     ) -> Result<CoordinateReading<P>, CoordinateError> {
         self.validate_reading(binding)?;
-        input::check(binding, contract, budget)?;
+        let covariance_indices = input::check(binding, contract, budget)?;
         let lowered = lowering::prepare::<P>(
             binding,
             &contract.0.normalize,
@@ -233,7 +266,7 @@ impl Heap {
             .bytes
             .checked_add(lowered.bytes)
             .ok_or(HeapError::ExtentOverflow)?;
-        let (payload, coverage) = budget.with_retained_payload(
+        let (payload, coverage, covariance) = budget.with_retained_payload(
             bytes,
             nrz_bindings::readings::algebra::Location::new("coordinate execution"),
             |budget| {
@@ -241,9 +274,18 @@ impl Heap {
                 Ok::<_, CoordinateError>((
                     numeric::evaluate(&input, &lowered.coefficients, context, budget)?,
                     coverage,
+                    covariance::capture(
+                        self,
+                        binding,
+                        &covariance_indices,
+                        &lowered.coefficients,
+                        context,
+                        budget,
+                    )?,
                 ))
             },
         )?;
+        let bytes = covariance::output(&covariance, bytes, budget)?;
         let bytes = numeric::output::<P>(payload.centers.len(), bytes, budget)?;
         Ok(CoordinateReading(Rc::new(Snapshot {
             previous: None,
@@ -251,6 +293,7 @@ impl Heap {
             source: binding.clone(),
             contract: contract.clone(),
             payload,
+            covariance,
             lowered: Rc::new(lowered),
             direction: CoordinateDirection::Normalize,
             coverage,
@@ -286,11 +329,18 @@ impl Heap {
             .bytes
             .checked_add(lowered.bytes)
             .ok_or(HeapError::ExtentOverflow)?;
-        let payload = budget.with_retained_payload(
+        let (payload, covariance) = budget.with_retained_payload(
             bytes,
             nrz_bindings::readings::algebra::Location::new("coordinate restoration"),
-            |budget| numeric::evaluate(&input.0.payload, &lowered.coefficients, context, budget),
+            |budget| {
+                let payload =
+                    numeric::evaluate(&input.0.payload, &lowered.coefficients, context, budget)?;
+                let covariance =
+                    covariance::restore(input, &lowered.coefficients, context, budget)?;
+                Ok::<_, CoordinateError>((payload, covariance))
+            },
         )?;
+        let bytes = covariance::output(&covariance, bytes, budget)?;
         let bytes = numeric::output::<P>(payload.centers.len(), bytes, budget)?;
         Ok(CoordinateReading(Rc::new(Snapshot {
             previous: Some(input.clone()),
@@ -298,6 +348,7 @@ impl Heap {
             source: input.0.source.clone(),
             contract: input.0.contract.clone(),
             payload,
+            covariance,
             lowered: Rc::new(lowered),
             direction: CoordinateDirection::Restore,
             coverage: input.0.coverage,

@@ -45,16 +45,21 @@ pub(crate) fn plan_with_budget(
     entries: &[EntryMeaning],
     resources: &mut nrz_bindings::Budget,
 ) -> TestResult<Plan> {
-    let mut case = Fixture::new(&[
-        ("z", matrix(2, 1)),
-        ("x", matrix(2, 1)),
-        ("v", real()),
-        ("i", real()),
-        ("p", matrix(2, 1)),
-        ("r", matrix(2, 1)),
-        ("e", matrix(2, 1)),
-        ("q", matrix(2, 1)),
-    ])?;
+    build(entries, resources, false)
+}
+
+/// A mixed cross-covariance fixture retains a second independent state on both ordered axes.
+pub(crate) fn covariance_plan(entries: &[EntryMeaning]) -> TestResult<Plan> {
+    build(entries, &mut ledger()?, true)
+}
+
+/// Extend the original deterministic state declaration only when ordered covariance is requested.
+fn build(
+    entries: &[EntryMeaning],
+    resources: &mut nrz_bindings::Budget,
+    covariance: bool,
+) -> TestResult<Plan> {
+    let mut case = declarations(covariance)?;
     let family = CoordinateFamily::new(
         &case.cas,
         &case.context,
@@ -71,7 +76,7 @@ pub(crate) fn plan_with_budget(
     )?;
     let voltage = component(&mut case, &whole, "v", 0)?;
     let current = component(&mut case, &whole, "i", 1)?;
-    let readings = vec![
+    let mut readings = vec![
         adapter(&mut case, &whole, "z", &[0, 1])?,
         adapter(&mut case, &voltage, "v", &[0])?,
         adapter(&mut case, &current, "i", &[1])?,
@@ -81,8 +86,13 @@ pub(crate) fn plan_with_budget(
     let second = relation(&mut case, &whole, &current, 1, resources)?;
     let second_work = resources.usage().work;
     let overlaps = vec![first, second];
-    let companions = prepare_companions(&mut case, &readings[0])?;
-    let coverage = ReadingCoverage::new(tickets(0, &[0, 1]), readings, overlaps, &mut ledger()?)?;
+    let mut companions = prepare_companions(&mut case, &readings[0])?;
+    let mut universe = tickets(0, &[0, 1]);
+    if covariance {
+        covariance_inventory(&mut case, entries, &mut readings, &mut companions)?;
+        universe.extend(tickets(3, &[0, 1]));
+    }
+    let coverage = ReadingCoverage::new(universe, readings, overlaps, &mut ledger()?)?;
     let frame = CoordinateNormalization::new(&mut case.cas, &case.context, entries, resources)?;
     let frame_work = resources.usage().work;
     let contract =
@@ -95,6 +105,33 @@ pub(crate) fn plan_with_budget(
         contract,
         construction,
     })
+}
+
+/// Optional statistical declarations leave the deterministic fixture header unchanged.
+fn declarations(covariance: bool) -> TestResult<Fixture> {
+    let mut declarations = vec![
+        ("z", matrix(2, 1)),
+        ("x", matrix(2, 1)),
+        ("v", real()),
+        ("i", real()),
+        ("p", matrix(2, 1)),
+        ("r", matrix(2, 1)),
+        ("e", matrix(2, 1)),
+        ("q", matrix(2, 1)),
+    ];
+    if covariance {
+        declarations.extend([
+            ("w", matrix(2, 1)),
+            ("y", matrix(2, 1)),
+            ("u", matrix(2, 2)),
+            ("s", matrix(2, 2)),
+            ("t", matrix(2, 2)),
+            ("h", matrix(2, 2)),
+            ("j", matrix(2, 2)),
+            ("k", matrix(2, 2)),
+        ]);
+    }
+    Fixture::new(&declarations)
 }
 
 /// Select one original state coordinate without creating an independent source.
@@ -234,4 +271,67 @@ pub(crate) fn import_with_budget(
         policy,
         budget,
     )?)
+}
+
+/// Distinct covariance parameters preserve shared and cross-source target order.
+fn covariance_inventory(
+    case: &mut Fixture,
+    entries: &[EntryMeaning],
+    readings: &mut Vec<ReadingAdapter<usize>>,
+    companions: &mut Vec<CompanionAdapter<usize>>,
+) -> TestResult {
+    let family = CoordinateFamily::new(
+        &case.cas,
+        &case.context,
+        &case.symbol("w")?,
+        entries.to_vec(),
+        &mut ledger()?,
+    )?;
+    let other = case.define(
+        &family,
+        "y",
+        SelectionSpec::Column(0),
+        AffineMap::identity(2, &mut ledger()?)?,
+        entries.to_vec(),
+    )?;
+    let symbol = case.symbol("w")?;
+    let representation = Representation::prove(
+        &mut case.cas,
+        &other,
+        RepresentationDefinition::Defined {
+            symbol,
+            expansion: AffineMap::identity(2, &mut ledger()?)?,
+        },
+        &mut ledger()?,
+    )?;
+    let other = ReadingAdapter::new(representation, tickets(3, &[0, 1]), &mut ledger()?)?;
+    for (region, input, output, targets) in [
+        (4, "u", "s", [readings[0].clone(), readings[0].clone()]),
+        (5, "t", "h", [readings[0].clone(), other.clone()]),
+        (6, "j", "k", [other.clone(), readings[0].clone()]),
+    ] {
+        let values = targets
+            .iter()
+            .map(|target| target.reading().clone())
+            .collect::<Vec<_>>();
+        let parameters = CompanionParameters::new(
+            &case.cas,
+            &case.context,
+            &case.symbol(input)?,
+            CompanionReadingKind::Covariance,
+            &values,
+            &mut ledger()?,
+        )?;
+        let symbol = case.symbol(output)?;
+        let covariance =
+            CompanionReading::define(&mut case.cas, &symbol, &parameters, &values, &mut ledger()?)?;
+        companions.push(CompanionAdapter::new(
+            covariance,
+            tickets(region, &[0, 1, 2, 3]),
+            targets.to_vec(),
+            &mut ledger()?,
+        )?);
+    }
+    readings.push(other);
+    Ok(())
 }

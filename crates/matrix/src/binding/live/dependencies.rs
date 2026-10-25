@@ -23,7 +23,7 @@ pub(crate) enum ReadDependencies {
 }
 
 /// Prepare all exact closures before storage allocation or result evaluation.
-pub(super) fn prepare(
+pub(crate) fn prepare(
     graph: Rc<Cas>,
     coverage: ReadingCoverage<usize>,
     companions: Vec<crate::CompanionAdapter<usize>>,
