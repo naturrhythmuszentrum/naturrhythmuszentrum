@@ -774,3 +774,20 @@ The shared public harness lives in `src/testing/`, included through the private 
 The library test binary privately includes `src/testing/mod.rs`, which composes shared public basics and crate-only frontier and frozen-search fixtures. `src/testing/common.rs` is compiled in both binaries. Crate-only fixture files are never reachable from the public entrypoint.
 
 The linter derives each inventory area from the test's location: inline unit tests carry `test:unit`, crate tests under `src/tests/` carry `test:crate`, and public conformance and integration tests carry `test:integration`. Every label is the final documentation line and keeps its acute-accent delimiters.
+
+## Ordinary decision-membership baseline · `sec:cas:decision-baseline`
+
+The certified-decision design in `docs/design/decision-nodes.md` requires two checked lemmas before a computed enclosure may supply a membership fact. The ordinary baseline admits a local frame restricted to the worked rational box, checks its assumed `ctx.hypothesis` membership, and runs `Task::Select` on that frame. Each fixture uses one native association with literal value three to isolate membership and selection costs; it proves no enclosure origin, integer option range, complete sign partition or seven-chart phase partition. The upper-left rectangle currently reaches `PendingPremise` in the exact region partition checker.
+
+|Fixture and lifecycle|Work|Minimum staged bytes|Minimum retained ceiling|Added graph bytes|Witness bytes|
+|---------------------|----|--------------------|------------------------|-----------------|-------------|
+|Integer membership|29,300|20,816|14,095|2,055|783|
+|Integer selection|956,428 generation; 1,715,691 checker|169,741|36,455|14,446|1,610|
+|Negative-sign membership|29,340|20,848|11,645|2,055|785|
+|Negative-sign selection|742,533 generation; 1,336,868 checker|168,496|30,199|14,392|1,391|
+|Upper-left membership|43,786|33,120|18,188|2,079|1,193|
+|Upper-left pending selection|208,643 generation|37,817|34,357|9,662|None|
+
+The integer box is `[203/64,205/64]` inside `[3,4)`, the sign box is `[-301/4,-299/4]`, and the upper-left rectangle is `[-7/4,-5/4] × [1/4,1/2]`. Retained ceilings include existing fixture syntax; they are distinct from added graph payload. Generation includes the optional response envelope, with an exact Work boundary for retaining that envelope. Checker Work has its own allowance. Pending selection retains a request record but no selection witness. Each admission call rolls back its own refused graph changes, while earlier successful calls and spent Work remain retained. Witness export checks its byte allowance before spending Work.
+
+Independent public tests pin the costs (`test:integration:decision-baseline-costs`), cumulative admission and prior usage (`test:integration:decision-baseline-admission-boundaries`), separate selection resources (`test:integration:decision-baseline-selection-boundaries`) and atomic export refusal (`test:integration:decision-baseline-export-boundaries`). Every permanent resource boundary uses the measured literal N and N−1; the disposable measurement searches are absent. These measurements supply no certified-membership kind, origin checker or new primitive authority.
