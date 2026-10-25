@@ -123,6 +123,50 @@ pub struct ReciprocalDerivativeEvaluation<P: Scalar> {
 }
 
 impl<P: Scalar + 'static> ReciprocalDerivativeEvaluation<P> {
+    /// Existing retained allowance for point arrays and the shared original contract.
+    pub(crate) fn native_payload_bytes(&self) -> Result<u64, HeapError> {
+        let count = self
+            .point
+            .len()
+            .checked_add(self.values.len())
+            .ok_or(HeapError::ExtentOverflow)?;
+        u64::try_from(count)
+            .map_err(|_| HeapError::ExtentOverflow)?
+            .checked_mul(256)
+            .and_then(|bytes| bytes.checked_add(self.contract.0.bytes))
+            .ok_or(HeapError::ExtentOverflow)
+    }
+
+    /// Numerical partials are lent only inside a binding that validated this exact point.
+    pub(crate) fn native_values(&self) -> &[Enclosure<P>] {
+        &self.values
+    }
+
+    /// Native admission authenticates each original selected reading under its exclusive lease.
+    pub(crate) fn validate_native(
+        &self,
+        heap: &Heap,
+        handles: &[crate::Handle<crate::Value, P>],
+        context: &ArithmeticContext,
+    ) -> Result<(), crate::OperationError> {
+        if self.revision != context.revision() || self.inputs.len() != handles.len() {
+            return Err(crate::StatisticsError::Contract.into());
+        }
+        for (input, handle) in self.inputs.iter().zip(handles) {
+            let expected = input.selected();
+            expected.validate(heap)?;
+            let actual = heap
+                .symbols
+                .selection(handle.key)
+                .ok_or(HeapError::MissingBinding)?;
+            actual.validate(heap)?;
+            if !Rc::ptr_eq(&actual.group, &expected.group) || actual.index != expected.index {
+                return Err(crate::StatisticsError::Contract.into());
+            }
+        }
+        Ok(())
+    }
+
     /// Exact theorem, which remains valid when this numerical evaluation becomes stale.
     #[must_use]
     pub const fn contract(&self) -> &ReciprocalDerivativeContract {

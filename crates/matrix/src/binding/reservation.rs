@@ -353,6 +353,9 @@ fn specifications<P: Scalar>(
         } else if let super::NativeRecipe::Kernel(contract)
         | super::NativeRecipe::Reciprocal {
             kernel: contract, ..
+        }
+        | super::NativeRecipe::ReciprocalStatistics {
+            kernel: contract, ..
         } = &operation.recipe
         {
             contract.coverage(inputs)?
@@ -368,6 +371,9 @@ fn specifications<P: Scalar>(
                 super::NativeRecipe::Copy => input.contributions.is_some(),
                 super::NativeRecipe::Kernel(contract)
                 | super::NativeRecipe::Reciprocal {
+                    kernel: contract, ..
+                }
+                | super::NativeRecipe::ReciprocalStatistics {
                     kernel: contract, ..
                 } => {
                     contract.kind() == crate::KernelKind::Product

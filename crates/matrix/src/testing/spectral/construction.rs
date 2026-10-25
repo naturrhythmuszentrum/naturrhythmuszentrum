@@ -16,7 +16,7 @@ use nrz_bindings::{
 
 /// Attached-before, separate-after and separate-before inventories use unchanged per-operation policies.
 pub(crate) fn construction(mode: usize, limits: [u64; 5]) -> TestResult<[u64; 7]> {
-    let (mut source, _, _) = original()?;
+    let (mut source, _, _) = original(Limits::default())?;
     let mut declaration = phase(limits[4])?;
     if mode == 2 {
         extra_header(&mut source, &mut declaration)?;

@@ -56,6 +56,13 @@ impl<P: Scalar + 'static> Plan<P> {
             }
             return Ok(());
         }
+        if matches!(operation.recipe, NativeRecipe::ReciprocalStatistics { .. }) {
+            self.lineage
+                .as_mut()
+                .ok_or(StatisticsError::Contract)?
+                .assurance = MomentAssurance::LinearizedMoments;
+            return Ok(());
+        }
         let NativeRecipe::Kernel(contract) = &operation.recipe else {
             return Ok(());
         };

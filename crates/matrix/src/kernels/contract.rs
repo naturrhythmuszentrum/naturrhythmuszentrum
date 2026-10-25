@@ -151,7 +151,10 @@ impl CheckedOperation {
         }
         if matches!(
             self.recipe,
-            NativeRecipe::Kernel(_) | NativeRecipe::Reciprocal { .. } | NativeRecipe::Solve(_)
+            NativeRecipe::Kernel(_)
+                | NativeRecipe::Reciprocal { .. }
+                | NativeRecipe::ReciprocalStatistics { .. }
+                | NativeRecipe::Solve(_)
         ) {
             return Ok(0..self.inputs.len());
         }

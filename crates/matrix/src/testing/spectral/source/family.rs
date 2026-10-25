@@ -22,8 +22,8 @@ pub(super) struct Family {
     pub(super) region: Handle,
 }
 
-pub(super) fn store(budget: &mut Budget) -> TestResult<Fixture> {
-    let mut cas = Cas::new(Limits::default())?;
+pub(super) fn store(limits: Limits, budget: &mut Budget) -> TestResult<Fixture> {
+    let mut cas = Cas::new(limits)?;
     let declarations = [
         ("L", Field::Real),
         ("C", Field::Real),

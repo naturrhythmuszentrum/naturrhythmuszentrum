@@ -128,10 +128,12 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> crate::Bound<'_, P, Q> {
             .outputs
             .first()
             .ok_or(OperationError::CandidateContract)?;
-        let private = match &self.operation.recipe {
-            crate::binding::NativeRecipe::Reciprocal { definition, .. } => Some(
-                crate::private::Run::new::<P>(&self.resources.trace, token, definition)?,
-            ),
+        let private = match self.operation.reciprocal_map() {
+            Some(definition) => Some(crate::private::Run::new::<P>(
+                &self.resources.trace,
+                token,
+                definition,
+            )?),
             _ => None,
         };
         let (payload, claim) = evaluate(contract, views, reservation, private.as_ref())?;

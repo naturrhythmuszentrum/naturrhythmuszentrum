@@ -87,6 +87,8 @@ pub struct Binding<P: Scalar, Q: Scalar = P> {
     pub(crate) inputs: Vec<Handle<Value, P>>,
     /// Explicit work and private scratch limits.
     pub(crate) limits: ExecutionLimits,
+    /// Caller-evaluated reciprocal Jacobian, retaining its exact original point and sources.
+    pub(crate) reciprocal_statistics: Option<std::rc::Rc<crate::ReciprocalDerivativeEvaluation<P>>>,
     /// Output scalar type, fixed independently of the input handle type.
     pub(crate) output: std::marker::PhantomData<Q>,
 }
@@ -104,6 +106,7 @@ impl<P: Scalar + 'static> Binding<P> {
             symbol_inputs: None,
             inputs,
             limits,
+            reciprocal_statistics: None,
             output: std::marker::PhantomData,
         }
     }
@@ -122,6 +125,7 @@ impl<P: Scalar + 'static> Binding<P> {
             symbol_inputs: Some(inputs),
             operation,
             limits,
+            reciprocal_statistics: None,
             output: std::marker::PhantomData,
         }
     }
@@ -153,6 +157,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             | NativeRecipe::Affine(_)
             | NativeRecipe::Kernel(_)
             | NativeRecipe::Reciprocal { .. }
+            | NativeRecipe::ReciprocalStatistics { .. }
             | NativeRecipe::Solve(_)
                 if P::PRECISION == Q::PRECISION => {}
             _ => return Err(HeapError::PrecisionMismatch.into()),
@@ -173,6 +178,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         let entries = payload_entries(&dependencies)?;
         if let NativeRecipe::Kernel(contract)
         | NativeRecipe::Reciprocal {
+            kernel: contract, ..
+        }
+        | NativeRecipe::ReciprocalStatistics {
             kernel: contract, ..
         } = &self.operation.recipe
         {
@@ -198,6 +206,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
             self.limits,
             &resources.trace,
             budget,
+            self.reciprocal_statistics,
         )?;
         if !matches!(self.operation.recipe, NativeRecipe::Solve(_)) {
             resources.completed_backend(

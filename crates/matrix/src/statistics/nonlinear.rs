@@ -22,9 +22,13 @@ pub(crate) fn map<P: Scalar + 'static, Q: Scalar + 'static>(
     slot: usize,
     points: &[Matrix<P>],
     derivative: Option<&CheckedSensitivity>,
+    reciprocal: Option<&crate::ReciprocalDerivativeEvaluation<P>>,
     context: &ArithmeticContext,
     run: &super::inventory::Run,
 ) -> Result<Affine<Q>, OperationError> {
+    if matches!(operation.recipe, NativeRecipe::ReciprocalStatistics { .. }) {
+        return super::reciprocal::map(operation, reciprocal, context, run);
+    }
     if let NativeRecipe::Kernel(contract) = &operation.recipe {
         match contract.kind() {
             crate::KernelKind::Product => {

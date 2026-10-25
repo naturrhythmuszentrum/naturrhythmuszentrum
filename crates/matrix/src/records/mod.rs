@@ -134,6 +134,7 @@ impl OperationRecord {
                 crate::binding::NativeRecipe::Solve(_)
                 | crate::binding::NativeRecipe::Kernel(_)
                 | crate::binding::NativeRecipe::Reciprocal { .. }
+                | crate::binding::NativeRecipe::ReciprocalStatistics { .. }
                 | crate::binding::NativeRecipe::Affine(_)
                 | crate::binding::NativeRecipe::Precision { .. },
                 _,

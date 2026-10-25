@@ -21,6 +21,8 @@ pub(crate) struct Plan<P: Scalar> {
     pub(crate) points: Vec<super::matrix::Matrix<P>>,
     /// Replayed bindings-owned native derivative relation, when required.
     pub(crate) derivative: Option<std::rc::Rc<nrz_bindings::CheckedSensitivity>>,
+    /// Caller-owned numerical derivative held only during this validated execution.
+    pub(crate) reciprocal: Option<std::rc::Rc<crate::ReciprocalDerivativeEvaluation<P>>>,
     /// Original statistical allocation plan, absent only for source-free operations.
     pub(crate) inventory: Option<super::inventory::Run>,
 }
@@ -33,6 +35,7 @@ impl<P: Scalar + 'static> Plan<P> {
         limits: ExecutionLimits,
         trace: &crate::execution::Trace,
         budget: &nrz_bindings::Budget,
+        reciprocal: Option<std::rc::Rc<crate::ReciprocalDerivativeEvaluation<P>>>,
     ) -> Result<Self, OperationError> {
         let joint = JointLimits::new(limits.scratch, limits.scratch, limits.work);
         let mut result = Self {
@@ -43,7 +46,9 @@ impl<P: Scalar + 'static> Plan<P> {
             points: Vec::new(),
             derivative: None,
             inventory: None,
+            reciprocal,
         };
+        super::reciprocal::validate(heap, operation, handles, result.reciprocal.as_deref())?;
         let mut present = false;
         for &handle in handles {
             present |= super::capture::present(heap, handle)?;
@@ -57,6 +62,9 @@ impl<P: Scalar + 'static> Plan<P> {
             return Err(StatisticsError::MissingSource { slot, entry: 0 }.into());
         }
         if !present {
+            if result.reciprocal.is_some() {
+                return Err(StatisticsError::MissingSource { slot: 0, entry: 0 }.into());
+            }
             return Ok(result);
         }
         if !operation.carries_statistics() {
@@ -171,6 +179,7 @@ impl CheckedOperation {
                 | NativeRecipe::Kernel(_)
                 | NativeRecipe::Affine(_)
                 | NativeRecipe::Precision { .. }
+                | NativeRecipe::ReciprocalStatistics { .. }
         )
     }
 }

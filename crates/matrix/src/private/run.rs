@@ -301,8 +301,8 @@ impl Run {
         bound: &crate::Bound<'_, P, Q>,
         candidate: &crate::Candidate<Q>,
     ) -> Result<Option<Box<ReciprocalInventory>>, OperationError> {
-        match (&bound.operation.recipe, &candidate.private) {
-            (crate::binding::NativeRecipe::Reciprocal { definition, .. }, Some(run)) => {
+        match (bound.operation.reciprocal_map(), &candidate.private) {
+            (Some(definition), Some(run)) => {
                 let payload = candidate.outputs.first().ok_or(Error::IncompleteCoverage)?;
                 run.validate(bound.execution, candidate.token, definition, payload)?;
                 let bytes = candidate
@@ -312,9 +312,7 @@ impl Run {
                     .ok_or(OperationError::ResourceLimit)?;
                 Ok(Some(run.completed(bytes)))
             }
-            (crate::binding::NativeRecipe::Reciprocal { .. }, None) => {
-                Err(Error::IncompleteCoverage.into())
-            }
+            (Some(_), None) => Err(Error::IncompleteCoverage.into()),
             (_, Some(_)) => Err(Error::ForeignInventory.into()),
             (_, None) => Ok(None),
         }

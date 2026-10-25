@@ -81,7 +81,9 @@ pub(crate) fn map<P: Scalar + 'static>(
         NativeRecipe::Affine(contracts) => {
             super::conversion::map(operation, contracts, slot, &mut result, context)?;
         }
-        NativeRecipe::Solve(_) | NativeRecipe::Reciprocal { .. } => {
+        NativeRecipe::Solve(_)
+        | NativeRecipe::Reciprocal { .. }
+        | NativeRecipe::ReciprocalStatistics { .. } => {
             return Err(StatisticsError::Unsupported.into());
         }
     }

@@ -73,6 +73,7 @@ impl<P: Scalar + 'static> Plan<P> {
             slot,
             &self.points,
             self.derivative.as_deref(),
+            self.reciprocal.as_deref(),
             context,
             run,
         )?;

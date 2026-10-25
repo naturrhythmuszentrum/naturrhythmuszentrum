@@ -106,6 +106,7 @@ impl CheckedOperation {
     pub fn reciprocal_map(&self) -> Option<&nrz_bindings::readings::PositiveReciprocalMap> {
         match &self.recipe {
             NativeRecipe::Reciprocal { definition, .. } => Some(definition),
+            NativeRecipe::ReciprocalStatistics { definition, .. } => Some(&definition.map),
             _ => None,
         }
     }
@@ -214,6 +215,13 @@ pub(crate) enum NativeRecipe {
         kernel: Rc<crate::kernels::KernelContract>,
         /// Original physical references and complete exact correspondence.
         definition: std::rc::Rc<nrz_bindings::readings::PositiveReciprocalMap>,
+    },
+    /// Original reciprocal law with its shared exact source-Jacobian identity.
+    ReciprocalStatistics {
+        /// The same deterministic numerical schedule and full-box domain guard.
+        kernel: Rc<crate::kernels::KernelContract>,
+        /// Retained original map and exact derivative, independent of numerical point storage.
+        definition: Rc<crate::statistics::reciprocal::Definition>,
     },
     /// Square solve under an independent inverse-defect and residual theorem.
     Solve(Rc<crate::solve::SolveContract>),

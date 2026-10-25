@@ -46,18 +46,37 @@ pub(crate) struct Fixture {
 impl Fixture {
     /// All exact evidence and complete input declarations precede numerical input access.
     pub(crate) fn new(references: [&str; 3]) -> TestResult<Self> {
-        Self::build(references, false, [Limits::default().work; 2])
+        Self::build(
+            references,
+            false,
+            [Limits::default().work; 2],
+            Limits::default(),
+        )
     }
     /// Every Complex root, Real component and companion is predeclared for publication.
     pub(crate) fn with_outputs(references: [&str; 3]) -> TestResult<Self> {
-        Self::build(references, true, [Limits::default().work; 2])
+        Self::build(
+            references,
+            true,
+            [Limits::default().work; 2],
+            Limits::default(),
+        )
     }
     /// Physical and output declaration transactions honor exact caller Work ceilings separately.
     pub(crate) fn with_construction_limits(work: [u64; 2]) -> TestResult<Self> {
-        Self::build(["5", "1/10", "1/2000"], true, work)
+        Self::build(["5", "1/10", "1/2000"], true, work, Limits::default())
     }
-    fn build(references: [&str; 3], with_outputs: bool, work: [u64; 2]) -> TestResult<Self> {
-        let (mut source, coverage, parameters) = original()?;
+    /// An explicit derivative policy must also own the permanent graph ceilings.
+    pub(crate) fn with_store_limits(references: [&str; 3], limits: Limits) -> TestResult<Self> {
+        Self::build(references, false, [Limits::default().work; 2], limits)
+    }
+    fn build(
+        references: [&str; 3],
+        with_outputs: bool,
+        work: [u64; 2],
+        limits: Limits,
+    ) -> TestResult<Self> {
+        let (mut source, coverage, parameters) = original(limits)?;
         let mut construction = Budget::new(Limits {
             work: work[0],
             ..Limits::default()
@@ -217,8 +236,8 @@ fn symbol(
 }
 
 /// Original complete root coverage is constructed and replayed before physical transport.
-fn original() -> TestResult<(source::Fixture, RootCoverage, [Handle; 2])> {
-    let (mut source, request) = source::original([1, 1], &mut source::ledger()?)?;
+fn original(limits: Limits) -> TestResult<(source::Fixture, RootCoverage, [Handle; 2])> {
+    let (mut source, request) = source::original([1, 1], limits, &mut source::ledger()?)?;
     let parameters = [
         source.real.clone(),
         source::expression(

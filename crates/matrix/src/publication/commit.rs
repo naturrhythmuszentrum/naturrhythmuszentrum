@@ -110,6 +110,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
             crate::binding::NativeRecipe::Kernel(contract)
             | crate::binding::NativeRecipe::Reciprocal {
                 kernel: contract, ..
+            }
+            | crate::binding::NativeRecipe::ReciprocalStatistics {
+                kernel: contract, ..
             } => {
                 let Some(crate::RecipeEvidence::Kernel(claim)) = evidence else {
                     return Err(OperationError::CandidateContract);

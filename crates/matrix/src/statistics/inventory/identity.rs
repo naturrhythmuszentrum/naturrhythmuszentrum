@@ -86,6 +86,16 @@ fn same_recipe(original: &NativeRecipe, actual: &NativeRecipe) -> bool {
                 definition: second,
             },
         ) => Rc::ptr_eq(left, right) && Rc::ptr_eq(first, second),
+        (
+            NativeRecipe::ReciprocalStatistics {
+                kernel: left,
+                definition: first,
+            },
+            NativeRecipe::ReciprocalStatistics {
+                kernel: right,
+                definition: second,
+            },
+        ) => Rc::ptr_eq(left, right) && Rc::ptr_eq(first, second),
         _ => false,
     }
 }

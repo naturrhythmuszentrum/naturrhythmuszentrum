@@ -227,7 +227,7 @@ fn inputs(fixture: &Fixture) -> TestResult<Inputs> {
 }
 
 /// A deterministic validated copy exposes public dependency handles without recording an operation.
-fn capture_handles<P: Scalar + 'static>(
+pub(super) fn capture_handles<P: Scalar + 'static>(
     heap: &mut Heap,
     selected: &[ValueBinding<P>],
 ) -> TestResult<[Handle<Value, P>; 2]> {
@@ -248,7 +248,7 @@ fn capture_handles<P: Scalar + 'static>(
 }
 
 /// Each target keeps its exact alias key and ordered base coordinates.
-fn capture_targets<P: Scalar + 'static>(
+pub(super) fn capture_targets<P: Scalar + 'static>(
     heap: &Heap,
     handles: [Handle<Value, P>; 2],
 ) -> TestResult<[TargetMap<P>; 2]> {
@@ -259,7 +259,7 @@ fn capture_targets<P: Scalar + 'static>(
 }
 
 /// One rank-one factor declares the shared fluctuation without an independence inference.
-fn joint_model<P: Scalar + 'static>(
+pub(super) fn joint_model<P: Scalar + 'static>(
     selected: &[ValueBinding<P>],
     coefficients: &[P],
 ) -> TestResult<JointModel<P>> {
