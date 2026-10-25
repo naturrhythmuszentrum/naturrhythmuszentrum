@@ -48,10 +48,11 @@ pub use binding::{
     OperatorAdapter, PhasorAllocation, PhasorAllocationChannel, PhasorAllocationStage, PhasorError,
     PhasorEvaluation, PhasorInventory, PhasorOperand, PhasorProduct, PhasorPublication,
     PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication,
-    PhasorStatistics, PhasorTransferBounds, PhasorTransferredResidual, PublishedLcSpectrum,
-    PublishedPhasor, PublishedPhasorSolve, ReadingAdapter, ReadingAdapterError, ReadingBinding,
-    ReadingCoverage, ReadingImport, ReadingRegion, ReadingSelection, ReciprocalDerivativeContract,
-    ReciprocalDerivativeError, ReciprocalDerivativeEvaluation, SpectralError, SpectralValue,
+    PhasorStatistics, PhasorTransferBounds, PhasorTransferredResidual, PiCoordinateContract,
+    PublishedLcSpectrum, PublishedPhasor, PublishedPhasorSolve, ReadingAdapter,
+    ReadingAdapterError, ReadingBinding, ReadingCoverage, ReadingImport, ReadingRegion,
+    ReadingSelection, ReciprocalDerivativeContract, ReciprocalDerivativeError,
+    ReciprocalDerivativeEvaluation, SpectralError, SpectralValue,
 };
 pub use binding::{
     Binding, Bound, CheckedOperation, CompanionSnapshot, ExecutionId, ExecutionLimits,
@@ -168,13 +169,14 @@ mod conversion;
     reason = "lowered descriptor maps are shared by the numerical conversion recipes"
 )]
 mod coordinate_numeric;
+pub use coordinate_numeric::ConstantCoefficient;
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/joint_twins.rs"]
 mod joint_twins;
 pub use conversion::{
-    ConstantEvidence, ConversionContract, ConversionError, ConversionEvidence, ConversionMode,
-    PiConstant, PiConstantEvidence, PiConversionEvidence, PiConversionUse, PrecisionContract,
-    PrecisionEvidence, RecipeEvidence,
+    CertifiedCoefficient, ConstantEvidence, ConversionContract, ConversionError,
+    ConversionEvidence, ConversionMode, PiConstant, PiConstantEvidence, PiConversionEvidence,
+    PiConversionUse, PrecisionContract, PrecisionEvidence, RecipeEvidence,
 };
 
 #[cfg(test)]

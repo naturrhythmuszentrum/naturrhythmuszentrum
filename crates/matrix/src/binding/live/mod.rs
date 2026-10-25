@@ -33,7 +33,9 @@ mod copies;
 pub use copies::CopyDiscrepancy;
 pub(crate) mod dependencies;
 
-pub use coordinates::{CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading};
+pub use coordinates::{
+    CoordinateContract, CoordinateError, CoordinateNorm, CoordinateReading, PiCoordinateContract,
+};
 mod import;
 pub(crate) mod invalidation;
 pub(crate) mod results;

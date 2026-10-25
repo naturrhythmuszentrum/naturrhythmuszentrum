@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Mixed coordinate execution and native selections retain exact maps, selected copies and errors.
 
+mod certified;
 mod covariance;
+mod execution;
+mod resources;
+pub use certified::PiCoordinateContract;
 mod input;
 mod lowering;
 mod norm;
@@ -33,6 +37,9 @@ pub enum CoordinateError {
     /// Typed references, exact correspondence or rational coefficient export refused.
     #[error("coordinate definition: {0}")]
     Reading(#[from] ReadingError),
+    /// Exact constant recognition or its certified numerical coefficient refused.
+    #[error("coordinate constant: {0}")]
+    Constant(#[from] crate::ConversionError),
     /// The cumulative exact and numerical lowering allowance was exhausted.
     #[error("coordinate resources: {0}")]
     Exact(#[from] nrz_bindings::readings::algebra::Fault),
@@ -225,6 +232,11 @@ impl<P: Scalar> CoordinateReading<P> {
     pub fn coverage(&self) -> Coverage {
         self.0.coverage
     }
+    /// Shared pi evidence when this snapshot used explicitly certified coordinate coefficients.
+    #[must_use]
+    pub fn constant(&self) -> Option<&crate::PiConstant<P>> {
+        self.0.lowered.pi.as_ref()
+    }
     /// Exact per-entry image that covers all lowered scales, offsets and result entries.
     #[must_use]
     pub fn image(&self) -> &CoordinateImage {
@@ -232,7 +244,7 @@ impl<P: Scalar> CoordinateReading<P> {
     }
     /// Coefficient enclosures in scale/offset order for each logical coordinate.
     #[must_use]
-    pub fn coefficients(&self) -> &[[nrz_scalar::DecodedLiteral<P>; 2]] {
+    pub fn coefficients(&self) -> &[[crate::ConstantCoefficient<P>; 2]] {
         &self.0.lowered.coefficients
     }
 }
@@ -261,10 +273,30 @@ impl Heap {
             context,
             budget,
         )?;
+        self.finish_normalize(
+            binding,
+            contract,
+            Rc::new(lowered),
+            &covariance_indices,
+            context,
+            budget,
+        )
+    }
+
+    /// Execute and retain the complete arrays after the chosen lowering has been authenticated.
+    fn finish_normalize<P: Scalar + 'static>(
+        &self,
+        binding: &ReadingBinding<P>,
+        contract: &CoordinateContract,
+        lowered: Rc<lowering::Lowered<P>>,
+        covariance_indices: &[usize],
+        context: &ArithmeticContext,
+        budget: &mut Budget,
+    ) -> Result<CoordinateReading<P>, CoordinateError> {
         let bytes = contract
             .0
             .bytes
-            .checked_add(lowered.bytes)
+            .checked_add(lowered.bytes()?)
             .ok_or(HeapError::ExtentOverflow)?;
         let (payload, coverage, covariance) = budget.with_retained_payload(
             bytes,
@@ -277,7 +309,7 @@ impl Heap {
                     covariance::capture(
                         self,
                         binding,
-                        &covariance_indices,
+                        covariance_indices,
                         &lowered.coefficients,
                         context,
                         budget,
@@ -294,7 +326,7 @@ impl Heap {
             contract: contract.clone(),
             payload,
             covariance,
-            lowered: Rc::new(lowered),
+            lowered,
             direction: CoordinateDirection::Normalize,
             coverage,
             revision: context.revision(),
@@ -324,10 +356,20 @@ impl Heap {
             context,
             budget,
         )?;
+        Self::finish_restore(input, Rc::new(lowered), context, budget)
+    }
+
+    /// Restore from the exact coefficient region selected by the original execution contract.
+    fn finish_restore<P: Scalar + 'static>(
+        input: &CoordinateReading<P>,
+        lowered: Rc<lowering::Lowered<P>>,
+        context: &ArithmeticContext,
+        budget: &mut Budget,
+    ) -> Result<CoordinateReading<P>, CoordinateError> {
         let bytes = input
             .0
             .bytes
-            .checked_add(lowered.bytes)
+            .checked_add(lowered.bytes()?)
             .ok_or(HeapError::ExtentOverflow)?;
         let (payload, covariance) = budget.with_retained_payload(
             bytes,
@@ -349,7 +391,7 @@ impl Heap {
             contract: input.0.contract.clone(),
             payload,
             covariance,
-            lowered: Rc::new(lowered),
+            lowered,
             direction: CoordinateDirection::Restore,
             coverage: input.0.coverage,
             revision: context.revision(),

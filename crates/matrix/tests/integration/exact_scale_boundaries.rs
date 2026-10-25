@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Existing rational-only matrix schema boundaries refuse exact pi coefficients by name.
+//! Exact schema constants retain pi without claiming rational numerical export.
 
 use nrz_bindings::{Descriptor, Kind, Measure, Role, Scale, UnitError};
 use nrz_matrix::{
-    Axis, AxisEntry, CoordinateMap, ExactCoefficient, Partition, ReferenceScale, ShapeError,
-    ShapeLimits,
+    Axis, AxisEntry, CoordinateMap, ExactCoefficient, Partition, ReferenceScale, ShapeLimits,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -17,10 +16,10 @@ fn pi_ratio() -> TestResult<Descriptor> {
     )?)
 }
 
-/// Normalization references need a future numerical pi enclosure before entering the old map path.
-/// ´test:integration:coordinate-reference-refuses-irrational-export´
+/// Positive pi references preserve exact reciprocal maps and their independent definition identity.
+/// ´test:integration:coordinate-reference-retains-irrational-definition´
 #[test]
-fn coordinate_reference_refuses_irrational_export() -> TestResult {
+fn coordinate_reference_retains_irrational_definition() -> TestResult {
     let quantity = Descriptor::ratio();
     let limits = ShapeLimits::default();
     let axis = Axis::new(
@@ -29,26 +28,36 @@ fn coordinate_reference_refuses_irrational_export() -> TestResult {
         limits,
     )?;
     let reference = ReferenceScale::new("pi", &pi_ratio()?)?;
-    assert!(matches!(
-        CoordinateMap::check(&axis, vec![reference], vec![None], limits),
-        Err(ShapeError::Units(UnitError::UnsupportedExactConstantExport))
-    ));
+    let checked = CoordinateMap::check(&axis, vec![reference.clone()], vec![None], limits)?;
+    assert_eq!(checked.references(), std::slice::from_ref(&reference));
+    let normalize = checked.normalization().first().ok_or("normalization")?;
+    let restore = checked.restoration().first().ok_or("restoration")?;
+    assert_eq!(restore.scale, *pi_ratio()?.measure().scale());
+    assert_eq!(
+        normalize.apply_exact(&restore.scale)?,
+        *Measure::coherent().scale()
+    );
+    assert_ne!(reference, ReferenceScale::new("pi", &pi_ratio()?)?);
     Ok(())
 }
 
-/// Structural coefficient arithmetic cannot reinterpret pi as a rational stored coefficient.
-/// ´test:integration:structural-coefficient-refuses-irrational-export´
+/// Irrational units and explicit factors retain their exact definitions and refuse rational export.
+/// ´test:integration:structural-coefficient-retains-irrational-definition´
 #[test]
-fn structural_coefficient_refuses_irrational_export() -> TestResult {
+fn structural_coefficient_retains_irrational_definition() -> TestResult {
+    let definition = pi_ratio()?;
+    let coefficient = ExactCoefficient::unit(&definition)?;
+    assert_eq!(coefficient.descriptor(), &Descriptor::ratio());
+    assert_eq!(coefficient.exact_map().scale, *definition.measure().scale());
     assert_eq!(
-        ExactCoefficient::unit(&pi_ratio()?),
-        Err(ShapeError::Units(UnitError::UnsupportedExactConstantExport))
+        coefficient.exact_map().rational_scale(),
+        Err(UnitError::UnsupportedExactConstantExport)
     );
     let unit = Measure::coherent();
     let irrational = pi_ratio()?.conversion_to(&Descriptor::ratio())?;
     assert_eq!(
-        ExactCoefficient::new(&Descriptor::ratio(), &irrational),
-        Err(ShapeError::Units(UnitError::UnsupportedExactConstantExport))
+        ExactCoefficient::new(&Descriptor::ratio(), &irrational)?,
+        coefficient
     );
     assert_eq!(
         unit.rational_scale()?,

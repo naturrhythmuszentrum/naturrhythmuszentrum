@@ -7,7 +7,7 @@
 //!
 //! Conversion checks dimension, kind and role before composing scales in the CAS. For example `(pi/180)/(2*pi)` reduces to the exact Rational `1/360`. Measure origins remain rational; a point conversion's shift may be irrational because it divides the origin difference by the target scale. Differences have exact zero shifts and zero measure offsets. `Conversion::apply_exact` accepts source-free exact coordinates; `apply` additionally requires its exact result to be rational. Neither API accepts stored heap values. Companion products, variances, formal sensitivity quotients and original coordinate checking retain the exact scale graph.
 //!
-//! `Conversion::export_scale` exports signed or zero rational structural coefficients as bounded exact literals for numerical owners, and refuses a non-rational coefficient by name. The quantity stage must enclose pi-dependent constants once per exact map, precision and arithmetic revision, retain their evaluation error, and share eligible invariant evaluations. The implemented export surface retains exact descriptor meaning and explicit refusal; it supplies no numerical pi kernel or heap materialization.
+//! `Conversion::export_scale` exports signed or zero rational structural coefficients as bounded exact literals for numerical owners, and refuses a non-rational coefficient by name. `ExactEnclosureExport` separately recognizes rational factors of pi without changing that rational-only boundary. Matrix certified coefficient and coordinate owners retain the exact definition, precision, arithmetic revision and complete evaluation error while sharing the original pi region. Bindings supplies no numerical pi kernel or heap materialization.
 
 use nrz_cas::{ExactConstant, PositiveConstant, Rational};
 

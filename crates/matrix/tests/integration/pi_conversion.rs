@@ -14,7 +14,11 @@ mod budgets;
 #[path = "pi_conversion/lifecycle.rs"]
 mod lifecycle;
 #[path = "pi_conversion/oracle.rs"]
-mod oracle;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent pi bounds serve multiple public integration fixtures"
+)]
+pub(crate) mod oracle;
 #[path = "pi_conversion/roundtrip.rs"]
 mod roundtrip;
 #[path = "pi_conversion/statistics.rs"]
@@ -36,7 +40,7 @@ fn owner() -> TestResult<Rc<CheckedDeclarations>> {
 }
 
 /// An explicit bounded allowance for exact factor recognition.
-fn exact_policy() -> LimitsOverride {
+pub(super) fn exact_policy() -> LimitsOverride {
     LimitsOverride {
         staged_payload_bytes: Some(65_536),
         output_bytes: Some(16_384),
@@ -45,7 +49,7 @@ fn exact_policy() -> LimitsOverride {
 }
 
 /// Materialize the measured scalar enclosure and its reciprocal exactly once.
-fn pi<P: Scalar + 'static>(
+pub(super) fn pi<P: Scalar + 'static>(
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> TestResult<PiConstant<P>> {
@@ -166,3 +170,9 @@ fn conversion<P: Scalar + 'static>(
     }
     Ok(result)
 }
+
+#[path = "pi_conversion/coordinates.rs"]
+mod coordinates;
+
+#[path = "pi_conversion/unit.rs"]
+mod unit;

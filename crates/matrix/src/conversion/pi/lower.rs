@@ -4,13 +4,12 @@
 use super::{ConversionError, PiConstant};
 use crate::{
     ConversionContract,
-    coordinate_numeric::{Coefficient, LoweredMap},
+    coordinate_numeric::{ConstantCoefficient, LoweredMap},
 };
 use nrz_bindings::{
-    Budget, DescriptorConstant, Limits, LimitsOverride, PiFactor,
-    readings::algebra::limits::BudgetKind,
+    Budget, DescriptorConstant, Limits, LimitsOverride, readings::algebra::limits::BudgetKind,
 };
-use nrz_scalar::{ArithmeticContext, LiteralLimits, NumericLiteral, Scalar};
+use nrz_scalar::{ArithmeticContext, LiteralLimits, Scalar};
 use std::rc::Rc;
 
 /// One immutable pair of coefficients and its shared original pi materialization.
@@ -217,7 +216,7 @@ fn coefficient<P: Scalar + 'static>(
     literals: LiteralLimits,
     context: &ArithmeticContext,
     available: u64,
-) -> Result<Coefficient<P>, ConversionError> {
+) -> Result<ConstantCoefficient<P>, ConversionError> {
     let mut policy = exact.clone();
     policy.work = Some(
         policy
@@ -226,36 +225,15 @@ fn coefficient<P: Scalar + 'static>(
             .min(available),
     );
     let exported = constant.enclosure_export(&policy)?;
-    let remaining = available
-        .checked_sub(exported.work_used())
-        .ok_or(ConversionError::ResourceLimit)?;
-    let limits = LiteralLimits::new(
-        literals.max_digits(),
-        literals.max_exponent(),
-        literals.max_work().min(remaining),
-    );
-    let decoded = NumericLiteral::new(exported.rational_factor(), limits)?.decode::<P>(context)?;
-    let work = exported
-        .work_used()
-        .checked_add(decoded.work_used())
-        .ok_or(ConversionError::ResourceLimit)?;
-    if exported.pi_factor() == PiFactor::Rational {
-        return Coefficient::enclosed(
-            decoded.enclosure(),
-            work.checked_add(1)
-                .filter(|work| *work <= available)
-                .ok_or(ConversionError::ResourceLimit)?,
-            context,
-        );
-    }
-    let work = work
-        .checked_add(2)
-        .filter(|work| *work <= available)
-        .ok_or(ConversionError::ResourceLimit)?;
-    let factor = match exported.pi_factor() {
-        PiFactor::Multiply => pi.pi().enclosure(),
-        PiFactor::Divide => pi.reciprocal(),
-        PiFactor::Rational => return Err(ConversionError::Contract),
-    };
-    Coefficient::enclosed(decoded.enclosure().mul(factor, context)?, work, context)
+    super::coefficient::decode(
+        (
+            exported.rational_factor(),
+            exported.pi_factor(),
+            exported.work_used(),
+        ),
+        pi,
+        literals,
+        context,
+        available,
+    )
 }

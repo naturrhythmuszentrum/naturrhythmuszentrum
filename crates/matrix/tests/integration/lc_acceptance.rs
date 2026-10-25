@@ -156,3 +156,6 @@ fn operator_oracle(heap: &Heap, bundle: nrz_matrix::PublishedBundle<f64>) -> Tes
     }
     Ok(())
 }
+
+#[path = "lc_acceptance/pi_coordinates.rs"]
+mod pi_coordinates;

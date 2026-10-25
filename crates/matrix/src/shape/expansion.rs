@@ -37,11 +37,11 @@ impl ExactCoefficient {
         }
         let value = descriptor
             .conversion_to(&descriptor.coherent())?
-            .apply(definition.rational_scale()?)?;
+            .apply_exact(&definition.scale)?;
         Ok(Self {
             descriptor: descriptor.coherent(),
             value: Conversion {
-                scale: value.into(),
+                scale: value,
                 shift: Measure::coherent().offset().clone().into(),
             },
         })
@@ -73,7 +73,7 @@ impl ExactCoefficient {
         &self.descriptor
     }
 
-    /// Exact constant factor with zero shift; numerical lowering remains unimplemented.
+    /// Exact constant factor with zero shift; `crate::CertifiedCoefficient` encloses admitted pi factors.
     #[must_use]
     pub const fn exact_map(&self) -> &Conversion {
         &self.value

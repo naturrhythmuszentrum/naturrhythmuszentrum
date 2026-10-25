@@ -2,12 +2,13 @@
 //! Covariance remains a declared parameter with two ordered coordinate factors and its own error.
 
 use super::{CoordinateError, CoordinateReading, ReadingBinding};
+use crate::ConstantCoefficient;
 use crate::{Heap, HeapError};
 use nrz_bindings::{
     Budget,
     readings::algebra::{Location, limits::BudgetKind},
 };
-use nrz_scalar::{ArithmeticContext, DecodedLiteral, Enclosure, Finite, Scalar};
+use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
 /// No copied descriptor graph or invented independent source accompanies a parameter array.
 #[derive(Debug)]
@@ -25,7 +26,7 @@ pub(super) fn capture<P: Scalar + 'static>(
     heap: &Heap,
     source: &ReadingBinding<P>,
     indices: &[usize],
-    coefficients: &[[DecodedLiteral<P>; 2]],
+    coefficients: &[[ConstantCoefficient<P>; 2]],
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> Result<Vec<Parameter<P>>, CoordinateError> {
@@ -65,7 +66,7 @@ pub(super) fn capture<P: Scalar + 'static>(
 /// Restoration reuses both original target identities and propagates prior parameter errors once.
 pub(super) fn restore<P: Scalar>(
     input: &CoordinateReading<P>,
-    coefficients: &[[DecodedLiteral<P>; 2]],
+    coefficients: &[[ConstantCoefficient<P>; 2]],
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> Result<Vec<Parameter<P>>, CoordinateError> {
@@ -105,7 +106,7 @@ pub(super) fn restore<P: Scalar>(
 fn evaluate<P: Scalar>(
     source: &ReadingBinding<P>,
     input: &Parameter<P>,
-    coefficients: &[[DecodedLiteral<P>; 2]],
+    coefficients: &[[ConstantCoefficient<P>; 2]],
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> Result<Parameter<P>, CoordinateError> {
@@ -164,7 +165,7 @@ fn evaluate<P: Scalar>(
 fn factor<P: Scalar>(
     matched: bool,
     index: usize,
-    coefficients: &[[DecodedLiteral<P>; 2]],
+    coefficients: &[[ConstantCoefficient<P>; 2]],
 ) -> Result<(P, Enclosure<P>), CoordinateError> {
     if matched {
         let pair = coefficients.get(index).ok_or(CoordinateError::Identity)?;
@@ -185,20 +186,30 @@ fn reserve<P: Scalar>(
     channels: usize,
     budget: &Budget,
 ) -> Result<(), CoordinateError> {
-    let values = coordinates
-        .checked_mul(channels)
-        .and_then(|count| count.checked_mul(std::mem::size_of::<P>()))
-        .ok_or(HeapError::ExtentOverflow)?;
-    let bytes = bytes::<P>(count, parameters)?
-        .checked_mul(2)
-        .and_then(|value| value.checked_add(u64::try_from(values).ok()?))
-        .ok_or(HeapError::ExtentOverflow)?;
-    budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
+    budget.check(
+        BudgetKind::StagedPayloadBytes,
+        staged_bytes::<P>(count, parameters, coordinates, channels)?,
+        AT,
+    )?;
     Ok(())
 }
 
+/// Planning and allocation admission share the same simultaneous parameter/channel extent.
+pub(super) fn staged_bytes<P: Scalar>(
+    count: usize,
+    parameters: usize,
+    coordinates: usize,
+    channels: usize,
+) -> Result<u64, CoordinateError> {
+    let values = super::numeric::array_bytes::<P>(coordinates, channels)?;
+    bytes::<P>(count, parameters)?
+        .checked_mul(2)
+        .and_then(|value| value.checked_add(values))
+        .ok_or_else(|| HeapError::ExtentOverflow.into())
+}
+
 /// Both parameter channels and their fixed metadata remain part of the retained snapshot.
-fn bytes<P: Scalar>(count: usize, parameters: usize) -> Result<u64, CoordinateError> {
+pub(super) fn bytes<P: Scalar>(count: usize, parameters: usize) -> Result<u64, CoordinateError> {
     let entries = count
         .checked_mul(2 * std::mem::size_of::<P>())
         .ok_or(HeapError::ExtentOverflow)?;

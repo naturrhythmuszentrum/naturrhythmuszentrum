@@ -71,8 +71,9 @@ pub use admission::{
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};
 pub use constants::{
-    CheckedMap, ConstantEnclosureExport, ConstantKind, DescriptorConstant, MapCoordinates,
-    MapError, MapIdentity, MapKind, OriginDefinition, PiFactor, ReferenceDefinition,
+    CheckedMap, ConstantEnclosureExport, ConstantKind, DescriptorConstant, ExactEnclosureExport,
+    MapCoordinates, MapError, MapIdentity, MapKind, OriginDefinition, PiFactor,
+    ReferenceDefinition,
 };
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};

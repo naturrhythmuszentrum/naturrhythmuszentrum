@@ -51,36 +51,109 @@ impl DescriptorConstant {
         &self,
         limits: &LimitsOverride,
     ) -> Result<ConstantEnclosureExport<'_>, MapError> {
-        let mut ledger = Budget::new(Limits::default().resolve(limits)?)?;
-        let metadata = u64::try_from(size_of::<ConstantEnclosureExport<'_>>())
-            .map_err(|_| UnitError::UnsupportedExactConstantExport)?;
-        let (factor, pi) = ledger.with_retained_payload(
-            metadata,
-            Location::new("constant enclosure export"),
-            |ledger| recognize(self.exact(), ledger),
-        )?;
-        let bytes = size_of::<ConstantEnclosureExport<'_>>()
-            .checked_add(factor.capacity())
-            .ok_or(UnitError::UnsupportedExactConstantExport)?;
-        let count = u64::try_from(bytes).map_err(|_| UnitError::UnsupportedExactConstantExport)?;
-        ledger.check(
-            BudgetKind::StagedPayloadBytes,
-            count,
-            Location::new("constant enclosure export"),
-        )?;
-        ledger.check(
-            BudgetKind::OutputBytes,
-            count,
-            Location::new("constant enclosure export"),
+        let (factor, pi, work, bytes) = export(
+            self.exact(),
+            size_of::<ConstantEnclosureExport<'_>>(),
+            limits,
         )?;
         Ok(ConstantEnclosureExport {
             definition: self,
             factor,
             pi,
-            work: ledger.usage().work,
+            work,
             bytes,
         })
     }
+}
+
+/// Borrowed exact coefficient export for live maps and typed structural constants.
+///
+/// The caller retains the original typed owner and graph position. This export
+/// certifies only the admitted exact rational factor and pi operation.
+#[derive(Debug)]
+pub struct ExactEnclosureExport<'a> {
+    /// Original immutable exact coefficient; no graph is copied or reidentified.
+    definition: &'a ExactConstant,
+    /// Exact integer or fraction, with no approximate spelling of pi.
+    factor: String,
+    /// Admitted operation on the rational factor.
+    pi: PiFactor,
+    /// Complete recognition and spelling Work.
+    work: u64,
+    /// Logical metadata and owned string capacity.
+    bytes: usize,
+}
+
+impl<'a> ExactEnclosureExport<'a> {
+    /// Recognize a rational, rational-times-pi or rational-over-pi constant.
+    /// # Errors
+    /// Refuses unsupported expressions by name and bounded exact Work or bytes.
+    pub fn new(value: &'a ExactConstant, limits: &LimitsOverride) -> Result<Self, MapError> {
+        let (factor, pi, work, bytes) = export(value, size_of::<Self>(), limits)?;
+        Ok(Self {
+            definition: value,
+            factor,
+            pi,
+            work,
+            bytes,
+        })
+    }
+    /// Original exact coefficient, including its immutable graph node when irrational.
+    #[must_use]
+    pub const fn definition(&self) -> &'a ExactConstant {
+        self.definition
+    }
+    /// Exact rational spelling, ready for certified literal import.
+    #[must_use]
+    pub fn rational_factor(&self) -> &str {
+        &self.factor
+    }
+    /// The admitted pi operation, or the rational-only case.
+    #[must_use]
+    pub const fn pi_factor(&self) -> PiFactor {
+        self.pi
+    }
+    /// Complete successful exact recognition and spelling Work.
+    #[must_use]
+    pub const fn work_used(&self) -> u64 {
+        self.work
+    }
+    /// Owned logical metadata and string capacity; exact graph storage is borrowed.
+    #[must_use]
+    pub const fn owned_bytes(&self) -> usize {
+        self.bytes
+    }
+}
+
+/// One recognition implementation preserves descriptor and live-coefficient owner costs.
+fn export(
+    value: &ExactConstant,
+    metadata: usize,
+    limits: &LimitsOverride,
+) -> Result<(String, PiFactor, u64, usize), MapError> {
+    let mut ledger = Budget::new(Limits::default().resolve(limits)?)?;
+    let retained =
+        u64::try_from(metadata).map_err(|_| UnitError::UnsupportedExactConstantExport)?;
+    let (factor, pi) = ledger.with_retained_payload(
+        retained,
+        Location::new("constant enclosure export"),
+        |ledger| recognize(value, ledger),
+    )?;
+    let bytes = metadata
+        .checked_add(factor.capacity())
+        .ok_or(UnitError::UnsupportedExactConstantExport)?;
+    let count = u64::try_from(bytes).map_err(|_| UnitError::UnsupportedExactConstantExport)?;
+    ledger.check(
+        BudgetKind::StagedPayloadBytes,
+        count,
+        Location::new("constant enclosure export"),
+    )?;
+    ledger.check(
+        BudgetKind::OutputBytes,
+        count,
+        Location::new("constant enclosure export"),
+    )?;
+    Ok((factor, pi, ledger.usage().work, bytes))
 }
 
 /// Rational inputs never construct or inspect pi; unsupported constants receive no approximation.

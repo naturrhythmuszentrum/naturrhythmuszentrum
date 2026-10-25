@@ -2,6 +2,7 @@
 //! Exact image, original reuse identity and enclosed coefficients remain one immutable inventory.
 
 use super::{CoordinateError, ReadingBinding};
+use crate::ConstantCoefficient;
 use nrz_bindings::{
     Budget,
     readings::{
@@ -9,7 +10,7 @@ use nrz_bindings::{
         algebra::{Location, Rational, limits::BudgetKind},
     },
 };
-use nrz_scalar::{ArithmeticContext, DecodedLiteral, LiteralLimits, NumericLiteral, Scalar};
+use nrz_scalar::{ArithmeticContext, LiteralLimits, NumericLiteral, Scalar};
 
 /// Each pair and result position is covered by the same ordered exact coordinate definition.
 #[derive(Clone, Debug)]
@@ -17,9 +18,17 @@ pub(super) struct Lowered<P: Scalar> {
     /// Original native law, endpoint definitions, correspondence witness and complete key.
     pub(super) image: CoordinateImage,
     /// Scale and offset enclosures in exactly the image's per-entry order.
-    pub(super) coefficients: Vec<[DecodedLiteral<P>; 2]>,
-    /// Full coefficient array and retained exact declaration allowance.
-    pub(super) bytes: u64,
+    pub(super) coefficients: Vec<[ConstantCoefficient<P>; 2]>,
+    /// Certified constant owner, absent from ordinary rational coordinate paths.
+    pub(super) pi: Option<crate::PiConstant<P>>,
+}
+
+impl<P: Scalar> Lowered<P> {
+    /// Derive the numerical array size instead of storing a redundant counter beside its owner.
+    pub(super) fn bytes(&self) -> Result<u64, CoordinateError> {
+        u64::try_from(std::mem::size_of_val(self.coefficients.as_slice()))
+            .map_err(|_| crate::HeapError::ExtentOverflow.into())
+    }
 }
 
 /// Authenticate the complete original key and finish all coefficient imports before reading input floats.
@@ -39,7 +48,7 @@ pub(super) fn prepare<P: Scalar>(
     let length = u64::try_from(count).map_err(|_| crate::HeapError::ExtentOverflow)?;
     let bytes = length
         .checked_mul(
-            u64::try_from(std::mem::size_of::<[DecodedLiteral<P>; 2]>())
+            u64::try_from(std::mem::size_of::<[ConstantCoefficient<P>; 2]>())
                 .map_err(|_| crate::HeapError::ExtentOverflow)?,
         )
         .ok_or(crate::HeapError::ExtentOverflow)?;
@@ -81,7 +90,7 @@ pub(super) fn prepare<P: Scalar>(
     Ok(Lowered {
         image: image.clone(),
         coefficients,
-        bytes,
+        pi: None,
     })
 }
 
@@ -91,7 +100,7 @@ fn decode<P: Scalar>(
     policy: LiteralLimits,
     context: &ArithmeticContext,
     budget: &mut Budget,
-) -> Result<DecodedLiteral<P>, CoordinateError> {
+) -> Result<ConstantCoefficient<P>, CoordinateError> {
     let text = value.exact_string(budget)?;
     let length = u64::try_from(text.len()).map_err(|_| crate::HeapError::ExtentOverflow)?;
     let work = length
@@ -104,7 +113,9 @@ fn decode<P: Scalar>(
         policy.max_exponent(),
         policy.max_work().min(work),
     );
-    Ok(NumericLiteral::new(&text, limits)?.decode(context)?)
+    Ok(ConstantCoefficient::literal(
+        NumericLiteral::new(&text, limits)?.decode(context)?,
+    ))
 }
 
 /// The exported rational rectangle remains live during coefficient decoding.

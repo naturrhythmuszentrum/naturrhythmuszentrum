@@ -34,7 +34,7 @@ fn circle() -> [i128; 2] {
 }
 
 /// Independently enclose positive n*pi/d or n/(d*pi) at a chosen dyadic resolution.
-pub(super) fn factor(n: i128, d: i128, inverse: bool, bits: u32) -> TestResult<[Rational; 2]> {
+pub(crate) fn factor(n: i128, d: i128, inverse: bool, bits: u32) -> TestResult<[Rational; 2]> {
     let bounds = circle();
     let scale = 1_i128 << bits;
     let original = 1_i128 << 56;
@@ -55,7 +55,7 @@ pub(super) fn factor(n: i128, d: i128, inverse: bool, bits: u32) -> TestResult<[
 }
 
 /// Both independently projected endpoints must lie in the returned numerical error ball.
-pub(super) fn covers(bounds: [Rational; 2], center: f64, error: f64) -> TestResult {
+pub(crate) fn covers(bounds: [Rational; 2], center: f64, error: f64) -> TestResult {
     for endpoint in bounds {
         assert!(
             endpoint.covered(center, error)?,

@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Shared immutable pi regions and explicitly metered certified descriptor lowering.
 
+mod coefficient;
+pub(crate) use coefficient::decode as enclose_pi_factor;
 mod evidence;
 mod lower;
 mod region;
+mod unit;
 
 pub use evidence::PiConstantEvidence;
 pub(crate) use lower::CertifiedMap;
 pub use lower::PiConversionUse;
 pub use region::PiConstant;
+pub use unit::CertifiedCoefficient;
 
 use super::ConversionError;
 use nrz_bindings::{

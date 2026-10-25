@@ -42,7 +42,7 @@ impl<P: Scalar> CoordinateNorm<P> {
     }
     /// Scale and offset enclosures in metric entry order; only the positive scale divides radii.
     #[must_use]
-    pub fn coefficients(&self) -> &[[nrz_scalar::DecodedLiteral<P>; 2]] {
+    pub fn coefficients(&self) -> &[[crate::ConstantCoefficient<P>; 2]] {
         &self.metric.coefficients
     }
 
@@ -101,11 +101,12 @@ impl Heap {
             context,
             budget,
         )?;
+        let lowered_bytes = lowered.bytes()?;
         let bytes = input
             .0
             .bytes
             .checked_add(metric.0.bytes)
-            .and_then(|value| value.checked_add(lowered.bytes))
+            .and_then(|value| value.checked_add(lowered_bytes))
             .ok_or(HeapError::ExtentOverflow)?;
         let (total, error) =
             budget.with_retained_payload(bytes, Location::new("coordinate norm"), |budget| {

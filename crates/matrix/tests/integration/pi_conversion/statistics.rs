@@ -112,7 +112,7 @@ fn paired<P: Scalar + 'static>() -> TestResult {
 }
 
 /// Every entry, including off-diagonal covariance, encloses both independent factor endpoints.
-fn covariance<P: Scalar + 'static>(
+pub(super) fn covariance<P: Scalar + 'static>(
     view: &ParameterView<'_, P>,
     left: [Rational; 2],
     right: [Rational; 2],
@@ -133,7 +133,10 @@ fn covariance<P: Scalar + 'static>(
 }
 
 /// Mean errors include both the exact factor's enclosure and finite multiplication error.
-fn means<P: Scalar + 'static>(view: &ParameterView<'_, P>, factor: [Rational; 2]) -> TestResult {
+pub(super) fn means<P: Scalar + 'static>(
+    view: &ParameterView<'_, P>,
+    factor: [Rational; 2],
+) -> TestResult {
     for index in 0..2 {
         let original = Rational::new(i128::try_from(index + 1)?, 1)?;
         oracle::covers(
@@ -146,7 +149,7 @@ fn means<P: Scalar + 'static>(view: &ParameterView<'_, P>, factor: [Rational; 2]
 }
 
 /// Import one angle vector and retain the returned original joint companion identity.
-fn declared_source<P: Scalar + 'static>(
+pub(super) fn declared_source<P: Scalar + 'static>(
     heap: &mut Heap,
     descriptor: &nrz_bindings::Descriptor,
 ) -> TestResult<(nrz_matrix::PublishedBundle<P>, nrz_matrix::CompanionRef<P>)> {

@@ -56,9 +56,9 @@ pub use live::{
     MappedReading, PhasorAllocation, PhasorAllocationChannel, PhasorAllocationStage, PhasorError,
     PhasorEvaluation, PhasorInventory, PhasorOperand, PhasorProduct, PhasorPublication,
     PhasorSolve, PhasorSolveCertificate, PhasorSolveEvaluation, PhasorSolvePublication,
-    PhasorStatistics, PhasorTransferBounds, PhasorTransferredResidual, PublishedLcSpectrum,
-    PublishedPhasor, PublishedPhasorSolve, ReadingBinding, ReadingImport, ReadingRegion,
-    ReadingSelection, ReciprocalDerivativeContract, ReciprocalDerivativeError,
+    PhasorStatistics, PhasorTransferBounds, PhasorTransferredResidual, PiCoordinateContract,
+    PublishedLcSpectrum, PublishedPhasor, PublishedPhasorSolve, ReadingBinding, ReadingImport,
+    ReadingRegion, ReadingSelection, ReciprocalDerivativeContract, ReciprocalDerivativeError,
     ReciprocalDerivativeEvaluation, SpectralError, SpectralValue,
 };
 pub(crate) use operation::NativeRecipe;

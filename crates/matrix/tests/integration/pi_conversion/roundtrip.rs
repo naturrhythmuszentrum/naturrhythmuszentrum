@@ -169,7 +169,7 @@ fn frequency<P: Scalar + 'static>() -> TestResult {
 }
 
 /// Full errors cover original declared endpoints while numerical errors cover nominal truth.
-fn check<P: Scalar + 'static>(
+pub(super) fn check<P: Scalar + 'static>(
     heap: &Heap,
     output: PublishedBundle<P>,
     bounds: [Rational; 2],

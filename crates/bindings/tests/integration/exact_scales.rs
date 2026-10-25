@@ -419,6 +419,15 @@ fn pi_enclosure_export_retains_exact_definition() -> TestResult {
             assert!(std::ptr::eq(exported.definition(), original.scale()));
             assert_eq!(exported.rational_factor(), factor);
             assert_eq!(exported.pi_factor(), action);
+            let direct = nrz_bindings::ExactEnclosureExport::new(
+                original.scale().exact(),
+                &LimitsOverride::default(),
+            )?;
+            assert!(std::ptr::eq(direct.definition(), original.scale().exact()));
+            assert_eq!(direct.rational_factor(), factor);
+            assert_eq!(direct.pi_factor(), action);
+            assert_eq!(direct.work_used(), exported.work_used());
+            assert_eq!(direct.owned_bytes(), exported.owned_bytes());
         }
     }
     let map = declarations.conversion_map(&degree, &turn)?;
@@ -481,6 +490,9 @@ fn pi_enclosure_export_resource_boundaries() -> TestResult {
             let exported = map.scale().enclosure_export(&policy)?;
             assert_eq!(exported.work_used(), work);
             assert_eq!(exported.owned_bytes(), 64);
+            let direct = nrz_bindings::ExactEnclosureExport::new(map.scale().exact(), &policy)?;
+            assert_eq!(direct.work_used(), work);
+            assert_eq!(direct.owned_bytes(), 64);
             for field in 0..3 {
                 let mut limited = policy.clone();
                 match field {
@@ -489,6 +501,9 @@ fn pi_enclosure_export_resource_boundaries() -> TestResult {
                     _ => limited.output_bytes = Some(output - 1),
                 }
                 assert!(map.scale().enclosure_export(&limited).is_err());
+                assert!(
+                    nrz_bindings::ExactEnclosureExport::new(map.scale().exact(), &limited).is_err()
+                );
                 assert!(std::ptr::eq(exported.definition(), map.scale()));
                 assert_eq!(exported.work_used(), work);
             }

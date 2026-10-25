@@ -16,9 +16,9 @@ pub(crate) struct LoweredMap<P: Scalar> {
     /// Original definition, including frozen declaration, reference and origin identities.
     pub(crate) exact: Rc<CheckedMap>,
     /// Scale candidate, exact-constant enclosure and its own evaluation displacement.
-    pub(crate) scale: Coefficient<P>,
+    pub(crate) scale: ConstantCoefficient<P>,
     /// Shift candidate and evaluation enclosure; radii never use this coefficient.
-    pub(crate) shift: Coefficient<P>,
+    pub(crate) shift: ConstantCoefficient<P>,
     /// Arithmetic proof used by both coefficient decodes.
     pub(crate) revision: u32,
 }
@@ -99,16 +99,16 @@ fn lower<P: Scalar>(
     constant: &DescriptorConstant,
     limits: LiteralLimits,
     context: &ArithmeticContext,
-) -> Result<Coefficient<P>, ConversionError> {
+) -> Result<ConstantCoefficient<P>, ConversionError> {
     let spelling = constant.export(&Default::default())?;
-    Ok(Coefficient::literal(
+    Ok(ConstantCoefficient::literal(
         NumericLiteral::new(&spelling, limits)?.decode(context)?,
     ))
 }
 
 /// Numerical fields of one certified coefficient, independent of its exact representation.
 #[derive(Clone, Copy, Debug)]
-pub(crate) struct Coefficient<P: Scalar> {
+pub struct ConstantCoefficient<P: Scalar> {
     /// Finite candidate used by the affine kernel.
     center: Finite<P>,
     /// Outward exact-definition bounds.
@@ -119,7 +119,7 @@ pub(crate) struct Coefficient<P: Scalar> {
     work: u64,
 }
 
-impl<P: Scalar> Coefficient<P> {
+impl<P: Scalar> ConstantCoefficient<P> {
     /// Preserve the ordinary rational literal decoder's center and error.
     pub(crate) const fn literal(decoded: DecodedLiteral<P>) -> Self {
         Self {
@@ -144,19 +144,23 @@ impl<P: Scalar> Coefficient<P> {
         })
     }
     /// The finite numerical candidate.
-    pub(crate) const fn center(self) -> Finite<P> {
+    #[must_use]
+    pub const fn center(self) -> Finite<P> {
         self.center
     }
     /// The complete outward coefficient family.
-    pub(crate) const fn enclosure(self) -> Enclosure<P> {
+    #[must_use]
+    pub const fn enclosure(self) -> Enclosure<P> {
         self.enclosure
     }
     /// A bound on every member's displacement from the candidate.
-    pub(crate) const fn displacement(self) -> Finite<P> {
+    #[must_use]
+    pub const fn displacement(self) -> Finite<P> {
         self.displacement
     }
     /// Charged recognition, import and numerical lowering Work.
-    pub(crate) const fn work_used(self) -> u64 {
+    #[must_use]
+    pub const fn work_used(self) -> u64 {
         self.work
     }
 }

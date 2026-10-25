@@ -20,7 +20,7 @@ pub struct ConstantEvidence {
 
 impl ConstantEvidence {
     /// Retain exact binary widening; no arithmetic on descriptor values occurs here.
-    fn from_decoded<P: Scalar>(decoded: crate::coordinate_numeric::Coefficient<P>) -> Self {
+    fn from_decoded<P: Scalar>(decoded: crate::coordinate_numeric::ConstantCoefficient<P>) -> Self {
         Self {
             center: decoded.center().get().to_f64(),
             enclosure: [

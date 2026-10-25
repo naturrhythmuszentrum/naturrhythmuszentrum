@@ -440,7 +440,7 @@ fn coordinate_measure(
     );
     Ok(Measure::new(
         "normalized-reference",
-        Scale::Exact(reference.rational_scale()?.clone()),
+        Scale::Expression(reference.scale().clone()),
         offset,
     )?)
 }

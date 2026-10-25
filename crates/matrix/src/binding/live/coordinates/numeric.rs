@@ -2,12 +2,13 @@
 //! Numerical diagonal maps keep propagated total and nominal-target error in separate arrays.
 
 use super::CoordinateError;
+use crate::ConstantCoefficient;
 use nrz_accuracy::Nonnegative;
 use nrz_bindings::{
     Budget,
     readings::algebra::{Location, limits::BudgetKind},
 };
-use nrz_scalar::{ArithmeticContext, DecodedLiteral, Enclosure, Finite, Scalar};
+use nrz_scalar::{ArithmeticContext, Enclosure, Finite, Scalar};
 
 /// Private numerical arrays; their per-entry meanings are retained by the binding execution record.
 #[derive(Clone, Debug)]
@@ -23,7 +24,7 @@ pub(super) struct Entries<P: Scalar> {
 /// Retain a fixed finite numerical schedule and reserve all arrays before evaluation.
 pub(super) fn evaluate<P: Scalar>(
     input: &Entries<P>,
-    coefficients: &[[DecodedLiteral<P>; 2]],
+    coefficients: &[[ConstantCoefficient<P>; 2]],
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> Result<Entries<P>, CoordinateError> {
@@ -64,7 +65,7 @@ fn entry<P: Scalar>(
     center: P,
     total: P,
     error: P,
-    pair: &[DecodedLiteral<P>; 2],
+    pair: &[ConstantCoefficient<P>; 2],
     context: &ArithmeticContext,
 ) -> Result<[P; 3], CoordinateError> {
     let original = Finite::new(center)?;
@@ -100,19 +101,23 @@ pub(super) fn reserve<P: Scalar>(
     arrays: usize,
     budget: &Budget,
 ) -> Result<(), CoordinateError> {
-    let length = u64::try_from(count).map_err(|_| super::HeapError::ExtentOverflow)?;
-    let width = arrays
-        .checked_mul(std::mem::size_of::<P>())
-        .ok_or(super::HeapError::ExtentOverflow)?;
-    let bytes = length
-        .checked_mul(u64::try_from(width).map_err(|_| super::HeapError::ExtentOverflow)?)
-        .ok_or(super::HeapError::ExtentOverflow)?;
     budget.check(
         BudgetKind::StagedPayloadBytes,
-        bytes,
+        array_bytes::<P>(count, arrays)?,
         Location::new("coordinate arrays"),
     )?;
     Ok(())
+}
+
+/// The byte plan and allocator checks use the same checked scalar-array extent.
+pub(super) fn array_bytes<P: Scalar>(count: usize, arrays: usize) -> Result<u64, CoordinateError> {
+    let length = u64::try_from(count).map_err(|_| super::HeapError::ExtentOverflow)?;
+    let width = arrays
+        .checked_mul(size_of::<P>())
+        .ok_or(super::HeapError::ExtentOverflow)?;
+    length
+        .checked_mul(u64::try_from(width).map_err(|_| super::HeapError::ExtentOverflow)?)
+        .ok_or_else(|| super::HeapError::ExtentOverflow.into())
 }
 
 /// Complete shared metadata and all three retained numerical arrays fit the result allowance.
@@ -121,18 +126,22 @@ pub(super) fn output<P: Scalar>(
     retained: u64,
     budget: &Budget,
 ) -> Result<u64, CoordinateError> {
-    let length = u64::try_from(count).map_err(|_| super::HeapError::ExtentOverflow)?;
-    let width = u64::try_from(3 * std::mem::size_of::<P>())
-        .map_err(|_| super::HeapError::ExtentOverflow)?;
-    let bytes = length
-        .checked_mul(width)
-        .and_then(|value| value.checked_add(retained))
-        .and_then(|value| value.checked_add(256))
-        .ok_or(super::HeapError::ExtentOverflow)?;
+    let bytes = retained_bytes::<P>(count, retained)?;
     budget.check(
         BudgetKind::OutputBytes,
         bytes,
         Location::new("coordinate result"),
     )?;
     Ok(bytes)
+}
+
+/// The fixed snapshot envelope and three output arrays retain their original rational-path size.
+pub(super) fn retained_bytes<P: Scalar>(
+    count: usize,
+    retained: u64,
+) -> Result<u64, CoordinateError> {
+    array_bytes::<P>(count, 3)?
+        .checked_add(retained)
+        .and_then(|value| value.checked_add(256))
+        .ok_or_else(|| super::HeapError::ExtentOverflow.into())
 }
