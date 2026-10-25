@@ -79,6 +79,13 @@ impl Fixture {
             limits,
         )
     }
+    /// Varied physical references retain complete outputs under the same explicit caller policy.
+    pub(crate) fn with_scaled_output_store_limits(
+        references: [&str; 3],
+        limits: Limits,
+    ) -> TestResult<Self> {
+        Self::build(references, true, [Limits::default().work; 2], limits)
+    }
     fn build(
         references: [&str; 3],
         with_outputs: bool,

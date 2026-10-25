@@ -56,6 +56,12 @@ pub(super) struct Moments<P: Scalar> {
 }
 
 impl<P: Scalar + 'static> LcSpectrum<P> {
+    /// Original joint declaration and physical input columns for the closed family consumer.
+    pub(crate) fn statistical_selection(&self) -> Option<(CompanionRef<P>, [usize; 2])> {
+        self.extension()
+            .map(|extension| (extension.input.companion, extension.input.columns))
+    }
+
     /// Attach the original evaluated Jacobian and its complete native L/C joint declaration.
     ///
     /// Both root signs retain `LinearizedMoments` assurance. Statistical parameter enclosures

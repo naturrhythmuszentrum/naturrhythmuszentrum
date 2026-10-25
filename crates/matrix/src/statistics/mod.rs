@@ -19,6 +19,7 @@ mod declarations;
 mod derivative;
 mod error;
 mod evaluate;
+mod family;
 pub(crate) mod inventory;
 mod matrix;
 pub(crate) use affine::Affine;

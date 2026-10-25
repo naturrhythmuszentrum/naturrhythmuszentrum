@@ -30,6 +30,9 @@ const AT: Location = Location::new("LC spectral execution");
 /// An exact, live-source, whole-family domain or outward-arithmetic refusal.
 #[derive(Clone, Debug, thiserror::Error)]
 pub enum SpectralError {
+    /// A published operator or its original statistical lineage is unavailable.
+    #[error("spectral operator moments: {0}")]
+    Operator(#[from] crate::OperationError),
     /// Exact physical law admission refused.
     #[error("spectral law: {0}")]
     Law(#[from] SpectralLawError),
