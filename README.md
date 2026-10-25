@@ -37,6 +37,8 @@ The nightly Rust workspace contains six implemented packages. Dependencies flow 
 
 Each implemented crate's README is its rustdoc front page, introducing purpose, dependencies, the LC contribution, public concepts, guarantees, limits and testing. Detailed contracts live beside the corresponding source modules and types. The planned physics and facade packages are not workspace members.
 
+The closed LC spectral path carries an explicitly declared original L/C covariance through the same exact Jacobian as the operator. Both signed root blocks retain first-order `LinearizedMoments` assurance, separate from deterministic complete-root bounds. Original source/model identities and all value and companion versions remain required; generic mapped source composition and quantity conversion retain their separate owners in the spectral-lowering step (`step:nrz:lc-resonance-spectral-lowering`) and LC-quantities step (`step:nrz:lc-resonance-quantity-bite`).
+
 ## LC target and plan · `sec:nrz:overview-plan`
 
 For `L=25 mH` and `C=10 µF`, the independent reference answers include `ω₀=2000 rad/s`, `f₀=1000/π Hz`, characteristic impedance `50 ohm` and state roots `±2000i s⁻¹`. Impedance below, at and above resonance is `−75i`, `0` and `+75i ohm`. At resonance, impedance succeeds while phase is undefined and admittance/current cannot produce a finite result. The source-free energy check and driven phasor experiment are distinct uses of the same ideal elements.

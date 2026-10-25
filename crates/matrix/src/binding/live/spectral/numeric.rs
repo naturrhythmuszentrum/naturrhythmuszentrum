@@ -17,7 +17,7 @@ pub(super) fn constants<P: Scalar>(
     result
         .try_reserve_exact(3)
         .map_err(|_| HeapError::Capacity)?;
-    for text in &plan.0.constants {
+    for text in plan.constants() {
         let work = u64::try_from(text.len())
             .map_err(|_| HeapError::ExtentOverflow)?
             .checked_mul(12)

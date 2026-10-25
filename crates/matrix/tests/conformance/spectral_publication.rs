@@ -56,29 +56,19 @@ fn lc_spectral_publication_work_is_atomic() -> TestResult {
 #[test]
 fn lc_spectral_publication_payload_boundaries() -> TestResult {
     let fixture = Fixture::with_outputs(["5", "1/10", "1/2000"])?;
-    let mut costs = Vec::new();
-    for kind in [BudgetKind::StagedPayloadBytes, BudgetKind::OutputBytes] {
-        for planning in [true, false] {
-            let mut lower = 1;
-            let mut upper = Limits::default().output_bytes;
-            while lower < upper {
-                let middle = lower + (upper - lower) / 2;
-                if attempt(&fixture, kind, middle, 0, planning)? {
-                    upper = middle;
-                } else {
-                    lower = middle + 1;
-                }
-            }
-            assert!(attempt(&fixture, kind, upper, 0, planning)?);
-            assert!(!attempt(&fixture, kind, upper - 1, 0, planning)?);
+    for (kind, requirements) in [
+        (BudgetKind::StagedPayloadBytes, [503_608, 1_010_208]),
+        (BudgetKind::OutputBytes, [503_608, 505_400]),
+    ] {
+        for (planning, required) in [true, false].into_iter().zip(requirements) {
+            assert!(attempt(&fixture, kind, required, 0, planning)?);
+            assert!(!attempt(&fixture, kind, required - 1, 0, planning)?);
             if kind == BudgetKind::StagedPayloadBytes {
-                assert!(attempt(&fixture, kind, upper + 23, 23, planning)?);
-                assert!(!attempt(&fixture, kind, upper + 22, 23, planning)?);
+                assert!(attempt(&fixture, kind, required + 23, 23, planning)?);
+                assert!(!attempt(&fixture, kind, required + 22, 23, planning)?);
             }
-            costs.push(upper);
         }
     }
-    assert_eq!(costs, vec![503_608, 1_010_208, 503_608, 505_400]);
     Ok(())
 }
 
@@ -193,31 +183,16 @@ fn lc_spectral_result_definition_boundaries() -> TestResult {
 /// ´test:integration:lc-spectral-complete-construction-work-boundaries´
 #[test]
 fn lc_spectral_complete_construction_work_boundaries() {
-    let mut costs = [0; 2];
-    for (phase, cost) in costs.iter_mut().enumerate() {
-        let mut lower = 1;
-        let mut upper = Limits::default().work;
-        while lower < upper {
-            let middle = lower + (upper - lower) / 2;
-            let mut limits = [Limits::default().work; 2];
-            limits[phase] = middle;
-            if Fixture::with_construction_limits(limits).is_ok() {
-                upper = middle;
-            } else {
-                lower = middle + 1;
-            }
-        }
-        *cost = upper;
-        for work in [upper, upper - 1] {
+    for (phase, required) in [1_611_309, 932_710].into_iter().enumerate() {
+        for work in [required, required - 1] {
             let mut limits = [Limits::default().work; 2];
             limits[phase] = work;
             assert_eq!(
                 Fixture::with_construction_limits(limits).is_ok(),
-                work == upper
+                work == required
             );
         }
     }
-    assert_eq!(costs, [1_611_309, 932_710]);
 }
 
 /// Measure each declaration kind and its native proof, separately from the immutable shared law.

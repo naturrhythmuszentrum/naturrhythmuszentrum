@@ -2,9 +2,11 @@
 //! Strict positive-family spectral bounds retain the original theorem and every live input version.
 
 mod input;
+mod moments;
 mod numeric;
 mod plan;
 mod publication;
+mod statistics;
 pub use plan::LcSpectrum;
 pub use publication::{LcSpectralPublication, PublishedLcSpectrum};
 
@@ -37,6 +39,12 @@ pub enum SpectralError {
     /// A selected source or companion version is unavailable.
     #[error("spectral live input: {0}")]
     Live(#[from] LiveBindingError),
+    /// Original evaluated derivative admission or validation refused.
+    #[error("spectral derivative: {0}")]
+    Derivative(#[from] crate::ReciprocalDerivativeError),
+    /// Original joint model, target coverage or covariance parameter access refused.
+    #[error("spectral statistical input: {0}")]
+    Joint(#[from] crate::JointError),
     /// Numerical storage or extent admission refused.
     #[error("spectral storage: {0}")]
     Heap(#[from] HeapError),
@@ -81,7 +89,8 @@ pub struct SpectralValue<P: Scalar> {
 ///
 /// This immutable evaluation publishes no heap reading. The real parts are proved exact zero;
 /// `imaginary_rates` orders the positive imaginary root before its conjugate, independently of
-/// CAS selection order. No local linearization or statistical model is asserted.
+/// CAS selection order. An explicitly attached original Jacobian and joint model additionally
+/// supply local linear covariance without changing these deterministic endpoints.
 #[derive(Clone, Debug)]
 pub struct LcSpectralEvaluation<P: Scalar> {
     /// Prechecked original law, exact constants and original selected inputs.
@@ -172,19 +181,19 @@ impl Heap {
     ) -> Result<LcSpectralEvaluation<P>, SpectralError> {
         let before = budget.usage();
         plan.validate(self)?;
-        let bytes = u64::try_from(std::mem::size_of::<LcSpectralEvaluation<P>>())
-            .map_err(|_| HeapError::ExtentOverflow)?;
-        let (values, coverage) = budget.with_retained_payload(bytes, AT, |budget| {
+        let bytes = statistics::evaluation_bytes(plan)?;
+        let (values, coverage, moments) = budget.with_retained_payload(bytes, AT, |budget| {
             let constants = numeric::constants(plan, context, budget)?;
             let (inputs, coverage) = input::capture(self, plan, budget)?;
             Ok::<_, SpectralError>((
                 numeric::evaluate(&inputs, &constants, context, budget)?,
                 coverage,
+                statistics::evaluate(self, plan, &constants, context, budget)?,
             ))
         })?;
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
         Ok(LcSpectralEvaluation {
-            plan: plan.clone(),
+            plan: statistics::evaluated(plan, moments),
             values,
             coverage,
             revision: context.revision(),

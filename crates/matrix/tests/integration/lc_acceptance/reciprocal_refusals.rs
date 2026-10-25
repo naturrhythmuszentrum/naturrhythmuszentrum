@@ -294,7 +294,7 @@ fn lc_native_reciprocal_refuses_substituted_references() -> TestResult {
 }
 
 /// Only source-free reference names change; all exact magnitudes and native matrix syntax agree.
-fn different_references(
+pub(super) fn different_references(
     fixture: &mut Fixture,
     budget: &mut Budget,
 ) -> TestResult<nrz_matrix::CheckedOperation> {

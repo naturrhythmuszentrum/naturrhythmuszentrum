@@ -28,7 +28,7 @@ pub(super) struct Plan<P: Scalar> {
     /// Ordered original L/C readings, retaining target and companion versions.
     pub(super) inputs: [ReadingBinding<P>; 2],
     /// Upper numerator, lower magnitude numerator and time reference, respectively.
-    pub(super) constants: [String; 3],
+    pub(super) parameters: Parameters<P>,
     /// Explicit bounded scalar literal policy.
     pub(super) literals: LiteralLimits,
     /// Newly owned plan and string allocations; shared evidence is counted by its owner.
@@ -37,7 +37,42 @@ pub(super) struct Plan<P: Scalar> {
     pub(super) usage: [BudgetUsage; 2],
 }
 
+/// Reuse the existing string-owner niche without adding a field to deterministic records.
+#[derive(Debug)]
+pub(super) enum Parameters<P: Scalar> {
+    /// Original three independently owned exact constant spellings.
+    Constants([String; 3]),
+    /// Statistical requests alone own their additional input or evaluated parameters.
+    Statistical(Box<super::statistics::Extension<P>>),
+}
+
 impl<P: Scalar> LcSpectrum<P> {
+    /// Statistical extensions retain the original constant owner directly.
+    pub(super) fn constants(&self) -> &[String; 3] {
+        match &self.0.parameters {
+            Parameters::Constants(constants) => constants,
+            Parameters::Statistical(extension) => extension.base.constants(),
+        }
+    }
+    /// Optional statistical state has no allocation in a deterministic request.
+    pub(super) fn extension(&self) -> Option<&super::statistics::Extension<P>> {
+        match &self.0.parameters {
+            Parameters::Constants(_) => None,
+            Parameters::Statistical(extension) => Some(extension),
+        }
+    }
+    /// Share the original deterministic owner while replacing only its parameter view.
+    pub(super) fn extended(extension: super::statistics::Extension<P>) -> Self {
+        let base = &extension.base.0;
+        Self(Rc::new(Plan {
+            law: base.law.clone(),
+            inputs: base.inputs.clone(),
+            literals: base.literals,
+            bytes: base.bytes,
+            usage: base.usage,
+            parameters: Parameters::Statistical(Box::new(extension)),
+        }))
+    }
     /// Bind the exact law to the original scalar inputs and lower its rational constants.
     /// # Errors
     /// Refuses foreign graphs, changed symbols or references, nonidentity input/companion maps,
@@ -59,7 +94,7 @@ impl<P: Scalar> LcSpectrum<P> {
         Ok(Self(Rc::new(Plan {
             law,
             inputs,
-            constants,
+            parameters: Parameters::Constants(constants),
             literals,
             bytes,
             usage: [before, budget.usage()],
@@ -80,7 +115,7 @@ impl<P: Scalar> LcSpectrum<P> {
     pub fn usage(&self) -> [BudgetUsage; 2] {
         self.0.usage
     }
-    /// Newly owned plan/string allocations; the law and source groups remain shared.
+    /// Original deterministic plan/string allocation; statistical extensions report their own allowance.
     #[must_use]
     pub fn retained_payload_bytes(&self) -> u64 {
         self.0.bytes
@@ -92,6 +127,9 @@ impl<P: Scalar + 'static> LcSpectrum<P> {
     pub(super) fn validate(&self, heap: &Heap) -> Result<(), Error> {
         for source in self.inputs() {
             heap.validate_reading(source)?;
+        }
+        if let Some(extension) = self.extension() {
+            super::statistics::validate(heap, &extension.input)?;
         }
         Ok(())
     }

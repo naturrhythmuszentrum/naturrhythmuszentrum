@@ -14,6 +14,12 @@ mod reciprocal_costs;
 mod reciprocal_refusals;
 mod reciprocal_statistics;
 mod reuse;
+mod root_payload;
+mod root_publication;
+mod root_refusals;
+mod root_statistics;
+mod root_support;
+mod root_work;
 mod selected_joint;
 mod state;
 #[allow(

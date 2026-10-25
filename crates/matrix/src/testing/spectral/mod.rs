@@ -70,6 +70,15 @@ impl Fixture {
     pub(crate) fn with_store_limits(references: [&str; 3], limits: Limits) -> TestResult<Self> {
         Self::build(references, false, [Limits::default().work; 2], limits)
     }
+    /// Root statistics share explicit original graph limits with complete output declarations.
+    pub(crate) fn with_output_store_limits(limits: Limits) -> TestResult<Self> {
+        Self::build(
+            ["5", "1/10", "1/2000"],
+            true,
+            [Limits::default().work; 2],
+            limits,
+        )
+    }
     fn build(
         references: [&str; 3],
         with_outputs: bool,

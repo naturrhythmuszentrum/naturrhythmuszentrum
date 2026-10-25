@@ -2,6 +2,8 @@
 //! The closed LC law joins original complete roots to one retained state similarity and time map.
 
 mod hypotheses;
+mod jacobian;
+pub use jacobian::LcRootJacobian;
 mod original;
 mod output_context;
 mod result;

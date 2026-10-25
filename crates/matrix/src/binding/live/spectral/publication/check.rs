@@ -231,6 +231,10 @@ pub(super) fn produced<P: nrz_scalar::Scalar>(plan: &super::Plan<P>) -> Result<u
     let mut bytes = plan.bytes;
     add(
         &mut bytes,
+        super::super::statistics::output_bytes(&plan.spectrum)?,
+    )?;
+    add(
+        &mut bytes,
         sized(1, std::mem::size_of::<crate::binding::live::Group>())?,
     )?;
     add(

@@ -50,9 +50,11 @@ fn lc_spectral_numerical_payload_boundaries() -> TestResult {
     let (heap, inputs) = fixture.import([[1.0_f64, 0.125, 0.0]; 2])?;
     let plan = fixture.plan(inputs.clone(), &mut ledger()?)?;
     let context = ArithmeticContext::new()?;
-    let mut costs = Vec::new();
-    for kind in [BudgetKind::StagedPayloadBytes, BudgetKind::OutputBytes] {
-        for planning in [true, false] {
+    for (kind, requirements) in [
+        (BudgetKind::StagedPayloadBytes, [87_803, 1064]),
+        (BudgetKind::OutputBytes, [14_793, 680]),
+    ] {
+        for (planning, required) in [true, false].into_iter().zip(requirements) {
             let attempt = |limit, prior| -> TestResult<bool> {
                 let mut limits = Limits::default();
                 match kind {
@@ -74,17 +76,14 @@ fn lc_spectral_numerical_payload_boundaries() -> TestResult {
                     )
                     .is_ok())
             };
-            let required = minimum(&attempt)?;
             assert!(attempt(required, 0)?);
             assert!(!attempt(required - 1, 0)?);
             if kind == BudgetKind::StagedPayloadBytes {
                 assert!(attempt(required + 23, 23)?);
                 assert!(!attempt(required + 22, 23)?);
             }
-            costs.push(required);
         }
     }
-    assert_eq!(costs, vec![87_803, 1064, 14_793, 680]);
     Ok(())
 }
 
@@ -96,19 +95,4 @@ fn execute(
 ) -> TestResult {
     heap.evaluate_lc_spectrum(plan, context, budget)?;
     Ok(())
-}
-
-fn minimum(attempt: &impl Fn(u64, u64) -> TestResult<bool>) -> TestResult<u64> {
-    let mut lower = 1;
-    let mut upper = Limits::default().output_bytes;
-    assert!(attempt(upper, 0)?);
-    while lower < upper {
-        let middle = lower + (upper - lower) / 2;
-        if attempt(middle, 0)? {
-            upper = middle;
-        } else {
-            lower = middle + 1;
-        }
-    }
-    Ok(upper)
 }

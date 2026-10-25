@@ -189,6 +189,20 @@ impl<P: Scalar + 'static> PublishedLcSpectrum<P> {
         }
         Ok(values)
     }
+    /// Full first-order covariance of both published roots, ordered `(Re+, Im+, Re-, Im-)`.
+    ///
+    /// The enclosure targets statistical parameters only, with `LinearizedMoments` assurance.
+    /// Every output view and original source is revalidated before lending this result.
+    /// # Errors
+    /// Refuses changed output values or radii, original values or companions, and arithmetic revisions.
+    pub fn root_covariance(
+        &self,
+        heap: &Heap,
+        context: &ArithmeticContext,
+    ) -> Result<Option<[[nrz_scalar::Enclosure<P>; 4]; 4]>, Error> {
+        self.validate(heap, context)?;
+        self.evaluation.root_covariance(heap, context)
+    }
     /// Shared signed views have exact zero copy discrepancy because they read one stored value.
     /// # Errors
     /// Refuses any stale result, parameter, original source or arithmetic revision.
