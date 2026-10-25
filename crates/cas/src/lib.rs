@@ -32,6 +32,8 @@ pub mod decision;
 )]
 mod decision_cut;
 mod decision_enclosure;
+mod decision_introduction;
+mod decision_wire;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \

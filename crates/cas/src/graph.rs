@@ -354,6 +354,8 @@ pub(crate) struct Source {
 /// Canonical mathematical context weight.
 #[derive(Clone, Debug)]
 pub(crate) struct Context {
+    /// Checked decision introduction, absent on caller-assumed frames.
+    pub(crate) introduction: Option<LogicalId>,
     /// Actual header object, retained independently of its legacy view.
     pub(crate) header_id: LogicalId,
     /// Exact admissible region.
@@ -2055,6 +2057,10 @@ fn context_key(context: &Context, out: &mut Encoder<'_>) -> Result<(), Fault> {
     out.raw(&context.header)?;
     out.count(context.assumptions.len())?;
     out.raw(&context.canonical_assumptions)?;
+    if let Some(introduction) = context.introduction {
+        out.byte(1)?;
+        encode_id(introduction, out)?;
+    }
     Ok(())
 }
 

@@ -151,6 +151,15 @@ pub struct BoundaryDraft {
 /// A root assumption set or a strictly nested local hypothesis frame.
 #[derive(Clone, Debug)]
 pub enum ContextDraft {
+    /// A local membership frame retaining an earlier checked decision introduction.
+    Certified {
+        /// Exact source context of the introduction.
+        parent: Reference,
+        /// Exact selected association region.
+        region: Reference,
+        /// Earlier discharged decision proof retaining its source assumptions.
+        introduction: Reference,
+    },
     /// Top-level mathematical assumptions remain visibly assumed.
     Root {
         /// Complete header used by the theorem.

@@ -22,6 +22,7 @@ fn formal_register_standing_is_complete() {
         .iter()
         .map(|entry| &entry.lemma)
         .chain(&EMPTY_SCHEMAS)
+        .chain(&nrz_cas::decision::DECISION_SCHEMAS)
         .chain(&HYPOTHESIS_SCHEMAS)
         .chain(std::iter::once(&ANONYMOUS_LEMMA_SCHEMA));
     for schema in entries {
@@ -220,6 +221,7 @@ fn formal_register_heads_are_bijective() {
         .iter()
         .map(|entry| &entry.lemma)
         .chain(&EMPTY_SCHEMAS)
+        .chain(&nrz_cas::decision::DECISION_SCHEMAS)
         .chain(&HYPOTHESIS_SCHEMAS)
         .chain(std::iter::once(&ANONYMOUS_LEMMA_SCHEMA))
         .collect();

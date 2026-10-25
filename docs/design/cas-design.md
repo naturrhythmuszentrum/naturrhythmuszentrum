@@ -408,3 +408,11 @@ The CAS exposes `RationalEnclosure` and `Cas::check_rational_enclosure` for a cl
 **Rule (Closed replay resource ownership)** · `rule:nrz:cas-closed-enclosure-resources`
 
 The new replay path charges its retained input, bounded rational scratch, existing exact-constant reconstruction and returned contract on the caller's cumulative ledger. Normalization owns a temporary private CAS graph; the caller's graph occupancy stays unchanged on success and refusal. No cache participates, no default changes and ordinary proof paths pay none of these new costs. Literal resource boundaries and the distinction between temporary graph payload and returned ownership are documented in `crates/cas/README.md`; a sealed constant bound does not complete qualified introduction (`thm:nrz:decision-membership-introduction`).
+
+**Rule (Retained certified context introduction)** · `rule:nrz:cas-certified-context-introduction`
+
+`ContextDraft::Certified` names an exact parent, selected region and earlier checked introduction proof; admission refuses an ordinary membership proof, a changed parent or a different region (`rule:nrz:decision-certified-frame-implementation`). The context retains a proof dependency and includes full proof identity in interning. Portable replay reconstructs the introduction before admitting its local membership slot. Using that slot retains its qualified identity and every source hypothesis consumed by the introduction (`assum:nrz:decision-certified-membership`), (`rule:nrz:decision-hypothesis-use`).
+
+**Rule (Auxiliary decision proof ownership)** · `rule:nrz:cas-decision-introduction-ownership`
+
+The versioned decision certificate uses the existing native region dispatcher, so the ordinary primitive inventory and logical-policy weights stay unchanged (`rule:nrz:decision-lemma-reuse`). Introduction owns full partition and closed enclosure replay, exact cut checking, source-proof identity checks and proof publication; local admission owns the frame and introduction dependency; witness export and import own portable closure and independent replay (`req:nrz:decision-lifecycle-measurements`), (`rule:nrz:cas-certified-context-introduction`). Caller-assumed frames retain their existing identity and encoding. Resource refusal rolls back graph publication while preserving spent cumulative Work (`rule:nrz:decision-selected-publication`).

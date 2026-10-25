@@ -48,6 +48,8 @@ pub enum HypothesisKind {
     Boolean,
     /// Every point of the stated source region belongs to the exact containing region.
     RegionMembership,
+    /// Membership introduced by a retained checked decision proof.
+    CertifiedRegionMembership,
     /// The stated region has no assignments under the retained conditions.
     EmptyRegion,
     /// Every point of the exact domain belongs to a retained cover member.
@@ -109,7 +111,7 @@ pub enum HypothesisKind {
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 45] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 46] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -155,10 +157,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 45] = [
     HypothesisKind::NonPositive,
     HypothesisKind::GermEvidence,
     HypothesisKind::SplitEvidence,
+    HypothesisKind::CertifiedRegionMembership,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 45] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 46] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -519,6 +522,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 45] = [
         statement: "The original function has the stated finite integral or sum.",
         premises: "Exact function, domain or inclusive integer range and endpoint value.",
     },
+    LemmaSchema {
+        name: "hyp.certified-region-membership",
+        label: "assum:cas:hyp-certified-region-membership",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "The exact source family belongs to the selected option under a retained checked introduction.",
+        premises: "Exact introducing context and slot, partition, replay, cut and coordinate-to-target equality proofs with their used source hypotheses.",
+    },
 ];
 
 impl HypothesisKind {
@@ -541,6 +552,7 @@ impl HypothesisKind {
             Self::Universal => &HYPOTHESIS_SCHEMAS[12],
             Self::Named => &HYPOTHESIS_SCHEMAS[13],
             Self::Boolean => &HYPOTHESIS_SCHEMAS[14],
+            Self::CertifiedRegionMembership => &HYPOTHESIS_SCHEMAS[45],
             Self::RegionMembership => &HYPOTHESIS_SCHEMAS[15],
             Self::EmptyRegion => &HYPOTHESIS_SCHEMAS[16],
             Self::Cover => &HYPOTHESIS_SCHEMAS[17],
@@ -635,7 +647,11 @@ impl HypothesisRef {
     pub fn qualified(&self, cas: &Cas) -> Result<QualifiedHypothesis, Fault> {
         let frame = cas.state.context(cas.checked(&self.context)?)?;
         let kind = if frame.parent.is_some() && self.slot == 0 {
-            HypothesisKind::RegionMembership
+            if frame.introduction.is_some() {
+                HypothesisKind::CertifiedRegionMembership
+            } else {
+                HypothesisKind::RegionMembership
+            }
         } else {
             let predicate = crate::context_check::predicate(cas, self)?;
             cas.predicate_hypothesis_kind(&predicate)?

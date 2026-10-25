@@ -47,6 +47,27 @@ pub struct ProofCitation {
 }
 
 impl ProofCitation {
+    /// Inspect the auxiliary decision schema actually retained by this checked application.
+    ///
+    /// # Errors
+    /// Refuses a foreign handle or a handle that is not a checked proof.
+    pub fn auxiliary_schema(
+        &self,
+        cas: &Cas,
+    ) -> Result<Option<&'static crate::proof::LemmaSchema>, Fault> {
+        Ok(match Source::read(cas, cas.checked(&self.proof)?)? {
+            Source::Scoped(value)
+                if matches!(
+                    value.certificate,
+                    crate::proof_model::Certificate::Decision(_)
+                ) =>
+            {
+                Some(&crate::decision::DECISION_SCHEMAS[0])
+            }
+            _ => None,
+        })
+    }
+
     /// Borrow the exact formal lemma, version and ordered-premise contract.
     #[must_use]
     pub const fn formal_schema(&self) -> &'static PrimitiveSchema {
@@ -92,9 +113,31 @@ impl<'a> Source<'a> {
         }
     }
 
+    /// A certified membership use retains the proof that introduced its exact slot.
+    fn introduction(self, cas: &Cas) -> Result<Option<LogicalId>, Fault> {
+        if let Self::Scoped(value) = self
+            && let crate::proof_model::Certificate::Hypothesis(reference) = &value.certificate
+            && reference.slot == 0
+        {
+            return Ok(cas
+                .state
+                .context(cas.checked(&reference.context)?)?
+                .introduction);
+        }
+        Ok(None)
+    }
+
     /// Read the proposition family without rebuilding or rechecking its certificate.
     fn kind(self, cas: &Cas) -> Result<HypothesisKind, Fault> {
         match self {
+            Self::Scoped(value)
+                if matches!(
+                    &value.certificate,
+                    crate::proof_model::Certificate::Decision(_)
+                ) || self.introduction(cas)?.is_some() =>
+            {
+                Ok(HypothesisKind::CertifiedRegionMembership)
+            }
             Self::Scoped(value) => cas.statement_hypothesis_kind(&value.judgment.statement),
             Self::Scalar(value) => Ok(match &value.relation {
                 Relation::EqualOnDomain => HypothesisKind::Equality,
@@ -167,6 +210,10 @@ fn closure(
         budget.work(size(premises.len(), AT)?, AT)?;
         meter.reserve(&mut pending, premises.len(), budget)?;
         pending.extend_from_slice(premises);
+        if let Some(introduction) = source.introduction(cas)? {
+            meter.reserve(&mut pending, 1, budget)?;
+            pending.push(introduction);
+        }
     }
     let count = size(visited.len(), AT)?;
     budget.work(
@@ -294,6 +341,14 @@ fn premises(
         result.push(PremiseCitation {
             proof: cas.handle(*proof),
             kind,
+        });
+    }
+    if let Some(proof) = source.introduction(cas)? {
+        meter.reserve(&mut result, 1, budget)?;
+        budget.work(1, AT)?;
+        result.push(PremiseCitation {
+            proof: cas.handle(proof),
+            kind: HypothesisKind::CertifiedRegionMembership,
         });
     }
     Ok(result)

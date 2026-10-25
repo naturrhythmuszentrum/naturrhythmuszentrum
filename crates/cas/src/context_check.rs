@@ -98,10 +98,17 @@ pub(crate) fn hypothesis(
             return Err(invalid());
         }
     }
-    Ok(ScopedConditions {
+    let mut conditions = ScopedConditions {
         hypotheses: vec![reference.clone()],
         ..ScopedConditions::default()
-    })
+    };
+    if reference.slot == 0
+        && let Some(introduction) = frame.introduction
+    {
+        let proof = crate::proof_view::application(cas, introduction, budget)?;
+        crate::statement::merge(cas, &mut conditions, &proof.conditions, budget)?;
+    }
+    Ok(conditions)
 }
 
 /// The explicitly stated pointwise domain, if the proposition has one.

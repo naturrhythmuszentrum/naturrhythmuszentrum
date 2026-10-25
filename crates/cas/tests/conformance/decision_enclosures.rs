@@ -32,7 +32,7 @@ fn question(
     })
 }
 
-fn driven(source: &mut Fixture) -> TestResult<Handle> {
+pub(super) fn driven(source: &mut Fixture) -> TestResult<Handle> {
     let omega = source.number(1_000, 1)?;
     let inductance = source.number(1, 40)?;
     let capacitance = source.number(1, 100_000)?;

@@ -174,7 +174,7 @@ fn decode(
     manifest: &[Primitive],
 ) -> Result<Decoded, Fault> {
     match tag {
-        0..=8 | 13..=36 => {
+        0..=8 | 13..=37 => {
             crate::wire_objects::decode(cas, tag, layer, space.as_ref(), reader, records)
                 .map(Decoded::Object)
         }

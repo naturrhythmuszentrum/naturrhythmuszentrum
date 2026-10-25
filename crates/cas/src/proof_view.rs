@@ -411,6 +411,9 @@ pub(crate) fn measure(
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
     crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
+    if let Certificate::Decision(certificate) = &value.certificate {
+        crate::decision_wire::measure(cas, certificate, budget)?;
+    }
     if let Certificate::Emptiness(certificate) = &value.certificate {
         crate::emptiness::measure(cas, certificate, budget)?;
     }

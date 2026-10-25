@@ -288,6 +288,16 @@ fn header_draft(value: &HeaderDraft, out: &mut Encoder<'_>) -> Result<(), Fault>
 /// Measure complete context frames, including provenance and parent references.
 fn context_draft(value: &ContextDraft, out: &mut Encoder<'_>) -> Result<(), Fault> {
     let hypotheses = match value {
+        ContextDraft::Certified {
+            parent,
+            region,
+            introduction,
+        } => {
+            out.byte(2)?;
+            reference(parent, out)?;
+            reference(region, out)?;
+            return reference(introduction, out);
+        }
         ContextDraft::Root {
             header,
             admissible,

@@ -23,61 +23,14 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let value = match draft {
-            ContextDraft::Root {
-                header,
-                admissible,
-                assumptions,
-            } => {
-                let header_id = self.resolve(state, header, locals)?;
-                let admissible = self.resolve(state, admissible, locals)?;
-                let region = state.region(admissible)?;
-                if !crate::header::embeds(state, region.header, header_id, budget)? {
-                    return Err(Fault::invalid(InvalidCode::Context, AT));
-                }
-                let declared = self.frame_predicates(
-                    state,
-                    header_id,
-                    &region.scope,
-                    assumptions,
-                    locals,
-                    budget,
-                )?;
-                let assumptions: Vec<_> = declared
-                    .into_iter()
-                    .collect::<BTreeMap<_, _>>()
-                    .into_iter()
-                    .collect();
-                let canonical_assumptions =
-                    crate::context::canonical(state, &region.scope, &assumptions, budget)?;
-                let header = state.header(header_id)?;
-                Context {
-                    header_id,
-                    admissible,
-                    parent: None,
-                    restriction: None,
-                    frame: Vec::new(),
-                    depth: 0,
-                    environment: header.environment.clone(),
-                    header: header.bytes.clone(),
-                    assumptions,
-                    canonical_assumptions,
-                }
-            }
-            ContextDraft::Local {
-                parent,
-                region,
-                hypotheses,
-            } => {
-                let parent = self.resolve(state, parent, locals)?;
-                let region = self.resolve(state, region, locals)?;
-                self.local_context(state, parent, region, hypotheses, locals, pending, budget)?
-            }
-        };
+        let value = self.context_frame_value(state, draft, locals, pending, budget)?;
         let mut edges = vec![
             (value.header_id, Edge::InHeader),
             (value.admissible, Edge::AdmissibleRegion),
         ];
+        if let Some(introduction) = value.introduction {
+            edges.push((introduction, Edge::DependsOn));
+        }
         if let Some(parent) = value.parent {
             edges.push((parent, Edge::ParentContext));
         }
@@ -106,6 +59,83 @@ impl Cas {
             }
         }
         self.insert(state, vertex, &edges, pending, budget)
+    }
+
+    /// Reconstruct the exact frame before interning or publishing any context edge.
+    fn context_frame_value(
+        &self,
+        state: &mut State,
+        draft: &ContextDraft,
+        locals: &[LogicalId],
+        pending: u64,
+        budget: &mut Budget,
+    ) -> Result<Context, Fault> {
+        Ok(match draft {
+            ContextDraft::Certified {
+                parent,
+                region,
+                introduction,
+            } => {
+                let parent = self.resolve(state, parent, locals)?;
+                let region = self.resolve(state, region, locals)?;
+                let introduction = self.resolve(state, introduction, locals)?;
+                crate::decision_introduction::frame(state, parent, region, introduction, budget)?;
+                let mut context =
+                    self.local_context(state, parent, region, &[], locals, pending, budget)?;
+                context.introduction = Some(introduction);
+                context
+            }
+            ContextDraft::Root {
+                header,
+                admissible,
+                assumptions,
+            } => {
+                let header_id = self.resolve(state, header, locals)?;
+                let admissible = self.resolve(state, admissible, locals)?;
+                let region = state.region(admissible)?;
+                if !crate::header::embeds(state, region.header, header_id, budget)? {
+                    return Err(Fault::invalid(InvalidCode::Context, AT));
+                }
+                let declared = self.frame_predicates(
+                    state,
+                    header_id,
+                    &region.scope,
+                    assumptions,
+                    locals,
+                    budget,
+                )?;
+                let assumptions: Vec<_> = declared
+                    .into_iter()
+                    .collect::<BTreeMap<_, _>>()
+                    .into_iter()
+                    .collect();
+                let canonical_assumptions =
+                    crate::context::canonical(state, &region.scope, &assumptions, budget)?;
+                let header = state.header(header_id)?;
+                Context {
+                    introduction: None,
+                    header_id,
+                    admissible,
+                    parent: None,
+                    restriction: None,
+                    frame: Vec::new(),
+                    depth: 0,
+                    environment: header.environment.clone(),
+                    header: header.bytes.clone(),
+                    assumptions,
+                    canonical_assumptions,
+                }
+            }
+            ContextDraft::Local {
+                parent,
+                region,
+                hypotheses,
+            } => {
+                let parent = self.resolve(state, parent, locals)?;
+                let region = self.resolve(state, region, locals)?;
+                self.local_context(state, parent, region, hypotheses, locals, pending, budget)?
+            }
+        })
     }
 
     /// Validate predicate slots before copying them, without reordering local frames.
@@ -205,6 +235,33 @@ impl Cas {
         hypotheses.extend_from_slice(&frame);
         let canonical_assumptions =
             crate::context::canonical(state, &base.scope, &hypotheses, budget)?;
+        let admissible =
+            self.restricted_region(state, &enclosing, restriction, base, pending, budget)?;
+        Ok(Context {
+            introduction: None,
+            header_id: enclosing.header_id,
+            admissible,
+            parent: Some(parent),
+            restriction: Some(restriction),
+            frame,
+            depth,
+            environment: enclosing.environment,
+            header: enclosing.header,
+            assumptions: enclosing.assumptions,
+            canonical_assumptions,
+        })
+    }
+
+    /// Retain exactly the existing meet and family projection without changing ordinary costs.
+    fn restricted_region(
+        &self,
+        state: &mut State,
+        enclosing: &Context,
+        restriction: LogicalId,
+        base: Region,
+        pending: u64,
+        budget: &mut Budget,
+    ) -> Result<LogicalId, Fault> {
         let mut members = vec![enclosing.admissible, restriction];
         members.sort_unstable();
         members.dedup();
@@ -222,7 +279,7 @@ impl Cas {
         } else {
             base.lies_over
         };
-        let admissible = self.retain_region(
+        self.retain_region(
             state,
             Region {
                 lies_over: projection,
@@ -234,19 +291,7 @@ impl Cas {
             &edges,
             pending,
             budget,
-        )?;
-        Ok(Context {
-            header_id: enclosing.header_id,
-            admissible,
-            parent: Some(parent),
-            restriction: Some(restriction),
-            frame,
-            depth,
-            environment: enclosing.environment,
-            header: enclosing.header,
-            assumptions: enclosing.assumptions,
-            canonical_assumptions,
-        })
+        )
     }
 
     /// A formal-root frame retains the exact original parent and its lifted region without restriction.
@@ -266,6 +311,7 @@ impl Cas {
         // Ancestor assumptions retain their original qualified identities through the parent edge.
         let canonical_assumptions = crate::context::canonical(state, scope, &frame, budget)?;
         Ok(Context {
+            introduction: None,
             header_id: enclosing.header_id,
             admissible: region,
             parent: Some(parent),

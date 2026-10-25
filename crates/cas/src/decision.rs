@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Exact rational cuts, reusable finite decision partitions and closed rational enclosures.
+//! Exact decision prerequisites and checked local membership introductions.
 //!
-//! These checks establish cut, partition and closed rational enclosure premises. They admit no
-//! selected value, proof record or certified-membership hypothesis.
-//! A consumer must separately establish the target enclosure and complete decision
-//! contract before using this calculation in a checked introduction rule.
+//! Standalone cut, partition and closed rational enclosure checks return caller-retained values.
+//! `DecisionIntroduction` combines their exact contracts with whole-family coordinate equalities
+//! in an auxiliary checked proof; `ContextDraft::Certified` retains that proof in a local frame.
+//! Selection and local definedness remain separate checked obligations.
 
 use crate::budget::Budget;
 use crate::error::Fault;
@@ -240,3 +240,27 @@ impl Cas {
         result
     }
 }
+
+/// Replayable enclosure-to-membership evidence, consumed by `Primitive::RegionDecide`.
+///
+/// Ordered proof premises establish each coordinate equal to the corresponding target
+/// throughout the exact source context's admitted family. No input is trusted by name.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DecisionIntroduction {
+    /// Complete finite native partition and its exact coordinate inventory.
+    pub partition: CasePartition,
+    /// Exact selected association and rational coordinate box.
+    pub cut: CaseCut,
+    /// Original target replay for each coordinate, in the identical order.
+    pub enclosures: Vec<RationalEnclosure>,
+}
+
+/// Closed auxiliary inference register; no ordinary cost-policy entry is added.
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 1] = [crate::proof::LemmaSchema {
+    name: "decision.enclosure-membership",
+    label: "thm:cas:decision-enclosure-membership",
+    version: 1,
+    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+    statement: "Exact target enclosures and box inclusion establish membership in the declared option.",
+    premises: "Complete partition, exact original-target replay, cut and ordered coordinate-to-target equalities on the whole source family, retaining every used hypothesis.",
+}];

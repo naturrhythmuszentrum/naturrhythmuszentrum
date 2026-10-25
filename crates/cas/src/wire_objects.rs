@@ -203,9 +203,18 @@ fn source(
 /// Reconstruct the local frame and independently verify its exact meet region.
 fn context(
     cas: &mut Cas,
+    certified: bool,
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<Handle, Fault> {
+    let introduction = if certified {
+        let Decoded::Application(proof) = crate::wire_decode::reference(reader, records)? else {
+            return Err(invalid());
+        };
+        Some(proof.clone())
+    } else {
+        None
+    };
     let header = object(reader, records)?;
     let parent = optional(reader, records)?;
     let admissible = object(reader, records)?;
@@ -221,13 +230,20 @@ fn context(
             condition: reference(reader, records)?,
         });
     }
-    let draft = match (parent, restriction) {
-        (None, None) => ContextDraft::Root {
+    let draft = match (parent, restriction, introduction) {
+        (Some(parent), Some(region), Some(introduction)) if assumptions.is_empty() => {
+            ContextDraft::Certified {
+                parent: Reference::Existing(parent),
+                region: Reference::Existing(region),
+                introduction: Reference::Existing(introduction),
+            }
+        }
+        (None, None, None) => ContextDraft::Root {
             header: Reference::Existing(header.clone()),
             admissible: Reference::Existing(admissible.clone()),
             assumptions,
         },
-        (Some(parent), Some(region)) => ContextDraft::Local {
+        (Some(parent), Some(region), None) => ContextDraft::Local {
             parent: Reference::Existing(parent),
             region: Reference::Existing(region),
             hypotheses: assumptions,
@@ -279,7 +295,7 @@ pub(crate) fn decode(
                 reader,
             )?
         }
-        8 => context(cas, reader, records)?,
+        8 | 37 => context(cas, tag == 37, reader, records)?,
         13..=36 => {
             if layer != Layer::Logic || space.is_some() {
                 return Err(invalid());
@@ -298,7 +314,7 @@ pub(crate) fn decode(
             .budget
             .specialized(BudgetKind::BoundaryNodes, 1, true, AT)?;
     }
-    if tag == 8
+    if matches!(tag, 8 | 37)
         && cas.state.context(cas.checked(&value)?)?.parent.is_some()
         && reader.budget.usage().local_contexts == previous.local_contexts
     {

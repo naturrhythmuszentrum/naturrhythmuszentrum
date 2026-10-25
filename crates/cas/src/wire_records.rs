@@ -331,7 +331,10 @@ fn describe_remaining(
             }
         }
         Vertex::Context(value) => {
-            record.tag = 8;
+            record.tag = if value.introduction.is_some() { 37 } else { 8 };
+            if let Some(introduction) = value.introduction {
+                object(out, &mut record.references, introduction)?;
+            }
             object(out, &mut record.references, value.header_id)?;
             out.byte(u8::from(value.parent.is_some()))?;
             if let Some(parent) = value.parent {

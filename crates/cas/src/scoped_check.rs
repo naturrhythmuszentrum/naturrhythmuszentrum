@@ -139,6 +139,9 @@ fn rule_conditions(
         Primitive::ContextHypothesis => crate::context_check::hypothesis(cas, draft, budget)?,
         Primitive::ContextWeaken => crate::context_check::weaken(cas, draft, premises, budget)?,
         Primitive::ContextClose => crate::context_check::close(cas, draft, premises, budget)?,
+        Primitive::RegionDecide if matches!(&draft.certificate, Certificate::Decision(_)) => {
+            crate::decision_introduction::check(cas, draft, premises, budget)?
+        }
         Primitive::RegionDecide if matches!(&draft.certificate, Certificate::Emptiness(_)) => {
             crate::emptiness::check(cas, draft, premises, budget)?
         }
@@ -259,6 +262,9 @@ impl Cas {
             self.checked(&application.judgment.context)?,
             Edge::InContext,
         )];
+        if let Certificate::Decision(value) = &application.certificate {
+            crate::decision_introduction::dependencies(self, value, &mut edges, budget)?;
+        }
         let mut objects = crate::statement::objects(&application.judgment.statement);
         if matches!(&application.judgment.statement, Statement::Cover { .. }) {
             let count = size(objects.len(), AT)?;
