@@ -314,6 +314,27 @@ impl Runner<'_> {
 
     /// Choose an actual covering association; unrelated global overlaps do not enter this theorem.
     fn select(&mut self, function: &Handle, region: &Handle) -> Result<Handle, Fault> {
+        if let Some((original, association)) = crate::decision_selection::retained_option(
+            self.cas,
+            &self.request.context,
+            self.generation,
+        )? {
+            if function.logical_id() != original {
+                return Err(invalid());
+            }
+            let right = self.cas.handle(self.cas.state.arm(association)?.value);
+            let premises = self.certified_selection_premise(region)?;
+            return self.push(
+                Primitive::CaseSelect,
+                Statement::Equality {
+                    left: function.clone(),
+                    right,
+                    domain: region.clone(),
+                    domain_contract: DomainContract::DefinedAndEqual,
+                },
+                &premises,
+            );
+        }
         let arms = self
             .cas
             .state
@@ -344,6 +365,7 @@ impl Runner<'_> {
             match contained {
                 Ok(()) => {
                     let right = self.cas.handle(arm.value);
+                    let premises = self.certified_selection_premise(region)?;
                     return self.push(
                         Primitive::CaseSelect,
                         Statement::Equality {
@@ -352,7 +374,7 @@ impl Runner<'_> {
                             domain: region.clone(),
                             domain_contract: DomainContract::DefinedAndEqual,
                         },
-                        &[],
+                        &premises,
                     );
                 }
                 Err(fault)
@@ -361,6 +383,40 @@ impl Runner<'_> {
                         crate::error::FaultKind::Invalid(InvalidCode::Rule)
                     ) => {}
                 Err(fault) => return Err(fault),
+            }
+        }
+        Err(pending())
+    }
+
+    /// Preserve the supplied certified membership as a checked premise of local selection.
+    fn certified_selection_premise(&mut self, region: &Handle) -> Result<Vec<Handle>, Fault> {
+        let frame = self.cas.state.context(self.request.context.logical_id())?;
+        if frame.introduction.is_none() {
+            return Ok(Vec::new());
+        }
+        if region.logical_id() != frame.admissible {
+            return Err(pending());
+        }
+        let expected = Statement::Subset {
+            subset: region.clone(),
+            superset: self.cas.handle(frame.restriction.ok_or_else(invalid)?),
+        };
+        let used = crate::domain_model::HypothesisRef {
+            context: self.request.context.clone(),
+            slot: 0,
+        };
+        let at = Location::new("certified selection premise");
+        for proof in &self.request.premises {
+            self.generation.work(
+                crate::graph::size(proof.hypotheses().len(), at)?.saturating_add(1),
+                at,
+            )?;
+            if proof.judgment().context == self.request.context
+                && proof.judgment().statement == expected
+                && proof.is_discharged()
+                && proof.hypotheses().contains(&used)
+            {
+                return Ok(vec![proof.proof().clone()]);
             }
         }
         Err(pending())
@@ -494,7 +550,7 @@ const fn classify(fault: Fault, task: &Task) -> Fault {
 
 /// An unconditional countercell does not refute a request whose extra hypotheses remain undecided.
 fn classify_context(
-    cas: &Cas,
+    cas: &mut Cas,
     request: &Request,
     fault: Fault,
     budget: &mut Budget,
@@ -506,6 +562,13 @@ fn classify_context(
         )
     );
     if refuted {
+        if matches!(
+            fault.kind,
+            crate::error::FaultKind::Invalid(InvalidCode::RefutedDomain)
+        ) && crate::decision_selection::undefined(cas, request, budget)?
+        {
+            return Ok(fault);
+        }
         if request
             .premises
             .iter()

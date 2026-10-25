@@ -28,15 +28,19 @@ pub(crate) fn reconstruct(
             domain,
             domain_contract: DomainContract::DefinedAndEqual,
         } => {
+            let certified = crate::decision_selection::check(cas, draft, premises, budget)?;
             let left = cas.checked(left)?;
             let right = cas.checked(right)?;
             let domain = cas.checked(domain)?;
             crate::case_check::subset(cas, domain, within, budget)?;
-            let arm = selected_arm(cas, left, right, domain, budget)?;
-            let analysis = crate::case_cells::analyze(cas, left, right, domain, budget)?;
+            let arm =
+                certified.map_or_else(|| selected_arm(cas, left, right, domain, budget), Ok)?;
+            // The retained introduction proves unique ownership; only the selected value needs refinement.
+            let endpoint = if certified.is_some() { right } else { left };
+            let analysis = crate::case_cells::analyze(cas, endpoint, right, domain, budget)?;
             analysis.check(
                 cas,
-                left,
+                endpoint,
                 right,
                 domain,
                 DomainContract::DefinedAndEqual,

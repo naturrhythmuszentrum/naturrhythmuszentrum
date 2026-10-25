@@ -16,6 +16,8 @@ use nrz_cas::{Cas, Handle, Reference};
 mod refusals;
 #[path = "decision_introductions/resources.rs"]
 mod resources;
+#[path = "decision_introductions/selection.rs"]
+mod selection;
 #[path = "decision_introductions/wire.rs"]
 mod wire;
 
