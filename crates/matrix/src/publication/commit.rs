@@ -135,9 +135,9 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
                 let contract = contracts
                     .get(slot)
                     .ok_or(OperationError::CandidateContract)?;
-                let Some(crate::RecipeEvidence::Conversion(claim)) = evidence else {
-                    return Err(OperationError::CandidateContract);
-                };
+                let claim = evidence
+                    .and_then(crate::RecipeEvidence::conversion)
+                    .ok_or(OperationError::CandidateContract)?;
                 if claim.map() != contract.map() || claim.precision() != Q::PRECISION {
                     return Err(OperationError::CandidateContract);
                 }

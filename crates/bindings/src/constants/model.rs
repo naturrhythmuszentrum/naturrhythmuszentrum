@@ -14,6 +14,10 @@ use crate::{CheckedDeclarations, Conversion, NamedReference, SnapshotId};
 pub enum MapKind {
     /// Conversion between compatible measures of one quantity kind and role.
     Measure,
+    /// Checked full-cycle conversion from cyclic to angular frequency.
+    ToAngularFrequency,
+    /// Checked inverse full-cycle conversion from angular to cyclic frequency.
+    ToCyclicFrequency,
     /// Remove a named origin when required, then divide by a positive exact reference.
     Normalization,
     /// Inverse of the retained normalization, restoring the same reference and origin.
@@ -219,6 +223,8 @@ impl CheckedMap {
         std::mem::swap(&mut id.source, &mut id.target);
         id.kind = match id.kind {
             MapKind::Measure => MapKind::Measure,
+            MapKind::ToAngularFrequency => MapKind::ToCyclicFrequency,
+            MapKind::ToCyclicFrequency => MapKind::ToAngularFrequency,
             MapKind::Normalization => MapKind::Restoration,
             MapKind::Restoration => MapKind::Normalization,
         };

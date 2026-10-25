@@ -397,3 +397,102 @@ fn irrational_implicit_sensitivity_exports_refuse() -> TestResult {
     ));
     Ok(())
 }
+
+/// The enclosure export borrows exact map identity and retains a rational factor without approximating pi.
+/// ´test:integration:pi-enclosure-export-retains-exact-definition´
+#[test]
+fn pi_enclosure_export_retains_exact_definition() -> TestResult {
+    let declarations = owner()?;
+    let degree = angle("degree", 1, 180)?;
+    let turn = angle("turn", 2, 1)?;
+    for (source, forward_factor, reverse_factor) in [(&degree, "1/180", "180"), (&turn, "2", "1/2")]
+    {
+        let map = declarations.conversion_map(source, &source.coherent())?;
+        let reverse = map.inverse()?;
+        for (original, factor, action) in [
+            (&map, forward_factor, nrz_bindings::PiFactor::Multiply),
+            (&reverse, reverse_factor, nrz_bindings::PiFactor::Divide),
+        ] {
+            let exported = original
+                .scale()
+                .enclosure_export(&LimitsOverride::default())?;
+            assert!(std::ptr::eq(exported.definition(), original.scale()));
+            assert_eq!(exported.rational_factor(), factor);
+            assert_eq!(exported.pi_factor(), action);
+        }
+    }
+    let map = declarations.conversion_map(&degree, &turn)?;
+    let exported = map.scale().enclosure_export(&LimitsOverride::default())?;
+    assert_eq!(exported.pi_factor(), nrz_bindings::PiFactor::Rational);
+    assert_eq!(exported.rational_factor(), "1/360");
+    Ok(())
+}
+
+/// Exact positive expressions outside the admitted pi factor grammar keep their named refusal.
+/// ´test:integration:pi-enclosure-export-refuses-other-constants´
+#[test]
+fn pi_enclosure_export_refuses_other_constants() -> TestResult {
+    let declarations = owner()?;
+    let circle = pi()?;
+    let euler = ExactConstant::named(Constant::E, &mut ledger()?)?;
+    for scale in [
+        euler,
+        circle.add(&ExactConstant::one(), &mut ledger()?)?,
+        circle.pow(2, &mut ledger()?)?,
+    ] {
+        let source = Descriptor::new(
+            Kind::Angle,
+            Measure::new("unsupported", Scale::Expression(scale), Rational::zero())?,
+            Role::Difference,
+        )?;
+        let map = declarations.conversion_map(&source, &source.coherent())?;
+        assert!(matches!(
+            map.scale().enclosure_export(&LimitsOverride::default()),
+            Err(MapError::Units(UnitError::UnsupportedExactConstantExport))
+        ));
+    }
+    Ok(())
+}
+
+/// Exact factor admission succeeds at measured Work and byte limits and refuses one below.
+/// ´test:integration:pi-enclosure-export-resource-boundaries´
+#[test]
+fn pi_enclosure_export_resource_boundaries() -> TestResult {
+    let declarations = owner()?;
+    for (source, costs) in [
+        (
+            angle("degree", 1, 180)?,
+            [(38_371, 6731, 297), (84_462, 8264, 749)],
+        ),
+        (
+            angle("turn", 2, 1)?,
+            [(37_908, 6721, 297), (85_387, 8256, 749)],
+        ),
+    ] {
+        let forward = declarations.conversion_map(&source, &source.coherent())?;
+        let reverse = forward.inverse()?;
+        for (map, (work, staged, output)) in [&forward, &reverse].into_iter().zip(costs) {
+            let policy = LimitsOverride {
+                work: Some(work),
+                staged_payload_bytes: Some(staged),
+                output_bytes: Some(output),
+                ..LimitsOverride::default()
+            };
+            let exported = map.scale().enclosure_export(&policy)?;
+            assert_eq!(exported.work_used(), work);
+            assert_eq!(exported.owned_bytes(), 64);
+            for field in 0..3 {
+                let mut limited = policy.clone();
+                match field {
+                    0 => limited.work = Some(work - 1),
+                    1 => limited.staged_payload_bytes = Some(staged - 1),
+                    _ => limited.output_bytes = Some(output - 1),
+                }
+                assert!(map.scale().enclosure_export(&limited).is_err());
+                assert!(std::ptr::eq(exported.definition(), map.scale()));
+                assert_eq!(exported.work_used(), work);
+            }
+        }
+    }
+    Ok(())
+}

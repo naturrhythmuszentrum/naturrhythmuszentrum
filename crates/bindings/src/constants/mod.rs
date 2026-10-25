@@ -15,12 +15,14 @@
 
 mod coordinates;
 mod definitions;
+mod enclosure;
 mod maps;
 mod model;
 mod schema;
 
 pub use coordinates::MapCoordinates;
 pub use definitions::{OriginDefinition, ReferenceDefinition};
+pub use enclosure::{ConstantEnclosureExport, PiFactor};
 pub use model::{CheckedMap, ConstantKind, DescriptorConstant, MapIdentity, MapKind};
 
 use crate::{SnapshotError, UnitError};

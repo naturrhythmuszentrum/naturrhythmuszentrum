@@ -57,3 +57,36 @@ impl CheckedDeclarations {
         )
     }
 }
+
+impl CheckedDeclarations {
+    /// Bind the registered full-cycle relation to this immutable declaration owner.
+    ///
+    /// Source and target remain distinct kinds; ordinary same-kind conversion
+    /// still refuses them. The frozen registry retains the checked cycle definition.
+    /// # Errors
+    /// Refuses missing cycle registration, wrong kinds/roles, foreign registry
+    /// meanings and bounded exact arithmetic failure.
+    pub fn frequency_map(
+        &self,
+        source: &Descriptor,
+        target: &Descriptor,
+    ) -> Result<CheckedMap, MapError> {
+        let relation = self.registry().frequency_relation(source, target)?;
+        let kind = match relation.direction() {
+            crate::FrequencyDirection::ToAngular => MapKind::ToAngularFrequency,
+            crate::FrequencyDirection::ToCyclic => MapKind::ToCyclicFrequency,
+        };
+        Ok(CheckedMap::new(
+            MapIdentity {
+                snapshot: self.id().clone(),
+                kind,
+                source: MapCoordinates::scalar(source.clone()),
+                target: MapCoordinates::scalar(target.clone()),
+                reference: None,
+                column_reference: None,
+                origin: None,
+            },
+            relation.conversion().clone(),
+        ))
+    }
+}

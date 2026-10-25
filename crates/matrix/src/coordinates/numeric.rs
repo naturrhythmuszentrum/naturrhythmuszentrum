@@ -6,6 +6,7 @@ use nrz_bindings::{CheckedMap, DescriptorConstant};
 use nrz_scalar::{
     ArithmeticContext, DecodedLiteral, Enclosure, Finite, LiteralLimits, NumericLiteral, Scalar,
 };
+use std::rc::Rc;
 
 use crate::conversion::ConversionError;
 
@@ -13,11 +14,11 @@ use crate::conversion::ConversionError;
 #[derive(Clone, Debug)]
 pub(crate) struct LoweredMap<P: Scalar> {
     /// Original definition, including frozen declaration, reference and origin identities.
-    pub(crate) exact: CheckedMap,
+    pub(crate) exact: Rc<CheckedMap>,
     /// Scale candidate, exact-constant enclosure and its own evaluation displacement.
-    pub(crate) scale: DecodedLiteral<P>,
+    pub(crate) scale: Coefficient<P>,
     /// Shift candidate and evaluation enclosure; radii never use this coefficient.
-    pub(crate) shift: DecodedLiteral<P>,
+    pub(crate) shift: Coefficient<P>,
     /// Arithmetic proof used by both coefficient decodes.
     pub(crate) revision: u32,
 }
@@ -25,12 +26,12 @@ pub(crate) struct LoweredMap<P: Scalar> {
 impl<P: Scalar> LoweredMap<P> {
     /// Export only descriptor constants; stored numerical data never enters bindings arithmetic.
     pub(crate) fn new(
-        exact: &CheckedMap,
+        exact: &Rc<CheckedMap>,
         limits: LiteralLimits,
         context: &ArithmeticContext,
     ) -> Result<Self, ConversionError> {
         Ok(Self {
-            exact: exact.clone(),
+            exact: Rc::clone(exact),
             scale: lower(exact.scale(), limits, context)?,
             shift: lower(exact.shift(), limits, context)?,
             revision: context.revision(),
@@ -98,7 +99,64 @@ fn lower<P: Scalar>(
     constant: &DescriptorConstant,
     limits: LiteralLimits,
     context: &ArithmeticContext,
-) -> Result<DecodedLiteral<P>, ConversionError> {
+) -> Result<Coefficient<P>, ConversionError> {
     let spelling = constant.export(&Default::default())?;
-    Ok(NumericLiteral::new(&spelling, limits)?.decode(context)?)
+    Ok(Coefficient::literal(
+        NumericLiteral::new(&spelling, limits)?.decode(context)?,
+    ))
+}
+
+/// Numerical fields of one certified coefficient, independent of its exact representation.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct Coefficient<P: Scalar> {
+    /// Finite candidate used by the affine kernel.
+    center: Finite<P>,
+    /// Outward exact-definition bounds.
+    enclosure: Enclosure<P>,
+    /// Outward candidate displacement.
+    displacement: Finite<P>,
+    /// Complete charged coefficient lowering Work.
+    work: u64,
+}
+
+impl<P: Scalar> Coefficient<P> {
+    /// Preserve the ordinary rational literal decoder's center and error.
+    pub(crate) const fn literal(decoded: DecodedLiteral<P>) -> Self {
+        Self {
+            center: decoded.center(),
+            enclosure: decoded.enclosure(),
+            displacement: decoded.displacement(),
+            work: decoded.work_used(),
+        }
+    }
+    /// Choose the lower endpoint and enclose the complete candidate displacement.
+    pub(crate) fn enclosed(
+        enclosure: Enclosure<P>,
+        work: u64,
+        context: &ArithmeticContext,
+    ) -> Result<Self, ConversionError> {
+        let center = enclosure.lower();
+        Ok(Self {
+            center,
+            enclosure,
+            displacement: enclosure.displacement_from(center, context)?,
+            work,
+        })
+    }
+    /// The finite numerical candidate.
+    pub(crate) const fn center(self) -> Finite<P> {
+        self.center
+    }
+    /// The complete outward coefficient family.
+    pub(crate) const fn enclosure(self) -> Enclosure<P> {
+        self.enclosure
+    }
+    /// A bound on every member's displacement from the candidate.
+    pub(crate) const fn displacement(self) -> Finite<P> {
+        self.displacement
+    }
+    /// Charged recognition, import and numerical lowering Work.
+    pub(crate) const fn work_used(self) -> u64 {
+        self.work
+    }
 }

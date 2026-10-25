@@ -149,6 +149,12 @@ impl Provenance {
                 .checked_mul(size_of::<ProvenanceId>())
                 .ok_or(OperationError::ProvenanceLimit)?;
             usage.bytes = add(usage.bytes, add(fixed, parent_bytes)?)?;
+            if matches!(
+                record.evidence.get(node.slot),
+                Some(RecipeEvidence::PiConversion(_))
+            ) {
+                usage.bytes = add(usage.bytes, size_of::<crate::PiConversionEvidence>())?;
+            }
             let output_map = output
                 .dependency
                 .layout()

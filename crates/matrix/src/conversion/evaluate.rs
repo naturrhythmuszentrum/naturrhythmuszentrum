@@ -7,20 +7,28 @@ use crate::coordinate_numeric::LoweredMap;
 use crate::publication::Payload;
 use crate::{NormalizedView, OperationError, OutputReservation, RecipeEvidence};
 use nrz_scalar::{ArithmeticContext, Scalar};
+use std::rc::Rc;
 
 /// Evaluate one checked map with a per-execution exact-identity coefficient cache.
 pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     view: &NormalizedView<'_, P>,
     reservation: OutputReservation,
     contract: &ConversionContract,
-    cache: &mut Vec<LoweredMap<Q>>,
+    cache: &mut Vec<Rc<LoweredMap<Q>>>,
     context: &ArithmeticContext,
     slot: usize,
 ) -> Result<(Payload<Q>, RecipeEvidence), OperationError> {
-    let position = if let Some(position) = cache
-        .iter()
-        .position(|lowered| lowered.exact == contract.map)
-    {
+    let retained = contract
+        .cache
+        .try_borrow()
+        .map_err(|_| ConversionError::Contract)?;
+    let position = cache.iter().position(|lowered| {
+        let same_map = lowered.exact == contract.map;
+        let compatible = retained.compatible(lowered);
+        same_map && compatible
+    });
+    drop(retained);
+    let position = if let Some(position) = position {
         position
     } else {
         let lowered = contract
@@ -38,7 +46,19 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
     let payload = region(view, reservation, map, context)?;
     let evidence =
         ConversionEvidence::new(slot, payload.extent.entries(), reservation.coverage(), map);
-    Ok((payload, RecipeEvidence::Conversion(Box::new(evidence))))
+    let constant = contract
+        .cache
+        .try_borrow()
+        .map_err(|_| ConversionError::Contract)?
+        .evidence(map);
+    let evidence = match constant {
+        Some(constant) => RecipeEvidence::PiConversion(Box::new(super::PiConversionEvidence {
+            conversion: evidence,
+            constant,
+        })),
+        None => RecipeEvidence::Conversion(Box::new(evidence)),
+    };
+    Ok((payload, evidence))
 }
 
 /// Form the center, complete bound and new evaluation region in logical column order.

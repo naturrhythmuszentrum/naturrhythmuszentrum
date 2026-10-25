@@ -22,6 +22,9 @@ pub enum ConversionError {
     /// An outward finite arithmetic result was unavailable.
     #[error("conversion arithmetic: {0}")]
     Arithmetic(#[from] nrz_scalar::ArithmeticFailure),
+    /// The fixed pi enclosure could not satisfy its explicit policy.
+    #[error("pi constant: {0}")]
+    Pi(#[from] nrz_scalar::PiError),
     /// The supplied or computed deterministic bound was invalid.
     #[error("conversion bound: {0}")]
     Accuracy(#[from] nrz_accuracy::AccuracyFailure),
@@ -33,12 +36,17 @@ pub enum ConversionError {
     ResourceLimit,
 }
 
+mod pi;
+pub use pi::{PiConstant, PiConstantEvidence, PiConversionUse};
+
 mod contract;
 pub use contract::ConversionContract;
 pub(crate) use contract::check_operations;
 
 mod evidence;
-pub use evidence::{ConstantEvidence, ConversionEvidence, PrecisionEvidence, RecipeEvidence};
+pub use evidence::{
+    ConstantEvidence, ConversionEvidence, PiConversionEvidence, PrecisionEvidence, RecipeEvidence,
+};
 
 mod evaluate;
 pub(crate) use evaluate::evaluate;
@@ -61,6 +69,14 @@ pub(crate) fn same_format<P: nrz_scalar::Scalar + 'static, Q: nrz_scalar::Scalar
         .copied()
         .ok_or_else(|| crate::HeapError::PrecisionMismatch.into())
 }
+
+mod cache;
+
+mod definitions;
+mod schema;
+pub use schema::{NormalizationMaps, NormalizedEntryMaps};
+pub(crate) mod precision;
+pub use precision::PrecisionContract;
 
 #[cfg(test)]
 mod tests {
@@ -107,11 +123,3 @@ mod tests {
         Ok(())
     }
 }
-
-mod cache;
-
-mod definitions;
-mod schema;
-pub use schema::{NormalizationMaps, NormalizedEntryMaps};
-pub(crate) mod precision;
-pub use precision::PrecisionContract;

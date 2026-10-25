@@ -4,7 +4,8 @@
 use crate::coordinate_numeric::LoweredMap;
 use crate::{CopyEvidence, Coverage};
 use nrz_bindings::CheckedMap;
-use nrz_scalar::{DecodedLiteral, Precision, Scalar};
+use nrz_scalar::{Precision, Scalar};
+use std::rc::Rc;
 
 /// Constant candidate, enclosure and evaluation error, widened exactly for inspection.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -19,7 +20,7 @@ pub struct ConstantEvidence {
 
 impl ConstantEvidence {
     /// Retain exact binary widening; no arithmetic on descriptor values occurs here.
-    fn from_decoded<P: Scalar>(decoded: DecodedLiteral<P>) -> Self {
+    fn from_decoded<P: Scalar>(decoded: crate::coordinate_numeric::Coefficient<P>) -> Self {
         Self {
             center: decoded.center().get().to_f64(),
             enclosure: [
@@ -56,7 +57,7 @@ pub struct ConversionEvidence {
     /// Physical scope retained from the input, excluding invented physical exactness.
     pub(crate) coverage: Coverage,
     /// Full exact coefficient definitions and snapshot identity.
-    map: CheckedMap,
+    map: Rc<CheckedMap>,
     /// Scale and shift lowering results, in that order.
     constants: [ConstantEvidence; 2],
     /// Sealed arithmetic format used by the conversion.
@@ -77,7 +78,7 @@ impl ConversionEvidence {
             slot,
             entries,
             coverage,
-            map: map.exact.clone(),
+            map: Rc::clone(&map.exact),
             constants: [
                 ConstantEvidence::from_decoded(map.scale),
                 ConstantEvidence::from_decoded(map.shift),
@@ -88,7 +89,7 @@ impl ConversionEvidence {
     }
     /// Exact map identifying the coefficient definitions and declared origins/references.
     #[must_use]
-    pub const fn map(&self) -> &CheckedMap {
+    pub fn map(&self) -> &CheckedMap {
         &self.map
     }
     /// Scale and shift candidates with their own numerical enclosures and errors.
@@ -119,6 +120,8 @@ pub enum RecipeEvidence {
     Copy(CopyEvidence),
     /// Outward affine evaluation and propagated deterministic companions.
     Conversion(Box<ConversionEvidence>),
+    /// Certified pi-dependent conversion retaining its original shared constant region.
+    PiConversion(Box<PiConversionEvidence>),
     /// New representation with retained prior bounds and a separate center displacement.
     Precision(PrecisionEvidence),
 }
@@ -131,6 +134,7 @@ impl RecipeEvidence {
             Self::Solve(_) | Self::Kernel(_) => 0,
             Self::Copy(claim) => claim.slot(),
             Self::Conversion(claim) => claim.slot,
+            Self::PiConversion(claim) => claim.conversion.slot,
             Self::Precision(claim) => claim.slot,
         }
     }
@@ -142,6 +146,7 @@ impl RecipeEvidence {
             Self::Kernel(claim) => claim.entries,
             Self::Copy(claim) => claim.entries(),
             Self::Conversion(claim) => claim.entries,
+            Self::PiConversion(claim) => claim.conversion.entries,
             Self::Precision(claim) => claim.entries,
         }
     }
@@ -153,6 +158,7 @@ impl RecipeEvidence {
             Self::Kernel(claim) => claim.coverage,
             Self::Copy(claim) => claim.coverage(),
             Self::Conversion(claim) => claim.coverage,
+            Self::PiConversion(claim) => claim.conversion.coverage,
             Self::Precision(claim) => claim.coverage,
         }
     }
@@ -190,5 +196,39 @@ impl PrecisionEvidence {
     #[must_use]
     pub const fn arithmetic_revision(&self) -> u32 {
         self.revision
+    }
+}
+
+/// A pi conversion binds the original exact map to the same numerical region used by every channel.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PiConversionEvidence {
+    /// Complete exact map, coefficient bounds, numerical format and coverage.
+    pub(crate) conversion: ConversionEvidence,
+    /// Original immutable pi/reciprocal region and its constant revision.
+    pub(crate) constant: super::PiConstantEvidence,
+}
+
+impl PiConversionEvidence {
+    /// Original map and the actual scale/shift enclosures used by the conversion.
+    #[must_use]
+    pub const fn conversion(&self) -> &ConversionEvidence {
+        &self.conversion
+    }
+    /// Original shared pi materialization, including rational evidence and both revisions.
+    #[must_use]
+    pub const fn constant(&self) -> &super::PiConstantEvidence {
+        &self.constant
+    }
+}
+
+impl RecipeEvidence {
+    /// Inspect either admitted affine conversion without discarding its additional constant evidence.
+    #[must_use]
+    pub const fn conversion(&self) -> Option<&ConversionEvidence> {
+        match self {
+            Self::Conversion(value) => Some(value),
+            Self::PiConversion(value) => Some(&value.conversion),
+            _ => None,
+        }
     }
 }

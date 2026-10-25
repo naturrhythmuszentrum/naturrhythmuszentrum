@@ -173,7 +173,8 @@ mod coordinate_numeric;
 mod joint_twins;
 pub use conversion::{
     ConstantEvidence, ConversionContract, ConversionError, ConversionEvidence, ConversionMode,
-    PrecisionContract, PrecisionEvidence, RecipeEvidence,
+    PiConstant, PiConstantEvidence, PiConversionEvidence, PiConversionUse, PrecisionContract,
+    PrecisionEvidence, RecipeEvidence,
 };
 
 #[cfg(test)]

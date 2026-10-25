@@ -21,7 +21,7 @@ pub struct ConversionContract {
     /// Fresh destination interpretation and ordered tangent-coordinate shape.
     pub(crate) output: RegionContract,
     /// Exact map identity retained through lowering and publication.
-    pub(crate) map: CheckedMap,
+    pub(crate) map: Rc<CheckedMap>,
     /// Explicit bound on each coefficient's numerical decoding.
     pub(crate) literals: LiteralLimits,
     /// Required companion coverage, retained until concrete source validation.
@@ -64,7 +64,7 @@ impl ConversionContract {
         Ok(Self {
             input,
             output,
-            map,
+            map: Rc::new(map),
             literals,
             mode,
             cache: Rc::default(),
@@ -73,7 +73,7 @@ impl ConversionContract {
 
     /// Exact checked map, with source, destination, reference and origin identity.
     #[must_use]
-    pub const fn map(&self) -> &CheckedMap {
+    pub fn map(&self) -> &CheckedMap {
         &self.map
     }
 }

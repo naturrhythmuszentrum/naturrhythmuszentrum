@@ -103,7 +103,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Bound<'_, P, Q> {
         slot: usize,
         view: &NormalizedView<'_, P>,
         reservation: OutputReservation,
-        cache: &mut Vec<crate::coordinate_numeric::LoweredMap<Q>>,
+        cache: &mut Vec<std::rc::Rc<crate::coordinate_numeric::LoweredMap<Q>>>,
         context: Option<&nrz_scalar::ArithmeticContext>,
     ) -> Result<(Payload<Q>, crate::RecipeEvidence), OperationError> {
         match &self.operation.recipe {

@@ -219,3 +219,51 @@ fn lc_frequency_equation_retains_original_typed_operands() -> TestResult {
     ));
     Ok(())
 }
+
+/// Checked full-cycle maps retain snapshot identity, direction and exact pi factors.
+/// ´test:integration:pi-frequency-map-retains-original-relation´
+#[test]
+fn pi_frequency_map_retains_original_relation() -> TestResult {
+    let registry = Registry::with_angle_frequency(ExponentPolicy::Rational)?;
+    let owner = Context::with_real_symbols(registry, Limits::default(), &[])?.freeze()?;
+    let hertz = measured(owner.registry(), "Hz")?;
+    let angular = measured(owner.registry(), "rad/s")?;
+    let forward = owner.frequency_map(hertz, angular)?;
+    let reverse = owner.frequency_map(angular, hertz)?;
+    assert_eq!(
+        forward.id().kind(),
+        nrz_bindings::MapKind::ToAngularFrequency
+    );
+    assert_eq!(
+        reverse.id().kind(),
+        nrz_bindings::MapKind::ToCyclicFrequency
+    );
+    assert_eq!(forward.inverse()?, reverse);
+    assert_eq!(
+        forward.scale().exact(),
+        &owner
+            .registry()
+            .frequency_relation(hertz, angular)?
+            .conversion()
+            .scale
+    );
+    for (map, factor, operation) in [
+        (&forward, "2", nrz_bindings::PiFactor::Multiply),
+        (&reverse, "1/2", nrz_bindings::PiFactor::Divide),
+    ] {
+        let exported = map.scale().enclosure_export(&LimitsOverride::default())?;
+        assert_eq!(exported.rational_factor(), factor);
+        assert_eq!(exported.pi_factor(), operation);
+        assert!(std::ptr::eq(exported.definition(), map.scale()));
+    }
+    let foreign = Context::with_real_symbols(
+        Registry::with_angle_frequency(ExponentPolicy::Rational)?,
+        Limits::default(),
+        &[],
+    )?
+    .freeze()?;
+    assert!(forward.validate_snapshot(&foreign).is_err());
+    assert!(owner.frequency_map(hertz, hertz).is_err());
+    assert!(owner.conversion_map(hertz, angular).is_err());
+    Ok(())
+}
