@@ -17,7 +17,7 @@ pub(crate) struct Target {
     pub(crate) stamp: ValueStamp,
     /// Selected logical column order.
     pub(crate) layout: Layout,
-    /// Exact homogeneous base interpretation.
+    /// Exact base schema identity, including general reading storage.
     schema: SchemaId,
     /// Original sealed floating format.
     pub(crate) precision: Precision,
@@ -34,9 +34,12 @@ impl<P: Scalar + 'static> TargetMap<P> {
     /// Capture the exact current value version and selected logical entry order.
     ///
     /// # Errors
-    /// Refuses foreign/stale values or invalid existing evidence.
+    /// Refuses foreign/stale values, selected companion revisions or invalid existing evidence.
     pub fn capture(heap: &Heap, handle: Handle<Value, P>) -> Result<Self, JointError> {
         let value = heap.value(handle)?;
+        if let Some(selected) = heap.symbols.selection(handle.key) {
+            selected.validate(heap)?;
+        }
         Ok(Self {
             target: Target {
                 key: handle.key,
@@ -72,6 +75,24 @@ impl<P: Scalar + 'static> TargetMap<P> {
     }
 }
 impl Target {
+    /// Resolve the selected meaning without assigning a homogeneous quantity to its base.
+    pub(crate) fn quantity<'h>(
+        &self,
+        heap: &'h Heap,
+    ) -> Result<&'h nrz_bindings::Descriptor, HeapError> {
+        if heap.symbols.selection(self.key).is_some() {
+            return heap
+                .symbols
+                .selection_symbols(self.key)
+                .map(|symbols| symbols.value().descriptor())
+                .ok_or(HeapError::MissingBinding);
+        }
+        heap.meanings
+            .get(self.schema.index)
+            .and_then(|schema| schema.quantity.as_ref())
+            .ok_or(HeapError::MissingBinding)
+    }
+
     /// Raw dependency validation avoids recursive companion-to-value access.
     pub(crate) fn validate(&self, heap: &Heap) -> Result<(), HeapError> {
         if self.scope != heap.scope {
@@ -100,6 +121,9 @@ impl Target {
         self.layout
             .validate(region.length, heap.limits.layout_work)?;
         heap.storage.resolve(region)?;
+        if let Some(selected) = heap.symbols.selection(self.key) {
+            selected.validate(heap)?;
+        }
         Ok(())
     }
 }

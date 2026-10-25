@@ -11,6 +11,7 @@ mod grid;
 mod invariants;
 mod oracle_regression;
 mod reuse;
+mod selected_joint;
 mod state;
 #[allow(
     dead_code,

@@ -31,7 +31,12 @@ pub(super) fn prepare<P: Scalar + 'static>(
         for (target, errors) in targets.iter().zip(&means.errors) {
             let handle = crate::Handle::<crate::Value, P>::new(heap.scope, target.target.key);
             let symbol = heap.symbol_binding(handle)?;
-            let selected = parameters::targets(symbol.symbol(), target.layout())?;
+            let layout = if heap.symbols.selection(target.target.key).is_some() {
+                crate::Layout::contiguous(target.layout().extent())?
+            } else {
+                target.layout().clone()
+            };
+            let selected = parameters::targets(symbol.symbol(), &layout)?;
             let mean = parameters::values(Extent::new(errors.len(), 1)?, selected)?;
             declarations.push(parameters::errors(&mean)?);
         }

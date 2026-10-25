@@ -8,7 +8,7 @@ use crate::heap::{
     records::{Location, Meaning, Record},
 };
 use crate::storage::{Format, Region};
-use crate::{Extent, Heap, HeapError, JointError, JointLimits, JointModel, Layout};
+use crate::{Extent, Heap, JointError, JointLimits, JointModel, Layout};
 use nrz_bindings::{PairingWitness, UncertaintyMode};
 use nrz_scalar::Scalar;
 use std::{marker::PhantomData, rc::Rc};
@@ -69,7 +69,8 @@ impl Heap {
     ///
     /// Targets are operating centers, not asserted expectations. Source fluctuations
     /// are zero-mean. Attaching after any operation history refuses, since those
-    /// historical recipes did not capture this statistical dependency.
+    /// historical recipes did not capture this statistical dependency. Selected original
+    /// readings retain their own quantity and complete value/companion version closure.
     ///
     /// # Errors
     /// Refuses stale/wrong targets, inconsistent source maps, unsupported descriptors,
@@ -313,13 +314,7 @@ fn validate_selection<P: Scalar + 'static>(
     if target.layout().extent().entries() != selection.len() {
         return Err(JointError::WrongTarget);
     }
-    let schema = &heap
-        .meanings
-        .get(heap.descriptors.get(target.target.key)?.schema)
-        .ok_or(HeapError::InvalidLayout)?
-        .quantity
-        .as_ref()
-        .ok_or(HeapError::MissingBinding)?;
+    let quantity = target.target.quantity(heap)?;
     for (position, &index) in selection.iter().enumerate() {
         for (earlier, &previous) in selection[..position].iter().enumerate() {
             if target.layout().flat_index(position)? == target.layout().flat_index(earlier)?
@@ -329,7 +324,7 @@ fn validate_selection<P: Scalar + 'static>(
             }
         }
         let source = model.sources().get(index).ok_or(JointError::WrongTarget)?;
-        if source.descriptor() != &schema.difference() {
+        if source.descriptor() != &quantity.difference() {
             return Err(JointError::WrongTarget);
         }
     }
