@@ -7,3 +7,5 @@ mod fused;
 mod literals;
 mod primitives;
 mod reductions;
+
+mod pi;

@@ -13,6 +13,7 @@ mod fused;
     reason = "literal tokens and work counters are shared only inside private decoder modules"
 )]
 mod literal;
+mod pi;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "rounded primitives are shared only between private arithmetic modules"
@@ -27,6 +28,7 @@ pub use error::ArithmeticFailure;
 pub use finite::Finite;
 pub use format::{Precision, Scalar};
 pub use literal::{DecodedLiteral, LiteralLimits, NumericLiteral};
+pub use pi::{PiBounds, PiBudget, PiEnclosure, PiError, PiLimits, PiUsage};
 pub use reduction::{dot, norm_upper, sum};
 
 #[cfg(any(doc, doctest))]

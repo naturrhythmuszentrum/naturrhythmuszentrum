@@ -25,6 +25,13 @@
 |(`test:integration:literal-syntax-refusals`)|scalar|Grammar rejects expressions, unsupported spellings and malformed fraction components.|
 |(`test:integration:literal-resource-boundaries`)|scalar|Limits are enforced at, below and above each resource boundary.|
 |(`test:integration:literal-range-and-divisor-refusals`)|scalar|Overflow and zero-containing denominator enclosures refuse even when an exact quotient is small.|
+|(`test:integration:pi-independent-rational-bounds`)|scalar|Every refinement and format encloses pi by an independent exact rational theorem.|
+|(`test:integration:pi-refinement-is-nested`)|scalar|Tightened requests retain nested rational evidence and include binary quantization.|
+|(`test:integration:pi-tolerance-refusals-are-atomic`)|scalar|Invalid tolerances and exhausted fixed resolution preserve nonzero caller usage.|
+|(`test:integration:pi-zero-resource-refusals`)|scalar|Independent caps refuse before publication even with a zero allowance.|
+|(`test:integration:pi-resource-boundaries`)|scalar|Literal Work, steps and byte boundaries cover the seed and both binary formats.|
+|(`test:integration:pi-cumulative-resource-boundaries`)|scalar|Repeated requests charge full cumulative Work, steps and output with atomic late refusal.|
+|(`test:integration:pi-mixed-format-staging-boundary`)|scalar|A larger-format staging refusal preserves a previously committed smaller-format result.|
 |(`test:integration:binary32-primitive-boundary-oracle`)|scalar|Binary32 boundaries include ties, cancellation, subnormals and both finite limits.|
 |(`test:integration:binary64-primitive-boundary-oracle`)|scalar|Binary64 boundaries exercise the same laws at its independent exponent range.|
 |(`test:integration:endpoint-hulls-enclose`)|scalar|All four signs and zero crossings preserve inclusion in both formats.|
