@@ -40,6 +40,10 @@ pub enum InvalidCode {
     DecisionOutsideRegion,
     /// The selected value or its explicit option range is not an admissible integer cell.
     DecisionIntegerRange,
+    /// Two declared decision options own the same exact cell, even if their values agree.
+    DecisionPartitionOverlap,
+    /// A declared decision option includes a point outside the exact case domain.
+    DecisionPartitionOutsideDomain,
     /// A factor has no established strict sign in the requested region.
     StrictSignUnavailable,
     /// A reading map coefficient depends on a reading being substituted.

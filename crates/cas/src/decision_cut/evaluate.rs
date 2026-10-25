@@ -73,17 +73,7 @@ pub(super) fn check(
     order: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let ambient = &cas.state.region(roots[0])?.ambient;
-    let mut values = Values::new();
-    for id in order {
-        budget.condition(size(values.len(), AT)?.saturating_add(1), AT)?;
-        let retained = payload(&values, budget)?;
-        let bytes = retained.saturating_add(temporary(cut.bounds.len(), budget)?);
-        let value = budget.with_retained_payload(bytes, AT, |budget| {
-            evaluate(cas, cut, header, ambient, *id, &values, budget)
-        })?;
-        values.insert(*id, value);
-    }
+    let values = build(cas, cut, header, roots[0], order, budget)?;
     for root in roots {
         match truth(&values, *root)? {
             Truth::All => {}
@@ -97,6 +87,29 @@ pub(super) fn check(
         }
     }
     Ok(())
+}
+
+/// Reconstruct every original operand; successful compilation proves global totality of this grammar.
+pub(super) fn build(
+    cas: &Cas,
+    cut: &CaseCut,
+    header: LogicalId,
+    domain: LogicalId,
+    order: &[LogicalId],
+    budget: &mut Budget,
+) -> Result<Values, Fault> {
+    let ambient = &cas.state.region(domain)?.ambient;
+    let mut values = Values::new();
+    for id in order {
+        budget.condition(size(values.len(), AT)?.saturating_add(1), AT)?;
+        let retained = payload(&values, budget)?;
+        let bytes = retained.saturating_add(temporary(cut.bounds.len(), budget)?);
+        let value = budget.with_retained_payload(bytes, AT, |budget| {
+            evaluate(cas, cut, header, ambient, *id, &values, budget)
+        })?;
+        values.insert(*id, value);
+    }
+    Ok(values)
 }
 
 /// Interpret one node only after its original typed dependencies have been checked.
@@ -304,7 +317,7 @@ fn integer_range(
 }
 
 /// Retain actual coefficient sizes and conservative tree/vector overhead between node evaluations.
-fn payload(values: &Values, budget: &mut Budget) -> Result<u64, Fault> {
+pub(super) fn payload(values: &Values, budget: &mut Budget) -> Result<u64, Fault> {
     let mut bytes = 1_024_u64;
     for value in values.values() {
         budget.work(1, AT)?;

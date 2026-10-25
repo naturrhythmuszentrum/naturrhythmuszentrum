@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Exact box inclusion in an existing native case association.
+//! Exact rational cuts and reusable finite decision partitions.
 //!
-//! These checks establish only the cut premise. They admit no enclosure origin,
-//! partition, selected value, proof record or certified-membership hypothesis.
+//! These checks establish cut and partition premises. They admit no enclosure origin,
+//! selected value, proof record or certified-membership hypothesis.
 //! A consumer must separately establish the target enclosure and complete decision
 //! contract before using this calculation in a checked introduction rule.
 
@@ -67,6 +67,87 @@ impl Cas {
     pub fn check_case_cut(&self, cut: &CaseCut, budget: &mut Budget) -> Result<(), Fault> {
         let previous = budget.restrict_storage(&self.limits);
         let result = crate::decision_cut::check(self, cut, budget);
+        budget.restore_limits(previous);
+        result
+    }
+}
+
+/// An untrusted finite partition question over an actual native case revision.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct CasePartition {
+    /// Exact native case, including its domain and complete association inventory.
+    pub function: Handle,
+    /// Distinct closed Real coordinates exhausting the domain's ambient axes.
+    pub coordinates: Vec<Handle>,
+    /// Optional finite integer family; both endpoints must be present and integral.
+    pub integer: Option<IntegerCellRange>,
+}
+
+/// A sealed, reusable check of one immutable case partition and optional integer family.
+///
+/// This caller-owned value retains its exact input contract, not a membership fact.
+/// Reuse checks store and case identity without reconstructing the common partition.
+/// It has no wire representation and cannot be used as a proof or cover witness.
+#[derive(Clone, Debug)]
+pub struct CheckedCasePartition {
+    /// Exact immutable case revision, ordered axes and optional finite integer range.
+    pub(crate) contract: CasePartition,
+    /// Prepaid conservative ownership bound for this returned contract.
+    pub(crate) bytes: u64,
+}
+
+impl CheckedCasePartition {
+    /// Borrow the exact contract whose complete partition was checked.
+    #[must_use]
+    pub const fn contract(&self) -> &CasePartition {
+        &self.contract
+    }
+
+    /// Conservative logical bytes owned by this returned value, excluding shared graph syntax.
+    #[must_use]
+    pub const fn retained_bytes(&self) -> u64 {
+        self.bytes
+    }
+}
+
+impl Cas {
+    /// Check total predicates, nonempty domain, pairwise disjointness and exact cover once.
+    ///
+    /// Supported atoms are rational affine comparisons involving at most one axis
+    /// after exact cancellation. Their common Cartesian cells retain every singleton
+    /// boundary. An integer family additionally matches each literal option to its
+    /// exact half-open cell and the case domain to the declared finite range.
+    /// # Errors
+    /// Refuses missing members, overlaps, options outside the domain, empty domains,
+    /// mismatched identities, malformed integer families and unsupported predicates.
+    /// Refusal publishes no graph state or returned check; spent Work remains spent.
+    pub fn check_case_partition(
+        &self,
+        contract: &CasePartition,
+        budget: &mut Budget,
+    ) -> Result<CheckedCasePartition, Fault> {
+        let previous = budget.restrict_storage(&self.limits);
+        let result = crate::decision_cut::partition::check(self, contract, budget);
+        budget.restore_limits(previous);
+        result
+    }
+
+    /// Check a cut against an already checked, identical partition contract.
+    ///
+    /// Exact case, ordered coordinates and integer-range identities must agree.
+    /// The sealed partition avoids repeating cover and disjointness checks; the cut
+    /// itself is checked anew on the same cumulative ledger. No target enclosure,
+    /// certified membership, local frame or selected value is introduced.
+    /// # Errors
+    /// Refuses foreign checks, changed contracts and every refusal of `check_case_cut`.
+    pub fn check_partition_cut(
+        &self,
+        partition: &CheckedCasePartition,
+        cut: &CaseCut,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        let previous = budget.restrict_storage(&self.limits);
+        let result = crate::decision_cut::partition::reuse(self, partition, cut, budget);
         budget.restore_limits(previous);
         result
     }

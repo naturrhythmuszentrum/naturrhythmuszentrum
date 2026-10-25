@@ -3,6 +3,7 @@
 
 mod affine;
 mod evaluate;
+pub(crate) mod partition;
 mod plan;
 
 use std::cmp::Ordering;
