@@ -50,6 +50,8 @@ pub enum HypothesisKind {
     RegionMembership,
     /// Membership introduced by a retained checked decision proof.
     CertifiedRegionMembership,
+    /// Every point in the exact affine projected domain has one ordered Integer tuple.
+    LatticeCover,
     /// Every projected input has exactly one Integer index in its declared native relation.
     IntegerFamily,
     /// The unique projected Integer of the declared family equals the selected exact value.
@@ -115,7 +117,7 @@ pub enum HypothesisKind {
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 48] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 49] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -164,10 +166,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 48] = [
     HypothesisKind::CertifiedRegionMembership,
     HypothesisKind::IntegerFamily,
     HypothesisKind::IntegerSelection,
+    HypothesisKind::LatticeCover,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 48] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 49] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -552,6 +555,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 48] = [
         statement: "The declared family's unique projected Integer equals the exact selected value.",
         premises: "Complete Integer family and selected Integer literal; a retained statement alone confers no certified selection or materialization authority.",
     },
+    LemmaSchema {
+        name: "hyp.lattice-cover",
+        label: "assum:cas:hyp-lattice-cover",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "Every point of the exact affine projected domain belongs to one half-open lattice cell indexed by the declared product range.",
+        premises: "Original basis, offset, common parameter context, ordered scalar ranges and affine inverse; a retained statement is not a checked product-cover lemma.",
+    },
 ];
 
 impl HypothesisKind {
@@ -559,6 +570,7 @@ impl HypothesisKind {
     #[must_use]
     pub const fn formal_schema(self) -> &'static LemmaSchema {
         match self {
+            Self::LatticeCover => &HYPOTHESIS_SCHEMAS[48],
             Self::DomainGuard => &HYPOTHESIS_SCHEMAS[0],
             Self::NonZero => &HYPOTHESIS_SCHEMAS[1],
             Self::StrictSign => &HYPOTHESIS_SCHEMAS[2],

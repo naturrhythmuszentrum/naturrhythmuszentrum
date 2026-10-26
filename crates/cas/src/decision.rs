@@ -310,7 +310,7 @@ pub struct IntegerSelection {
 }
 
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
-pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 5] = [
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 6] = [
     crate::proof::LemmaSchema {
         name: "decision.enclosure-membership",
         label: "thm:cas:decision-enclosure-membership",
@@ -350,5 +350,13 @@ pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 5] = [
         standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
         statement: "The unique projected result of the declared floor family is the selected exact Integer.",
         premises: "Checked identical floor-family theorem, whole-domain coordinate-to-target equality, exact original-target enclosure wholly inside the selected half-open cell and checked index-range membership, retaining every used hypothesis.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.lattice-floor-cover",
+        label: "thm:cas:decision-lattice-floor-cover",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "Every point in the exact affine projected domain has exactly one ordered Integer tuple in the declared half-open product range.",
+        premises: "Original homogeneous basis and offset, checked nonzero determinant and both inverse identities, followed by one checked scalar floor family per distinct coordinate under the common independent parameter frame, with exact projected domains and all binding hypotheses retained.",
     },
 ];

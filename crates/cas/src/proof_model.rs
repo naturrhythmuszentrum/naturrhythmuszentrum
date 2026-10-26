@@ -36,6 +36,8 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// Unique finite affine product projection over an exact lattice index domain.
+    LatticeCover(Box<crate::lattice::LatticeCover>),
     /// Complete unique Integer projection of a finite native floor relation.
     IntegerFamily(Box<crate::decision::IntegerFamily>),
     /// Exact Integer selected by a checked unique family projection.

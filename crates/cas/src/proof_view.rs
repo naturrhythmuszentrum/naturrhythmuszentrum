@@ -374,7 +374,7 @@ fn prepay_scalar_copy(
 }
 
 /// Native payload and its optional scalar cache are bounded before either is cloned.
-fn prepay_scoped_copy(value: &CheckedApplication, budget: &mut Budget) -> Result<(), Fault> {
+fn prepay_scoped_copy(value: &CheckedApplication, budget: &mut Budget) -> Result<u64, Fault> {
     let mut out = crate::encoding::Encoder::new(budget, AT);
     crate::statement::application(value, &mut out)?;
     let bytes = size(out.finish().len(), AT)?
@@ -399,7 +399,24 @@ fn prepay_scoped_copy(value: &CheckedApplication, budget: &mut Budget) -> Result
             .checked_add(retained)
             .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
         AT,
-    )
+    )?;
+    Ok(total)
+}
+
+/// Prepay one authenticated premise copy before reserving an aggregate retained inventory.
+pub(crate) fn application_bytes(
+    cas: &Cas,
+    proof: LogicalId,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
+    let Vertex::Proof(id) = cas.state.node(proof)? else {
+        return Err(invalid());
+    };
+    match cas.state.node(*id)? {
+        Vertex::ScopedApplication(value) => prepay_scoped_copy(value, budget),
+        Vertex::Application(value) => prepay_scalar_copy(value, budget),
+        _ => Err(invalid()),
+    }
 }
 
 /// Bound the number and payload of a typed application before caller-owned copies.
@@ -437,6 +454,17 @@ pub(crate) fn measure(
         }
     }
     let objects = match &value.conclusion {
+        Statement::LatticeCover(value) => {
+            let bytes = crate::lattice::cover::check::payload(value, budget)?;
+            budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
+            budget.work(bytes, AT)?;
+            value
+                .index
+                .families
+                .len()
+                .saturating_mul(7)
+                .saturating_add(7)
+        }
         Statement::IntegerSelection(value) => 7 + usize::from(value.family.count.is_some()),
         Statement::IntegerFamily(value) => 6 + usize::from(value.count.is_some()),
         Statement::BoundaryPartition(value) => {
@@ -522,6 +550,9 @@ pub(crate) fn validate_judgment(
             Vertex::SourceForm(value) => value.header,
             Vertex::Condition(value) => value.header,
             Vertex::Space(value) => value.header,
+            Vertex::Context(frame) if matches!(&value.statement, Statement::LatticeCover(_)) => {
+                frame.header_id
+            }
             _ => return Err(Fault::invalid(InvalidCode::Reference, AT)),
         };
         if !crate::header::embeds(&cas.state, header, context.header_id, budget)? {

@@ -26,6 +26,9 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<Statement, Fault> {
     Ok(match reader.byte()? {
+        28 => Statement::LatticeCover(Box::new(crate::lattice::cover::wire::decode(
+            reader, records,
+        )?)),
         27 => Statement::IntegerSelection(Box::new(crate::decision_integer_wire::decode(
             reader, records,
         )?)),

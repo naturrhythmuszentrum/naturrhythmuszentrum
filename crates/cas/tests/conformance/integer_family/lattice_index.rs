@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Cartesian lattice ranges consume existing scalar family proofs in their original parent scope.
 
+#[path = "lattice_cover.rs"]
+mod lattice_cover;
+
 use super::{Frame, admit, bound_guard, ledger, real};
 use crate::testing::builders::environment;
 use crate::testing::common::TestResult;

@@ -312,6 +312,10 @@ pub(crate) fn encode(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Statement::LatticeCover(value) => {
+            out.byte(28)?;
+            crate::lattice::cover::wire::encode(value, out, &mut write)?;
+        }
         Statement::IntegerSelection(value) => {
             crate::decision_integer_wire::encode(value, out, &mut write)?;
         }
@@ -545,6 +549,7 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::LatticeCover(value) => crate::lattice::cover::wire::objects(value),
         Statement::IntegerSelection(value) => crate::decision_integer_wire::objects(value),
         Statement::IntegerFamily(value) => crate::decision_family_wire::objects(value),
         Statement::Solve(value) => value.objects(),
@@ -776,7 +781,8 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
 pub(crate) const fn layer(value: &Statement) -> Layer {
     match value {
         Statement::Distribution(_) => Layer::Distribution,
-        Statement::IntegerSelection(_)
+        Statement::LatticeCover(_)
+        | Statement::IntegerSelection(_)
         | Statement::IntegerFamily(_)
         | Statement::Solve(_)
         | Statement::BoundaryPartition(_)

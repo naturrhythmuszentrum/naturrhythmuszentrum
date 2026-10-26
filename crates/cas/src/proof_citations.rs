@@ -97,6 +97,13 @@ impl ProofCitation {
             return Ok(None);
         };
         if matches!(
+            &value.judgment.statement,
+            crate::proof_model::Statement::LatticeCover(_)
+        ) && value.rule == Primitive::RegionDecide
+        {
+            return Ok(Some(&crate::decision::DECISION_SCHEMAS[5]));
+        }
+        if matches!(
             value.judgment.statement,
             crate::proof_model::Statement::IntegerFamily(_)
         ) && value.rule == Primitive::RegionDecide

@@ -8,7 +8,7 @@ use crate::domain_model::{AmbientDomain, RegionExpr};
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Handle, LogicalId, Vertex, size};
 use crate::model::Operator;
-use crate::proof_model::{Certificate, Statement, VerifiedWitness};
+use crate::proof_model::{Certificate, CheckedApplication, Statement, VerifiedWitness};
 use crate::rule::Primitive;
 
 /// All new range-composition costs belong to this caller-owned operation.
@@ -140,7 +140,11 @@ impl Cas {
     }
 
     /// An ambient parameter frame has no hidden restriction on the coordinates being projected.
-    fn lattice_range_frame(&self, home: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
+    pub(super) fn lattice_range_frame(
+        &self,
+        home: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
         let frame = self.state.context(home)?;
         let domain = self.state.region(frame.admissible)?;
         if domain.ambient != AmbientDomain::Assignments || !domain.scope.is_empty() {
@@ -172,6 +176,17 @@ impl Cas {
         let Vertex::ScopedApplication(proof) = self.state.node(*id)? else {
             return Err(invalid());
         };
+        self.lattice_scalar_application(home, family, proof, budget)
+    }
+
+    /// Share exact scalar theorem and parameter provenance checks with product replay.
+    pub(super) fn lattice_scalar_application(
+        &self,
+        home: LogicalId,
+        family: &IntegerFamily,
+        proof: &CheckedApplication,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
         let Statement::IntegerFamily(actual) = &proof.judgment.statement else {
             return Err(invalid());
         };
@@ -204,7 +219,7 @@ impl Cas {
     }
 
     /// Visit original operands, so canceled dependencies cannot turn coupled ranges into products.
-    fn lattice_range_independence(
+    pub(super) fn lattice_range_independence(
         &self,
         question: &LatticeIndexQuestion,
         axes: &[&str],
@@ -266,7 +281,7 @@ impl Cas {
     }
 
     /// Exact constructor identity forbids widening, omission or a substituted scalar factor.
-    fn lattice_range_product(
+    pub(super) fn lattice_range_product(
         &self,
         question: &LatticeIndexQuestion,
         budget: &mut Budget,
@@ -308,7 +323,7 @@ impl Cas {
 }
 
 /// Family clones retain only fixed handles and bounded optional exact count numbers.
-fn payload(question: &LatticeIndexQuestion, budget: &mut Budget) -> Result<u64, Fault> {
+pub(super) fn payload(question: &LatticeIndexQuestion, budget: &mut Budget) -> Result<u64, Fault> {
     let count = size(question.families.len(), AT)?;
     let mut bytes = count.saturating_mul(512).saturating_add(256);
     for family in &question.families {
