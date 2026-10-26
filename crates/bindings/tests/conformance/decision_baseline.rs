@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Measured public CAS prerequisites; these do not constitute bindings decision admission.
 
-#[path = "decision_fixture.rs"]
-mod fixture;
-
+use super::decision_fixture::{fixture, ledger};
 use crate::testing::declarations::TestResult;
-use fixture::{fixture, ledger};
 use nrz_bindings::{BindingSymbols, Descriptor};
 use nrz_cas::{
     Cas, FaultKind, InvalidCode, Location,

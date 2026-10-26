@@ -24,6 +24,11 @@ mod constants;
         unreachable_pub"
 )]
 mod coordinates;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "private decision modules share bounded admission helpers"
+)]
+mod decision;
 mod declaration;
 mod descriptor;
 mod diagnostic;
@@ -74,6 +79,10 @@ pub use constants::{
     CheckedMap, ConstantEnclosureExport, ConstantKind, DescriptorConstant, ExactEnclosureExport,
     MapCoordinates, MapError, MapIdentity, MapKind, OriginDefinition, PiFactor,
     ReferenceDefinition,
+};
+pub use decision::{
+    DecisionAttachment, DecisionError, DecisionExpression, IntegerDecisionCase,
+    IntegerDecisionSpec, SelectedDecision,
 };
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};

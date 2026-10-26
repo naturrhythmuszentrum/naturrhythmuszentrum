@@ -65,6 +65,37 @@ impl CountDomain {
         Ok(())
     }
 
+    /// Check an exact count on the caller's cumulative ledger.
+    ///
+    /// This is the explicit accounting route for decision admission; existing
+    /// descriptor-only checks retain their independent fixed-operation budgets.
+    /// # Errors
+    /// Refuses fractional or out-of-domain values and exhausted exact resources.
+    pub fn check_with_budget(
+        self,
+        value: &Rational,
+        ledger: &mut nrz_cas::limits::Budget,
+    ) -> Result<(), UnitError> {
+        let at = nrz_cas::Location::new("count domain admission");
+        ledger.work(1, at)?;
+        value.check(ledger, at)?;
+        if !value.is_integer() {
+            return Err(UnitError::CountValue);
+        }
+        for (bound, forbidden) in [
+            (self.minimum, std::cmp::Ordering::Less),
+            (self.maximum, std::cmp::Ordering::Greater),
+        ] {
+            if let Some(bound) = bound {
+                let bound = Rational::from_ratio(bound, 1, ledger)?;
+                if value.compare(&bound, ledger)? == forbidden {
+                    return Err(UnitError::CountValue);
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Whether unconstrained addition is closed in this supported domain.
     #[must_use]
     pub fn admits_addition(self) -> bool {
