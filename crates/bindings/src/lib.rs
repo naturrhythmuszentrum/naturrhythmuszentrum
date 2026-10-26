@@ -82,7 +82,7 @@ pub use constants::{
 };
 pub use decision::{
     CountDescriptor, CountEvidence, DecisionAttachment, DecisionError, DecisionExpression,
-    IntegerDecisionCase, IntegerDecisionSpec, SelectedDecision,
+    DecisionInputs, DecisionOperand, IntegerDecisionCase, IntegerDecisionSpec, SelectedDecision,
 };
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};

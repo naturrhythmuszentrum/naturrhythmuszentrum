@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Storage-neutral certified Integer admission for closed, physically checked expressions.
 
+mod association;
 mod case;
 mod count;
 mod expression;
 mod snapshot;
 mod storage;
 
+pub use association::{DecisionInputs, DecisionOperand};
 pub use case::{DecisionAttachment, IntegerDecisionCase, IntegerDecisionSpec};
 pub use count::{CountDescriptor, CountEvidence};
 pub use expression::DecisionExpression;
@@ -15,6 +17,15 @@ pub use snapshot::SelectedDecision;
 /// Exact admission refusals; executable count capacity remains a separate operation.
 #[derive(Debug, thiserror::Error)]
 pub enum DecisionError {
+    /// The original dependency is outside the supported closed constant subset.
+    #[error("decision source has no closed constant input association")]
+    Source,
+    /// Numerical symbols do not match the sealed original input association.
+    #[error("decision input association does not match")]
+    Association,
+    /// Storage-neutral numerical symbol declaration refused.
+    #[error("decision input symbols: {0}")]
+    Symbols(#[from] crate::AdmissionError),
     /// The original closed mathematical target does not match the physical expression.
     #[error("decision target does not match the bound expression")]
     Target,
