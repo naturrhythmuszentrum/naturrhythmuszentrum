@@ -47,6 +47,44 @@ pub struct ProofCitation {
 }
 
 impl ProofCitation {
+    /// Inspect the constant theorem consumed inside this checked application.
+    ///
+    /// The ordinary citation closure includes these retained applications, so this
+    /// view also exposes pi dependencies after composition and fresh-store replay.
+    /// # Errors
+    /// Refuses foreign or non-proof handles and exhausted explicit traversal Work.
+    pub fn constant_schema(
+        &self,
+        cas: &Cas,
+        budget: &mut Budget,
+    ) -> Result<Option<&'static crate::proof::LemmaSchema>, Fault> {
+        let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof)?)? else {
+            return Ok(None);
+        };
+        let uses_pi = match &value.certificate {
+            crate::proof_model::Certificate::IntegerSelection(enclosure) => {
+                budget.work(1, AT)?;
+                matches!(
+                    enclosure.origin,
+                    crate::decision::EnclosureOrigin::PiBound { .. }
+                )
+            }
+            crate::proof_model::Certificate::Decision(evidence) => {
+                let mut found = false;
+                for enclosure in &evidence.enclosures {
+                    budget.work(1, AT)?;
+                    found |= matches!(
+                        enclosure.origin,
+                        crate::decision::EnclosureOrigin::PiBound { .. }
+                    );
+                }
+                found
+            }
+            _ => false,
+        };
+        Ok(uses_pi.then_some(&crate::proof::CONSTANT_SCHEMAS[0]))
+    }
+
     /// Inspect the auxiliary decision schema actually retained by this checked application.
     ///
     /// # Errors

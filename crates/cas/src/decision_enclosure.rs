@@ -48,6 +48,14 @@ pub(crate) fn validate(
     contract: &RationalEnclosure,
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
+    if let EnclosureOrigin::PiBound {
+        expression,
+        certificate,
+    } = &contract.origin
+    {
+        return crate::decision_pi::validate(cas, contract, expression, certificate, budget)
+            .map_err(fragment);
+    }
     let EnclosureOrigin::ExactRational { expression, value } = &contract.origin else {
         return Err(unsupported());
     };
@@ -74,7 +82,11 @@ pub(crate) fn validate(
 }
 
 /// The context's actual region and header cannot be replaced by caller descriptions.
-fn identities(cas: &Cas, contract: &RationalEnclosure) -> Result<(), Fault> {
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the sibling closed replay checkers share this validation boundary"
+)]
+pub(super) fn identities(cas: &Cas, contract: &RationalEnclosure) -> Result<(), Fault> {
     let target = cas.state.expression(cas.checked(&contract.target)?)?;
     let context = cas.state.context(cas.checked(&contract.context)?)?;
     let family = cas.checked(&contract.input_family)?;

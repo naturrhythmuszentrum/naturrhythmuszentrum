@@ -126,7 +126,9 @@ pub(crate) fn dependencies(
     for handle in [&value.target, &value.context, &value.input_family] {
         edges.push((cas.checked(handle)?, Edge::DependsOn));
     }
-    if let EnclosureOrigin::ExactRational { expression, .. } = &value.origin {
+    if let EnclosureOrigin::ExactRational { expression, .. }
+    | EnclosureOrigin::PiBound { expression, .. } = &value.origin
+    {
         edges.push((cas.checked(expression)?, Edge::DependsOn));
     }
     Ok(())

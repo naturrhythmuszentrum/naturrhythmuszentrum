@@ -41,9 +41,22 @@ fn assemble(
     selected: &str,
     target: &str,
 ) -> TestResult<SelectionFixture> {
-    let number = Rational::parse(target, &mut ledger()?)?;
     let value = exact(&mut frame, selected, true)?;
-    let target = exact(&mut frame, target, false)?;
+    let (target, number) = if target == "10/Pi" {
+        let pi = frame.term(
+            Operator::Constant(nrz_cas::syntax::Constant::Pi),
+            super::super::real(),
+            &[],
+        )?;
+        let ten = exact(&mut frame, "10", false)?;
+        (
+            frame.term(Operator::Div, super::super::real(), &[ten, pi])?,
+            None,
+        )
+    } else {
+        let number = Rational::parse(target, &mut ledger()?)?;
+        (exact(&mut frame, target, false)?, Some(number))
+    };
     let predicate = admit(
         &mut frame.cas,
         Draft::Condition {
@@ -110,7 +123,7 @@ fn applications(
     value: Handle,
     target: Handle,
     bindings: &[Handle],
-    number: Rational,
+    number: Option<Rational>,
 ) -> TestResult<Vec<ApplicationDraft>> {
     let mut steps = Vec::new();
     for (index, predicate) in bindings.iter().enumerate() {
@@ -131,16 +144,32 @@ fn applications(
         substitutions: Vec::new(),
         certificate: Certificate::None,
     });
+    let (lower, upper, origin) = if let Some(number) = number {
+        (
+            number.clone(),
+            number.clone(),
+            EnclosureOrigin::ExactRational {
+                expression: target.clone(),
+                value: number,
+            },
+        )
+    } else {
+        (
+            Rational::from_ratio(203, 64, &mut ledger()?)?,
+            Rational::from_ratio(205, 64, &mut ledger()?)?,
+            EnclosureOrigin::PiBound {
+                expression: target.clone(),
+                certificate: Box::new(crate::conformance::pi_bounds::cycle()?),
+            },
+        )
+    };
     let enclosure = RationalEnclosure {
-        target: target.clone(),
+        target,
         context: context.clone(),
         input_family: family.domain.clone(),
-        lower: number.clone(),
-        upper: number.clone(),
-        origin: EnclosureOrigin::ExactRational {
-            expression: target,
-            value: number,
-        },
+        lower,
+        upper,
+        origin,
     };
     steps.push(ApplicationDraft {
         rule: Primitive::CaseSelect,
@@ -630,3 +659,6 @@ fn integer_family_selection_resource_boundaries() -> TestResult {
     }
     Ok(())
 }
+
+#[path = "selection/pi.rs"]
+mod pi;

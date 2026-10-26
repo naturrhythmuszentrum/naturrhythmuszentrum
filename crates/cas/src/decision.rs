@@ -166,6 +166,13 @@ pub enum EnclosureOrigin {
         /// Untrusted rational result, checked against exact CAS normalization.
         value: Rational,
     },
+    /// Closed interval replay with an independently checked finite Machin expansion.
+    PiBound {
+        /// Exact original expression, identical to the requested target.
+        expression: Handle,
+        /// Untrusted constant theorem instance, retained and rechecked on every replay.
+        certificate: Box<crate::pi_bounds::PiBoundCertificate>,
+    },
     /// Scalar numerical certificates require a separate, presently unsupported checker.
     ScalarKernel,
     /// Matrix numerical certificates require a separate, presently unsupported checker.
@@ -176,9 +183,9 @@ pub enum EnclosureOrigin {
 
 /// An untrusted rational enclosure of an exact target in its original context.
 ///
-/// The supported replay is a closed expression with an exactly rational result.
-/// Its bound holds throughout the stated family without using any input assumption.
-/// Free-input interval arguments and non-rational remainder bounds are unsupported.
+/// Replay supports exact rational results and closed pi arithmetic under an explicit
+/// checked Machin certificate. Its bound holds throughout the stated family without
+/// using an input assumption. Free-input interval arguments remain unsupported.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RationalEnclosure {
     /// Exact original expression, including operands that normalization could erase.
@@ -208,6 +215,15 @@ pub struct CheckedRationalEnclosure {
 }
 
 impl CheckedRationalEnclosure {
+    /// The constant theorem retained by this checked enclosure, when pi replay was used.
+    #[must_use]
+    pub const fn constant_schema(&self) -> Option<&'static crate::proof::LemmaSchema> {
+        match &self.contract.origin {
+            EnclosureOrigin::PiBound { .. } => Some(&crate::proof::CONSTANT_SCHEMAS[0]),
+            _ => None,
+        }
+    }
+
     /// Borrow the exact original contract whose replay and rational bounds were checked.
     #[must_use]
     pub const fn contract(&self) -> &RationalEnclosure {
@@ -225,13 +241,14 @@ impl Cas {
     /// Replay a closed original expression and check its exact result against a rational box.
     ///
     /// Existing exact-constant rules check finiteness before normalization and
-    /// independently check the normalized equality. Named constants are accepted
-    /// only when that exact normalization produces a rational result, such as `Pi/Pi`.
+    /// independently check the normalized equality. `ExactRational` requires an
+    /// exactly rational result; `PiBound` additionally checks a finite Machin theorem
+    /// and propagates outward rational intervals through the closed expression.
     /// All original operands are checked even when cancellation could hide them.
     /// # Errors
     /// Refuses foreign identities, changed targets or input families, false results,
-    /// reversed or excluding boxes, unsupported origins, free inputs, non-rational
-    /// results and unproved original divisor domains. No caller graph state changes.
+    /// reversed or excluding boxes, unsupported origins or constants, free inputs,
+    /// invalid pi certificates and unproved divisor domains. No caller graph state changes.
     pub fn check_rational_enclosure(
         &self,
         contract: &RationalEnclosure,

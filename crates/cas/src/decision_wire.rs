@@ -92,6 +92,26 @@ pub(crate) fn encode_enclosure(
             write(expression, out)?;
             out.number(value)
         }
+        EnclosureOrigin::PiBound {
+            expression,
+            certificate,
+        } => {
+            out.byte(4)?;
+            write(expression, out)?;
+            out.unsigned(u64::from(certificate.version))?;
+            for count in certificate.terms {
+                out.unsigned(u64::from(count))?;
+            }
+            for value in [
+                &certificate.sums[0],
+                &certificate.sums[1],
+                &certificate.lower,
+                &certificate.upper,
+            ] {
+                out.number(value)?;
+            }
+            Ok(())
+        }
         EnclosureOrigin::ScalarKernel => out.byte(1),
         EnclosureOrigin::MatrixKernel => out.byte(2),
         EnclosureOrigin::Unverified => out.byte(3),
@@ -218,6 +238,10 @@ pub(crate) fn decode_enclosure(
         1 => EnclosureOrigin::ScalarKernel,
         2 => EnclosureOrigin::MatrixKernel,
         3 => EnclosureOrigin::Unverified,
+        4 => EnclosureOrigin::PiBound {
+            expression: object(reader, records)?,
+            certificate: Box::new(decode_pi(reader)?),
+        },
         _ => return Err(invalid()),
     };
     Ok(RationalEnclosure {
@@ -280,4 +304,19 @@ pub(crate) fn decode_sign(
         16 => Ok(Certificate::DecisionDischarge),
         _ => Err(invalid()),
     }
+}
+
+/// A pi certificate has its own semantic revision within the additive origin tag.
+fn decode_pi(reader: &mut Reader<'_, '_>) -> Result<crate::pi_bounds::PiBoundCertificate, Fault> {
+    let version = reader.small()?;
+    if version != crate::proof::CONSTANT_SCHEMAS[0].version {
+        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+    }
+    Ok(crate::pi_bounds::PiBoundCertificate {
+        version,
+        terms: [reader.small()?, reader.small()?],
+        sums: [reader.rational()?, reader.rational()?],
+        lower: reader.rational()?,
+        upper: reader.rational()?,
+    })
 }

@@ -2,7 +2,7 @@
 //! Owned finite constant expressions with checked sign evidence and exact CAS normalization.
 
 mod arithmetic;
-mod graph;
+pub(crate) mod graph;
 mod sign;
 
 use std::rc::Rc;

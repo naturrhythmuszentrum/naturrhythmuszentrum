@@ -184,7 +184,7 @@ fn decision_enclosure_hidden_domain() -> TestResult {
     Ok(())
 }
 
-/// Named constants use exact cancellation only; the LC target 10/Pi has no rational replay.
+/// Exact cancellation needs no pi bound; a rational candidate alone cannot certify 10/Pi.
 /// ´test:integration:decision-enclosure-named-constant-boundary´
 #[test]
 fn decision_enclosure_named_constant_boundary() -> TestResult {

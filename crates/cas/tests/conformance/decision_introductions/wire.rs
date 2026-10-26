@@ -118,3 +118,74 @@ pub(super) fn unknown_version(original: &[u8], certificate: u8) -> TestResult {
     }
     Err("missing consequence certificate".into())
 }
+
+fn skip_rational(bytes: &[u8], position: &mut usize) -> TestResult {
+    *position += 1;
+    for _ in 0..2 {
+        let count = number(bytes, position)?;
+        *position = position.checked_add(count).ok_or("rational offset")?;
+    }
+    Ok(())
+}
+
+fn skip_integer_range(bytes: &[u8], position: &mut usize) -> TestResult {
+    let present = *bytes.get(*position).ok_or("range presence")?;
+    *position += 1;
+    if present == 0 {
+        return Ok(());
+    }
+    assert_eq!(present, 1);
+    *position += 4;
+    for _ in 0..2 {
+        let present = *bytes.get(*position).ok_or("endpoint presence")?;
+        *position += 1;
+        if present == 1 {
+            skip_rational(bytes, position)?;
+        } else {
+            assert_eq!(present, 0);
+        }
+    }
+    Ok(())
+}
+
+/// Parse the versioned introduction grammar, without searching for coincidental byte patterns.
+pub(super) fn pi_offsets(bytes: &[u8]) -> TestResult<[usize; 4]> {
+    for (tag, start, _) in wire_inventory(bytes)? {
+        if tag != 11 {
+            continue;
+        }
+        let mut position = start + 14;
+        let premises = number(bytes, &mut position)?;
+        position += 4 * premises;
+        assert_eq!(number(bytes, &mut position)?, 0);
+        if bytes[position] != 14 {
+            continue;
+        }
+        position += 1 + 8 + 4;
+        let coordinates = number(bytes, &mut position)?;
+        position += 4 * coordinates;
+        skip_integer_range(bytes, &mut position)?;
+        position += 8;
+        let bounds = number(bytes, &mut position)?;
+        for _ in 0..bounds {
+            position += 4;
+            skip_rational(bytes, &mut position)?;
+            skip_rational(bytes, &mut position)?;
+        }
+        skip_integer_range(bytes, &mut position)?;
+        assert_eq!(number(bytes, &mut position)?, 1);
+        position += 12;
+        skip_rational(bytes, &mut position)?;
+        skip_rational(bytes, &mut position)?;
+        assert_eq!(bytes[position], 4);
+        position += 1 + 4;
+        let version = position;
+        let terms = version + 8;
+        let sums = terms + 16;
+        position = sums;
+        skip_rational(bytes, &mut position)?;
+        skip_rational(bytes, &mut position)?;
+        return Ok([version, terms, sums, position]);
+    }
+    Err("missing pi origin".into())
+}
