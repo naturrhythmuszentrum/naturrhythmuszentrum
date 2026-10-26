@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked affine lattice bases over the existing exact matrix and proof vocabulary.
 
+mod index;
+
+pub use index::{CheckedLatticeIndexDomain, LatticeIndexQuestion};
+
 use crate::budget::{Budget, BudgetKind};
 use crate::conditions::Conditions;
 use crate::error::{Fault, FaultKind, InvalidCode, Location};

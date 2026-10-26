@@ -10,7 +10,7 @@ use crate::error::Fault;
 use crate::graph::{Cas, LogicalId, Vertex, size};
 
 /// Visit the acyclic region and expression closure once with an explicit bounded stack.
-pub(super) fn order(
+pub(crate) fn order(
     cas: &Cas,
     roots: &[LogicalId],
     budget: &mut Budget,

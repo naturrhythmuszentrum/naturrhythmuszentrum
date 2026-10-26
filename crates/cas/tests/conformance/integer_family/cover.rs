@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Native floor-family proof, complete domain identities and independent replay.
 
+#[path = "lattice_index.rs"]
+mod lattice_index;
 #[path = "parameters.rs"]
 mod parameters;
 #[path = "selection.rs"]

@@ -5,7 +5,7 @@ mod affine;
 mod evaluate;
 pub(crate) mod family;
 pub(crate) mod partition;
-mod plan;
+pub(crate) mod plan;
 
 use std::cmp::Ordering;
 
