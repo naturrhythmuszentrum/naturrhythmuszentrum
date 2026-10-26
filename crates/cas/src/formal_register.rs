@@ -620,3 +620,13 @@ const fn solving(schema: SolveSchema) -> &'static PrimitiveSchema {
         SolveSchema::SolutionTransport => &PRIMITIVE_SCHEMAS[78],
     }
 }
+
+/// Closed constant theorems with independently reconstructed rational certificates.
+pub const CONSTANT_SCHEMAS: [LemmaSchema; 1] = [LemmaSchema {
+    name: "constant.pi-machin-bounds",
+    label: "thm:cas:constant-pi-machin-bounds",
+    version: 1,
+    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+    statement: "The claimed closed rational interval contains mathematical pi.",
+    premises: "Exact finite alternating sums for atan(1/5) and atan(1/239), their signed next-term remainders, Machin's identity and outward rational endpoint comparisons.",
+}];

@@ -1050,3 +1050,15 @@ Selecting N=3 from the nonnegative family at rational target 51/16 with enclosur
 **Example (Bounded projected selection costs)** · `ex:cas:integer-selection-bounded-costs`
 
 The same selected Integer and enclosure under the `[0,5)` family cost 141,257 Work and 87,616 staged bytes, add 3,885 graph bytes, and retain a 1,666-byte witness. The source graph requires 19,710 payload bytes; fresh-store inspection costs 233,660 Work, 86,912 staged bytes and 19,198 payload bytes. Literal N/N−1 and prior-usage checks cover both proof and replay, including zero output allowance and atomic graph rollback (`test:integration:integer-family-selection`), (`test:integration:integer-family-selection-resource-boundaries`).
+
+**Theorem (Machin bounds for pi)** · `thm:cas:constant-pi-machin-bounds`
+
+Formal schema `constant.pi-machin-bounds`, version 1. The claimed closed rational interval contains mathematical pi. Required premises: Exact finite alternating sums for atan(1/5) and atan(1/239), their signed next-term remainders, Machin's identity and outward rational endpoint comparisons. Standing: Lemma; instances are CAS-checked.
+
+**Rule (Checked finite pi certificates)** · `rule:cas:pi-machin-certificates`
+
+`PiBoundCertificate::check` reconstructs each stated partial sum in exact rational arithmetic, places the omitted arctangent remainder between zero and the next signed term, combines the two intervals with coefficients 16 and −4, and checks outward containment in the claimed interval (`thm:cas:constant-pi-machin-bounds`). The sealed `CheckedPiBounds` retains the expansion, endpoints, revision and formal schema. False sums, insufficient terms, inward or reversed endpoints and unknown versions refuse; scalar results and external provenance have no authority. The fixed analytic derivation is the root statement “Machin identity and signed remainders” in the CAS design.
+
+**Rule (Measured Machin certificate resources)** · `rule:cas:pi-machin-resources`
+
+The LC certificate uses term counts `[2,1]` and costs 18,179 Work, 539 arithmetic steps and 680 returned bytes; the adjacent dyadic endpoints over denominator 2^96 use `[21,7]` and cost 355,924 Work, 4,669 steps and 1,104 returned bytes (`test:integration:pi-machin-costs`). Exact Work, arithmetic-step and returned-byte boundaries include N and N−1, prior caller Work and unchanged input certificates on refusal (`test:integration:pi-machin-resources`). Arithmetic and conservative retained scratch are charged to the caller's cumulative ledger; failure restores temporary limits while spent Work remains spent. No default changes and requests that do not invoke this theorem pay no new cost (`rule:cas:pi-machin-certificates`).

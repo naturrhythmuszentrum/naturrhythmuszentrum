@@ -58,6 +58,7 @@ mod error;
 )]
 mod exact_constant;
 mod formal_register;
+
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
@@ -66,6 +67,8 @@ mod formal_register;
 mod graph;
 mod hypothesis_kinds;
 mod model;
+/// Independently checked rational bounds for mathematical pi.
+pub mod pi_bounds;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \
