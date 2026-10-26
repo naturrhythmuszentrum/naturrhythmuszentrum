@@ -52,6 +52,7 @@ fn endpoints(
 pub(crate) fn validate(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<(), Fault> {
     budget.work(1, Location::new("statement object roles"))?;
     match statement {
+        Statement::IntegerFamily(value) => crate::decision_cut::family::roles(cas, value)?,
         Statement::Solve(value) => crate::solving::graph::statement(cas, value, budget)?,
         Statement::Germ(value) => crate::germ_check::validate(cas, value, budget)?,
         Statement::Split(value) => crate::split_geometry::validate(cas, value, budget)?,

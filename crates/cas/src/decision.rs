@@ -257,8 +257,30 @@ pub struct DecisionIntroduction {
     pub enclosures: Vec<RationalEnclosure>,
 }
 
+/// A projected floor-family proposition over an explicit native `(q,n)` frame.
+///
+/// For every assignment in `domain` with the `index` coordinate omitted, exactly
+/// one Integer index belongs to the declared range and the native case relation.
+/// Bounds are exact Integer expressions; absence is the corresponding unbounded
+/// constructor. The executable checker currently requires literal bounds.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IntegerFamily {
+    /// Finite native Integer case whose sole association returns `index`.
+    pub function: Handle,
+    /// Declared Real coordinate projected by the floor relation.
+    pub coordinate: Handle,
+    /// Declared Integer coordinate explicitly bound by this proposition.
+    pub index: Handle,
+    /// Exact projected input domain, independent of the bound index.
+    pub domain: Handle,
+    /// Included Integer endpoint, or no lower bound.
+    pub lower: Option<Handle>,
+    /// Excluded Integer endpoint, or no upper bound.
+    pub upper: Option<Handle>,
+}
+
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
-pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 3] = [
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 4] = [
     crate::proof::LemmaSchema {
         name: "decision.enclosure-membership",
         label: "thm:cas:decision-enclosure-membership",
@@ -282,5 +304,13 @@ pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 3] = [
         standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
         statement: "A checked certified sign consequence discharges one original nonzero requirement without changing the local equality or its retained requirements.",
         premises: "Original conditional defined-and-equal statement with exactly one pointwise nonzero residual and a checked decision.membership-nonzero fact on the identical context, region and predicate, retaining every source hypothesis.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.integer-floor-family",
+        label: "thm:cas:decision-integer-floor-family",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "Every admitted Real coordinate has exactly one Integer index in the declared floor relation and range.",
+        premises: "Exact finite native case on the explicit mixed frame, Integer result identical to its bound index, complete half-open floor relation, nonempty exact Integer range and identical projected input domain.",
     },
 ];

@@ -993,3 +993,23 @@ Integer option literals retain distinct graph identities from the Real literals 
 **Example (Explicit floor frame boundary)** · `ex:cas:integer-case-family-boundary`
 
 The explicit declarations q:Real and n:Integer express `n <= q < n+1` using `IntegerEmbed` in the comparisons, with Integer n as the case result. Declaring the nonnegative range costs 16,227 Work; its native association/case admission costs 6,913 Work and adds 965 graph bytes. The bounded `[0,5)` twin costs 18,427 and 7,549 Work and adds the same graph bytes. Complete partition checking refuses `UnsupportedCertificate` after 530 or 1,390 Work, with no graph growth; ordinary selection remains `PendingPremise` at the exact-region partition after 646,328 or 701,891 Work (`test:integration:integer-case-family-boundary`). Syntax admission supplies no projected cover or uniqueness lemma for either family, as required by `docs/design/decision-nodes.md` (`rule:cas:decision-partition-authority`).
+
+**Theorem (Unique Integer floor family)** · `thm:cas:decision-integer-floor-family`
+
+Formal schema `decision.integer-floor-family`, version 1. Every admitted Real coordinate has exactly one Integer index in the declared floor relation and range. Required premises: Exact finite native case on the explicit mixed frame, Integer result identical to its bound index, complete half-open floor relation, nonempty exact Integer range and identical projected input domain. Standing: Lemma; instances are CAS-checked.
+
+**Assumption (Unique Integer family)** · `assum:cas:hyp-integer-family`
+
+Formal hypothesis `hyp.integer-family`, version 1. Every admitted projected input has exactly one Integer index in the stated native relation and range. Required premises: Exact case, Real coordinate, explicit Integer binder, projected domain and optional Integer endpoints; a retained statement is not a checked floor-family lemma. Standing: Hypothesis; every undischarged use remains conditional.
+
+**Rule (Explicit floor projection)** · `rule:cas:decision-integer-family`
+
+`Statement::IntegerFamily` names its finite native case, Real coordinate, bound Integer coordinate, projected domain and optional Integer endpoints. `Primitive::RegionDecide` with `Certificate::None` checks the complete affine conjunction `n <= q < n+1`, the exact index range, and the identical projected range in q; a literal nonempty interval or exact missing-bound constructor establishes cover and uniqueness for every admitted q (`thm:cas:decision-integer-floor-family`). Original operands are checked before affine cancellation, and the typed witness carries the registered lemma through ordinary export, import and citation closure (`test:integration:integer-family-cover`). Parameter expressions and selection from this projected theorem remain separate obligations; the formal hypothesis kind names the proposition shape and confers no checker authority by itself (`assum:cas:hyp-integer-family`).
+
+**Example (Nonnegative floor-family ownership)** · `ex:cas:integer-family-nonnegative-costs`
+
+The nonnegative family proof costs 67,141 Work and 79,744 staged bytes, adds 1,087 graph bytes, and retains a 1,010-byte canonical witness. Fresh-store inspection costs 124,524 Work and 79,040 staged bytes, with 11,939 total graph payload bytes; proof admission has the same total payload limit. Both operations succeed with zero output allowance, and literal `N`/`N−1` tests cover each owning limit and cumulative Work (`test:integration:integer-family-resource-boundaries`). Inspection reconstructs the syntax and independently reruns the theorem checker before publishing its citation (`test:integration:integer-family-cover`); the family checker adds no cache.
+
+**Example (Bounded floor-family ownership)** · `ex:cas:integer-family-bounded-costs`
+
+The `[0,5)` family proof costs 98,253 Work and 87,616 staged bytes, adds 1,146 graph bytes, and retains a 1,256-byte canonical witness. Fresh-store inspection costs 172,358 Work and 86,912 staged bytes; both require 14,897 total graph payload bytes and accept zero output allowance (`test:integration:integer-family-resource-boundaries`). An independently built expected judgment accepts the exact witness and atomically refuses a changed range (`test:integration:integer-family-cover-expected`); widened domains, empty ranges and closed upper edges likewise refuse (`test:integration:integer-family-cover-domain-hole`), (`test:integration:integer-family-cover-refusals`), (`test:integration:integer-family-cover-closed-upper`).

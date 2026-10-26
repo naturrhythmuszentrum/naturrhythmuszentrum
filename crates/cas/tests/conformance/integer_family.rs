@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit Integer floor frames admit syntax without supplying a projected family cover.
 
+#[path = "integer_family/cover.rs"]
+mod cover;
+
 use crate::testing::builders::{admit, environment, expression_draft};
 use crate::testing::common::{TestResult, real};
 use crate::testing::readings::ledger;

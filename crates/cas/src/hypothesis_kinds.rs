@@ -50,6 +50,8 @@ pub enum HypothesisKind {
     RegionMembership,
     /// Membership introduced by a retained checked decision proof.
     CertifiedRegionMembership,
+    /// Every projected input has exactly one Integer index in its declared native relation.
+    IntegerFamily,
     /// The stated region has no assignments under the retained conditions.
     EmptyRegion,
     /// Every point of the exact domain belongs to a retained cover member.
@@ -111,7 +113,7 @@ pub enum HypothesisKind {
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 46] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 47] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -158,10 +160,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 46] = [
     HypothesisKind::GermEvidence,
     HypothesisKind::SplitEvidence,
     HypothesisKind::CertifiedRegionMembership,
+    HypothesisKind::IntegerFamily,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 46] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 47] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -530,6 +533,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 46] = [
         statement: "The exact source family belongs to the selected option under a retained checked introduction.",
         premises: "Exact introducing context and slot, partition, replay, cut and coordinate-to-target equality proofs with their used source hypotheses.",
     },
+    LemmaSchema {
+        name: "hyp.integer-family",
+        label: "assum:cas:hyp-integer-family",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "Every admitted projected input has exactly one Integer index in the stated native relation and range.",
+        premises: "Exact case, Real coordinate, explicit Integer binder, projected domain and optional Integer endpoints; a retained statement is not a checked floor-family lemma.",
+    },
 ];
 
 impl HypothesisKind {
@@ -552,6 +563,7 @@ impl HypothesisKind {
             Self::Universal => &HYPOTHESIS_SCHEMAS[12],
             Self::Named => &HYPOTHESIS_SCHEMAS[13],
             Self::Boolean => &HYPOTHESIS_SCHEMAS[14],
+            Self::IntegerFamily => &HYPOTHESIS_SCHEMAS[46],
             Self::CertifiedRegionMembership => &HYPOTHESIS_SCHEMAS[45],
             Self::RegionMembership => &HYPOTHESIS_SCHEMAS[15],
             Self::EmptyRegion => &HYPOTHESIS_SCHEMAS[16],

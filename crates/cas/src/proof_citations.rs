@@ -58,6 +58,13 @@ impl ProofCitation {
         let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof)?)? else {
             return Ok(None);
         };
+        if matches!(
+            value.judgment.statement,
+            crate::proof_model::Statement::IntegerFamily(_)
+        ) && value.rule == Primitive::RegionDecide
+        {
+            return Ok(Some(&crate::decision::DECISION_SCHEMAS[3]));
+        }
         let index = match value.certificate {
             crate::proof_model::Certificate::Decision(_) => 0,
             crate::proof_model::Certificate::DecisionNonZero(_) => 1,

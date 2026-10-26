@@ -26,6 +26,9 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<Statement, Fault> {
     Ok(match reader.byte()? {
+        26 => Statement::IntegerFamily(Box::new(crate::decision_family_wire::decode(
+            reader, records,
+        )?)),
         25 => Statement::Solve(Box::new(crate::solving::SolveStatement::decode(
             reader, records,
         )?)),

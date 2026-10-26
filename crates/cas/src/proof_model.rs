@@ -36,6 +36,8 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// Complete unique Integer projection of a finite native floor relation.
+    IntegerFamily(Box<crate::decision::IntegerFamily>),
     /// An exact solving judgment, checked only by its closed schema.
     Solve(Box<crate::solving::SolveStatement>),
     /// Standalone punctured limit or polynomial side-series relation.

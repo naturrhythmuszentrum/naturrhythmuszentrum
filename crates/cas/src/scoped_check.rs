@@ -142,6 +142,9 @@ fn rule_conditions(
             crate::decision_sign::discharge(cas, draft, premises, budget)?
         }
         Primitive::ContextClose => crate::context_check::close(cas, draft, premises, budget)?,
+        Primitive::RegionDecide if matches!(&draft.conclusion, Statement::IntegerFamily(_)) => {
+            crate::decision_cut::family::check(cas, draft, premises, budget)?
+        }
         Primitive::RegionDecide
             if matches!(&draft.certificate, Certificate::DecisionNonZero(_)) =>
         {
