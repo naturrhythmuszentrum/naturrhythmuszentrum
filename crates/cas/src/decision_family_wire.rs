@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact floor-family references participate in ordinary statement replay.
 
-use crate::decision::IntegerFamily;
+use crate::decision::{IntegerCellRange, IntegerFamily};
 use crate::encoding::Encoder;
 use crate::error::Fault;
 use crate::graph::Handle;
@@ -26,10 +26,22 @@ pub(crate) fn encode(
     ] {
         write(handle, out)?;
     }
-    for endpoint in [&value.lower, &value.upper] {
-        out.byte(u8::from(endpoint.is_some()))?;
-        if let Some(handle) = endpoint {
-            write(handle, out)?;
+    let flags = u8::from(value.lower.is_some()) | (u8::from(value.count.is_some()) << 1);
+    out.byte(flags)?;
+    if let Some(lower) = &value.lower {
+        write(lower, out)?;
+    }
+    out.byte(u8::from(value.upper.is_some()))?;
+    if let Some(upper) = &value.upper {
+        write(upper, out)?;
+    }
+    if let Some(count) = &value.count {
+        write(&count.coordinate, out)?;
+        for bound in [&count.lower, &count.upper] {
+            out.byte(u8::from(bound.is_some()))?;
+            if let Some(number) = bound {
+                out.number(number)?;
+            }
         }
     }
     Ok(())
@@ -44,13 +56,37 @@ pub(crate) fn decode(
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<IntegerFamily, Fault> {
+    let function = object(reader, records)?;
+    let coordinate = object(reader, records)?;
+    let index = object(reader, records)?;
+    let domain = object(reader, records)?;
+    let flags = reader.byte()?;
+    if flags > 3 {
+        return Err(invalid());
+    }
+    let lower = if flags & 1 == 1 {
+        Some(object(reader, records)?)
+    } else {
+        None
+    };
+    let upper = endpoint(reader, records)?;
+    let count = if flags & 2 == 2 {
+        Some(Box::new(IntegerCellRange {
+            coordinate: object(reader, records)?,
+            lower: bound(reader)?,
+            upper: bound(reader)?,
+        }))
+    } else {
+        None
+    };
     Ok(IntegerFamily {
-        function: object(reader, records)?,
-        coordinate: object(reader, records)?,
-        index: object(reader, records)?,
-        domain: object(reader, records)?,
-        lower: endpoint(reader, records)?,
-        upper: endpoint(reader, records)?,
+        function,
+        coordinate,
+        index,
+        domain,
+        lower,
+        upper,
+        count,
     })
 }
 
@@ -60,6 +96,15 @@ fn endpoint(reader: &mut Reader<'_, '_>, records: &[Decoded]) -> Result<Option<H
         0 => Ok(None),
         1 => Ok(Some(object(reader, records)?)),
         _ => Err(invalid()),
+    }
+}
+
+/// Count-domain endpoints are exact optional rationals, not machine infinities.
+fn bound(reader: &mut Reader<'_, '_>) -> Result<Option<crate::number::Rational>, Fault> {
+    if reader.boolean()? {
+        Ok(Some(reader.rational()?))
+    } else {
+        Ok(None)
     }
 }
 
@@ -77,5 +122,6 @@ pub(crate) fn objects(value: &IntegerFamily) -> Vec<&Handle> {
     ];
     result.extend(value.lower.iter());
     result.extend(value.upper.iter());
+    result.extend(value.count.iter().map(|count| &count.coordinate));
     result
 }

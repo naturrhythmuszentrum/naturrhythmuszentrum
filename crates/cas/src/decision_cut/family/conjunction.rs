@@ -15,9 +15,9 @@ use crate::number::Rational;
 /// One strict or non-strict affine comparison against zero.
 pub(super) struct Atom {
     /// Positive is strict; nonnegative owns the lower boundary.
-    strict: bool,
+    pub(super) strict: bool,
     /// Constant followed by q and n coefficients.
-    coefficients: [Rational; 3],
+    pub(super) coefficients: Vec<Rational>,
 }
 
 /// Three-valued cut results never enter the universal family proof.
@@ -40,11 +40,11 @@ pub(super) fn expected(
     if relation {
         result.push(Atom {
             strict: false,
-            coefficients: [zero.clone(), one.clone(), minus.clone()],
+            coefficients: vector([zero.clone(), one.clone(), minus.clone()])?,
         });
         result.push(Atom {
             strict: true,
-            coefficients: [one.clone(), minus, one.clone()],
+            coefficients: vector([one.clone(), minus, one.clone()])?,
         });
     }
     let (q, n) = if relation {
@@ -55,19 +55,29 @@ pub(super) fn expected(
     if let Some(lower) = lower {
         result.push(Atom {
             strict: false,
-            coefficients: [zero.sub(lower, budget)?, q.clone(), n.clone()],
+            coefficients: vector([zero.sub(lower, budget)?, q.clone(), n.clone()])?,
         });
     }
     if let Some(upper) = upper {
         result.push(Atom {
             strict: true,
-            coefficients: [
+            coefficients: vector([
                 upper.add(&zero, budget)?,
                 zero.sub(&q, budget)?,
                 zero.sub(&n, budget)?,
-            ],
+            ])?,
         });
     }
+    Ok(result)
+}
+
+/// Fixed literal coefficients use the same bounded allocation policy as parameter vectors.
+fn vector(values: [Rational; 3]) -> Result<Vec<Rational>, Fault> {
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(3)
+        .map_err(|_| Fault::allocation(AT))?;
+    result.extend(values);
     Ok(result)
 }
 

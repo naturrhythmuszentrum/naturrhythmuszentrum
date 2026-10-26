@@ -2,6 +2,7 @@
 //! Checked unique floor projection over an explicitly declared Integer coordinate.
 
 mod conjunction;
+mod parameters;
 
 use super::{evaluate, plan};
 use crate::budget::Budget;
@@ -49,6 +50,11 @@ pub(crate) fn roles(cas: &Cas, family: &IntegerFamily) -> Result<(), Fault> {
             return Err(invalid());
         }
     }
+    if let Some(count) = &family.count
+        && count.coordinate != family.coordinate
+    {
+        return Err(invalid());
+    }
     Ok(())
 }
 
@@ -77,16 +83,16 @@ pub(crate) fn check(
     let Statement::IntegerFamily(family) = &draft.conclusion else {
         return Err(invalid());
     };
-    if draft.certificate != Certificate::None
-        || !premises.is_empty()
-        || !draft.substitutions.is_empty()
-    {
+    if draft.certificate != Certificate::None || !draft.substitutions.is_empty() {
         return Err(invalid());
     }
     roles(cas, family)?;
     let frame = cas.state.context(cas.checked(&draft.context)?)?;
     if frame.admissible != cas.checked(&family.domain)? {
         return Err(invalid());
+    }
+    if family.count.is_some() || !premises.is_empty() {
+        return parameters::check(cas, draft, family, premises, budget);
     }
     budget.with_retained_payload(4_096, AT, |budget| reconstruct(cas, family, budget))?;
     Ok(ScopedConditions::default())

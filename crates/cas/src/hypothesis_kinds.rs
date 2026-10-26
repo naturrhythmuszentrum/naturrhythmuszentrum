@@ -536,10 +536,10 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 47] = [
     LemmaSchema {
         name: "hyp.integer-family",
         label: "assum:cas:hyp-integer-family",
-        version: 1,
+        version: 2,
         standing: crate::proof::Standing::Hypothesis,
         statement: "Every admitted projected input has exactly one Integer index in the stated native relation and range.",
-        premises: "Exact case, Real coordinate, explicit Integer binder, projected domain and optional Integer endpoints; a retained statement is not a checked floor-family lemma.",
+        premises: "Exact case, Real coordinate, explicit Integer binder, projected domain, optional Integer endpoints and count-domain intersection; a retained statement is not a checked floor-family lemma.",
     },
 ];
 

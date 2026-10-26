@@ -434,7 +434,7 @@ pub(crate) fn measure(
         }
     }
     let objects = match &value.conclusion {
-        Statement::IntegerFamily(_) => 6,
+        Statement::IntegerFamily(value) => 6 + usize::from(value.count.is_some()),
         Statement::BoundaryPartition(value) => {
             budget.check(
                 BudgetKind::BoundaryNodes,

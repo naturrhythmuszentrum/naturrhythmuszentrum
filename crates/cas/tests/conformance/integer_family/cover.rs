@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Native floor-family proof, complete domain identities and independent replay.
 
+#[path = "parameters.rs"]
+mod parameters;
+
 use super::{Frame, admit, ledger, real};
 use crate::testing::common::TestResult;
 use nrz_cas::decision::IntegerFamily;
@@ -53,6 +56,7 @@ fn fixture(bounded: bool) -> TestResult<Fixture> {
             domain,
             lower: Some(zero),
             upper,
+            count: None,
         },
     )
 }
@@ -86,7 +90,7 @@ fn integer_family_cover() -> TestResult {
             .auxiliary_schema(&source.frame.cas)?
             .ok_or("missing floor schema")?;
         assert_eq!(schema.name, "decision.integer-floor-family");
-        assert_eq!(schema.version, 1);
+        assert_eq!(schema.version, 2);
         measured.push((
             bounded,
             budget.usage().work,
@@ -239,6 +243,7 @@ fn general_fixture(lower: Option<i64>, upper: Option<i64>) -> TestResult<Fixture
             domain,
             lower,
             upper,
+            count: None,
         },
     )
 }

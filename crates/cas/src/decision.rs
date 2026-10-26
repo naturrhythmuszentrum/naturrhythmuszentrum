@@ -24,8 +24,9 @@ pub struct CoordinateInterval {
 
 /// An explicit integer option range attached to one cut question.
 ///
-/// The index is the association's exact `Integer`-sorted rational literal. An integral
-/// Real literal refuses; this range does not itself admit a partition or physical count.
+/// A cut uses the association's exact `Integer`-sorted rational literal; a family
+/// uses its explicit Integer binder. Integral Real options refuse. The range alone
+/// admits neither a partition nor a physical count.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntegerCellRange {
     /// Coordinate whose box must lie in the selected integer's half-open cell.
@@ -262,7 +263,8 @@ pub struct DecisionIntroduction {
 /// For every assignment in `domain` with the `index` coordinate omitted, exactly
 /// one Integer index belongs to the declared range and the native case relation.
 /// Bounds are exact Integer expressions; absence is the corresponding unbounded
-/// constructor. The executable checker currently requires literal bounds.
+/// constructor. Nonliteral Integer-affine endpoints require ordered exact binding
+/// proofs on the whole source domain; their used hypotheses remain visible.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IntegerFamily {
     /// Finite native Integer case whose sole association returns `index`.
@@ -277,6 +279,8 @@ pub struct IntegerFamily {
     pub lower: Option<Handle>,
     /// Excluded Integer endpoint, or no upper bound.
     pub upper: Option<Handle>,
+    /// Optional declared count domain intersected with the endpoint range.
+    pub count: Option<Box<IntegerCellRange>>,
 }
 
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
@@ -308,9 +312,9 @@ pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 4] = [
     crate::proof::LemmaSchema {
         name: "decision.integer-floor-family",
         label: "thm:cas:decision-integer-floor-family",
-        version: 1,
+        version: 2,
         standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
         statement: "Every admitted Real coordinate has exactly one Integer index in the declared floor relation and range.",
-        premises: "Exact finite native case on the explicit mixed frame, Integer result identical to its bound index, complete half-open floor relation, nonempty exact Integer range and identical projected input domain.",
+        premises: "Exact finite native case on the explicit mixed frame, Integer result identical to its bound index, complete half-open floor relation, nonempty exact range intersected with the declared count domain, identical projected input domain and exact endpoint binding proofs retaining every used hypothesis.",
     },
 ];
