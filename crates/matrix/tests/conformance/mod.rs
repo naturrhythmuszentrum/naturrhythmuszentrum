@@ -71,3 +71,6 @@ mod spectral;
 mod spectral_publication;
 
 mod decision_snapshots;
+
+mod decision_fixture;
+mod decision_frozen;

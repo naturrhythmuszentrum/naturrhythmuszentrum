@@ -343,3 +343,5 @@ pub use private::{
     reason = "reciprocal fixtures are shared across test layers"
 )]
 mod reciprocal_testing;
+
+pub use publication::{DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs};
