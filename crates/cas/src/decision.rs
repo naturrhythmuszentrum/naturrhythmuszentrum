@@ -11,14 +11,14 @@ use crate::error::Fault;
 use crate::graph::{Cas, Handle};
 use crate::number::Rational;
 
-/// An untrusted closed rational interval for one exact declared Real coordinate.
+/// An untrusted closed rational interval for one exact declared Real or Integer coordinate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoordinateInterval {
-    /// The original closed Real free expression under the case's exact header.
+    /// The original closed Real or Integer free expression under the case's exact header.
     pub coordinate: Handle,
-    /// Included lower endpoint; no floating conversion is performed.
+    /// Included lower endpoint; Integer coordinates require an exact integer.
     pub lower: Rational,
-    /// Included upper endpoint; must be at least the lower endpoint.
+    /// Included upper endpoint; ordered and integral for Integer coordinates.
     pub upper: Rational,
 }
 
@@ -43,7 +43,7 @@ pub struct CaseCut {
     pub function: Handle,
     /// Exact case-arm handle, which must occur in the function's arm inventory.
     pub association: Handle,
-    /// Nonempty box over the ambient Real coordinates, without duplicates or reversed endpoints.
+    /// Nonempty box exhausting the Real and Integer ambient coordinates, without duplicates.
     pub bounds: Vec<CoordinateInterval>,
     /// Optional declared integer range and half-open cell requirement.
     pub integer: Option<IntegerCellRange>,
@@ -53,9 +53,11 @@ impl Cas {
     /// Check exact inclusion of a nonempty rational box in a declared case option.
     ///
     /// The closed grammar supports rational affine scalar expressions, strict
-    /// comparisons, equality, nonzero, constant integer ranges and total Boolean
-    /// region constructors. Both the case domain and selected region must contain
-    /// the whole box. An integer question also checks its declared range and
+    /// comparisons, equality, nonzero, affine integer ranges, explicit Integer
+    /// embeddings and total Boolean region constructors. Integer axes have integral
+    /// endpoints, so every accepted box has at least one assignment. Both the case
+    /// domain and selected region must contain the whole box. An integer question
+    /// also checks its declared range and
     /// `n <= lower <= upper < n + 1`. No graph or hypothesis is published.
     ///
     /// # Errors

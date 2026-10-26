@@ -247,7 +247,7 @@ fn predicate(
             Ok(truth(values, *arguments.first().ok_or_else(unsupported)?)?.negate())
         }
         PredicateKind::Defined => Ok(Truth::All),
-        PredicateKind::IntegerRange => integer_range(arguments, values, budget),
+        PredicateKind::IntegerRange => integer_range(arguments, values, cut, budget),
         PredicateKind::Positive
         | PredicateKind::NonNegative
         | PredicateKind::NonZero
@@ -294,19 +294,23 @@ fn comparison(
     })
 }
 
-/// Constant integer predicates use exact half-open endpoint comparisons.
+/// Integer predicates retain the constant path and exact affine half-open comparisons.
 fn integer_range(
     arguments: &[LogicalId],
     values: &Values,
+    cut: &CaseCut,
     budget: &mut Budget,
 ) -> Result<Truth, Fault> {
     let subject = affine::get(values, *arguments.first().ok_or_else(unsupported)?)?;
     let lower = affine::get(values, *arguments.get(1).ok_or_else(unsupported)?)?;
     let upper = affine::get(values, *arguments.get(2).ok_or_else(unsupported)?)?;
     for value in [subject, lower, upper] {
-        if !affine::is_constant(value, budget)?
-            || !value.first().ok_or_else(unsupported)?.is_integer()
-        {
+        if !affine::is_constant(value, budget)? {
+            let low = difference(subject, lower, &PredicateKind::NonNegative, cut, budget)?;
+            let high = difference(upper, subject, &PredicateKind::Positive, cut, budget)?;
+            return Ok(low.and(high));
+        }
+        if !value.first().ok_or_else(unsupported)?.is_integer() {
             return Err(unsupported());
         }
     }
@@ -314,6 +318,19 @@ fn integer_range(
     let low = subject.compare(lower.first().ok_or_else(unsupported)?, budget)? != Ordering::Less;
     let high = subject.compare(upper.first().ok_or_else(unsupported)?, budget)? == Ordering::Less;
     Ok(if low && high { Truth::All } else { Truth::None })
+}
+
+/// Release each temporary coefficient vector before comparing the next range endpoint.
+fn difference(
+    left: &[Rational],
+    right: &[Rational],
+    kind: &PredicateKind,
+    cut: &CaseCut,
+    budget: &mut Budget,
+) -> Result<Truth, Fault> {
+    let coefficients = affine::combine(left, right, true, budget)?;
+    let (lower, upper) = bounds(&coefficients, &cut.bounds, budget)?;
+    comparison(kind, &lower, &upper, budget)
 }
 
 /// Retain actual coefficient sizes and conservative tree/vector overhead between node evaluations.

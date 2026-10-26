@@ -105,8 +105,15 @@ fn prepare(
     };
     let (header, initial) = super::identities(cas, &cut, budget)?;
     super::input_payload(&cut, budget)?;
-    super::validate_box(cas, &cut, header, budget)?;
-    super::axes(cas, &cut, header, initial[0], budget)?;
+    super::validate_box(cas, &cut, header, super::Coordinates::Real, budget)?;
+    super::axes(
+        cas,
+        &cut,
+        header,
+        initial[0],
+        super::Coordinates::Real,
+        budget,
+    )?;
     let mut roots = Vec::new();
     roots
         .try_reserve_exact(function.arms.len().saturating_add(1))

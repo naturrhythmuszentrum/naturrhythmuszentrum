@@ -45,6 +45,7 @@ pub(super) fn build(
                 .ok_or_else(unsupported)? = Rational::one();
             Ok(result)
         }
+        Operator::IntegerEmbed => scale(first(values, arguments)?, &Rational::one(), false, budget),
         Operator::Neg => scale(
             first(values, arguments)?,
             &Rational::from_ratio(-1, 1, budget)?,

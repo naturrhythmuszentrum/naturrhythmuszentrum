@@ -19,6 +19,15 @@ use crate::number::Rational;
 /// Stable diagnostic location for exact inclusion checks.
 const AT: Location = Location::new("exact case box cut");
 
+/// Finite partition grids remain Real; direct cuts also admit exact Integer axes.
+#[derive(Clone, Copy)]
+enum Coordinates {
+    /// A continuous Real cell decomposition.
+    Real,
+    /// A closed box with integral endpoints on every Integer coordinate.
+    Mixed,
+}
+
 /// No unsupported grammar acquires authority from its name or representation.
 const fn unsupported() -> Fault {
     Fault::invalid(InvalidCode::UnsupportedCertificate, AT)
@@ -34,8 +43,8 @@ pub(crate) fn check(cas: &Cas, cut: &CaseCut, budget: &mut Budget) -> Result<(),
     let (header, roots) = identities(cas, cut, budget)?;
     let bytes = input_payload(cut, budget)?;
     budget.with_retained_payload(bytes, AT, |budget| {
-        validate_box(cas, cut, header, budget)?;
-        axes(cas, cut, header, roots[0], budget)?;
+        validate_box(cas, cut, header, Coordinates::Mixed, budget)?;
+        axes(cas, cut, header, roots[0], Coordinates::Mixed, budget)?;
         let order = plan::order(cas, &roots, budget)?;
         let bytes = size(order.len(), AT)?
             .saturating_mul(256)
@@ -111,6 +120,7 @@ fn validate_box(
     cas: &Cas,
     cut: &CaseCut,
     header: LogicalId,
+    coordinates: Coordinates,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     for (index, interval) in cut.bounds.iter().enumerate() {
@@ -118,19 +128,36 @@ fn validate_box(
         let coordinate = cas.checked(&interval.coordinate)?;
         let value = cas.state.expression(coordinate)?;
         let real = value.sort == Sort::Value(AtomicSort::Scalar(Field::Real));
+        let integer = matches!(coordinates, Coordinates::Mixed)
+            && value.sort == Sort::Value(AtomicSort::Integer);
         let closed = value.scope.is_empty() && value.binding.is_none() && value.space.is_none();
         if value.header != header
-            || !real
+            || !(real || integer)
             || !closed
             || !matches!(value.operator, Operator::Free(_))
         {
             return Err(Fault::invalid(InvalidCode::Scope, AT));
+        }
+        if integer {
+            integer_endpoints(interval, budget)?;
         }
         let duplicate = cut.bounds[..index]
             .iter()
             .any(|other| other.coordinate == interval.coordinate);
         let reversed = interval.lower.compare(&interval.upper, budget)? == Ordering::Greater;
         if duplicate || reversed {
+            return Err(invalid());
+        }
+    }
+    Ok(())
+}
+
+/// Integral ordered endpoints ensure that every admitted Integer box is nonempty.
+fn integer_endpoints(interval: &CoordinateInterval, budget: &mut Budget) -> Result<(), Fault> {
+    for endpoint in [&interval.lower, &interval.upper] {
+        budget.work(1, AT)?;
+        endpoint.check(budget, AT)?;
+        if !endpoint.is_integer() {
             return Err(invalid());
         }
     }
@@ -250,12 +277,13 @@ fn bounds(
     Ok((lower, upper))
 }
 
-/// The supplied axes exhaust the domain's Real coordinates; another axis is not a substitute.
+/// Supplied axes exhaust the admitted numeric declarations; another axis is not a substitute.
 fn axes(
     cas: &Cas,
     cut: &CaseCut,
     header: LogicalId,
     domain: LogicalId,
+    coordinates: Coordinates,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let region = cas.state.region(domain)?;
@@ -269,9 +297,10 @@ fn axes(
             let declarations = &cas.state.header(header)?.environment.declarations;
             for declaration in declarations {
                 budget.work(1, AT)?;
-                if declaration.sort == Sort::Value(AtomicSort::Scalar(Field::Real))
-                    && !contains_axis(cas, cut, &declaration.key, budget)?
-                {
+                let real = declaration.sort == Sort::Value(AtomicSort::Scalar(Field::Real));
+                let integer = matches!(coordinates, Coordinates::Mixed)
+                    && declaration.sort == Sort::Value(AtomicSort::Integer);
+                if (real || integer) && !contains_axis(cas, cut, &declaration.key, budget)? {
                     return Err(invalid());
                 }
             }
