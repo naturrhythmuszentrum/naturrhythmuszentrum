@@ -2,6 +2,7 @@
 //! Direct public-contract laws, refusals, boundaries and determinism.
 
 mod graph;
+mod lattice_basis;
 mod numbers;
 mod proofs;
 mod representation;

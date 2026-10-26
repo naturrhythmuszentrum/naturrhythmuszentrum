@@ -67,6 +67,8 @@ mod formal_register;
 )]
 mod graph;
 mod hypothesis_kinds;
+/// Checked exact affine lattice basis admission.
+pub mod lattice;
 mod model;
 /// Independently checked rational bounds for mathematical pi.
 pub mod pi_bounds;
