@@ -33,6 +33,8 @@ pub mod decision;
 mod decision_cut;
 mod decision_enclosure;
 mod decision_family_wire;
+mod decision_integer_selection;
+mod decision_integer_wire;
 mod decision_introduction;
 mod decision_selection;
 mod decision_sign;

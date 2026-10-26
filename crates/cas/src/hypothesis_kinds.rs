@@ -52,6 +52,8 @@ pub enum HypothesisKind {
     CertifiedRegionMembership,
     /// Every projected input has exactly one Integer index in its declared native relation.
     IntegerFamily,
+    /// The unique projected Integer of the declared family equals the selected exact value.
+    IntegerSelection,
     /// The stated region has no assignments under the retained conditions.
     EmptyRegion,
     /// Every point of the exact domain belongs to a retained cover member.
@@ -113,7 +115,7 @@ pub enum HypothesisKind {
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 47] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 48] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -161,10 +163,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 47] = [
     HypothesisKind::SplitEvidence,
     HypothesisKind::CertifiedRegionMembership,
     HypothesisKind::IntegerFamily,
+    HypothesisKind::IntegerSelection,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 47] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 48] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -541,6 +544,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 47] = [
         statement: "Every admitted projected input has exactly one Integer index in the stated native relation and range.",
         premises: "Exact case, Real coordinate, explicit Integer binder, projected domain, optional Integer endpoints and count-domain intersection; a retained statement is not a checked floor-family lemma.",
     },
+    LemmaSchema {
+        name: "hyp.integer-selection",
+        label: "assum:cas:hyp-integer-selection",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "The declared family's unique projected Integer equals the exact selected value.",
+        premises: "Complete Integer family and selected Integer literal; a retained statement alone confers no certified selection or materialization authority.",
+    },
 ];
 
 impl HypothesisKind {
@@ -563,6 +574,7 @@ impl HypothesisKind {
             Self::Universal => &HYPOTHESIS_SCHEMAS[12],
             Self::Named => &HYPOTHESIS_SCHEMAS[13],
             Self::Boolean => &HYPOTHESIS_SCHEMAS[14],
+            Self::IntegerSelection => &HYPOTHESIS_SCHEMAS[47],
             Self::IntegerFamily => &HYPOTHESIS_SCHEMAS[46],
             Self::CertifiedRegionMembership => &HYPOTHESIS_SCHEMAS[45],
             Self::RegionMembership => &HYPOTHESIS_SCHEMAS[15],

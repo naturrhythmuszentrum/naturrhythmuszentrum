@@ -11,7 +11,7 @@ use std::fmt;
 use num_bigint::{BigInt, BigUint, Sign};
 use num_integer::Integer;
 use num_rational::Ratio;
-use num_traits::{One, Zero};
+use num_traits::{One, ToPrimitive, Zero};
 
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
@@ -661,6 +661,26 @@ impl Rational {
         Ok(i64::try_from(magnitude)
             .ok()
             .map(|value| if self.negative { -value } else { value }))
+    }
+
+    /// Convert only a nonnegative Integer within the caller's declared executable capacity.
+    pub(crate) fn materialize_count(
+        &self,
+        capacity: u64,
+        budget: &mut Budget,
+    ) -> Result<u64, Fault> {
+        let at = Location::new("Integer materialization capacity");
+        self.check(budget, at)?;
+        budget.work(1, at)?;
+        let refused = || Fault::invalid(InvalidCode::DecisionMaterializationCapacity, at);
+        if self.negative || !self.is_integer() || self.numerator().bits() > 64 {
+            return Err(refused());
+        }
+        charge(self.numerator().bits(), 1, budget, at)?;
+        self.numerator()
+            .to_u64()
+            .filter(|value| *value <= capacity)
+            .ok_or_else(refused)
     }
 
     /// Parse an exact integer, fraction, decimal or decimal scientific spelling.

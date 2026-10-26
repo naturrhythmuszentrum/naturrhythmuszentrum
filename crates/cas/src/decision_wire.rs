@@ -68,7 +68,11 @@ fn integer(
 }
 
 /// Retain the original target, family, bounds and origin.
-fn encode_enclosure(
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "finite and Integer selection certificates share original enclosure syntax"
+)]
+pub(crate) fn encode_enclosure(
     enclosure: &RationalEnclosure,
     out: &mut Encoder<'_>,
     write: &mut impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
@@ -193,7 +197,11 @@ fn decode_integer(
 }
 
 /// Decode an original enclosure for independent semantic replay.
-fn decode_enclosure(
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "finite and Integer selection certificates share original enclosure syntax"
+)]
+pub(crate) fn decode_enclosure(
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<RationalEnclosure, Fault> {

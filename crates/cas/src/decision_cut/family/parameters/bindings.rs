@@ -141,3 +141,50 @@ fn nonempty(
     }
     Ok(())
 }
+
+/// An exact selected Integer must belong to every declared range constraint.
+pub(super) fn contains(
+    cas: &Cas,
+    draft: &ApplicationDraft,
+    family: &IntegerFamily,
+    premises: &[CheckedApplication],
+    value: &Rational,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let mut cursor = 0;
+    for (upper, handle) in [(false, &family.lower), (true, &family.upper)] {
+        let (endpoint, used) = resolve(cas, draft, handle.as_ref(), premises.get(cursor), budget)?;
+        cursor += usize::from(used);
+        if let Some(endpoint) = endpoint {
+            included(value, endpoint, upper, budget)?;
+        }
+    }
+    if cursor != premises.len() {
+        return Err(invalid());
+    }
+    if let Some(count) = &family.count {
+        for (upper, endpoint) in [(false, &count.lower), (true, &count.upper)] {
+            if let Some(endpoint) = endpoint {
+                included(value, endpoint, upper, budget)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Range lower bounds are inclusive and upper bounds are exclusive, independently of capacity.
+fn included(
+    value: &Rational,
+    endpoint: &Rational,
+    upper: bool,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let order = value.compare(endpoint, budget)?;
+    let below_upper = upper && order == std::cmp::Ordering::Less;
+    let above_lower = !upper && order != std::cmp::Ordering::Less;
+    if below_upper || above_lower {
+        Ok(())
+    } else {
+        Err(invalid())
+    }
+}

@@ -121,3 +121,22 @@ fn reconstruct(
         })
     })
 }
+
+/// Retain exact checked endpoint premises while deciding one selected index's declared range.
+pub(super) fn contains(
+    cas: &Cas,
+    draft: &ApplicationDraft,
+    family: &IntegerFamily,
+    cover: &CheckedApplication,
+    value: &Rational,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let mut premises = Vec::new();
+    premises
+        .try_reserve_exact(cover.premises.len())
+        .map_err(|_| Fault::allocation(AT))?;
+    for id in &cover.premises {
+        premises.push(crate::proof_view::application(cas, *id, budget)?);
+    }
+    bindings::contains(cas, draft, family, &premises, value, budget)
+}

@@ -411,6 +411,9 @@ pub(crate) fn measure(
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
     crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
+    if let Certificate::IntegerSelection(certificate) = &value.certificate {
+        crate::decision_integer_wire::measure(cas, certificate, budget)?;
+    }
     if let Certificate::Decision(certificate) = &value.certificate {
         crate::decision_wire::measure(cas, certificate, budget)?;
     }
@@ -434,6 +437,7 @@ pub(crate) fn measure(
         }
     }
     let objects = match &value.conclusion {
+        Statement::IntegerSelection(value) => 7 + usize::from(value.family.count.is_some()),
         Statement::IntegerFamily(value) => 6 + usize::from(value.count.is_some()),
         Statement::BoundaryPartition(value) => {
             budget.check(

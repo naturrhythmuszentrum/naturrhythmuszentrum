@@ -38,6 +38,8 @@ pub enum Ownership {
 pub enum Statement {
     /// Complete unique Integer projection of a finite native floor relation.
     IntegerFamily(Box<crate::decision::IntegerFamily>),
+    /// Exact Integer selected by a checked unique family projection.
+    IntegerSelection(Box<crate::decision::IntegerSelection>),
     /// An exact solving judgment, checked only by its closed schema.
     Solve(Box<crate::solving::SolveStatement>),
     /// Standalone punctured limit or polynomial side-series relation.
@@ -248,6 +250,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// Original target enclosure consumed by the exact Integer projection checker.
+    IntegerSelection(Box<crate::decision::RationalEnclosure>),
     /// Complete rational decision introduction with independently checked source equalities.
     Decision(Box<crate::decision::DecisionIntroduction>),
     /// Strict-sign consequence of an exact certified membership slot.

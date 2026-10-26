@@ -3,6 +3,8 @@
 
 #[path = "parameters.rs"]
 mod parameters;
+#[path = "selection.rs"]
+mod selection;
 
 use super::{Frame, admit, ledger, real};
 use crate::testing::common::TestResult;

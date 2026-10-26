@@ -197,6 +197,9 @@ pub(crate) fn certificate(
         Certificate::DecisionNonZero(_) | Certificate::DecisionDischarge => {
             crate::decision_wire::sign(value, out, &mut write)
         }
+        Certificate::IntegerSelection(value) => {
+            crate::decision_integer_wire::certificate(value, out, &mut write)
+        }
         Certificate::Decision(value) => {
             out.byte(14)?;
             crate::decision_wire::encode(value, out, &mut write)
@@ -309,6 +312,9 @@ pub(crate) fn encode(
     mut write: impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     match value {
+        Statement::IntegerSelection(value) => {
+            crate::decision_integer_wire::encode(value, out, &mut write)?;
+        }
         Statement::IntegerFamily(value) => {
             out.byte(26)?;
             crate::decision_family_wire::encode(value, out, &mut write)?;
@@ -539,6 +545,7 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
+        Statement::IntegerSelection(value) => crate::decision_integer_wire::objects(value),
         Statement::IntegerFamily(value) => crate::decision_family_wire::objects(value),
         Statement::Solve(value) => value.objects(),
         Statement::Germ(value) => vec![&value.function, &value.at.point],
@@ -769,7 +776,8 @@ pub(crate) const fn edge_role(value: &Statement, position: u32) -> Edge {
 pub(crate) const fn layer(value: &Statement) -> Layer {
     match value {
         Statement::Distribution(_) => Layer::Distribution,
-        Statement::IntegerFamily(_)
+        Statement::IntegerSelection(_)
+        | Statement::IntegerFamily(_)
         | Statement::Solve(_)
         | Statement::BoundaryPartition(_)
         | Statement::PredicateFact { .. }

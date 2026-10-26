@@ -66,6 +66,7 @@ impl ProofCitation {
             return Ok(Some(&crate::decision::DECISION_SCHEMAS[3]));
         }
         let index = match value.certificate {
+            crate::proof_model::Certificate::IntegerSelection(_) => 4,
             crate::proof_model::Certificate::Decision(_) => 0,
             crate::proof_model::Certificate::DecisionNonZero(_) => 1,
             crate::proof_model::Certificate::DecisionDischarge => 2,

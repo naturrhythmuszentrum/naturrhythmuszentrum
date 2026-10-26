@@ -194,3 +194,19 @@ fn reconstruct(cas: &Cas, family: &IntegerFamily, budget: &mut Budget) -> Result
         })
     })
 }
+
+/// Selection checks its candidate against the same endpoint bindings used by the retained cover.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the selection consumer shares exact parameter-range checking"
+)]
+pub(crate) fn contains(
+    cas: &Cas,
+    draft: &ApplicationDraft,
+    family: &IntegerFamily,
+    cover: &CheckedApplication,
+    value: &Rational,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    parameters::contains(cas, draft, family, cover, value, budget)
+}

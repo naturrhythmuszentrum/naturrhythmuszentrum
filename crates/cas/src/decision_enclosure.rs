@@ -28,6 +28,26 @@ pub(crate) fn check(
     contract: &RationalEnclosure,
     budget: &mut Budget,
 ) -> Result<CheckedRationalEnclosure, Fault> {
+    let bytes = validate(cas, contract, budget)?;
+    budget.check(BudgetKind::OutputBytes, bytes, AT)?;
+    budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
+    budget.work(bytes, AT)?;
+    Ok(CheckedRationalEnclosure {
+        contract: contract.clone(),
+        bytes,
+    })
+}
+
+/// Validate the existing certificate in place without allocating an unused owned receipt.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the enclosure facade and selected Integer theorem share original-target validation"
+)]
+pub(crate) fn validate(
+    cas: &Cas,
+    contract: &RationalEnclosure,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
     let EnclosureOrigin::ExactRational { expression, value } = &contract.origin else {
         return Err(unsupported());
     };
@@ -50,13 +70,7 @@ pub(crate) fn check(
     budget.with_retained_payload(bytes.saturating_add(scratch), AT, |budget| {
         replay(cas, contract, value, budget)
     })?;
-    budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-    budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
-    budget.work(bytes, AT)?;
-    Ok(CheckedRationalEnclosure {
-        contract: contract.clone(),
-        bytes,
-    })
+    Ok(bytes)
 }
 
 /// The context's actual region and header cannot be replaced by caller descriptions.

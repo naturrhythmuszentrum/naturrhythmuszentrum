@@ -40,6 +40,8 @@ pub enum InvalidCode {
     DecisionOutsideRegion,
     /// The selected value or its explicit option range is not an admissible integer cell.
     DecisionIntegerRange,
+    /// An exact selected Integer exceeds the declared executable count capacity.
+    DecisionMaterializationCapacity,
     /// Two declared decision options own the same exact cell, even if their values agree.
     DecisionPartitionOverlap,
     /// A declared decision option includes a point outside the exact case domain.

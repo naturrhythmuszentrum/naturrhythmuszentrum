@@ -482,3 +482,20 @@ fn integer_family_parameter_expected() -> TestResult {
 fn integer_family_parameter_nonlinear() -> TestResult {
     refusal(&mut with_operator(2, 5, Some(Operator::Mul))?)
 }
+
+/// Supply the original parameter predicates to the projected-selection fixture.
+pub(super) fn selection_seed() -> TestResult<(Frame, IntegerFamily, Vec<Handle>)> {
+    let mut source = fixture(2, 5)?;
+    let Statement::IntegerFamily(family) = source.steps.pop().ok_or("missing family")?.conclusion
+    else {
+        return Err("missing family statement".into());
+    };
+    let mut bindings = Vec::new();
+    for step in source.steps {
+        let Statement::PredicateFact { predicate, .. } = step.conclusion else {
+            return Err("missing parameter predicate".into());
+        };
+        bindings.push(predicate);
+    }
+    Ok((source.frame, *family, bindings))
+}

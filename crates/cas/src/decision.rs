@@ -283,8 +283,17 @@ pub struct IntegerFamily {
     pub count: Option<Box<IntegerCellRange>>,
 }
 
+/// Exact unique Integer projection selected under its retained source correspondence.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct IntegerSelection {
+    /// Original finite family and its complete declared range.
+    pub family: IntegerFamily,
+    /// Exact Integer literal selected by the checked enclosure and family theorem.
+    pub value: Handle,
+}
+
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
-pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 4] = [
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 5] = [
     crate::proof::LemmaSchema {
         name: "decision.enclosure-membership",
         label: "thm:cas:decision-enclosure-membership",
@@ -316,5 +325,13 @@ pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 4] = [
         standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
         statement: "Every admitted Real coordinate has exactly one Integer index in the declared floor relation and range.",
         premises: "Exact finite native case on the explicit mixed frame, Integer result identical to its bound index, complete half-open floor relation, nonempty exact range intersected with the declared count domain, identical projected input domain and exact endpoint binding proofs retaining every used hypothesis.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.integer-family-selection",
+        label: "thm:cas:decision-integer-family-selection",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The unique projected result of the declared floor family is the selected exact Integer.",
+        premises: "Checked identical floor-family theorem, whole-domain coordinate-to-target equality, exact original-target enclosure wholly inside the selected half-open cell and checked index-range membership, retaining every used hypothesis.",
     },
 ];

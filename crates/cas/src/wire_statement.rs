@@ -26,6 +26,9 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<Statement, Fault> {
     Ok(match reader.byte()? {
+        27 => Statement::IntegerSelection(Box::new(crate::decision_integer_wire::decode(
+            reader, records,
+        )?)),
         26 => Statement::IntegerFamily(Box::new(crate::decision_family_wire::decode(
             reader, records,
         )?)),
@@ -238,6 +241,9 @@ pub(crate) fn certificate(
     records: &[Decoded],
 ) -> Result<Certificate, Fault> {
     Ok(match reader.byte()? {
+        17 => Certificate::IntegerSelection(Box::new(
+            crate::decision_integer_wire::decode_certificate(reader, records)?,
+        )),
         tag @ (15 | 16) => crate::decision_wire::decode_sign(tag, reader, records)?,
         14 => Certificate::Decision(Box::new(crate::decision_wire::decode(reader, records)?)),
         13 => Certificate::Emptiness(Box::new(crate::emptiness::decode(reader, records)?)),
