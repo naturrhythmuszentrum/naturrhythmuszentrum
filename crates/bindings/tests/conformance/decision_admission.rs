@@ -16,7 +16,10 @@ use nrz_cas::{
 use std::rc::Rc;
 
 /// A nominal period and duration carry physical time units before their ratio is checked.
-fn physical_source(source: &str, doubled_unit: bool) -> TestResult<Rc<CheckedDeclarations>> {
+pub(super) fn physical_source(
+    source: &str,
+    doubled_unit: bool,
+) -> TestResult<Rc<CheckedDeclarations>> {
     let mut budget = ledger()?;
     let duration = Kind::Named(
         "duration".into(),
@@ -79,7 +82,7 @@ fn physical_source(source: &str, doubled_unit: bool) -> TestResult<Rc<CheckedDec
 }
 
 /// Extract the predeclared mathematical question without treating the proposed certificate as proof.
-fn specification(
+pub(super) fn specification(
     source: &SelectionFixture,
     domain: CountDomain,
 ) -> TestResult<IntegerDecisionSpec> {

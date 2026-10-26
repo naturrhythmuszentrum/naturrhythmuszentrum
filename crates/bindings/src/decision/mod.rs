@@ -2,11 +2,13 @@
 //! Storage-neutral certified Integer admission for closed, physically checked expressions.
 
 mod case;
+mod count;
 mod expression;
 mod snapshot;
 mod storage;
 
 pub use case::{DecisionAttachment, IntegerDecisionCase, IntegerDecisionSpec};
+pub use count::{CountDescriptor, CountEvidence};
 pub use expression::DecisionExpression;
 pub use snapshot::SelectedDecision;
 

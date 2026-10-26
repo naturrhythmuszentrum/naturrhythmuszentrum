@@ -81,8 +81,8 @@ pub use constants::{
     ReferenceDefinition,
 };
 pub use decision::{
-    DecisionAttachment, DecisionError, DecisionExpression, IntegerDecisionCase,
-    IntegerDecisionSpec, SelectedDecision,
+    CountDescriptor, CountEvidence, DecisionAttachment, DecisionError, DecisionExpression,
+    IntegerDecisionCase, IntegerDecisionSpec, SelectedDecision,
 };
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};
