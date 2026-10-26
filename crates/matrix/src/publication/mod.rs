@@ -8,6 +8,8 @@
 //! Publication fills the already reserved private slabs and prepares all immutable graph records, source edges and append capacities before changing visible state. The commit only installs prepared storage, schemas, descriptors and graph objects through the existing no-fail primitives. It runs no allocation, caller callback or numerical kernel. Internal bounds target the reserved fresh output identities and versions in that same commit. Existing inputs and their versions remain unchanged on every refusal. Scratch consists of the reserved slab set and candidate payload set, each bounded by `ExecutionLimits`; temporary preparation copies and ordinary allocator aborts remain subject to the heap's documented allocation contract.
 
 mod commit;
+mod decision;
+pub use decision::{LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision};
 mod decision_inputs;
 pub use decision_inputs::{DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs};
 mod evaluate;

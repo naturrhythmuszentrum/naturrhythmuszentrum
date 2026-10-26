@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete physical associations are matched to the actual versioned LC inputs.
 
-use super::decision_fixture::{fixture, ledger};
+use super::decision_fixture::{SelectionFixture, fixture, ledger};
 use crate::binding_testing::TestResult;
 use nrz_bindings::{
     BaseDimension, Context, CountDomain, DecisionExpression, DecisionInputs, Declaration,
@@ -17,7 +17,20 @@ use nrz_matrix::{Coverage, DecisionSnapshotError, Heap, HeapError, HeapLimits, V
 use std::rc::Rc;
 
 /// Exact duration and original full-period map, retained by one physical decision owner.
-fn association() -> TestResult<DecisionInputs> {
+pub(super) fn decision_source() -> TestResult<(DecisionInputs, SelectionFixture)> {
+    decision_source_map(false)
+}
+
+/// Equal coherent period with a distinct original exact measure.
+pub(super) fn decision_source_map(doubled: bool) -> TestResult<(DecisionInputs, SelectionFixture)> {
+    decision_source_budget(doubled, &mut ledger()?)
+}
+
+/// Prepare physical checking, case correspondence and association on one caller ledger.
+pub(super) fn decision_source_budget(
+    doubled: bool,
+    caller: &mut nrz_bindings::Budget,
+) -> TestResult<(DecisionInputs, SelectionFixture)> {
     let source = fixture(false, "3", "10/Pi")?;
     let mut budget = ledger()?;
     let time = Kind::Named(
@@ -26,7 +39,7 @@ fn association() -> TestResult<DecisionInputs> {
     );
     let second = Descriptor::new(time.clone(), Measure::coherent(), Role::Difference)?;
     let pi = ExactConstant::named(Constant::Pi, &mut budget)?;
-    let divisor = Rational::from_ratio(1000, 1, &mut budget)?;
+    let divisor = Rational::from_ratio(if doubled { 500 } else { 1000 }, 1, &mut budget)?;
     let period = Descriptor::new(
         time,
         Measure::new(
@@ -47,7 +60,11 @@ fn association() -> TestResult<DecisionInputs> {
             second,
             Rational::from_ratio(1, 100, &mut budget)?,
         ),
-        ("period", period, Rational::one()),
+        (
+            "period",
+            period,
+            Rational::from_ratio(1, if doubled { 2 } else { 1 }, &mut budget)?,
+        ),
     ] {
         owner.declare(
             name.into(),
@@ -67,7 +84,7 @@ fn association() -> TestResult<DecisionInputs> {
             evidence: Evidence::default(),
         }),
     )?;
-    let physical = DecisionExpression::declared(Rc::new(owner.freeze()?), "quotient", &mut budget)?;
+    let physical = DecisionExpression::declared(Rc::new(owner.freeze()?), "quotient", caller)?;
     let proposal = source.steps.last().ok_or("missing selection")?;
     let Statement::IntegerSelection(selection) = &proposal.conclusion else {
         return Err("missing Integer selection".into());
@@ -89,13 +106,21 @@ fn association() -> TestResult<DecisionInputs> {
                 Role::Difference,
             )?,
         },
-        &mut budget,
+        caller,
     )?;
-    Ok(case.associate_inputs(&mut budget)?)
+    Ok((case.associate_inputs(caller)?, source))
+}
+
+/// Snapshot-only tests do not require retaining the separate mathematical selection fixture.
+fn association() -> TestResult<DecisionInputs> {
+    Ok(decision_source()?.0)
 }
 
 /// Import against the designated symbols; equal independently declared inputs cannot substitute.
-fn inputs(heap: &mut Heap, association: &DecisionInputs) -> TestResult<Vec<ValueBinding<f64>>> {
+pub(super) fn inputs(
+    heap: &mut Heap,
+    association: &DecisionInputs,
+) -> TestResult<Vec<ValueBinding<f64>>> {
     association
         .operands()
         .iter()

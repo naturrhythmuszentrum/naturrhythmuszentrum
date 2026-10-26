@@ -345,3 +345,5 @@ pub use private::{
 mod reciprocal_testing;
 
 pub use publication::{DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs};
+
+pub use publication::{LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision};
