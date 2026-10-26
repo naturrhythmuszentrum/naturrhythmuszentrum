@@ -520,3 +520,106 @@ fn integer_family_cover_expected() -> TestResult {
     assert_eq!(receiver.frame.cas.counts(), before);
     Ok(())
 }
+
+/// Scalar floor proof and fresh replay ownership are the unchanged lattice-coordinate baseline.
+/// ´test:integration:lattice-scalar-baseline´
+#[test]
+fn lattice_scalar_baseline() -> TestResult {
+    let mut measured = Vec::new();
+    for range in [0, 1, 2] {
+        let mut source = if range == 0 {
+            general_fixture(None, None)?
+        } else {
+            fixture(range == 2)?
+        };
+        let before = source.frame.cas.counts();
+        let mut budget = ledger()?;
+        let witness =
+            source
+                .frame
+                .cas
+                .check_proof(&source.context, &[source.application], &mut budget)?;
+        let bytes = source.frame.cas.export_witness(&witness, &mut ledger()?)?;
+        let mut receiver = Cas::new(Limits::default())?;
+        let mut replay = ledger()?;
+        receiver.inspect(&bytes, &mut replay)?;
+        measured.push((
+            range,
+            budget.usage().work,
+            source.frame.cas.counts().payload_bytes - before.payload_bytes,
+            bytes.len(),
+            replay.usage().work,
+            receiver.counts().payload_bytes,
+        ));
+    }
+    assert_eq!(
+        measured,
+        [
+            (0, 50_969, 1_028, 868, 98_096, 10_039),
+            (1, 67_141, 1_087, 1_010, 124_524, 11_939),
+            (2, 98_253, 1_146, 1_256, 172_358, 14_897),
+        ]
+    );
+    Ok(())
+}
+
+/// Unrestricted scalar proof and replay use literal Work boundaries with cumulative prior usage.
+/// ´test:integration:lattice-scalar-baseline-work´
+#[test]
+fn lattice_scalar_baseline_work() -> TestResult {
+    for (replay, needed) in [(false, 50_969), (true, 98_096)] {
+        for (allowance, prior, succeeds) in [
+            (needed, 0, true),
+            (needed - 1, 0, false),
+            (needed, 37, false),
+            (needed + 37, 37, true),
+        ] {
+            let mut source = general_fixture(None, None)?;
+            let bytes = if replay {
+                let witness = source.frame.cas.check_proof(
+                    &source.context,
+                    std::slice::from_ref(&source.application),
+                    &mut ledger()?,
+                )?;
+                Some(source.frame.cas.export_witness(&witness, &mut ledger()?)?)
+            } else {
+                None
+            };
+            let mut receiver = Cas::new(Limits::default())?;
+            let cas = if replay {
+                &mut receiver
+            } else {
+                &mut source.frame.cas
+            };
+            let before = cas.counts();
+            let limits = Limits {
+                work: allowance,
+                ..Limits::default()
+            };
+            let mut budget = Budget::new(limits.clone())?;
+            budget.work(prior, Location::new("prior lattice baseline work"))?;
+            let result = if let Some(bytes) = bytes {
+                cas.inspect(&bytes, &mut budget)
+            } else {
+                cas.check_proof(&source.context, &[source.application], &mut budget)
+            };
+            assert_eq!(result.is_ok(), succeeds);
+            assert!(budget.usage().work >= prior);
+            assert_eq!(budget.limits(), &limits);
+            if succeeds {
+                assert_eq!(budget.usage().work, needed + prior);
+            } else {
+                let fault = result.err().ok_or("missing Work refusal")?;
+                assert!(matches!(
+                    fault.kind,
+                    FaultKind::Exhausted {
+                        budget: BudgetKind::Work,
+                        ..
+                    }
+                ));
+                assert_eq!(cas.counts(), before);
+            }
+        }
+    }
+    Ok(())
+}
