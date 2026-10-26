@@ -42,3 +42,4 @@ mod decision_admission;
 mod decision_fixture;
 
 mod count_descriptor;
+mod lc_count;
