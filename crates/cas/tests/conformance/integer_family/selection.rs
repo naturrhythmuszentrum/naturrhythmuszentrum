@@ -662,3 +662,169 @@ fn integer_family_selection_resource_boundaries() -> TestResult {
 
 #[path = "selection/pi.rs"]
 mod pi;
+
+/// The certified view retains the original target and permits exact values beyond machine capacity.
+/// ´test:integration:integer-selection-evidence-view´
+#[test]
+fn integer_selection_evidence_view() -> TestResult {
+    for (selected, target) in [
+        ("3", "10/Pi"),
+        ("18446744073709551616", "18446744073709551616"),
+    ] {
+        let mut source = fixture(false, selected, target)?;
+        let witness =
+            source
+                .frame
+                .cas
+                .check_proof(&source.context, &source.steps, &mut ledger()?)?;
+        let before = source.frame.cas.counts();
+        let mut budget = ledger()?;
+        let (selection, enclosure) = source
+            .frame
+            .cas
+            .integer_selection_evidence(&witness, &mut budget)?;
+        assert_eq!(budget.usage().work, 4);
+        assert_eq!(
+            &Statement::IntegerSelection(Box::new(selection.clone())),
+            &witness.judgment().statement
+        );
+        let Certificate::IntegerSelection(expected) =
+            &source.steps.last().ok_or("missing selection")?.certificate
+        else {
+            return Err("missing original enclosure".into());
+        };
+        assert_eq!(enclosure, expected.as_ref());
+        assert_eq!(&enclosure.context, &witness.judgment().context);
+        assert_eq!(witness.hypotheses().len(), 1);
+        assert_eq!(source.frame.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// Literal 4/3 Work and prior-work twins authenticate without allocating or changing the graph.
+/// ´test:integration:integer-selection-evidence-work´
+#[test]
+fn integer_selection_evidence_work() -> TestResult {
+    let mut source = fixture(false, "3", "10/Pi")?;
+    let witness = source
+        .frame
+        .cas
+        .check_proof(&source.context, &source.steps, &mut ledger()?)?;
+    let before = source.frame.cas.counts();
+    for (prior, allowance, accepted) in
+        [(0, 4, true), (0, 3, false), (17, 21, true), (17, 20, false)]
+    {
+        let mut budget = Budget::new(Limits {
+            work: allowance,
+            ..Limits::default()
+        })?;
+        budget.work(prior, Location::new("prior selection evidence work"))?;
+        let result = source
+            .frame
+            .cas
+            .integer_selection_evidence(&witness, &mut budget);
+        assert_eq!(result.is_ok(), accepted);
+        if accepted {
+            assert_eq!(budget.usage().work, prior + 4);
+        } else {
+            let fault = result.err().ok_or("short evidence ledger accepted")?;
+            assert!(matches!(
+                fault.kind,
+                FaultKind::Exhausted {
+                    budget: BudgetKind::Work,
+                    ..
+                }
+            ));
+            assert!(budget.usage().work >= prior);
+        }
+        assert_eq!(source.frame.cas.counts(), before);
+    }
+    Ok(())
+}
+
+/// A checked family theorem cannot impersonate certified selection; foreign roots refuse.
+/// ´test:integration:integer-selection-evidence-roots´
+#[test]
+fn integer_selection_evidence_roots() -> TestResult {
+    let mut family = cover_fixture(false)?;
+    let witness =
+        family
+            .frame
+            .cas
+            .check_proof(&family.context, &[family.application], &mut ledger()?)?;
+    let before = family.frame.cas.counts();
+    let fault = family
+        .frame
+        .cas
+        .integer_selection_evidence(&witness, &mut ledger()?)
+        .err()
+        .ok_or("family root accepted")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::EndpointMismatch)
+    );
+    assert_eq!(family.frame.cas.counts(), before);
+    let mut source = fixture(false, "3", "10/Pi")?;
+    let witness = source
+        .frame
+        .cas
+        .check_proof(&source.context, &source.steps, &mut ledger()?)?;
+    let other = Cas::new(Limits::default())?;
+    let before = other.counts();
+    let fault = other
+        .integer_selection_evidence(&witness, &mut ledger()?)
+        .err()
+        .ok_or("foreign root accepted")?;
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::ForeignHandle));
+    assert_eq!(other.counts(), before);
+    Ok(())
+}
+
+/// A proved equality with an original divisor residual supplies no certified selection view.
+/// ´test:integration:integer-selection-evidence-residual´
+#[test]
+fn integer_selection_evidence_residual() -> TestResult {
+    let mut source = fixture(false, "3", "10/Pi")?;
+    let Statement::IntegerSelection(selection) =
+        &source.steps.last().ok_or("missing selection")?.conclusion
+    else {
+        return Err("missing selection proposition".into());
+    };
+    let coordinate = selection.family.coordinate.clone();
+    let domain = selection.family.domain.clone();
+    let one = exact(&mut source.frame, "1", false)?;
+    let value = source
+        .frame
+        .term(Operator::Div, super::super::real(), &[one, coordinate])?;
+    let step = ApplicationDraft {
+        rule: Primitive::Reflexivity,
+        context: source.context.clone(),
+        conclusion: Statement::Equality {
+            left: value.clone(),
+            right: value,
+            domain,
+            domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
+        },
+        premises: Vec::new(),
+        substitutions: Vec::new(),
+        certificate: Certificate::None,
+    };
+    let witness = source
+        .frame
+        .cas
+        .check_proof(&source.context, &[step], &mut ledger()?)?;
+    assert!(!witness.is_discharged());
+    let before = source.frame.cas.counts();
+    let fault = source
+        .frame
+        .cas
+        .integer_selection_evidence(&witness, &mut ledger()?)
+        .err()
+        .ok_or("residual root accepted")?;
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::EndpointMismatch)
+    );
+    assert_eq!(source.frame.cas.counts(), before);
+    Ok(())
+}

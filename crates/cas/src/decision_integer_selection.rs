@@ -195,6 +195,37 @@ fn cell(value: &Rational, enclosure: &RationalEnclosure, budget: &mut Budget) ->
 }
 
 impl Cas {
+    /// Borrow the original evidence of a checked certified Integer selection.
+    ///
+    /// This authenticates the retained proof root without replaying its certificate
+    /// or imposing an executable capacity. The witness retains every qualified
+    /// source assumption; the borrowed view grants no physical count interpretation.
+    /// # Errors
+    /// Refuses foreign witnesses, other proof roots, residual obligations and exhausted Work.
+    pub fn integer_selection_evidence<'a>(
+        &'a self,
+        witness: &crate::proof_model::VerifiedWitness,
+        budget: &mut Budget,
+    ) -> Result<(&'a IntegerSelection, &'a RationalEnclosure), Fault> {
+        budget.work(4, AT)?;
+        let Vertex::Proof(application) = self.state.node(self.checked(witness.proof())?)? else {
+            return Err(invalid());
+        };
+        let Vertex::ScopedApplication(proof) = self.state.node(*application)? else {
+            return Err(invalid());
+        };
+        let Statement::IntegerSelection(selection) = &proof.judgment.statement else {
+            return Err(invalid());
+        };
+        let Certificate::IntegerSelection(enclosure) = &proof.certificate else {
+            return Err(invalid());
+        };
+        if proof.rule != Primitive::CaseSelect || !proof.conditions.residuals.is_empty() {
+            return Err(invalid());
+        }
+        Ok((selection, enclosure))
+    }
+
     /// Materialize a checked selected Integer within an inclusive executable capacity.
     /// The caller retains the witness and its qualified assumptions alongside the count.
     /// # Errors
