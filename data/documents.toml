@@ -213,3 +213,7 @@ requires = ["engineering"]
 [[document]]
 output = "docs/engineering/evidence.md"
 requires = []
+
+[[document]]
+output = "docs/design/lattice-decisions.md"
+requires = []

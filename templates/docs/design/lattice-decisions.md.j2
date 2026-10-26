@@ -1,0 +1,187 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Certified lattice decisions in arbitrary dimension · `spec:nrz:lattice-decisions`
+
+**Principle (A lattice family supplies the options)** · `prin:nrz:lattice-decision-contract`
+
+A lattice decision selects an exact Integer tuple from a declared family of cells using certified containment of the original target. This design generalizes the checked scalar floor family and selected Integer of (`rule:nrz:decision-integer-family-implementation`), (`rule:nrz:decision-integer-selection-implementation`); it specifies additional admission, affine-cover and closest-vector obligations, not an implemented multidimensional checker. The mathematical, physical and live-storage owners retain the boundaries of (`def:nrz:decision-layers`), (`def:nrz:decision-execution-layers`), and every selection retains separate enclosure and cut proofs (`rule:nrz:decision-enclosure-and-cut`).
+
+## Exact question and admission · `sec:nrz:lattice-admission`
+
+**Definition (Full-rank affine lattice)** · `def:nrz:lattice-family`
+
+For a declared finite dimension d ≥ 1, an ordered Real coordinate frame, a d × d matrix B and a vector φ of length d, define `L = {φ + B·k : k ∈ ℤ^d}` with column basis B. B and φ are immutable exact CAS expressions under one retained declaration and parameter context, with defined finite Real entries; `2π` and `2π·I_d` denote exact expressions, and `I_d` is the real identity matrix. When φ ≠ 0, L is an affine translate of a lattice, not necessarily an additive subgroup. The target q is an exact vector expression in that same frame; these are mathematical declarations independent of floating representations, as required by (`prin:nrz:descriptor-binding-cas-meaning`), (`def:nrz:cas-design-context`).
+
+**Rule (Checked basis admission)** · `rule:nrz:lattice-basis-admission`
+
+Admission of (`def:nrz:lattice-family`) requires a checked fact `det B ≠ 0` throughout the retained admissible parameter family, plus an exact inverse A with checked identities `A·B = B·A = I_d`. Exact elimination with proved nonzero pivots can derive these facts; a numerical determinant, a condition estimate or an unchecked predicate name cannot. All original entry expressions and their domains are checked before cancellation, so an undefined entry multiplied by zero remains invalid. A valid expression with no supported nonsingularity proof leaves admission unresolved; a singular B refuses the full-rank contract. This follows the reconstruction and residual rules of (`def:nrz:cas-design-rules`), (`rule:nrz:cas-design-expected-claim`).
+
+**Definition (Index range and projected domain)** · `def:nrz:lattice-index-domain`
+
+The mathematical index set K is `ℤ^d`, a nonempty Integer box, or a Cartesian product of exact ranges `a_i(p) ≤ k_i < b_i(p)` intersected with separately declared coordinate count/index domains. Missing bounds are exact constructors. For a chosen cell convention C, the projected target domain is `D_K = ⋃_{k ∈ K} C_k`; a restriction of K does not cover all of `ℝ^d`. Under the floor convention this domain is exactly the inverse image of the corresponding product of half-open coordinate ranges. Parameter bindings retain whole-domain Integer equalities, nonempty intersections and earlier-stratum dependencies as in (`rule:nrz:decision-parameter-range`), (`rule:nrz:decision-parameter-family-implementation`); coupled non-box constraints require an additional checked domain theorem and are outside this admission subset.
+
+**Rule (Domain outcomes do not clamp indices)** · `rule:nrz:lattice-restricted-domain`
+
+Admission proves cover and uniqueness on the exact `D_K` of (`def:nrz:lattice-index-domain`), or on a declared nonempty subdomain proved contained in it. For a request admitting targets outside `D_K`, a separately proved outside-domain region and declared continuation are required. An excluded k never becomes the nearest allowed index by clamping or searching K: that would be a different partition. An enclosure meeting both admitted and outside regions stays undecided unless wholly contained in one declared outcome, following (`rule:nrz:decision-partition-admission`), (`def:nrz:decision-outcomes`), (`rule:nrz:cas-piecewise-empty-domain`).
+
+**Definition (Complete lattice question identity)** · `def:nrz:lattice-question-identity`
+
+The question retains d, ordered axes, exact target and context, the original B and φ identities, their definedness/inverse proofs, K and parameter bindings, cell convention and boundary order, physical reading/restoration maps, and all referenced schema and proof revisions. Nearest-point questions additionally retain the declared Euclidean coordinate metric and any reduction/comparison certificate. The attachment extends this key with every live source, value, radius, numerical-error companion and assurance version in (`def:nrz:decision-node`), (`def:nrz:decision-evidence`); neither printed coefficients nor equal rounded centers identify a question (`def:nrz:descriptor-binding-reuse-key`).
+
+**Rule (Equivalent point sets do not identify questions)** · `rule:nrz:lattice-basis-transport`
+
+A unimodular Integer matrix U with checked determinant ±1 gives `B' = B·U` and the same lattice points, with indices related by `k = U·k'`. An offset change `φ' = φ + B·z` with exact Integer z also preserves the point set, with `k = z + k'`. Nevertheless the original bases, offsets and ordered indices remain distinct in (`def:nrz:lattice-question-identity`): a shear changes floor cells, and index order can change nearest-point tie ownership. Reuse requires an explicit checked transport of the chosen regions, target and output tuple; point-set equality alone is insufficient under (`rule:nrz:cas-piecewise-case-identities`), (`rule:nrz:decision-replay-identity`).
+
+## Fundamental domains and cover · `sec:nrz:lattice-cells`
+
+**Definition (Half-open parallelepiped cells)** · `def:nrz:lattice-floor-cells`
+
+With the admitted inverse A, set `t = A·(q − φ)` and `C_k = {q : k_i ≤ t_i < k_i + 1 for every i}`. Thus `C_k = φ + B·(k + [0,1)^d)` and the selected index is coordinate-wise `floor(t)`. Faces with `t_i = k_i` belong to k, whereas the opposite faces belong to the neighboring cell with that coordinate incremented; this ownership applies simultaneously at edges and corners. The inequalities are in basis coordinates, so a negative determinant or a skew basis changes no endpoint rule (`rule:nrz:lattice-basis-admission`), (`rule:nrz:decision-cut-predicates`).
+
+**Theorem (Affine product cover and unique projection)** · `thm:nrz:lattice-floor-cover`
+
+For every `q ∈ ℝ^d`, nonsingularity supplies exactly one `t = A·(q − φ)`. Apply the scalar floor lemma of (`rule:nrz:decision-integer-family-implementation`) to each t_i to obtain exactly one Integer k_i with `k_i ≤ t_i < k_i + 1`; their ordered tuple is the unique k whose cell contains q by (`def:nrz:lattice-floor-cells`). Conversely any two such tuples agree in every coordinate by scalar uniqueness. Restricting to K proves cover exactly on `D_K` from (`def:nrz:lattice-index-domain`). This is a finite theorem schema over d explicit binders, never an enumeration of cells or infinitely many native case arms (`rule:nrz:decision-option-ranges`).
+
+**Definition (Voronoi cells with owned ties)** · `def:nrz:lattice-voronoi-cells`
+
+Use the declared Euclidean metric in the normalized Real frame of (`def:nrz:lattice-family`). Select a lattice site `s_k = φ + B·k` minimizing `‖q − s_k‖²`, resolving all equal minima by the lexicographically greatest original index tuple k in the declared axis order. The owned cell `V_k` requires distance strictly smaller than every lexicographically greater competitor and no greater than every lexicographically smaller competitor. This refines the overlapping closed Voronoi cells into a partition with explicit face, edge and vertex ownership; the order is a mathematical tie convention, not producer search priority (`def:nrz:decision-partition`), (`dec:nrz:cas-piecewise-graph-representation`).
+
+**Theorem (Nearest-site existence and unique cover)** · `thm:nrz:lattice-voronoi-cover`
+
+For the full-rank B of (`rule:nrz:lattice-basis-admission`), a bounded Euclidean ball contains finitely many lattice sites: applying the continuous inverse A bounds every Integer coordinate. The site φ supplies a finite trial distance for any q, so all minimizing candidates lie in a finite ball and a minimum exists. The finite nonempty minimizer set has a unique lexicographically greatest tuple, proving that the cells of (`def:nrz:lattice-voronoi-cells`) cover `ℝ^d` exactly once. Integer translation preserves lexicographic order, hence `V_k = B·k + V_0`, an owned fundamental domain; restricting K again covers only `D_K` (`def:nrz:lattice-index-domain`). This existence proof does not supply an efficient closest-vector algorithm.
+
+**Rule (Orthogonal nearest-point certificate)** · `rule:nrz:lattice-orthogonal-nearest`
+
+If exact checking proves `Bᵀ·B` diagonal with strictly positive diagonal entries, then `‖q − φ − B·k‖²` is the sum of positive multiples of `(t_i − k_i)²`. Each coordinate minimizes independently with `k_i = floor(t_i + 1/2)`, giving basis residuals in `[−1/2,1/2)`. At a half-integer, the larger Integer wins, including simultaneous ties, in agreement with (`def:nrz:lattice-voronoi-cells`). This gives a short exact certificate after affine replay, but coordinate rounding without the orthogonality proof is not a nearest-point theorem (`thm:nrz:lattice-floor-cover`), (`rule:nrz:lattice-basis-admission`).
+
+**Rule (General closest-vector admission)** · `rule:nrz:lattice-general-nearest`
+
+Nearest-point selection for a general basis is a closest-vector problem. Exact certification is direct for the orthogonal case of (`rule:nrz:lattice-orthogonal-nearest`) and can be manageable for a suitably reduced basis with a short complete comparison certificate, but it is hard in general and this design promises no polynomial algorithm in d. The declared non-orthogonal route requires `B' = B·U`, checked unimodular U, explicitly stated and checked reduction conditions, and a certificate proving that a finite competitor set suffices for exact global nearest-point and tie selection. Reduction, including ordinary basis reduction, alone never proves that coordinate rounding is exact. A general basis without this supported proof package is refused for nearest-point admission; it can still admit floor cells under (`thm:nrz:lattice-floor-cover`).
+
+**Rule (Finite competitor completeness and exact cuts)** · `rule:nrz:lattice-nearest-completeness`
+
+One sufficient package for (`rule:nrz:lattice-general-nearest`) proves a rational R bounding `‖q − s_k‖` on the proposed enclosure, lists every nonzero lattice difference v with `‖v‖ ≤ 2R`, and checks list completeness by bounding its Integer coordinates through a certified inverse. Differences with norm greater than 2R cannot tie or beat s_k by the triangle inequality. For every listed v, the comparison is the affine inequality `2(q − s_k)·v ≤ ‖v‖²`, made strict when the competing original index is lexicographically greater. This includes equality-distance competitors at vertices, not merely apparent facets. All norm, inverse, list-exhaustiveness and strictness claims require exact proofs; finite enumeration of nearby differences can be expensive or exponential in d and is distinct from enumerating the lattice's infinitely many cells (`def:nrz:lattice-voronoi-cells`), (`thm:nrz:lattice-voronoi-cover`).
+
+## Enclosure replay and selection · `sec:nrz:lattice-selection`
+
+**Definition (Certified vector enclosure)** · `def:nrz:lattice-enclosure`
+
+The baseline enclosure is a closed rational box `E = ∏_i [l_i,u_i]` with `l_i ≤ u_i`, together with proof that the original q lies in E for every realization of the retained input family. Each coordinate includes import, reading/restoration and evaluation error exactly once; shared sources retain their identities even when a box relaxation loses correlation. Matrix authenticates the exported versions, bindings checks coordinate correspondence, and CAS replays the mathematical origin independently. Neither standard uncertainty nor a center is this evidence (`rule:nrz:decision-exact-certificate`), (`rule:nrz:decision-enclosure-and-cut`), (`rule:nrz:descriptor-binding-error-composition`).
+
+**Decision (Box certificate boundary)** · `dec:nrz:lattice-enclosure-shapes`
+
+The initial lattice selection contract admits rational boxes from (`def:nrz:lattice-enclosure`) and rational boxes H in the declared exact basis coordinates, with a checked original-target judgment `A·(q − φ) ∈ H`. The latter denotes the enclosure `φ + B·H` of q and retains the exact affine correspondence; it is not permission to admit arbitrary polytopes or zonotopes. General polytopes and zonotopes enter only through a separately checked containment in one of these boxes; their correlations confer no additional cut authority in this subset. A direct extension must declare its exact representation and support-function or inclusion theorem, for example rational vertex extrema or a zonotope's sum of absolute generator projections, and retain the original-target enclosure proof. An unsupported shape or an unproved conversion cannot supply membership (`rule:nrz:decision-enclosure-and-cut`), (`rule:nrz:cas-design-closed-registration`).
+
+**Rule (Replay the exact affine map)** · `rule:nrz:lattice-affine-enclosure`
+
+After original-target replay for E, certify a rational box H containing `A·(E − φ)` using the admitted exact inverse and exact rational outward interval operations. Rational coefficients permit exact row extrema on E; irrational coefficients remain the original descriptors with independently proved rational bounds. For π-dependent entries, retain the checked Machin theorem used by (`ex:nrz:decision-closed-replay-scope`), never a decimal surrogate. Every reciprocal needs a bound excluding zero, even when symbolic nonsingularity is already proved; inability to obtain such bounds leaves this certificate unsupported or exhausts its declared refinement budget. Alternatively, replay the original affine expression `A·(q − φ)` directly to certify a basis-coordinate H under (`dec:nrz:lattice-enclosure-shapes`); exact identities can then give a sharper enclosure of the original target without asserting containment of an older, wider E. Correlated parameter-dependent q, B and φ retain their common scope; independent interval relaxation is conservative, and any sharper cancellation needs an exact identity (`rule:nrz:lattice-basis-admission`), (`rule:nrz:decision-mathematical-scope`).
+
+**Rule (Named candidate and whole-box inclusion)** · `rule:nrz:lattice-floor-selection`
+
+A producer names one exact k and the checker proves `k ∈ K`, replays the original target and affine map, and checks `k_i ≤ H.lower_i` and `H.upper_i < k_i + 1` for every i. These rational comparisons establish `φ + B·H ⊆ C_k`, also `E ⊆ C_k` when H encloses the transform of E, and hence the unique selected tuple by (`thm:nrz:lattice-floor-cover`), (`rule:nrz:lattice-affine-enclosure`), (`thm:nrz:decision-membership-introduction`). Approximate coordinates may propose k but have no proof authority. The checker validates that tuple directly regardless of how far its cell is from the origin; no search over preceding cells occurs. Missing coordinates, a different original target or an out-of-range candidate cannot publish a selection (`rule:nrz:cas-design-expected-claim`).
+
+**Rule (Straddling and owned equalities)** · `rule:nrz:lattice-boundary-selection`
+
+If E contains points owned by different cells, it cannot certify one index, even if the actual q or its center happens to lie inside one. A transformed outer box H crossing a face may instead reflect conservative relaxation; it establishes no uniform selection and may be refined under the same question. An upper endpoint equal to the excluded face fails the strict cut; a singleton exactly on an included face can select its owner when equality is proved. Irrational-face equality may need an exact algebraic identity rather than finite-width constant bounds. No epsilon, tolerance or center rounding replaces these checks (`rule:nrz:decision-cut-predicates`), (`rule:nrz:decision-refinement`), (`rule:nrz:lattice-floor-selection`).
+
+**Rule (Nearest-point enclosure selection)** · `rule:nrz:lattice-nearest-selection`
+
+For an orthogonal B, apply the whole-box tests of (`rule:nrz:lattice-floor-selection`) to `H + (1/2,…,1/2)` using (`rule:nrz:lattice-orthogonal-nearest`). Otherwise check every complete competitor inequality from (`rule:nrz:lattice-nearest-completeness`) over the entire E with exact rational extrema and certified coefficient bounds. A reduced basis transports candidate indices and comparisons back to the original k-order; applying its own lexicographic rule silently would change the question. Failure to prove a needed strict inequality or tie equality stays undecided, and a false reduction/completeness certificate is a typed refusal, under (`rule:nrz:lattice-basis-transport`), (`def:nrz:decision-outcomes`).
+
+**Argument (Dimension and bit-size scaling)** · `arg:nrz:lattice-selection-cost`
+
+For dense rational B, ordinary exact elimination takes O(d³) arithmetic operations to obtain the inverse, with pivot/domain proofs and operand growth charged separately; it is reusable only under the complete basis/context identity. Given certified coefficient bounds, mapping a box takes O(d²) rational operations, range and floor cuts take O(d) comparisons, and the tuple occupies O(d) Integers. These are operation counts, not unit-cost bit bounds: total cost includes original expression replay, certificate sizes, numerator/denominator growth and the bit lengths of k. Diagonal maps reduce the affine work to O(d). The count of possible cells never enters this floor check; nearest-point work additionally depends on the competitor/reduction proof, with O(m·d) comparisons of precomputed affine forms for m competitors and no general polynomial-size guarantee (`rule:nrz:lattice-floor-selection`), (`rule:nrz:lattice-nearest-completeness`), (`rule:nrz:decision-lemma-reuse`).
+
+## Descriptors, continuations and lifetimes · `sec:nrz:lattice-results`
+
+**Definition (Exact selected outputs)** · `def:nrz:lattice-outputs`
+
+A decided lattice result returns an immutable descriptor of the ordered exact Integer tuple k and a descriptor of `r = q − B·k`, with checked identity `q = B·k + r` and the selected cell witness. The optional site descriptor is `s = φ + B·k`; selecting s means q belongs to its owned cell, not that `q = s`. For floor cells, `r ∈ φ + B·[0,1)^d`; the zero-offset basis residual is `r − φ`. For nearest cells r belongs to `V_0`. These statements follow by substitution in (`def:nrz:lattice-floor-cells`), (`def:nrz:lattice-voronoi-cells`), and equality to a lattice point requires a separate exact zero-residual proof. No decimal remainder replaces the original expression (`prin:nrz:descriptor-binding-cas-meaning`).
+
+**Rule (Physical meanings and separate capacity)** · `rule:nrz:lattice-output-meaning`
+
+Bindings declares the physical coordinate frame and exact map before interpreting (`def:nrz:lattice-outputs`). Each k_i can denote a signed winding index, a crystal translation coordinate, a quantization index or an admitted nonnegative counted kind; an angular representative retains its angle kind, while a bare Integer never acquires angle or cycle meaning from being dimensionless. B maps index differences to the declared physical differences, and φ retains its point/offset role. Heap storage holds no selected index or count (`rule:nrz:decision-count-sources`), (`prin:nrz:descriptor-binding-float-heap`). Executable conversion checks each coordinate's signedness, representation and inclusive capacity separately, then aggregate allocation/shape budgets; any failure is a typed materialization refusal preserving the exact tuple, never rounding, wrapping or clamping (`rule:nrz:decision-materialization-capacity`), (`rule:nrz:lc-resonance-kinds`).
+
+**Rule (Undecided handoff to graph strata)** · `rule:nrz:lattice-undecided-handoff`
+
+A valid but inconclusive attempt carries `Undecided(reason, evidence)` with the complete lattice question, last valid original and transformed enclosures, attempted k/cuts, pending obligations, policy and spent budget. Proven boundary intersection, unsupported replay, exhausted refinement and exhausted decision budget retain the named distinctions of (`def:nrz:decision-outcomes`); an attempted k is not a selected descriptor. The later graph-strata owner must preserve this record and implement the predeclared continuation, allowing independent enclosure consumers, permitted same-target refinement or blocking exact-choice dependents. Undecided introduces neither complement membership nor a default lattice index (`rule:nrz:decision-undecided-continuation`), (`req:nrz:decision-owner-graph-strata`).
+
+**Rule (Retirement and atomic attachment publication)** · `rule:nrz:lattice-attachment-lifetime`
+
+Any changed dependency in (`def:nrz:lattice-question-identity`) retires the live attachment and its transitive selected descriptors/lowerings, including a radius-only change that crosses a face while the center stays fixed. A change staying in the same cell still requires fresh dependency validation; equality of the resulting k does not revive an old attachment. CAS retains the immutable theorem about the old snapshot, and matrix publishes a fresh attachment only after complete validation under the live lease. This specializes (`rule:nrz:decision-attachment-lifetime`), (`rule:nrz:decision-invalidation`), (`rule:nrz:decision-selected-publication`); no lattice decision may provide a premise for computing its own enclosure (`rule:nrz:decision-stratification`).
+
+## Exact worked instances · `sec:nrz:lattice-examples`
+
+**Example (Integer floor is the scalar instance)** · `ex:nrz:lattice-integer-floor`
+
+Set `d = 1`, `B = 1`, `φ = 0` and `K = ℤ`, or the declared nonnegative range for complete LC cycles. The original `q = 10/Pi` has the checked enclosure `[203/64,205/64]`, so `3 ≤ 203/64` and `205/64 < 4` select k = 3; r is exactly `10/Pi − 3` in `[0,1)`. The wider box `[191/64,205/64]` crosses the face at 3 and cannot select uniformly. This recovers the implemented mathematical selection of (`rule:nrz:decision-integer-selection-implementation`), (`ex:nrz:decision-lc-cycle-selection`); the paired lattice-output descriptor is the proposed contract of (`def:nrz:lattice-outputs`), not an additional implementation claim.
+
+**Example (Full-turn floor and centered phase)** · `ex:nrz:lattice-phase-wrap`
+
+Let `d = 1`, `B = 2π`, `φ = 0`, and q be a radian-coordinate phase. Exact `q = 5π/2` has a certified rational enclosure `[15/2,8]`: the weaker consequences `3 < π < 22/7` of the retained Machin certificate suffice. They also give `2π < 44/7 < 15/2` and `8 < 12 < 4π`, so floor selection yields k = 1 and exact `r = π/2 ∈ [0,2π)`. For the same lattice, orthogonal nearest-point selection has representative interval `[−π,π)`; exact `q = π` selects k = 1 and r = −π by the greater-index tie rule. This centered convention is explicit and distinct from the LC argument convention `(-π,π]` in (`rule:nrz:lc-resonance-kinds`), following (`rule:nrz:lattice-orthogonal-nearest`), (`rule:nrz:lattice-boundary-selection`).
+
+**Example (A phase enclosure crosses the wrap face)** · `ex:nrz:lattice-phase-straddling`
+
+For the exact target `q = 2π`, the valid rational enclosure `[6,13/2]` contains points strictly below and above 2π because `3 < π < 22/7`; it therefore yields `Undecided(BoundaryIntersection)` for floor cells, not k = 1 inferred from a center. An independently replayed affine equality `q/(2π) = 1` supports the singleton basis-coordinate enclosure `{1}` of (`dec:nrz:lattice-enclosure-shapes`) and selects the owned face with k = 1 and r = 0. That is a separate stronger original-target certificate; it does not prove that the straddling box lies in one cell. Both outcomes obey (`rule:nrz:lattice-affine-enclosure`), (`rule:nrz:lattice-boundary-selection`), (`rule:nrz:lattice-undecided-handoff`).
+
+**Example (A torus of two LC phases)** · `ex:nrz:lattice-lc-torus`
+
+Take two ideal LC modes with positive natural times `τ₁ = 1/2000 s`, `τ₂ = 1/1000 s`, each satisfying its own exact `τ_i² = L_i·C_i`, zero initial phases and elapsed time `t = 1/100 s`. Their phase coordinates are `q_i = t/τ_i`, giving `q = (20,10)` from the angular-frequency law of (`def:nrz:lc-resonance-model`), with the full-cycle interpretation of (`rule:nrz:lc-resonance-kinds`). For `B = 2π·I_2`, `φ = (0,0)` and floor cells, `3 < π < 22/7` proves `3 < 10/π < 4` and `1 < 5/π < 2`. Thus k = (3,1), and the exact representative `(20 − 6π,10 − 2π)` lies in `[0,2π)²`. This is a two-dimensional torus quotient under (`thm:nrz:lattice-floor-cover`), retaining two ordered sources and their shared elapsed-time dependency under (`def:nrz:lattice-question-identity`); the second mode is a declared example, not an implemented fixture.
+
+**Example (Torus uncertainty can block the whole tuple)** · `ex:nrz:lattice-torus-boundary`
+
+For the torus question of (`ex:nrz:lattice-lc-torus`), the box `[19,20] × [9,10]` lies wholly in cell (3,1): `6π < 132/7 < 19`, `20 < 8π`, `2π < 9`, and `10 < 4π`. Widening only its first radius to produce `[18,21] × [9,10]` crosses the face at 6π because `18 < 6π < 132/7 < 21`. The vector decision stays undecided even though the second coordinate still fits cell 1; it publishes no partially selected tuple. A plan wanting independent coordinate decisions must declare them separately. The widening retires the earlier attachment by (`rule:nrz:lattice-attachment-lifetime`), (`rule:nrz:lattice-floor-selection`).
+
+**Example (A skew crystal basis and exact reduction)** · `ex:nrz:lattice-skew-crystal`
+
+In a declared orthonormal Cartesian frame with one exact length reference, take `B = [[1,1,0],[0,1,0],[0,0,1]]`, `φ = 0` and singleton `q = (3/5,2/5,1/10)`. The exact determinant is 1 and `A = [[1,−1,0],[0,1,0],[0,0,1]]`, so `A·q = (1/5,2/5,1/10)` and floor selection returns (0,0,0). Rounding these basis coordinates to nearest also returns zero, whose squared distance is 53/100, whereas site (1,0,0) has squared distance 33/100. Thus a skew basis invalidates coordinate-wise nearest reasoning. The explicit unimodular reduction `U = A` gives `B·U = I_3`; checked orthogonality then proves reduced nearest index m = (1,0,0), original k = U·m = (1,0,0), and representative `(−2/5,2/5,1/10)`. Without that certificate or a complete admitted competitor proof, the general nearest route refuses under (`rule:nrz:lattice-general-nearest`), even though floor selection remains available under (`thm:nrz:lattice-floor-cover`).
+
+**Example (Reciprocal crystal lattice retains its own question)** · `ex:nrz:lattice-reciprocal-crystal`
+
+For the direct crystal basis of (`ex:nrz:lattice-skew-crystal`), declare reciprocal basis `G = 2π·B^(−ᵀ) = 2π·[[1,0,0],[−1,1,0],[0,0,1]]`. Exact multiplication proves `Bᵀ·G = 2π·I_3` and nonsingularity; the reciprocal physical frame uses inverse-length coordinates and the declared full-turn phase pairing. A reciprocal-space target uses a separate lattice decision with G, its own K and its own enclosure, not the direct-space attachment. Irrational affine bounds follow (`rule:nrz:lattice-affine-enclosure`); nearest reciprocal-site selection still needs (`rule:nrz:lattice-general-nearest`). Bindings owns the direct/reciprocal physical correspondence, while CAS checks the matrix identities (`rule:nrz:lattice-output-meaning`), (`def:nrz:lattice-question-identity`).
+
+**Example (A quantization grid retains exact indices)** · `ex:nrz:lattice-quantization-grid`
+
+Let `B = diag(1/8,1/16)`, `φ = (0,0)`, and exact `q = (3/10,1/5)` in declared compatible normalized coordinates. Then `A·q = (12/5,16/5)` selects floor index (2,3) and exact representative `(1/20,1/80)` in `[0,1/8) × [0,1/16)`. Orthogonal nearest selection happens to give the same tuple here; that coincidence does not identify the two conventions. An executable first-coordinate capacity of 1 refuses materialization while preserving the exact decided tuple, as required by (`rule:nrz:lattice-floor-selection`), (`rule:nrz:lattice-orthogonal-nearest`), (`rule:nrz:lattice-output-meaning`).
+
+## Ordered owner obligations · `sec:nrz:lattice-delivery`
+
+**Requirement (CAS lattice admission and affine cover)** · `req:nrz:lattice-owner-admission`
+
+Owner: `nrz-cas`. Deliver checked vector/basis/context admission, exact inverse and determinant judgments, coordinate-range binding and the finite affine product-cover schema of (`rule:nrz:lattice-basis-admission`), (`thm:nrz:lattice-floor-cover`), preserving original scope on fresh replay. Minimal failing case: `B = [[1,1],[1,1]]` cannot admit a two-dimensional lattice; a positive twin with determinant 1 must admit without enumerating K. A widened projected domain or omitted parameter binding also refuses under (`def:nrz:lattice-index-domain`).
+
+**Requirement (CAS original-target replay and tuple selection)** · `req:nrz:lattice-owner-selection`
+
+Owner: `nrz-cas`, after (`req:nrz:lattice-owner-admission`). Deliver rational box export grammar, original-target and affine replay, named-tuple cuts and exact output identities under (`rule:nrz:lattice-affine-enclosure`), (`rule:nrz:lattice-floor-selection`), (`def:nrz:lattice-outputs`). Minimal failing case: the widened torus box in (`ex:nrz:lattice-torus-boundary`) cannot select (3,1); its narrow twin must replay with both coordinate sources and the π proof retained. Mutating the original target while keeping the same candidate refuses expected-claim matching.
+
+**Requirement (CAS certified nearest-point branch)** · `req:nrz:lattice-owner-nearest`
+
+Owner: `nrz-cas`, after (`req:nrz:lattice-owner-selection`). Deliver owned Voronoi cover, the orthogonal certificate and the explicitly bounded reduction/completeness route of (`rule:nrz:lattice-general-nearest`), (`rule:nrz:lattice-nearest-completeness`). Minimal failing case: the zero nearest index proposed by basis-coordinate rounding in (`ex:nrz:lattice-skew-crystal`) refuses; the checked unimodular-to-orthogonal twin succeeds. Missing comparison vectors, unproved reduction or a tie order silently changed during basis transport must refuse rather than weaken the closest-vector claim (`rule:nrz:lattice-nearest-selection`).
+
+**Requirement (Bindings correspondence and descriptor outputs)** · `req:nrz:lattice-owner-bindings`
+
+Owner: `nrz-bindings`, after (`req:nrz:lattice-owner-selection`) for floor and additionally (`req:nrz:lattice-owner-nearest`) for nearest cells. Deliver the storage-neutral question/attachment, original physical coordinate and full-turn correspondences, signed index or counted kinds, exact representative descriptors and separate capacity consumers of (`def:nrz:lattice-question-identity`), (`rule:nrz:lattice-output-meaning`). Minimal failing case: replacing a full turn by a half turn or changing an offset/source while preserving center bytes cannot reuse a selected attachment; a coordinate capacity below its exact selected Integer gives a typed refusal and leaves the mathematical witness intact.
+
+**Requirement (Matrix live enclosures and publication)** · `req:nrz:lattice-owner-matrix`
+
+Owner: `nrz-matrix`, after (`req:nrz:lattice-owner-bindings`), with numerical arithmetic evidence supplied by `nrz-scalar` and independently checked by CAS. Deliver authenticated vector/value/companion exports, lease validation, atomic publication and transitive invalidation under (`def:nrz:lattice-enclosure`), (`rule:nrz:lattice-attachment-lifetime`), retaining the certificate-origin obligations of (`req:nrz:decision-owner-certificate-origins`). Minimal failing case: the radius-only widening in (`ex:nrz:lattice-torus-boundary`) must retire the old selected tuple and its dependent results; a failed revalidation publishes no prefix of an attachment.
+
+**Requirement (Later graph-strata consumer)** · `req:nrz:lattice-owner-strata`
+
+Owners: `nrz-bindings`, `nrz-matrix` and the later graph owner of (`req:nrz:decision-owner-graph-strata`), after (`req:nrz:lattice-owner-matrix`). Deliver declared indexed interfaces, complete undecided handling and capacity-aware activation in strictly later strata, consuming (`rule:nrz:lattice-undecided-handoff`) without adding graph topology to CAS values. Minimal failing case: a continuation that defaults an undecided tuple to zero, omits its undecided interface, or chooses the recipe needed to compute its own phase enclosure is invalid under (`rule:nrz:decision-undecided-continuation`), (`rule:nrz:decision-stratification`).
+
+**Table (Ordered lattice implementation lanes)** · `tab:nrz:lattice-implementation-lanes`
+
+|Statement|Order and owner|Minimal failing case|
+|---------|---------------|--------------------|
+|(`req:nrz:lattice-owner-admission`)|Admission and cover; `nrz-cas`|Singular two-dimensional basis|
+|(`req:nrz:lattice-owner-selection`)|After admission: original replay and floor selection; `nrz-cas`|Torus box crossing one face|
+|(`req:nrz:lattice-owner-nearest`)|After selection: nearest-point proof branch; `nrz-cas`|Skew-basis coordinate rounding|
+|(`req:nrz:lattice-owner-bindings`)|After the selected convention's CAS proof: correspondence and outputs; `nrz-bindings`|Half-turn substitution or insufficient coordinate capacity|
+|(`req:nrz:lattice-owner-matrix`)|After bindings: live export and publication; `nrz-matrix`|Radius-only change leaving a stale selection|
+|(`req:nrz:lattice-owner-strata`)|After live publication: indexed graph continuations; bindings, matrix and later graph owner|Missing undecided handling or cyclic premise|
+
+**Requirement (Evidence for design and implementation claims)** · `req:nrz:lattice-verification`
+
+The document and its template are checked by deterministic docgen rendering, fixed-point checking and host label/format lint, which establish documentation consistency only. Each owner lane in (`tab:nrz:lattice-implementation-lanes`) must independently verify its positive example and minimal failure, complete assumption retention, budget exhaustion without partial publication, and fresh replay against changed basis/offset/context identities before claiming implementation. Arbitrary finite d is the mathematical contract; executable dimension, Integer and proof-size ceilings remain explicit resource refusals under (`rule:nrz:decision-materialization-capacity`), and no benchmark or successful one-dimensional implementation establishes those multidimensional properties (`prin:nrz:lattice-decision-contract`).
