@@ -69,3 +69,5 @@ mod reciprocal_operator;
 mod spectral;
 
 mod spectral_publication;
+
+mod decision_snapshots;
