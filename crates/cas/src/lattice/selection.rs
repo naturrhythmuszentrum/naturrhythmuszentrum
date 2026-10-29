@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Named tuple selection composes a checked affine cover and original-target box replay.
 
+mod attempt;
+
 #[expect(
     clippy::redundant_pub_crate,
     reason = "the statement kernel shares the closed lattice selection wire"
 )]
 pub(crate) mod wire;
+
+pub use attempt::{
+    CheckedLatticeAttempt, LatticeAttemptPolicy, LatticeFloorCut, LatticePendingObligation,
+    LatticeSelectionOutcome, LatticeUndecided, LatticeUndecidedReason,
+};
 
 use super::{LatticeBoxEnclosure, LatticeCoordinateEnclosure, LatticeCover};
 use crate::budget::Budget;

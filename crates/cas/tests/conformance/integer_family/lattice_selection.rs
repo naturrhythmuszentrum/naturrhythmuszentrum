@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Portable named tuple proofs retain original-target boxes and affine cover dependencies.
 
+#[path = "lattice_selection/attempt.rs"]
+mod attempt;
 #[path = "lattice_selection/costs.rs"]
 mod costs;
 #[path = "lattice_selection/direct.rs"]

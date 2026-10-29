@@ -12,7 +12,11 @@ pub use coordinate_enclosure::{CheckedLatticeCoordinateEnclosure, LatticeCoordin
 pub use cover::LatticeCover;
 pub use enclosure::{CheckedRationalBoxEnclosure, RationalBoxEnclosure};
 
-pub use selection::{LatticeEnclosure, LatticeSelection};
+pub use selection::{
+    CheckedLatticeAttempt, LatticeAttemptPolicy, LatticeEnclosure, LatticeFloorCut,
+    LatticePendingObligation, LatticeSelection, LatticeSelectionOutcome, LatticeUndecided,
+    LatticeUndecidedReason,
+};
 
 pub use index::{CheckedLatticeIndexDomain, LatticeIndexQuestion};
 
