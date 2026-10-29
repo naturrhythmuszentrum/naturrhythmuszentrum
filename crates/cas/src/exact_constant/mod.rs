@@ -2,6 +2,9 @@
 //! Owned finite constant expressions with checked sign evidence and exact CAS normalization.
 
 mod arithmetic;
+mod cache;
+
+pub use cache::{ConstantIdentity, ConstantIdentityKind, ExactConstantCache, PreparedConstant};
 pub(crate) mod graph;
 mod sign;
 

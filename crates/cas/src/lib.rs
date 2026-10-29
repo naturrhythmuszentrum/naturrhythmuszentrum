@@ -283,7 +283,10 @@ mod service;
 mod shortcut;
 
 pub use error::{Exhaustion, Fault, FaultKind, InvalidCode, Location};
-pub use exact_constant::{ExactConstant, PositiveConstant};
+pub use exact_constant::{
+    ConstantIdentity, ConstantIdentityKind, ExactConstant, ExactConstantCache, PositiveConstant,
+    PreparedConstant,
+};
 pub use graph::{Cas, Handle, LogicalId, Reference};
 pub use number::Rational;
 

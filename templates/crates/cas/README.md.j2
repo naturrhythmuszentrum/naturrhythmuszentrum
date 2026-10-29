@@ -657,6 +657,30 @@ For the literal zero origin, admission costs 3,956 Work, polynomial normalizatio
 
 The original `GeneralPower(StrictReal)` with exponent `1/2` and radicand `1/4000000` refuses as `UnsupportedFragment` at “exact constant expression” after 1,047 Work. The closed grammar refuses this operator before sign inference or polynomial normalization; the positive rational radicand alone does not extend the admitted syntax (`test:unit:constant-square-root-grammar-refusal`), (`def:cas:constant-preparation`).
 
+**Definition (Retained checked constants)** · `def:cas:constant-cache`
+
+`ExactConstantCache::prepare(cas, context, original, budget)` retains one `PreparedConstant` for an original closed expression and its complete context. The first request uses the ordinary finite-real admission, normalization equality and sign checks of (`def:cas:constant-preparation`); later requests borrow that checked result across caller operations (`test:integration:constant-cache-reuses-checked-preparation`). Ordinary `ExactConstant::from_expression` remains independent of this opt-in cache.
+
+**Rule (Complete local constant keys)** · `rule:cas:constant-cache-key`
+
+The key consists of source-store ownership, rollback generation, the canonical original expression node and the canonical context node. Inside that immutable graph namespace, these nodes identify all ordered operand, declaration, assumption and family dependencies; normalized values and printed names never authorize reuse (`test:integration:constant-cache-original-identity`), (`test:integration:constant-cache-context-and-owner`), (`test:integration:constant-cache-declaration-identity`). A new store or rollback requires fresh checking, and a saturated generation disables hits (`test:unit:constant-cache-rollback-generation`), (`test:unit:constant-cache-saturated-generation`). This local content identity complements the portable complete-byte key of (`thm:cas:lemma-cache`).
+
+**Rule (Retained finite-real identities)** · `rule:cas:constant-cache-identities`
+
+For a checked finite real value x, `x*1 = x` and `x+0 = x`. `PreparedConstant::identity` returns a sealed `ConstantIdentity` borrowing that exact preparation as its sole nonliteral premise and exact result; `positive` exposes only its already checked strict sign (`def:cas:constant-preparation`), (`test:integration:constant-cache-closed-fixtures`). These local receipts create no graph proof, portable witness or hypothesis discharge; their evidence cannot be supplied as an independent `VerifiedWitness`.
+
+**Example (Checked constant lookup costs)** · `ex:cas:constant-cache-costs`
+
+The first direct `2*Pi` preparation costs 27,938 Work, exactly the uncached admission; its second request costs one Work. Each identity citation costs one Work, including both repetitions of `Pi*1` and `Pi+0`, and borrows the same retained evidence (`test:integration:constant-cache-reuses-checked-preparation`), (`test:integration:constant-cache-closed-fixtures`). Literal N/N−1 boundaries include zero available Work for a hit and prior cumulative caller Work (`test:integration:constant-cache-work-boundaries`); the uncached costs remain those of (`ex:cas:constant-two-pi-costs`), (`ex:cas:constant-pi-costs`).
+
+**Example (Checked constant retained storage)** · `ex:cas:constant-cache-storage`
+
+The direct `2*Pi` preparation retains 3,654 logical bytes, including its normalized graph, canonical value bytes and cache metadata. Literal output and staged-payload boundaries check hits at 3,654 and 3,653 bytes, and output boundaries check miss publication at the same figures (`test:integration:constant-cache-storage-boundaries`), (`test:integration:constant-cache-miss-storage`). One caller-retained input byte and a failed second insertion preserve prior evidence and restore temporary limits while keeping spent Work (`test:integration:constant-cache-retained-refusals`), (`rule:cas:constant-cache-key`).
+
+**Rule (Checked constant cache lifecycle)** · `rule:cas:constant-cache-lifecycle`
+
+Hits charge at least one Work, using the bit width of the retained entry count, and check the retained storage against caller and source-store ceilings. Misses reserve existing retained payload beside ordinary admission scratch and publish only after storage checks succeed; spent Work is never refunded (`test:integration:constant-cache-work-boundaries`). Foreign handles refuse at handle authentication, and an original zero divisor refuses at the closed sign checker without changing the source graph or retained entries (`test:integration:constant-cache-context-and-owner`), (`test:integration:constant-cache-domain-refusal`).
+
 ## Main concepts and types · `sec:cas:concepts`
 
 `Cas` is an owned exact graph; its `Handle` and `Reference` values retain store identity. `Rational` and `ExactConstant` support bounded exact arithmetic, with `PositiveConstant` witnessing admitted strict positivity. For example, the LC coefficient product remains an exact rational before any numerical import:
