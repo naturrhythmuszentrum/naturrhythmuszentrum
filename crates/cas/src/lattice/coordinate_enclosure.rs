@@ -89,41 +89,11 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeCoordinateEnclosure, Fault> {
         self.validate_lattice_basis(&contract.basis, basis, budget)?;
-        budget.work(4, AT)?;
         self.checked(&contract.inverse)?;
-        if contract.inverse != *basis.inverse().map().expression()
-            || contract.coordinates.context != contract.basis.context
-            || size(contract.coordinates.coordinates.len(), AT)? != u64::from(basis.dimension())
-        {
+        if contract.inverse != *basis.inverse().map().expression() {
             return Err(mismatch());
         }
-        let home = self.state.context(self.checked(&contract.basis.context)?)?;
-        let target = self.checked(&contract.target)?;
-        if self.lattice_rectangle(target, home.header_id)? != (basis.dimension(), 1) {
-            return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
-        }
-        let original = &self.state.expression(target)?.operands;
-        let inverse = &self
-            .state
-            .expression(self.checked(&contract.inverse)?)?
-            .operands;
-        budget.check(BudgetKind::MatrixEntries, size(inverse.len(), AT)?, AT)?;
-        let width = original.len().saturating_add(1);
-        for (row, coordinate) in contract.coordinates.coordinates.iter().enumerate() {
-            let start = row.saturating_mul(width);
-            let coefficients = inverse
-                .get(start..start.saturating_add(width))
-                .ok_or_else(mismatch)?;
-            correspondence(
-                self,
-                self.checked(&coordinate.target)?,
-                coefficients,
-                original,
-                budget,
-            )?;
-        }
-        let bytes =
-            super::enclosure::validate(self, &contract.coordinates, budget)?.saturating_add(512);
+        let bytes = validate(self, contract, basis.dimension(), budget)?;
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
         budget.work(bytes, AT)?;
@@ -137,6 +107,49 @@ impl Cas {
             bytes,
         })
     }
+}
+
+/// Shared semantic replay after the caller authenticates the original basis and inverse.
+pub(super) fn validate(
+    cas: &Cas,
+    contract: &LatticeCoordinateEnclosure,
+    dimension: u32,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
+    budget.work(4, AT)?;
+    cas.checked(&contract.inverse)?;
+    if contract.coordinates.context != contract.basis.context
+        || size(contract.coordinates.coordinates.len(), AT)? != u64::from(dimension)
+    {
+        return Err(mismatch());
+    }
+    let home = cas.state.context(cas.checked(&contract.basis.context)?)?;
+    let target = cas.checked(&contract.target)?;
+    if cas.lattice_rectangle(target, home.header_id)? != (dimension, 1) {
+        return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
+    }
+    let original = &cas.state.expression(target)?.operands;
+    let inverse = &cas
+        .state
+        .expression(cas.checked(&contract.inverse)?)?
+        .operands;
+    budget.check(BudgetKind::MatrixEntries, size(inverse.len(), AT)?, AT)?;
+    let width = original.len().saturating_add(1);
+    for (row, coordinate) in contract.coordinates.coordinates.iter().enumerate() {
+        let start = row.saturating_mul(width);
+        let coefficients = inverse
+            .get(start..start.saturating_add(width))
+            .ok_or_else(mismatch)?;
+        correspondence(
+            cas,
+            cas.checked(&coordinate.target)?,
+            coefficients,
+            original,
+            budget,
+        )?;
+    }
+    let bytes = super::enclosure::validate(cas, &contract.coordinates, budget)?.saturating_add(512);
+    Ok(bytes)
 }
 
 /// The exact syntactic affine identity is checked before any cancellation can erase operands.

@@ -6,10 +6,13 @@ mod coordinate_enclosure;
 pub(crate) mod cover;
 mod enclosure;
 mod index;
+pub(crate) mod selection;
 pub use affine_enclosure::{CheckedLatticeBoxEnclosure, LatticeBoxEnclosure};
 pub use coordinate_enclosure::{CheckedLatticeCoordinateEnclosure, LatticeCoordinateEnclosure};
 pub use cover::LatticeCover;
 pub use enclosure::{CheckedRationalBoxEnclosure, RationalBoxEnclosure};
+
+pub use selection::{LatticeEnclosure, LatticeSelection};
 
 pub use index::{CheckedLatticeIndexDomain, LatticeIndexQuestion};
 

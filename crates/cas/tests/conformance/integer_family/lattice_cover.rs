@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Native finite cover, complete affine evidence and independent ordinary replay.
 
+#[path = "lattice_selection.rs"]
+mod selection;
+
 use super::{Product, fixture, ledger, matrix, real};
 use crate::testing::common::TestResult;
 use nrz_cas::lattice::{LatticeBasisOutcome, LatticeBasisQuestion};

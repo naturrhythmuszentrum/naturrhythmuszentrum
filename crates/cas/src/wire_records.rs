@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Typed structural record descriptions with symbolic, strictly semantic dependencies.
 
-use crate::budget::Budget;
+use crate::budget::{Budget, BudgetKind};
 use crate::domain_model::{Layer, RegionExpr};
 use crate::encoding::{self, Encoder};
 use crate::error::{Fault, Location};
@@ -42,6 +42,7 @@ pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result
         }
         _ => None,
     };
+    let selection_cover = selection_cover(value, budget)?;
     let mut out = Encoder::witness(budget, AT);
     let mut record = Record {
         tag: 0,
@@ -123,16 +124,40 @@ pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result
             })?;
         }
     } else {
-        describe_entity(cas, value, &mut record, &mut out)?;
+        describe_entity(cas, value, selection_cover, &mut record, &mut out)?;
     }
     record.payload = out.finish();
     Ok(record)
+}
+
+/// A lattice selection cites the already retained complete cover proposition once.
+fn selection_cover(
+    entity: &Entity,
+    budget: &mut Budget,
+) -> Result<Option<crate::proof_model::Judgment>, Fault> {
+    let Entity::Statement(judgment) = entity else {
+        return Ok(None);
+    };
+    let crate::proof_model::Statement::LatticeSelection(selection) = &judgment.statement else {
+        return Ok(None);
+    };
+    let bytes = crate::lattice::cover::check::payload(&selection.cover, budget)?;
+    budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
+    budget.work(bytes, AT)?;
+    Ok(Some(crate::proof_model::Judgment {
+        context: selection.cover.index.basis.context.clone(),
+        layer: Layer::Logic,
+        space: None,
+        statement: crate::proof_model::Statement::LatticeCover(Box::new(selection.cover.clone())),
+        residuals: Vec::new(),
+    }))
 }
 
 /// Describe synthetic guarded, statement and conclusion records.
 fn describe_entity(
     cas: &Cas,
     entity: &Entity,
+    selection_cover: Option<crate::proof_model::Judgment>,
     record: &mut Record,
     out: &mut Encoder<'_>,
 ) -> Result<(), Fault> {
@@ -150,34 +175,7 @@ fn describe_entity(
             object(out, &mut record.references, cas.checked(&value.region)?)?;
             object(out, &mut record.references, cas.checked(&value.predicate)?)
         }
-        Entity::Statement(value) => {
-            record.tag = 10;
-            record.layer = value.layer;
-            record.space = value
-                .space
-                .as_ref()
-                .map(|value| Entity::Object(value.logical_id()));
-            object(out, &mut record.references, cas.checked(&value.context)?)?;
-            let start = record.references.len();
-            crate::statement::encode(&value.statement, out, |value, out| {
-                object(out, &mut record.references, cas.checked(value)?)
-            })?;
-            if let crate::proof_model::Statement::Cover { members, .. } = &value.statement {
-                record.sets.push(
-                    (start.checked_add(1).ok_or_else(invalid)?..record.references.len()).collect(),
-                );
-                if members.len().checked_add(1).ok_or_else(invalid)?
-                    != record
-                        .references
-                        .len()
-                        .checked_sub(start)
-                        .ok_or_else(invalid)?
-                {
-                    return Err(invalid());
-                }
-            }
-            Ok(())
-        }
+        Entity::Statement(value) => describe_statement(cas, value, selection_cover, record, out),
         Entity::Conclusion {
             proof,
             judgment,
@@ -216,6 +214,57 @@ fn describe_entity(
             Ok(())
         }
     }
+}
+
+/// Selection references share the cover statement but confer no cover proof authority.
+fn describe_statement(
+    cas: &Cas,
+    value: &crate::proof_model::Judgment,
+    selection_cover: Option<crate::proof_model::Judgment>,
+    record: &mut Record,
+    out: &mut Encoder<'_>,
+) -> Result<(), Fault> {
+    use crate::proof_model::Statement;
+    record.tag = 10;
+    record.layer = value.layer;
+    record.space = value
+        .space
+        .as_ref()
+        .map(|value| Entity::Object(value.logical_id()));
+    object(out, &mut record.references, cas.checked(&value.context)?)?;
+    let start = record.references.len();
+    if let Statement::LatticeSelection(selection) = &value.statement {
+        out.byte(29)?;
+        reference(
+            out,
+            &mut record.references,
+            Entity::Statement(selection_cover.ok_or_else(invalid)?),
+        )?;
+        object(out, &mut record.references, cas.checked(&selection.target)?)?;
+        out.count(selection.values.len())?;
+        for selected in &selection.values {
+            object(out, &mut record.references, cas.checked(selected)?)?;
+        }
+    } else {
+        crate::statement::encode(&value.statement, out, |value, out| {
+            object(out, &mut record.references, cas.checked(value)?)
+        })?;
+    }
+    if let Statement::Cover { members, .. } = &value.statement {
+        record
+            .sets
+            .push((start.checked_add(1).ok_or_else(invalid)?..record.references.len()).collect());
+        if members.len().checked_add(1).ok_or_else(invalid)?
+            != record
+                .references
+                .len()
+                .checked_sub(start)
+                .ok_or_else(invalid)?
+        {
+            return Err(invalid());
+        }
+    }
+    Ok(())
 }
 
 /// Describe headers, exact regions and immutable syntax dependencies.

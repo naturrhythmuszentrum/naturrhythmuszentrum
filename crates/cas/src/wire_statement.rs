@@ -26,6 +26,9 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<Statement, Fault> {
     Ok(match reader.byte()? {
+        29 => Statement::LatticeSelection(Box::new(crate::lattice::selection::wire::decode(
+            reader, records,
+        )?)),
         28 => Statement::LatticeCover(Box::new(crate::lattice::cover::wire::decode(
             reader, records,
         )?)),
@@ -244,6 +247,9 @@ pub(crate) fn certificate(
     records: &[Decoded],
 ) -> Result<Certificate, Fault> {
     Ok(match reader.byte()? {
+        18 => Certificate::LatticeSelection(Box::new(
+            crate::lattice::selection::wire::decode_certificate(reader, records)?,
+        )),
         17 => Certificate::IntegerSelection(Box::new(
             crate::decision_integer_wire::decode_certificate(reader, records)?,
         )),

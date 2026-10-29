@@ -131,6 +131,9 @@ fn rule_conditions(
         Primitive::JetPolynomial | Primitive::CaseInterior | Primitive::CaseBoundary => {
             crate::boundary_check::check(cas, draft, premises, budget)?
         }
+        Primitive::CaseSelect if matches!(&draft.conclusion, Statement::LatticeSelection(_)) => {
+            crate::lattice::selection::check(cas, draft, premises, budget)?
+        }
         Primitive::CaseSelect if matches!(&draft.conclusion, Statement::IntegerSelection(_)) => {
             crate::decision_integer_selection::check(cas, draft, premises, budget)?
         }
@@ -279,6 +282,9 @@ impl Cas {
             self.checked(&application.judgment.context)?,
             Edge::InContext,
         )];
+        if let Certificate::LatticeSelection(value) = &application.certificate {
+            crate::lattice::selection::wire::dependencies(self, value, &mut edges, budget)?;
+        }
         if let Certificate::IntegerSelection(value) = &application.certificate {
             crate::decision_integer_wire::dependencies(self, value, &mut edges, budget)?;
         }

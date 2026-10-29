@@ -95,45 +95,11 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeBoxEnclosure, Fault> {
         self.validate_lattice_basis(&contract.basis, basis, budget)?;
-        budget.work(4, AT)?;
         self.checked(&contract.inverse)?;
-        if contract.inverse != *basis.inverse().map().expression()
-            || contract.original.context != contract.basis.context
-            || size(contract.original.coordinates.len(), AT)? != u64::from(basis.dimension())
-            || contract.bounds.len() != contract.original.coordinates.len()
-        {
+        if contract.inverse != *basis.inverse().map().expression() {
             return Err(mismatch());
         }
-        let mut bytes = super::enclosure::validate(self, &contract.original, budget)?;
-        bytes = bytes.saturating_add(512);
-        let count = contract.original.coordinates.len();
-        let width = count.saturating_add(1);
-        let entries = &self
-            .state
-            .expression(self.checked(&contract.inverse)?)?
-            .operands;
-        let coefficient_count = count.saturating_mul(width);
-        if contract.coefficients.len() != coefficient_count {
-            return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
-        }
-        budget.check(BudgetKind::MatrixEntries, size(coefficient_count, AT)?, AT)?;
-        bytes = coefficients(self, contract, entries, bytes, budget)?;
-        for (lower, upper) in &contract.bounds {
-            lower.check(budget, AT)?;
-            upper.check(budget, AT)?;
-            bytes = bytes
-                .saturating_add(number_bytes(lower))
-                .saturating_add(number_bytes(upper));
-        }
-        let scratch = budget
-            .limits()
-            .component_bits
-            .div_ceil(8)
-            .saturating_mul(64)
-            .saturating_add(1_024);
-        budget.with_retained_payload(bytes.saturating_add(scratch), AT, |budget| {
-            transport(contract, width, budget)
-        })?;
+        let bytes = validate(self, contract, basis.dimension(), budget)?;
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
         budget.work(bytes, AT)?;
@@ -147,6 +113,54 @@ impl Cas {
             bytes,
         })
     }
+}
+
+/// Shared semantic replay after the caller authenticates the original basis and inverse.
+pub(super) fn validate(
+    cas: &Cas,
+    contract: &LatticeBoxEnclosure,
+    dimension: u32,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
+    budget.work(4, AT)?;
+    cas.checked(&contract.inverse)?;
+    if contract.original.context != contract.basis.context
+        || size(contract.original.coordinates.len(), AT)? != u64::from(dimension)
+        || contract.bounds.len() != contract.original.coordinates.len()
+    {
+        return Err(mismatch());
+    }
+    let mut bytes = super::enclosure::validate(cas, &contract.original, budget)?;
+    bytes = bytes.saturating_add(512);
+    let count = contract.original.coordinates.len();
+    let width = count.saturating_add(1);
+    let entries = &cas
+        .state
+        .expression(cas.checked(&contract.inverse)?)?
+        .operands;
+    let coefficient_count = count.saturating_mul(width);
+    if contract.coefficients.len() != coefficient_count {
+        return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
+    }
+    budget.check(BudgetKind::MatrixEntries, size(coefficient_count, AT)?, AT)?;
+    bytes = coefficients(cas, contract, entries, bytes, budget)?;
+    for (lower, upper) in &contract.bounds {
+        lower.check(budget, AT)?;
+        upper.check(budget, AT)?;
+        bytes = bytes
+            .saturating_add(number_bytes(lower))
+            .saturating_add(number_bytes(upper));
+    }
+    let scratch = budget
+        .limits()
+        .component_bits
+        .div_ceil(8)
+        .saturating_mul(64)
+        .saturating_add(1_024);
+    budget.with_retained_payload(bytes.saturating_add(scratch), AT, |budget| {
+        transport(contract, width, budget)
+    })?;
+    Ok(bytes)
 }
 
 /// Reuse only byte-identical complete scalar contracts within this one transform.

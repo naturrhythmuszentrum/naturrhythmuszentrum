@@ -86,7 +86,7 @@ impl<'a, 'b> Reader<'a, 'b> {
     }
 
     /// Reserve cumulative decoded memory before building a vector or owned string.
-    fn allocation(&mut self, bytes: u64) -> Result<(), Fault> {
+    pub(crate) fn allocation(&mut self, bytes: u64) -> Result<(), Fault> {
         self.allocated = self
             .allocated
             .checked_add(bytes)

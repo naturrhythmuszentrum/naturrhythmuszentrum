@@ -52,6 +52,7 @@ fn endpoints(
 pub(crate) fn validate(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<(), Fault> {
     budget.work(1, Location::new("statement object roles"))?;
     match statement {
+        Statement::LatticeSelection(value) => crate::lattice::selection::roles(cas, value, budget)?,
         Statement::LatticeCover(value) => {
             crate::lattice::cover::check::roles(cas, value, budget)?;
         }

@@ -114,10 +114,12 @@ pub enum HypothesisKind {
     GermEvidence,
     /// The original function has the stated finite integral or sum.
     SplitEvidence,
+    /// The original lattice target belongs to the cell of the exact selected Integer tuple.
+    LatticeSelection,
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 49] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 50] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -167,10 +169,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 49] = [
     HypothesisKind::IntegerFamily,
     HypothesisKind::IntegerSelection,
     HypothesisKind::LatticeCover,
+    HypothesisKind::LatticeSelection,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 49] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 50] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -563,6 +566,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 49] = [
         statement: "Every point of the exact affine projected domain belongs to one half-open lattice cell indexed by the declared product range.",
         premises: "Original basis, offset, common parameter context, ordered scalar ranges and affine inverse; a retained statement is not a checked product-cover lemma.",
     },
+    LemmaSchema {
+        name: "hyp.lattice-selection",
+        label: "assum:cas:hyp-lattice-selection",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "The original lattice target belongs to the half-open cell indexed by the exact ordered Integer tuple.",
+        premises: "Complete affine cover question, original target and ordered Integer literals; a retained statement alone confers no certified tuple-selection authority.",
+    },
 ];
 
 impl HypothesisKind {
@@ -570,6 +581,7 @@ impl HypothesisKind {
     #[must_use]
     pub const fn formal_schema(self) -> &'static LemmaSchema {
         match self {
+            Self::LatticeSelection => &HYPOTHESIS_SCHEMAS[49],
             Self::LatticeCover => &HYPOTHESIS_SCHEMAS[48],
             Self::DomainGuard => &HYPOTHESIS_SCHEMAS[0],
             Self::NonZero => &HYPOTHESIS_SCHEMAS[1],

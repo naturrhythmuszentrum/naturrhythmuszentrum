@@ -62,6 +62,9 @@ impl ProofCitation {
             return Ok(None);
         };
         let uses_pi = match &value.certificate {
+            crate::proof_model::Certificate::LatticeSelection(enclosure) => {
+                crate::lattice::selection::wire::uses_pi(enclosure, budget)?
+            }
             crate::proof_model::Certificate::IntegerSelection(enclosure) => {
                 budget.work(1, AT)?;
                 matches!(
@@ -111,6 +114,7 @@ impl ProofCitation {
             return Ok(Some(&crate::decision::DECISION_SCHEMAS[3]));
         }
         let index = match value.certificate {
+            crate::proof_model::Certificate::LatticeSelection(_) => 6,
             crate::proof_model::Certificate::IntegerSelection(_) => 4,
             crate::proof_model::Certificate::Decision(_) => 0,
             crate::proof_model::Certificate::DecisionNonZero(_) => 1,

@@ -36,6 +36,8 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// The original lattice target lies in the cell of one exact ordered Integer tuple.
+    LatticeSelection(Box<crate::lattice::LatticeSelection>),
     /// Unique finite affine product projection over an exact lattice index domain.
     LatticeCover(Box<crate::lattice::LatticeCover>),
     /// Complete unique Integer projection of a finite native floor relation.
@@ -252,6 +254,8 @@ pub struct Judgment {
 /// Independently checked evidence tied to a closed primitive schema.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Certificate {
+    /// Complete original-target box evidence consumed by the lattice tuple checker.
+    LatticeSelection(Box<crate::lattice::LatticeEnclosure>),
     /// Original target enclosure consumed by the exact Integer projection checker.
     IntegerSelection(Box<crate::decision::RationalEnclosure>),
     /// Complete rational decision introduction with independently checked source equalities.

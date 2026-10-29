@@ -419,6 +419,24 @@ pub(crate) fn application_bytes(
     }
 }
 
+/// Prepay the new lattice proposition without extending the shared preflight dispatch.
+fn lattice_selection_objects(
+    value: &crate::lattice::LatticeSelection,
+    budget: &mut Budget,
+) -> Result<usize, Fault> {
+    let bytes = crate::lattice::cover::check::payload(&value.cover, budget)?;
+    budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
+    budget.work(bytes, AT)?;
+    Ok(value
+        .cover
+        .index
+        .families
+        .len()
+        .saturating_mul(7)
+        .saturating_add(8)
+        .saturating_add(value.values.len()))
+}
+
 /// Bound the number and payload of a typed application before caller-owned copies.
 pub(crate) fn measure(
     cas: &Cas,
@@ -428,6 +446,9 @@ pub(crate) fn measure(
     budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
     cas.state.context(cas.checked(&value.context)?)?;
     crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
+    if let Certificate::LatticeSelection(certificate) = &value.certificate {
+        crate::lattice::selection::wire::measure(cas, certificate, budget)?;
+    }
     if let Certificate::IntegerSelection(certificate) = &value.certificate {
         crate::decision_integer_wire::measure(cas, certificate, budget)?;
     }
@@ -454,6 +475,7 @@ pub(crate) fn measure(
         }
     }
     let objects = match &value.conclusion {
+        Statement::LatticeSelection(value) => lattice_selection_objects(value, budget)?,
         Statement::LatticeCover(value) => {
             let bytes = crate::lattice::cover::check::payload(value, budget)?;
             budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
@@ -550,7 +572,12 @@ pub(crate) fn validate_judgment(
             Vertex::SourceForm(value) => value.header,
             Vertex::Condition(value) => value.header,
             Vertex::Space(value) => value.header,
-            Vertex::Context(frame) if matches!(&value.statement, Statement::LatticeCover(_)) => {
+            Vertex::Context(frame)
+                if matches!(
+                    &value.statement,
+                    Statement::LatticeCover(_) | Statement::LatticeSelection(_)
+                ) =>
+            {
                 frame.header_id
             }
             _ => return Err(Fault::invalid(InvalidCode::Reference, AT)),

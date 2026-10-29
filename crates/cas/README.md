@@ -1193,3 +1193,39 @@ Complete original-box transport costs 119,257 Work for the wide torus, 119,025 f
 **Example (Measured coefficient replay and route choice)** · `ex:cas:lattice-enclosure-reuse-costs`
 
 A temporary failing phase split measured 137,012 coefficient-validation Work within the original 184,357-Work wide-torus transform; complete-contract reuse removes 65,100 Work, while the one-coordinate paths retain their original costs (`ex:cas:lattice-affine-box-costs`), (`rule:cas:lattice-affine-box-refusal`). Direct affine-expression replay costs 219,119 Work for either torus fixture with 3,440 retained bytes, 60,913/59,633 for phase wrap/straddle with 1,560 bytes, and 83,132 for scalar LC with 2,104 bytes (`test:integration:lattice-direct-coordinate-costs`). Literal `N`/`N−1` checks include 37 prior Work (`test:integration:lattice-direct-coordinate-work`). Direct phase replay is cheaper than transporting E, while direct torus replay is more expensive; the producer's route choice preserves the distinct judgments of (`rule:cas:lattice-affine-box`), (`rule:cas:lattice-coordinate-box`).
+
+**Theorem (Certified lattice tuple selection)** · `thm:cas:decision-lattice-floor-selection`
+
+Formal schema `decision.lattice-floor-selection`, version 1. The original lattice target belongs to the unique half-open cell indexed by the exact ordered Integer tuple. Required premises: Identical checked affine cover, complete original-target affine enclosure, exact tuple membership in every declared index range and strict whole-box floor cuts, retaining all qualified cover hypotheses. Standing: Lemma; instances are CAS-checked.
+
+**Assumption (Selected lattice tuple)** · `assum:cas:hyp-lattice-selection`
+
+Formal hypothesis `hyp.lattice-selection`, version 1. The original lattice target belongs to the half-open cell indexed by the exact ordered Integer tuple. Required premises: Complete affine cover question, original target and ordered Integer literals; a retained statement alone confers no certified tuple-selection authority. Standing: Hypothesis; every undischarged use remains conditional.
+
+**Rule (Named original-target tuple selection)** · `rule:cas:lattice-tuple-selection`
+
+`Cas::prove_lattice_selection` checks one exact ordered Integer tuple against the identical retained affine cover of (`rule:cas:lattice-cover`), with every coordinate in its declared range. It replays either original-target enclosure form of (`rule:cas:lattice-affine-box`), (`rule:cas:lattice-coordinate-box`), then checks each included lower face and strictly excluded upper face before publishing the finite theorem of (`thm:cas:decision-lattice-floor-selection`). Fresh inspection retains the complete cover premise, qualified parameter assumptions and actual Machin dependency (`test:integration:lattice-tuple-selection`). No cell enumeration or executable Integer conversion participates in selection.
+
+**Rule (Original identity and atomic tuple refusals)** · `rule:cas:lattice-tuple-identity`
+
+Expected-claim replay matches the entire original question and target, even when the candidate tuple is unchanged (`test:integration:lattice-tuple-expected-target`). Missing coordinates, Real literals offered as Integers, a changed original target and excluded parameter-range values refuse at their actual typed-role or range checker (`test:integration:lattice-tuple-refusals`). Whole-box torus and phase straddles preserve graph counts and canonical snapshots without publishing a tuple prefix (`test:integration:lattice-tuple-straddles`). These checks constrain the selected proposition of (`rule:cas:lattice-tuple-selection`) independently of producer choice.
+
+**Example (Torus, wrap, scalar and grid tuple fixtures)** · `ex:cas:lattice-tuple-fixtures`
+
+For `B = 2π·I_2` and `q = (20,10)`, the narrow original box `[19,20] × [9,10]` selects `(3,1)`, whereas `[18,21] × [9,10]` refuses the whole tuple. The phase target `5π/2` in `[15/2,8]` selects 1, the original `10/Pi` box selects 3, and the rational quantization grid selects `(2,3)` (`test:integration:lattice-tuple-selection`), (`test:integration:lattice-tuple-straddles`). For `q = 2π`, transporting `[6,13/2]` cannot select; independently replaying the exact original affine expression as singleton `{1}` selects its owned face (`test:integration:lattice-tuple-direct-selection`). A literal surrogate cannot replace that expression (`test:integration:lattice-tuple-direct-refusal`), preserving the distinct evidence contracts of (`rule:cas:lattice-affine-box`), (`rule:cas:lattice-coordinate-box`).
+
+**Rule (Portable cover identity sharing)** · `rule:cas:lattice-tuple-wire-sharing`
+
+The new portable tuple proposition references the complete cover proposition already retained by its checked premise, rather than encoding that question twice. Local structural identity and caller expected claims still include every original cover field, and fresh replay still requires the independently checked matching cover application (`rule:cas:lattice-tuple-selection`), (`test:integration:lattice-tuple-expected-target`). The original coordinate and coefficient certificates remain explicit replay evidence; statement sharing supplies no authority by itself (`assum:cas:hyp-lattice-selection`). Existing statement encodings and unrelated cost paths are unchanged.
+
+**Example (Tuple proof and fresh inspection costs)** · `ex:cas:lattice-tuple-costs`
+
+After prerequisite cover admission, original-box tuple proof/fresh inspection cost 404,211/1,071,050 Work for the narrow torus, 398,592/978,609 for phase wrap, 313,199/758,686 for scalar LC and 335,639/876,456 for the quantization grid; their witnesses contain 4,004, 4,120, 3,575 and 3,745 bytes respectively (`test:integration:lattice-tuple-work`). Direct-H proof/fresh inspection costs are 473,783/1,173,089 for torus, 303,727/884,277 for phase wrap, 295,200/857,936 for the owned wrap face, 305,136/759,867 for scalar LC and 334,530/907,345 for grid, with 4,113, 4,042, 3,872, 3,619 and 3,862 witness bytes (`test:integration:lattice-tuple-direct-work`). Each owner has literal `N`/`N−1` boundaries including 37 prior Work, unchanged caller limits and atomic graph refusal, enforcing (`rule:cas:lattice-tuple-identity`); existing scalar pins remain unchanged (`ex:cas:lattice-selection-scalar-baseline`).
+
+**Example (Measured sealing split and remaining wire cost)** · `ex:cas:lattice-tuple-sealing`
+
+Temporary exclusive probes for the cited torus witness measured 13,978 Work in two application copies, 1,456 in DAG lookup keys, 18,836 in record serialization, 120,192 in the retained-record footprint charge, 54,829 in canonical ordering and 4,004 in the envelope: 213,295 total across 74 records. The scalar nonnegative `10/Pi` comparison measured 3,736, 423, 4,864, 42,432, 8,608 and 1,562 respectively: 61,625 Work across 36 records (`ex:cas:lattice-selection-scalar-baseline`). Cover citation reduces torus proof Work from 406,440 to 404,211 and bytes from 4,080 to 4,004 (`rule:cas:lattice-tuple-wire-sharing`), (`ex:cas:lattice-tuple-costs`). Across these fixtures, record count grows about 2.1 times, footprint about 2.8 times and ordering about 6.4 times; this measured superlinearity belongs to the shared wire builder and remains a separate optimization obligation. It is not a general asymptotic bound.
+
+**Requirement (Remaining tuple result owners)** · `req:cas:lattice-tuple-results`
+
+The implemented theorem of (`rule:cas:lattice-tuple-selection`) does not yet supply typed undecided handoffs, an immutable paired representative descriptor with its checked reconstruction identity, or coordinate capacity consumers. Those remain the root design's undecided-handoff and exact-selected-outputs obligations. Nearest-point admission, scalar specialization, physical bindings and live publication retain their separate owners; the fixture claims of (`ex:cas:lattice-tuple-fixtures`) concern mathematical floor selection only.
