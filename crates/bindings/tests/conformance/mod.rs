@@ -48,6 +48,7 @@ mod decision_association;
 
 mod lattice_baseline;
 
+mod lattice_cache;
 mod lattice_coordinate;
 mod lattice_fixture;
 mod lattice_physical;

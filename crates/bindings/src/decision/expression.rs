@@ -4,7 +4,7 @@
 use super::{DecisionError, storage};
 use crate::{CheckedDeclarations, Kind, Role};
 use nrz_cas::{ExactConstant, Handle, limits::Budget};
-use std::rc::Rc;
+use std::{collections::BTreeMap, rc::Rc};
 
 /// A closed exact ratio expression with its original physical declaration owner.
 ///
@@ -128,6 +128,55 @@ impl DecisionCoordinate {
         Ok(Self(DecisionExpression::closed(
             owner, name, false, budget,
         )?))
+    }
+
+    /// Prepare a batch within one operation, retaining one check per original source identity.
+    ///
+    /// Repeated requests share their checked constant and owner. Independent frozen
+    /// sources never share an entry, even when their exact values are equal.
+    /// # Errors
+    /// Refuses the same inputs as `Self::declared` and exhausted cumulative resources.
+    /// A failed batch returns no coordinates; all earlier Work remains spent.
+    pub fn declared_many(
+        sources: &[(Rc<CheckedDeclarations>, &str)],
+        budget: &mut Budget,
+    ) -> Result<Vec<Self>, DecisionError> {
+        let bytes = u64::try_from(sources.len())
+            .map_err(|_| DecisionError::Capacity)?
+            .saturating_mul(256);
+        storage::retained(bytes, budget)?;
+        let mut cache = BTreeMap::new();
+        let mut retained = 0_u64;
+        let mut result = Vec::new();
+        result
+            .try_reserve_exact(sources.len())
+            .map_err(|_| DecisionError::Capacity)?;
+        budget.with_retained_payload(bytes, storage::AT, |budget| {
+            for (owner, name) in sources {
+                let original = &owner.checked(name)?.original().syntax;
+                let key = (Rc::as_ptr(owner).addr(), original.logical_id(), *name);
+                let value = if let Some(value) = cache.get(&key) {
+                    budget.work(1, storage::AT)?;
+                    Self::clone(value)
+                } else {
+                    let value = budget.with_retained_payload(retained, storage::AT, |budget| {
+                        Self::declared(Rc::clone(owner), name, budget)
+                    })?;
+                    retained = retained
+                        .saturating_add(storage::constant_bytes(value.exact()))
+                        .saturating_add(
+                            u64::try_from(name.len()).map_err(|_| DecisionError::Capacity)?,
+                        )
+                        .saturating_add(256);
+                    storage::retained(retained, budget)?;
+                    cache.insert(key, value.clone());
+                    value
+                };
+                result.push(value);
+            }
+            Ok::<_, DecisionError>(())
+        })?;
+        Ok(result)
     }
 
     /// Original checked kind, unit map, affine role and dependency inventory.

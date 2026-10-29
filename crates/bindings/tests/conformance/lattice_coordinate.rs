@@ -8,17 +8,17 @@ use nrz_cas::{FaultKind, Location, limits::BudgetKind};
 use std::rc::Rc;
 
 /// One independently measured physical-coordinate preparation owner.
-struct Cost {
+pub(super) struct Cost {
     /// Phase, two-angle or grid fixture.
-    fixture: u8,
+    pub(super) fixture: u8,
     /// Original declared physical coordinate.
-    name: &'static str,
+    pub(super) name: &'static str,
     /// Complete closed-source checker Work under unchanged defaults.
-    work: u64,
+    pub(super) work: u64,
 }
 
 /// Literal counters from the deliberately failing coordinate probe.
-const COSTS: [Cost; 13] = [
+pub(super) const COSTS: [Cost; 13] = [
     Cost {
         fixture: 0,
         name: "axis_a",

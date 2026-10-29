@@ -7,7 +7,7 @@ use crate::{
     decision::{association, storage},
 };
 use nrz_cas::limits::Budget;
-use std::rc::Rc;
+use std::{collections::BTreeSet, rc::Rc};
 
 /// Complete original constant inventory, ordered by first physical occurrence and declaration key.
 #[derive(Clone, Debug)]
@@ -44,10 +44,17 @@ impl LatticeDecisionCase {
     /// No input association is returned until the whole symbol inventory is complete.
     pub fn associate_inputs(&self, budget: &mut Budget) -> Result<LatticeInputs, DecisionError> {
         let mut originals = Vec::new();
+        let mut seen = BTreeSet::new();
         let mut bytes = 128_u64;
         for axis in &self.specification().axes {
             for source in [&axis.target, &axis.offset].into_iter().chain(&axis.basis) {
-                inventory(source.source(), &mut originals, &mut bytes, budget)?;
+                inventory(
+                    source.source(),
+                    &mut originals,
+                    &mut seen,
+                    &mut bytes,
+                    budget,
+                )?;
             }
         }
         storage::retained(bytes, budget)?;
@@ -83,6 +90,7 @@ impl LatticeDecisionCase {
 fn inventory<'a>(
     source: &'a DecisionExpression,
     originals: &mut Vec<Original<'a>>,
+    seen: &mut BTreeSet<(usize, &'a str)>,
     bytes: &mut u64,
     budget: &mut Budget,
 ) -> Result<(), DecisionError> {
@@ -100,15 +108,9 @@ fn inventory<'a>(
             Declaration::Derived(_) => continue,
             _ => return Err(DecisionError::Source),
         };
-        let mut present = false;
-        for original in originals.iter() {
-            budget.work(length(name)?.saturating_add(1), storage::AT)?;
-            if original.source.owner().id() == source.owner().id() && original.name == name {
-                present = true;
-                break;
-            }
-        }
-        if present {
+        budget.work(length(name)?.saturating_add(1), storage::AT)?;
+        let key = (std::ptr::from_ref(source.owner()).addr(), name.as_str());
+        if !seen.insert(key) {
             continue;
         }
         *bytes = bytes

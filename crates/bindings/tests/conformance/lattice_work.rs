@@ -22,7 +22,7 @@ struct Costs {
     association: u64,
     /// Complete question and ordered companion authentication.
     authentication: u64,
-    /// Newly owned physical question metadata.
+    /// Newly owned question metadata and unique prepared exact judgments.
     question_bytes: u64,
     /// New association metadata and symbol graphs.
     input_bytes: u64,
@@ -35,27 +35,27 @@ const COSTS: [Costs; 3] = [
     Costs {
         kind: 0,
         question: 67_825,
-        association: 36_568,
+        association: 36_567,
         authentication: 11,
-        question_bytes: 844,
+        question_bytes: 7_025,
         input_bytes: 13_426,
         inputs: 3,
     },
     Costs {
         kind: 1,
-        question: 93_582,
-        association: 60_935,
+        question: 53_780,
+        association: 60_881,
         authentication: 17,
-        question_bytes: 1_304,
+        question_bytes: 5_711,
         input_bytes: 22_293,
         inputs: 5,
     },
     Costs {
         kind: 2,
-        question: 46_260,
-        association: 60_935,
+        question: 34_395,
+        association: 60_881,
         authentication: 17,
-        question_bytes: 1_304,
+        question_bytes: 3_297,
         input_bytes: 22_293,
         inputs: 5,
     },

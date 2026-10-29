@@ -3,9 +3,11 @@
 
 mod correspondence;
 mod inputs;
+mod preparation;
 mod storage;
 
 pub use inputs::LatticeInputs;
+pub use preparation::LatticePreparationUsage;
 
 use super::{DecisionCoordinate, DecisionError};
 use crate::{Descriptor, Kind, readings::CoordinateNormalization};
@@ -85,6 +87,8 @@ pub struct LatticeAttachment(Rc<Data>);
 struct Data {
     /// Complete original mathematical and physical identities.
     specification: LatticeDecisionSpec,
+    /// Unique checked constants and restoration judgments shared by all occurrences.
+    preparations: preparation::Preparations,
     /// Newly owned names, vectors and index descriptors; other owners remain shared.
     bytes: u64,
 }
@@ -103,11 +107,14 @@ impl LatticeDecisionCase {
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
         let bytes = storage::specification(&specification, budget)?;
-        budget.with_retained_payload(bytes, super::storage::AT, |budget| {
+        let preparations = budget.with_retained_payload(bytes, super::storage::AT, |budget| {
             correspondence::check(cas, &specification, budget)
         })?;
+        let bytes = bytes.saturating_add(preparations.usage().bytes);
+        super::storage::retained(bytes, budget)?;
         Ok(Self(Rc::new(Data {
             specification,
+            preparations,
             bytes,
         })))
     }
@@ -146,7 +153,13 @@ impl LatticeDecisionCase {
         }
     }
 
-    /// Newly owned metadata; shared physical, mathematical and map owners retain their allowances.
+    /// Unique prepared judgments retained by this operation, excluding original shared owners.
+    #[must_use]
+    pub fn preparation_usage(&self) -> LatticePreparationUsage {
+        self.0.preparations.usage()
+    }
+
+    /// Newly owned metadata and prepared constants; original owners retain their allowances.
     #[must_use]
     pub fn retained_payload_bytes(&self) -> u64 {
         self.0.bytes

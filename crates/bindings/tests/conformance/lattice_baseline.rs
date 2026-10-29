@@ -204,7 +204,7 @@ fn prior(work: u64) -> TestResult<Budget> {
 }
 
 /// Pin resource refusal to the actual Work checker rather than a generic error.
-fn exhausted(error: &DecisionError) -> TestResult {
+pub(super) fn exhausted(error: &DecisionError) -> TestResult {
     let DecisionError::Algebra(fault) = error else {
         return Err("not a Work refusal".into());
     };

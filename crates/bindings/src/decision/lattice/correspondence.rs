@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original target, offset and basis entries restore through the exact physical frame.
 
-use super::{DecisionError, LatticeDecisionSpec};
+use super::{DecisionError, LatticeDecisionSpec, preparation::Preparations};
 use crate::{DecisionCoordinate, Role, decision::storage, readings::EntryMeaning};
 use nrz_cas::{
-    Cas, ExactConstant, Handle, Rational,
+    Cas, Handle,
     lattice::LatticeConvention,
     limits::Budget,
     source::{SyntaxNode, SyntaxRole},
@@ -16,7 +16,8 @@ pub(super) fn check(
     cas: &Cas,
     value: &LatticeDecisionSpec,
     budget: &mut Budget,
-) -> Result<(), DecisionError> {
+) -> Result<Preparations, DecisionError> {
+    let mut prepared = Preparations::default();
     let basis = value.basis.question();
     cas.validate_lattice_basis(&value.index.question().basis, &value.basis, budget)?;
     if value.frame.context() != &basis.context {
@@ -33,8 +34,24 @@ pub(super) fn check(
     let coefficients = entries(cas, &basis.basis, &header, [dimension, dimension], budget)?;
     let width = value.axes.len();
     for (row, (axis, meaning)) in value.axes.iter().zip(value.frame.entries()).enumerate() {
-        coordinate(cas, &targets[row], &axis.target, meaning, false, budget)?;
-        coordinate(cas, &offsets[row], &axis.offset, meaning, false, budget)?;
+        coordinate(
+            cas,
+            &targets[row],
+            &axis.target,
+            meaning,
+            false,
+            &mut prepared,
+            budget,
+        )?;
+        coordinate(
+            cas,
+            &offsets[row],
+            &axis.offset,
+            meaning,
+            false,
+            &mut prepared,
+            budget,
+        )?;
         for (column, physical) in axis.basis.iter().enumerate() {
             coordinate(
                 cas,
@@ -42,11 +59,12 @@ pub(super) fn check(
                 physical,
                 meaning,
                 true,
+                &mut prepared,
                 budget,
             )?;
         }
     }
-    Ok(())
+    Ok(prepared)
 }
 
 /// Typed syntax exposes original operands without importing CAS-private matrix machinery.
@@ -105,6 +123,7 @@ fn coordinate(
     physical: &DecisionCoordinate,
     meaning: &EntryMeaning,
     difference: bool,
+    prepared: &mut Preparations,
     budget: &mut Budget,
 ) -> Result<(), DecisionError> {
     let descriptor = physical.checked()?.descriptor();
@@ -117,26 +136,12 @@ fn coordinate(
     if descriptor.role() != role {
         return Err(DecisionError::LatticeMeaning);
     }
-    let exact = ExactConstant::from_expression(cas, node, budget)?;
-    // Both operands have already passed closed definedness checking. Identity maps
-    // retain the checked exact value instead of constructing a new constant graph.
-    budget.work(2, storage::AT)?;
-    let unit = meaning.magnitude().as_rational() == Some(&Rational::one());
-    let scaled = if unit {
-        exact
-    } else {
-        exact.mul(meaning.magnitude(), budget)?
-    };
-    let restored = if difference || meaning.shift().is_zero() {
-        scaled
-    } else {
-        scaled.add(meaning.shift(), budget)?
-    };
+    let restored = prepared.restore(cas, node, meaning, difference, budget)?;
     budget.work(
         storage::constant_bytes(&restored).max(storage::constant_bytes(physical.exact())),
         storage::AT,
     )?;
-    if &restored != physical.exact() {
+    if restored.as_ref() != physical.exact() {
         return Err(DecisionError::LatticeMeaning);
     }
     Ok(())

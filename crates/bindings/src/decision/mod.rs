@@ -15,7 +15,7 @@ pub use count::{CountDescriptor, CountEvidence};
 pub use expression::{DecisionCoordinate, DecisionExpression};
 pub use lattice::{
     LatticeAttachment, LatticeAxis, LatticeDecisionCase, LatticeDecisionSpec, LatticeIndexKind,
-    LatticeInputs, LatticeMetric,
+    LatticeInputs, LatticeMetric, LatticePreparationUsage,
 };
 pub use snapshot::SelectedDecision;
 

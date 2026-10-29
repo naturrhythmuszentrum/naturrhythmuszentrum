@@ -63,6 +63,11 @@ impl EntryMeaning {
         Rc::ptr_eq(&self.0, &other.0)
     }
 
+    /// Transient cache index while this immutable definition remains retained.
+    pub(crate) fn cache_identity(&self) -> usize {
+        Rc::as_ptr(&self.0).addr()
+    }
+
     /// Match complete physical coordinates, including independent reference identities.
     /// # Errors
     /// Refuses changed kinds, units, roles, references or origins by their invariant.

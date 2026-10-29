@@ -84,7 +84,7 @@ pub use decision::{
     CountDescriptor, CountEvidence, DecisionAttachment, DecisionCoordinate, DecisionError,
     DecisionExpression, DecisionInputs, DecisionOperand, IntegerDecisionCase, IntegerDecisionSpec,
     LatticeAttachment, LatticeAxis, LatticeDecisionCase, LatticeDecisionSpec, LatticeIndexKind,
-    LatticeInputs, LatticeMetric, SelectedDecision,
+    LatticeInputs, LatticeMetric, LatticePreparationUsage, SelectedDecision,
 };
 pub use declaration::{Companion, Context, Declaration, Evidence, FunctionSignature, Observable};
 pub use descriptor::{Descriptor, Role, uncertainty};
