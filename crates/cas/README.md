@@ -626,6 +626,36 @@ The mixed quadratic family's unspecialized Real parameter supplies a bounded dis
 
 The citation list retains the earlier assumed use and every covering, containment and closure step. Omitting the discharge proof leaves a guarded residual. Replacing the contained region by the original ambient region refuses, and replay against a widened expected region refuses. This fixture uses existing checkers and ordinary witness bytes. A future external bounded theorem would additionally need its cited certificate independently admitted by an explicit checker; documentary provenance alone never discharges a hypothesis.
 
+## Exact constant preparation costs · `sec:cas:constant-preparation-costs`
+
+**Definition (Closed constant admission)** · `def:cas:constant-preparation`
+
+`ExactConstant::from_expression` checks every reached original operand, finite-real divisor domains, exact normalization equality and the normalized sign before retaining a closed value (`rule:cas:decision-enclosure-replay`). The ordinary route reconstructs this evidence on every call, even in the same source store; `PositiveConstant` witnesses only the strict positivity established by those checks (`test:integration:constant-positivity-is-checked`).
+
+**Example (Repeated two-pi preparation)** · `ex:cas:constant-two-pi-costs`
+
+For the direct original `2*Pi`, admission costs 27,938 Work, polynomial normalization alone 6,509, multiplication of the retained value by one 37,111, and addition of zero 38,270. Each second operation costs exactly the first again on a cumulative ledger; these are separate operations, not additive stages of admission (`test:unit:constant-preparation-costs`).
+
+**Example (Repeated pi preparation)** · `ex:cas:constant-pi-costs`
+
+For the original `Pi`, admission costs 10,888 Work, polynomial normalization alone 3,343, multiplication by one 18,633, and addition of zero 19,792, each unchanged on repetition (`test:unit:constant-preparation-costs`).
+
+**Example (Repeated rational preparation)** · `ex:cas:constant-rational-costs`
+
+For the original rational `3/7`, admission costs 6,741 Work, polynomial normalization alone 2,570, multiplication by one 544, and addition of zero 448, each unchanged on repetition (`test:unit:constant-preparation-costs`).
+
+**Example (Repeated unit-scale preparation)** · `ex:cas:constant-unit-costs`
+
+For the literal unit scale one, admission costs 6,453 Work, polynomial normalization alone 2,474, multiplication by one 448, and addition of zero 384, each unchanged on repetition (`test:unit:constant-preparation-costs`).
+
+**Example (Repeated zero-origin preparation)** · `ex:cas:constant-zero-costs`
+
+For the literal zero origin, admission costs 3,956 Work, polynomial normalization alone 1,532, multiplication by one 448, and addition of zero 384, each unchanged on repetition. The five fixtures pin every operation at literal N and N−1 Work without changing any existing default (`test:unit:constant-preparation-costs`).
+
+**Rule (Square-root grammar boundary)** · `rule:cas:constant-square-root-boundary`
+
+The original `GeneralPower(StrictReal)` with exponent `1/2` and radicand `1/4000000` refuses as `UnsupportedFragment` at “exact constant expression” after 1,047 Work. The closed grammar refuses this operator before sign inference or polynomial normalization; the positive rational radicand alone does not extend the admitted syntax (`test:unit:constant-square-root-grammar-refusal`), (`def:cas:constant-preparation`).
+
 ## Main concepts and types · `sec:cas:concepts`
 
 `Cas` is an owned exact graph; its `Handle` and `Reference` values retain store identity. `Rational` and `ExactConstant` support bounded exact arithmetic, with `PositiveConstant` witnessing admitted strict positivity. For example, the LC coefficient product remains an exact rational before any numerical import:

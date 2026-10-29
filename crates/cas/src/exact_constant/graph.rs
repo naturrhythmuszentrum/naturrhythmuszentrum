@@ -290,3 +290,6 @@ const fn draft(
         operands,
     }
 }
+
+#[cfg(test)]
+mod tests;
