@@ -91,9 +91,9 @@ pub(crate) fn construct(
 /// Normalize only after finiteness, independently check equality, then own just the exact result.
 fn finish(mut cas: Cas, original: LogicalId, budget: &mut Budget) -> Result<ExactConstant, Fault> {
     sign::check(&cas.state, original, budget)?;
-    let normalized = crate::polynomial::normalize(&mut cas, original, budget)?;
+    let normalized = crate::polynomial::normalize_constants(&mut cas, original, budget)?;
     let normalized = cancel_equal(&mut cas, normalized, budget)?;
-    if !crate::polynomial::equal(&cas.state, original, normalized, true, budget)? {
+    if !crate::polynomial::equal_constants(&cas.state, original, normalized, budget)? {
         return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
     }
     if let Operator::Rational(value) = &cas.state.expression(normalized)?.operator {
@@ -189,7 +189,7 @@ pub(crate) fn order(
             continue;
         }
         let term = state.expression(id)?;
-        grammar(term)?;
+        grammar(state, term)?;
         if expanded {
             result.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
             result.push(id);
@@ -206,10 +206,22 @@ pub(crate) fn order(
 }
 
 /// Reject non-real, open or attached syntax before any simplification can hide it.
-fn grammar(term: &crate::graph::Expression) -> Result<(), Fault> {
+fn grammar(state: &State, term: &crate::graph::Expression) -> Result<(), Fault> {
     let scalar = term.sort == real() || term.sort == Sort::Value(AtomicSort::Integer);
     let closed = term.scope.is_empty() && term.binding.is_none() && term.space.is_none();
     let plain = term.attachment.is_none() && term.domain.is_none() && term.arms.is_empty();
+    let square_root = if matches!(
+        term.operator,
+        Operator::GeneralPower(crate::model::Branch::StrictReal)
+    ) {
+        let exponent = term
+            .operands
+            .get(1)
+            .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?;
+        matches!(&state.expression(*exponent)?.operator, Operator::Rational(value) if value.is_half())
+    } else {
+        false
+    };
     let supported = matches!(
         term.operator,
         Operator::Rational(_)
@@ -220,7 +232,7 @@ fn grammar(term: &crate::graph::Expression) -> Result<(), Fault> {
             | Operator::Mul
             | Operator::Div
             | Operator::IntegerPower(_)
-    );
+    ) || square_root;
     if scalar && closed && plain && supported {
         Ok(())
     } else {

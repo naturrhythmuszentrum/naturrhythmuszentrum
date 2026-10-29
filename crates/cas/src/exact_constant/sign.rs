@@ -153,6 +153,9 @@ fn fact(
                 .map(|value| value.pow(*exponent, budget))
                 .transpose()?
         }
+        Operator::GeneralPower(crate::model::Branch::StrictReal) => {
+            square_root(first, child(1)?, budget)?
+        }
         _ => rational_binary(operator, first, child(1)?, budget)?,
     };
     let sign = if let Some(value) = &rational {
@@ -165,6 +168,28 @@ fn fact(
         )?
     };
     Ok(Fact { rational, sign })
+}
+
+/// Half powers require strict positivity of the original radicand before any normalization.
+fn square_root(
+    first: &Fact,
+    exponent: &Fact,
+    budget: &mut Budget,
+) -> Result<Option<Rational>, Fault> {
+    if exponent.rational.as_ref() != Some(&Rational::from_ratio(1, 2, budget)?) {
+        return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
+    }
+    match first.sign {
+        Sign::Positive => {}
+        Sign::Negative | Sign::Zero => return Err(Fault::invalid(InvalidCode::RefutedDomain, AT)),
+        Sign::Unknown => return Err(Fault::invalid(InvalidCode::PendingPremise, AT)),
+    }
+    first
+        .rational
+        .as_ref()
+        .map(|value| value.square_root_exact(budget))
+        .transpose()
+        .map(Option::flatten)
 }
 
 /// A rational divisor is checked even when its numerator contains an irrational constant.
@@ -193,6 +218,7 @@ fn rational_binary(
 fn symbolic(operator: &Operator, first: Sign, second: Option<Sign>) -> Result<Sign, Fault> {
     match operator {
         Operator::Neg => Ok(first.negated()),
+        Operator::GeneralPower(crate::model::Branch::StrictReal) => Ok(Sign::Positive),
         Operator::IntegerPower(exponent) => {
             if *exponent <= 0 {
                 first.nonzero()?;

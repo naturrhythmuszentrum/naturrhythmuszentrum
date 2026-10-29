@@ -67,3 +67,17 @@ impl ExactConstant {
         graph::construct(Operator::IntegerPower(exponent), &[self], budget)
     }
 }
+
+impl super::PositiveConstant {
+    /// Take the positive real square root of an exact rational radicand.
+    /// # Errors
+    /// Refuses radicands outside the rational square-root fragment or exhausted exact budgets.
+    pub fn sqrt(&self, budget: &mut Budget) -> Result<ExactConstant, Fault> {
+        let half = ExactConstant::from(crate::Rational::from_ratio(1, 2, budget)?);
+        graph::construct(
+            Operator::GeneralPower(crate::model::Branch::StrictReal),
+            &[self.value(), &half],
+            budget,
+        )
+    }
+}

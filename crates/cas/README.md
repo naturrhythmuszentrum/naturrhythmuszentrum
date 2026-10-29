@@ -654,7 +654,7 @@ For the literal zero origin, admission costs 3,956 Work, polynomial normalizatio
 
 **Rule (Square-root grammar boundary)** · `rule:cas:constant-square-root-boundary`
 
-The original `GeneralPower(StrictReal)` with exponent `1/2` and radicand `1/4000000` refuses as `UnsupportedFragment` at “exact constant expression” after 1,047 Work. The closed grammar refuses this operator before sign inference or polynomial normalization; the positive rational radicand alone does not extend the admitted syntax (`test:unit:constant-square-root-grammar-refusal`), (`def:cas:constant-preparation`).
+`GeneralPower(StrictReal)` with literal exponent `1/2` requires strict positivity of the original radicand before normalization and an exactly rational radicand in the supported coefficient fragment. Zero and negative radicands refuse as `RefutedDomain`; an unproved sign refuses as `PendingPremise` (`test:integration:constant-square-root-refusals`). Other branches and exponents remain unsupported, as do non-rational radicands such as `Pi` and general nested-radical denesting (`test:integration:constant-square-root-fragment`), (`test:integration:constant-square-root-nested-boundary`), (`def:cas:constant-preparation`).
 
 **Definition (Retained checked constants)** · `def:cas:constant-cache`
 
@@ -679,6 +679,34 @@ The direct `2*Pi` preparation retains 3,654 logical bytes, including its normali
 **Rule (Checked constant cache lifecycle)** · `rule:cas:constant-cache-lifecycle`
 
 Hits charge at least one Work, using the bit width of the retained entry count, and check the retained storage against caller and source-store ceilings. Misses reserve existing retained payload beside ordinary admission scratch and publish only after storage checks succeed; spent Work is never refunded (`test:integration:constant-cache-work-boundaries`). Foreign handles refuse at handle authentication, and an original zero divisor refuses at the closed sign checker without changing the source graph or retained entries (`test:integration:constant-cache-context-and-owner`), (`test:integration:constant-cache-domain-refusal`).
+
+**Definition (Positive rational square roots)** · `def:cas:constant-square-roots`
+
+`ExactConstant::from_expression` admits strict-real square roots of exactly rational expressions after checking every original operand and its strict sign. `PositiveConstant::sqrt` constructs the same checked expression from an already admitted positive value; a radicand outside the rational fragment still refuses (`rule:cas:constant-square-root-boundary`). A non-square rational remains exact root syntax, never a floating value (`test:integration:constant-square-root-exact-rules`).
+
+**Rule (Checked square-root normalization)** · `rule:cas:constant-square-root-normalization`
+
+An exact rational root is published only when the proposed numerator and denominator square back to the original reduced components. Positive root atoms retain complete canonical rational radicands; their even powers use the defining square, and products combine only already proved positive radicands, establishing `sqrt(a*b) = sqrt(a)*sqrt(b)` on that domain. Consequently `sqrt((3/7)^2) = 3/7`, `sqrt(2)*sqrt(3) = sqrt(6)` and `sqrt(2)*sqrt(8) = 4` reduce exactly (`test:integration:constant-square-root-exact-rules`). Ordinary polynomial callers retain their earlier fragment; only closed constant normalization and its independent equality check enable these rules (`test:unit:constant-preparation-costs`).
+
+**Rule (Certified square-root intervals)** · `rule:cas:constant-square-root-enclosures`
+
+A rational result uses the existing `ExactRational` origin, preserving the complete original target (`test:integration:constant-square-root-lc-enclosure`), (`rule:cas:decision-enclosure-replay`). The existing `PiBound` interval route also propagates square roots: for nonnegative rational `n/d`, integer bit trials propose `k = floor(sqrt(n*d))`, and exact squaring independently checks the endpoints `k/d` and `(k+1)/d`, using a singleton when exact. Endpoint monotonicity then gives an outward interval, including `[1,2]` for `sqrt(2)`; inward requested boxes refuse at containment (`test:integration:constant-square-root-enclosures`). This route still checks and retains its supplied Machin certificate under (`rule:cas:pi-machin-certificates`); no floating estimate or unverified endpoint enters the bound.
+
+**Example (LC period from its original coefficients)** · `ex:cas:constant-square-root-lc`
+
+The original product with `L = 1/40` and `C = 1/100000` derives `tau = sqrt(L*C) = 1/2000`, and its exact-rational enclosure is the singleton `[1/2000,1/2000]`. At duration `1/100`, the canonical radian magnitude one gives `radian*(duration/tau) = 20` exactly, and division by the exact turn `2*Pi` gives `10/Pi` (`test:integration:constant-square-root-lc-phase`), (`test:integration:constant-square-root-lc-enclosure`). A substituted rational period refuses against the unchanged original root (`test:integration:constant-square-root-lc-enclosure`).
+
+**Example (Direct rational square-root admission)** · `ex:cas:constant-square-root-direct-cost`
+
+Admitting the direct `sqrt(1/4000000)` now costs 20,490 Work, with literal N/N−1 boundaries and the exact result `1/2000` (`test:unit:constant-square-root-admission-costs`). The earlier 1,047-Work grammar refusal is replaced by successful finite-real checking and independently checked normalization, rather than by a larger budget (`rule:cas:constant-square-root-normalization`).
+
+**Example (Original square-root replay costs)** · `ex:cas:constant-square-root-costs`
+
+The original `sqrt(2)` costs 57,657 Work to admit and 82,954 to enclose through `PiBound`. The original LC product root costs 31,324 Work to admit and 33,668 to enclose through `ExactRational`; preserving the original product adds 10,834 Work over the direct rational radicand (`ex:cas:constant-square-root-direct-cost`). Literal N/N−1, prior-Work and spent-ledger checks leave source graph bytes unchanged on refusal (`test:integration:constant-square-root-costs`).
+
+**Rule (Square-root enclosure validation cost)** · `rule:cas:constant-square-root-validation-cost`
+
+The complete Machin certificate check costs 18,179 Work, including 680 retained bytes and 17,499 validation Work. The `sqrt(2)` enclosure ledger comprises 57,657 admission Work, that 17,499 validation Work and 7,798 for retention and root bounds, so enclosure after admission adds 25,297 (`test:integration:constant-square-root-breakdown`), (`ex:cas:constant-square-root-costs`). Reuse of a checked `PiBound` certificate remains open: (`def:cas:constant-cache`) retains checked constants, while this enclosure route still validates its certificate on every call under (`rule:cas:pi-machin-certificates`).
 
 ## Main concepts and types · `sec:cas:concepts`
 
@@ -934,7 +962,7 @@ Work and staging cover traversal, total affine reconstruction, exact cuts, cell 
 
 **Rule (Closed original-expression replay)** · `rule:cas:decision-enclosure-replay`
 
-The checker delegates to `ExactConstant::from_expression`, which inspects every original operand, establishes finite-real divisor domains before normalization and independently checks equality to the normalized result. `ExactRational` requires an exactly rational result equal to its candidate; exact cancellation such as `Pi/Pi` needs no constant bound (`test:integration:decision-enclosure-named-constant-boundary`). `PiBound` independently validates the finite Machin certificate and propagates closed rational intervals through normalized negation, addition, subtraction, multiplication, division and integer powers; every interval divisor must exclude zero (`test:integration:decision-pi-closed-targets`). Both routes check containment in the requested box, with no floating comparisons (`rule:cas:pi-machin-certificates`).
+The checker delegates to `ExactConstant::from_expression`, which inspects every original operand, establishes finite-real divisor domains before normalization and independently checks equality to the normalized result. `ExactRational` requires an exactly rational result equal to its candidate; exact cancellation such as `Pi/Pi` needs no constant bound (`test:integration:decision-enclosure-named-constant-boundary`). `PiBound` independently validates the finite Machin certificate and propagates closed rational intervals through normalized negation, addition, subtraction, multiplication, division, integer powers and the checked square-root extension of (`rule:cas:constant-square-root-enclosures`); every interval divisor must exclude zero (`test:integration:decision-pi-closed-targets`). Both routes check containment in the requested box, with no floating comparisons (`rule:cas:pi-machin-certificates`).
 
 **Rule (Closed replay refusals)** · `rule:cas:decision-enclosure-refusals`
 

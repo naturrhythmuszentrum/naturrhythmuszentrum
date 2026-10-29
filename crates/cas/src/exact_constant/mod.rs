@@ -28,7 +28,8 @@ enum Value {
 /// A finite real constant expression, never a floating approximation or a free parameter.
 ///
 /// Admission checks every original operand before normalization. The closed grammar
-/// contains rational literals, `Pi`, `E`, negation, arithmetic and integer powers.
+/// contains rational literals, `Pi`, `E`, negation, arithmetic, integer powers and
+/// strict-real square roots of proved-positive rational expressions.
 /// Divisors and nonpositive powers require an independently established nonzero sign.
 /// Equality compares normalized CAS structure; it is not a general identity decision.
 #[derive(Clone, Debug)]

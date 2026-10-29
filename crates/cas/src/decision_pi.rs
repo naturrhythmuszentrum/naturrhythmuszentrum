@@ -95,6 +95,16 @@ impl Interval {
         Ok(Self { lower, upper })
     }
 
+    /// Monotonicity of the nonnegative square root transports independently squared endpoints.
+    fn square_root(&self, budget: &mut Budget) -> Result<Self, Fault> {
+        if self.lower.is_negative() {
+            return Err(unsupported());
+        }
+        let (lower, _) = self.lower.square_root_bounds(budget)?;
+        let (_, upper) = self.upper.square_root_bounds(budget)?;
+        Ok(Self { lower, upper })
+    }
+
     /// Conservative retained map payload, excluding shared immutable graph syntax.
     fn bytes(&self) -> u64 {
         128_u64
@@ -214,6 +224,15 @@ fn evaluate(
         Operator::Mul => child(0)?.product(child(1)?, budget),
         Operator::Div => child(0)?.product(&child(1)?.reciprocal(budget)?, budget),
         Operator::IntegerPower(exponent) => child(0)?.power(*exponent, budget),
+        Operator::GeneralPower(crate::model::Branch::StrictReal) => {
+            let half = Rational::from_ratio(1, 2, budget)?;
+            let lower_half = child(1)?.lower == half;
+            let upper_half = child(1)?.upper == half;
+            if !(lower_half && upper_half) {
+                return Err(unsupported());
+            }
+            child(0)?.square_root(budget)
+        }
         _ => Err(unsupported()),
     }
 }

@@ -3,6 +3,7 @@
 
 pub(crate) mod matrix;
 mod matrix_determinant;
+mod roots;
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -19,6 +20,8 @@ enum Atom {
     Free(String),
     /// Pi or E under an explicit stable tag.
     Constant(u8),
+    /// A privately checked positive rational square root.
+    Root(Box<roots::Root>),
 }
 
 /// A sorted finite exponent vector with zero exponents omitted.
@@ -104,10 +107,11 @@ impl Polynomial {
             .flat_map(|term| term.iter())
             .chain(monomial)
         {
+            let key_bytes = roots::comparison_bytes(atom, budget)?;
             budget.work(
                 size(variables.len(), AT)?
                     .checked_add(1)
-                    .and_then(|n| n.checked_mul(budget.limits().name_bytes))
+                    .and_then(|n| n.checked_mul(key_bytes))
                     .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
                 AT,
             )?;
@@ -120,8 +124,26 @@ impl Polynomial {
         Ok(())
     }
 
-    /// Add one coefficient, charging ordered-container comparisons before insertion.
+    /// Reduce positive root factors only in the explicitly enabled constant fragment.
     fn accumulate(
+        &mut self,
+        monomial: Monomial,
+        coefficient: &Rational,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        if monomial
+            .iter()
+            .any(|(atom, _)| matches!(atom, Atom::Root(_)))
+        {
+            let (monomial, coefficient) = roots::reduce(monomial, coefficient, budget)?;
+            self.accumulate_reduced(monomial, &coefficient, budget)
+        } else {
+            self.accumulate_reduced(monomial, coefficient, budget)
+        }
+    }
+
+    /// Add one coefficient, charging ordered-container comparisons before insertion.
+    fn accumulate_reduced(
         &mut self,
         monomial: Monomial,
         coefficient: &Rational,
@@ -231,6 +253,7 @@ fn entry_bytes(monomial: &[(Atom, u64)], coefficient: &Rational) -> Result<u64, 
         let name = match atom {
             Atom::Free(key) => size(key.len(), AT)?,
             Atom::Constant(_) => 1,
+            Atom::Root(root) => root.bytes()?,
         };
         bytes = bytes
             .checked_add(name)
@@ -249,9 +272,10 @@ fn multiply_monomials(
     let mut exponents = BTreeMap::new();
     let mut degree = 0_u64;
     for (atom, exponent) in left.iter().chain(right) {
+        let key_bytes = roots::comparison_bytes(atom, budget)?;
         let work = size(exponents.len(), AT)?
             .checked_add(1)
-            .and_then(|n| n.checked_mul(budget.limits().name_bytes))
+            .and_then(|n| n.checked_mul(key_bytes))
             .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
         budget.work(work, AT)?;
         let previous: u64 = exponents.get(atom).copied().unwrap_or(0);
@@ -320,12 +344,12 @@ impl Fraction {
 
 /// Convert a scalar DAG with an explicit postorder stack and no success cache from search.
 fn convert(state: &State, root: LogicalId, budget: &mut Budget) -> Result<Fraction, Fault> {
-    convert_mode(state, root, true, budget)
+    convert_mode(state, root, true, false, budget)
 }
 
 /// Matrix coefficient leaves exclude nested determinants, keeping traversal stacks explicit.
 fn convert_scalar(state: &State, root: LogicalId, budget: &mut Budget) -> Result<Fraction, Fault> {
-    convert_mode(state, root, false, budget)
+    convert_mode(state, root, false, false, budget)
 }
 
 /// A determinant root delegates once to the ordered matrix checker, whose leaves stay scalar.
@@ -333,6 +357,7 @@ fn convert_mode(
     state: &State,
     root: LogicalId,
     allow_determinant: bool,
+    allow_roots: bool,
     budget: &mut Budget,
 ) -> Result<Fraction, Fault> {
     let mut values: BTreeMap<LogicalId, Fraction> = BTreeMap::new();
@@ -374,7 +399,7 @@ fn convert_mode(
             let source = *term.operands.first().ok_or_else(fragment)?;
             matrix_determinant::determinant(state, source, budget)
         } else {
-            convert_node(&term.operator, &term.operands, &values, budget)
+            convert_node(&term.operator, &term.operands, &values, allow_roots, budget)
         };
         budget.restore_limits(previous);
         let value = value?;
@@ -402,6 +427,7 @@ fn convert_node(
     operator: &Operator,
     operands: &[LogicalId],
     values: &BTreeMap<LogicalId, Fraction>,
+    allow_roots: bool,
     budget: &mut Budget,
 ) -> Result<Fraction, Fault> {
     let child = |position: usize| {
@@ -423,6 +449,9 @@ fn convert_node(
                 Constant::E => 1,
             };
             Fraction::polynomial(Polynomial::atom(Atom::Constant(tag), budget)?, budget)
+        }
+        Operator::GeneralPower(crate::model::Branch::StrictReal) if allow_roots => {
+            roots::convert(child(0)?, child(1)?, budget)
         }
         Operator::IntegerEmbed => {
             let value = child(0)?;
@@ -465,8 +494,30 @@ pub(crate) fn equal(
     rational: bool,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let a = convert(state, left, budget)?;
-    let b = convert(state, right, budget)?;
+    equal_mode(state, left, right, rational, false, budget)
+}
+
+/// Closed constant equality additionally reconstructs positive rational square-root relations.
+pub(crate) fn equal_constants(
+    state: &State,
+    left: LogicalId,
+    right: LogicalId,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    equal_mode(state, left, right, true, true, budget)
+}
+
+/// The ordinary coefficient fragment never opts into square-root rules.
+fn equal_mode(
+    state: &State,
+    left: LogicalId,
+    right: LogicalId,
+    rational: bool,
+    allow_roots: bool,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    let a = convert_mode(state, left, true, allow_roots, budget)?;
+    let b = convert_mode(state, right, true, allow_roots, budget)?;
     if !rational && (!a.denominator.is_scalar() || !b.denominator.is_scalar()) {
         return Err(fragment());
     }
@@ -486,7 +537,16 @@ pub(crate) fn normalize(
     root: LogicalId,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    normalize_mode(cas, root, false, budget)
+    normalize_mode(cas, root, false, false, budget)
+}
+
+/// Normalize the closed constant extension without enabling radicals in ordinary polynomial callers.
+pub(crate) fn normalize_constants(
+    cas: &mut Cas,
+    root: LogicalId,
+    budget: &mut Budget,
+) -> Result<LogicalId, Fault> {
+    normalize_mode(cas, root, false, true, budget)
 }
 
 /// Keep composite denominator syntax when differentiation would otherwise invent extra guards.
@@ -495,7 +555,7 @@ pub(crate) fn normalize_derivative(
     root: LogicalId,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    normalize_mode(cas, root, true, budget)
+    normalize_mode(cas, root, true, false, budget)
 }
 
 /// A mathematical producer may choose a conservative canonicalization fragment.
@@ -503,10 +563,11 @@ fn normalize_mode(
     cas: &mut Cas,
     root: LogicalId,
     preserve_denominator: bool,
+    allow_roots: bool,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
     let previous = budget.reserve_temporary(cas.counts().payload_bytes, AT)?;
-    let converted = convert(&cas.state, root, budget);
+    let converted = convert_mode(&cas.state, root, true, allow_roots, budget);
     budget.restore_limits(previous);
     let value = converted?;
     if preserve_denominator
@@ -585,9 +646,10 @@ fn cancel_monomial(value: &mut Fraction, budget: &mut Budget) -> Result<(), Faul
         .chain(value.denominator.terms.keys())
     {
         for (atom, exponent) in &mut common {
+            let key_bytes = roots::comparison_bytes(atom, budget)?;
             budget.work(
                 size(term.len(), AT)?
-                    .checked_mul(budget.limits().name_bytes)
+                    .checked_mul(key_bytes)
                     .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
                 AT,
             )?;
@@ -609,9 +671,10 @@ fn cancel_monomial(value: &mut Fraction, budget: &mut Budget) -> Result<(), Faul
                 .try_reserve_exact(term.len())
                 .map_err(|_| Fault::allocation(AT))?;
             for (atom, exponent) in term {
+                let key_bytes = roots::comparison_bytes(atom, budget)?;
                 budget.work(
                     size(common.len(), AT)?
-                        .checked_mul(budget.limits().name_bytes)
+                        .checked_mul(key_bytes)
                         .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
                     AT,
                 )?;
@@ -690,12 +753,26 @@ fn materialize_term(
         None
     };
     for (atom, exponent) in monomial {
-        let operator = match atom {
-            Atom::Free(key) => Operator::Free(key.clone()),
-            Atom::Constant(0) => Operator::Constant(Constant::Pi),
-            Atom::Constant(_) => Operator::Constant(Constant::E),
+        let mut factor = match atom {
+            Atom::Root(root) => root.materialize(cas, context, sort, budget)?,
+            Atom::Free(key) => cas.generated(
+                context,
+                Operator::Free(key.clone()),
+                sort.clone(),
+                &[],
+                budget,
+            )?,
+            Atom::Constant(tag) => {
+                let constant = if *tag == 0 { Constant::Pi } else { Constant::E };
+                cas.generated(
+                    context,
+                    Operator::Constant(constant),
+                    sort.clone(),
+                    &[],
+                    budget,
+                )?
+            }
         };
-        let mut factor = cas.generated(context, operator, sort.clone(), &[], budget)?;
         if *exponent != 1 {
             let exponent = i64::try_from(*exponent).map_err(|_| fragment())?;
             factor = cas.generated(
@@ -765,7 +842,9 @@ fn univariate_coefficients(
             match atom {
                 Atom::Free(key) if key == variable => degree = degree.max(*exponent),
                 Atom::Free(_) => return Err(Fault::invalid(InvalidCode::PolynomialFragment, AT)),
-                Atom::Constant(_) => return Err(Fault::invalid(InvalidCode::CoefficientField, AT)),
+                Atom::Constant(_) | Atom::Root(_) => {
+                    return Err(Fault::invalid(InvalidCode::CoefficientField, AT));
+                }
             }
         }
     }

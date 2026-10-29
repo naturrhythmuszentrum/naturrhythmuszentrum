@@ -217,3 +217,5 @@ fn constant_proof_work_boundaries() -> TestResult {
 }
 
 mod cache;
+
+mod roots;

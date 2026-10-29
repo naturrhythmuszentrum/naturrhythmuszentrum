@@ -5,6 +5,8 @@
 //!
 //! `Rational` owns canonical sign/magnitude, positive-denominator and reduction invariants over `num-bigint` 0.4 with default features disabled. Integers, fractions, decimals and decimal scientific notation parse exactly. Arithmetic cross-cancels before multiplication and uses continued fractions for comparison. The default component/intermediate limits are 4,096/8,192 bits; `(4/5)^78` fits with numerator/denominator sizes of 157/182 bits. Every big-integer operation prepays a conservative size-dependent work charge; a smaller bit budget returns `Exhausted` with `ArithmeticRange`. `petgraph` 0.8 supplies append-only graph storage. The seed lock inspected on 2026-10-22 at `51105aeb4927f5e2d0bb76a607d87aae1d40c00b` pins `num-bigint` 0.4.8 and `petgraph` 0.8.3, including their exact transitive dependencies. The production arithmetic uses those dependencies without a numerical engine dependency.
 
+mod roots;
+
 use std::cmp::Ordering;
 use std::fmt;
 

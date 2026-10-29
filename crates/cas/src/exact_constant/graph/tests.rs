@@ -151,11 +151,11 @@ fn constant_preparation_costs() -> Result<(), Fault> {
     Ok(())
 }
 
-/// A positive exact square root currently refuses in the closed grammar.
-/// ´test:unit:constant-square-root-grammar-refusal´
-/// ´claim:cas:constant-square-root-grammar-refusal´
+/// The positive LC square root now admits through exact normalization.
+/// ´test:unit:constant-square-root-admission-costs´
+/// ´claim:cas:constant-square-root-admission-costs´
 #[test]
-fn constant_square_root_grammar_refusal() -> Result<(), Fault> {
+fn constant_square_root_admission_costs() -> Result<(), Fault> {
     let mut budget = ledger()?;
     let (mut cas, header) = empty(&mut budget)?;
     let input = cas.generated(
@@ -180,14 +180,12 @@ fn constant_square_root_grammar_refusal() -> Result<(), Fault> {
         &mut budget,
     )?;
     let mut measured = ledger()?;
-    let Err(fault) = admit(&cas, &cas.handle(root), &mut measured) else {
-        panic!("square-root grammar refusal expected");
-    };
+    let result = admit(&cas, &cas.handle(root), &mut measured)?;
     assert_eq!(
-        fault.kind,
-        crate::FaultKind::Invalid(InvalidCode::UnsupportedFragment)
+        result,
+        ExactConstant::from(Rational::from_ratio(1, 2_000, &mut ledger()?)?)
     );
-    assert_eq!(fault.location, AT);
-    assert_eq!(measured.usage().work, 1_047);
+    assert_eq!(measured.usage().work, 20_490);
+    pin(|budget| admit(&cas, &cas.handle(root), budget), 20_490)?;
     Ok(())
 }
