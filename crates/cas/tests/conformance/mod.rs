@@ -3,6 +3,7 @@
 
 mod graph;
 mod lattice_basis;
+mod lattice_enclosures;
 mod numbers;
 mod proofs;
 mod representation;

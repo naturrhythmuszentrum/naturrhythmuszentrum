@@ -2,8 +2,10 @@
 //! Checked affine lattice bases over the existing exact matrix and proof vocabulary.
 
 pub(crate) mod cover;
+mod enclosure;
 mod index;
 pub use cover::LatticeCover;
+pub use enclosure::{CheckedRationalBoxEnclosure, RationalBoxEnclosure};
 
 pub use index::{CheckedLatticeIndexDomain, LatticeIndexQuestion};
 
