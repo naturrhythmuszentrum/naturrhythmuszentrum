@@ -7,6 +7,10 @@ mod attempt;
 mod costs;
 #[path = "lattice_selection/direct.rs"]
 mod direct;
+#[path = "lattice_selection/output_costs.rs"]
+mod output_costs;
+#[path = "lattice_selection/outputs.rs"]
+mod outputs;
 
 use super::{Product, fixture, ledger, matrix, prove, real};
 use crate::testing::common::TestResult;

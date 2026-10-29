@@ -2,6 +2,7 @@
 //! Named tuple selection composes a checked affine cover and original-target box replay.
 
 mod attempt;
+mod outputs;
 
 #[expect(
     clippy::redundant_pub_crate,
@@ -13,6 +14,8 @@ pub use attempt::{
     CheckedLatticeAttempt, LatticeAttemptPolicy, LatticeFloorCut, LatticePendingObligation,
     LatticeSelectionOutcome, LatticeUndecided, LatticeUndecidedReason,
 };
+
+pub use outputs::CheckedLatticeOutputs;
 
 use super::{LatticeBoxEnclosure, LatticeCoordinateEnclosure, LatticeCover};
 use crate::budget::Budget;
