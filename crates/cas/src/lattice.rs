@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked affine lattice bases over the existing exact matrix and proof vocabulary.
 
+mod affine_enclosure;
+mod coordinate_enclosure;
 pub(crate) mod cover;
 mod enclosure;
 mod index;
+pub use affine_enclosure::{CheckedLatticeBoxEnclosure, LatticeBoxEnclosure};
+pub use coordinate_enclosure::{CheckedLatticeCoordinateEnclosure, LatticeCoordinateEnclosure};
 pub use cover::LatticeCover;
 pub use enclosure::{CheckedRationalBoxEnclosure, RationalBoxEnclosure};
 

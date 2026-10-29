@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Vector boxes preserve original operand order and reuse scalar certificate authority.
 
+mod affine;
+
 use crate::testing::common::{TestResult, real};
 use crate::testing::readings::{Fixture, ledger, matrix};
 use nrz_cas::decision::{EnclosureOrigin, RationalEnclosure};

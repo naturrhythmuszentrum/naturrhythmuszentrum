@@ -23,11 +23,15 @@ const fn unsupported() -> Fault {
 
 /// Exact outward interval, with included endpoints and no floating intermediates.
 #[derive(Clone)]
-struct Interval {
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scalar and lattice replay share exact outward interval arithmetic"
+)]
+pub(super) struct Interval {
     /// Included lower endpoint.
-    lower: Rational,
+    pub(super) lower: Rational,
     /// Included upper endpoint.
-    upper: Rational,
+    pub(super) upper: Rational,
 }
 
 impl Interval {
@@ -56,7 +60,7 @@ impl Interval {
     }
 
     /// The product of two closed intervals has extrema among its four endpoint products.
-    fn product(&self, other: &Self, budget: &mut Budget) -> Result<Self, Fault> {
+    pub(super) fn product(&self, other: &Self, budget: &mut Budget) -> Result<Self, Fault> {
         let mut result = Self::point(&self.lower.mul(&other.lower, budget)?);
         for (left, right) in [
             (&self.lower, &other.upper),
