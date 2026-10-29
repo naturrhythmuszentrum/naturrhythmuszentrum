@@ -26,6 +26,9 @@ pub(crate) fn statement(
     records: &[Decoded],
 ) -> Result<Statement, Fault> {
     Ok(match reader.byte()? {
+        30 => Statement::LatticeNearestSelection(Box::new(
+            crate::lattice::selection::wire::decode(reader, records)?,
+        )),
         29 => Statement::LatticeSelection(Box::new(crate::lattice::selection::wire::decode(
             reader, records,
         )?)),

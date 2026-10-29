@@ -310,7 +310,7 @@ pub struct IntegerSelection {
 }
 
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
-pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 7] = [
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 8] = [
     crate::proof::LemmaSchema {
         name: "decision.enclosure-membership",
         label: "thm:cas:decision-enclosure-membership",
@@ -366,5 +366,13 @@ pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 7] = [
         standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
         statement: "The original lattice target belongs to the unique half-open cell indexed by the exact ordered Integer tuple.",
         premises: "Identical checked affine cover, complete original-target affine enclosure, exact tuple membership in every declared index range and strict whole-box floor cuts, retaining all qualified cover hypotheses.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.lattice-orthogonal-nearest-selection",
+        label: "thm:cas:decision-lattice-orthogonal-nearest-selection",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The original target belongs to the nearest lattice cell of the exact ordered Integer tuple, with simultaneous ties owned by the greatest original index.",
+        premises: "Identical checked affine basis and range evidence, exact positive diagonal Gram matrix, complete original-target enclosure and whole-box shifted floor cuts, retaining all qualified hypotheses.",
     },
 ];

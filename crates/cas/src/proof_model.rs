@@ -36,6 +36,8 @@ pub enum Ownership {
 /// A mathematical statement with exactly the objects needed by its proposition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Statement {
+    /// The original target belongs to the nearest cell with greatest original-index ties.
+    LatticeNearestSelection(Box<crate::lattice::LatticeSelection>),
     /// The original lattice target lies in the cell of one exact ordered Integer tuple.
     LatticeSelection(Box<crate::lattice::LatticeSelection>),
     /// Unique finite affine product projection over an exact lattice index domain.

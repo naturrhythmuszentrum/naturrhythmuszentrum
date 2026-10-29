@@ -20,10 +20,11 @@ use crate::wire_read::Reader;
 )]
 pub(crate) fn encode(
     value: &LatticeSelection,
+    tag: u8,
     out: &mut Encoder<'_>,
     write: &mut impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
-    out.byte(29)?;
+    out.byte(tag)?;
     crate::lattice::cover::wire::encode(&value.cover, out, write)?;
     write(&value.target, out)?;
     out.count(value.values.len())?;
@@ -246,7 +247,7 @@ pub(super) fn payload(
         cas.checked(handle)?;
         crate::statement::handle(handle, out)
     };
-    encode(expected, &mut out, &mut write)?;
+    encode(expected, 29, &mut out, &mut write)?;
     certificate(value, &mut out, &mut write)?;
     let bytes = size(out.finish().len(), super::AT)?.saturating_mul(32);
     budget.check(BudgetKind::StagedPayloadBytes, bytes, super::AT)?;

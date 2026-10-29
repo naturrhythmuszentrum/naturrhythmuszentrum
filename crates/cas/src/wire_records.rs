@@ -138,7 +138,9 @@ fn selection_cover(
     let Entity::Statement(judgment) = entity else {
         return Ok(None);
     };
-    let crate::proof_model::Statement::LatticeSelection(selection) = &judgment.statement else {
+    let (crate::proof_model::Statement::LatticeSelection(selection)
+    | crate::proof_model::Statement::LatticeNearestSelection(selection)) = &judgment.statement
+    else {
         return Ok(None);
     };
     let bytes = crate::lattice::cover::check::payload(&selection.cover, budget)?;
@@ -233,8 +235,16 @@ fn describe_statement(
         .map(|value| Entity::Object(value.logical_id()));
     object(out, &mut record.references, cas.checked(&value.context)?)?;
     let start = record.references.len();
-    if let Statement::LatticeSelection(selection) = &value.statement {
-        out.byte(29)?;
+    if let Statement::LatticeSelection(selection) | Statement::LatticeNearestSelection(selection) =
+        &value.statement
+    {
+        out.byte(
+            if matches!(value.statement, Statement::LatticeNearestSelection(_)) {
+                30
+            } else {
+                29
+            },
+        )?;
         reference(
             out,
             &mut record.references,

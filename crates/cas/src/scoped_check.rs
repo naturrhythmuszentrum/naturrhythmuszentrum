@@ -131,7 +131,12 @@ fn rule_conditions(
         Primitive::JetPolynomial | Primitive::CaseInterior | Primitive::CaseBoundary => {
             crate::boundary_check::check(cas, draft, premises, budget)?
         }
-        Primitive::CaseSelect if matches!(&draft.conclusion, Statement::LatticeSelection(_)) => {
+        Primitive::CaseSelect
+            if matches!(
+                &draft.conclusion,
+                Statement::LatticeSelection(_) | Statement::LatticeNearestSelection(_)
+            ) =>
+        {
             crate::lattice::selection::check(cas, draft, premises, budget)?
         }
         Primitive::CaseSelect if matches!(&draft.conclusion, Statement::IntegerSelection(_)) => {

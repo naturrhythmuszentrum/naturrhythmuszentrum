@@ -7,7 +7,7 @@ use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Handle, LogicalId, Vertex, size};
 use crate::model::{AtomicSort, Extent, Field, Operator, Sort};
 use crate::number::Rational;
-use crate::proof_model::{Certificate, Statement, VerifiedWitness};
+use crate::proof_model::{Certificate, VerifiedWitness};
 use crate::rule::Primitive;
 
 /// Output construction and metadata access own their costs independently of selection.
@@ -82,9 +82,7 @@ impl Cas {
         let Vertex::ScopedApplication(proof) = self.state.node(*application)? else {
             return Err(invalid());
         };
-        let Statement::LatticeSelection(selection) = &proof.judgment.statement else {
-            return Err(invalid());
-        };
+        let (selection, _) = super::question(&proof.judgment.statement).map_err(|_| invalid())?;
         let Certificate::LatticeSelection(enclosure) = &proof.certificate else {
             return Err(invalid());
         };
@@ -111,16 +109,15 @@ impl Cas {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
                 let (actual, _) = cas.lattice_selection_evidence(witness, budget)?;
-                let Statement::LatticeSelection(question) = &witness.judgment().statement else {
-                    return Err(invalid());
-                };
+                let (question, _) =
+                    super::question(&witness.judgment().statement).map_err(|_| invalid())?;
                 let count = size(question.values.len(), AT)?;
                 budget.check(BudgetKind::MatrixEntries, count.saturating_mul(count), AT)?;
                 let bytes = super::super::cover::check::payload(&question.cover, budget)?
                     .saturating_add(count.saturating_mul(256))
                     .saturating_add(512);
                 budget.work(bytes, AT)?;
-                if actual != question.as_ref() {
+                if actual != question {
                     return Err(invalid());
                 }
                 budget.with_retained_payload(bytes, AT, |budget| {

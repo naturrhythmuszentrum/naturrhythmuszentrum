@@ -2,6 +2,7 @@
 //! Named tuple selection composes a checked affine cover and original-target box replay.
 
 mod attempt;
+mod nearest;
 mod outputs;
 
 #[expect(
@@ -30,6 +31,15 @@ use crate::rule::Primitive;
 
 /// Every selection charge belongs to this optional owner.
 const AT: Location = Location::new("lattice tuple selection");
+
+/// Cell ownership is part of the theorem, even when the selected tuple coincides.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LatticeConvention {
+    /// Included lower and excluded upper faces in original basis coordinates.
+    Floor,
+    /// Euclidean nearest sites; equal minima belong to the greatest original index.
+    Nearest,
+}
 
 /// Exact original lattice question, target and ordered proposed Integer values.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -106,9 +116,7 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<ScopedConditions, Fault> {
-    let Statement::LatticeSelection(selection) = &draft.conclusion else {
-        return Err(invalid());
-    };
+    let (selection, convention) = question(&draft.conclusion)?;
     let Certificate::LatticeSelection(enclosure) = &draft.certificate else {
         return Err(invalid());
     };
@@ -120,6 +128,9 @@ pub(crate) fn check(
     }
     cover_matches(selection, cover)?;
     roles(cas, selection, budget)?;
+    if convention == LatticeConvention::Nearest {
+        nearest::orthogonal(cas, selection, budget)?;
+    }
     validate(cas, selection, enclosure, budget)?;
     let scratch = budget
         .limits()
@@ -129,7 +140,10 @@ pub(crate) fn check(
         .saturating_add(4_096);
     budget.with_retained_payload(scratch, AT, |budget| {
         ranges(cas, selection, cover, budget)?;
-        cuts(cas, selection, enclosure, budget)
+        match convention {
+            LatticeConvention::Floor => cuts(cas, selection, enclosure, budget),
+            LatticeConvention::Nearest => nearest::cuts(cas, selection, enclosure, budget),
+        }
     })?;
     let mut conditions = ScopedConditions::default();
     crate::statement::merge(cas, &mut conditions, &cover.conditions, budget)?;
@@ -316,7 +330,36 @@ impl Cas {
         enclosure: &LatticeEnclosure,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
-        self.prove_lattice_selection_root(cover.proof(), expected, enclosure, budget)
+        self.prove_lattice_selection_root(
+            cover.proof(),
+            expected,
+            enclosure,
+            LatticeConvention::Floor,
+            budget,
+        )
+    }
+
+    /// Prove Euclidean nearest selection with greatest-original-index tie ownership.
+    ///
+    /// The closed checker replays a rational Gram matrix and proves it positive diagonal,
+    /// then applies whole-box floor cuts after adding one half to every coordinate.
+    /// # Errors
+    /// Refuses unsupported or nonorthogonal bases, malformed evidence, excluded indices,
+    /// inconclusive cuts and resource exhaustion. No partial theorem is published.
+    pub fn prove_lattice_nearest_selection(
+        &mut self,
+        cover: &VerifiedWitness,
+        expected: &LatticeSelection,
+        enclosure: &LatticeEnclosure,
+        budget: &mut Budget,
+    ) -> Result<VerifiedWitness, Fault> {
+        self.prove_lattice_selection_root(
+            cover.proof(),
+            expected,
+            enclosure,
+            LatticeConvention::Nearest,
+            budget,
+        )
     }
 
     /// The producer and prepared-attempt consumer share one transactional proof path.
@@ -325,6 +368,7 @@ impl Cas {
         cover: &Handle,
         expected: &LatticeSelection,
         enclosure: &LatticeEnclosure,
+        convention: LatticeConvention,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
         self.proof_limits(budget, |cas, budget| {
@@ -338,7 +382,14 @@ impl Cas {
                     let draft = ApplicationDraft {
                         rule: Primitive::CaseSelect,
                         context: expected.cover.index.basis.context.clone(),
-                        conclusion: Statement::LatticeSelection(Box::new(expected.clone())),
+                        conclusion: match convention {
+                            LatticeConvention::Floor => {
+                                Statement::LatticeSelection(Box::new(expected.clone()))
+                            }
+                            LatticeConvention::Nearest => {
+                                Statement::LatticeNearestSelection(Box::new(expected.clone()))
+                            }
+                        },
                         premises: vec![0],
                         substitutions: Vec::new(),
                         certificate: Certificate::LatticeSelection(Box::new(enclosure.clone())),
@@ -361,4 +412,13 @@ impl Cas {
 /// Altered original questions and incomplete typed tuples cannot borrow another selection.
 const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::EndpointMismatch, AT)
+}
+
+/// Both conventions share descriptors while preserving the statement's mathematical identity.
+fn question(statement: &Statement) -> Result<(&LatticeSelection, LatticeConvention), Fault> {
+    match statement {
+        Statement::LatticeSelection(value) => Ok((value, LatticeConvention::Floor)),
+        Statement::LatticeNearestSelection(value) => Ok((value, LatticeConvention::Nearest)),
+        _ => Err(invalid()),
+    }
 }

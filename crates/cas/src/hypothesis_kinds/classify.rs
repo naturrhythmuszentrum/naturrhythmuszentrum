@@ -94,6 +94,7 @@ impl Cas {
             Statement::Germ(_) => HypothesisKind::GermEvidence,
             Statement::Split(_) => HypothesisKind::SplitEvidence,
             Statement::Distribution(_) => HypothesisKind::DistributionEvidence,
+            Statement::LatticeNearestSelection(_) => HypothesisKind::LatticeNearestSelection,
             Statement::LatticeSelection(_) => HypothesisKind::LatticeSelection,
             Statement::LatticeCover(_) => HypothesisKind::LatticeCover,
             Statement::IntegerSelection(_) => HypothesisKind::IntegerSelection,

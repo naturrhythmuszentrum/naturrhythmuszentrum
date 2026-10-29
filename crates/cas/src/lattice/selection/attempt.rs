@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Sealed valid evidence survives an inconclusive cut or exhausted decision ledger.
 
-use super::{AT, LatticeEnclosure, LatticeSelection, invalid};
+use super::{AT, LatticeConvention, LatticeEnclosure, LatticeSelection, invalid};
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, FaultKind, InvalidCode};
 use crate::graph::{Cas, Handle, Vertex};
@@ -18,7 +18,7 @@ pub enum LatticeAttemptPolicy {
 /// No cut proof or portable selected theorem is retained by a prepared or undecided attempt.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LatticePendingObligation {
-    /// Establish all included lower and strictly excluded upper floor cuts together.
+    /// Establish all whole-box cuts for the retained cell convention together.
     WholeBoxCuts,
     /// Publish the complete independently replayable witness with its original dependencies.
     PortableWitness,
@@ -43,6 +43,8 @@ pub struct LatticeFloorCut<'a> {
 pub struct CheckedLatticeAttempt {
     /// Authenticated immutable cover root in the preparing arena.
     cover: Handle,
+    /// Explicit selected-cell convention, including its fixed tie order.
+    convention: LatticeConvention,
     /// Original question and attempted Integer tuple, never yet a selected descriptor.
     candidate: LatticeSelection,
     /// Both the original-target identity and every enclosure scalar have passed replay.
@@ -67,9 +69,13 @@ impl CheckedLatticeAttempt {
         ]
     }
 
-    /// Borrow one proposed cut without allocating or claiming that any coordinate was selected.
+    /// Borrow one floor cut without allocating or claiming that any coordinate was selected.
+    /// Nearest receipts return no floor cut; their enclosure and convention retain shifted cuts.
     #[must_use]
     pub fn cut(&self, coordinate: usize) -> Option<LatticeFloorCut<'_>> {
+        if self.convention != LatticeConvention::Floor {
+            return None;
+        }
         let candidate = self.candidate.values.get(coordinate)?;
         let (lower, upper) = super::bounds(&self.enclosure, coordinate).ok()?;
         Some(LatticeFloorCut {
@@ -77,6 +83,12 @@ impl CheckedLatticeAttempt {
             lower,
             upper,
         })
+    }
+
+    /// Cell convention whose complete cuts remain pending.
+    #[must_use]
+    pub const fn convention(&self) -> LatticeConvention {
+        self.convention
     }
 
     /// Complete original question and attempted tuple; no cut authority is implied.
@@ -155,7 +167,36 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeAttempt, Fault> {
         let previous = budget.restrict_storage(&self.limits);
-        let result = self.lattice_selection_attempt(cover, expected, enclosure, budget);
+        let result = self.lattice_selection_attempt(
+            cover,
+            expected,
+            enclosure,
+            LatticeConvention::Floor,
+            budget,
+        );
+        budget.restore_limits(previous);
+        result
+    }
+
+    /// Validate nearest evidence, including exact orthogonality, before attempting cuts.
+    /// # Errors
+    /// Refuses unsupported or nonorthogonal bases and the same malformed evidence and
+    /// resources as floor preparation. The receipt itself confers no selected tuple authority.
+    pub fn prepare_lattice_nearest_selection(
+        &self,
+        cover: &VerifiedWitness,
+        expected: &LatticeSelection,
+        enclosure: &LatticeEnclosure,
+        budget: &mut Budget,
+    ) -> Result<CheckedLatticeAttempt, Fault> {
+        let previous = budget.restrict_storage(&self.limits);
+        let result = self.lattice_selection_attempt(
+            cover,
+            expected,
+            enclosure,
+            LatticeConvention::Nearest,
+            budget,
+        );
         budget.restore_limits(previous);
         result
     }
@@ -166,6 +207,7 @@ impl Cas {
         cover: &VerifiedWitness,
         expected: &LatticeSelection,
         enclosure: &LatticeEnclosure,
+        convention: LatticeConvention,
         budget: &mut Budget,
     ) -> Result<CheckedLatticeAttempt, Fault> {
         budget.work(4, AT)?;
@@ -186,10 +228,14 @@ impl Cas {
         budget.with_retained_payload(bytes.saturating_add(scratch), AT, |budget| {
             super::cover_matches(expected, premise)?;
             super::roles(self, expected, budget)?;
+            if convention == LatticeConvention::Nearest {
+                super::nearest::orthogonal(self, expected, budget)?;
+            }
             super::validate(self, expected, enclosure, budget)?;
             super::ranges(self, expected, premise, budget)?;
             Ok(CheckedLatticeAttempt {
                 cover: cover.proof().clone(),
+                convention,
                 candidate: expected.clone(),
                 enclosure: enclosure.clone(),
                 spent_work: budget.usage().work,
@@ -213,6 +259,7 @@ impl Cas {
             &attempt.cover,
             &attempt.candidate,
             &attempt.enclosure,
+            attempt.convention,
             budget,
         );
         match result {

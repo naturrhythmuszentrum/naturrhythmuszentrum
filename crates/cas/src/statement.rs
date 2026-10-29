@@ -316,7 +316,10 @@ pub(crate) fn encode(
 ) -> Result<(), Fault> {
     match value {
         Statement::LatticeSelection(value) => {
-            crate::lattice::selection::wire::encode(value, out, &mut write)?;
+            crate::lattice::selection::wire::encode(value, 29, out, &mut write)?;
+        }
+        Statement::LatticeNearestSelection(value) => {
+            crate::lattice::selection::wire::encode(value, 30, out, &mut write)?;
         }
         Statement::LatticeCover(value) => {
             out.byte(28)?;
@@ -555,7 +558,9 @@ fn encode_boundary(
 /// Enumerate every mathematical object referenced by a typed statement.
 pub(crate) fn objects(value: &Statement) -> Vec<&Handle> {
     match value {
-        Statement::LatticeSelection(value) => crate::lattice::selection::wire::objects(value),
+        Statement::LatticeSelection(value) | Statement::LatticeNearestSelection(value) => {
+            crate::lattice::selection::wire::objects(value)
+        }
         Statement::LatticeCover(value) => crate::lattice::cover::wire::objects(value),
         Statement::IntegerSelection(value) => crate::decision_integer_wire::objects(value),
         Statement::IntegerFamily(value) => crate::decision_family_wire::objects(value),
@@ -789,6 +794,7 @@ pub(crate) const fn layer(value: &Statement) -> Layer {
     match value {
         Statement::Distribution(_) => Layer::Distribution,
         Statement::LatticeSelection(_)
+        | Statement::LatticeNearestSelection(_)
         | Statement::LatticeCover(_)
         | Statement::IntegerSelection(_)
         | Statement::IntegerFamily(_)

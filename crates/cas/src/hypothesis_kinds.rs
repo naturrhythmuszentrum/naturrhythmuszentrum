@@ -116,10 +116,12 @@ pub enum HypothesisKind {
     SplitEvidence,
     /// The original lattice target belongs to the cell of the exact selected Integer tuple.
     LatticeSelection,
+    /// The original target belongs to the nearest cell with greatest original-index ties.
+    LatticeNearestSelection,
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 50] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 51] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -170,10 +172,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 50] = [
     HypothesisKind::IntegerSelection,
     HypothesisKind::LatticeCover,
     HypothesisKind::LatticeSelection,
+    HypothesisKind::LatticeNearestSelection,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 50] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 51] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -574,6 +577,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 50] = [
         statement: "The original lattice target belongs to the half-open cell indexed by the exact ordered Integer tuple.",
         premises: "Complete affine cover question, original target and ordered Integer literals; a retained statement alone confers no certified tuple-selection authority.",
     },
+    LemmaSchema {
+        name: "hyp.lattice-nearest-selection",
+        label: "assum:cas:hyp-lattice-nearest-selection",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "The original target belongs to the nearest lattice cell indexed by the exact ordered Integer tuple, with ties owned by the greatest original index.",
+        premises: "Original basis, offset, context, range, target and ordered Integer literals in the Euclidean coordinate metric; a retained statement alone confers no nearest-selection authority.",
+    },
 ];
 
 impl HypothesisKind {
@@ -581,6 +592,7 @@ impl HypothesisKind {
     #[must_use]
     pub const fn formal_schema(self) -> &'static LemmaSchema {
         match self {
+            Self::LatticeNearestSelection => &HYPOTHESIS_SCHEMAS[50],
             Self::LatticeSelection => &HYPOTHESIS_SCHEMAS[49],
             Self::LatticeCover => &HYPOTHESIS_SCHEMAS[48],
             Self::DomainGuard => &HYPOTHESIS_SCHEMAS[0],

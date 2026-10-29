@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Rational skew and orthogonal fixtures retain the original target and index order.
 
+#[path = "nearest_costs.rs"]
+mod costs;
+
+#[path = "orthogonal.rs"]
+mod orthogonal;
+
 use super::{
     EnclosureOrigin, LatticeBasisOutcome, LatticeBasisQuestion, LatticeBoxEnclosure,
     LatticeEnclosure, LatticeSelection, Operator, Rational, RationalBoxEnclosure,
