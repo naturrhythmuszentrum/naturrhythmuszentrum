@@ -138,11 +138,8 @@ impl Cas {
             let mut guards = application.conditions.requirements.clone();
             guards.extend_from_slice(&judgment.residuals);
             judgment.residuals = crate::statement::union(self, &guards, budget)?;
-            let root = Entity::Conclusion {
-                proof: None,
-                judgment,
-                hypotheses: application.conditions.hypotheses.clone(),
-            };
+            let root =
+                Entity::conclusion(None, judgment, application.conditions.hypotheses.clone());
             let (records, root, rules, assigned) = indexed_table(self, root, budget)?;
             let meter = super::inventory_budget::table_meter(&records, &assigned, budget)?;
             budget.work(size(PRIMITIVES.len(), AT)?.saturating_mul(64), AT)?;

@@ -35,18 +35,37 @@ pub(crate) enum Entity {
     /// An admitted syntax/context object, or a proof naming an application.
     Object(LogicalId),
     /// A guarded predicate including its home and precise domain.
-    Guard(GuardedObligation),
+    Guard(Box<GuardedObligation>),
     /// A typed statement with its context and mathematical layer.
-    Statement(Judgment),
-    /// A final theorem; absent proof is used only for portable expected-judgment keys.
-    Conclusion {
-        /// Checked application root, absent only for expected-judgment keys.
+    Statement(Box<Judgment>),
+    /// A theorem with its reconstructed conditions.
+    Conclusion(Box<Conclusion>),
+}
+
+/// Large synthetic theorem fields are retained only by actual conclusion entities.
+#[derive(Clone, Debug)]
+pub(crate) struct Conclusion {
+    /// Checked application root, absent only for expected-judgment keys.
+    pub(crate) proof: Option<LogicalId>,
+    /// Complete typed theorem and its residual obligations.
+    pub(crate) judgment: Judgment,
+    /// Qualified assumptions used by the proof.
+    pub(crate) hypotheses: Vec<crate::domain_model::HypothesisRef>,
+}
+
+impl Entity {
+    /// Keep ordinary graph references compact without omitting any theorem field.
+    pub(crate) fn conclusion(
         proof: Option<LogicalId>,
-        /// Complete typed theorem and its residual obligations.
         judgment: Judgment,
-        /// Qualified assumptions used by the proof.
         hypotheses: Vec<crate::domain_model::HypothesisRef>,
-    },
+    ) -> Self {
+        Self::Conclusion(Box::new(Conclusion {
+            proof,
+            judgment,
+            hypotheses,
+        }))
+    }
 }
 
 /// Measured symbolic record; reference byte positions are patched after dependencies are ready.
@@ -111,11 +130,12 @@ pub(crate) fn key(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result<Key,
             crate::statement::encode(&value.statement, &mut out, crate::statement::handle)?;
             Key::Statement(out.finish())
         }
-        Entity::Conclusion {
-            proof,
-            judgment,
-            hypotheses,
-        } => {
+        Entity::Conclusion(value) => {
+            let Conclusion {
+                proof,
+                judgment,
+                hypotheses,
+            } = value.as_ref();
             out.byte(u8::from(proof.is_some()))?;
             if let Some(proof) = proof {
                 crate::graph::encode_id(*proof, &mut out)?;
@@ -366,11 +386,11 @@ pub(crate) fn encode(cas: &Cas, proof: LogicalId, budget: &mut Budget) -> Result
     #[cfg(test)]
     let _attribution = crate::testing::work_trace::Scope::phase("witness encoding");
     let application = crate::proof_view::application(cas, proof, budget)?;
-    let root = Entity::Conclusion {
-        proof: Some(proof),
-        judgment: application.judgment,
-        hypotheses: application.conditions.hypotheses,
-    };
+    let root = Entity::conclusion(
+        Some(proof),
+        application.judgment,
+        application.conditions.hypotheses,
+    );
     let (records, root, rules) = table(cas, root, budget)?;
     envelope(records, root, &rules, crate::wire::MAGIC, budget)
 }
@@ -383,11 +403,7 @@ pub(crate) fn judgment_key(
 ) -> Result<Vec<u8>, Fault> {
     #[cfg(test)]
     let _attribution = crate::testing::work_trace::Scope::phase("judgment comparison");
-    let root = Entity::Conclusion {
-        proof: None,
-        judgment: judgment.clone(),
-        hypotheses: Vec::new(),
-    };
+    let root = Entity::conclusion(None, judgment.clone(), Vec::new());
     let (records, root, rules) = table(cas, root, budget)?;
     envelope(records, root, &rules, b"NRZJDG04", budget)
 }
@@ -484,6 +500,15 @@ mod tests {
     use crate::graph::{Cas, LogicalId, VertexKind};
     use std::collections::BTreeMap;
     use std::sync::Arc;
+
+    /// Large synthetic judgments never inflate the ordinary dependency-slot representation.
+    /// ´claim:cas:wire-entity-reference-storage´
+    /// ´test:unit:wire-entity-reference-storage´
+    #[test]
+    fn wire_entity_reference_storage() {
+        assert!(std::mem::size_of::<Entity>() <= 32);
+        assert!(std::mem::size_of::<(usize, Entity)>() <= 40);
+    }
 
     /// Ready descriptors use child structural bytes rather than local serial order.
     /// ´test:unit:ready-reference-order´

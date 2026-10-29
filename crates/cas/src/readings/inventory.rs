@@ -81,11 +81,11 @@ impl Cas {
         if !check::applicable(&self.state, self.checked(left)?, self.checked(right)?)? {
             return Err(invalid(InvalidCode::ReadingDefinition));
         }
-        let root = Entity::Conclusion {
-            proof: Some(id),
-            judgment: application.judgment,
-            hypotheses: application.conditions.hypotheses,
-        };
+        let root = Entity::conclusion(
+            Some(id),
+            application.judgment,
+            application.conditions.hypotheses,
+        );
         let table = indexed_table(self, root, budget)?;
         compare_witness(witness, &table, budget)?;
         Ok(table)

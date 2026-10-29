@@ -67,7 +67,7 @@ pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result
         reference(
             &mut out,
             &mut record.references,
-            Entity::Statement(application.judgment.clone()),
+            Entity::Statement(Box::new(application.judgment.clone())),
         )?;
         out.count(application.premises.len())?;
         for premise in application.premises {
@@ -178,11 +178,12 @@ fn describe_entity(
             object(out, &mut record.references, cas.checked(&value.predicate)?)
         }
         Entity::Statement(value) => describe_statement(cas, value, selection_cover, record, out),
-        Entity::Conclusion {
-            proof,
-            judgment,
-            hypotheses,
-        } => {
+        Entity::Conclusion(value) => {
+            let crate::wire_build::Conclusion {
+                proof,
+                judgment,
+                hypotheses,
+            } = value.as_ref();
             record.tag = 12;
             record.layer = judgment.layer;
             record.space = judgment
@@ -196,12 +197,16 @@ fn describe_entity(
             reference(
                 out,
                 &mut record.references,
-                Entity::Statement(judgment.clone()),
+                Entity::Statement(Box::new(judgment.clone())),
             )?;
             out.count(judgment.residuals.len())?;
             let start = record.references.len();
             for residual in &judgment.residuals {
-                reference(out, &mut record.references, Entity::Guard(residual.clone()))?;
+                reference(
+                    out,
+                    &mut record.references,
+                    Entity::Guard(Box::new(residual.clone())),
+                )?;
             }
             record.sets.push((start..record.references.len()).collect());
             out.count(hypotheses.len())?;
@@ -248,7 +253,7 @@ fn describe_statement(
         reference(
             out,
             &mut record.references,
-            Entity::Statement(selection_cover.ok_or_else(invalid)?),
+            Entity::Statement(Box::new(selection_cover.ok_or_else(invalid)?)),
         )?;
         object(out, &mut record.references, cas.checked(&selection.target)?)?;
         out.count(selection.values.len())?;
