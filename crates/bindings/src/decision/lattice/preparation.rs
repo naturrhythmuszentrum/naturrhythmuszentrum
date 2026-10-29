@@ -9,11 +9,11 @@ use std::{collections::BTreeMap, rc::Rc};
 /// Unique checked preparations retained by one physical question operation.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct LatticePreparationUsage {
-    /// Requests for original exact mathematical entries.
+    /// Requests for original exact entries or physical source/index products.
     pub requests: u64,
-    /// Original entries answered by a retained normalization judgment.
+    /// Requests answered by a retained checked judgment.
     pub hits: u64,
-    /// Separately retained exact graphs, including nonidentity restoration results.
+    /// Separately retained exact graphs, including arithmetic and restoration results.
     pub graphs: u64,
     /// Records in those independently owned exact graphs.
     pub records: u64,

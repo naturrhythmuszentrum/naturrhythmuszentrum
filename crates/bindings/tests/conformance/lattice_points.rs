@@ -50,7 +50,7 @@ fn bindings_lattice_point_restoration() -> TestResult {
 }
 
 /// The normalized grid restores through S=diag(2,3) and o=(10,20) in metres.
-fn specification(fixture: &mut LatticeFixture) -> TestResult<LatticeDecisionSpec> {
+pub(super) fn specification(fixture: &mut LatticeFixture) -> TestResult<LatticeDecisionSpec> {
     let owner = source()?;
     let zero = DecisionCoordinate::declared(Rc::clone(&owner), "zero", &mut ledger()?)?;
     let mut axes = Vec::new();

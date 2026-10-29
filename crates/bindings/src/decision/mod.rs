@@ -14,8 +14,9 @@ pub use case::{DecisionAttachment, IntegerDecisionCase, IntegerDecisionSpec};
 pub use count::{CountDescriptor, CountEvidence};
 pub use expression::{DecisionCoordinate, DecisionExpression};
 pub use lattice::{
-    LatticeAttachment, LatticeAxis, LatticeDecisionCase, LatticeDecisionSpec, LatticeIndexKind,
-    LatticeInputs, LatticeMetric, LatticePreparationUsage,
+    LatticeAttachment, LatticeAxis, LatticeCoordinate, LatticeDecisionCase, LatticeDecisionSpec,
+    LatticeIndexKind, LatticeInputs, LatticeMetric, LatticePreparationUsage, LatticeSite,
+    SelectedLattice,
 };
 pub use snapshot::SelectedDecision;
 

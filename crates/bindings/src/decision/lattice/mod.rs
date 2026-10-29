@@ -3,11 +3,15 @@
 
 mod correspondence;
 mod inputs;
+mod outputs;
+mod physical;
 mod preparation;
+mod selected;
 mod storage;
 
 pub use inputs::LatticeInputs;
 pub use preparation::LatticePreparationUsage;
+pub use selected::{LatticeCoordinate, LatticeSite, SelectedLattice};
 
 use super::{DecisionCoordinate, DecisionError};
 use crate::{Descriptor, Kind, readings::CoordinateNormalization};

@@ -410,7 +410,7 @@ fn applications(
 }
 
 /// Independent finite Machin certificate for the LC cycle box.
-fn cycle() -> TestResult<PiBoundCertificate> {
+pub(super) fn cycle() -> TestResult<PiBoundCertificate> {
     let mut budget = ledger()?;
     Ok(PiBoundCertificate {
         version: 1,
