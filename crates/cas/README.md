@@ -654,7 +654,7 @@ For the literal zero origin, admission costs 3,956 Work, polynomial normalizatio
 
 **Rule (Square-root grammar boundary)** · `rule:cas:constant-square-root-boundary`
 
-`GeneralPower(StrictReal)` with literal exponent `1/2` requires strict positivity of the original radicand before normalization and an exactly rational radicand in the supported coefficient fragment. Zero and negative radicands refuse as `RefutedDomain`; an unproved sign refuses as `PendingPremise` (`test:integration:constant-square-root-refusals`). Other branches and exponents remain unsupported, as do non-rational radicands such as `Pi` and general nested-radical denesting (`test:integration:constant-square-root-fragment`), (`test:integration:constant-square-root-nested-boundary`), (`def:cas:constant-preparation`).
+`GeneralPower(StrictReal)` with literal exponent `1/2` requires strict positivity of the original radicand before normalization and a radicand in the rational or Pi monomial fragment of (`rule:cas:constant-square-root-pi`). Zero and negative radicands refuse as `RefutedDomain`; an unproved sign refuses as `PendingPremise` (`test:integration:constant-square-root-refusals`). Other branches and exponents remain unsupported, as do other named radicands such as `E` and general nested-radical denesting (`test:integration:constant-square-root-fragment`), (`test:integration:constant-square-root-nested-boundary`), (`def:cas:constant-preparation`).
 
 **Definition (Retained checked constants)** · `def:cas:constant-cache`
 
@@ -680,13 +680,25 @@ The direct `2*Pi` preparation retains 3,654 logical bytes, including its normali
 
 Hits charge at least one Work, using the bit width of the retained entry count, and check the retained storage against caller and source-store ceilings. Misses reserve existing retained payload beside ordinary admission scratch and publish only after storage checks succeed; spent Work is never refunded (`test:integration:constant-cache-work-boundaries`). Foreign handles refuse at handle authentication, and an original zero divisor refuses at the closed sign checker without changing the source graph or retained entries (`test:integration:constant-cache-context-and-owner`), (`test:integration:constant-cache-domain-refusal`).
 
-**Definition (Positive rational square roots)** · `def:cas:constant-square-roots`
+**Definition (Positive exact square roots)** · `def:cas:constant-square-roots`
 
-`ExactConstant::from_expression` admits strict-real square roots of exactly rational expressions after checking every original operand and its strict sign. `PositiveConstant::sqrt` constructs the same checked expression from an already admitted positive value; a radicand outside the rational fragment still refuses (`rule:cas:constant-square-root-boundary`). A non-square rational remains exact root syntax, never a floating value (`test:integration:constant-square-root-exact-rules`).
+`ExactConstant::from_expression` admits strict-real square roots of rational expressions and positive Pi monomials after checking every original operand and its strict sign. `PositiveConstant::sqrt` constructs the same checked expression from an already admitted positive value; a radicand outside those fragments still refuses (`rule:cas:constant-square-root-boundary`). A non-square rational remains exact root syntax, never a floating value (`test:integration:constant-square-root-exact-rules`).
 
 **Rule (Checked square-root normalization)** · `rule:cas:constant-square-root-normalization`
 
-An exact rational root is published only when the proposed numerator and denominator square back to the original reduced components. Positive root atoms retain complete canonical rational radicands; their even powers use the defining square, and products combine only already proved positive radicands, establishing `sqrt(a*b) = sqrt(a)*sqrt(b)` on that domain. Consequently `sqrt((3/7)^2) = 3/7`, `sqrt(2)*sqrt(3) = sqrt(6)` and `sqrt(2)*sqrt(8) = 4` reduce exactly (`test:integration:constant-square-root-exact-rules`). Ordinary polynomial callers retain their earlier fragment; only closed constant normalization and its independent equality check enable these rules (`test:unit:constant-preparation-costs`).
+An exact rational root is published only when the proposed numerator and denominator square back to the original reduced components. Positive root atoms retain complete canonical rational components and an explicit Pi-factor tag; their even powers use the defining square, and products combine only already proved positive radicands, establishing `sqrt(a*b) = sqrt(a)*sqrt(b)` on that domain. Consequently `sqrt((3/7)^2) = 3/7`, `sqrt(2)*sqrt(3) = sqrt(6)` and `sqrt(2)*sqrt(8) = 4` reduce exactly (`test:integration:constant-square-root-exact-rules`). Ordinary polynomial callers retain their earlier fragment; only closed constant normalization and its independent equality check enable these rules (`test:unit:constant-preparation-costs`).
+
+**Rule (Positive Pi monomial roots)** · `rule:cas:constant-square-root-pi`
+
+A positive radicand `q*Pi^k`, with exactly rational `q > 0` and integral `k`, uses the strict positivity of Pi under (`def:cas:constant-preparation`). Euclidean division of `k` extracts whole Pi powers and leaves at most one Pi factor inside a root; products of already positive root atoms combine their rational components and Pi tags under (`rule:cas:constant-square-root-normalization`). Thus `sqrt((3*Pi/7)^2) = 3*Pi/7`, `sqrt(Pi)*sqrt(2*Pi) = Pi*sqrt(2)` and reciprocal Pi powers reduce exactly (`test:integration:constant-square-root-pi-rules`). The original quotient and square also retain their source-domain check, so a zero divisor still refuses before normalization (`test:integration:constant-square-root-pi-original-square`). Positive sums such as `Pi+1` still refuse, and a negative multiple of Pi refuses at the original sign checker (`test:integration:constant-square-root-pi-boundary`).
+
+**Example (Certified Pi root boxes)** · `ex:cas:constant-square-root-pi-enclosures`
+
+The unchanged finite Machin certificate and independently squared rational endpoints certify `sqrt(Pi)` inside `[1,2]` and the original `sqrt(2*Pi)` inside `[2,3]`; inward requests refuse without changing the source graph (`test:integration:constant-square-root-pi-enclosures`), (`rule:cas:constant-square-root-enclosures`). A forged Machin partial sum refuses at the finite certificate checker (`test:integration:constant-square-root-pi-certificate-refusal`). These values retain exact strict-real root syntax, and ordinary polynomial callers retain their earlier fragment (`rule:cas:constant-square-root-normalization`).
+
+**Example (Pi square-root replay costs)** · `ex:cas:constant-square-root-pi-costs`
+
+Direct `sqrt(Pi)` costs 59,574 Work to admit and 89,711 to enclose through `PiBound`; the original `sqrt(2*Pi)` costs 81,440 Work to admit and 119,183 to enclose. Literal N/N−1, prior-Work and spent-ledger checks preserve the original source graph on refusal (`test:integration:constant-square-root-pi-costs`). These are newly supported paths under (`rule:cas:constant-square-root-pi`); rational-root costs remain as pinned in (`ex:cas:constant-square-root-costs`).
 
 **Rule (Certified square-root intervals)** · `rule:cas:constant-square-root-enclosures`
 

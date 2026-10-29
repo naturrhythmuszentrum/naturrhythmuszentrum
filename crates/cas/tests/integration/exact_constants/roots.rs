@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Positive rational roots, exact LC phases and independently squared interval bounds.
 
+mod pi;
+
 use super::{TestResult, ledger, original, rational};
 use nrz_cas::decision::{EnclosureOrigin, RationalEnclosure};
 use nrz_cas::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
@@ -150,12 +152,12 @@ fn constant_square_root_refusals() -> TestResult {
     Ok(())
 }
 
-/// Other powers and non-rational radicands remain explicit fragment refusals.
+/// Other powers and unsupported named radicands remain explicit fragment refusals.
 /// ´test:integration:constant-square-root-fragment´
 /// ´claim:cas:constant-square-root-fragment´
 #[test]
 fn constant_square_root_fragment() -> TestResult {
-    let (cas, expression) = rooted(vec![(Operator::Constant(Constant::Pi), vec![])])?;
+    let (cas, expression) = rooted(vec![(Operator::Constant(Constant::E), vec![])])?;
     refused(
         &cas,
         &expression,

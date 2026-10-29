@@ -20,7 +20,7 @@ enum Atom {
     Free(String),
     /// Pi or E under an explicit stable tag.
     Constant(u8),
-    /// A privately checked positive rational square root.
+    /// A privately checked positive rational or Pi monomial square root.
     Root(Box<roots::Root>),
 }
 
@@ -497,7 +497,7 @@ pub(crate) fn equal(
     equal_mode(state, left, right, rational, false, budget)
 }
 
-/// Closed constant equality additionally reconstructs positive rational square-root relations.
+/// Closed constant equality additionally reconstructs positive square-root relations.
 pub(crate) fn equal_constants(
     state: &State,
     left: LogicalId,

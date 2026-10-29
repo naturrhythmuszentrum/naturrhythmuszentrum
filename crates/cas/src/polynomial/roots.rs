@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Positive rational square-root atoms for the explicitly enabled constant fragment.
+//! Positive rational and Pi monomial square roots in the closed constant fragment.
+
+mod pi;
 
 use std::cmp::Ordering;
 
@@ -10,18 +12,22 @@ use crate::graph::{Cas, LogicalId, size};
 use crate::model::{Branch, Operator, Sort};
 use crate::number::Rational;
 
-/// Complete canonical rational bytes order one strictly positive radicand.
+/// A Pi tag and complete canonical rational bytes order one strictly positive radicand.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct Root {
     /// Positive exact radicand, privately checked at construction.
     value: Rational,
+    /// Whether the positive radicand includes one additional factor of Pi.
+    pi: bool,
     /// Collision-free canonical component encoding, never a digest or display string.
     key: Vec<u8>,
 }
 
 impl Ord for Root {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.key.cmp(&other.key)
+        self.pi
+            .cmp(&other.pi)
+            .then_with(|| self.key.cmp(&other.key))
     }
 }
 
@@ -33,7 +39,7 @@ impl PartialOrd for Root {
 
 impl Root {
     /// Key only a finite rational with an independently established strict positive sign.
-    fn new(value: &Rational, budget: &mut Budget) -> Result<Self, Fault> {
+    fn new(value: &Rational, pi: bool, budget: &mut Budget) -> Result<Self, Fault> {
         value.check(budget, AT)?;
         if value.is_zero() || value.is_negative() {
             return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
@@ -41,6 +47,7 @@ impl Root {
         let key = value.structural_bytes(budget)?;
         Ok(Self {
             value: value.clone(),
+            pi,
             key,
         })
     }
@@ -60,13 +67,27 @@ impl Root {
         sort: &Sort,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let base = cas.generated(
+        let mut base = cas.generated(
             header,
             Operator::Rational(self.value.clone()),
             sort.clone(),
             &[],
             budget,
         )?;
+        if self.pi {
+            let pi = cas.generated(
+                header,
+                Operator::Constant(crate::model::Constant::Pi),
+                sort.clone(),
+                &[],
+                budget,
+            )?;
+            base = if self.value == Rational::one() {
+                pi
+            } else {
+                cas.generated(header, Operator::Mul, sort.clone(), &[base, pi], budget)?
+            };
+        }
         let half = Rational::from_ratio(1, 2, budget)?;
         let exponent =
             cas.generated(header, Operator::Rational(half), sort.clone(), &[], budget)?;
@@ -102,7 +123,7 @@ fn rational(value: &Fraction, budget: &mut Budget) -> Result<Rational, Fault> {
     numerator.div(denominator, budget)
 }
 
-/// A half power admits only a proved positive rational radicand into this extension.
+/// Admit a rational first; only the explicit Pi monomial extension handles non-rational bases.
 pub(super) fn convert(
     base: &Fraction,
     exponent: &Fraction,
@@ -111,14 +132,21 @@ pub(super) fn convert(
     if rational(exponent, budget)? != Rational::from_ratio(1, 2, budget)? {
         return Err(fragment());
     }
-    let value = rational(base, budget)?;
+    let value = match rational(base, budget) {
+        Ok(value) => value,
+        Err(fault) if fault == fragment() => return pi::convert(base, budget),
+        Err(fault) => return Err(fault),
+    };
     if value.is_zero() || value.is_negative() {
         return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
     }
     let result = if let Some(root) = value.square_root_exact(budget)? {
         Polynomial::constant(&root, budget)?
     } else {
-        Polynomial::atom(Atom::Root(Box::new(Root::new(&value, budget)?)), budget)?
+        Polynomial::atom(
+            Atom::Root(Box::new(Root::new(&value, false, budget)?)),
+            budget,
+        )?
     };
     Fraction::polynomial(result, budget)
 }
@@ -138,8 +166,12 @@ pub(super) fn reduce(
         .map_err(|_| Fault::allocation(AT))?;
     let mut scale = Rational::one();
     let mut radicand = Rational::one();
+    let mut pi_power = 0_u64;
     for (atom, exponent) in monomial {
         if let Atom::Root(root) = atom {
+            if root.pi {
+                pi_power = pi_power.checked_add(exponent).ok_or_else(fragment)?;
+            }
             let power = i64::try_from(exponent / 2).map_err(|_| fragment())?;
             if power != 0 {
                 scale = scale.mul(&root.value.pow(power, budget)?, budget)?;
@@ -151,10 +183,18 @@ pub(super) fn reduce(
             result.push((atom, exponent));
         }
     }
-    if let Some(root) = radicand.square_root_exact(budget)? {
+    if pi_power >= 2 {
+        pi::merge(&mut result, pi_power / 2, budget)?;
+    }
+    if pi_power % 2 != 0 {
+        result.push((Atom::Root(Box::new(Root::new(&radicand, true, budget)?)), 1));
+    } else if let Some(root) = radicand.square_root_exact(budget)? {
         scale = scale.mul(&root, budget)?;
     } else {
-        result.push((Atom::Root(Box::new(Root::new(&radicand, budget)?)), 1));
+        result.push((
+            Atom::Root(Box::new(Root::new(&radicand, false, budget)?)),
+            1,
+        ));
     }
     Ok((result, coefficient.mul(&scale, budget)?))
 }

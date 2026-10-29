@@ -69,9 +69,9 @@ impl ExactConstant {
 }
 
 impl super::PositiveConstant {
-    /// Take the positive real square root of an exact rational radicand.
+    /// Take the positive real square root of a rational or rational-times-Pi-power radicand.
     /// # Errors
-    /// Refuses radicands outside the rational square-root fragment or exhausted exact budgets.
+    /// Refuses radicands outside the rational and Pi monomial square-root fragment or exhausted exact budgets.
     pub fn sqrt(&self, budget: &mut Budget) -> Result<ExactConstant, Fault> {
         let half = ExactConstant::from(crate::Rational::from_ratio(1, 2, budget)?);
         graph::construct(
