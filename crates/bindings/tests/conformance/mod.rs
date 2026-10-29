@@ -45,3 +45,5 @@ mod count_descriptor;
 mod lc_count;
 
 mod decision_association;
+
+mod lattice_baseline;

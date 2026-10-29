@@ -13,7 +13,7 @@ use nrz_cas::{ExactConstant, Rational};
 use std::rc::Rc;
 
 /// Exact nominal data and an explicit complete-turn period retain all original physical operands.
-fn physical_source(cycle_value: &str) -> TestResult<Rc<CheckedDeclarations>> {
+pub(super) fn physical_source(cycle_value: &str) -> TestResult<Rc<CheckedDeclarations>> {
     let time = Kind::Named(
         "duration".into(),
         Box::new(Dimension::integers([0, 0, 1, 0, 0, 0, 0])?),
