@@ -37,16 +37,20 @@ fn integer(frame: &mut Frame, value: i64) -> TestResult<Handle> {
 }
 
 fn frame(parameters: bool) -> TestResult<Frame> {
-    let mut cas = Cas::new(Limits::default())?;
-    let mut budget = ledger()?;
     let names = if parameters {
         &["q", "n", "a", "b"][..]
     } else {
         &["q", "n", "r", "m"][..]
     };
+    named_frame(names)
+}
+
+fn named_frame(names: &[&str]) -> TestResult<Frame> {
+    let mut cas = Cas::new(Limits::default())?;
+    let mut budget = ledger()?;
     let mut declarations = environment(Field::Real, names);
     for declaration in &mut declarations.declarations {
-        if !matches!(declaration.key.as_str(), "q" | "r") {
+        if !matches!(declaration.key.as_str(), "q" | "r" | "s") {
             declaration.sort = Sort::Value(AtomicSort::Integer);
         }
     }
@@ -272,8 +276,18 @@ fn factor(
 
 fn fixture(kind: u32, lower: i64, local: bool, dependent: bool) -> TestResult<Product> {
     let parameters = kind == 2;
-    let count = if parameters { 1 } else { 2 };
-    let mut frame = frame(parameters)?;
+    let count = if parameters {
+        1
+    } else if kind == 3 {
+        3
+    } else {
+        2
+    };
+    let mut frame = if kind == 3 {
+        named_frame(&["q", "n", "r", "m", "s", "l"])?
+    } else {
+        frame(parameters)?
+    };
     let (endpoints, predicates) = if parameters {
         parameter_bindings(&mut frame, lower)?
     } else {
@@ -305,10 +319,10 @@ fn fixture(kind: u32, lower: i64, local: bool, dependent: bool) -> TestResult<Pr
             _ => [endpoints.first().cloned(), endpoints.get(1).cloned()],
         };
         let spec = Factor {
-            keys: if position == 0 {
-                ("q", "n")
-            } else {
-                ("r", "m")
+            keys: match position {
+                0 => ("q", "n"),
+                1 => ("r", "m"),
+                _ => ("s", "l"),
             },
             endpoints: bounds,
             nonnegative: parameters,

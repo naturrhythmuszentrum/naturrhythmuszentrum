@@ -52,7 +52,7 @@ fn outcome(
     }
 }
 
-fn proof_boundary(
+pub(super) fn proof_boundary(
     source: &mut Selection,
     amount: u64,
     succeeds: bool,
@@ -78,7 +78,7 @@ fn proof_boundary(
         .transpose()
 }
 
-fn replay_boundary(bytes: &[u8], amount: u64, succeeds: bool) -> TestResult {
+pub(super) fn replay_boundary(bytes: &[u8], amount: u64, succeeds: bool) -> TestResult {
     let mut cas = Cas::new(Limits::default())?;
     let before = cas.counts();
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
