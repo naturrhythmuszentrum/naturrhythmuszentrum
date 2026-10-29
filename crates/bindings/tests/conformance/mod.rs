@@ -47,3 +47,11 @@ mod lc_count;
 mod decision_association;
 
 mod lattice_baseline;
+
+mod lattice_coordinate;
+mod lattice_fixture;
+mod lattice_physical;
+mod lattice_points;
+mod lattice_question;
+mod lattice_refusals;
+mod lattice_work;

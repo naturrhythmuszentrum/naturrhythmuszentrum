@@ -2,7 +2,7 @@
 //! Sealed original-source associations precede numerical allocation and live admission.
 
 use super::{DecisionError, DecisionExpression, IntegerDecisionCase, storage};
-use crate::{BindingSymbols, CheckedExpression, Declaration, Role};
+use crate::{BindingSymbols, CheckedExpression, Declaration, Descriptor, Role};
 use nrz_cas::limits::Budget;
 use std::rc::Rc;
 
@@ -77,20 +77,7 @@ impl IntegerDecisionCase {
             .map_err(|_| DecisionError::Capacity)?;
         for (name, declaration) in original.declarations() {
             if let Declaration::Constant { descriptor, .. } = declaration {
-                let coherent = descriptor.coherent();
-                let symbols = budget.with_retained_payload(bytes, storage::AT, |budget| {
-                    BindingSymbols::declare(&coherent, [1, 1], [true, true], budget)
-                })?;
-                let symbol_bytes = symbols.value().cas()?.counts().payload_bytes;
-                bytes = bytes
-                    .checked_add(symbol_bytes)
-                    .ok_or(DecisionError::Capacity)?;
-                storage::retained(bytes, budget)?;
-                operands.push(DecisionOperand {
-                    name: name.clone(),
-                    source: source.clone(),
-                    symbols,
-                });
+                operands.push(operand(source, name, descriptor, &mut bytes, budget)?);
             }
         }
         Ok(DecisionInputs(Rc::new(Data {
@@ -130,20 +117,7 @@ impl DecisionInputs {
         budget: &mut Budget,
     ) -> Result<(), DecisionError> {
         case.validate_attachment(&self.0.case.attachment(), budget)?;
-        budget.work(1, storage::AT)?;
-        if symbols.len() != self.0.operands.len() {
-            return Err(DecisionError::Association);
-        }
-        for (actual, expected) in symbols.iter().zip(&self.0.operands) {
-            budget.work(3, storage::AT)?;
-            if actual.value() != expected.symbols.value()
-                || actual.bound() != expected.symbols.bound()
-                || actual.error() != expected.symbols.error()
-            {
-                return Err(DecisionError::Association);
-            }
-        }
-        Ok(())
+        authenticate(&self.0.operands, symbols, budget)
     }
 }
 
@@ -164,4 +138,50 @@ impl DecisionOperand {
     pub const fn symbols(&self) -> &BindingSymbols {
         &self.symbols
     }
+}
+
+/// Construct one designated symbol bundle with the existing retained-input accounting.
+pub(super) fn operand(
+    source: &DecisionExpression,
+    name: &str,
+    descriptor: &Descriptor,
+    bytes: &mut u64,
+    budget: &mut Budget,
+) -> Result<DecisionOperand, DecisionError> {
+    let coherent = descriptor.coherent();
+    let symbols = budget.with_retained_payload(*bytes, storage::AT, |budget| {
+        BindingSymbols::declare(&coherent, [1, 1], [true, true], budget)
+    })?;
+    let symbol_bytes = symbols.value().cas()?.counts().payload_bytes;
+    *bytes = bytes
+        .checked_add(symbol_bytes)
+        .ok_or(DecisionError::Capacity)?;
+    storage::retained(*bytes, budget)?;
+    Ok(DecisionOperand {
+        name: name.into(),
+        source: source.clone(),
+        symbols,
+    })
+}
+
+/// Authenticate complete ordered value and companion identities for either decision shape.
+pub(super) fn authenticate(
+    operands: &[DecisionOperand],
+    symbols: &[&BindingSymbols],
+    budget: &mut Budget,
+) -> Result<(), DecisionError> {
+    budget.work(1, storage::AT)?;
+    if symbols.len() != operands.len() {
+        return Err(DecisionError::Association);
+    }
+    for (actual, expected) in symbols.iter().zip(operands) {
+        budget.work(3, storage::AT)?;
+        if actual.value() != expected.symbols.value()
+            || actual.bound() != expected.symbols.bound()
+            || actual.error() != expected.symbols.error()
+        {
+            return Err(DecisionError::Association);
+        }
+    }
+    Ok(())
 }

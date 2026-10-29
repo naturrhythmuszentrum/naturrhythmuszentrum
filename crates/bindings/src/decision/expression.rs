@@ -38,12 +38,28 @@ impl DecisionExpression {
         name: &str,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
+        Self::closed(owner, name, true, budget)
+    }
+
+    /// Share closed-source checking while leaving the scalar route's charges unchanged.
+    fn closed(
+        owner: Rc<CheckedDeclarations>,
+        name: &str,
+        ratio: bool,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
         let length = u64::try_from(name.len()).map_err(|_| DecisionError::Capacity)?;
         budget.work(length.saturating_add(4), storage::AT)?;
         let checked = owner.checked(name)?;
-        if checked.descriptor().kind() != &Kind::Ratio
-            || checked.descriptor().role() != Role::Difference
-        {
+        let descriptor = checked.descriptor();
+        if ratio {
+            if descriptor.kind() != &Kind::Ratio || descriptor.role() != Role::Difference {
+                return Err(DecisionError::Target);
+            }
+        } else if !matches!(
+            descriptor.kind(),
+            Kind::Ratio | Kind::Angle | Kind::Named(..)
+        ) {
             return Err(DecisionError::Target);
         }
         let original = checked.original().syntax.clone();
@@ -65,6 +81,13 @@ impl DecisionExpression {
         })))
     }
 
+    /// Original checked physical kind, unit map, role and dependency inventory.
+    /// # Errors
+    /// Refuses an unavailable declaration rather than manufacturing a descriptor.
+    pub fn checked(&self) -> Result<&crate::CheckedExpression, DecisionError> {
+        Ok(self.owner().checked(self.name())?)
+    }
+
     /// Frozen physical declarations, including original source and exact unit maps.
     #[must_use]
     pub fn owner(&self) -> &CheckedDeclarations {
@@ -84,5 +107,56 @@ impl DecisionExpression {
     #[must_use]
     pub fn exact(&self) -> &ExactConstant {
         &self.0.exact
+    }
+}
+
+/// A continuous physical coordinate retaining its original kind, unit and affine role.
+///
+/// This distinct type cannot be passed as the scalar decision's ratio source.
+#[derive(Clone, Debug)]
+pub struct DecisionCoordinate(DecisionExpression);
+
+impl DecisionCoordinate {
+    /// Reuse closed exact source checking for a continuous physical coordinate.
+    /// # Errors
+    /// Refuses counts, uncertainty kinds, open or undefined expressions and caller limits.
+    pub fn declared(
+        owner: Rc<CheckedDeclarations>,
+        name: &str,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
+        Ok(Self(DecisionExpression::closed(
+            owner, name, false, budget,
+        )?))
+    }
+
+    /// Original checked kind, unit map, affine role and dependency inventory.
+    /// # Errors
+    /// Refuses an unavailable declaration rather than manufacturing a descriptor.
+    pub fn checked(&self) -> Result<&crate::CheckedExpression, DecisionError> {
+        self.0.checked()
+    }
+
+    /// Exact coherent value, without a dimensionless reinterpretation.
+    #[must_use]
+    pub fn exact(&self) -> &ExactConstant {
+        self.0.exact()
+    }
+
+    /// Frozen original declarations and semantic revision.
+    #[must_use]
+    pub fn owner(&self) -> &CheckedDeclarations {
+        self.0.owner()
+    }
+
+    /// Original declaration key within its retained owner.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        self.0.name()
+    }
+
+    /// Share input association internals without exposing a scalar ratio conversion.
+    pub(super) const fn source(&self) -> &DecisionExpression {
+        &self.0
     }
 }

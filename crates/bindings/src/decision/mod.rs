@@ -5,13 +5,18 @@ mod association;
 mod case;
 mod count;
 mod expression;
+mod lattice;
 mod snapshot;
 mod storage;
 
 pub use association::{DecisionInputs, DecisionOperand};
 pub use case::{DecisionAttachment, IntegerDecisionCase, IntegerDecisionSpec};
 pub use count::{CountDescriptor, CountEvidence};
-pub use expression::DecisionExpression;
+pub use expression::{DecisionCoordinate, DecisionExpression};
+pub use lattice::{
+    LatticeAttachment, LatticeAxis, LatticeDecisionCase, LatticeDecisionSpec, LatticeIndexKind,
+    LatticeInputs, LatticeMetric,
+};
 pub use snapshot::SelectedDecision;
 
 /// Exact admission refusals; executable count capacity remains a separate operation.
@@ -41,6 +46,21 @@ pub enum DecisionError {
     /// A physical count needs an explicit counted kind and its domain.
     #[error("decision output requires a declared counted kind")]
     CountKind,
+    /// A physical lattice needs complete ordered axes, columns and index meanings.
+    #[error("physical lattice shape does not match")]
+    LatticeShape,
+    /// Original physical coordinates do not restore the declared mathematical entries.
+    #[error("physical lattice coordinate correspondence does not match")]
+    LatticeMeaning,
+    /// A discrete coordinate needs an explicitly declared index or nonnegative counted kind.
+    #[error("physical lattice index kind is not admitted")]
+    LatticeIndexKind,
+    /// Cell convention and normalized coordinate metric must be declared together.
+    #[error("physical lattice metric does not match the convention")]
+    LatticeMetric,
+    /// Existing physical reading and restoration checks refused.
+    #[error("physical lattice reading: {0}")]
+    Reading(#[from] crate::readings::ReadingError),
     /// The bounded retained metadata cannot be represented.
     #[error("decision metadata capacity exhausted")]
     Capacity,

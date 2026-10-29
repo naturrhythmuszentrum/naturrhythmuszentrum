@@ -43,6 +43,12 @@ impl CountDomain {
         }
     }
 
+    /// Whether the declared mathematical domain excludes every negative Integer.
+    #[must_use]
+    pub const fn is_nonnegative(self) -> bool {
+        matches!(self.minimum, Some(value) if value >= 0)
+    }
+
     /// Check a literal without rounding a fractional count into an integer.
     ///
     /// # Errors
