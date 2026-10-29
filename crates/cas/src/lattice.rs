@@ -14,8 +14,8 @@ pub use enclosure::{CheckedRationalBoxEnclosure, RationalBoxEnclosure};
 
 pub use selection::{
     CheckedLatticeAttempt, CheckedLatticeOutputs, LatticeAttemptPolicy, LatticeConvention,
-    LatticeEnclosure, LatticeFloorCut, LatticePendingObligation, LatticeSelection,
-    LatticeSelectionOutcome, LatticeUndecided, LatticeUndecidedReason,
+    LatticeEnclosure, LatticeFloorCut, LatticePendingObligation, LatticeReduction,
+    LatticeSelection, LatticeSelectionOutcome, LatticeUndecided, LatticeUndecidedReason,
 };
 
 pub use index::{CheckedLatticeIndexDomain, LatticeIndexQuestion};

@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Rational skew and orthogonal fixtures retain the original target and index order.
 
+#[path = "reduction.rs"]
+mod reduction;
+
 #[path = "nearest_costs.rs"]
 mod costs;
 

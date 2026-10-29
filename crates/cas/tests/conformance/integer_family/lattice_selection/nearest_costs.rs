@@ -30,12 +30,20 @@ fn budget(amount: u64) -> TestResult<Budget> {
     Ok(budget)
 }
 
+/// Full grid snapshots fit default Work; larger fixtures use the caller's exact count checks.
+fn snapshot(cas: &Cas, dimension: usize) -> TestResult<Option<Vec<u8>>> {
+    if dimension > 2 {
+        return Ok(None);
+    }
+    Ok(Some(cas.canonical_snapshot(&mut ledger()?)?))
+}
+
 fn outcome<T>(
     cas: &Cas,
     result: Result<T, Fault>,
     budget: &Budget,
     succeeds: bool,
-    snapshot: &[u8],
+    snapshot: Option<&[u8]>,
 ) -> TestResult<Option<T>> {
     assert!(budget.usage().work > 37);
     if succeeds {
@@ -53,14 +61,20 @@ fn outcome<T>(
             }
         ));
         assert!(budget.usage().work <= budget.limits().work);
-        assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        if let Some(snapshot) = snapshot {
+            assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        }
         Ok(None)
     }
 }
 
-fn proof(source: &mut Selection, work: u64, succeeds: bool) -> TestResult<Option<VerifiedWitness>> {
+pub(super) fn proof(
+    source: &mut Selection,
+    work: u64,
+    succeeds: bool,
+) -> TestResult<Option<VerifiedWitness>> {
     let cas = &mut source.source.frame.cas;
-    let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
+    let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
     let mut budget = budget(work)?;
     let limits = budget.limits().clone();
@@ -71,16 +85,16 @@ fn proof(source: &mut Selection, work: u64, succeeds: bool) -> TestResult<Option
         &mut budget,
     );
     assert_eq!(budget.limits(), &limits);
-    let result = outcome(cas, result, &budget, succeeds, &snapshot)?;
+    let result = outcome(cas, result, &budget, succeeds, snapshot.as_deref())?;
     if !succeeds {
         assert_eq!(cas.counts(), before);
     }
     Ok(result)
 }
 
-fn preparation(source: &Selection, work: u64, succeeds: bool) -> TestResult {
+pub(super) fn preparation(source: &Selection, work: u64, succeeds: bool) -> TestResult {
     let cas = &source.source.frame.cas;
-    let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
+    let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
     let mut budget = budget(work)?;
     let limits = budget.limits().clone();
@@ -91,28 +105,30 @@ fn preparation(source: &Selection, work: u64, succeeds: bool) -> TestResult {
         &mut budget,
     );
     assert_eq!(budget.limits(), &limits);
-    if let Some(attempt) = outcome(cas, result, &budget, succeeds, &snapshot)? {
+    if let Some(attempt) = outcome(cas, result, &budget, succeeds, snapshot.as_deref())? {
         assert_eq!(attempt.spent_work(), work);
     }
     assert_eq!(cas.counts(), before);
-    assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+    if let Some(snapshot) = snapshot {
+        assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+    }
     Ok(())
 }
 
-fn outputs(
+pub(super) fn outputs(
     source: &mut Selection,
     witness: &VerifiedWitness,
     work: u64,
     succeeds: bool,
 ) -> TestResult<Option<Vec<u8>>> {
     let cas = &mut source.source.frame.cas;
-    let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
+    let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
     let mut budget = budget(work)?;
     let limits = budget.limits().clone();
     let result = cas.lattice_selection_outputs(witness, &mut budget);
     assert_eq!(budget.limits(), &limits);
-    let result = outcome(cas, result, &budget, succeeds, &snapshot)?;
+    let result = outcome(cas, result, &budget, succeeds, snapshot.as_deref())?;
     if !succeeds {
         assert_eq!(cas.counts(), before);
     }

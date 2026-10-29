@@ -117,7 +117,13 @@ impl ProofCitation {
             value.judgment.statement,
             crate::proof_model::Statement::LatticeNearestSelection(_)
         ) {
-            return Ok(Some(&crate::decision::DECISION_SCHEMAS[7]));
+            let index = if matches!(&value.certificate, crate::proof_model::Certificate::LatticeSelection(enclosure) if matches!(enclosure.as_ref(), crate::lattice::LatticeEnclosure::Reduced(_)))
+            {
+                8
+            } else {
+                7
+            };
+            return Ok(Some(&crate::decision::DECISION_SCHEMAS[index]));
         }
         let index = match value.certificate {
             crate::proof_model::Certificate::LatticeSelection(_) => 6,

@@ -3,6 +3,9 @@
 
 mod attempt;
 mod nearest;
+mod reduction;
+mod reduction_wire;
+pub use reduction::LatticeReduction;
 mod outputs;
 
 #[expect(
@@ -55,6 +58,8 @@ pub struct LatticeSelection {
 /// Closed original-target evidence for one of the two admitted box forms.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LatticeEnclosure {
+    /// A checked integral transport to an orthogonal basis, retaining either original box form.
+    Reduced(Box<LatticeReduction>),
     /// Transport the entire original E through the exact admitted inverse.
     Original(Box<LatticeBoxEnclosure>),
     /// Replay the original affine expression directly; this makes no claim about an E.
@@ -129,7 +134,12 @@ pub(crate) fn check(
     cover_matches(selection, cover)?;
     roles(cas, selection, budget)?;
     if convention == LatticeConvention::Nearest {
-        nearest::orthogonal(cas, selection, budget)?;
+        nearest::validate(cas, selection, enclosure, budget)?;
+    }
+    let floor = convention == LatticeConvention::Floor;
+    let reduced = matches!(enclosure.as_ref(), LatticeEnclosure::Reduced(_));
+    if floor && reduced {
+        return Err(invalid());
     }
     validate(cas, selection, enclosure, budget)?;
     let scratch = budget
@@ -220,6 +230,12 @@ fn validate(
     let basis = &selection.cover.index.basis;
     let inverse = &selection.cover.inverse;
     match enclosure {
+        LatticeEnclosure::Reduced(reduction) => {
+            if matches!(reduction.enclosure, LatticeEnclosure::Reduced(_)) {
+                return Err(invalid());
+            }
+            validate(cas, selection, &reduction.enclosure, budget)?;
+        }
         LatticeEnclosure::Original(contract) => {
             if &contract.basis != basis
                 || &contract.inverse != inverse
@@ -277,6 +293,7 @@ fn bounds(
     coordinate: usize,
 ) -> Result<(&Rational, &Rational), Fault> {
     match enclosure {
+        LatticeEnclosure::Reduced(_) => Err(invalid()),
         LatticeEnclosure::Original(value) => value
             .bounds
             .get(coordinate)

@@ -229,7 +229,12 @@ impl Cas {
             super::cover_matches(expected, premise)?;
             super::roles(self, expected, budget)?;
             if convention == LatticeConvention::Nearest {
-                super::nearest::orthogonal(self, expected, budget)?;
+                super::nearest::validate(self, expected, enclosure, budget)?;
+            }
+            let floor = convention == LatticeConvention::Floor;
+            let reduced = matches!(enclosure, LatticeEnclosure::Reduced(_));
+            if floor && reduced {
+                return Err(invalid());
             }
             super::validate(self, expected, enclosure, budget)?;
             super::ranges(self, expected, premise, budget)?;

@@ -146,9 +146,13 @@ pub(crate) fn certificate(
     out: &mut Encoder<'_>,
     write: &mut impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
+    if let LatticeEnclosure::Reduced(reduction) = value {
+        return super::reduction_wire::encode(reduction, out, write);
+    }
     out.byte(18)?;
     out.unsigned(1)?;
     let (tag, basis, inverse) = match value {
+        LatticeEnclosure::Reduced(_) => return Err(crate::wire_read::invalid()),
         LatticeEnclosure::Original(value) => (0, &value.basis, &value.inverse),
         LatticeEnclosure::Coordinates(value) => (1, &value.basis, &value.inverse),
     };
@@ -157,6 +161,7 @@ pub(crate) fn certificate(
         write(handle, out)?;
     }
     match value {
+        LatticeEnclosure::Reduced(_) => return Err(crate::wire_read::invalid()),
         LatticeEnclosure::Original(value) => {
             encode_box(&value.original, out, write)?;
             out.count(value.coefficients.len())?;
@@ -186,10 +191,37 @@ pub(crate) fn decode_certificate(
     reader: &mut Reader<'_, '_>,
     records: &[Decoded],
 ) -> Result<LatticeEnclosure, Fault> {
+    decode_versioned(reader, records, true)
+}
+
+/// A reduction wraps exactly one base certificate, never another reduction.
+pub(super) fn decode_base_certificate(
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+) -> Result<LatticeEnclosure, Fault> {
+    if reader.byte()? != 18 {
+        return Err(crate::wire_read::invalid());
+    }
+    decode_versioned(reader, records, false)
+}
+
+/// Decode the declared revision while independently bounding reduction nesting.
+fn decode_versioned(
+    reader: &mut Reader<'_, '_>,
+    records: &[Decoded],
+    reduction: bool,
+) -> Result<LatticeEnclosure, Fault> {
     if reader.unsigned()? != 1 {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, super::AT));
     }
     let tag = reader.byte()?;
+    if tag == 2 {
+        if !reduction {
+            return Err(crate::wire_read::invalid());
+        }
+        return super::reduction_wire::decode(reader, records)
+            .map(|value| LatticeEnclosure::Reduced(Box::new(value)));
+    }
     let basis = LatticeBasisQuestion {
         context: object(reader, records)?,
         basis: object(reader, records)?,
@@ -286,21 +318,7 @@ pub(crate) fn dependencies(
     edges: &mut Vec<(LogicalId, Edge)>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let count = match value {
-        LatticeEnclosure::Original(value) => value
-            .original
-            .coordinates
-            .len()
-            .saturating_add(value.coefficients.len())
-            .saturating_mul(4)
-            .saturating_add(7),
-        LatticeEnclosure::Coordinates(value) => value
-            .coordinates
-            .coordinates
-            .len()
-            .saturating_mul(4)
-            .saturating_add(8),
-    };
+    let count = dependency_count(value)?;
     let retained = size(edges.len().saturating_add(count), super::AT)?.saturating_mul(32);
     budget.check(BudgetKind::StagedPayloadBytes, retained, super::AT)?;
     budget.work(size(count, super::AT)?, super::AT)?;
@@ -322,7 +340,14 @@ pub(crate) fn dependencies(
     reason = "proof citations share the retained lattice Machin dependencies"
 )]
 pub(crate) fn uses_pi(value: &LatticeEnclosure, budget: &mut Budget) -> Result<bool, Fault> {
+    if let LatticeEnclosure::Reduced(value) = value {
+        if matches!(value.enclosure, LatticeEnclosure::Reduced(_)) {
+            return Err(crate::wire_read::invalid());
+        }
+        return uses_pi(&value.enclosure, budget);
+    }
     let (original, coefficients) = match value {
+        LatticeEnclosure::Reduced(_) => return Err(crate::wire_read::invalid()),
         LatticeEnclosure::Original(value) => (&value.original, value.coefficients.as_slice()),
         LatticeEnclosure::Coordinates(value) => (&value.coordinates, &[] as &[RationalEnclosure]),
     };
@@ -332,4 +357,29 @@ pub(crate) fn uses_pi(value: &LatticeEnclosure, budget: &mut Budget) -> Result<b
         found |= matches!(scalar.origin, EnclosureOrigin::PiBound { .. });
     }
     Ok(found)
+}
+
+/// Bound the one optional transport wrapper without unbounded recursive certificate walks.
+fn dependency_count(value: &LatticeEnclosure) -> Result<usize, Fault> {
+    Ok(match value {
+        LatticeEnclosure::Reduced(value) => {
+            if matches!(value.enclosure, LatticeEnclosure::Reduced(_)) {
+                return Err(crate::wire_read::invalid());
+            }
+            dependency_count(&value.enclosure)?.saturating_add(value.values.len())
+        }
+        LatticeEnclosure::Original(value) => value
+            .original
+            .coordinates
+            .len()
+            .saturating_add(value.coefficients.len())
+            .saturating_mul(4)
+            .saturating_add(7),
+        LatticeEnclosure::Coordinates(value) => value
+            .coordinates
+            .coordinates
+            .len()
+            .saturating_mul(4)
+            .saturating_add(8),
+    })
 }

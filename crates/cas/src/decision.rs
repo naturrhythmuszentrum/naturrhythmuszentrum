@@ -310,7 +310,7 @@ pub struct IntegerSelection {
 }
 
 /// Closed auxiliary inference register; no ordinary cost-policy entry is added.
-pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 8] = [
+pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 9] = [
     crate::proof::LemmaSchema {
         name: "decision.enclosure-membership",
         label: "thm:cas:decision-enclosure-membership",
@@ -374,5 +374,13 @@ pub static DECISION_SCHEMAS: [crate::proof::LemmaSchema; 8] = [
         standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
         statement: "The original target belongs to the nearest lattice cell of the exact ordered Integer tuple, with simultaneous ties owned by the greatest original index.",
         premises: "Identical checked affine basis and range evidence, exact positive diagonal Gram matrix, complete original-target enclosure and whole-box shifted floor cuts, retaining all qualified hypotheses.",
+    },
+    crate::proof::LemmaSchema {
+        name: "decision.lattice-reduced-nearest-selection",
+        label: "thm:cas:decision-lattice-reduced-nearest-selection",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The original target belongs to the nearest lattice cell of the exact original Integer tuple after a checked unimodular orthogonal reduction, with original-index tie ownership.",
+        premises: "Identical checked affine basis and range evidence, integral two-sided inverse matrices U and W, positive diagonal Gram matrix of B*U, original k = U*m, complete original-target enclosure transported through W, and whole-box nearest cuts oriented by the first nonzero original entry of each U column.",
     },
 ];

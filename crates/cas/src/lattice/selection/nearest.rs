@@ -16,17 +16,36 @@ const fn unsupported() -> Fault {
     Fault::invalid(InvalidCode::UnsupportedCertificate, AT)
 }
 
+/// Nearest proof preparation checks the declared route before any potentially undecided cuts.
+pub(super) fn validate(
+    cas: &Cas,
+    selection: &LatticeSelection,
+    enclosure: &LatticeEnclosure,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    match enclosure {
+        LatticeEnclosure::Reduced(value) => {
+            super::reduction::validate(cas, selection, value, budget)
+        }
+        LatticeEnclosure::Original(_) | LatticeEnclosure::Coordinates(_) => {
+            with_basis(cas, selection, budget, |values, budget| {
+                gram(values, selection.values.len(), budget)
+            })
+        }
+    }
+}
+
 /// Replaying every original entry precedes cancellation in the exact positive-diagonal Gram test.
-pub(super) fn orthogonal(
+pub(super) fn with_basis(
     cas: &Cas,
     selection: &LatticeSelection,
     budget: &mut Budget,
+    check: impl FnOnce(&[Rational], &mut Budget) -> Result<(), Fault>,
 ) -> Result<(), Fault> {
     let entries = &cas
         .state
         .expression(cas.checked(&selection.cover.index.basis.basis)?)?
         .operands;
-    let count = selection.values.len();
     let slots = size(entries.len(), AT)?;
     budget.check(BudgetKind::MatrixEntries, slots, AT)?;
     let bytes = slots.saturating_mul(
@@ -49,12 +68,12 @@ pub(super) fn orthogonal(
             rational.check(budget, AT)?;
             values.push(rational.clone());
         }
-        gram(&values, count, budget)
+        check(&values, budget)
     })
 }
 
 /// Every off-diagonal inner product vanishes and every squared column norm is positive.
-fn gram(values: &[Rational], count: usize, budget: &mut Budget) -> Result<(), Fault> {
+pub(super) fn gram(values: &[Rational], count: usize, budget: &mut Budget) -> Result<(), Fault> {
     for column in 0..count {
         for other in column..count {
             let mut product = Rational::zero();
@@ -84,6 +103,9 @@ pub(super) fn cuts(
     enclosure: &LatticeEnclosure,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    if let LatticeEnclosure::Reduced(value) = enclosure {
+        return super::reduction::cuts(cas, selection, value, budget);
+    }
     let half = Rational::from_ratio(1, 2, budget)?;
     for (coordinate, selected) in selection.values.iter().enumerate() {
         let value = super::literal(cas, selected, &selection.cover.index.basis.context)?;
