@@ -37,6 +37,7 @@
 //! ```
 
 mod checker;
+mod clamp;
 mod derivative;
 mod exp;
 mod interval;
@@ -213,7 +214,7 @@ pub use model::{
 pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 8] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 9] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -278,6 +279,14 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 8] = [
         statement: "The closed first-derivative identities and ordered chain rules enclose the derivative of the original supported expression over its complete ordered coordinate box. Strict domains establish smoothness on a neighborhood; a midpoint or callback grants no authority.",
         premises: "Original `DomainGuard`, reconstructed `Differentiable` and `Derivative` identities, exact `Equality` of the original coordinate and ordered source, `NonZero` or `StrictSign` for required domains, and separate full-box `Enclosure` premises for every constituent.",
     },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.clamp-generalized",
+        label: "thm:cas:enclosure-clamp-generalized",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The closed clamp composition encloses its branchwise values. Under the checked continuous smooth responsive extension, its generalized first derivative is enclosed by the responsive derivative above the wall, zero below it, and their convex hull at a touching or crossing box. An uncertain wall is included throughout; no classical derivative at a kink follows.",
+        premises: "Original `DomainGuard`, exact `Equality` at the common join, `Cover` of the constant and responsive regions, and `Enclosure` for values; generalized derivatives additionally require reconstructed `Differentiable` and `Derivative` premises on the complete responsive extension, with every strict domain retained.",
+    },
 ];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
@@ -299,6 +308,8 @@ pub enum EnclosureLaw {
     PositivePower,
     /// Closed first derivative with independently checked full-box premises.
     SmoothDerivative,
+    /// Clamp values and generalized derivatives with checked branch coverage and regularity.
+    ClampGeneralized,
 }
 
 impl EnclosureLaw {
@@ -314,6 +325,7 @@ impl EnclosureLaw {
             Self::TanhCompose => &ENCLOSURE_SCHEMAS[5],
             Self::PositivePower => &ENCLOSURE_SCHEMAS[6],
             Self::SmoothDerivative => &ENCLOSURE_SCHEMAS[7],
+            Self::ClampGeneralized => &ENCLOSURE_SCHEMAS[8],
         }
     }
 }
@@ -339,10 +351,20 @@ pub(crate) fn supported_shape(
         | Operator::Sigmoid
         | Operator::Tanh => 1,
         Operator::Derivative(_)
-            if operands.len() == 1 && state.expression(operands[0])?.enclosure_derivative == 0 =>
+            if operands.len() == 1
+                && state.expression(operands[0])?.enclosure_derivative == 0
+                && state.expression(operands[0])?.enclosure_clamp == 0 =>
         {
             1
         }
+        Operator::GeneralizedDerivative(_)
+            if operands.len() == 1
+                && state.expression(operands[0])?.enclosure_derivative == 0
+                && state.expression(operands[0])?.enclosure_clamp == 1 =>
+        {
+            1
+        }
+        Operator::ClampFloor if clamp::shape(state, operands)? => 2,
         Operator::PositivePower
             if operands.len() == 2
                 && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if r.component_bits().0 <= 63 && r.component_bits().1 <= 64) =>
@@ -356,7 +378,9 @@ pub(crate) fn supported_shape(
         return Ok(false);
     }
     for id in operands {
-        if !state.expression(*id)?.supported_enclosure {
+        if !state.expression(*id)?.supported_enclosure
+            || state.expression(*id)?.enclosure_clamp == 2
+        {
             return Ok(false);
         }
     }
@@ -547,7 +571,7 @@ pub(crate) fn receipt_slots(
                 _ => 43,
             }
         }
-        Operator::Derivative(_) if operands.len() == 1 => {
+        Operator::Derivative(_) | Operator::GeneralizedDerivative(_) if operands.len() == 1 => {
             state.expression(operands[0])?.unfolded.saturating_add(1)
         }
         _ => 1,
@@ -591,6 +615,23 @@ pub(crate) fn derivative_depth(
     }
     Ok(depth.saturating_add(u8::from(matches!(
         operator,
-        crate::model::Operator::Derivative(_)
+        crate::model::Operator::Derivative(_) | crate::model::Operator::GeneralizedDerivative(_)
     ))))
+}
+
+/// Distinguish clamp values and generalized derivatives in preflight metadata.
+pub(crate) fn clamp_metadata(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<u8, crate::Fault> {
+    let mut kind = match operator {
+        crate::model::Operator::ClampFloor => 1,
+        crate::model::Operator::GeneralizedDerivative(_) => 2,
+        _ => 0,
+    };
+    for id in operands {
+        kind = kind.max(state.expression(*id)?.enclosure_clamp);
+    }
+    Ok(kind)
 }

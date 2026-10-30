@@ -425,6 +425,8 @@ impl<'a, 'b> Reader<'a, 'b> {
             53 => Ok(Operator::Sigmoid),
             54 => Ok(Operator::Tanh),
             55 => Ok(Operator::PositivePower),
+            56 => Ok(Operator::ClampFloor),
+            57 => Ok(Operator::GeneralizedDerivative(self.name()?)),
             10 => Ok(Operator::GeneralPower(self.branch()?)),
             11 => Ok(Operator::Call(self.name()?)),
             12 => Ok(Operator::Derivative(self.name()?)),

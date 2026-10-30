@@ -16,6 +16,9 @@ pub(in crate::enclosure) fn check(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<(), Fault> {
+    if source.generalized {
+        super::super::clamp::source(source, &evidence.coordinate, budget)?;
+    }
     let count = source.schedule.len();
     if evidence.steps.len() != count || source.values.len() != count {
         return Err(invalid());
@@ -43,6 +46,7 @@ pub(in crate::enclosure) fn check(
         };
         let (rule, bound) = identity(
             &expression.operator,
+            source.generalized,
             &evidence.coordinate,
             (left.map(input), right.map(input)),
             &source.values[index],
@@ -63,6 +67,7 @@ pub(in crate::enclosure) fn check(
 /// Reconstruct the closed symbolic law independently of the production dispatcher.
 fn identity(
     operator: &Operator,
+    generalized: bool,
     coordinate: &str,
     inputs: (Option<Input<'_>>, Option<Input<'_>>),
     value: &Interval,
@@ -70,6 +75,16 @@ fn identity(
     budget: &mut Budget,
 ) -> Result<(Rule, Interval), Fault> {
     match operator {
+        Operator::ClampFloor => {
+            if !generalized {
+                return Err(invalid());
+            }
+            super::super::clamp::check_slope(
+                inputs.0.ok_or_else(invalid)?.value,
+                inputs.1.ok_or_else(invalid)?.value,
+                budget,
+            )
+        }
         Operator::Rational(_) => Ok((Rule::Constant, constant(0, budget)?)),
         Operator::Free(name) => Ok(if name == coordinate {
             (Rule::Coordinate, constant(1, budget)?)

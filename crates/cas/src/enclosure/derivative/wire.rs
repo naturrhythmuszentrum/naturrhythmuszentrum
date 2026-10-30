@@ -81,6 +81,9 @@ const fn tag(rule: Rule) -> u8 {
         Rule::Tanh => 11,
         Rule::Power => 12,
         Rule::Root => 13,
+        Rule::ClampConstant => 14,
+        Rule::ClampResponsive => 15,
+        Rule::ClampJoin => 16,
     }
 }
 
@@ -101,6 +104,9 @@ const fn rule(tag: u8) -> Result<Rule, Fault> {
         11 => Rule::Tanh,
         12 => Rule::Power,
         13 => Rule::Root,
+        14 => Rule::ClampConstant,
+        15 => Rule::ClampResponsive,
+        16 => Rule::ClampJoin,
         _ => return Err(invalid()),
     })
 }

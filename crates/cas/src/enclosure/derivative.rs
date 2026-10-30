@@ -44,6 +44,12 @@ pub enum DerivativeRule {
     Power,
     /// Square-root chain rule requiring a strictly positive input box.
     Root,
+    /// The complete box lies strictly below every declared wall.
+    ClampConstant,
+    /// The complete box lies strictly above every declared wall.
+    ClampResponsive,
+    /// Touching, crossing or uncertain wall coverage retains both slopes.
+    ClampJoin,
 }
 
 /// A proposed symbolic identity and its separately checked full-box enclosure.
@@ -77,6 +83,8 @@ pub(super) struct Segment<'a> {
     pub schedule: &'a [LogicalId],
     /// Value enclosures at the same original indices.
     pub values: &'a [Interval],
+    /// Only a separately named generalized derivative permits a clamp slope.
+    pub generalized: bool,
 }
 
 /// One earlier original value and its derivative enclosure.

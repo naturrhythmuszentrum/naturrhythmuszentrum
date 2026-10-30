@@ -163,6 +163,16 @@ impl CheckedEnclosure {
     #[must_use]
     pub fn formal_schemas(&self) -> &'static [crate::emptiness::LemmaSchema] {
         match self.certificate.law {
+            super::EnclosureLaw::ClampGeneralized => {
+                let index = usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(!self.certificate.exponentials.is_empty()) << 2)
+                    | (usize::from(self.sigmoids) << 3)
+                    | (usize::from(self.tangents) << 4)
+                    | (usize::from(!self.certificate.powers.is_empty()) << 5);
+                let (schemas, count) = &CLAMP_SCHEMAS[index];
+                &schemas[..*count]
+            }
             super::EnclosureLaw::SmoothDerivative => {
                 let index = usize::from(self.roots)
                     | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
@@ -216,6 +226,27 @@ impl CheckedEnclosure {
     #[must_use]
     pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
         use crate::proof::HypothesisKind;
+        if matches!(self.certificate.law, super::EnclosureLaw::ClampGeneralized) {
+            return if self.certificate.derivatives.is_empty() {
+                &[
+                    HypothesisKind::DomainGuard,
+                    HypothesisKind::Equality,
+                    HypothesisKind::Cover,
+                    HypothesisKind::Enclosure,
+                ]
+            } else {
+                &[
+                    HypothesisKind::DomainGuard,
+                    HypothesisKind::Equality,
+                    HypothesisKind::Cover,
+                    HypothesisKind::Differentiable,
+                    HypothesisKind::Derivative,
+                    HypothesisKind::NonZero,
+                    HypothesisKind::StrictSign,
+                    HypothesisKind::Enclosure,
+                ]
+            };
+        }
         if matches!(self.certificate.law, super::EnclosureLaw::SmoothDerivative) {
             return &[
                 HypothesisKind::DomainGuard,
@@ -514,4 +545,79 @@ const fn derivative_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 8],
     }
     schemas[count] = super::ENCLOSURE_SCHEMAS[7];
     (schemas, count + 1)
+}
+
+/// Clamp inventories name only the completed primitive laws actually used.
+static CLAMP_SCHEMAS: [([crate::emptiness::LemmaSchema; 8], usize); 64] = [
+    clamp_schemas(0),
+    clamp_schemas(1),
+    clamp_schemas(2),
+    clamp_schemas(3),
+    clamp_schemas(4),
+    clamp_schemas(5),
+    clamp_schemas(6),
+    clamp_schemas(7),
+    clamp_schemas(8),
+    clamp_schemas(9),
+    clamp_schemas(10),
+    clamp_schemas(11),
+    clamp_schemas(12),
+    clamp_schemas(13),
+    clamp_schemas(14),
+    clamp_schemas(15),
+    clamp_schemas(16),
+    clamp_schemas(17),
+    clamp_schemas(18),
+    clamp_schemas(19),
+    clamp_schemas(20),
+    clamp_schemas(21),
+    clamp_schemas(22),
+    clamp_schemas(23),
+    clamp_schemas(24),
+    clamp_schemas(25),
+    clamp_schemas(26),
+    clamp_schemas(27),
+    clamp_schemas(28),
+    clamp_schemas(29),
+    clamp_schemas(30),
+    clamp_schemas(31),
+    clamp_schemas(32),
+    clamp_schemas(33),
+    clamp_schemas(34),
+    clamp_schemas(35),
+    clamp_schemas(36),
+    clamp_schemas(37),
+    clamp_schemas(38),
+    clamp_schemas(39),
+    clamp_schemas(40),
+    clamp_schemas(41),
+    clamp_schemas(42),
+    clamp_schemas(43),
+    clamp_schemas(44),
+    clamp_schemas(45),
+    clamp_schemas(46),
+    clamp_schemas(47),
+    clamp_schemas(48),
+    clamp_schemas(49),
+    clamp_schemas(50),
+    clamp_schemas(51),
+    clamp_schemas(52),
+    clamp_schemas(53),
+    clamp_schemas(54),
+    clamp_schemas(55),
+    clamp_schemas(56),
+    clamp_schemas(57),
+    clamp_schemas(58),
+    clamp_schemas(59),
+    clamp_schemas(60),
+    clamp_schemas(61),
+    clamp_schemas(62),
+    clamp_schemas(63),
+];
+
+/// A generalized conclusion does not advertise a classical derivative conclusion.
+const fn clamp_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 8], usize) {
+    let (mut schemas, count) = derivative_schemas(mask);
+    schemas[count - 1] = super::ENCLOSURE_SCHEMAS[8];
+    (schemas, count)
 }

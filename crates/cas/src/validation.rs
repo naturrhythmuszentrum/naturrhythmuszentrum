@@ -741,7 +741,7 @@ fn operator_sorts(
             leaf_sort(operator, result, scope, environment, budget)? && children.is_empty()
         }
         Operator::Constant(_) => constant_sort(result, children),
-        Operator::PositivePower => {
+        Operator::PositivePower | Operator::ClampFloor => {
             children.len() == 2 && same && *result == Sort::Value(AtomicSort::Scalar(Field::Real))
         }
         Operator::NaturalLog | Operator::Exponential | Operator::Sigmoid | Operator::Tanh => {
@@ -755,7 +755,7 @@ fn operator_sorts(
         | Operator::IntegerPower(_)
         | Operator::GeneralPower(_) => arithmetic_sorts(operator, result, children),
         Operator::Call(key) => call_sorts(key, result, environment, children, budget)?,
-        Operator::Derivative(key) => {
+        Operator::Derivative(key) | Operator::GeneralizedDerivative(key) => {
             children.len() == 1
                 && same
                 && matches!(result, Sort::Value(AtomicSort::Scalar(_)))

@@ -17,6 +17,9 @@ pub(in crate::enclosure) fn produce(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<(Interval, DerivativeEvidence), Fault> {
+    if source.generalized {
+        super::super::clamp::source(source, coordinate, budget)?;
+    }
     let (record, first, grid) = position;
     let count = crate::graph::size(source.schedule.len(), AT)?;
     budget.check(
@@ -59,6 +62,7 @@ pub(in crate::enclosure) fn produce(
         };
         let (rule, bound) = node(
             &expression.operator,
+            source.generalized,
             coordinate,
             (left.map(input), right.map(input)),
             &source.values[index],
@@ -88,6 +92,7 @@ pub(in crate::enclosure) fn produce(
 /// Each identity is fixed by the source operator and the original coordinate.
 fn node(
     operator: &Operator,
+    generalized: bool,
     coordinate: &str,
     inputs: (Option<Input<'_>>, Option<Input<'_>>),
     value: &Interval,
@@ -96,6 +101,16 @@ fn node(
 ) -> Result<(Rule, Interval), Fault> {
     let zero = || Rational::zero();
     let result = match operator {
+        Operator::ClampFloor => {
+            if !generalized {
+                return Err(invalid());
+            }
+            super::super::clamp::slope(
+                inputs.0.ok_or_else(invalid)?.value,
+                inputs.1.ok_or_else(invalid)?.value,
+                budget,
+            )?
+        }
         Operator::Rational(_) => (Rule::Constant, Interval::singleton(&zero(), budget)?),
         Operator::Free(name) if name == coordinate => (
             Rule::Coordinate,

@@ -419,6 +419,8 @@ pub(crate) struct Expression {
     pub(crate) enclosure_power: crate::enclosure::PowerShape,
     /// Maximum first-derivative nesting in the original expression.
     pub(crate) enclosure_derivative: u8,
+    /// Zero for smooth syntax, one for a clamp value, two for a generalized derivative.
+    pub(crate) enclosure_clamp: u8,
     /// Whether the supported closure uses the logarithm law.
     pub(crate) enclosure_logs: bool,
     /// Present exponential family, with a conservative reduction bound when known.
@@ -1726,6 +1728,7 @@ impl Cas {
             crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
         let expression = Vertex::Expression(Expression {
             enclosure_exp,
+            enclosure_clamp: crate::enclosure::clamp_metadata(state, &draft.operator, &operands)?,
             enclosure_derivative: crate::enclosure::derivative_depth(
                 state,
                 &draft.operator,

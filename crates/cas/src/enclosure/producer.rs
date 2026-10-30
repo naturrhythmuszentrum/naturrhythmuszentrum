@@ -62,7 +62,10 @@ pub(super) fn generate_planned(
         } else {
             None
         };
-        let generated = if matches!(expression.operator, Operator::Derivative(_)) {
+        let generated = if matches!(
+            expression.operator,
+            Operator::Derivative(_) | Operator::GeneralizedDerivative(_)
+        ) {
             derivative_node(
                 cas,
                 expression,
@@ -172,6 +175,7 @@ fn binary(
         Operator::GeneralPower(crate::model::Branch::StrictReal) => {
             super::roots::produce(left, grid, budget)
         }
+        Operator::ClampFloor => left.maximum(right, grid, budget),
         Operator::Add => left.add(right, grid, budget),
         Operator::Sub => left.sub(right, grid, budget),
         Operator::Mul => left.mul(right, grid, budget),
@@ -435,6 +439,14 @@ fn transcript_law(
     families: (bool, bool, bool, bool),
 ) -> Result<super::EnclosureLaw, Fault> {
     let (logs, exps, powers, derivatives) = families;
+    if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_clamp
+        != 0
+    {
+        return Ok(super::EnclosureLaw::ClampGeneralized);
+    }
     if derivatives {
         return Ok(super::EnclosureLaw::SmoothDerivative);
     }
@@ -470,7 +482,9 @@ fn derivative_node(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<Generated, Fault> {
-    let Operator::Derivative(coordinate) = &expression.operator else {
+    let (Operator::Derivative(coordinate) | Operator::GeneralizedDerivative(coordinate)) =
+        &expression.operator
+    else {
         return Err(invalid());
     };
     let (schedule, records, index) = source;
@@ -481,6 +495,7 @@ fn derivative_node(
         cas,
         schedule: &schedule[first..index],
         values: &records[first..index],
+        generalized: matches!(expression.operator, Operator::GeneralizedDerivative(_)),
     };
     let (bound, evidence) = super::derivative::produce(
         source,

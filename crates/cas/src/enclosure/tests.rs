@@ -3,6 +3,7 @@
 
 use super::*;
 
+mod clamps;
 mod derivatives;
 mod exponentials;
 mod powers;

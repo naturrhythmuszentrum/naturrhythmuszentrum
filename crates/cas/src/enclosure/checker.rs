@@ -134,7 +134,7 @@ impl Replay<'_> {
                     interrupt,
                 );
             }
-            Operator::Derivative(_) => {
+            Operator::Derivative(_) | Operator::GeneralizedDerivative(_) => {
                 return self.derivative(cas, expression, (schedule, index), budget, interrupt);
             }
             Operator::PositivePower => {
@@ -146,6 +146,17 @@ impl Replay<'_> {
                     budget,
                     interrupt,
                 );
+            }
+            Operator::ClampFloor => {
+                let (lo, hi) = super::clamp::check_value(
+                    &cas.state,
+                    expression,
+                    &self.certificate.records[left.ok_or_else(invalid)?],
+                    &self.certificate.records[right.ok_or_else(invalid)?],
+                    self.certificate.grid,
+                    budget,
+                )?;
+                return endpoint_match(record, (lo, hi), false, self.certificate.grid, budget);
             }
             Operator::GeneralPower(crate::model::Branch::StrictReal) => {
                 let exponent = expression.operands.get(1).ok_or_else(invalid)?;
@@ -238,7 +249,9 @@ impl Replay<'_> {
     ) -> Result<(), Fault> {
         if !matches!(
             self.certificate.law,
-            super::EnclosureLaw::PositivePower | super::EnclosureLaw::SmoothDerivative
+            super::EnclosureLaw::PositivePower
+                | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             return Err(invalid());
         }
@@ -279,13 +292,23 @@ impl Replay<'_> {
         budget: &mut Budget,
         interrupt: &mut impl FnMut(BudgetUsage) -> bool,
     ) -> Result<(), Fault> {
-        if self.certificate.law != super::EnclosureLaw::SmoothDerivative {
+        if !matches!(
+            self.certificate.law,
+            super::EnclosureLaw::SmoothDerivative | super::EnclosureLaw::ClampGeneralized
+        ) {
             return Err(invalid());
         }
-        let Operator::Derivative(coordinate) = &expression.operator else {
+        let (Operator::Derivative(coordinate) | Operator::GeneralizedDerivative(coordinate)) =
+            &expression.operator
+        else {
             return Err(invalid());
         };
         let (schedule, index) = position;
+        if matches!(expression.operator, Operator::GeneralizedDerivative(_))
+            && index + 1 != self.certificate.records.len()
+        {
+            return Err(invalid());
+        }
         let count = usize::try_from(cas.state.expression(expression.operands[0])?.unfolded)
             .map_err(|_| invalid())?;
         let first = index.checked_sub(count).ok_or_else(invalid)?;
@@ -300,6 +323,7 @@ impl Replay<'_> {
             cas,
             schedule: &schedule[first..index],
             values: &self.certificate.records[first..index],
+            generalized: matches!(expression.operator, Operator::GeneralizedDerivative(_)),
         };
         super::derivative::check(
             source,
@@ -319,6 +343,13 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_clamp
+        != 0
+    {
+        super::EnclosureLaw::ClampGeneralized
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_derivative

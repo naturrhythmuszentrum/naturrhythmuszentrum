@@ -41,6 +41,7 @@ impl EnclosureCertificate {
                 | super::EnclosureLaw::TanhCompose
                 | super::EnclosureLaw::PositivePower
                 | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             super::log::encode(&self.logarithms, &mut out)?;
         } else if !self.logarithms.is_empty() {
@@ -60,6 +61,7 @@ impl EnclosureCertificate {
                 | super::EnclosureLaw::TanhCompose
                 | super::EnclosureLaw::PositivePower
                 | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             super::exp::encode(&self.exponentials, &mut out)?;
         } else if !self.exponentials.is_empty() {
@@ -67,7 +69,9 @@ impl EnclosureCertificate {
         }
         if matches!(
             self.law,
-            super::EnclosureLaw::PositivePower | super::EnclosureLaw::SmoothDerivative
+            super::EnclosureLaw::PositivePower
+                | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             for (present, index) in [
                 (!self.logarithms.is_empty(), 2),
@@ -82,7 +86,10 @@ impl EnclosureCertificate {
         } else if !self.powers.is_empty() {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
         }
-        if self.law == super::EnclosureLaw::SmoothDerivative {
+        if matches!(
+            self.law,
+            super::EnclosureLaw::SmoothDerivative | super::EnclosureLaw::ClampGeneralized
+        ) {
             super::derivative::encode(&self.derivatives, &mut out)?;
         } else if !self.derivatives.is_empty() {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
@@ -99,17 +106,7 @@ impl EnclosureCertificate {
         if reader.take(8)? != b"NRZENCW1" {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
         }
-        let law = match reader.name()?.as_str() {
-            "enclosure.rational-inclusion" => super::EnclosureLaw::RationalInclusion,
-            "enclosure.root-grid" => super::EnclosureLaw::RootGrid,
-            "enclosure.log-atanh" => super::EnclosureLaw::LogAtanh,
-            "enclosure.exp-taylor" => super::EnclosureLaw::ExpTaylor,
-            "enclosure.sigmoid-compose" => super::EnclosureLaw::SigmoidCompose,
-            "enclosure.tanh-compose" => super::EnclosureLaw::TanhCompose,
-            "enclosure.positive-power" => super::EnclosureLaw::PositivePower,
-            "enclosure.smooth-derivative" => super::EnclosureLaw::SmoothDerivative,
-            _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
-        };
+        let law = read_law(&mut reader)?;
         let version = reader.small()?;
         if version != 1 {
             return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
@@ -136,6 +133,7 @@ impl EnclosureCertificate {
                 | super::EnclosureLaw::TanhCompose
                 | super::EnclosureLaw::PositivePower
                 | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             super::log::decode(&mut reader)?
         } else {
@@ -155,6 +153,7 @@ impl EnclosureCertificate {
                 | super::EnclosureLaw::TanhCompose
                 | super::EnclosureLaw::PositivePower
                 | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             super::exp::decode(&mut reader)?
         } else {
@@ -162,7 +161,9 @@ impl EnclosureCertificate {
         };
         let powers = if matches!(
             law,
-            super::EnclosureLaw::PositivePower | super::EnclosureLaw::SmoothDerivative
+            super::EnclosureLaw::PositivePower
+                | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
         ) {
             for (present, index) in [(!logarithms.is_empty(), 2), (!exponentials.is_empty(), 3)] {
                 if present
@@ -176,7 +177,10 @@ impl EnclosureCertificate {
         } else {
             Vec::new()
         };
-        let derivatives = if law == super::EnclosureLaw::SmoothDerivative {
+        let derivatives = if matches!(
+            law,
+            super::EnclosureLaw::SmoothDerivative | super::EnclosureLaw::ClampGeneralized
+        ) {
             super::derivative::decode(&mut reader)?
         } else {
             Vec::new()
@@ -195,4 +199,20 @@ impl EnclosureCertificate {
             derivatives,
         })
     }
+}
+
+/// Decode only names whose exact checker is in the closed formal register.
+fn read_law(reader: &mut Reader<'_, '_>) -> Result<super::EnclosureLaw, Fault> {
+    Ok(match reader.name()?.as_str() {
+        "enclosure.rational-inclusion" => super::EnclosureLaw::RationalInclusion,
+        "enclosure.root-grid" => super::EnclosureLaw::RootGrid,
+        "enclosure.log-atanh" => super::EnclosureLaw::LogAtanh,
+        "enclosure.exp-taylor" => super::EnclosureLaw::ExpTaylor,
+        "enclosure.sigmoid-compose" => super::EnclosureLaw::SigmoidCompose,
+        "enclosure.tanh-compose" => super::EnclosureLaw::TanhCompose,
+        "enclosure.positive-power" => super::EnclosureLaw::PositivePower,
+        "enclosure.smooth-derivative" => super::EnclosureLaw::SmoothDerivative,
+        "enclosure.clamp-generalized" => super::EnclosureLaw::ClampGeneralized,
+        _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
+    })
 }
