@@ -67,7 +67,10 @@ fn lookup(
         let inventory = match entry {
             PendingJudgment::NewPi(inventory) => inventory,
             PendingJudgment::RecheckedPi(id) => cas.pi_inventory(*id)?,
-            PendingJudgment::NewScalar(_) | PendingJudgment::RecheckedScalar(_) => continue,
+            PendingJudgment::NewScalar(_)
+            | PendingJudgment::RecheckedScalar(_)
+            | PendingJudgment::NewEnclosure(_)
+            | PendingJudgment::RecheckedEnclosure(_) => continue,
         };
         if certificate
             .canonical_key()?

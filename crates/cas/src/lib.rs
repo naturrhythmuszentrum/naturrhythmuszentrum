@@ -47,6 +47,8 @@ mod decision_wire;
         unreachable_pub"
 )]
 mod derivative_check;
+/// Certified rational endpoint arithmetic and original-scope enclosure evidence.
+pub mod enclosure;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies \

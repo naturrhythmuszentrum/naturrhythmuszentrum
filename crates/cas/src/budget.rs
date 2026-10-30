@@ -1125,6 +1125,13 @@ impl Budget {
         Ok(previous)
     }
 
+    /// Reserve an explicit checking allowance from generation without changing spent Work.
+    pub(crate) fn reserve_enclosure_checking(&mut self, work: u64) -> Limits {
+        let previous = self.limits.clone();
+        self.limits.work = self.limits.work.saturating_sub(work);
+        previous
+    }
+
     /// Restore the caller policy while retaining every consumed work unit.
     pub(crate) const fn restore_limits(&mut self, limits: Limits) {
         self.limits = limits;

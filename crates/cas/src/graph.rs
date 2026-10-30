@@ -413,6 +413,8 @@ pub(crate) enum ExpressionAttachment {
 /// Immutable expression weight and cached, checked shape statistics.
 #[derive(Clone, Debug)]
 pub(crate) struct Expression {
+    /// Closed rational enclosure grammar, derived from the original children at admission.
+    pub(crate) rational_enclosure: bool,
     /// Checked scalar registry identity, mandatory for registered scalar sorts.
     pub(crate) ambient: Option<LogicalId>,
     /// Typed literal dependencies, never concealed in an operator.
@@ -1706,6 +1708,11 @@ impl Cas {
         )?;
         let ambient = crate::solving::sorts::ambient(state, header, &draft.sort)?;
         let expression = Vertex::Expression(Expression {
+            rational_enclosure: crate::enclosure::supported_shape(
+                state,
+                &draft.operator,
+                &operands,
+            )?,
             ambient,
             attachment: None,
             operator: draft.operator.clone(),

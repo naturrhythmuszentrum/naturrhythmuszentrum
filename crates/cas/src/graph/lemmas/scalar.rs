@@ -34,6 +34,10 @@ pub(crate) enum PendingJudgment {
     RecheckedScalar(LogicalId),
     /// Complete newly checked finite Machin argument.
     NewPi(super::PiInventory),
+    /// Complete newly checked original-scope enclosure.
+    NewEnclosure(super::EnclosureInventory),
+    /// Earlier enclosure independently rechecked in this namespace.
+    RecheckedEnclosure(LogicalId),
     /// Earlier Machin node independently rechecked in this namespace.
     RecheckedPi(LogicalId),
 }
@@ -110,14 +114,19 @@ impl Cas {
             .filter(|entry| {
                 matches!(
                     entry,
-                    PendingJudgment::NewScalar(_) | PendingJudgment::NewPi(_)
+                    PendingJudgment::NewScalar(_)
+                        | PendingJudgment::NewPi(_)
+                        | PendingJudgment::NewEnclosure(_)
                 )
             })
             .count();
         let bytes = pending.iter().fold(0_u64, |total, entry| match entry {
             PendingJudgment::NewScalar(inventory) => total.saturating_add(inventory.bytes),
             PendingJudgment::NewPi(inventory) => total.saturating_add(inventory.bytes),
-            PendingJudgment::RecheckedScalar(_) | PendingJudgment::RecheckedPi(_) => total,
+            PendingJudgment::NewEnclosure(inventory) => total.saturating_add(inventory.bytes),
+            PendingJudgment::RecheckedScalar(_)
+            | PendingJudgment::RecheckedPi(_)
+            | PendingJudgment::RecheckedEnclosure(_) => total,
         });
         preflight(self, pending, count, bytes, budget)?;
         if let Some(journal) = &mut self.state.journal {
@@ -137,6 +146,11 @@ impl Cas {
                 serial,
             };
             let undo = match entry {
+                PendingJudgment::NewEnclosure(inventory) => Undo::Vertex {
+                    id,
+                    key: Some(inventory.key.clone()),
+                    policy: None,
+                },
                 PendingJudgment::NewScalar(inventory) => Undo::ScalarJudgment {
                     id,
                     key: Arc::clone(&inventory.key),
@@ -145,7 +159,9 @@ impl Cas {
                     id,
                     certificate: Arc::clone(&inventory.certificate),
                 },
-                PendingJudgment::RecheckedScalar(_) | PendingJudgment::RecheckedPi(_) => continue,
+                PendingJudgment::RecheckedScalar(_)
+                | PendingJudgment::RecheckedPi(_)
+                | PendingJudgment::RecheckedEnclosure(_) => continue,
             };
             self.state.record(undo)?;
             serial += 1;
@@ -154,6 +170,10 @@ impl Cas {
             match entry {
                 PendingJudgment::NewScalar(inventory) => append(self, inventory),
                 PendingJudgment::NewPi(inventory) => super::pi::append(self, inventory),
+                PendingJudgment::NewEnclosure(inventory) => {
+                    super::enclosure::append(self, inventory);
+                }
+                PendingJudgment::RecheckedEnclosure(id) => self.refresh_enclosure(id),
                 PendingJudgment::RecheckedPi(id) => self.refresh_pi(id),
                 PendingJudgment::RecheckedScalar(id) => {
                     let index = self.state.indices[&id];
@@ -184,7 +204,10 @@ fn preflight(
         total.saturating_add(match entry {
             PendingJudgment::NewScalar(_) => 4,
             PendingJudgment::NewPi(_) => 2,
-            PendingJudgment::RecheckedScalar(_) | PendingJudgment::RecheckedPi(_) => 0,
+            PendingJudgment::NewEnclosure(_) => 3,
+            PendingJudgment::RecheckedScalar(_)
+            | PendingJudgment::RecheckedPi(_)
+            | PendingJudgment::RecheckedEnclosure(_) => 0,
         })
     });
     let edges = size(cas.state.graph.edge_count(), AT)?.saturating_add(added_edges);
@@ -212,6 +235,17 @@ fn preflight(
         .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?;
     for entry in pending {
         match entry {
+            PendingJudgment::NewEnclosure(inventory) => {
+                for id in inventory.scope {
+                    cas.state.node(id)?;
+                }
+                let total = cas.state.judgment_bytes.saturating_add(bytes);
+                budget.check(BudgetKind::OutputBytes, total, AT)?;
+                budget.check(BudgetKind::StagedPayloadBytes, total, AT)?;
+            }
+            PendingJudgment::RecheckedEnclosure(id) => {
+                cas.enclosure_inventory(*id)?;
+            }
             PendingJudgment::NewScalar(inventory) => {
                 for id in inventory.scope {
                     cas.state.node(id)?;

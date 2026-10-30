@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked anonymous judgments use the graph's canonical index and evidence edges.
 
+mod enclosure;
+pub(crate) use enclosure::EnclosureInventory;
 mod pi;
 pub(crate) use pi::{PiIndex, PiInventory};
 mod scalar;
@@ -26,6 +28,8 @@ pub(crate) enum AnonymousLemma {
     Scalar(scalar::ScalarLemma),
     /// Complete finite Machin argument under the registered constant theorem.
     Pi(pi::PiLemma),
+    /// Independently checked original-scope rational enclosure.
+    Enclosure(enclosure::EnclosureLemma),
 }
 
 impl AnonymousLemma {
@@ -34,6 +38,7 @@ impl AnonymousLemma {
     pub(crate) fn key_bytes(&self) -> usize {
         match self {
             Self::Constant(node) => node.key.len(),
+            Self::Enclosure(node) => node.inventory.key.len(),
             Self::Scalar(node) => node.inventory.key.len(),
             Self::Pi(node) => node
                 .inventory
@@ -50,6 +55,7 @@ impl AnonymousLemma {
             Self::Constant(node) => crate::exact_constant::preparation_bytes(node.constant.value()),
             Self::Scalar(node) => Ok(node.inventory.bytes),
             Self::Pi(node) => Ok(node.inventory.bytes),
+            Self::Enclosure(node) => Ok(node.inventory.bytes),
         }
     }
 
@@ -57,6 +63,7 @@ impl AnonymousLemma {
     pub(crate) fn encode(&self, out: &mut crate::encoding::Encoder<'_>) -> Result<(), Fault> {
         match self {
             Self::Constant(node) => out.raw(&node.key[1..]),
+            Self::Enclosure(node) => out.raw(&node.inventory.key[1..]),
             Self::Scalar(node) => {
                 out.byte(1)?;
                 out.unsigned(u64::from(crate::proof::RETAINED_SCHEMAS[1].version))?;

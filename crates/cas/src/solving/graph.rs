@@ -2807,6 +2807,7 @@ impl Cas {
             ));
         }
         let expression = crate::graph::Expression {
+            rational_enclosure: false,
             ambient,
             attachment: Some(literal.attachment),
             operator: literal.operator,
