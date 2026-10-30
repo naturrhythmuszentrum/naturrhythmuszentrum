@@ -24,6 +24,7 @@ fn formal_register_standing_is_complete() {
         .chain(&EMPTY_SCHEMAS)
         .chain(&nrz_cas::proof::CONSTANT_SCHEMAS)
         .chain(&nrz_cas::proof::RETAINED_SCHEMAS)
+        .chain(&nrz_cas::enclosure::ENCLOSURE_SCHEMAS)
         .chain(&nrz_cas::decision::DECISION_SCHEMAS)
         .chain(&HYPOTHESIS_SCHEMAS)
         .chain(std::iter::once(&ANONYMOUS_LEMMA_SCHEMA));
@@ -225,6 +226,7 @@ fn formal_register_heads_are_bijective() {
         .chain(&EMPTY_SCHEMAS)
         .chain(&nrz_cas::proof::CONSTANT_SCHEMAS)
         .chain(&nrz_cas::proof::RETAINED_SCHEMAS)
+        .chain(&nrz_cas::enclosure::ENCLOSURE_SCHEMAS)
         .chain(&nrz_cas::decision::DECISION_SCHEMAS)
         .chain(&HYPOTHESIS_SCHEMAS)
         .chain(std::iter::once(&ANONYMOUS_LEMMA_SCHEMA))
@@ -251,7 +253,10 @@ fn formal_register_heads_are_bijective() {
                 .collect();
             assert_eq!(matching.len(), 1);
             for (index, _) in matching {
-                let category = if schema.name.starts_with("hyp.") {
+                let category = if HYPOTHESIS_SCHEMAS
+                    .iter()
+                    .any(|entry| entry.name == schema.name)
+                {
                     "hypothesis"
                 } else if PRIMITIVE_SCHEMAS
                     .iter()

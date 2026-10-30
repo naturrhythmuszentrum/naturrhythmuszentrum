@@ -189,7 +189,10 @@ pub(super) fn lookup(
         let inventory = match entry {
             PendingJudgment::NewScalar(inventory) => inventory,
             PendingJudgment::RecheckedScalar(id) => cas.scalar_inventory(*id)?,
-            PendingJudgment::NewPi(_) | PendingJudgment::RecheckedPi(_) => continue,
+            PendingJudgment::NewPi(_)
+            | PendingJudgment::RecheckedPi(_)
+            | PendingJudgment::NewEnclosure(_)
+            | PendingJudgment::RecheckedEnclosure(_) => continue,
         };
         if inventory.key.as_ref() == key {
             return Ok(Some(Arc::clone(&inventory.values)));

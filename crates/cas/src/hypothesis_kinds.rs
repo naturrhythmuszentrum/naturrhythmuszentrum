@@ -16,6 +16,8 @@ mod classify;
 /// A kind is an assumed shape; a checked proof of an instance remains evidence for that instance.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum HypothesisKind {
+    /// The original subject lies between ordered endpoints on the complete stated box.
+    Enclosure,
     /// The original operands are defined on the stated region.
     DomainGuard,
     /// The exact scalar subject is defined and nonzero.
@@ -121,7 +123,7 @@ pub enum HypothesisKind {
 }
 
 /// Every formal hypothesis kind in register order.
-pub const HYPOTHESIS_KINDS: [HypothesisKind; 51] = [
+pub const HYPOTHESIS_KINDS: [HypothesisKind; 52] = [
     HypothesisKind::DomainGuard,
     HypothesisKind::NonZero,
     HypothesisKind::StrictSign,
@@ -173,10 +175,11 @@ pub const HYPOTHESIS_KINDS: [HypothesisKind; 51] = [
     HypothesisKind::LatticeCover,
     HypothesisKind::LatticeSelection,
     HypothesisKind::LatticeNearestSelection,
+    HypothesisKind::Enclosure,
 ];
 
 /// The named assumed shape of every supported hypothesis kind.
-pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 51] = [
+pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 52] = [
     LemmaSchema {
         name: "hyp.domain-guard",
         label: "assum:cas:hyp-domain-guard",
@@ -585,6 +588,14 @@ pub static HYPOTHESIS_SCHEMAS: [LemmaSchema; 51] = [
         statement: "The original target belongs to the nearest lattice cell indexed by the exact ordered Integer tuple, with ties owned by the greatest original index.",
         premises: "Original basis, offset, context, range, target and ordered Integer literals in the Euclidean coordinate metric; a retained statement alone confers no nearest-selection authority.",
     },
+    LemmaSchema {
+        name: "enclosure.hyp.enclosure",
+        label: "assum:cas:hyp-enclosure",
+        version: 1,
+        standing: crate::proof::Standing::Hypothesis,
+        statement: "The original subject lies between the ordered rational endpoints throughout the exact coordinate box.",
+        premises: "Original subject, context, ordered coordinate box and endpoints; an unchecked interval confers no hypothesis authority.",
+    },
 ];
 
 impl HypothesisKind {
@@ -592,6 +603,7 @@ impl HypothesisKind {
     #[must_use]
     pub const fn formal_schema(self) -> &'static LemmaSchema {
         match self {
+            Self::Enclosure => &HYPOTHESIS_SCHEMAS[51],
             Self::LatticeNearestSelection => &HYPOTHESIS_SCHEMAS[50],
             Self::LatticeSelection => &HYPOTHESIS_SCHEMAS[49],
             Self::LatticeCover => &HYPOTHESIS_SCHEMAS[48],
