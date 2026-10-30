@@ -26,8 +26,8 @@ const AT: Location = Location::new("matrix live scalar kernel");
 pub struct RatioKernelEvidence {
     /// Original numerator and denominator slots in the retained complete source inventory.
     order: [usize; 2],
-    /// Two input sums, then denominator reciprocal, then quotient product.
-    records: [KernelCertificate; 4],
+    /// Two input sums, optional exact affine operations, then reciprocal and quotient product.
+    records: Vec<KernelCertificate>,
     /// Independently checked original target, input sets and exact endpoint relations.
     original: CheckedRationalEnclosure,
     /// Exact scalar construction/export inventory charged on the owner ledger.
@@ -46,7 +46,7 @@ impl RatioKernelEvidence {
     }
     /// Actual ordered input-box and quotient operations, never a reconstructed nominal trace.
     #[must_use]
-    pub const fn records(&self) -> &[KernelCertificate; 4] {
+    pub fn records(&self) -> &[KernelCertificate] {
         &self.records
     }
     /// Original numerator and denominator slots; versions live in the accompanying frozen inputs.
@@ -96,10 +96,11 @@ impl<P: Scalar> FrozenRatioKernel<P> {
 }
 
 impl Heap {
-    /// Execute and certify the closed original quotient over the complete frozen total-radius sets.
+    /// Execute and certify the original physical quotient over the complete frozen total-radius sets.
     ///
     /// Native inputs may be declared rational or rational-times-pi constants, or explicit
-    /// physical families admitted by bindings. CAS retains every family premise and
+    /// physical families with optional exact scalar readings admitted by bindings.
+    /// CAS retains every family premise and
     /// independently replays the supplied Machin data.
     /// Numerical error is already in each total radius and is never added twice.
     /// # Errors
@@ -128,6 +129,7 @@ impl Heap {
                 .retained_payload_bytes()
                 .saturating_add(records::pi_bytes(pi))
                 .saturating_add(records::family_bytes(&frozen))
+                .saturating_add(records::reading_bytes(&frozen))
                 .saturating_add(4096);
             budget.check(BudgetKind::OutputBytes, scratch, AT)?;
             budget.work(scratch - frozen.retained_payload_bytes(), AT)?;
@@ -143,17 +145,7 @@ impl Heap {
                     lower: output.lower.clone(),
                     upper: output.upper.clone(),
                     origin: EnclosureOrigin::ScalarKernel(Box::new(ScalarKernelCertificate {
-                        version: if frozen
-                            .association()
-                            .case()
-                            .source()
-                            .input_families()
-                            .is_empty()
-                        {
-                            2
-                        } else {
-                            3
-                        },
+                        version: version(&frozen),
                         expression: spec.target.clone(),
                         context: spec.context.clone(),
                         input_family: spec.family.domain.clone(),
@@ -161,7 +153,10 @@ impl Heap {
                     })),
                 };
                 let original = attempt.check_rational_enclosure(&contract, budget)?;
-                let bytes = original.retained_bytes().saturating_add(768);
+                let scalar_bytes = u64::try_from(records.len())
+                    .map_err(|_| LiveDecisionError::Recipe)?
+                    .saturating_mul(192);
+                let bytes = original.retained_bytes().saturating_add(scalar_bytes);
                 budget.check(
                     BudgetKind::OutputBytes,
                     bytes.saturating_add(frozen.retained_payload_bytes()),
@@ -219,5 +214,17 @@ impl Heap {
             literals: LiteralLimits::new(0, 0, 0),
             kernel: Some(Box::new(trace.evidence)),
         })
+    }
+}
+
+/// Additive grammar versions leave both closed and unmapped family traces unchanged.
+fn version<P: Scalar>(frozen: &FrozenDecisionInputs<P>) -> u32 {
+    let source = frozen.association().case().source();
+    if !source.input_readings().is_empty() {
+        4
+    } else if !source.input_families().is_empty() {
+        3
+    } else {
+        2
     }
 }

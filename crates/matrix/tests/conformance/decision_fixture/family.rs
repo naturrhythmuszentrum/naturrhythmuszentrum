@@ -6,7 +6,9 @@ use super::{
     HypothesisRef, Operator, PredicateKind, Rational, Reference, RegionExpr, SelectionFixture,
     TestResult, admit, applications, cover_in, exact, ledger, real,
 };
-use nrz_bindings::readings::algebra::decision::{IntegerCellRange, ScalarKernelFamily};
+use nrz_bindings::readings::algebra::decision::{
+    IntegerCellRange, IntegerFamily, ScalarKernelFamily,
+};
 
 /// Add one Real source to the unchanged Integer decision declaration vocabulary.
 fn frame() -> TestResult<Frame> {
@@ -71,6 +73,16 @@ pub(super) fn fixture() -> TestResult<(SelectionFixture, ScalarKernelFamily)> {
     let thousand = exact(&mut frame, "1000", false)?;
     let period = frame.term(Operator::Div, real(), &[pi, thousand])?;
     let target = frame.term(Operator::Div, real(), &[input.clone(), period])?;
+    finish(frame, family, input, target)
+}
+
+/// Both native and mapped questions retain the same exact source-box and quotient assumptions.
+pub(super) fn finish(
+    mut frame: Frame,
+    family: IntegerFamily,
+    input: Handle,
+    target: Handle,
+) -> TestResult<(SelectionFixture, ScalarKernelFamily)> {
     let lower = Rational::from_ratio(9999, 1_000_000, &mut ledger()?)?;
     let upper = Rational::from_ratio(10001, 1_000_000, &mut ledger()?)?;
     let low = endpoint(&mut frame, &input, &lower, true)?;

@@ -17,6 +17,7 @@ mod input;
     reason = "the public decision facade re-exports the pure certificate model"
 )]
 pub(super) mod model;
+mod reading;
 mod relations;
 mod root;
 mod wire;
@@ -54,7 +55,7 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    if !matches!(certificate.version, 1..=3) {
+    if !matches!(certificate.version, 1..=4) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     for handle in [
@@ -86,7 +87,7 @@ pub(super) fn validate(
         .saturating_add(number_bytes(&contract.lower))
         .saturating_add(number_bytes(&contract.upper));
     budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-    if certificate.version == 3 {
+    if certificate.version >= 3 {
         budget.with_retained_payload(bytes, AT, |budget| {
             family::validate(cas, contract, certificate, budget)
         })?;
@@ -155,7 +156,10 @@ fn replay(
             if certificate.version == 1 && matches!(record.law, ScalarKernelLaw::Input(_)) {
                 return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
             }
-            if matches!(record.law, ScalarKernelLaw::Family(_)) {
+            if matches!(
+                record.law,
+                ScalarKernelLaw::Family(_) | ScalarKernelLaw::Reading(_)
+            ) {
                 return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
             }
             relations::check(
@@ -204,7 +208,7 @@ fn exact(
     match law {
         ScalarKernelLaw::Rational(value) => Ok(value.clone().into()),
         ScalarKernelLaw::Input(value) => input::exact(value, budget),
-        ScalarKernelLaw::Family(_) => Err(unsupported()),
+        ScalarKernelLaw::Family(_) | ScalarKernelLaw::Reading(_) => Err(unsupported()),
         ScalarKernelLaw::Sum { left, right } => child(*left)?.add(child(*right)?, budget),
         ScalarKernelLaw::Product { left, right } => child(*left)?.mul(child(*right)?, budget),
         ScalarKernelLaw::Reciprocal { input } => ExactConstant::one().div(child(*input)?, budget),
@@ -235,6 +239,7 @@ fn record_bytes(record: &ScalarKernelRecord) -> u64 {
         ScalarKernelLaw::Rational(value) => number_bytes(value),
         ScalarKernelLaw::Input(value) => input::bytes(value),
         ScalarKernelLaw::Family(value) => family::bytes(value),
+        ScalarKernelLaw::Reading(value) => reading::bytes(value),
         ScalarKernelLaw::Sum { .. }
         | ScalarKernelLaw::Product { .. }
         | ScalarKernelLaw::Reciprocal { .. }

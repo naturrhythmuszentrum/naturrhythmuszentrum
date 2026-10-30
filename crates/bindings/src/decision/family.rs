@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Explicit physical source correspondence precedes every conditional numerical trace.
 
+mod reading;
+
 use super::{DecisionError, DecisionExpression, IntegerDecisionSpec, storage};
 use crate::{CheckedDeclarations, Declaration, Kind, Role};
 use nrz_cas::{
@@ -16,7 +18,9 @@ pub(super) struct Inputs {
     /// Scope in which every qualified endpoint assumption is available.
     pub(super) context: Handle,
     /// Complete canonical original input inventory and its explicit mathematical correspondence.
-    pub(super) inputs: Vec<(String, ScalarKernelFamily)>,
+    pub(super) families: Vec<(String, ScalarKernelFamily)>,
+    /// Original affine definitions and physical coordinate meanings for mapped operands.
+    pub(super) readings: Vec<(String, crate::readings::PhysicalReading)>,
 }
 
 impl Inputs {
@@ -27,6 +31,7 @@ impl Inputs {
         name: &str,
         context: &Handle,
         inputs: Vec<(String, ScalarKernelFamily)>,
+        readings: Vec<(String, crate::readings::PhysicalReading)>,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
         let original = owner.checked(name)?;
@@ -70,11 +75,15 @@ impl Inputs {
                 .saturating_add(storage::rational_bytes(&family.lower))
                 .saturating_add(storage::rational_bytes(&family.upper));
         }
+        bytes = bytes.saturating_add(reading::check(
+            cas, owner, context, &inputs, &readings, budget,
+        )?);
         storage::retained(bytes, budget)?;
         budget.work(bytes, storage::AT)?;
         Ok(Self {
             context: context.clone(),
-            inputs,
+            families: inputs,
+            readings,
         })
     }
 }
@@ -138,7 +147,9 @@ pub(super) fn correspondence(
     for (name, target) in names.iter().zip(&operands) {
         budget.work(1, storage::AT)?;
         if let Some((_, family)) = source.input_families().iter().find(|(key, _)| key == *name) {
-            if &family.source != target {
+            let mapped = source.input_readings().iter().find(|(key, _)| key == *name);
+            let expected = mapped.map_or(&family.source, |(_, reading)| reading.node());
+            if expected != target {
                 return Err(DecisionError::Target);
             }
             cas.check_scalar_kernel_family(&spec.context, family, budget)?;
@@ -196,8 +207,13 @@ pub(super) fn authenticate(
         return Err(DecisionError::Source);
     };
     let mut count = 0;
+    let mut mapped = 0;
     for record in &certificate.records {
         budget.work(1, storage::AT)?;
+        if let ScalarKernelLaw::Reading(value) = &record.law {
+            reading::authenticate(source, value, budget)?;
+            mapped += 1;
+        }
         if let ScalarKernelLaw::Family(input) = &record.law {
             budget.work(
                 u64::try_from(source.input_families().len())
@@ -214,7 +230,7 @@ pub(super) fn authenticate(
             count += 1;
         }
     }
-    if count != source.input_families().len() {
+    if count != source.input_families().len() || mapped != source.input_readings().len() {
         return Err(DecisionError::Source);
     }
     Ok(())

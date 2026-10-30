@@ -135,6 +135,14 @@ impl DecisionOperand {
             .iter()
             .find_map(|(name, family)| (name == &self.name).then_some(family))
     }
+    /// Original exact affine definition, when this numerical operand supplies a selected source.
+    #[must_use]
+    pub fn reading(&self) -> Option<&crate::readings::PhysicalReading> {
+        self.source
+            .input_readings()
+            .iter()
+            .find_map(|(name, reading)| (name == &self.name).then_some(reading))
+    }
     /// Original declaration key, scoped by the retained physical source owner.
     #[must_use]
     pub fn name(&self) -> &str {

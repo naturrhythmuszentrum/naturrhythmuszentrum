@@ -58,6 +58,7 @@ pub(super) fn check(
     match &record.law {
         ScalarKernelLaw::Input(value) => super::input::check(cas, original, record, value, budget),
         ScalarKernelLaw::Family(value) => super::family::input(record, value, budget),
+        ScalarKernelLaw::Reading(value) => super::reading::enclose(record, value, earlier, budget),
         ScalarKernelLaw::Rational(value) => {
             value.check(budget, AT)?;
             contains(record, value, budget)

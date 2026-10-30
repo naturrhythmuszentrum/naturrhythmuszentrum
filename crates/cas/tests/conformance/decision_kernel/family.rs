@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Physical source boxes remain qualified assumptions throughout exact kernel replay.
 
+mod mapped;
+
 use super::{Fixture, TestResult, certificate, constant, ledger, prepared, rational};
 use crate::testing::builders::admit;
 use nrz_cas::decision::{

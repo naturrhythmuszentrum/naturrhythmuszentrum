@@ -7,7 +7,7 @@ use nrz_bindings::readings::algebra::{
     ExactConstant, Rational,
     decision::{
         ScalarKernelFamilyInput, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
-        ScalarKernelRecord,
+        ScalarKernelReading, ScalarKernelRecord,
     },
     pi_bounds::PiBoundCertificate,
     syntax::Constant,
@@ -15,43 +15,110 @@ use nrz_bindings::readings::algebra::{
 use nrz_bindings::{Budget, Declaration, Role};
 use nrz_scalar::{
     ArithmeticContext, Dyadic, Enclosure, Finite, KernelBudget, KernelCertificate,
-    KernelEvaluation, KernelLaw, KernelUsage, Scalar,
+    KernelEvaluation, KernelLaw, KernelUsage, LiteralLimits, Scalar,
 };
 
-/// Prepay the bounded four-operation schedule, including every fixed-size export.
+/// Prepay the bounded quotient and optional affine schedules, including every fixed-size export.
 pub(super) fn execute<P: Scalar>(
     frozen: &FrozenDecisionInputs<P>,
     order: [usize; 2],
     arithmetic: &ArithmeticContext,
     budget: &mut Budget,
-) -> Result<([KernelCertificate; 4], KernelUsage), LiveDecisionError> {
-    // Two sums (116), reciprocal (44), product (60), four exports (512).
-    budget.work(732, AT)?;
-    let mut scalar = KernelBudget::new(732);
-    let first = input_box(
-        frozen.operands()[order[0]].coordinates(),
-        arithmetic,
-        &mut scalar,
-    )?;
-    let second = input_box(
-        frozen.operands()[order[1]].coordinates(),
-        arithmetic,
-        &mut scalar,
-    )?;
-    let reciprocal = KernelEvaluation::reciprocal(second.enclosure(), arithmetic, &mut scalar)?;
+) -> Result<(Vec<KernelCertificate>, KernelUsage), LiveDecisionError> {
+    let mapped = frozen.association().case().source().input_readings().len();
+    let work = 732_u64.saturating_add(
+        u64::try_from(mapped)
+            .map_err(|_| LiveDecisionError::Recipe)?
+            .saturating_mul(1064),
+    );
+    budget.work(work, AT)?;
+    let mut scalar = KernelBudget::new(work);
+    let mut records = Vec::new();
+    records
+        .try_reserve_exact(4_usize.saturating_add(mapped.saturating_mul(4)))
+        .map_err(|_| LiveDecisionError::Recipe)?;
+    let mut values = [
+        input_box(
+            frozen.operands()[order[0]].coordinates(),
+            arithmetic,
+            &mut scalar,
+        )?,
+        input_box(
+            frozen.operands()[order[1]].coordinates(),
+            arithmetic,
+            &mut scalar,
+        )?,
+    ];
+    for value in &values {
+        records.push(value.export(&mut scalar)?);
+    }
+    for (value, slot) in values.iter_mut().zip(order) {
+        if let Some(reading) = frozen.association().operands()[slot].reading() {
+            *value = mapped_input(
+                *value,
+                reading,
+                arithmetic,
+                &mut scalar,
+                &mut records,
+                budget,
+            )?;
+        }
+    }
+    let reciprocal = KernelEvaluation::reciprocal(values[1].enclosure(), arithmetic, &mut scalar)?;
     let product = KernelEvaluation::product(
-        first.enclosure(),
+        values[0].enclosure(),
         reciprocal.enclosure(),
         arithmetic,
         &mut scalar,
     )?;
-    let records = [
-        first.export(&mut scalar)?,
-        second.export(&mut scalar)?,
-        reciprocal.export(&mut scalar)?,
-        product.export(&mut scalar)?,
-    ];
+    records.push(reciprocal.export(&mut scalar)?);
+    records.push(product.export(&mut scalar)?);
     Ok((records, scalar.usage()))
+}
+
+/// Execute both exact coefficient imports and the full-box product and sum in declared order.
+fn mapped_input<P: Scalar>(
+    input: KernelEvaluation<P>,
+    reading: &nrz_bindings::readings::PhysicalReading,
+    arithmetic: &ArithmeticContext,
+    scalar: &mut KernelBudget,
+    records: &mut Vec<KernelCertificate>,
+    budget: &mut Budget,
+) -> Result<KernelEvaluation<P>, LiveDecisionError> {
+    let [scale] = reading.map().coefficients() else {
+        return Err(LiveDecisionError::Recipe);
+    };
+    let [offset] = reading.map().offsets() else {
+        return Err(LiveDecisionError::Recipe);
+    };
+    let scale = coefficient(scale, arithmetic, scalar, budget)?;
+    let offset = coefficient(offset, arithmetic, scalar, budget)?;
+    let product =
+        KernelEvaluation::product(input.enclosure(), scale.enclosure(), arithmetic, scalar)?;
+    let sum = KernelEvaluation::sum(product.enclosure(), offset.enclosure(), arithmetic, scalar)?;
+    for value in [scale, offset, product, sum] {
+        records.push(value.export(scalar)?);
+    }
+    Ok(sum)
+}
+
+/// The native import keeps its existing explicit literal allowance and refuses larger requirements.
+fn coefficient<P: Scalar>(
+    value: &Rational,
+    arithmetic: &ArithmeticContext,
+    scalar: &mut KernelBudget,
+    budget: &mut Budget,
+) -> Result<KernelEvaluation<P>, LiveDecisionError> {
+    let (numerator, denominator) = value
+        .small_ratio(budget)?
+        .ok_or(LiveDecisionError::Recipe)?;
+    Ok(KernelEvaluation::rational(
+        numerator,
+        denominator,
+        LiteralLimits::new(32, 32, 128),
+        arithmetic,
+        scalar,
+    )?)
 }
 
 /// The total already contains its numerical companion, so use it exactly once.
@@ -94,13 +161,15 @@ fn record(
 pub(super) fn convert<P: Scalar>(
     frozen: &FrozenDecisionInputs<P>,
     order: [usize; 2],
-    records: &[KernelCertificate; 4],
+    records: &[KernelCertificate],
     pi: &PiBoundCertificate,
     budget: &mut Budget,
 ) -> Result<Vec<ScalarKernelRecord>, LiveDecisionError> {
     let mut result = Vec::new();
     result
-        .try_reserve_exact(4)
+        .try_reserve_exact(
+            4_usize.saturating_add(frozen.association().case().source().input_readings().len()),
+        )
         .map_err(|_| LiveDecisionError::Recipe)?;
     for (slot, value) in order.into_iter().zip(&records[..2]) {
         let KernelLaw::Sum { left, right } = value.law else {
@@ -130,17 +199,62 @@ pub(super) fn convert<P: Scalar>(
             budget,
         )?);
     }
+    let (logical, cursor) = mapped_records(frozen, order, records, &mut result, budget)?;
+    if records.len() != cursor + 2 {
+        return Err(LiveDecisionError::Recipe);
+    }
+    let reciprocal = u32::try_from(result.len()).map_err(|_| LiveDecisionError::Recipe)?;
     result.push(record(
-        &records[2],
-        ScalarKernelLaw::Reciprocal { input: 1 },
+        &records[cursor],
+        ScalarKernelLaw::Reciprocal { input: logical[1] },
         budget,
     )?);
     result.push(record(
-        &records[3],
-        ScalarKernelLaw::Product { left: 0, right: 2 },
+        &records[cursor + 1],
+        ScalarKernelLaw::Product {
+            left: logical[0],
+            right: reciprocal,
+        },
         budget,
     )?);
     Ok(result)
+}
+
+/// One exact map law covers the final actual sum; all four executed primitives remain in the trace.
+fn mapped_records<P: Scalar>(
+    frozen: &FrozenDecisionInputs<P>,
+    order: [usize; 2],
+    records: &[KernelCertificate],
+    result: &mut Vec<ScalarKernelRecord>,
+    budget: &mut Budget,
+) -> Result<([u32; 2], usize), LiveDecisionError> {
+    let mut logical = [0, 1];
+    let mut cursor = 2;
+    for (position, slot) in order.into_iter().enumerate() {
+        if let Some(reading) = frozen.association().operands()[slot].reading() {
+            let [scale] = reading.map().coefficients() else {
+                return Err(LiveDecisionError::Recipe);
+            };
+            let [offset] = reading.map().offsets() else {
+                return Err(LiveDecisionError::Recipe);
+            };
+            let value = records.get(cursor + 3).ok_or(LiveDecisionError::Recipe)?;
+            let index = u32::try_from(result.len()).map_err(|_| LiveDecisionError::Recipe)?;
+            result.push(record(
+                value,
+                ScalarKernelLaw::Reading(Box::new(ScalarKernelReading {
+                    definition: reading.node().clone(),
+                    input: logical[position],
+                    scale: scale.clone(),
+                    offset: offset.clone(),
+                })),
+                budget,
+            )?);
+            logical[position] = index;
+            cursor += 4;
+        }
+    }
+    Ok((logical, cursor))
 }
 
 /// Independently use the original checked coherent constant, never a frozen center or name alone.
@@ -217,5 +331,32 @@ pub(super) fn family_bytes<P: Scalar>(frozen: &FrozenDecisionInputs<P>) -> u64 {
                     )
                 },
             )
+        })
+}
+
+/// Extra actual scalar records and exact map fields are prepaid before execution and cloning.
+pub(super) fn reading_bytes<P: Scalar>(frozen: &FrozenDecisionInputs<P>) -> u64 {
+    frozen
+        .association()
+        .case()
+        .source()
+        .input_readings()
+        .iter()
+        .fold(0_u64, |total, (_, reading)| {
+            reading
+                .map()
+                .coefficients()
+                .iter()
+                .chain(reading.map().offsets())
+                .fold(total.saturating_add(960), |total, value| {
+                    let (first, second) = value.component_bits();
+                    total.saturating_add(
+                        first
+                            .div_ceil(8)
+                            .saturating_add(second.div_ceil(8))
+                            .saturating_mul(4)
+                            .saturating_add(128),
+                    )
+                })
         })
 }

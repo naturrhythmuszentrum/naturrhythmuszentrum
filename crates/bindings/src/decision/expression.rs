@@ -98,7 +98,40 @@ impl DecisionExpression {
         inputs: Vec<(String, nrz_cas::decision::ScalarKernelFamily)>,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
-        let family = family::Inputs::check(cas, &owner, name, context, inputs, budget)?;
+        Self::open(cas, owner, name, context, inputs, Vec::new(), budget)
+    }
+
+    /// Declare exact scalar affine readings over explicit physical source families.
+    ///
+    /// Each retained reading must select its original one-entry family in the same context.
+    /// # Errors
+    /// Refuses missing or foreign readings, changed physical meanings, maps and limits.
+    pub fn mapped_family(
+        cas: &nrz_cas::Cas,
+        owner: Rc<CheckedDeclarations>,
+        name: &str,
+        context: &Handle,
+        inputs: Vec<(String, nrz_cas::decision::ScalarKernelFamily)>,
+        readings: Vec<(String, crate::readings::PhysicalReading)>,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
+        if readings.is_empty() {
+            return Err(DecisionError::Source);
+        }
+        Self::open(cas, owner, name, context, inputs, readings, budget)
+    }
+
+    /// Both explicit input forms share the original source and complete correspondence owner.
+    fn open(
+        cas: &nrz_cas::Cas,
+        owner: Rc<CheckedDeclarations>,
+        name: &str,
+        context: &Handle,
+        inputs: Vec<(String, nrz_cas::decision::ScalarKernelFamily)>,
+        readings: Vec<(String, crate::readings::PhysicalReading)>,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
+        let family = family::Inputs::check(cas, &owner, name, context, inputs, readings, budget)?;
         let original = owner.checked(name)?.original().syntax.clone();
         Ok(Self(Rc::new(Data {
             owner,
@@ -142,7 +175,15 @@ impl DecisionExpression {
         self.0
             .family
             .as_ref()
-            .map_or(&[], |family| family.inputs.as_slice())
+            .map_or(&[], |family| family.families.as_slice())
+    }
+    /// Exact defined readings keyed by their original physical operands, in declaration order.
+    #[must_use]
+    pub fn input_readings(&self) -> &[(String, crate::readings::PhysicalReading)] {
+        self.0
+            .family
+            .as_ref()
+            .map_or(&[], |family| family.readings.as_slice())
     }
     /// Original scope of the explicitly retained source assumptions, when the source is open.
     #[must_use]

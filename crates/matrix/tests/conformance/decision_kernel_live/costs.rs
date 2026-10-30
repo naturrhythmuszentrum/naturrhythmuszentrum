@@ -295,7 +295,8 @@ fn relations(records: &[ScalarKernelRecord], budget: &mut Budget) -> TestResult 
                     }
                 }
             }
-            ScalarKernelLaw::Family(_)
+            ScalarKernelLaw::Reading(_)
+            | ScalarKernelLaw::Family(_)
             | ScalarKernelLaw::Rational(_)
             | ScalarKernelLaw::Sum { .. }
             | ScalarKernelLaw::SquareRoot { .. } => return Err("unexpected LC law".into()),
@@ -322,7 +323,8 @@ fn meaning(records: &[ScalarKernelRecord], budget: &mut Budget) -> TestResult {
             ScalarKernelLaw::Product { left, right } => {
                 values[usize::try_from(*left)?].mul(&values[usize::try_from(*right)?], budget)?
             }
-            ScalarKernelLaw::Family(_)
+            ScalarKernelLaw::Reading(_)
+            | ScalarKernelLaw::Family(_)
             | ScalarKernelLaw::Rational(_)
             | ScalarKernelLaw::Sum { .. }
             | ScalarKernelLaw::SquareRoot { .. } => return Err("unexpected LC law".into()),

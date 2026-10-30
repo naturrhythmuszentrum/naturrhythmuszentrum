@@ -2,6 +2,7 @@
 //! Original LC floor selection assembled solely through public CAS constructors.
 
 mod family;
+mod mapped;
 
 use crate::binding_testing::TestResult;
 use nrz_bindings::readings::algebra::decision::{
@@ -250,6 +251,15 @@ pub(super) struct SelectionFixture {
     pub(super) context: Handle,
     /// Independently checked proof proposal.
     pub(super) steps: Vec<ApplicationDraft>,
+}
+
+/// A defined one-entry physical reading with its original source-box assumptions.
+pub(super) fn mapped_fixture() -> TestResult<(
+    SelectionFixture,
+    nrz_bindings::readings::algebra::decision::ScalarKernelFamily,
+    nrz_bindings::readings::PhysicalReading,
+)> {
+    mapped::fixture()
 }
 
 /// The original varying LC duration and its retained exact source-box premises.

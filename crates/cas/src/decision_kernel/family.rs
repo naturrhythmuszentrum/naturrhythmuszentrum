@@ -44,30 +44,42 @@ impl Cas {
         family: &ScalarKernelFamily,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        budget.work(5, PREMISE)?;
-        let context_id = self.checked(context)?;
-        let source = self.state.expression(self.checked(&family.source)?)?;
-        if source.header != self.state.context(context_id)?.header_id
-            || source.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
-            || !source.scope.is_empty()
-            || source.binding.is_some()
-            || source.space.is_some()
-            || source.domain.is_some()
-            || source.attachment.is_some()
-            || !matches!(source.operator, Operator::Free(_))
-        {
-            return Err(invalid());
-        }
-        family.lower.check(budget, PREMISE)?;
-        family.upper.check(budget, PREMISE)?;
-        if family.lower.compare(&family.upper, budget)? == Ordering::Greater {
-            return Err(Fault::invalid(InvalidCode::RefutedDomain, PREMISE));
-        }
-        for (index, premise) in family.premises.iter().enumerate() {
-            endpoint(self, context_id, family, premise, index == 0, budget)?;
-        }
-        Ok(())
+        check_source(self, context, family, true, budget)
     }
+}
+
+/// Version three retains free scalar leaves; version four additionally admits selected entries.
+fn check_source(
+    cas: &Cas,
+    context: &Handle,
+    family: &ScalarKernelFamily,
+    selected: bool,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    budget.work(5, PREMISE)?;
+    let context_id = cas.checked(context)?;
+    let source = cas.state.expression(cas.checked(&family.source)?)?;
+    if source.header != cas.state.context(context_id)?.header_id
+        || source.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
+        || !source.scope.is_empty()
+        || source.binding.is_some()
+        || source.space.is_some()
+        || source.domain.is_some()
+        || source.attachment.is_some()
+        || (!selected && !matches!(source.operator, Operator::Free(_)))
+    {
+        return Err(invalid());
+    }
+    source_shape(cas, source, budget)?;
+    family.lower.check(budget, PREMISE)?;
+    family.upper.check(budget, PREMISE)?;
+    if family.lower.compare(&family.upper, budget)? == Ordering::Greater {
+        return Err(Fault::invalid(InvalidCode::RefutedDomain, PREMISE));
+    }
+    for (index, premise) in family.premises.iter().enumerate() {
+        endpoint(cas, context_id, family, premise, index == 0, budget)?;
+    }
+    Ok(())
 }
 
 /// A qualified predicate authenticates both its original source and literal bound.
@@ -125,7 +137,13 @@ pub(super) fn validate(
     for (index, record) in certificate.records.iter().enumerate() {
         budget.work(super::record_bytes(record), COVERAGE)?;
         if let ScalarKernelLaw::Family(input) = &record.law {
-            cas.check_scalar_kernel_family(&certificate.context, &input.family, budget)?;
+            check_source(
+                cas,
+                &certificate.context,
+                &input.family,
+                certificate.version == 4,
+                budget,
+            )?;
             super::relations::check(
                 cas,
                 cas.checked(&contract.target)?,
@@ -134,6 +152,18 @@ pub(super) fn validate(
                 budget,
             )?;
             found = true;
+        }
+        if let ScalarKernelLaw::Reading(value) = &record.law {
+            if certificate.version != 4 {
+                return Err(Fault::invalid(InvalidCode::UnsupportedVersion, COVERAGE));
+            }
+            super::reading::identity(
+                cas,
+                &certificate.context,
+                value,
+                &certificate.records[..index],
+                budget,
+            )?;
         }
     }
     if !found {
@@ -212,12 +242,49 @@ pub(super) fn bytes(value: &ScalarKernelFamilyInput) -> u64 {
 )]
 pub(crate) fn closed(contract: &RationalEnclosure) -> Result<(), Fault> {
     if let crate::decision::EnclosureOrigin::ScalarKernel(certificate) = &contract.origin
-        && certificate.version == 3
+        && certificate.version >= 3
     {
         return Err(Fault::invalid(
             InvalidCode::UnsupportedCertificate,
             COVERAGE,
         ));
+    }
+    Ok(())
+}
+
+/// A selected scalar retains the complete one-entry free matrix declaration behind its source.
+fn source_shape(
+    cas: &Cas,
+    source: &crate::graph::Expression,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    if matches!(source.operator, Operator::Free(_)) {
+        return Ok(());
+    }
+    budget.work(2, PREMISE)?;
+    if !matches!(source.operator, Operator::Select(_)) {
+        return Err(invalid());
+    }
+    let [root] = source.operands.as_slice() else {
+        return Err(invalid());
+    };
+    let root = cas.state.expression(*root)?;
+    let matrix = root.sort
+        == Sort::Value(AtomicSort::Matrix {
+            field: Field::Real,
+            rows: crate::model::Extent::Literal(1),
+            columns: crate::model::Extent::Literal(1),
+        });
+    if !matrix
+        || !matches!(root.operator, Operator::Free(_))
+        || root.header != source.header
+        || !root.scope.is_empty()
+        || root.binding.is_some()
+        || root.space.is_some()
+        || root.domain.is_some()
+        || root.attachment.is_some()
+    {
+        return Err(invalid());
     }
     Ok(())
 }

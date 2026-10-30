@@ -65,6 +65,15 @@ fn step(
                 return Err(invalid());
             }
         }
+        ScalarKernelLaw::Reading(value) => {
+            if cas.checked(&value.definition)? != original {
+                return Err(invalid());
+            }
+            let [_, selected] = expression.operands.as_slice() else {
+                return Err(invalid());
+            };
+            pending.push((*selected, child(value.input)?));
+        }
         ScalarKernelLaw::Rational(value) => constant(cas, original, &value.clone().into(), budget)?,
         ScalarKernelLaw::Input(value) => constant(
             cas,

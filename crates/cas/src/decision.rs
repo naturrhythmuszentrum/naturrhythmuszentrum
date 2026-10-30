@@ -15,7 +15,7 @@ pub use crate::decision_enclosure::EnclosureAttempt;
 
 pub use crate::decision_kernel::model::{
     ScalarKernelCertificate, ScalarKernelFamily, ScalarKernelFamilyInput, ScalarKernelInput,
-    ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelRecord,
+    ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelReading, ScalarKernelRecord,
 };
 
 /// An untrusted closed rational interval for one exact declared Real or Integer coordinate.

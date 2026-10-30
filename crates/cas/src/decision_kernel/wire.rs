@@ -3,7 +3,7 @@
 
 use super::model::{
     ScalarKernelCertificate, ScalarKernelFamily, ScalarKernelFamilyInput, ScalarKernelInput,
-    ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelRecord,
+    ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelReading, ScalarKernelRecord,
 };
 use crate::budget::BudgetKind;
 use crate::encoding::Encoder;
@@ -32,6 +32,13 @@ pub(crate) fn encode(
     out.count(value.records.len())?;
     for record in &value.records {
         match &record.law {
+            ScalarKernelLaw::Reading(value) => {
+                out.byte(7)?;
+                write(&value.definition, out)?;
+                out.unsigned(u64::from(value.input))?;
+                out.number(&value.scale)?;
+                out.number(&value.offset)?;
+            }
             ScalarKernelLaw::Family(value) => {
                 out.byte(6)?;
                 encode_family(value, out, write)?;
@@ -79,7 +86,7 @@ pub(crate) fn decode(
     objects: &[Decoded],
 ) -> Result<ScalarKernelCertificate, Fault> {
     let version = reader.small()?;
-    if !matches!(version, 1..=3) {
+    if !matches!(version, 1..=4) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     let expression = object(reader, objects)?;
@@ -92,9 +99,15 @@ pub(crate) fn decode(
         .map_err(|_| Fault::allocation(AT))?;
     for _ in 0..count {
         let law = match reader.byte()? {
-            6 if version == 3 => ScalarKernelLaw::Family(Box::new(decode_family(reader, objects)?)),
+            7 if version == 4 => ScalarKernelLaw::Reading(Box::new(ScalarKernelReading {
+                definition: object(reader, objects)?,
+                input: reader.small()?,
+                scale: reader.rational()?,
+                offset: reader.rational()?,
+            })),
+            6 if version >= 3 => ScalarKernelLaw::Family(Box::new(decode_family(reader, objects)?)),
             5 if version >= 2 => ScalarKernelLaw::Input(Box::new(decode_input(reader)?)),
-            5..=6 => return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT)),
+            5..=7 => return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT)),
             0 => ScalarKernelLaw::Rational(reader.rational()?),
             1 => ScalarKernelLaw::Sum {
                 left: reader.small()?,

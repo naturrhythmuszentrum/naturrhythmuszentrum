@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Pure exact records for the closed scalar certificate checker.
+//! Pure exact scalar interval laws and retained physical source definitions.
 
 use crate::pi_bounds::PiBoundCertificate;
 use crate::{Handle, Rational};
 
-/// One closed scalar law; indices refer only to earlier complete records.
+/// One exact scalar law; indices refer only to earlier complete records.
 ///
 /// Each referenced record supplies its entire real interval, so all arithmetic
 /// relations cover the full Cartesian input box. No floating value is accepted.
@@ -16,6 +16,8 @@ pub enum ScalarKernelLaw {
     Input(Box<ScalarKernelInput>),
     /// Version-three physical family, conditional on two retained endpoint assumptions.
     Family(Box<ScalarKernelFamilyInput>),
+    /// Version-four exact affine definition applied to an earlier physical family.
+    Reading(Box<ScalarKernelReading>),
     /// Exact real addition of the ordered earlier records.
     Sum {
         /// Earlier left operand.
@@ -45,7 +47,7 @@ pub enum ScalarKernelLaw {
 /// An untrusted exact endpoint claim for one operation in a finite scalar trace.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScalarKernelRecord {
-    /// The closed mathematical operation and its complete operand references.
+    /// The mathematical operation and its complete operand references.
     pub law: ScalarKernelLaw,
     /// Included rational lower endpoint, exported from a scalar dyadic.
     pub lower: Rational,
@@ -58,7 +60,8 @@ pub struct ScalarKernelRecord {
 /// Version one has rational leaves and closed sums, products, reciprocals and
 /// positive square roots. Version two additionally checks complete native input
 /// sets with closed rational or rational-times-pi sources. Version three additionally
-/// retains explicit physical source-box assumptions. The last record is the original
+/// retains explicit physical source-box assumptions. Version four adds exact scalar
+/// affine reading definitions. The last record is the original
 /// target. A quotient uses reciprocal then product; every record is checked before
 /// any result. Closed leaves add no assumptions; family leaves retain both qualified
 /// endpoint premises through mathematical selection and independent wire replay.
@@ -126,4 +129,17 @@ pub struct ScalarKernelFamilyInput {
     pub radius: Rational,
     /// Original source identity, declared box and retained endpoint assumptions.
     pub family: ScalarKernelFamily,
+}
+
+/// One original scalar affine definition, independently matched to its exact coefficients.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScalarKernelReading {
+    /// Actual transparent CAS reading definition, never its bare result declaration.
+    pub definition: Handle,
+    /// Earlier complete physical-family input record.
+    pub input: u32,
+    /// Exact rational scale declared by the reading.
+    pub scale: Rational,
+    /// Exact rational offset declared by the reading.
+    pub offset: Rational,
 }

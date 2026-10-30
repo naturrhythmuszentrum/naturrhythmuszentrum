@@ -3,6 +3,7 @@
 
 mod admission;
 mod costs;
+mod mapped;
 
 use super::{TestResult, inputs, ledger, pi, select};
 use crate::conformance::decision_fixture::{SelectionFixture, family_fixture};
@@ -88,6 +89,16 @@ fn source(budget: &mut Budget) -> TestResult<(DecisionInputs, SelectionFixture)>
         budget,
     )?;
     assert!(physical.exact().is_none());
+    let association = associate(&source, physical, budget)?;
+    Ok((association, source))
+}
+
+/// Native and mapped physical declarations share the complete case and association checks.
+fn associate(
+    source: &SelectionFixture,
+    physical: DecisionExpression,
+    budget: &mut Budget,
+) -> TestResult<DecisionInputs> {
     let proposal = source.steps.last().ok_or("selection")?;
     let Statement::IntegerSelection(selection) = &proposal.conclusion else {
         return Err("selection statement".into());
@@ -111,7 +122,7 @@ fn source(budget: &mut Budget) -> TestResult<(DecisionInputs, SelectionFixture)>
         },
         budget,
     )?;
-    Ok((case.associate_inputs(budget)?, source))
+    Ok(case.associate_inputs(budget)?)
 }
 
 /// The full family selects three cycles, survives fresh replay and retires on a radius-only write.

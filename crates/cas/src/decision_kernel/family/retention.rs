@@ -25,7 +25,7 @@ pub(crate) fn retain(
     let EnclosureOrigin::ScalarKernel(certificate) = &contract.origin else {
         return Ok(());
     };
-    if certificate.version != 3 {
+    if certificate.version < 3 {
         return Ok(());
     }
     for record in &certificate.records {
@@ -61,11 +61,21 @@ pub(crate) fn dependencies(
     let EnclosureOrigin::ScalarKernel(certificate) = &contract.origin else {
         return Ok(());
     };
-    if certificate.version != 3 {
+    if certificate.version < 3 {
         return Ok(());
     }
     for record in &certificate.records {
         budget.work(1, AT)?;
+        if let ScalarKernelLaw::Reading(value) = &record.law {
+            budget.check(
+                BudgetKind::StagedPayloadBytes,
+                size(edges.len().saturating_add(1), AT)?.saturating_mul(32),
+                AT,
+            )?;
+            budget.work(1, AT)?;
+            edges.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+            edges.push((cas.checked(&value.definition)?, Edge::DependsOn));
+        }
         if let ScalarKernelLaw::Family(input) = &record.law {
             budget.check(
                 BudgetKind::StagedPayloadBytes,
