@@ -35,7 +35,7 @@ Refinement improves bounds for the same target and premises without changing the
 
 **Rule (Deterministic bounded evaluation)** · `rule:nrz:cas-enclosures-determinism`
 
-The declared target, assumptions, evaluation policy, precision request and resource allowance determine the evaluation's choices and reported bounds. Unspecified traversal or cache warmth must not silently choose a mathematical outcome. A design may expose different reuse states or policies, but then records those differences and preserves the validity of every returned bound. Determinism does not promise identical elapsed time or completion after external interruption (`rule:nrz:cas-search-bounds`).
+Evaluation is deterministic for the declared target, assumptions, evaluation policy, precision request, resource allowance and store reuse state. A proved or refuted verdict, once reached, never depends on reuse state, and neither does the validity of any returned bound. Work is charged per operation, and checked results are reused within a store, so a warm request can consume less Work and reach a verdict under an allowance that leaves a cold request undecided or exhausted. Whether a verdict is reached within that allowance may therefore depend on reuse state; every result reports the Work actually consumed so that the difference is visible. Determinism promises neither identical outcomes under identical budgets across different reuse states nor identical elapsed time or completion after external interruption (`rule:nrz:cas-search-bounds`).
 
 **Caveat (Limits of enclosure evidence)** · `cav:nrz:cas-enclosures-nonclaims`
 
@@ -65,7 +65,7 @@ Interruption reports that execution stopped without completing the requested eva
 
 **Rule (Bounded work and honest exhaustion)** · `rule:nrz:cas-enclosures-budgets`
 
-Requests have finite arithmetic, storage, refinement and output allowances. Every expensive exact operation and certificate check consumes its applicable allowance; a resource ceiling does not become a bound on mathematical error. Exhaustion reports actual consumed work, unmet requirements and any valid retained evidence. It never invents a completed comparison, changes the target tolerance or increases a limit to obtain success. Refusal is atomic with respect to published evidence, while work already spent remains spent (`rule:nrz:cas-search-bounds`), (`[CAS-rule:cas:constant-cache-lifecycle]`).
+Requests have finite arithmetic, storage, refinement and output allowances. Work is charged for operations actually performed, including the applicable costs of checked reuse, rather than for checks avoided through store-local retention. Every expensive exact operation and certificate check consumes its applicable allowance; a resource ceiling does not become a bound on mathematical error. Every result reports actual consumed Work; exhaustion also reports unmet requirements and any valid retained evidence. Reuse can change whether the allowance suffices, but never invents a completed comparison, changes the target tolerance or increases a limit to obtain success. Refusal is atomic with respect to published evidence, while work already spent remains spent (`rule:nrz:cas-search-bounds`), (`[CAS-rule:cas:constant-cache-lifecycle]`).
 
 **Requirement (Bounded endpoint growth)** · `req:nrz:cas-enclosures-growth`
 
@@ -113,7 +113,7 @@ The existing scalar kernel family exports certificates for rational inputs, sums
 
 **Rule (Store-local reuse retains its scope)** · `rule:nrz:cas-enclosures-existing-caches`
 
-Checked constants, scalar records and Machin certificates already have store-local retention. Reuse depends on the complete checked identity, context and lifecycle, not on a printed value or a matching approximate endpoint. Those receipts can avoid repeated checking within their contracts but cannot become portable evidence merely because they were cached. Any new enclosure reuse must preserve target and parameter identity, resource accounting and rollback validity (`[CAS-def:cas:constant-cache]`), (`[CAS-def:cas:scalar-record-cache]`), (`[CAS-def:cas:pi-bound-cache]`).
+Checked constants, scalar records and Machin certificates already have store-local retention. Reuse depends on the complete checked identity, context and lifecycle, not on a printed value or a matching approximate endpoint. Those receipts can avoid repeated checking within their contracts but cannot become portable evidence merely because they were cached. Avoided operations reduce consumed Work and can let a warm request reach a verdict within an allowance that does not suffice in a cold store; the result reports actual consumed Work, while verdicts once reached and the validity of returned bounds remain independent of reuse state. Any new enclosure reuse must preserve target and parameter identity, resource accounting and rollback validity (`[CAS-def:cas:constant-cache]`), (`[CAS-def:cas:scalar-record-cache]`), (`[CAS-def:cas:pi-bound-cache]`).
 
 **Definition (Decision enclosure precedent)** · `def:nrz:cas-enclosures-existing-decisions`
 
@@ -132,6 +132,10 @@ The design will compare new laws in the scalar kernel family, each carrying its 
 **Requirement (Independent conformance evidence)** · `req:nrz:cas-enclosures-verification`
 
 Each implemented family needs independently justified exact or bounded oracles, known-value cases, containment and compatible-refinement checks, domain and boundary refusals, straddling comparisons and corrupted-certificate controls. A higher-precision run of the same producer is not by itself an independent oracle. Resource tests retain literal N/N−1 Work boundaries, prior spent work and atomic refusal evidence. These tests support robustness and conformance; the mathematical remainder and enclosure arguments remain explicit obligations (`rule:vision:independent-numerical-evidence`), (`[CAS-rule:cas:constant-cache-lifecycle]`).
+
+**Requirement (Registered analytic laws)** · `req:nrz:cas-enclosures-formal-laws`
+
+Each family's remainder or error argument, including logarithm, exponential, sigmoid, tanh, rational powers and the Krawczyk premises, must be a registered formal lemma schema with its own label, formal name and semantic version. Each checked instance cites its schema by name and version and its premises by formal kind, retaining the complete original statement, context and conditions. The design names these schemas rather than leaving their arguments only in prose; registration alone grants no proof authority, and the closed checker must establish each instance. Until its schema is registered, a remainder bound stated in this concept keeps a non-Theorem kind. This follows the formal primitive register and its typed premise shapes under the closed registration and version policy (`[CAS-sec:cas:primitive-schemas]`), (`rule:nrz:cas-design-closed-registration`).
 
 **Requirement (Design before implementation)** · `req:nrz:cas-enclosures-design-boundary`
 
