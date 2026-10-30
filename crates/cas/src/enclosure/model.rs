@@ -109,6 +109,8 @@ pub struct EnclosureCertificate {
     pub records: Vec<Interval>,
     /// Finite analytic instances, present only for the logarithm family.
     pub logarithms: Vec<super::LogEvidence>,
+    /// Finite exponential instances, absent from earlier family wire formats.
+    pub exponentials: Vec<super::ExpEvidence>,
 }
 
 /// Sealed evidence admitted only after the independent checker has completed.
@@ -155,8 +157,18 @@ impl CheckedEnclosure {
         match self.certificate.law {
             super::EnclosureLaw::RationalInclusion => &super::ENCLOSURE_SCHEMAS[..1],
             super::EnclosureLaw::RootGrid => &super::ENCLOSURE_SCHEMAS[..2],
-            super::EnclosureLaw::LogAtanh if self.roots => &super::ENCLOSURE_SCHEMAS,
+            super::EnclosureLaw::LogAtanh if self.roots => &super::ENCLOSURE_SCHEMAS[..3],
             super::EnclosureLaw::LogAtanh => &LOG_SCHEMAS,
+            super::EnclosureLaw::ExpTaylor
+                if self.roots && !self.certificate.logarithms.is_empty() =>
+            {
+                &super::ENCLOSURE_SCHEMAS
+            }
+            super::EnclosureLaw::ExpTaylor if self.roots => &EXP_ROOT_SCHEMAS,
+            super::EnclosureLaw::ExpTaylor if !self.certificate.logarithms.is_empty() => {
+                &EXP_LOG_SCHEMAS
+            }
+            super::EnclosureLaw::ExpTaylor => &EXP_SCHEMAS,
         }
     }
 
@@ -164,7 +176,10 @@ impl CheckedEnclosure {
     #[must_use]
     pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
         use crate::proof::HypothesisKind;
-        if matches!(self.certificate.law, super::EnclosureLaw::LogAtanh) {
+        if matches!(
+            self.certificate.law,
+            super::EnclosureLaw::LogAtanh | super::EnclosureLaw::ExpTaylor
+        ) {
             return &[
                 HypothesisKind::DomainGuard,
                 HypothesisKind::Equality,
@@ -197,6 +212,22 @@ impl CheckedEnclosure {
 /// The exact schema inventory for logarithms without a root operand.
 const LOG_SCHEMAS: [crate::emptiness::LemmaSchema; 2] =
     [super::ENCLOSURE_SCHEMAS[0], super::ENCLOSURE_SCHEMAS[2]];
+
+/// Rational and exponential laws without other analytic operands.
+const EXP_SCHEMAS: [crate::emptiness::LemmaSchema; 2] =
+    [super::ENCLOSURE_SCHEMAS[0], super::ENCLOSURE_SCHEMAS[3]];
+/// Root operands add their independently checked law.
+const EXP_ROOT_SCHEMAS: [crate::emptiness::LemmaSchema; 3] = [
+    super::ENCLOSURE_SCHEMAS[0],
+    super::ENCLOSURE_SCHEMAS[1],
+    super::ENCLOSURE_SCHEMAS[3],
+];
+/// Logarithm operands add their independently checked law.
+const EXP_LOG_SCHEMAS: [crate::emptiness::LemmaSchema; 3] = [
+    super::ENCLOSURE_SCHEMAS[0],
+    super::ENCLOSURE_SCHEMAS[2],
+    super::ENCLOSURE_SCHEMAS[3],
+];
 
 /// Result with actual Work and achieved precision; no stopping reason supplies evidence.
 #[derive(Debug)]

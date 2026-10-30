@@ -26,17 +26,16 @@ pub(super) fn preflight(
     let Some(mut grid) = policy.precision.checked_add(8) else {
         return Ok(None);
     };
-    if target.enclosure_logs {
-        let Some(plan) = super::log::plan(
-            policy,
-            target
-                .enclosure_log_bound
-                .unwrap_or(policy.reduction_ceiling),
-        ) else {
-            return Ok(None);
-        };
-        grid = grid.max(plan.grid);
-        budget.check(BudgetKind::ProofNodes, u64::from(plan.terms), AT)?;
+    let Some(plans) = super::planning::Plans::new(target, policy) else {
+        return Ok(None);
+    };
+    grid = plans.grid(grid);
+    for plan in [plans.log, plans.exp].into_iter().flatten() {
+        budget.check(
+            BudgetKind::ProofNodes,
+            u64::from(plan.terms) + u64::from(target.enclosure_exp.present),
+            AT,
+        )?;
         budget.check(BudgetKind::IntegerExponent, u64::from(plan.reduction), AT)?;
     }
     if policy.rounds == 0 || grid > policy.grid_ceiling {

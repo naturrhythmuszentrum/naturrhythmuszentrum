@@ -330,6 +330,8 @@ pub enum Operator {
     GeneralPower(Branch),
     /// Real natural logarithm, defined only for a strictly positive operand.
     NaturalLog,
+    /// Real exponential with a finite, independently checked enclosure law.
+    Exponential,
     /// A call to a declaration with a checked function signature.
     Call(String),
     /// An unevaluated derivative with respect to a free declaration.

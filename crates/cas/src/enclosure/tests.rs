@@ -2,6 +2,8 @@
 //! Full original-scope controls exercise producer, replay, retention and stopping separately.
 
 use super::*;
+
+mod exponentials;
 use crate::budget::{Budget, Limits};
 use crate::domain_model::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::graph::{Draft, ExpressionDraft};

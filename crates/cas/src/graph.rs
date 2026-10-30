@@ -417,6 +417,8 @@ pub(crate) struct Expression {
     pub(crate) enclosure_roots: bool,
     /// Whether the supported closure uses the logarithm law.
     pub(crate) enclosure_logs: bool,
+    /// Present exponential family, with a conservative reduction bound when known.
+    pub(crate) enclosure_exp: crate::enclosure::AnalyticShape,
     /// Resident conservative bound, or a request for the declared reduction ceiling.
     pub(crate) enclosure_log_bound: Option<u32>,
     /// Closed enclosure grammar, derived from the original children at admission.
@@ -1713,9 +1715,11 @@ impl Cas {
             budget,
         )?;
         let ambient = crate::solving::sorts::ambient(state, header, &draft.sort)?;
+        let enclosure_exp = crate::enclosure::exp_metadata(state, &draft.operator, &operands)?;
         let (enclosure_logs, enclosure_log_bound) =
             crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
         let expression = Vertex::Expression(Expression {
+            enclosure_exp,
             enclosure_logs,
             enclosure_log_bound,
             enclosure_roots: crate::enclosure::has_roots(state, &draft.operator, &operands)?,

@@ -535,6 +535,7 @@ impl Cas {
             Vertex::Expression(crate::graph::Expression {
                 supported_enclosure: false,
                 enclosure_roots: false,
+                enclosure_exp: crate::enclosure::AnalyticShape::default(),
                 enclosure_logs: false,
                 enclosure_log_bound: None,
                 ambient,

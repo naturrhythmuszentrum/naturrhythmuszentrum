@@ -8,15 +8,23 @@ use crate::{Fault, Rational};
 use std::cmp::Ordering;
 
 /// Monotonicity joins two independently checked strictly positive endpoint instances.
-pub(in crate::enclosure) fn check(
+pub(in crate::enclosure) fn check<'a>(
     input: &Interval,
-    evidence: &LogEvidence,
+    evidence: &'a LogEvidence,
     proposed: &Interval,
     grid: u32,
+    cache: &mut Vec<(&'a LogSeries, Interval)>,
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<(), Fault> {
-    let lo = endpoint(input.lower(), &evidence.lower, grid, budget, interrupt)?;
+    let lo = endpoint(
+        input.lower(),
+        &evidence.lower,
+        grid,
+        cache,
+        budget,
+        interrupt,
+    )?;
     budget.work(
         super::endpoint_bytes(&evidence.lower)
             .saturating_add(super::endpoint_bytes(&evidence.upper)),
@@ -28,7 +36,14 @@ pub(in crate::enclosure) fn check(
         budget.work(super::super::interval_bytes(&lo), AT)?;
         lo.clone()
     } else {
-        endpoint(input.upper(), &evidence.upper, grid, budget, interrupt)?
+        endpoint(
+            input.upper(),
+            &evidence.upper,
+            grid,
+            cache,
+            budget,
+            interrupt,
+        )?
     };
     if proposed.lower().compare(lo.lower(), budget)? != Ordering::Equal
         || proposed.upper().compare(hi.upper(), budget)? != Ordering::Equal
@@ -39,10 +54,11 @@ pub(in crate::enclosure) fn check(
 }
 
 /// Exact equality and range checks authenticate the proposed binary reduction.
-fn endpoint(
+fn endpoint<'a>(
     x: &Rational,
-    proof: &LogEndpoint,
+    proof: &'a LogEndpoint,
     grid: u32,
+    cache: &mut Vec<(&'a LogSeries, Interval)>,
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<Interval, Fault> {
@@ -76,15 +92,68 @@ fn endpoint(
         return Err(invalid());
     }
     let reduced = series(&proof.argument, &proof.reduced, grid, budget, interrupt)?;
-    let u_two = if proof.exponent == 0 {
-        Rational::zero()
+    let zero_two;
+    let logarithm_two = if proof.exponent == 0 {
+        zero_two = series(&Rational::zero(), &proof.two, grid, budget, interrupt)?;
+        &zero_two
     } else {
-        Rational::from_ratio(1, 3, budget)?
+        checked_two(&proof.two, grid, cache, budget, interrupt)?
     };
-    let logarithm_two = series(&u_two, &proof.two, grid, budget, interrupt)?;
     let factor = point(&Rational::from_ratio(proof.exponent, 1, budget)?, budget)?;
-    let scaled = op(&Operator::Mul, &logarithm_two, &factor, grid, budget)?;
+    let scaled = op(&Operator::Mul, logarithm_two, &factor, grid, budget)?;
     op(&Operator::Add, &reduced, &scaled, grid, budget)
+}
+
+/// Cite the one authenticated log-two recurrence retained for this replay only.
+fn checked_two<'a, 'c>(
+    proof: &'a LogSeries,
+    grid: u32,
+    cache: &'c mut Vec<(&'a LogSeries, Interval)>,
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<&'c Interval, Fault> {
+    let bytes = [&proof.sum, &proof.power, &proof.tail]
+        .into_iter()
+        .fold(32_u64, |size, value| {
+            size.saturating_add(super::super::interval_bytes(value))
+        });
+    let mut found = None;
+    for (index, (previous, _)) in cache.iter().enumerate() {
+        budget.work(bytes, AT)?;
+        if *previous == proof {
+            found = Some(index);
+            break;
+        }
+    }
+    let index = if let Some(index) = found {
+        index
+    } else {
+        let count = crate::graph::size(cache.len(), AT)?.saturating_add(1);
+        budget.check(BudgetKind::ProofNodes, count, AT)?;
+        let bound = series(
+            &Rational::from_ratio(1, 3, budget)?,
+            proof,
+            grid,
+            budget,
+            interrupt,
+        )?;
+        let retained = cache.iter().fold(0_u64, |size, (_, value)| {
+            size.saturating_add(super::super::interval_bytes(value))
+                .saturating_add(32)
+        });
+        budget.check(
+            BudgetKind::StagedPayloadBytes,
+            retained
+                .saturating_add(super::super::interval_bytes(&bound))
+                .saturating_add(32),
+            AT,
+        )?;
+        cache.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+        let index = cache.len();
+        cache.push((proof, bound));
+        index
+    };
+    cache.get(index).map(|(_, bound)| bound).ok_or_else(invalid)
 }
 
 /// Check the analytic law's finite recurrence with separately traversed exact relations.

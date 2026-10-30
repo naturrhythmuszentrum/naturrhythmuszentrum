@@ -33,9 +33,17 @@ impl EnclosureCertificate {
             out.number(record.lower())?;
             out.number(record.upper())?;
         }
-        if self.law == super::EnclosureLaw::LogAtanh {
+        if matches!(
+            self.law,
+            super::EnclosureLaw::LogAtanh | super::EnclosureLaw::ExpTaylor
+        ) {
             super::log::encode(&self.logarithms, &mut out)?;
         } else if !self.logarithms.is_empty() {
+            return Err(Fault::invalid(InvalidCode::Encoding, AT));
+        }
+        if self.law == super::EnclosureLaw::ExpTaylor {
+            super::exp::encode(&self.exponentials, &mut out)?;
+        } else if !self.exponentials.is_empty() {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
         }
         Ok(out.finish())
@@ -54,6 +62,7 @@ impl EnclosureCertificate {
             "enclosure.rational-inclusion" => super::EnclosureLaw::RationalInclusion,
             "enclosure.root-grid" => super::EnclosureLaw::RootGrid,
             "enclosure.log-atanh" => super::EnclosureLaw::LogAtanh,
+            "enclosure.exp-taylor" => super::EnclosureLaw::ExpTaylor,
             _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
         };
         let version = reader.small()?;
@@ -74,8 +83,16 @@ impl EnclosureCertificate {
             let upper = reader.rational()?;
             records.push(Interval::new(lower, upper, reader.budget)?);
         }
-        let logarithms = if law == super::EnclosureLaw::LogAtanh {
+        let logarithms = if matches!(
+            law,
+            super::EnclosureLaw::LogAtanh | super::EnclosureLaw::ExpTaylor
+        ) {
             super::log::decode(&mut reader)?
+        } else {
+            Vec::new()
+        };
+        let exponentials = if law == super::EnclosureLaw::ExpTaylor {
+            super::exp::decode(&mut reader)?
         } else {
             Vec::new()
         };
@@ -88,6 +105,7 @@ impl EnclosureCertificate {
             presentation,
             records,
             logarithms,
+            exponentials,
         })
     }
 }

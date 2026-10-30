@@ -421,6 +421,7 @@ impl<'a, 'b> Reader<'a, 'b> {
                 self,
             )?))),
             51 => Ok(Operator::NaturalLog),
+            52 => Ok(Operator::Exponential),
             10 => Ok(Operator::GeneralPower(self.branch()?)),
             11 => Ok(Operator::Call(self.name()?)),
             12 => Ok(Operator::Derivative(self.name()?)),

@@ -66,16 +66,9 @@ fn evaluate(
         return Ok(report);
     };
     let target = cas.state.expression(cas.checked(&request.target)?)?;
-    let mut analytic = if target.enclosure_logs {
-        super::log::plan(
-            policy,
-            target
-                .enclosure_log_bound
-                .unwrap_or(policy.reduction_ceiling),
-        )
-    } else {
-        None
-    };
+    let mut analytic = super::planning::Plans::new(target, policy)
+        .ok_or_else(|| Fault::invalid(InvalidCode::Policy, AT))?
+        .at_grid(grid);
     for _ in 0..policy.rounds {
         if grid > policy.grid_ceiling {
             break;
@@ -112,12 +105,12 @@ fn evaluate(
                 break;
             }
         }
-        if let Some(plan) = analytic {
-            let Some(next) = plan.next(policy) else {
+        if analytic.log.is_some() || analytic.exp.is_some() {
+            let Some(next) = analytic.next(policy) else {
                 break;
             };
-            grid = next.grid;
-            analytic = Some(next);
+            grid = next.grid(grid);
+            analytic = next.at_grid(grid);
             continue;
         }
         let Some(next) = grid
@@ -327,6 +320,21 @@ fn analytic_policy(
         crate::graph::size(certificate.logarithms.len(), AT)?,
         AT,
     )?;
+    budget.check(
+        BudgetKind::ProofNodes,
+        crate::graph::size(certificate.exponentials.len(), AT)?,
+        AT,
+    )?;
+    for record in &certificate.exponentials {
+        budget.work(1, AT)?;
+        for endpoint in [&record.lower, &record.upper] {
+            if endpoint.squarings > policy.reduction_ceiling
+                || endpoint.series.degree > policy.term_ceiling
+            {
+                return Err(Fault::invalid(InvalidCode::Policy, AT));
+            }
+        }
+    }
     for record in &certificate.logarithms {
         budget.work(1, AT)?;
         for endpoint in [&record.lower, &record.upper] {
@@ -346,7 +354,7 @@ fn round(
     cas: &mut Cas,
     request: &EnclosureRequest,
     policy: RefinementPolicy,
-    schedule: (u32, Option<super::log::Plan>),
+    schedule: (u32, super::planning::Plans),
     earlier: Option<&CheckedEnclosure>,
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
