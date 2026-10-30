@@ -93,7 +93,9 @@ pub enum EnclosureOutcome {
 /// Portable proposed evidence, never a checked receipt.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EnclosureCertificate {
-    /// Schema version; only rational-inclusion version one is implemented.
+    /// Closed law family; root transcripts also replay their rational operand steps.
+    pub law: super::EnclosureLaw,
+    /// Semantic version of the selected law.
     pub version: u32,
     /// Complete canonical original target, context, box and goal key.
     pub scope: Vec<u8>,
@@ -138,13 +140,32 @@ impl CheckedEnclosure {
     /// Registered mathematical law used by this instance.
     #[must_use]
     pub const fn formal_schema(&self) -> &'static crate::emptiness::LemmaSchema {
-        &super::ENCLOSURE_SCHEMAS[0]
+        self.certificate.law.formal_schema()
     }
 
-    /// Formal premise kinds of the rational checker, including divisor separation.
+    /// Complete schema inventory used by this transcript; roots compose rational inclusion.
+    #[must_use]
+    pub fn formal_schemas(&self) -> &'static [crate::emptiness::LemmaSchema] {
+        match self.certificate.law {
+            super::EnclosureLaw::RationalInclusion => &super::ENCLOSURE_SCHEMAS[..1],
+            super::EnclosureLaw::RootGrid => &super::ENCLOSURE_SCHEMAS,
+        }
+    }
+
+    /// Formal premise kinds of the implemented checker, including original domain checks.
     #[must_use]
     pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
         use crate::proof::HypothesisKind;
+        if matches!(self.certificate.law, super::EnclosureLaw::RootGrid) {
+            return &[
+                HypothesisKind::DomainGuard,
+                HypothesisKind::Equality,
+                HypothesisKind::NonZero,
+                HypothesisKind::Enclosure,
+                HypothesisKind::NonNegative,
+                HypothesisKind::IntegerRange,
+            ];
+        }
         &[
             HypothesisKind::DomainGuard,
             HypothesisKind::Equality,

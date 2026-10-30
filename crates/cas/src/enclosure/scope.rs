@@ -20,7 +20,7 @@ pub(super) fn preflight(
     if target.header != context.header_id || !target.scope.is_empty() {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
-    if !target.rational_enclosure || policy.version != 1 {
+    if !target.supported_enclosure || policy.version != 1 {
         return Ok(None);
     }
     let Some(grid) = policy.precision.checked_add(8) else {
@@ -32,6 +32,10 @@ pub(super) fn preflight(
     budget.check(BudgetKind::IntegerExponent, u64::from(grid), AT)?;
     budget.check(BudgetKind::ComponentBits, u64::from(grid) + 1, AT)?;
     budget.check(BudgetKind::IntermediateBits, u64::from(grid) + 1, AT)?;
+    if target.enclosure_roots {
+        budget.check(BudgetKind::IntegerExponent, u64::from(grid) * 2, AT)?;
+        budget.check(BudgetKind::IntermediateBits, u64::from(grid) * 2 + 1, AT)?;
+    }
     budget.check(BudgetKind::Depth, target.depth, AT)?;
     budget.check(BudgetKind::ProofNodes, target.unfolded, AT)?;
     budget.check(
@@ -197,7 +201,7 @@ pub(super) fn schedule(
             continue;
         }
         let value = cas.state.expression(id)?;
-        if !value.rational_enclosure || !value.scope.is_empty() || !scalar(&value.sort) {
+        if !value.supported_enclosure || !value.scope.is_empty() || !scalar(&value.sort) {
             return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
         }
         pending.push((id, true));

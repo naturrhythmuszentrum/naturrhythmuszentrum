@@ -89,3 +89,61 @@ impl Rational {
         }
     }
 }
+
+impl Rational {
+    /// Propose dyadic square-root bounds using the existing bounded integer bit trials.
+    /// Zero is admitted here without changing the strict-positive constant grammar.
+    pub(crate) fn square_root_grid(
+        &self,
+        grid: u32,
+        budget: &mut Budget,
+    ) -> Result<(Self, Self), Fault> {
+        self.check(budget, AT)?;
+        if self.is_negative() {
+            return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
+        }
+        let shift = u64::from(grid) * 2;
+        let bits = self.numerator().bits().saturating_add(shift);
+        budget.check(BudgetKind::IntegerExponent, shift, AT)?;
+        budget.check(BudgetKind::ComponentBits, u64::from(grid) + 1, AT)?;
+        budget.check(BudgetKind::IntermediateBits, bits, AT)?;
+        budget.check(
+            BudgetKind::StagedPayloadBytes,
+            bits.div_ceil(8).saturating_mul(32).saturating_add(256),
+            AT,
+        )?;
+        if self.is_zero() {
+            return Ok((Self::zero(), Self::zero()));
+        }
+        charge(bits, bits, budget, AT)?;
+        let shift =
+            usize::try_from(shift).map_err(|_| Fault::capacity(BudgetKind::IntegerExponent, AT))?;
+        let scaled = self.numerator() << shift;
+        let integral = super::quotient(&scaled, self.denominator(), budget, AT)?;
+        let floor = floor_root(&integral, budget)?;
+        let square = product(&floor, &floor, budget, AT)?;
+        let exact = product(&square, self.denominator(), budget, AT)? == scaled;
+        charge(u64::from(grid) + 1, 1, budget, AT)?;
+        let grid =
+            usize::try_from(grid).map_err(|_| Fault::capacity(BudgetKind::IntegerExponent, AT))?;
+        let denominator = BigUint::one() << grid;
+        let lower = Self::new(false, &floor, &denominator, budget)?;
+        if exact {
+            charge(
+                lower.numerator().bits(),
+                lower.denominator().bits(),
+                budget,
+                AT,
+            )?;
+            return Ok((lower.clone(), lower));
+        }
+        budget.check(
+            BudgetKind::IntermediateBits,
+            floor.bits().saturating_add(1),
+            AT,
+        )?;
+        charge(floor.bits(), 1, budget, AT)?;
+        let ceiling = floor + BigUint::one();
+        Ok((lower, Self::new(false, &ceiling, &denominator, budget)?))
+    }
+}

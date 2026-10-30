@@ -73,6 +73,15 @@ pub(super) fn generate(
         return Err(invalid());
     }
     Ok(EnclosureCertificate {
+        law: if cas
+            .state
+            .expression(cas.checked(&request.target)?)?
+            .enclosure_roots
+        {
+            super::EnclosureLaw::RootGrid
+        } else {
+            super::EnclosureLaw::RationalInclusion
+        },
         version: 1,
         scope,
         grid,
@@ -106,6 +115,9 @@ fn binary(
     budget: &mut Budget,
 ) -> Result<Interval, Fault> {
     match operator {
+        Operator::GeneralPower(crate::model::Branch::StrictReal) => {
+            super::roots::produce(left, grid, budget)
+        }
         Operator::Add => left.add(right, grid, budget),
         Operator::Sub => left.sub(right, grid, budget),
         Operator::Mul => left.mul(right, grid, budget),

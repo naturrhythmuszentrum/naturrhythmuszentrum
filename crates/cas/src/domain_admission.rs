@@ -533,7 +533,8 @@ impl Cas {
         self.insert(
             state,
             Vertex::Expression(crate::graph::Expression {
-                rational_enclosure: false,
+                supported_enclosure: false,
+                enclosure_roots: false,
                 ambient,
                 attachment: None,
                 header,

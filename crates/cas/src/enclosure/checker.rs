@@ -18,9 +18,7 @@ pub(super) fn check(
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<CheckedEnclosure, Fault> {
     super::interval::scratch(budget)?;
-    if certificate.version != 1 {
-        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
-    }
+    schema(cas, request, certificate)?;
     budget.check(
         BudgetKind::WitnessBytes,
         crate::graph::size(certificate.scope.len(), AT)?,
@@ -86,6 +84,12 @@ pub(super) fn check(
                     true,
                 )
             }
+            Operator::GeneralPower(crate::model::Branch::StrictReal) => {
+                let value = &certificate.records[left.ok_or_else(invalid)?];
+                super::roots::check(value, record, certificate.grid, budget)?;
+                stack.push(index);
+                continue;
+            }
             operator => {
                 let a = &certificate.records[left.ok_or_else(invalid)?];
                 let b = &certificate.records[right.ok_or_else(invalid)?];
@@ -109,6 +113,30 @@ pub(super) fn check(
         return Err(invalid());
     }
     finish(request, certificate, budget)
+}
+
+/// Bind the registered family and version to the original expression's derived grammar.
+fn schema(
+    cas: &Cas,
+    request: &EnclosureRequest,
+    certificate: &EnclosureCertificate,
+) -> Result<(), Fault> {
+    let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_roots
+    {
+        super::EnclosureLaw::RootGrid
+    } else {
+        super::EnclosureLaw::RationalInclusion
+    };
+    if certificate.law != expected_law {
+        return Err(invalid());
+    }
+    if certificate.version != 1 {
+        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+    }
+    Ok(())
 }
 
 /// Reserve the complete receipt before copying checked evidence for publication.

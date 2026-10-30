@@ -40,6 +40,7 @@ mod checker;
 mod interval;
 mod model;
 mod producer;
+mod roots;
 mod scope;
 mod service;
 #[cfg(test)]
@@ -160,20 +161,32 @@ pub use model::{
 };
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 1] = [crate::emptiness::LemmaSchema {
-    name: "enclosure.rational-inclusion",
-    label: "thm:cas:enclosure-rational-inclusion",
-    version: 1,
-    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
-    statement: "The original rational expression lies in the checked interval throughout its ordered box under its original context.",
-    premises: "Original `DomainGuard`, exact `Equality` and endpoint `Enclosure` relations, with `NonZero` for each divisor; all operands are checked before any simplification.",
-}];
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 2] = [
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.rational-inclusion",
+        label: "thm:cas:enclosure-rational-inclusion",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The original rational expression lies in the checked interval throughout its ordered box under its original context.",
+        premises: "Original `DomainGuard`, exact `Equality` and endpoint `Enclosure` relations, with `NonZero` for each divisor; all operands are checked before any simplification.",
+    },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.root-grid",
+        label: "thm:cas:enclosure-root-grid",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The nonnegative square root lies between the checked dyadic endpoints; nested instances enclose fourth roots and rational operand steps retain their own inclusion law.",
+        premises: "Original `DomainGuard`, `NonNegative` radicand, `IntegerRange` for the grid, exact `Equality` for scaling and operand `Enclosure`; every rational operand step is independently checked.",
+    },
+];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EnclosureLaw {
     /// Exact rational endpoint relations and outward coarsening.
     RationalInclusion,
+    /// Zero-capable square-root grid relations, composed with checked rational operands.
+    RootGrid,
 }
 
 impl EnclosureLaw {
@@ -182,6 +195,7 @@ impl EnclosureLaw {
     pub const fn formal_schema(self) -> &'static crate::emptiness::LemmaSchema {
         match self {
             Self::RationalInclusion => &ENCLOSURE_SCHEMAS[0],
+            Self::RootGrid => &ENCLOSURE_SCHEMAS[1],
         }
     }
 }
@@ -195,6 +209,12 @@ pub(crate) fn supported_shape(
     use crate::model::Operator;
     let arity = match operator {
         Operator::Rational(_) | Operator::Free(_) => 0,
+        Operator::GeneralPower(crate::model::Branch::StrictReal)
+            if operands.len() == 2
+                && matches!(&state.expression(operands[1])?.operator, Operator::Rational(value) if value.is_half()) =>
+        {
+            2
+        }
         Operator::Neg => 1,
         Operator::Add | Operator::Sub | Operator::Mul | Operator::Div => 2,
         _ => return Ok(false),
@@ -203,9 +223,29 @@ pub(crate) fn supported_shape(
         return Ok(false);
     }
     for id in operands {
-        if !state.expression(*id)?.rational_enclosure {
+        if !state.expression(*id)?.supported_enclosure {
             return Ok(false);
         }
     }
     Ok(true)
+}
+
+/// Propagate the root-law family without walking the expression closure at preflight.
+pub(crate) fn has_roots(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<bool, crate::Fault> {
+    if !supported_shape(state, operator, operands)? {
+        return Ok(false);
+    }
+    if matches!(operator, crate::model::Operator::GeneralPower(_)) {
+        return Ok(true);
+    }
+    for id in operands {
+        if state.expression(*id)?.enclosure_roots {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
