@@ -6,8 +6,8 @@ mod produce;
 pub(super) mod sizing;
 mod wire;
 
-pub(super) use check::check;
-pub(super) use produce::produce;
+pub(super) use check::{check, endpoint as check_endpoint};
+pub(super) use produce::{endpoint as produce_endpoint, produce};
 pub(super) use sizing::plan;
 pub(super) use wire::{decode, encode};
 

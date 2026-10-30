@@ -37,7 +37,7 @@ pub(in crate::enclosure) fn produce(
 }
 
 /// Select the least binary reduction and reconstruct by exactly that many squarings.
-fn endpoint(
+pub(in crate::enclosure) fn endpoint(
     x: &Rational,
     plan: Plan,
     budget: &mut Budget,

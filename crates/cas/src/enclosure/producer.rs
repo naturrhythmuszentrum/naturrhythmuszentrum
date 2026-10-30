@@ -108,7 +108,14 @@ pub(super) fn generate_planned(
         return Err(invalid());
     }
     Ok(EnclosureCertificate {
-        law: if exponentials.is_empty() {
+        law: if cas
+            .state
+            .expression(cas.checked(&request.target)?)?
+            .enclosure_saturation
+            == 1
+        {
+            super::EnclosureLaw::SigmoidCompose
+        } else if exponentials.is_empty() {
             law(cas, request, !logarithms.is_empty())?
         } else {
             super::EnclosureLaw::ExpTaylor
@@ -241,6 +248,17 @@ fn node(
                 interrupt,
             )?;
             log = Some(evidence);
+            bound
+        }
+        Operator::Sigmoid => {
+            let (bound, evidence) = super::saturating::produce(
+                right.ok_or_else(invalid)?,
+                u32::try_from(index).map_err(|_| invalid())?,
+                plan.exp.ok_or_else(invalid)?,
+                budget,
+                interrupt,
+            )?;
+            exp = Some(evidence);
             bound
         }
         Operator::Exponential => {

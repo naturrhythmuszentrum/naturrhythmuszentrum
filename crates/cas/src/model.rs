@@ -332,6 +332,8 @@ pub enum Operator {
     NaturalLog,
     /// Real exponential with a finite, independently checked enclosure law.
     Exponential,
+    /// Real logistic sigmoid, evaluated only through its checked composition law.
+    Sigmoid,
     /// A call to a declaration with a checked function signature.
     Call(String),
     /// An unevaluated derivative with respect to a free declaration.

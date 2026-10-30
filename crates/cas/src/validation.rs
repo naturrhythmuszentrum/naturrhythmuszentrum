@@ -741,7 +741,7 @@ fn operator_sorts(
             leaf_sort(operator, result, scope, environment, budget)? && children.is_empty()
         }
         Operator::Constant(_) => constant_sort(result, children),
-        Operator::NaturalLog | Operator::Exponential => {
+        Operator::NaturalLog | Operator::Exponential | Operator::Sigmoid => {
             children.len() == 1 && same && *result == Sort::Value(AtomicSort::Scalar(Field::Real))
         }
         Operator::Neg

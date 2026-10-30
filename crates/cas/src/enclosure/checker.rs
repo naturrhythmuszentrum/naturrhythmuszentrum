@@ -67,12 +67,17 @@ pub(super) fn check(
                 stack.push(index);
                 continue;
             }
-            Operator::Exponential => {
+            Operator::Exponential | Operator::Sigmoid => {
                 let evidence = exponentials.next().ok_or_else(invalid)?;
                 if usize::try_from(evidence.record).ok() != Some(index) {
                     return Err(invalid());
                 }
-                super::exp::check(
+                let replay = if matches!(expression.operator, Operator::Sigmoid) {
+                    super::saturating::check
+                } else {
+                    super::exp::check
+                };
+                replay(
                     &certificate.records[right.ok_or_else(invalid)?],
                     evidence,
                     record,
@@ -99,16 +104,7 @@ pub(super) fn check(
                 (lo, hi, true)
             }
         };
-        let (lower, upper) = if rounded {
-            grid(&lower, &upper, certificate.grid, budget)?
-        } else {
-            (lower, upper)
-        };
-        if record.lower().compare(&lower, budget)? != Ordering::Equal
-            || record.upper().compare(&upper, budget)? != Ordering::Equal
-        {
-            return Err(invalid());
-        }
+        endpoint_match(record, (lower, upper), rounded, certificate.grid, budget)?;
         stack.push(index);
     }
     if stack.len() != 1 || analytic.next().is_some() || exponentials.next().is_some() {
@@ -124,6 +120,13 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_saturation
+        == 1
+    {
+        super::EnclosureLaw::SigmoidCompose
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_exp
@@ -337,4 +340,26 @@ fn negated(value: &Interval, budget: &mut Budget) -> Result<(Rational, Rational,
         value.lower().negated(budget)?,
         true,
     ))
+}
+
+/// Compare the exact reconstructed relation after its required outward rounding.
+fn endpoint_match(
+    record: &Interval,
+    bounds: (Rational, Rational),
+    rounded: bool,
+    q: u32,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let (lower, upper) = bounds;
+    let (lower, upper) = if rounded {
+        grid(&lower, &upper, q, budget)?
+    } else {
+        (lower, upper)
+    };
+    if record.lower().compare(&lower, budget)? != Ordering::Equal
+        || record.upper().compare(&upper, budget)? != Ordering::Equal
+    {
+        return Err(invalid());
+    }
+    Ok(())
 }
