@@ -1,0 +1,208 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Certified rational-endpoint enclosure design · `spec:nrz:cas-enclosures-design`
+
+**Requirement (Design contract and standing)** · `req:nrz:enclosures-design-contract`
+
+This design realizes (`spec:nrz:cas-enclosures-concept`) through bounded exact rational evaluation and independently checked finite evidence. It decides placement, arithmetic, refinement, analytic schemas and publication boundaries; it advertises no new executable capability. Each family becomes available only with its checker, registered schema, resource pins and tests. All schemas proposed below remain Requirement statements until implementation registers their mathematical meaning, premises and checker; a design paragraph is not a checked theorem (`req:nrz:cas-enclosures-formal-laws`).
+
+## Placement and original meaning · `sec:nrz:enclosures-design-placement`
+
+**Decision (Exact evaluator and checker in CAS)** · `dec:nrz:enclosures-design-home`
+
+Choose a separate `nrz-cas::enclosure` module, with distinct producer and checker submodules, resolving (`open:nrz:cas-enclosures-placement`). It uses CAS's existing metered rational arithmetic, integer-root machinery, original expressions, contexts and closed formal registration. Extending the scalar kernel producer instead would require arbitrary-precision rational scheduling alongside its binary32/binary64 element contract, or an inappropriate dependency back into CAS. The existing scalar certificates remain valid inputs only under their present laws; this design neither changes their wire meanings nor requires a floating result. It adds no crate or external dependency. Refinement is bounded certificate generation within CAS, not live numerical data execution, and retains the matrix boundary of (`dec:nrz:matrix-core-cas-boundary`), (`[SCALAR-def:scalar:kernel-certificate]`).
+
+**Rule (One original expression graph)** · `rule:nrz:enclosures-design-target`
+
+Requests identify an original expression, context, ordered coordinate box and exact predicate or width goal. Closed function tags denote real logarithm, exponential, sigmoid, tanh, positive-base rational power and the supported clamp composition; an equal-spelled opaque call is not an executable definition. Admission checks every original operand and domain before simplification, including operands hidden by zero products and exponent zero. The evaluation schedule is a bounded ordered view of these graph objects, never a second algebra AST. Each interval record identifies its original operand and earlier checked premises; an interval alone cannot establish source correspondence or authorize a context hypothesis (`rule:nrz:cas-enclosures-target`), (`rule:nrz:cas-closed-enclosure-replay`).
+
+**Rule (Anonymous graph judgments and exact constants)** · `rule:nrz:enclosures-design-reuse`
+
+Use `Cas::prepare_constant` for supported original closed constants. It now returns graph-owned `PreparedConstant` evidence through an authenticated checked-evidence edge under `constant.closed-preparation@1`; it is not a caller-owned constant map. Extend the same anonymous-judgment mechanism for new checked enclosure instances, with disjoint kind/schema tags, exact endpoints, original context and box, ordered premise identities and checker version in the complete key. The index holds keys and node identifiers, not a second result store. A stronger retained bound can serve a weaker request only after a charged containment check; intersecting bounds needs a new checked conjunction of the same target and premises. Strong store identity, rollback generation and checked-edge authentication remain mandatory. Scalar-record and Machin retention still have their current separate ownership; this contribution neither claims they have migrated nor changes their shared-owner APIs (`[CAS-def:cas:constant-cache]`), (`[CAS-rule:cas:anonymous-judgment-key]`), (`[CAS-rule:cas:anonymous-judgment-evidence]`).
+
+## Representation, precision and outcomes · `sec:nrz:enclosures-design-representation`
+
+**Definition (Intervals and resource envelope)** · `def:nrz:enclosures-design-intervals`
+
+An admitted interval owns two canonical CAS `Rational` values l and u with l ≤ u; it denotes the complete closed real set between them. Rational normalization retains positive denominators and canonical zero. Input rationals need not be dyadic. A request carries finite ceilings for component and intermediate bits, arithmetic and Work, scratch and retained bytes, output and witness bytes, expression depth, matrix entries, reduction exponent, series terms and refinement rounds. Existing `BudgetKind` ceilings remain authoritative; new schedule bounds are checked fields, not replacements for those ceilings. Arithmetic reserves conservative intermediate capacity before allocating or shifting. There is no infinity sentinel, underflow to zero or unrestricted integer conversion (`req:nrz:cas-enclosures-growth`).
+
+**Procedure (Outward grid coarsening)** · `alg:nrz:enclosures-design-grid`
+
+At working grid h = 2^(-q), replace a lower endpoint a by floor(a/h)h and an upper endpoint b by ceil(b/h)h. Signed quotient and remainder establish the two directions exactly, including negative values and exact grid points. Each endpoint moves by less than h, and denominator size is bounded by 2^q after reduction. Numerators and pre-rounding intermediates still obey their independent bit ceilings; a grid does not bound their magnitude. Coarsen after each scheduled interval operation and retain its outward inequality. Input literals and exact singleton results may remain exact within the component ceiling. No precision or bit ceiling is raised on exhaustion (`req:nrz:cas-enclosures-outward`).
+
+**Procedure (Rational interval operations)** · `alg:nrz:enclosures-design-arithmetic`
+
+Addition uses the two lower and two upper endpoints; subtraction reverses the second interval; multiplication encloses all four products; reciprocal uses [1/u,1/l] only for a strictly same-sign interval. Division composes reciprocal and multiplication. Absolute value and maximum use exact endpoint comparisons, with zero included when an interval crosses zero. Each result is outward-coarsened after these exact relations. A zero-containing divisor is not passed through: a point expression can be refined until its domain is established, while a region containing a genuinely undefined point refuses the requested whole-region operation. Algebraic identities require original definedness, and overlap is never equality. These laws also cover positive normalization denominators and residual bounds divided by 1-c only after c < 1 is proved (`rule:nrz:cas-enclosures-target`).
+
+**Procedure (Finite refinement policy)** · `alg:nrz:enclosures-design-refinement`
+
+Policy version 1 accepts a bounded nonnegative integer p denoting absolute width ε = 2^(-p). Round i starts at q_i = p + 8·2^i and series truncation index N_i = 2^i. The logarithm sum uses N_i terms and the exponential sum uses N_i+1; check those actual counts, the working grid and the round number against their declared ceilings before starting. Checked arithmetic detects schedule overflow before work. The final presentation grid is 2^(-(p+2)); preflight refuses a grid limit too small to represent it. Recompute in original operand order with ascending term indices and increasing coordinate indices; reuse authenticated checked premises where applicable. Intersect each completed round with earlier checked bounds for the identical target and box, then outward-coarsen for presentation. Report the actual final width and whether it meets ε, never infer success from q_i. Empty intersection of compatible evidence is invalid evidence, not indecision. A point target with separated domain boundaries can refine under increasing resources; no particular finite allowance is promised to suffice (`rule:nrz:cas-enclosures-refinement`).
+
+**Definition (Range and decision requests)** · `def:nrz:enclosures-design-goals`
+
+A point request supplies exact closed operands; a range request quantifies over its full ordered box. Either may request a width bound or an exact comparison against a rational threshold. Region variation can prevent a width goal regardless of arithmetic precision, so the report retains the input box, achieved width, precision-met flag and stopping reason separately. This first policy does not subdivide boxes automatically. For x ≤ b, upper ≤ b proves the relation, lower > b refutes it, and every other enclosure is undecided. Strict comparisons use their corresponding strict endpoint rule. Equality is proved only by a checked exact identity or an appropriate singleton; overlapping intervals establish nothing. Failure to meet width or a sufficient contraction test never refutes the underlying mathematical assertion (`def:nrz:cas-enclosures-undecided`).
+
+**Definition (Proposed public surface)** · `def:nrz:enclosures-design-api`
+
+The module exposes checked interval construction, `EnclosureRequest`, a versioned `RefinementPolicy`, a sealed `CheckedEnclosure` and `EnclosureReport`; these are proposed items, not existing APIs. `Cas::enclose` produces bounded evidence, while `Cas::check_enclosure` checks supplied evidence against an explicit expected original target, context, box and goal without running the producer. The report contains optional checked bound, predicate verdict, precision-met flag, stopping reason, consumed Work delta and cumulative ledger, completed-round count, and schema manifest. A width-only request can return a checked bound without asserting any predicate. Private constructors prevent a caller from manufacturing a checked receipt. Portable encoding and receiving-store replay accompany the first exposed certificate format, with explicit semantic versions and exact expected-judgment comparison (`rule:nrz:cas-design-closed-registration`).
+
+**Rule (Outcomes and atomic refusal)** · `rule:nrz:enclosures-design-outcomes`
+
+Proved and Refuted require complete checked evidence for the stated predicate or its negation. Undecided retains a valid but insufficient bound and a reason such as Straddle, WidthLimit or WorkExhausted. Exhaustion before any checked bound returns no bound and no mathematical verdict. Unsupported identifies an operation, origin or domain fragment without a checker; a proved undefined operation is an invalid-domain refusal, not a refutation of an unrelated predicate. Cooperative interruption at charged operation boundaries reports Interrupted with no verdict; it may identify a previously committed bound but publishes no partial round. A killed process cannot promise a response. An invalid certificate is refused, never downgraded to an undecided proof. Each round checks and reserves its complete output before graph publication; an enclosing refusal rolls back its new nodes, edges, keys and speculative capacity while preserving earlier committed evidence and spent Work (`[CAS-rule:cas:anonymous-judgment-rollback]`).
+
+## Scalar algorithms and finite bounds · `sec:nrz:enclosures-design-functions`
+
+**Procedure (Square and fourth roots)** · `alg:nrz:enclosures-design-roots`
+
+For r = n/d ≥ 0, compute k = floor(sqrt(floor(n·2^(2q)/d))) using the existing bounded integer bit-trial root machinery extended with a grid parameter. Check k²d ≤ n·2^(2q) < (k+1)²d independently. Return [k/2^q,(k+1)/2^q], or the singleton lower endpoint when its square equals r. This bounds the gap by one grid unit. Apply the monotone rule separately to both interval endpoints; zero is an explicit numerical case and negative inputs refuse. A fourth root composes two checked square roots and their rounding bounds. This extends the internal root helper without relaxing the exact-constant constructor's strict-positive grammar or trusting a proposed root. Higher q refines the endpoint grid; all scaled integers are budgeted before construction (`[CAS-rule:cas:constant-square-root-boundary]`), (`[CAS-rule:cas:constant-square-root-enclosures]`).
+
+**Procedure (Logarithm and twice log two)** · `alg:nrz:enclosures-design-log`
+
+For exact x > 0, find bounded integer k and rational m with x = 2^k m and 1 ≤ m < 2 by exact comparisons. Set u = (m-1)/(m+1). For 0 ≤ u ≤ 1/3 and N ≥ 1, let S_N = 2∑ from j=0 to N-1 of u^(2j+1)/(2j+1), and R_N = 2u^(2N+1)/((2N+1)(1-u²)). The atanh series gives S_N ≤ log((1+u)/(1-u)) ≤ S_N+R_N: the omitted terms are positive, their denominators are at least 2N+1 and their powers sum geometrically. The analytic identity and convergence on this domain are the registered law; the checker reconstructs its finite instance. Evaluate log 2 at u=1/3, then k·log 2 + log m with signed interval multiplication; twice log two is an exact factor-two composition, not a decimal constant. Monotonicity extends endpoint evaluation to intervals with positive lower endpoint. A boundary not yet separated from zero requests refinement rather than implicit clipping. Increasing N tightens the tail and increasing q tightens rounding (`req:nrz:cas-enclosures-log-exp`).
+
+**Procedure (Exponential)** · `alg:nrz:enclosures-design-exp`
+
+For x ≥ 0, choose the least nonnegative k with a = x/2^k ≤ 1/2. For N ≥ 1, S_N = ∑ from j=0 to N of a^j/j! and T_N = (a^(N+1)/(N+1)!)/(1-a/(N+2)) give S_N ≤ exp(a) ≤ S_N+T_N. After the first omitted term each successive ratio is at most a/(N+2) < 1, which bounds the positive tail geometrically. Apply k checked interval squarings; for x < 0 use the reciprocal of exp(-x). Monotone endpoint evaluation covers interval inputs. Exact exp(0)=1 is a checked shortcut. Reduction count, output magnitude and intermediate sizes have finite ceilings; a huge positive or negative argument cannot silently overflow or underflow. The achieved width is checked after reconstruction, because squaring can amplify a small base error (`req:nrz:cas-enclosures-log-exp`).
+
+**Rule (Finite sums include arithmetic enclosure error)** · `rule:nrz:enclosures-design-series`
+
+The logarithm and exponential checkers rebuild bounded interval recurrences for their powers, terms and partial sums using exact rational operations followed by the declared outward grid rule. They do not assume that a producer's rounded partial sum equals the mathematical S_N. They enclose S_N, enclose the stated tail expression upward with a strictly positive denominator, and add that tail to the upper sum. Every term count, recurrence transition, reduction equality and final bound is checked. Tail laws concern the exact series; interval inclusion accounts separately for all finite arithmetic coarsening. This avoids requiring a gigantic exact common denominator for the entire sum without discarding its rounding error. Independent checker traversal does not call the producer's series or refinement routine (`req:nrz:cas-enclosures-outward`).
+
+**Procedure (Sigmoid and hyperbolic tangent)** · `alg:nrz:enclosures-design-sigmoid-tanh`
+
+For z ≥ 0 use σ(z)=1/(1+exp(-z)); for z < 0 use exp(z)/(1+exp(z)). For z ≥ 0 use tanh(z)=(1-exp(-2z))/(1+exp(-2z)), and oddness for negative z. The denominators are at least one before rounding; the checker verifies their separated bounds. Exact σ(0)=1/2 and tanh(0)=0, their monotonicity, symmetry and range supply registered identities, not heuristic clamps. Evaluate ordered interval endpoints and intersect only with proved ranges [0,1] or [-1,1]. All error is the checked exponential enclosure plus rational interval operations; near-zero cancellation refines rather than manufactures a singleton. Bounds reaching a limiting endpoint do not prove that the mathematical value reaches it (`req:nrz:cas-enclosures-sigmoid-tanh`).
+
+**Procedure (Positive rational powers)** · `alg:nrz:enclosures-design-power`
+
+Require a strictly positive base and a reduced rational exponent p/d with d > 0. Policy version 1 uses exponentiation by squaring for integral exponents, repeated square roots followed by integral powers when d is a power of two, and exp((p/d)·log x) otherwise. Negative exponents compose a checked reciprocal; exponent zero returns one only after original domain checks. For interval bases the endpoint order follows the exponent's sign; the exponent itself is exact and fixed. The domain excludes negative-base branch choices and arbitrary real exponents. All exponent magnitudes, root repetitions and reduction work are bounded; the route is recorded and independently reconstructed. Error is the composition of the component enclosures, with final-width checking and refinement of those components (`req:nrz:cas-enclosures-roots-powers`).
+
+**Procedure (Smooth derivatives over complete boxes)** · `alg:nrz:enclosures-design-derivatives`
+
+The closed expression grammar admits checked derivative rules for rational arithmetic, exp, log, sigmoid, tanh and positive-base rational powers, with exp′=exp, log′=1/x, σ′=σ(1-σ), tanh′=1-tanh² and (x^r)′=r x^(r-1). Square-root derivatives require strictly positive inputs even though value evaluation permits zero. Apply ordered chain, sum, product and quotient rules and enclose every derivative over the entire box. Retain the original coordinate ordering and every denominator/domain premise. A caller-supplied derivative callback or midpoint derivative is not evidence. A closed symbolic derivative identity and a full-box enclosure are separate premises; general differentiability remains unsupported when the grammar cannot establish it (`rule:nrz:cas-enclosures-target`).
+
+**Procedure (Clamped activation and generalized derivative)** · `alg:nrz:enclosures-design-clamp`
+
+For f(x)=g(max(x,a)), require a declared rational wall a and a supported g continuous at a and continuously differentiable with a finite derivative enclosure on the responsive segment. Below a, return g(a) and derivative zero; above a, enclose g and g′ on that segment. If a box crosses or meets the wall, enclose the hull of the constant and responsive values and use conv({0} ∪ g′(responsive segment)) as a generalized derivative enclosure, justified by continuity and local Lipschitz regularity. No classical derivative is asserted at the kink. For an uncertain wall, include its entire declared region in the value and derivative evaluation; this bound is for the x derivative at fixed wall, not a derivative with respect to the wall. A fourth-root activation is a composition of these rules and must prove its inner quantity positive wherever a bounded responsive derivative is requested. Missing regularity or a singular wall refuses that derivative capability while leaving separately checked values valid (`req:nrz:cas-enclosures-clamp`).
+
+## Formal schema and checking register · `sec:nrz:enclosures-design-schemas`
+
+**Decision (Closed enclosure schema register)** · `dec:nrz:enclosures-design-schema-register`
+
+Add an `ENCLOSURE_SCHEMAS` register of the existing `LemmaSchema` form beside `CONSTANT_SCHEMAS` and `RETAINED_SCHEMAS`, with an exhaustive closed `EnclosureLaw` dispatcher and typed ordered premise shapes. Each requirement below names a proposed schema and version 1; its current label is the design's proposed identity, to receive a crate-owned formal label in the implementing commit. No Theorem head is minted here. Implemented entries use CAS-checked instance provenance only when their checker is available, and expose schema name/version plus each premise's formal kind through citation inspection. Semantic changes require a new version; unknown versions refuse. Checked instances retain exact original judgment identity, not just a schema key. Registration, canonical encoding, checker dispatch and public schema-inventory tests land together (`[CAS-sec:cas:primitive-schemas]`), (`rule:nrz:cas-design-closed-registration`).
+
+**Requirement (Rational inclusion schema)** · `req:nrz:enclosures-schema-rational`
+
+Propose `enclosure.rational-inclusion@1`: rational leaves, signed grid rounding, addition, subtraction, products, reciprocal, absolute value, maximum and compatible intersection preserve inclusion. Formal premise kinds are DomainGuard, Equality, NonZero where division occurs, and a new registered Enclosure kind carrying the original subject, box and ordered endpoints. Exact quotient/remainder and endpoint comparisons are reconstructed, not accepted as Boolean flags. The implementing register adds `enclosure.hyp.enclosure@1` for that premise shape without making an unchecked interval a hypothesis proof.
+
+**Requirement (Root schema)** · `req:nrz:enclosures-schema-root`
+
+Propose `enclosure.root-grid@1`: the nonnegative square root is enclosed by endpoints satisfying the squared inequalities of (`alg:nrz:enclosures-design-roots`); fourth roots compose two instances. Formal premise kinds are DomainGuard, NonNegative, IntegerRange for q, Equality for exact scaling and Enclosure for the operand. This is a new numerical zero-capable law, not a changed meaning for the existing strictly positive scalar-kernel root law.
+
+**Requirement (Logarithm schema)** · `req:nrz:enclosures-schema-log`
+
+Propose `enclosure.log-atanh@1`: the positive target reduced as x=2^k m is enclosed by the finite atanh sums and geometric tails, including the u=1/3 instance for log 2. Formal premise kinds are DomainGuard, StrictSign for x, Equality for reduction, IntegerRange for k and N and Enclosure for reconstructed partial sums and log 2. The law includes the analytic series identity, convergence, monotonicity and tail inequality; a finite successful sample does not prove those analytic premises.
+
+**Requirement (Exponential schema)** · `req:nrz:enclosures-schema-exp`
+
+Propose `enclosure.exp-taylor@1`: the reduced exponential and its reconstruction are enclosed by the positive Taylor tail, squarings and negative-argument reciprocal of (`alg:nrz:enclosures-design-exp`). Formal premise kinds are DomainGuard, Equality for reduction, NonNegative for a, IntegerRange for k and N, StrictSign for the tail denominator and Enclosure for terms and intermediate results. The analytic exponential series, addition law and monotonicity belong to the schema's mathematical argument.
+
+**Requirement (Sigmoid schema)** · `req:nrz:enclosures-schema-sigmoid`
+
+Propose `enclosure.sigmoid-compose@1`: the sign-selected exponential composition, exact zero value, monotonic endpoint extension and range intersection enclose the real logistic sigmoid. Formal premise kinds are DomainGuard, Equality for the defining composition, NonNegative or StrictSign for the selected branch, StrictSign for denominators and Enclosure for exponential premises. Each instance names the exponential schema and version it actually uses.
+
+**Requirement (Hyperbolic tangent schema)** · `req:nrz:enclosures-schema-tanh`
+
+Propose `enclosure.tanh-compose@1`: the exponential quotient, odd reflection, exact zero and monotonic range extension enclose real tanh. Formal premise kinds are DomainGuard, Equality, NonNegative or StrictSign for branch selection, StrictSign for the quotient denominator and Enclosure for exponential premises. Cancellation error is retained; oddness does not authorize dropping a premise or changing its original argument.
+
+**Requirement (Rational-power schema)** · `req:nrz:enclosures-schema-power`
+
+Propose `enclosure.positive-power@1`: integral, power-of-two denominator and log/exp routes enclose the same positive-base rational power under the declared exponent. Formal premise kinds are DomainGuard, StrictSign for the base, Equality for exponent reduction and route identity, IntegerRange for bounded exponents and Enclosure for all component operations. The law includes monotonicity direction for the exponent sign and no negative-base extension.
+
+**Requirement (Derivative schema)** · `req:nrz:enclosures-schema-derivative`
+
+Propose `enclosure.smooth-derivative@1`: the closed derivative identities and ordered chain rules produce a full-box derivative enclosure of the original supported expression. Formal premise kinds are DomainGuard, Differentiable, Derivative, Equality, NonZero or StrictSign as required and Enclosure for each constituent. The checker reconstructs derivative identities and regularity from the closed grammar or retains explicitly qualified source assumptions; it never converts an assumption into an unconditional certificate.
+
+**Requirement (Clamp schema)** · `req:nrz:enclosures-schema-clamp`
+
+Propose `enclosure.clamp-generalized@1`: the continuous locally Lipschitz clamp composition has the branchwise value enclosure and generalized derivative hull of (`alg:nrz:enclosures-design-clamp`). Formal premise kinds are DomainGuard, Equality at the join, Differentiable on the responsive extension, Derivative, Cover for the two branch regions and Enclosure for values and derivatives. Continuity and local Lipschitz regularity are checked through this closed construction; the conclusion is deliberately distinct from a classical Derivative at the wall.
+
+**Requirement (Matrix product schema)** · `req:nrz:enclosures-schema-matrix`
+
+Propose `enclosure.matrix-product@1`: shape-compatible ordered interval sums and products contain every exact matrix product over the supplied component boxes. Formal premise kinds are DomainGuard, Equality for shapes and coordinate identities and Enclosure for each entry and accumulation. This is a CAS-checkable algebraic relation; numerical matrix ownership, live-source joins and public operation publication remain with the certified matrix core.
+
+**Requirement (Norm schema)** · `req:nrz:enclosures-schema-norm`
+
+Propose `enclosure.infinity-norm@1`: the maximum absolute component bounds a vector's infinity norm, and the maximum row sum of absolute component bounds a matrix's induced infinity norm. Formal premise kinds are DomainGuard, Equality for dimensions and coordinate order, NonNegative for absolute bounds and Enclosure for every entry. Empty vector and compatible empty-matrix cases return zero; no spectral-radius or statistical statement is implied.
+
+**Requirement (Local contraction schema)** · `req:nrz:enclosures-schema-krawczyk`
+
+Propose `enclosure.krawczyk-contraction@1`: a complete full-box Jacobian, nonsingular rational preconditioner, strict inclusion and norm bound below one establish the unique local zero described below. Formal premise kinds are DomainGuard, Differentiable, Jacobian with ordered JacobianCells, Equality for the preconditioner inverse, RegionMembership for the centre, Enclosure for f and J, and StrictSign for inclusion margins and 1-c. Continuously differentiable behavior on a neighborhood of the box is required; a generalized clamp derivative alone does not meet that premise. The schema identifies the local box and fixed parameter scope, never global completeness.
+
+**Rule (Independent instance checking and portability)** · `rule:nrz:enclosures-design-checker`
+
+Certificates contain a bounded child-before-parent record sequence, exact original scope, schema name/version, formal premise kinds and references, input and output intervals, reduction counts, series counts and outward arithmetic checkpoints. The checker reconstructs every finite relation in exact rationals from those inputs and authenticates earlier evidence; it calls neither the producer nor its refinement planner. Producer-supplied sums, tails, reductions and derivative expressions are checked proposals. Decoding checks lengths, canonical rationals, references, shape and versions before allocation; fresh-store replay rechecks the full dependency closure and expected judgment. Runtime store identity and cache warmth never enter portable mathematical bytes. Analytic soundness rests on the registered law and its reviewed argument; independent finite checking verifies its application, not an arbitrary user-supplied proof script (`[CAS-rule:cas:anonymous-judgment-locality]`).
+
+**Rule (Metered checking and reuse)** · `rule:nrz:enclosures-design-work`
+
+Use the existing cumulative `Budget` and metered rational operations for every arithmetic relation, comparison, term recurrence, root bit trial and exact normalization. Charge graph traversal, premise authentication, key construction/comparison, certificate decoding/copying and publication by their bounded sizes; charge every refinement round for work actually performed. Series count bounds never replace operation charges. Reserve caller-declared checking and output allowances so generation cannot consume the resources promised to final verification. Reuse charges its actual lookup, containment and copying work, not skipped reconstruction. A warm request may reach a verdict where a cold request exhausts the same allowance; every outcome reports consumed Work, and no hit changes a verdict or bound validity. Graph rollback preserves spent Work and removes speculative evidence under the existing journal. No unmetered cache scan, new default or raised limit is part of this design (`rule:nrz:cas-enclosures-budgets`), (`[CAS-rule:cas:anonymous-judgment-accounting]`).
+
+## Matrix and local-check boundary · `sec:nrz:enclosures-design-matrices`
+
+**Decision (Matrix producer and CAS evidence boundary)** · `dec:nrz:enclosures-design-matrix-home`
+
+The certified matrix core owns interval-matrix production, ordered shape contracts and any public matrix operation; CAS supplies exact endpoint-law checking and retained mathematical evidence. CAS does not depend on matrix and does not gain heap or live-version access. Extend matrix's permitted CAS-facing evidence boundary to submit dimension-neutral rational boxes and complete original identities to these closed checkers, preserving the core's descriptor and source joins separately. This contribution adds exact rational product/norm evidence and a local contraction checker after the scalar families; it does not replace the core's floating production domain, dense solve, covariance or statistical contracts. Public live-matrix integration waits for the matrix owner's explicit representation and publication work. Until that integration exists, only the bounded supplied-certificate interface is available, with no claim that it authenticates a heap snapshot (`step:nrz:bite-certified-matrix-core`), (`rule:nrz:cas-enclosures-matrix-boundary`).
+
+**Procedure (Products, norms and finite compositions)** · `alg:nrz:enclosures-design-matrix-operations`
+
+Multiply matrices with fixed increasing row, column and inner-index order using rational interval products and sums; retain factor order and every entry, including zeros with original domain obligations. Finite weighted sums, normalized rows, depth products and pair ratios are compositions of these same laws, with exact weights and separately proved denominator positivity. They carry no analytic remainder, only input enclosure and outward coarsening error. Compute vector infinity bounds by the maximum absolute endpoint and induced matrix infinity bounds by maximum row sum of absolute endpoint maxima. Shape mismatches refuse before iteration, and dimensions and total entries are bounded. Refinement improves the scalar premises and grid, not the mathematical factor order; correlation loss can leave a valid but wide result. A sum interval containing one alone proves no conservation identity (`req:nrz:cas-enclosures-matrices`).
+
+**Procedure (Local Krawczyk contraction certificate)** · `alg:nrz:enclosures-design-krawczyk`
+
+For f from R^n to R^n, supply a nonempty rational box X, a rational centre z in X, a rational matrix R with an exact two-sided inverse witness, and a checked interval Jacobian J(X) covering the complete box under a C1 neighborhood premise. Form M = I-RJ(X) and K = z-Rf(z)+M(X-z) with interval operations. Require K strictly inside X componentwise and c = upper bound of ||M||∞ < 1. The map T(x)=x-Rf(x) then maps X into itself and is a contraction there, so Banach gives a unique fixed point in X; nonsingularity of R makes it a zero of f. All zeros in X are fixed points, so uniqueness is restricted precisely to X. For a parameter box the same checks must hold uniformly and the conclusion is for each fixed parameter, not a joint unique parameter. A failed or straddling sufficient test is undecided about zeros. Refuse the smooth check on a box crossing a clamp kink unless a separate supported smoothness proof applies; this design registers no nonsmooth Krawczyk theorem (`req:nrz:cas-enclosures-krawczyk`).
+
+## Verification and landing order · `sec:nrz:enclosures-design-verification`
+
+**Requirement (Arithmetic and root controls)** · `req:nrz:enclosures-design-test-arithmetic`
+
+Independent bounded integer cross-products enumerate rational interval extrema, signed floor/ceil cases and grid identities without calling production interval operations. Root tests check integer square inequalities independently for zero, perfect squares, nonsquares and adjacent grid boundaries, then fourth-root containment. Controls mutate rounding direction, root sign, one endpoint, radicand, original context and grid exponent; zero divisors, negative roots, oversized shifts and malformed intervals refuse. Repeated refinement retains compatible nested intersections and exact singleton identities (`req:nrz:cas-enclosures-verification`).
+
+**Requirement (Analytic-family controls)** · `req:nrz:enclosures-design-test-functions`
+
+Log tests use exact log(1)=0, independent upper/lower rational Riemann sums for the integral of 1/x and distinct reductions of log 2. Exponential tests use exp(0)=1 and independently computed product bounds (1+x/n)^n ≤ exp(x) ≤ (1-x/n)^(-n) for rational x ≥ 0 and integer n > x, with their logarithm-inequality argument and no call to the production logarithm evaluator. Sigmoid and tanh use those independent exponential brackets, exact zero, reflection and range cases. Powers use independent exact integer and perfect-root examples, negative exponents and small positive bases. Each family mutates reduction identity, term count, tail denominator, a premise reference, endpoint and schema version, and exercises domain boundaries and straddling thresholds. A higher-precision call to the same producer is not an independent oracle.
+
+**Requirement (Derivative, clamp and matrix controls)** · `req:nrz:enclosures-design-test-composites`
+
+Derivative tests use independently transcribed polynomial/rational derivatives and the closed analytic identities with full-box endpoint checks. Clamp tests cover below, above, touching and crossing the wall, verify zero on the constant branch, and reject a smooth derivative claim at a genuine kink. Matrix tests use independent dense rational enumeration, noncommuting factors, exact row sums and empty dimensions; they mutate factor order, one entry and coordinate joins. Krawczyk tests use affine systems with known zeros and independently bounded nonlinear polynomials, then mutate the centre, Jacobian region, transpose, preconditioner inverse, strict inclusion margin and c. A clamp-crossing smooth-check request refuses. Failed sufficient conditions must never become a no-root verdict.
+
+**Requirement (Resource and lifecycle pins)** · `req:nrz:enclosures-design-test-work`
+
+Every implementing family adds tiny isolated tests with literal measured N success and N-1 refusal for generation, independent checking, retained lookup and output publication, including prior cumulative Work. Pin component/intermediate bits, staged and retained bytes, witness sizes and round/term ceilings separately. Cold, warm, rollback and fresh-store replay fixtures retain snapshot and byte comparisons; deliberate exhaustion before and after a checked round confirms atomic publication and honest outcomes. Test the same allowance reaching a warm verdict but a cold undecided or exhausted result, with different reported Work and compatible evidence. Interruption controls occur at deterministic charged boundaries without timing dependence. Changed pins are reported with old/new figures and their reason in the implementing commit; this design invents no measured cost (`rule:nrz:cas-enclosures-determinism`).
+
+**Step (Core intervals and reports)** · `step:nrz:enclosures-design-core`
+
+First implement validated rational intervals, grid rounding, original-scope requests, versioned refinement policy, honest outcomes and transactional evidence with the rational-inclusion schema. Keep unsupported families refused at preflight. Land arithmetic oracles, malformed-input controls, straddles, interruption, cold/warm accounting, literal Work boundaries and fresh-store checker replay in the same green commit. Register new formal premise shapes and certificate encoding only with their working checker; no accepting stub enters the register.
+
+**Step (Root refinement)** · `step:nrz:enclosures-design-roots`
+
+Next extend the existing bounded root machinery with requested grid refinement and the zero-capable root schema, followed by fourth-root composition. Land independent square checks, exact cases, domain refusals, corrupted-root certificates and resource pins together. Existing strict-positive constant and scalar-kernel contracts retain their meaning and costs unless a measured, explained change is intrinsic to this implementation.
+
+**Step (Logarithm family)** · `step:nrz:enclosures-design-log`
+
+Then implement the logarithm reduction, finite atanh-tail schema, log 2 and twice log two. Include the independent integral oracle, exact one, tiny positive inputs, signed reduction exponents, mutated tails and retained constant judgments. Producer, analytic argument, formal register, replay checker and literal resource boundaries form one independently green step.
+
+**Step (Exponential family)** · `step:nrz:enclosures-design-exp`
+
+Then implement exponential reduction, the Taylor-tail schema, squaring and negative reciprocal. Include independent product bounds, exact zero, extreme permitted arguments, output-size refusals and damaged reconstruction counts. Measure generator, replay and retained-hit Work separately; no successful candidate may bypass the independent endpoint checks.
+
+**Step (Sigmoid and tanh families)** · `step:nrz:enclosures-design-saturating`
+
+Implement sigmoid and tanh as two green family commits after exponential, each with its own schema, exact/symmetry cases, independent exponential brackets, sign-boundary straddles and corrupted-composition controls. Each commit exposes only its completed family and carries its own register and resource pins.
+
+**Step (Powers, derivatives and clamp)** · `step:nrz:enclosures-design-composites`
+
+Implement positive rational powers after roots, log and exp, with route identity and domain controls. Follow with the closed smooth-derivative family, then clamp values and generalized derivative bounds; each is a separate green step with its schema, independent controls and Work pins. Do not advertise a smooth local solver merely because clamp values or generalized derivatives are available.
+
+**Step (Matrix evidence and local contraction)** · `step:nrz:enclosures-design-local`
+
+Last add interval-matrix product and infinity-norm evidence with the certified matrix core's owner, then the C1 Krawczyk contraction schema and checker as a separate green step. The matrix and local-check controls above must pass before either capability is exposed. Live heap integration remains a distinct core-owned follow-up; exact supplied evidence has no live-source authority. Every step passes the whole workspace gate, docgen fixed point and label checks, includes generated artifacts and states why its changes and pin movements are necessary (`rule:nrz:required-verification`), (`rule:nrz:coherent-main-commits`).
