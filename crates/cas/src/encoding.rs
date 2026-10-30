@@ -283,6 +283,7 @@ const fn operator_tag(value: &Operator) -> u8 {
         Operator::Exponential => 52,
         Operator::Sigmoid => 53,
         Operator::Tanh => 54,
+        Operator::PositivePower => 55,
         Operator::Select(_) => 49,
         Operator::AffineReading(_) => 50,
         Operator::SymbolRelation(_) => 48,
@@ -409,6 +410,7 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
         | Operator::Exponential
         | Operator::Sigmoid
         | Operator::Tanh
+        | Operator::PositivePower
         | Operator::Conjugate
         | Operator::RealPart
         | Operator::ImagPart

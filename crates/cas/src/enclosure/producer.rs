@@ -41,6 +41,7 @@ pub(super) fn generate_planned(
     let (grid, presentation) = grids;
     let mut logarithms = Vec::new();
     let mut exponentials = Vec::new();
+    let mut powers = Vec::new();
     let schedule = super::scope::schedule(cas, request, budget)?;
     let mut records: Vec<Interval> = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
@@ -75,27 +76,19 @@ pub(super) fn generate_planned(
             budget,
             interrupt,
         )?;
-        if let Some(evidence) = generated.log {
-            let size = bytes
-                .saturating_add(super::log::bytes(&logarithms))
-                .saturating_add(super::exp::bytes(&exponentials))
-                .saturating_add(super::log::bytes(std::slice::from_ref(&evidence)));
-            append(&mut logarithms, evidence, size, budget)?;
-        }
-        if let Some(evidence) = generated.exp {
-            let size = bytes
-                .saturating_add(super::log::bytes(&logarithms))
-                .saturating_add(super::exp::bytes(&exponentials))
-                .saturating_add(super::exp::bytes(std::slice::from_ref(&evidence)));
-            append(&mut exponentials, evidence, size, budget)?;
-        }
-        let result = generated.bound;
+        let result = store_generated(
+            generated,
+            (&mut logarithms, &mut exponentials, &mut powers),
+            bytes,
+            budget,
+        )?;
         bytes = bytes.saturating_add(interval_bytes(&result));
         budget.check(
             BudgetKind::StagedPayloadBytes,
             bytes
                 .saturating_add(super::log::bytes(&logarithms))
-                .saturating_add(super::exp::bytes(&exponentials)),
+                .saturating_add(super::exp::bytes(&exponentials))
+                .saturating_add(super::power::bytes(&powers)),
             AT,
         )?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
@@ -108,7 +101,9 @@ pub(super) fn generate_planned(
         return Err(invalid());
     }
     Ok(EnclosureCertificate {
-        law: if cas
+        law: if !powers.is_empty() {
+            super::EnclosureLaw::PositivePower
+        } else if cas
             .state
             .expression(cas.checked(&request.target)?)?
             .enclosure_saturation
@@ -134,6 +129,7 @@ pub(super) fn generate_planned(
         records,
         logarithms,
         exponentials,
+        powers,
     })
 }
 
@@ -224,6 +220,8 @@ struct Generated {
     log: Option<super::LogEvidence>,
     /// Finite exponential evidence, when this node is an exponential.
     exp: Option<super::ExpEvidence>,
+    /// Route evidence for a positive-base power.
+    power: Option<super::PowerEvidence>,
 }
 
 /// Produce a single original operation after its operands have been scheduled.
@@ -239,8 +237,19 @@ fn node(
     let (grid, plan, index) = schedule;
     let (left, right) = inputs;
     let expression = cas.state.expression(id)?;
+    if matches!(expression.operator, Operator::PositivePower) {
+        return power_node(
+            cas,
+            expression,
+            left.ok_or_else(invalid)?,
+            schedule,
+            budget,
+            interrupt,
+        );
+    }
     let mut log = None;
     let mut exp = None;
+
     let bound = match &expression.operator {
         Operator::Rational(value) => Interval::singleton(value, budget)?,
         Operator::Free(_) => coordinate(cas, request, id, budget)?.copied(budget)?,
@@ -301,7 +310,12 @@ fn node(
             budget,
         )?,
     };
-    Ok(Generated { bound, log, exp })
+    Ok(Generated {
+        bound,
+        log,
+        exp,
+        power: None,
+    })
 }
 
 /// Check accumulated staged evidence before reserving or appending a record.
@@ -310,4 +324,78 @@ fn append<T>(records: &mut Vec<T>, value: T, bytes: u64, budget: &Budget) -> Res
     records.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
     records.push(value);
     Ok(())
+}
+
+/// Account for component proposals before appending them to the transcript.
+fn store_generated(
+    generated: Generated,
+    stores: (
+        &mut Vec<super::LogEvidence>,
+        &mut Vec<super::ExpEvidence>,
+        &mut Vec<super::PowerEvidence>,
+    ),
+    bytes: u64,
+    budget: &Budget,
+) -> Result<Interval, Fault> {
+    let (logarithms, exponentials, powers) = stores;
+    if let Some(evidence) = generated.log {
+        let size = bytes
+            .saturating_add(super::log::bytes(logarithms))
+            .saturating_add(super::exp::bytes(exponentials))
+            .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::log::bytes(std::slice::from_ref(&evidence)));
+        append(logarithms, evidence, size, budget)?;
+    }
+    if let Some(evidence) = generated.exp {
+        let size = bytes
+            .saturating_add(super::log::bytes(logarithms))
+            .saturating_add(super::exp::bytes(exponentials))
+            .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::exp::bytes(std::slice::from_ref(&evidence)));
+        append(exponentials, evidence, size, budget)?;
+    }
+    if let Some(evidence) = generated.power {
+        let size = bytes
+            .saturating_add(super::log::bytes(logarithms))
+            .saturating_add(super::exp::bytes(exponentials))
+            .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::power::bytes(std::slice::from_ref(&evidence)));
+        append(powers, evidence, size, budget)?;
+    }
+    Ok(generated.bound)
+}
+
+/// Keep direct invalid domains distinct from a computed boundary needing refinement.
+fn power_node(
+    cas: &Cas,
+    expression: &crate::graph::Expression,
+    base: &Interval,
+    schedule: (u32, super::planning::Plans, usize),
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<Generated, Fault> {
+    let Operator::Rational(exponent) = &cas.state.expression(expression.operands[1])?.operator
+    else {
+        return Err(invalid());
+    };
+    let original = &cas.state.expression(expression.operands[0])?.operator;
+    if (base.lower().is_zero() || base.lower().is_negative())
+        && matches!(original, Operator::Rational(_) | Operator::Free(_))
+    {
+        return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
+    }
+    let (grid, plan, index) = schedule;
+    let result = super::power::produce(
+        base,
+        exponent,
+        (u32::try_from(index).map_err(|_| invalid())?, grid, plan),
+        budget,
+        interrupt,
+    )?;
+    Ok(Generated {
+        bound: result.bound,
+        power: Some(result.evidence),
+        log: result.log,
+        exp: result.exp,
+    })
 }

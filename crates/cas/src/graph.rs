@@ -415,6 +415,8 @@ pub(crate) enum ExpressionAttachment {
 pub(crate) struct Expression {
     /// Whether the supported original enclosure grammar contains a root instance.
     pub(crate) enclosure_roots: bool,
+    /// Whether the original closure contains a positive-base rational power.
+    pub(crate) enclosure_power: crate::enclosure::PowerShape,
     /// Whether the supported closure uses the logarithm law.
     pub(crate) enclosure_logs: bool,
     /// Present exponential family, with a conservative reduction bound when known.
@@ -1718,10 +1720,12 @@ impl Cas {
         )?;
         let ambient = crate::solving::sorts::ambient(state, header, &draft.sort)?;
         let enclosure_exp = crate::enclosure::exp_metadata(state, &draft.operator, &operands)?;
+        let enclosure_power = crate::enclosure::power_metadata(state, &draft.operator, &operands)?;
         let (enclosure_logs, enclosure_log_bound) =
             crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
         let expression = Vertex::Expression(Expression {
             enclosure_exp,
+            enclosure_power,
             enclosure_saturation: crate::enclosure::saturation_metadata(
                 state,
                 &draft.operator,

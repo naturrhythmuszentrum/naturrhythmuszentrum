@@ -42,6 +42,7 @@ mod interval;
 mod log;
 mod model;
 mod planning;
+mod power;
 mod producer;
 mod roots;
 mod saturating;
@@ -73,7 +74,8 @@ fn boundary(
 
 /// Conservative retained receipt size including all endpoint components and original handles.
 pub(crate) fn footprint(value: &CheckedEnclosure) -> u64 {
-    exp::bytes(&value.certificate.exponentials)
+    power::bytes(&value.certificate.powers)
+        .saturating_add(exp::bytes(&value.certificate.exponentials))
         .saturating_add(log::bytes(&value.certificate.logarithms))
         .saturating_add(
             value.certificate.records.iter().fold(
@@ -106,6 +108,17 @@ fn receipt_reservation(
         .saturating_add(128);
     // A log record adds twelve series intervals and four rational reduction fields;
     // sixteen interval slots also cover their fixed metadata and the result record.
+    let power_slots = cas.state.expression(cas.checked(&request.target)?)?;
+    if power_slots.enclosure_power.present {
+        return Ok(power_slots
+            .enclosure_power
+            .slots
+            .saturating_add(1)
+            .saturating_mul(endpoint)
+            .saturating_add(u64::try_from(scope_len).unwrap_or(u64::MAX))
+            .saturating_add(request_bytes(request))
+            .saturating_add(512));
+    }
     let multiplier = if cas
         .state
         .expression(cas.checked(&request.target)?)?
@@ -133,7 +146,8 @@ fn receipt_reservation(
 
 /// Size the supplied transcript before checking or copying any of its records.
 fn certificate_bytes(value: &EnclosureCertificate) -> u64 {
-    exp::bytes(&value.exponentials)
+    power::bytes(&value.powers)
+        .saturating_add(exp::bytes(&value.exponentials))
         .saturating_add(log::bytes(&value.logarithms))
         .saturating_add(
             value.records.iter().fold(
@@ -192,9 +206,10 @@ pub use model::{
     CheckedEnclosure, CoordinateBound, EnclosureCertificate, EnclosureGoal, EnclosureOutcome,
     EnclosureReport, EnclosureRequest, RefinementPolicy, UndecidedReason,
 };
+pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 6] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 7] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -243,6 +258,14 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 6] = [
         statement: "The real hyperbolic tangent is enclosed by its checked exponential quotient, odd reflection, exact zero and monotone intersection with its proved range. Cancellation error remains in the bound; oddness retains every original argument and premise.",
         premises: "Original `DomainGuard`, composition `Equality`, `NonNegative` or `StrictSign` for the original branch, `StrictSign` for each denominator, and `Enclosure` under `enclosure.exp-taylor@1` for twice the negative original magnitude.",
     },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.positive-power",
+        label: "thm:cas:enclosure-positive-power",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "A strictly positive base raised to its fixed reduced rational exponent lies in the checked route enclosure. Integral squaring, repeated roots and logarithm-exponential composition denote the same real power; negative exponents reverse endpoint order through reciprocal.",
+        premises: "Original `DomainGuard`, `StrictSign` for the base, exact `Equality` for exponent and route identity, `IntegerRange` for bounded powers and roots, and `Enclosure` under each component schema actually used.",
+    },
 ];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
@@ -260,6 +283,8 @@ pub enum EnclosureLaw {
     SigmoidCompose,
     /// Checked exponential quotient and odd reflection for hyperbolic tangent.
     TanhCompose,
+    /// Strictly positive base and exact rational exponent with checked route.
+    PositivePower,
 }
 
 impl EnclosureLaw {
@@ -273,6 +298,7 @@ impl EnclosureLaw {
             Self::ExpTaylor => &ENCLOSURE_SCHEMAS[3],
             Self::SigmoidCompose => &ENCLOSURE_SCHEMAS[4],
             Self::TanhCompose => &ENCLOSURE_SCHEMAS[5],
+            Self::PositivePower => &ENCLOSURE_SCHEMAS[6],
         }
     }
 }
@@ -297,6 +323,12 @@ pub(crate) fn supported_shape(
         | Operator::Exponential
         | Operator::Sigmoid
         | Operator::Tanh => 1,
+        Operator::PositivePower
+            if operands.len() == 2
+                && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if r.component_bits().0 <= 63 && r.component_bits().1 <= 64) =>
+        {
+            2
+        }
         Operator::Add | Operator::Sub | Operator::Mul | Operator::Div => 2,
         _ => return Ok(false),
     };
@@ -320,6 +352,11 @@ pub(crate) fn has_roots(
     if !supported_shape(state, operator, operands)? {
         return Ok(false);
     }
+    if matches!(operator, crate::model::Operator::PositivePower)
+        && matches!(&state.expression(operands[1])?.operator, crate::model::Operator::Rational(r) if r.is_bounded_dyadic() && !r.is_integer())
+    {
+        return Ok(true);
+    }
     if matches!(operator, crate::model::Operator::GeneralPower(_)) {
         return Ok(true);
     }
@@ -340,6 +377,11 @@ pub(crate) fn log_metadata(
     use crate::model::Operator;
     if !supported_shape(state, operator, operands)? {
         return Ok((false, None));
+    }
+    if matches!(operator, Operator::PositivePower)
+        && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if !r.is_bounded_dyadic())
+    {
+        return Ok((true, None));
     }
     if matches!(operator, Operator::NaturalLog) {
         let child = state.expression(operands[0])?;
@@ -383,6 +425,14 @@ pub(crate) fn exp_metadata(
     use crate::model::Operator;
     if !supported_shape(state, operator, operands)? {
         return Ok(AnalyticShape::default());
+    }
+    if matches!(operator, Operator::PositivePower)
+        && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if !r.is_bounded_dyadic())
+    {
+        return Ok(AnalyticShape {
+            present: true,
+            reduction: None,
+        });
     }
     if matches!(
         operator,
@@ -440,4 +490,68 @@ pub(crate) fn saturation_metadata(
         family = family.max(state.expression(*id)?.enclosure_saturation);
     }
     Ok(family)
+}
+
+/// Propagate power presence from original operands without preflight traversal.
+pub(crate) fn has_powers(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<bool, crate::Fault> {
+    if matches!(operator, crate::model::Operator::PositivePower) {
+        return Ok(true);
+    }
+    for id in operands {
+        if state.expression(*id)?.enclosure_power.present {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// Reserve actual bounded route slots, rather than every route's maximum at every node.
+pub(crate) fn receipt_slots(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<u64, crate::Fault> {
+    use crate::model::Operator;
+    let mut slots: u64 = match operator {
+        Operator::NaturalLog => 16,
+        Operator::Exponential | Operator::Sigmoid | Operator::Tanh => 24,
+        Operator::PositivePower if operands.len() == 2 => {
+            match &state.expression(operands[1])?.operator {
+                Operator::Rational(exponent) => exponent
+                    .bounded_power_roots()
+                    .map_or(43, |roots| u64::from(roots) + 2),
+                _ => 43,
+            }
+        }
+        _ => 1,
+    };
+    for id in operands {
+        slots = slots.saturating_add(state.expression(*id)?.enclosure_power.slots);
+    }
+    Ok(slots)
+}
+
+/// Fixed-width original power metadata supports zero-Work preflight and receipt reservation.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PowerShape {
+    /// Whether any original node has a positive-power law.
+    pub(crate) present: bool,
+    /// Conservative number of interval slots in its complete receipt.
+    pub(crate) slots: u64,
+}
+
+/// Compute the bounded power grammar and its conservative receipt reservation together.
+pub(crate) fn power_metadata(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<PowerShape, crate::Fault> {
+    Ok(PowerShape {
+        present: has_powers(state, operator, operands)?,
+        slots: receipt_slots(state, operator, operands)?,
+    })
 }

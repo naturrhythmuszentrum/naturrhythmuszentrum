@@ -4,6 +4,7 @@
 use super::*;
 
 mod exponentials;
+mod powers;
 mod sigmoids;
 mod tangents;
 use crate::budget::{Budget, Limits};

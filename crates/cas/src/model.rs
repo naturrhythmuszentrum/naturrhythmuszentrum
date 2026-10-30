@@ -336,6 +336,8 @@ pub enum Operator {
     Sigmoid,
     /// Real hyperbolic tangent with checked exponential composition and oddness.
     Tanh,
+    /// Positive real base raised to an exact rational exponent.
+    PositivePower,
     /// A call to a declaration with a checked function signature.
     Call(String),
     /// An unevaluated derivative with respect to a free declaration.

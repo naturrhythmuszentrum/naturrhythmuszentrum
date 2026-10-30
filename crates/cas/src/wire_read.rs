@@ -424,6 +424,7 @@ impl<'a, 'b> Reader<'a, 'b> {
             52 => Ok(Operator::Exponential),
             53 => Ok(Operator::Sigmoid),
             54 => Ok(Operator::Tanh),
+            55 => Ok(Operator::PositivePower),
             10 => Ok(Operator::GeneralPower(self.branch()?)),
             11 => Ok(Operator::Call(self.name()?)),
             12 => Ok(Operator::Derivative(self.name()?)),

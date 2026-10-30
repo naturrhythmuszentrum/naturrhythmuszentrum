@@ -111,6 +111,8 @@ pub struct EnclosureCertificate {
     pub logarithms: Vec<super::LogEvidence>,
     /// Finite exponential instances, absent from earlier family wire formats.
     pub exponentials: Vec<super::ExpEvidence>,
+    /// Route and component bounds for original positive-power nodes.
+    pub powers: Vec<super::PowerEvidence>,
 }
 
 /// Sealed evidence admitted only after the independent checker has completed.
@@ -120,6 +122,8 @@ pub struct CheckedEnclosure {
     pub(super) roots: bool,
     /// Whether replay encountered a sigmoid composition premise.
     pub(super) sigmoids: bool,
+    /// Whether independent replay encountered hyperbolic tangent.
+    pub(super) tangents: bool,
     /// Authenticated original request, including ordered coordinates.
     pub(super) request: EnclosureRequest,
     /// Independently replayed endpoint transcript.
@@ -157,6 +161,15 @@ impl CheckedEnclosure {
     #[must_use]
     pub fn formal_schemas(&self) -> &'static [crate::emptiness::LemmaSchema] {
         match self.certificate.law {
+            super::EnclosureLaw::PositivePower => {
+                let index = usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(!self.certificate.exponentials.is_empty()) << 2)
+                    | (usize::from(self.sigmoids) << 3)
+                    | (usize::from(self.tangents) << 4);
+                let (schemas, count) = &POWER_SCHEMAS[index];
+                &schemas[..*count]
+            }
             super::EnclosureLaw::RationalInclusion => &super::ENCLOSURE_SCHEMAS[..1],
             super::EnclosureLaw::RootGrid => &super::ENCLOSURE_SCHEMAS[..2],
             super::EnclosureLaw::LogAtanh if self.roots => &super::ENCLOSURE_SCHEMAS[..3],
@@ -197,6 +210,7 @@ impl CheckedEnclosure {
                 | super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
                 | super::EnclosureLaw::TanhCompose
+                | super::EnclosureLaw::PositivePower
         ) {
             return &[
                 HypothesisKind::DomainGuard,
@@ -342,3 +356,55 @@ const TANH_SCHEMAS: [&[crate::emptiness::LemmaSchema]; 8] = [
         super::ENCLOSURE_SCHEMAS[5],
     ],
 ];
+
+/// Exact component inventories are compiled once, never allocated during inspection.
+static POWER_SCHEMAS: [([crate::emptiness::LemmaSchema; 7], usize); 32] = [
+    power_schemas(0),
+    power_schemas(1),
+    power_schemas(2),
+    power_schemas(3),
+    power_schemas(4),
+    power_schemas(5),
+    power_schemas(6),
+    power_schemas(7),
+    power_schemas(8),
+    power_schemas(9),
+    power_schemas(10),
+    power_schemas(11),
+    power_schemas(12),
+    power_schemas(13),
+    power_schemas(14),
+    power_schemas(15),
+    power_schemas(16),
+    power_schemas(17),
+    power_schemas(18),
+    power_schemas(19),
+    power_schemas(20),
+    power_schemas(21),
+    power_schemas(22),
+    power_schemas(23),
+    power_schemas(24),
+    power_schemas(25),
+    power_schemas(26),
+    power_schemas(27),
+    power_schemas(28),
+    power_schemas(29),
+    power_schemas(30),
+    power_schemas(31),
+];
+
+/// Unused array slots are inaccessible through each inventory's exact count.
+const fn power_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 7], usize) {
+    let mut schemas = [super::ENCLOSURE_SCHEMAS[0]; 7];
+    let mut count = 1;
+    let mut index = 1;
+    while index < 6 {
+        if mask & (1 << (index - 1)) != 0 {
+            schemas[count] = super::ENCLOSURE_SCHEMAS[index];
+            count += 1;
+        }
+        index += 1;
+    }
+    schemas[count] = super::ENCLOSURE_SCHEMAS[6];
+    (schemas, count + 1)
+}

@@ -39,6 +39,7 @@ impl EnclosureCertificate {
                 | super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
                 | super::EnclosureLaw::TanhCompose
+                | super::EnclosureLaw::PositivePower
         ) {
             super::log::encode(&self.logarithms, &mut out)?;
         } else if !self.logarithms.is_empty() {
@@ -56,9 +57,24 @@ impl EnclosureCertificate {
             super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
                 | super::EnclosureLaw::TanhCompose
+                | super::EnclosureLaw::PositivePower
         ) {
             super::exp::encode(&self.exponentials, &mut out)?;
         } else if !self.exponentials.is_empty() {
+            return Err(Fault::invalid(InvalidCode::Encoding, AT));
+        }
+        if self.law == super::EnclosureLaw::PositivePower {
+            for (present, index) in [
+                (!self.logarithms.is_empty(), 2),
+                (!self.exponentials.is_empty(), 3),
+            ] {
+                if present {
+                    out.name(super::ENCLOSURE_SCHEMAS[index].name)?;
+                    out.unsigned(1)?;
+                }
+            }
+            super::power::encode(&self.powers, &mut out)?;
+        } else if !self.powers.is_empty() {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
         }
         Ok(out.finish())
@@ -80,6 +96,7 @@ impl EnclosureCertificate {
             "enclosure.exp-taylor" => super::EnclosureLaw::ExpTaylor,
             "enclosure.sigmoid-compose" => super::EnclosureLaw::SigmoidCompose,
             "enclosure.tanh-compose" => super::EnclosureLaw::TanhCompose,
+            "enclosure.positive-power" => super::EnclosureLaw::PositivePower,
             _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
         };
         let version = reader.small()?;
@@ -106,6 +123,7 @@ impl EnclosureCertificate {
                 | super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
                 | super::EnclosureLaw::TanhCompose
+                | super::EnclosureLaw::PositivePower
         ) {
             super::log::decode(&mut reader)?
         } else {
@@ -123,8 +141,22 @@ impl EnclosureCertificate {
             super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
                 | super::EnclosureLaw::TanhCompose
+                | super::EnclosureLaw::PositivePower
         ) {
             super::exp::decode(&mut reader)?
+        } else {
+            Vec::new()
+        };
+        let powers = if law == super::EnclosureLaw::PositivePower {
+            for (present, index) in [(!logarithms.is_empty(), 2), (!exponentials.is_empty(), 3)] {
+                if present
+                    && (reader.name()? != super::ENCLOSURE_SCHEMAS[index].name
+                        || reader.small()? != 1)
+                {
+                    return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+                }
+            }
+            super::power::decode(&mut reader)?
         } else {
             Vec::new()
         };
@@ -138,6 +170,7 @@ impl EnclosureCertificate {
             records,
             logarithms,
             exponentials,
+            powers,
         })
     }
 }
