@@ -1031,3 +1031,5 @@ fn enclosure_staged_publication() -> TestResult {
     );
     Ok(())
 }
+
+mod roots;

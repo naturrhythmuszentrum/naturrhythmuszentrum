@@ -22,7 +22,7 @@ impl EnclosureCertificate {
         )?;
         let mut out = Encoder::witness(budget, AT);
         out.raw(b"NRZENCW1")?;
-        out.name("enclosure.rational-inclusion")?;
+        out.name(self.law.formal_schema().name)?;
         out.unsigned(u64::from(self.version))?;
         out.count(self.scope.len())?;
         out.raw(&self.scope)?;
@@ -42,9 +42,14 @@ impl EnclosureCertificate {
     /// Refuses malformed framing, unknown versions, noncanonical numbers or exhausted limits.
     pub fn from_bytes(bytes: &[u8], budget: &mut Budget) -> Result<Self, Fault> {
         let mut reader = Reader::new(bytes, budget)?;
-        if reader.take(8)? != b"NRZENCW1" || reader.name()? != "enclosure.rational-inclusion" {
+        if reader.take(8)? != b"NRZENCW1" {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
         }
+        let law = match reader.name()?.as_str() {
+            "enclosure.rational-inclusion" => super::EnclosureLaw::RationalInclusion,
+            "enclosure.root-grid" => super::EnclosureLaw::RootGrid,
+            _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
+        };
         let version = reader.small()?;
         if version != 1 {
             return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
@@ -65,6 +70,7 @@ impl EnclosureCertificate {
         }
         reader.finished()?;
         Ok(Self {
+            law,
             version,
             scope,
             grid,
