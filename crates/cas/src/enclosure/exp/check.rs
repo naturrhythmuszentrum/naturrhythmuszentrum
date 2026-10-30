@@ -39,7 +39,7 @@ pub(in crate::enclosure) fn check(
 }
 
 /// Authenticate the reduction from the original signed rational and check every square.
-fn endpoint(
+pub(in crate::enclosure) fn endpoint(
     x: &Rational,
     proof: &ExpEndpoint,
     q: u32,

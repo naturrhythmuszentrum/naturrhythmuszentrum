@@ -44,6 +44,7 @@ mod model;
 mod planning;
 mod producer;
 mod roots;
+mod saturating;
 mod scope;
 mod service;
 #[cfg(test)]
@@ -193,7 +194,7 @@ pub use model::{
 };
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 4] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 6] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -226,6 +227,22 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 4] = [
         statement: "The real exponential lies in the checked Taylor-tail enclosure after exact binary reduction, interval squarings and negative-argument reciprocal. The analytic series, addition law and monotonicity belong to this law; finite samples do not prove them.",
         premises: "Original `DomainGuard`, exact reduction `Equality`, `NonNegative` reduced argument, `IntegerRange` for reduction and degree, `StrictSign` for the tail denominator, and `Enclosure` for every recurrence and reconstruction.",
     },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.sigmoid-compose",
+        label: "thm:cas:enclosure-sigmoid-compose",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The logistic sigmoid is enclosed by its sign-selected exponential quotient, exact half at zero, monotone endpoints and intersection with its proved range. Symmetry and range are analytic identities, not empirical clamps.",
+        premises: "Original `DomainGuard`, composition `Equality`, `NonNegative` or `StrictSign` for the original branch, `StrictSign` for each denominator, and `Enclosure` under `enclosure.exp-taylor@1` for each transformed original argument.",
+    },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.tanh-compose",
+        label: "thm:cas:enclosure-tanh-compose",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The real hyperbolic tangent is enclosed by its checked exponential quotient, odd reflection, exact zero and monotone intersection with its proved range. Cancellation error remains in the bound; oddness retains every original argument and premise.",
+        premises: "Original `DomainGuard`, composition `Equality`, `NonNegative` or `StrictSign` for the original branch, `StrictSign` for each denominator, and `Enclosure` under `enclosure.exp-taylor@1` for twice the negative original magnitude.",
+    },
 ];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
@@ -239,6 +256,10 @@ pub enum EnclosureLaw {
     LogAtanh,
     /// Checked Taylor tails, binary squaring and negative-argument reciprocals.
     ExpTaylor,
+    /// Sign-selected logistic composition of checked exponential premises.
+    SigmoidCompose,
+    /// Checked exponential quotient and odd reflection for hyperbolic tangent.
+    TanhCompose,
 }
 
 impl EnclosureLaw {
@@ -250,6 +271,8 @@ impl EnclosureLaw {
             Self::RootGrid => &ENCLOSURE_SCHEMAS[1],
             Self::LogAtanh => &ENCLOSURE_SCHEMAS[2],
             Self::ExpTaylor => &ENCLOSURE_SCHEMAS[3],
+            Self::SigmoidCompose => &ENCLOSURE_SCHEMAS[4],
+            Self::TanhCompose => &ENCLOSURE_SCHEMAS[5],
         }
     }
 }
@@ -269,7 +292,11 @@ pub(crate) fn supported_shape(
         {
             2
         }
-        Operator::Neg | Operator::NaturalLog | Operator::Exponential => 1,
+        Operator::Neg
+        | Operator::NaturalLog
+        | Operator::Exponential
+        | Operator::Sigmoid
+        | Operator::Tanh => 1,
         Operator::Add | Operator::Sub | Operator::Mul | Operator::Div => 2,
         _ => return Ok(false),
     };
@@ -357,11 +384,22 @@ pub(crate) fn exp_metadata(
     if !supported_shape(state, operator, operands)? {
         return Ok(AnalyticShape::default());
     }
-    if matches!(operator, Operator::Exponential) {
+    if matches!(
+        operator,
+        Operator::Exponential | Operator::Sigmoid | Operator::Tanh
+    ) {
         let child = state.expression(operands[0])?;
         let bound = if let Operator::Rational(value) = &child.operator {
             let (n, d) = value.component_bits();
-            u32::try_from(n.saturating_add(2).saturating_sub(d)).ok()
+            u32::try_from(
+                n.saturating_add(if matches!(operator, Operator::Tanh) {
+                    3
+                } else {
+                    2
+                })
+                .saturating_sub(d),
+            )
+            .ok()
         } else {
             None
         };
@@ -385,4 +423,21 @@ pub(crate) fn exp_metadata(
         present: found,
         reduction: bound,
     })
+}
+
+/// Propagate completed composition families without an unpaid preflight traversal.
+pub(crate) fn saturation_metadata(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<u8, crate::Fault> {
+    let mut family = match operator {
+        crate::model::Operator::Sigmoid => 1,
+        crate::model::Operator::Tanh => 2,
+        _ => 0,
+    };
+    for id in operands {
+        family = family.max(state.expression(*id)?.enclosure_saturation);
+    }
+    Ok(family)
 }

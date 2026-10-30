@@ -2810,6 +2810,7 @@ impl Cas {
             supported_enclosure: false,
             enclosure_roots: false,
             enclosure_exp: crate::enclosure::AnalyticShape::default(),
+            enclosure_saturation: 0,
             enclosure_logs: false,
             enclosure_log_bound: None,
             ambient,

@@ -4,6 +4,8 @@
 use super::*;
 
 mod exponentials;
+mod sigmoids;
+mod tangents;
 use crate::budget::{Budget, Limits};
 use crate::domain_model::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::graph::{Draft, ExpressionDraft};

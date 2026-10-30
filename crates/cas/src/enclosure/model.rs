@@ -118,6 +118,8 @@ pub struct EnclosureCertificate {
 pub struct CheckedEnclosure {
     /// Whether independent replay encountered a checked root-grid instance.
     pub(super) roots: bool,
+    /// Whether replay encountered a sigmoid composition premise.
+    pub(super) sigmoids: bool,
     /// Authenticated original request, including ordered coordinates.
     pub(super) request: EnclosureRequest,
     /// Independently replayed endpoint transcript.
@@ -162,13 +164,26 @@ impl CheckedEnclosure {
             super::EnclosureLaw::ExpTaylor
                 if self.roots && !self.certificate.logarithms.is_empty() =>
             {
-                &super::ENCLOSURE_SCHEMAS
+                &super::ENCLOSURE_SCHEMAS[..4]
             }
             super::EnclosureLaw::ExpTaylor if self.roots => &EXP_ROOT_SCHEMAS,
             super::EnclosureLaw::ExpTaylor if !self.certificate.logarithms.is_empty() => {
                 &EXP_LOG_SCHEMAS
             }
             super::EnclosureLaw::ExpTaylor => &EXP_SCHEMAS,
+            super::EnclosureLaw::TanhCompose => {
+                TANH_SCHEMAS[usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(self.sigmoids) << 2)]
+            }
+            super::EnclosureLaw::SigmoidCompose => {
+                match (self.roots, self.certificate.logarithms.is_empty()) {
+                    (true, false) => &super::ENCLOSURE_SCHEMAS[..5],
+                    (true, true) => &SIGMOID_ROOT_SCHEMAS,
+                    (false, false) => &SIGMOID_LOG_SCHEMAS,
+                    (false, true) => &SIGMOID_SCHEMAS,
+                }
+            }
         }
     }
 
@@ -178,7 +193,10 @@ impl CheckedEnclosure {
         use crate::proof::HypothesisKind;
         if matches!(
             self.certificate.law,
-            super::EnclosureLaw::LogAtanh | super::EnclosureLaw::ExpTaylor
+            super::EnclosureLaw::LogAtanh
+                | super::EnclosureLaw::ExpTaylor
+                | super::EnclosureLaw::SigmoidCompose
+                | super::EnclosureLaw::TanhCompose
         ) {
             return &[
                 HypothesisKind::DomainGuard,
@@ -247,3 +265,80 @@ pub struct EnclosureReport {
     /// Exact resource refusal, when a ceiling stopped evaluation; never a verdict.
     pub resource_fault: Option<crate::Fault>,
 }
+
+/// Composition retains its actual exponential schema and rational premise law.
+const SIGMOID_SCHEMAS: [crate::emptiness::LemmaSchema; 3] = [
+    super::ENCLOSURE_SCHEMAS[0],
+    super::ENCLOSURE_SCHEMAS[3],
+    super::ENCLOSURE_SCHEMAS[4],
+];
+/// Root-bearing sigmoid transcripts retain their root law too.
+const SIGMOID_ROOT_SCHEMAS: [crate::emptiness::LemmaSchema; 4] = [
+    super::ENCLOSURE_SCHEMAS[0],
+    super::ENCLOSURE_SCHEMAS[1],
+    super::ENCLOSURE_SCHEMAS[3],
+    super::ENCLOSURE_SCHEMAS[4],
+];
+/// Log-bearing sigmoid transcripts retain their logarithm law too.
+const SIGMOID_LOG_SCHEMAS: [crate::emptiness::LemmaSchema; 4] = [
+    super::ENCLOSURE_SCHEMAS[0],
+    super::ENCLOSURE_SCHEMAS[2],
+    super::ENCLOSURE_SCHEMAS[3],
+    super::ENCLOSURE_SCHEMAS[4],
+];
+
+/// Exact inventories indexed by encountered root, logarithm and sigmoid premises.
+const TANH_SCHEMAS: [&[crate::emptiness::LemmaSchema]; 8] = [
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[1],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[2],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[1],
+        super::ENCLOSURE_SCHEMAS[2],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[4],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[1],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[4],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[2],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[4],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+    &[
+        super::ENCLOSURE_SCHEMAS[0],
+        super::ENCLOSURE_SCHEMAS[1],
+        super::ENCLOSURE_SCHEMAS[2],
+        super::ENCLOSURE_SCHEMAS[3],
+        super::ENCLOSURE_SCHEMAS[4],
+        super::ENCLOSURE_SCHEMAS[5],
+    ],
+];

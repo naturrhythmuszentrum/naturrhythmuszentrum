@@ -419,6 +419,8 @@ pub(crate) struct Expression {
     pub(crate) enclosure_logs: bool,
     /// Present exponential family, with a conservative reduction bound when known.
     pub(crate) enclosure_exp: crate::enclosure::AnalyticShape,
+    /// Highest completed saturating family in the original expression.
+    pub(crate) enclosure_saturation: u8,
     /// Resident conservative bound, or a request for the declared reduction ceiling.
     pub(crate) enclosure_log_bound: Option<u32>,
     /// Closed enclosure grammar, derived from the original children at admission.
@@ -1720,6 +1722,11 @@ impl Cas {
             crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
         let expression = Vertex::Expression(Expression {
             enclosure_exp,
+            enclosure_saturation: crate::enclosure::saturation_metadata(
+                state,
+                &draft.operator,
+                &operands,
+            )?,
             enclosure_logs,
             enclosure_log_bound,
             enclosure_roots: crate::enclosure::has_roots(state, &draft.operator, &operands)?,

@@ -21,6 +21,7 @@ pub(super) fn check(
     let mut analytic = certificate.logarithms.iter();
     let mut exponentials = certificate.exponentials.iter();
     let mut roots = false;
+    let mut sigmoids = false;
     let mut log_two = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
     stack
@@ -67,12 +68,20 @@ pub(super) fn check(
                 stack.push(index);
                 continue;
             }
-            Operator::Exponential => {
+            Operator::Exponential | Operator::Sigmoid | Operator::Tanh => {
                 let evidence = exponentials.next().ok_or_else(invalid)?;
                 if usize::try_from(evidence.record).ok() != Some(index) {
                     return Err(invalid());
                 }
-                super::exp::check(
+                sigmoids |= matches!(expression.operator, Operator::Sigmoid);
+                let replay = if matches!(expression.operator, Operator::Tanh) {
+                    super::saturating::check_tanh
+                } else if matches!(expression.operator, Operator::Sigmoid) {
+                    super::saturating::check
+                } else {
+                    super::exp::check
+                };
+                replay(
                     &certificate.records[right.ok_or_else(invalid)?],
                     evidence,
                     record,
@@ -99,22 +108,13 @@ pub(super) fn check(
                 (lo, hi, true)
             }
         };
-        let (lower, upper) = if rounded {
-            grid(&lower, &upper, certificate.grid, budget)?
-        } else {
-            (lower, upper)
-        };
-        if record.lower().compare(&lower, budget)? != Ordering::Equal
-            || record.upper().compare(&upper, budget)? != Ordering::Equal
-        {
-            return Err(invalid());
-        }
+        endpoint_match(record, (lower, upper), rounded, certificate.grid, budget)?;
         stack.push(index);
     }
     if stack.len() != 1 || analytic.next().is_some() || exponentials.next().is_some() {
         return Err(invalid());
     }
-    finish(request, certificate, roots, budget)
+    finish(request, certificate, (roots, sigmoids), budget)
 }
 
 /// Bind the registered family and version to the original expression's derived grammar.
@@ -124,6 +124,20 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_saturation
+        == 2
+    {
+        super::EnclosureLaw::TanhCompose
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_saturation
+        == 1
+    {
+        super::EnclosureLaw::SigmoidCompose
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_exp
@@ -158,7 +172,7 @@ fn schema(
 fn finish(
     request: &EnclosureRequest,
     certificate: &EnclosureCertificate,
-    roots: bool,
+    families: (bool, bool),
     budget: &mut Budget,
 ) -> Result<CheckedEnclosure, Fault> {
     let last = certificate.records.last().ok_or_else(invalid)?;
@@ -183,7 +197,8 @@ fn finish(
     budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
     budget.work(bytes, AT)?;
     Ok(CheckedEnclosure {
-        roots,
+        roots: families.0,
+        sigmoids: families.1,
         request: request.clone(),
         certificate: certificate.clone(),
         interval,
@@ -337,4 +352,26 @@ fn negated(value: &Interval, budget: &mut Budget) -> Result<(Rational, Rational,
         value.lower().negated(budget)?,
         true,
     ))
+}
+
+/// Compare the exact reconstructed relation after its required outward rounding.
+fn endpoint_match(
+    record: &Interval,
+    bounds: (Rational, Rational),
+    rounded: bool,
+    q: u32,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let (lower, upper) = bounds;
+    let (lower, upper) = if rounded {
+        grid(&lower, &upper, q, budget)?
+    } else {
+        (lower, upper)
+    };
+    if record.lower().compare(&lower, budget)? != Ordering::Equal
+        || record.upper().compare(&upper, budget)? != Ordering::Equal
+    {
+        return Err(invalid());
+    }
+    Ok(())
 }
