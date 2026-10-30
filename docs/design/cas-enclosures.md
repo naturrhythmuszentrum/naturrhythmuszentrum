@@ -1,0 +1,141 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Certified rational-endpoint enclosures · `spec:nrz:cas-enclosures-concept`
+
+**Requirement (Certified computation beyond exact reduction)** · `req:nrz:cas-enclosures-purpose`
+
+Certified computation needs bounds when an exact expression has no available rational reduction, and needs evidence before using those bounds to decide a threshold. A rational-endpoint evaluator supplies finite, inspectable enclosures of supported real expressions while preserving the expression, domain and assumptions to which each enclosure belongs. Its purpose is to extend checked numerical evidence without making a numerical estimate an exact identity (`rule:nrz:cas-conditional-witnesses`).
+
+**Caveat (Concept and implementation are distinct)** · `cav:nrz:cas-enclosures-status`
+
+This concept states the guarantees and boundaries of the proposed capability. It introduces no implementation, dependency, public API or registered analytic law. The later design chooses placement, representations, precision schedules, algorithms and certificate forms; implementation establishes the supported fragment and its measured costs. Existing capabilities retain their present contracts until an implementing change explicitly extends them.
+
+## Enclosures and refinement · `sec:nrz:cas-enclosures-meaning`
+
+**Definition (Exact rational endpoints)** · `def:nrz:cas-enclosures-interval`
+
+A rational-endpoint enclosure is a closed interval with finite exact rational endpoints l and u, with l at most u, together with evidence that the declared real target lies in that interval. For a declared input region, the evidence bounds the operation over the whole region, not merely at its centre. Rational endpoints have exact mathematical values even when the enclosed target is irrational; a singleton is not asserted merely because two printed approximations agree.
+
+**Rule (Original target and premises)** · `rule:nrz:cas-enclosures-target`
+
+An enclosure retains its original target, coordinate order where applicable, input region, mathematical context, domain conditions and evidence dependencies. The checker must establish the requested statement about that target. Evidence about a substituted expression, another branch or a nearby point cannot establish it. A declared hypothesis remains a hypothesis, and an unproved domain condition remains pending (`rule:nrz:cas-conditional-witnesses`), (`[CAS-rule:cas:decision-enclosure-replay]`).
+
+**Requirement (Outward correctness without a trusted float)** · `req:nrz:cas-enclosures-outward`
+
+Every accepted endpoint relation must bound the exact operation, including any finite approximation remainder and representation error. A floating result may suggest a candidate, but its value or the producer's success flag supplies no proof. Exact rational relations and the admitted mathematical laws establish containment independently of the candidate's origin, so the enclosure guarantee needs no trusted floating-point value or processor rounding assumption (`[SCALAR-rule:scalar:kernel-certificate-relations]`), (`[CAS-rule:cas:scalar-kernel-certificate]`).
+
+**Definition (Requested precision)** · `def:nrz:cas-enclosures-precision`
+
+A precision request specifies an exact tolerance and the quantity to which it applies. For a point target it can require an enclosure of at most that width. For an input region, arithmetic refinement cannot remove variation already present in the region; a request must distinguish enclosure error from input uncertainty. Success states the achieved bound and whether the requested tolerance was met, rather than treating a working precision as an accuracy guarantee.
+
+**Rule (Refinement preserves meaning)** · `rule:nrz:cas-enclosures-refinement`
+
+Refinement improves bounds for the same target and premises without changing their meaning. Previously checked bounds remain valid; compatible refinements can be intersected to retain a nested enclosure. Empty intersection of purportedly compatible valid bounds indicates an evidence or implementation error, not ordinary indecision. The supported point-evaluation contracts must explain why their enclosures can approach a requested positive tolerance when adequate resources are available, without promising that a particular finite budget will suffice.
+
+**Rule (Deterministic bounded evaluation)** · `rule:nrz:cas-enclosures-determinism`
+
+Evaluation is deterministic for the declared target, assumptions, evaluation policy, precision request, resource allowance and store reuse state. A proved or refuted verdict, once reached, never depends on reuse state, and neither does the validity of any returned bound. Work is charged per operation, and checked results are reused within a store, so a warm request can consume less Work and reach a verdict under an allowance that leaves a cold request undecided or exhausted. Whether a verdict is reached within that allowance may therefore depend on reuse state; every result reports the Work actually consumed so that the difference is visible. Determinism promises neither identical outcomes under identical budgets across different reuse states nor identical elapsed time or completion after external interruption (`rule:nrz:cas-search-bounds`).
+
+**Caveat (Limits of enclosure evidence)** · `cav:nrz:cas-enclosures-nonclaims`
+
+An enclosure does not establish the physical adequacy of a model, probabilistic coverage, arbitrary real equality, global solution completeness or the absence of roots outside its stated region. Overlap alone proves neither equality nor inequality. No universal termination, requested-width success under every finite limit, or support for every symbolic expression is claimed. Existing physical bindings, statistical companions and exact symbolic judgments keep their own evidence obligations (`rule:vision:imports-and-exactness`), (`rule:nrz:cas-solving-matrix-boundary`).
+
+## Outcomes and resources · `sec:nrz:cas-enclosures-outcomes`
+
+**Definition (Proved relation)** · `def:nrz:cas-enclosures-proved`
+
+A proved outcome establishes the requested relation under its retained premises. For the predicate x at most b, a checked enclosure with upper endpoint at most b proves the predicate. Equality at the boundary is included only when the evidence establishes it. A successfully produced interval can be valid while still failing to decide the predicate or meet the requested precision; those are separate result facts.
+
+**Definition (Refuted relation)** · `def:nrz:cas-enclosures-refuted`
+
+A refuted outcome establishes the negation of the requested relation on its stated scope. For the predicate x at most b, a checked lower endpoint strictly greater than b is sufficient. Failure to find a proof is not a refutation, and a purported enclosure with invalid premises is rejected as evidence rather than used to negate the target statement.
+
+**Definition (Undecided relation)** · `def:nrz:cas-enclosures-undecided`
+
+An undecided outcome retains valid evidence that does not establish the requested relation or its negation. An enclosure straddling a threshold remains undecided, including when a precision or work limit prevents further refinement. Such an outcome supplies neither a default branch nor a mathematical refutation. Its retained bounds and explicit stopping reason permit a later request to refine without reinterpreting the earlier result (`[CAS-rule:cas:lattice-tuple-undecided]`).
+
+**Definition (Unsupported request)** · `def:nrz:cas-enclosures-unsupported`
+
+Unsupported means that the requested operation, domain, evidence origin or precision contract lies outside the implemented fragment. It reports the missing capability and carries no mathematical conclusion about the target. A representation of a function does not imply an evaluator or a checker for it; the concept's intended scope is not a claim of current support (`cav:nrz:cas-enclosures-status`).
+
+**Definition (Interrupted execution)** · `def:nrz:cas-enclosures-interrupted`
+
+Interruption reports that execution stopped without completing the requested evaluation or decision. It carries no mathematical verdict. Already checked facts may be retained with their scope, but an incomplete construction cannot be published as a certificate. The report distinguishes interruption from a completed undecided comparison, including the case where work stops before any valid enclosure has been obtained.
+
+**Rule (Bounded work and honest exhaustion)** · `rule:nrz:cas-enclosures-budgets`
+
+Requests have finite arithmetic, storage, refinement and output allowances. Work is charged for operations actually performed, including the applicable costs of checked reuse, rather than for checks avoided through store-local retention. Every expensive exact operation and certificate check consumes its applicable allowance; a resource ceiling does not become a bound on mathematical error. Every result reports actual consumed Work; exhaustion also reports unmet requirements and any valid retained evidence. Reuse can change whether the allowance suffices, but never invents a completed comparison, changes the target tolerance or increases a limit to obtain success. Refusal is atomic with respect to published evidence, while work already spent remains spent (`rule:nrz:cas-search-bounds`), (`[CAS-rule:cas:constant-cache-lifecycle]`).
+
+**Requirement (Bounded endpoint growth)** · `req:nrz:cas-enclosures-growth`
+
+The evaluator must bound endpoint and intermediate integer sizes as well as operation counts. Any coarsening used to control growth must be outward and included in the achieved error bound. A refinement that cannot meet the requested tolerance within those size limits reports that fact; it may not discard a remainder or round inward. The design chooses the endpoint representation and growth policy and supplies their exact containment argument.
+
+## Function families · `sec:nrz:cas-enclosures-functions`
+
+**Requirement (Roots and rational powers)** · `req:nrz:cas-enclosures-roots-powers`
+
+The intended real fragment includes nonnegative square roots, fourth roots and rational powers of strictly positive bases, with explicit exponent and domain conventions. Root evidence relates endpoints to the original radicand; power evidence retains its base, exponent and definedness premises. Existing positive roots and compositions for power-of-two exponent denominators provide a foundation, while general rational powers need additional checked laws. This does not widen the present strict-positive constant grammar or admit negative-base branch choices implicitly (`[CAS-def:cas:constant-square-roots]`), (`[CAS-rule:cas:constant-square-root-boundary]`).
+
+**Requirement (Logarithm and exponential)** · `req:nrz:cas-enclosures-log-exp`
+
+The intended fragment includes the real logarithm on strictly positive inputs and the real exponential, including a certified enclosure for the exact constant 2 log 2. Each family must carry an explicit mathematical remainder or error argument whose finite instance is checked through exact endpoint relations. A decimal approximation of a constant, or a formal series without a convergence and remainder justification, cannot supply that evidence (`rule:nrz:cas-limits-and-series`).
+
+**Requirement (Sigmoid and hyperbolic tangent)** · `req:nrz:cas-enclosures-sigmoid-tanh`
+
+The intended fragment includes the logistic sigmoid, defined by 1 divided by 1 plus exp of the negated argument, and the real hyperbolic tangent. Their enclosures retain all constituent error and domain evidence, including any cancellation in a chosen evaluation. Range, symmetry and monotonicity facts can support checking and refinement only with their applicable premises; a familiar function name is not a certified numerical result.
+
+**Requirement (Clamped activation)** · `req:nrz:cas-enclosures-clamp`
+
+A supported clamped activation has the declared form g(max(x,a)), with a specified wall a and a function g whose value and derivative bounds are justified on the relevant domain. It retains the constant branch below the wall and the responsive branch above it. Across the join it encloses the union of branch values and an applicable generalized derivative bound, including the zero derivative of the constant branch. It does not replace the kink by a smooth derivative or choose a branch from an unresolved comparison; uncertain wall parameters remain part of the input region (`spec:nrz:cas-piecewise-concept`).
+
+**Requirement (Interval products and norms)** · `req:nrz:cas-enclosures-matrices`
+
+Interval matrix products and norm bounds must cover every matrix in the declared componentwise input regions, with compatible shapes and ordered coordinates. Products retain interaction terms and the order of factors; norms state the norm being bounded and its relation to the certified claim. This work belongs to the certified matrix core and must preserve its distinction between deterministic enclosures, numerical error and statistical covariance (`step:nrz:bite-certified-matrix-core`), (`rule:vision:arithmetic-closure`).
+
+**Requirement (Local Krawczyk contraction check)** · `req:nrz:cas-enclosures-krawczyk`
+
+A Krawczyk check must state its function, box, centre, preconditioner and parameter region, justify a Jacobian enclosure over the whole box, and verify the inclusion and contraction premises of its claimed local result. A midpoint derivative or a successful candidate iteration is insufficient. Existence, uniqueness and contraction claims retain their precise regions and hypotheses; failure of sufficient tests remains undecided about whether a solution exists. A box crossing a clamp requires a justified nonsmooth result or an explicit refusal of the smooth check, never an unannounced smooth derivative.
+
+**Caveat (Excluded function claims)** · `cav:nrz:cas-enclosures-function-boundaries`
+
+This concept does not promise arbitrary complex branches, general symbolic integration, arbitrary real-exponent evaluation, global nonlinear root isolation, or a decision procedure for real equality. It does not replace exact algebraic solving or the certified dense linear solve. Unsupported domains and origins remain explicit, and a local nonlinear certificate cannot silently become a global completeness claim (`rule:nrz:cas-solving-claims`), (`def:vision:certified-solve-contract`).
+
+## Existing capabilities and boundaries · `sec:nrz:cas-enclosures-foundations`
+
+**Definition (Constant root foundation)** · `def:nrz:cas-enclosures-existing-roots`
+
+The existing constant interface admits exact positive rational and Pi-monomial square-root expressions and checks rational enclosing endpoints against their original targets. Irrational results remain exact expressions, not floating substitutes. Those capabilities supply reusable domain and enclosure evidence; requested-precision refinement remains a distinct proposed contract (`[CAS-def:cas:constant-square-roots]`), (`[CAS-rule:cas:constant-square-root-enclosures]`).
+
+**Definition (Scalar certificates and CAS replay)** · `def:nrz:cas-enclosures-existing-kernels`
+
+The existing scalar kernel family exports certificates for rational inputs, sums, products, reciprocals away from zero and strictly positive square roots; quotients and fourth roots compose from those operations. CAS checks their exact endpoint relations and original-target scope and refuses an inward bound. New function families must provide equally explicit evidence rather than deriving trust from membership in the same family (`[SCALAR-def:scalar:kernel-certificate]`), (`[SCALAR-rule:scalar:kernel-certificate-relations]`), (`[CAS-rule:cas:scalar-kernel-certificate]`), (`[CAS-rule:cas:scalar-kernel-wire]`).
+
+**Rule (Store-local reuse retains its scope)** · `rule:nrz:cas-enclosures-existing-caches`
+
+Checked constants, scalar records and Machin certificates already have store-local retention. Reuse depends on the complete checked identity, context and lifecycle, not on a printed value or a matching approximate endpoint. Those receipts can avoid repeated checking within their contracts but cannot become portable evidence merely because they were cached. Avoided operations reduce consumed Work and can let a warm request reach a verdict within an allowance that does not suffice in a cold store; the result reports actual consumed Work, while verdicts once reached and the validity of returned bounds remain independent of reuse state. Any new enclosure reuse must preserve target and parameter identity, resource accounting and rollback validity (`[CAS-def:cas:constant-cache]`), (`[CAS-def:cas:scalar-record-cache]`), (`[CAS-def:cas:pi-bound-cache]`).
+
+**Definition (Decision enclosure precedent)** · `def:nrz:cas-enclosures-existing-decisions`
+
+Existing decision enclosures join rational bounds to their original targets, while prepared lattice attempts distinguish boundary intersection from exhausted decision work and retain valid evidence without a partial selection. This separation is the precedent for enclosure-based decisions: malformed evidence refuses, valid but insufficient evidence stays undecided, and neither case invents a selected alternative. It does not imply that a lattice receipt proves a new function's enclosure (`[CAS-rule:cas:decision-enclosure-replay]`), (`[CAS-rule:cas:lattice-tuple-undecided]`).
+
+**Rule (Certified matrix ownership)** · `rule:nrz:cas-enclosures-matrix-boundary`
+
+The certified matrix core propagates deterministic componentwise bounds and supplies dense solve evidence with independently bounded residuals and inverse norms. The proposed interval matrix and local contraction capabilities must fit that ownership rather than introduce a competing matrix authority. An interval-Jacobian Krawczyk check is a proposed extension, not an existing user operation or a consequence of a linear solve certificate (`step:nrz:bite-certified-matrix-core`), (`def:vision:certified-solve-contract`).
+
+## Design choices and evidence obligations · `sec:nrz:cas-enclosures-next`
+
+**Open Question (Scalar laws or a CAS module)** · `open:nrz:cas-enclosures-placement`
+
+The design will compare new laws in the scalar kernel family, each carrying its remainder argument as exact rational endpoint relations for CAS replay, with a separate nrz-cas module for enclosure evaluation. The first option extends an established producer/checker boundary; the second gives the evaluator a distinct surface within CAS. Both must meet the same target, domain, resource and checking contracts, and neither changes the certified matrix core's ownership. This concept selects neither placement (`rule:nrz:cas-enclosures-matrix-boundary`).
+
+**Requirement (Independent conformance evidence)** · `req:nrz:cas-enclosures-verification`
+
+Each implemented family needs independently justified exact or bounded oracles, known-value cases, containment and compatible-refinement checks, domain and boundary refusals, straddling comparisons and corrupted-certificate controls. A higher-precision run of the same producer is not by itself an independent oracle. Resource tests retain literal N/N−1 Work boundaries, prior spent work and atomic refusal evidence. These tests support robustness and conformance; the mathematical remainder and enclosure arguments remain explicit obligations (`rule:vision:independent-numerical-evidence`), (`[CAS-rule:cas:constant-cache-lifecycle]`).
+
+**Requirement (Registered analytic laws)** · `req:nrz:cas-enclosures-formal-laws`
+
+Each family's remainder or error argument, including logarithm, exponential, sigmoid, tanh, rational powers and the Krawczyk premises, must be a registered formal lemma schema with its own label, formal name and semantic version. Each checked instance cites its schema by name and version and its premises by formal kind, retaining the complete original statement, context and conditions. The design names these schemas rather than leaving their arguments only in prose; registration alone grants no proof authority, and the closed checker must establish each instance. Until its schema is registered, a remainder bound stated in this concept keeps a non-Theorem kind. This follows the formal primitive register and its typed premise shapes under the closed registration and version policy (`[CAS-sec:cas:primitive-schemas]`), (`rule:nrz:cas-design-closed-registration`).
+
+**Requirement (Design before implementation)** · `req:nrz:cas-enclosures-design-boundary`
+
+The next design must choose concrete algorithms, reduction and remainder rules, endpoint growth control, requested-precision semantics, capability boundaries, certificate checking and resource accounting. It must explain how each function is independently checked and how the matrix extension fits its owner. Reviewable implementation steps then establish core enclosure arithmetic and outcomes, each function family with its evidence, and finally the interval matrix and local contraction capabilities. No capability is advertised as implemented by this concept alone (`cav:nrz:cas-enclosures-status`).
