@@ -343,3 +343,26 @@ fn decision_enclosure_cumulative_ledger() -> TestResult {
     }
     Ok(())
 }
+
+/// Unsupported scalar origins refuse before replay while preserving all prior Work.
+/// ´test:integration:kernel-origin-baseline´
+/// ´claim:cas:kernel-origin-baseline´
+#[test]
+fn kernel_origin_baseline() -> TestResult {
+    let (source, mut request) = prepared(0)?;
+    request.origin = EnclosureOrigin::ScalarKernel;
+    let mut budget = ledger()?;
+    budget.work(17, Location::new("prior kernel probe"))?;
+    let before = source.cas.counts();
+    let Err(fault) = source.cas.check_rational_enclosure(&request, &mut budget) else {
+        panic!("kernel origin unexpectedly accepted");
+    };
+    assert_eq!(
+        fault.kind,
+        FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
+    );
+    assert_eq!(fault.location, Location::new("exact rational enclosure"));
+    assert_eq!(source.cas.counts(), before);
+    assert_eq!(budget.usage().work, 17);
+    Ok(())
+}

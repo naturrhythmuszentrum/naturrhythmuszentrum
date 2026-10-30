@@ -36,6 +36,7 @@
 |(`test:integration:binary64-primitive-boundary-oracle`)|scalar|Binary64 boundaries exercise the same laws at its independent exponent range.|
 |(`test:integration:endpoint-hulls-enclose`)|scalar|All four signs and zero crossings preserve inclusion in both formats.|
 |(`test:integration:outward-neighbours-without-residual-shortcuts`)|scalar|The outward-neighbour rule applies at exact ordinary sums and underflow alike.|
+|(`test:integration:kernel-endpoint-baseline`)|scalar|Endpoint-only arithmetic retains its original storage, revision and literal Work.|
 |(`test:integration:fixed-reduction-rational-oracles`)|scalar|Cancellation, underflow and exact small answers succeed in each format.|
 |(`test:integration:reduction-order-and-empty-laws`)|scalar|Increasing-index left folds refuse intermediate overflow instead of reassociating.|
 |(`test:integration:scaled-norm-rational-oracle`)|scalar|Scaling contains norms of huge, tiny, mixed and empty data without direct squaring overflow.|

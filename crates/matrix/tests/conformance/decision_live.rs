@@ -545,3 +545,75 @@ fn lattice_live_origin_refusal() -> TestResult {
     }
     Ok(())
 }
+
+/// Native LC evaluation covers both total input boxes without adding records or double error.
+/// ´test:integration:kernel-live-baseline´
+/// ´claim:matrix:kernel-live-baseline´
+#[test]
+fn kernel_live_baseline() -> TestResult {
+    use nrz_scalar::{Enclosure, Finite};
+    let (association, mut source) = decision_source()?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let bindings = inputs(&mut heap, &association)?;
+    let mut budget = ledger()?;
+    budget.work(
+        17,
+        nrz_bindings::readings::algebra::Location::new("prior live probe"),
+    )?;
+    let frozen = heap.freeze_decision_inputs(&association, &bindings, &mut budget)?;
+    let context = ArithmeticContext::new()?;
+    let mut boxes = Vec::new();
+    let mut coordinates = Vec::new();
+    for operand in frozen.operands() {
+        let [center, total, numerical] = operand.coordinates();
+        coordinates.push([center.to_bits(), total.to_bits(), numerical.to_bits()]);
+        boxes.push(
+            Enclosure::singleton(Finite::new(center)?)
+                .add(Enclosure::new(-total, total)?, &context)?,
+        );
+    }
+    let quotient = boxes[0].div(boxes[1], &context)?;
+    let endpoints = boxes
+        .iter()
+        .chain(std::iter::once(&quotient))
+        .map(|value| [value.lower().get().to_bits(), value.upper().get().to_bits()])
+        .collect::<Vec<_>>();
+    let capture = budget.usage().work;
+    let witness = source
+        .frame
+        .cas
+        .check_proof(&source.context, &source.steps, &mut ledger()?)?;
+    let graph = Rc::new(source.frame.cas);
+    let before = graph.counts();
+    let records = heap.provenance_usage();
+    heap.prepare_ratio_decision(
+        frozen,
+        Rc::clone(&graph),
+        witness,
+        &context,
+        literals(),
+        &mut budget,
+    )?;
+    assert_eq!(graph.counts(), before);
+    assert_eq!(heap.provenance_usage(), records);
+    assert_eq!(capture, 2969);
+    assert_eq!(budget.usage().work, 5748);
+    assert_eq!(before.vertices, 35);
+    assert_eq!(before.edges, 94);
+    assert_eq!(
+        coordinates,
+        [
+            [4_576_919_460_757_110_784, 4_526_117_625_507_348_480, 0],
+            [4_569_394_403_176_611_840, 4_526_117_625_507_348_480, 0],
+        ]
+    );
+    assert_eq!(
+        endpoints,
+        [
+            [4_576_917_261_733_855_231, 4_576_921_659_780_366_337],
+            [4_569_385_607_083_589_631, 4_569_403_199_269_634_049],
+            [4_614_336_318_571_737_447, 4_614_359_175_678_870_881],
+        ]
+    );
+    Ok(())
+}

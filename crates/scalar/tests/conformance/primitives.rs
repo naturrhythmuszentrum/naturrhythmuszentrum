@@ -7,6 +7,7 @@
 //! | [`binary64_primitive_boundary_oracle`] | scalar | Binary64 boundaries exercise the same laws at its independent exponent range. |
 //! | [`endpoint_hulls_enclose`] | scalar | All four signs and zero crossings preserve inclusion in both formats. |
 //! | [`outward_neighbours_without_residual_shortcuts`] | scalar | The outward-neighbour rule applies at exact ordinary sums and underflow alike. |
+//! | [`kernel_endpoint_baseline`] | scalar | Endpoint-only arithmetic retains its original storage, revision and literal Work. |
 
 //! Independent boundary oracles for each correctly rounded primitive.
 
@@ -173,4 +174,46 @@ fn neighbours<P: Scalar>() -> TestResult {
 fn outward_neighbours_without_residual_shortcuts() -> TestResult {
     neighbours::<f32>()?;
     neighbours::<f64>()
+}
+
+/// Endpoint-only arithmetic retains its original storage, revision and literal Work.
+/// ´claim:scalar:kernel-endpoint-baseline´
+/// ´test:integration:kernel-endpoint-baseline´
+#[test]
+fn kernel_endpoint_baseline() -> TestResult {
+    let context = ArithmeticContext::new()?;
+    assert_eq!(size_of::<Enclosure<f32>>(), 8);
+    assert_eq!(size_of::<Enclosure<f64>>(), 16);
+    assert_eq!(size_of::<ArithmeticContext>(), 4);
+    assert_eq!(context.revision(), 1);
+    let one = point(1.0_f64)?;
+    let two = point(2.0_f64)?;
+    let three = point(3.0_f64)?;
+    let values = [
+        one.add(two, &context)?,
+        two.mul(three, &context)?,
+        one.div(three, &context)?,
+        two.sqrt(&context)?,
+    ];
+    let endpoints =
+        values.map(|value| [value.lower().get().to_bits(), value.upper().get().to_bits()]);
+    assert_eq!(
+        endpoints,
+        [
+            [4_613_937_818_241_073_151, 4_613_937_818_241_073_153],
+            [4_618_441_417_868_443_647, 4_618_441_417_868_443_649],
+            [4_599_676_419_421_066_580, 4_599_676_419_421_066_582],
+            [4_609_047_870_845_172_684, 4_609_047_870_845_172_686],
+        ]
+    );
+    let literal =
+        nrz_scalar::NumericLiteral::new("1/10", nrz_scalar::LiteralLimits::new(32, 32, 40))?;
+    assert_eq!(literal.decode::<f64>(&context)?.work_used(), 40);
+    let literal =
+        nrz_scalar::NumericLiteral::new("1/10", nrz_scalar::LiteralLimits::new(32, 32, 39))?;
+    let Err(fault) = literal.decode::<f64>(&context) else {
+        panic!("one-below literal Work must refuse");
+    };
+    assert_eq!(fault, nrz_scalar::ArithmeticFailure::ResourceLimit);
+    Ok(())
 }
