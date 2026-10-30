@@ -19,7 +19,9 @@ pub(super) fn check(
 ) -> Result<CheckedEnclosure, Fault> {
     let schedule = prepare(cas, request, certificate, budget)?;
     let mut analytic = certificate.logarithms.iter();
+    let mut exponentials = certificate.exponentials.iter();
     let mut roots = false;
+    let mut log_two = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
     stack
         .try_reserve(schedule.len())
@@ -46,33 +48,31 @@ pub(super) fn check(
                 value.add(&Rational::zero(), budget)?,
                 false,
             ),
-            Operator::Free(_) => {
-                budget.work(crate::graph::size(request.coordinates.len(), AT)?, AT)?;
-                let value = request
-                    .coordinates
-                    .iter()
-                    .find(|v| v.coordinate.logical_id() == id)
-                    .ok_or_else(invalid)?;
-                (
-                    value.interval.lower().add(&Rational::zero(), budget)?,
-                    value.interval.upper().add(&Rational::zero(), budget)?,
-                    false,
-                )
-            }
-            Operator::Neg => {
-                let value = &certificate.records[right.ok_or_else(invalid)?];
-                (
-                    value.upper().negated(budget)?,
-                    value.lower().negated(budget)?,
-                    true,
-                )
-            }
+            Operator::Free(_) => coordinate(request, id, budget)?,
+            Operator::Neg => negated(&certificate.records[right.ok_or_else(invalid)?], budget)?,
             Operator::NaturalLog => {
                 let evidence = analytic.next().ok_or_else(invalid)?;
                 if usize::try_from(evidence.record).ok() != Some(index) {
                     return Err(invalid());
                 }
                 super::log::check(
+                    &certificate.records[right.ok_or_else(invalid)?],
+                    evidence,
+                    record,
+                    certificate.grid,
+                    &mut log_two,
+                    budget,
+                    interrupt,
+                )?;
+                stack.push(index);
+                continue;
+            }
+            Operator::Exponential => {
+                let evidence = exponentials.next().ok_or_else(invalid)?;
+                if usize::try_from(evidence.record).ok() != Some(index) {
+                    return Err(invalid());
+                }
+                super::exp::check(
                     &certificate.records[right.ok_or_else(invalid)?],
                     evidence,
                     record,
@@ -111,7 +111,7 @@ pub(super) fn check(
         }
         stack.push(index);
     }
-    if stack.len() != 1 || analytic.next().is_some() {
+    if stack.len() != 1 || analytic.next().is_some() || exponentials.next().is_some() {
         return Err(invalid());
     }
     finish(request, certificate, roots, budget)
@@ -124,6 +124,13 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_exp
+        .present
+    {
+        super::EnclosureLaw::ExpTaylor
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_logs
@@ -157,19 +164,21 @@ fn finish(
     let last = certificate.records.last().ok_or_else(invalid)?;
     let (lower, upper) = grid(last.lower(), last.upper(), certificate.presentation, budget)?;
     let interval = Interval::new(lower, upper, budget)?;
-    let bytes = super::log::bytes(&certificate.logarithms).saturating_add(
-        certificate
-            .records
-            .iter()
-            .fold(
-                u64::try_from(certificate.scope.len())
-                    .unwrap_or(u64::MAX)
-                    .saturating_add(512),
-                |sum, value| sum.saturating_add(super::interval_bytes(value)),
-            )
-            .saturating_add(super::request_bytes(request))
-            .saturating_add(super::interval_bytes(&interval)),
-    );
+    let bytes = super::exp::bytes(&certificate.exponentials)
+        .saturating_add(super::log::bytes(&certificate.logarithms))
+        .saturating_add(
+            certificate
+                .records
+                .iter()
+                .fold(
+                    u64::try_from(certificate.scope.len())
+                        .unwrap_or(u64::MAX)
+                        .saturating_add(512),
+                    |sum, value| sum.saturating_add(super::interval_bytes(value)),
+                )
+                .saturating_add(super::request_bytes(request))
+                .saturating_add(super::interval_bytes(&interval)),
+        );
     budget.check(BudgetKind::OutputBytes, bytes, AT)?;
     budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
     budget.work(bytes, AT)?;
@@ -300,4 +309,32 @@ fn prepare(
         return Err(invalid());
     }
     Ok(schedule)
+}
+
+/// Authenticate the complete original coordinate and copy its checked endpoints.
+fn coordinate(
+    request: &EnclosureRequest,
+    id: crate::graph::LogicalId,
+    budget: &mut Budget,
+) -> Result<(Rational, Rational, bool), Fault> {
+    budget.work(crate::graph::size(request.coordinates.len(), AT)?, AT)?;
+    let value = request
+        .coordinates
+        .iter()
+        .find(|v| v.coordinate.logical_id() == id)
+        .ok_or_else(invalid)?;
+    Ok((
+        value.interval.lower().add(&Rational::zero(), budget)?,
+        value.interval.upper().add(&Rational::zero(), budget)?,
+        false,
+    ))
+}
+
+/// Negation reverses and negates exact endpoints before outward gridding.
+fn negated(value: &Interval, budget: &mut Budget) -> Result<(Rational, Rational, bool), Fault> {
+    Ok((
+        value.upper().negated(budget)?,
+        value.lower().negated(budget)?,
+        true,
+    ))
 }

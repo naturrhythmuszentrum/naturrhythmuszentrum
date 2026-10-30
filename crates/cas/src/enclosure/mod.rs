@@ -37,9 +37,11 @@
 //! ```
 
 mod checker;
+mod exp;
 mod interval;
 mod log;
 mod model;
+mod planning;
 mod producer;
 mod roots;
 mod scope;
@@ -70,16 +72,18 @@ fn boundary(
 
 /// Conservative retained receipt size including all endpoint components and original handles.
 pub(crate) fn footprint(value: &CheckedEnclosure) -> u64 {
-    log::bytes(&value.certificate.logarithms).saturating_add(
-        value.certificate.records.iter().fold(
-            u64::try_from(value.certificate.scope.len())
-                .unwrap_or(u64::MAX)
-                .saturating_add(request_bytes(&value.request))
-                .saturating_add(interval_bytes(&value.interval))
-                .saturating_add(512),
-            |size, interval| size.saturating_add(interval_bytes(interval)),
-        ),
-    )
+    exp::bytes(&value.certificate.exponentials)
+        .saturating_add(log::bytes(&value.certificate.logarithms))
+        .saturating_add(
+            value.certificate.records.iter().fold(
+                u64::try_from(value.certificate.scope.len())
+                    .unwrap_or(u64::MAX)
+                    .saturating_add(request_bytes(&value.request))
+                    .saturating_add(interval_bytes(&value.interval))
+                    .saturating_add(512),
+                |size, interval| size.saturating_add(interval_bytes(interval)),
+            ),
+        )
 }
 
 /// Reserve a worst-case receipt from the admitted source size and component ceiling.
@@ -104,6 +108,13 @@ fn receipt_reservation(
     let multiplier = if cas
         .state
         .expression(cas.checked(&request.target)?)?
+        .enclosure_exp
+        .present
+    {
+        24
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
         .enclosure_logs
     {
         16
@@ -121,14 +132,16 @@ fn receipt_reservation(
 
 /// Size the supplied transcript before checking or copying any of its records.
 fn certificate_bytes(value: &EnclosureCertificate) -> u64 {
-    log::bytes(&value.logarithms).saturating_add(
-        value.records.iter().fold(
-            u64::try_from(value.scope.len())
-                .unwrap_or(u64::MAX)
-                .saturating_add(128),
-            |bytes, record| bytes.saturating_add(interval_bytes(record)),
-        ),
-    )
+    exp::bytes(&value.exponentials)
+        .saturating_add(log::bytes(&value.logarithms))
+        .saturating_add(
+            value.records.iter().fold(
+                u64::try_from(value.scope.len())
+                    .unwrap_or(u64::MAX)
+                    .saturating_add(128),
+                |bytes, record| bytes.saturating_add(interval_bytes(record)),
+            ),
+        )
 }
 
 /// Bound the request payload retained in a checked receipt.
@@ -171,6 +184,7 @@ fn interval_bytes(value: &Interval) -> u64 {
         })
 }
 
+pub use exp::{ExpEndpoint, ExpEvidence, ExpSeries};
 pub use interval::Interval;
 pub use log::{LogEndpoint, LogEvidence, LogSeries};
 pub use model::{
@@ -179,7 +193,7 @@ pub use model::{
 };
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 3] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 4] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -204,6 +218,14 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 3] = [
         statement: "The positive target reduced as x=2^k*m is enclosed by finite atanh sums and geometric tails, including the one-third instance for log two. The law includes the analytic identity, convergence, monotonicity and tail inequality; finite tests do not prove those analytic premises.",
         premises: "Original `DomainGuard`, `StrictSign` for the argument, exact `Equality` for reduction, `IntegerRange` for the exponent and term count, and `Enclosure` for reconstructed partial sums and log two.",
     },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.exp-taylor",
+        label: "thm:cas:enclosure-exp-taylor",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The real exponential lies in the checked Taylor-tail enclosure after exact binary reduction, interval squarings and negative-argument reciprocal. The analytic series, addition law and monotonicity belong to this law; finite samples do not prove them.",
+        premises: "Original `DomainGuard`, exact reduction `Equality`, `NonNegative` reduced argument, `IntegerRange` for reduction and degree, `StrictSign` for the tail denominator, and `Enclosure` for every recurrence and reconstruction.",
+    },
 ];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
@@ -215,6 +237,8 @@ pub enum EnclosureLaw {
     RootGrid,
     /// Finite atanh tails over positive inputs, with checked operand laws.
     LogAtanh,
+    /// Checked Taylor tails, binary squaring and negative-argument reciprocals.
+    ExpTaylor,
 }
 
 impl EnclosureLaw {
@@ -225,6 +249,7 @@ impl EnclosureLaw {
             Self::RationalInclusion => &ENCLOSURE_SCHEMAS[0],
             Self::RootGrid => &ENCLOSURE_SCHEMAS[1],
             Self::LogAtanh => &ENCLOSURE_SCHEMAS[2],
+            Self::ExpTaylor => &ENCLOSURE_SCHEMAS[3],
         }
     }
 }
@@ -244,7 +269,7 @@ pub(crate) fn supported_shape(
         {
             2
         }
-        Operator::Neg | Operator::NaturalLog => 1,
+        Operator::Neg | Operator::NaturalLog | Operator::Exponential => 1,
         Operator::Add | Operator::Sub | Operator::Mul | Operator::Div => 2,
         _ => return Ok(false),
     };
@@ -311,4 +336,53 @@ pub(crate) fn log_metadata(
         }
     }
     Ok((found, bound))
+}
+
+/// Resident capability summary separates family presence from a known reduction bound.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct AnalyticShape {
+    /// Whether the original expression contains this implemented analytic family.
+    pub(crate) present: bool,
+    /// A conservative reduction bound, absent for an unevaluated composite operand.
+    pub(crate) reduction: Option<u32>,
+}
+
+/// Fixed-size exponential metadata avoids an unpaid closure walk during sizing preflight.
+pub(crate) fn exp_metadata(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<AnalyticShape, crate::Fault> {
+    use crate::model::Operator;
+    if !supported_shape(state, operator, operands)? {
+        return Ok(AnalyticShape::default());
+    }
+    if matches!(operator, Operator::Exponential) {
+        let child = state.expression(operands[0])?;
+        let bound = if let Operator::Rational(value) = &child.operator {
+            let (n, d) = value.component_bits();
+            u32::try_from(n.saturating_add(2).saturating_sub(d)).ok()
+        } else {
+            None
+        };
+        return Ok(AnalyticShape {
+            present: true,
+            reduction: bound,
+        });
+    }
+    let mut found = false;
+    let mut bound = Some(0);
+    for id in operands {
+        let child = state.expression(*id)?;
+        if child.enclosure_exp.present {
+            found = true;
+            bound = bound
+                .zip(child.enclosure_exp.reduction)
+                .map(|(a, b)| a.max(b));
+        }
+    }
+    Ok(AnalyticShape {
+        present: found,
+        reduction: bound,
+    })
 }

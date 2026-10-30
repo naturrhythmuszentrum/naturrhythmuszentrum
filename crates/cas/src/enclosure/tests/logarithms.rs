@@ -457,6 +457,77 @@ fn limited(work: u64) -> Result<Budget, Fault> {
     })
 }
 
+/// Two original nodes cite one identical checked log-two series within a transcript.
+/// ´test:unit:enclosure-log-shared-two´
+/// ´claim:cas:enclosure-log-shared-two´
+#[test]
+fn enclosure_log_shared_two() -> TestResult {
+    let mut f = Fixture::new()?;
+    let two = f.rational(2, 1)?;
+    let four = f.rational(4, 1)?;
+    let first = f.term(Operator::NaturalLog, &[two])?;
+    let second = f.term(Operator::NaturalLog, &[four])?;
+    let target = f.term(Operator::Add, &[first, second])?;
+    let request = f.request(target);
+    let report = f
+        .cas
+        .enclose(&request, log_policy(), &mut ledger()?, &mut |_| false)?;
+    let checked = report.checked.ok_or("two-node bound")?;
+    let certificate = &checked.certificate;
+    assert_eq!(certificate.logarithms.len(), 2);
+    let mut replay_budget = ledger()?;
+    checker::check(
+        &f.cas,
+        &request,
+        certificate,
+        &mut replay_budget,
+        &mut |_| false,
+    )?;
+    assert_eq!(replay_budget.usage().work, 378_979);
+    for (available, passes) in [(378_979, true), (378_978, false)] {
+        let mut budget = limited(available + 7)?;
+        budget.work(7, AT)?;
+        assert_eq!(
+            checker::check(&f.cas, &request, certificate, &mut budget, &mut |_| false).is_ok(),
+            passes
+        );
+    }
+    assert_eq!(
+        certificate.logarithms[0].lower.two,
+        certificate.logarithms[1].lower.two
+    );
+    let plan = log::plan(log_policy(), 3).ok_or("plan")?;
+    let input = interval(2, 2, 1)?;
+    let (bound, proof) = log::produce(&input, 1, plan, &mut ledger()?, &mut |_| false)?;
+    let mut cache = Vec::new();
+    let mut cold = ledger()?;
+    log::check(
+        &input,
+        &proof,
+        &bound,
+        plan.grid,
+        &mut cache,
+        &mut cold,
+        &mut |_| false,
+    )?;
+    let mut warm = ledger()?;
+    log::check(
+        &input,
+        &proof,
+        &bound,
+        plan.grid,
+        &mut cache,
+        &mut warm,
+        &mut |_| false,
+    )?;
+    assert!(warm.usage().work < cold.usage().work);
+    assert_eq!(cache.len(), 1);
+    let mut damaged = certificate.clone();
+    damaged.logarithms[1].lower.two.tail = interval(0, 0, 1)?;
+    assert!(checker::check(&f.cas, &request, &damaged, &mut ledger()?, &mut |_| false).is_err());
+    Ok(())
+}
+
 /// Literal wire, retention and initial-schedule ceilings refuse at exactly one less.
 /// ´test:unit:enclosure-log-size-pins´
 /// ´claim:cas:enclosure-log-size-pins´
@@ -564,19 +635,37 @@ fn enclosure_log_term_count() -> TestResult {
         &mut ledger()?,
         &mut |_| false,
     )?;
-    log::check(&input, &first, &a, plan.grid, &mut ledger()?, &mut |_| {
-        false
-    })?;
-    log::check(&input, &second, &b, plan.grid, &mut ledger()?, &mut |_| {
-        false
-    })?;
+    log::check(
+        &input,
+        &first,
+        &a,
+        plan.grid,
+        &mut Vec::new(),
+        &mut ledger()?,
+        &mut |_| false,
+    )?;
+    log::check(
+        &input,
+        &second,
+        &b,
+        plan.grid,
+        &mut Vec::new(),
+        &mut ledger()?,
+        &mut |_| false,
+    )?;
     assert_ne!(first.lower.reduced.power, second.lower.reduced.power);
     let mut forged = first;
     forged.lower.reduced.terms += 1;
     assert!(
-        log::check(&input, &forged, &a, plan.grid, &mut ledger()?, &mut |_| {
-            false
-        })
+        log::check(
+            &input,
+            &forged,
+            &a,
+            plan.grid,
+            &mut Vec::new(),
+            &mut ledger()?,
+            &mut |_| { false }
+        )
         .is_err()
     );
     Ok(())

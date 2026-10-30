@@ -17,7 +17,15 @@ pub(super) fn generate(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<EnclosureCertificate, Fault> {
-    generate_planned(cas, request, scope, grids, None, budget, interrupt)
+    generate_planned(
+        cas,
+        request,
+        scope,
+        grids,
+        super::planning::Plans::default(),
+        budget,
+        interrupt,
+    )
 }
 
 /// Generate with the preflighted analytic schedule; no analytic family is inferred from a name.
@@ -26,12 +34,13 @@ pub(super) fn generate_planned(
     request: &EnclosureRequest,
     scope: Vec<u8>,
     grids: (u32, u32),
-    plan: Option<super::log::Plan>,
+    plan: super::planning::Plans,
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<EnclosureCertificate, Fault> {
     let (grid, presentation) = grids;
     let mut logarithms = Vec::new();
+    let mut exponentials = Vec::new();
     let schedule = super::scope::schedule(cas, request, budget)?;
     let mut records: Vec<Interval> = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
@@ -57,57 +66,36 @@ pub(super) fn generate_planned(
         } else {
             None
         };
-        let result = match &expression.operator {
-            Operator::Rational(value) => Interval::singleton(value, budget)?,
-            Operator::Free(_) => coordinate(cas, request, id, budget)?.copied(budget)?,
-            Operator::NaturalLog => {
-                let input = &records[right.ok_or_else(invalid)?];
-                if input.lower().is_zero() || input.lower().is_negative() {
-                    let original = cas.state.expression(expression.operands[0])?;
-                    if matches!(original.operator, Operator::Free(_) | Operator::Rational(_)) {
-                        return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
-                    }
-                }
-                let index = u32::try_from(records.len()).map_err(|_| invalid())?;
-                let (result, evidence) = super::log::produce(
-                    input,
-                    index,
-                    plan.ok_or_else(invalid)?,
-                    budget,
-                    interrupt,
-                )?;
-                budget.check(
-                    BudgetKind::StagedPayloadBytes,
-                    bytes.saturating_add(super::log::bytes(std::slice::from_ref(&evidence))),
-                    AT,
-                )?;
-                logarithms
-                    .try_reserve(1)
-                    .map_err(|_| Fault::allocation(AT))?;
-                logarithms.push(evidence);
-                result
-            }
-            Operator::Neg => {
-                let value = &records[right.ok_or_else(invalid)?];
-                Interval::new(
-                    value.upper().negated(budget)?,
-                    value.lower().negated(budget)?,
-                    budget,
-                )?
-                .coarsen(grid, budget)?
-            }
-            operator => binary(
-                operator,
-                &records[left.ok_or_else(invalid)?],
-                &records[right.ok_or_else(invalid)?],
-                grid,
-                budget,
-            )?,
-        };
+        let generated = node(
+            cas,
+            request,
+            id,
+            (left.map(|i| &records[i]), right.map(|i| &records[i])),
+            (grid, plan, records.len()),
+            budget,
+            interrupt,
+        )?;
+        if let Some(evidence) = generated.log {
+            let size = bytes
+                .saturating_add(super::log::bytes(&logarithms))
+                .saturating_add(super::exp::bytes(&exponentials))
+                .saturating_add(super::log::bytes(std::slice::from_ref(&evidence)));
+            append(&mut logarithms, evidence, size, budget)?;
+        }
+        if let Some(evidence) = generated.exp {
+            let size = bytes
+                .saturating_add(super::log::bytes(&logarithms))
+                .saturating_add(super::exp::bytes(&exponentials))
+                .saturating_add(super::exp::bytes(std::slice::from_ref(&evidence)));
+            append(&mut exponentials, evidence, size, budget)?;
+        }
+        let result = generated.bound;
         bytes = bytes.saturating_add(interval_bytes(&result));
         budget.check(
             BudgetKind::StagedPayloadBytes,
-            bytes.saturating_add(super::log::bytes(&logarithms)),
+            bytes
+                .saturating_add(super::log::bytes(&logarithms))
+                .saturating_add(super::exp::bytes(&exponentials)),
             AT,
         )?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
@@ -120,13 +108,18 @@ pub(super) fn generate_planned(
         return Err(invalid());
     }
     Ok(EnclosureCertificate {
-        law: law(cas, request, !logarithms.is_empty())?,
+        law: if exponentials.is_empty() {
+            law(cas, request, !logarithms.is_empty())?
+        } else {
+            super::EnclosureLaw::ExpTaylor
+        },
         version: 1,
         scope,
         grid,
         presentation,
         records,
         logarithms,
+        exponentials,
     })
 }
 
@@ -184,4 +177,107 @@ fn law(cas: &Cas, request: &EnclosureRequest, logs: bool) -> Result<super::Enclo
     } else {
         super::EnclosureLaw::RationalInclusion
     })
+}
+
+/// Direct nonpositive source domains refuse; computed boundaries remain refinable.
+fn logarithm(
+    input: &Interval,
+    original: &Operator,
+    index: usize,
+    plan: super::planning::Plans,
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<(Interval, super::LogEvidence), Fault> {
+    if (input.lower().is_zero() || input.lower().is_negative())
+        && matches!(original, Operator::Free(_) | Operator::Rational(_))
+    {
+        return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
+    }
+    super::log::produce(
+        input,
+        u32::try_from(index).map_err(|_| invalid())?,
+        plan.log.ok_or_else(invalid)?,
+        budget,
+        interrupt,
+    )
+}
+
+/// One original node's proposal, with at most one finite analytic record.
+struct Generated {
+    /// Proposed outward bound.
+    bound: Interval,
+    /// Finite logarithm evidence, when this node is a logarithm.
+    log: Option<super::LogEvidence>,
+    /// Finite exponential evidence, when this node is an exponential.
+    exp: Option<super::ExpEvidence>,
+}
+
+/// Produce a single original operation after its operands have been scheduled.
+fn node(
+    cas: &Cas,
+    request: &EnclosureRequest,
+    id: LogicalId,
+    inputs: (Option<&Interval>, Option<&Interval>),
+    schedule: (u32, super::planning::Plans, usize),
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<Generated, Fault> {
+    let (grid, plan, index) = schedule;
+    let (left, right) = inputs;
+    let expression = cas.state.expression(id)?;
+    let mut log = None;
+    let mut exp = None;
+    let bound = match &expression.operator {
+        Operator::Rational(value) => Interval::singleton(value, budget)?,
+        Operator::Free(_) => coordinate(cas, request, id, budget)?.copied(budget)?,
+        Operator::NaturalLog => {
+            let original = cas.state.expression(expression.operands[0])?;
+            let (bound, evidence) = logarithm(
+                right.ok_or_else(invalid)?,
+                &original.operator,
+                index,
+                plan,
+                budget,
+                interrupt,
+            )?;
+            log = Some(evidence);
+            bound
+        }
+        Operator::Exponential => {
+            let (bound, evidence) = super::exp::produce(
+                right.ok_or_else(invalid)?,
+                u32::try_from(index).map_err(|_| invalid())?,
+                plan.exp.ok_or_else(invalid)?,
+                budget,
+                interrupt,
+            )?;
+            exp = Some(evidence);
+            bound
+        }
+        Operator::Neg => {
+            let value = right.ok_or_else(invalid)?;
+            Interval::new(
+                value.upper().negated(budget)?,
+                value.lower().negated(budget)?,
+                budget,
+            )?
+            .coarsen(grid, budget)?
+        }
+        operator => binary(
+            operator,
+            left.ok_or_else(invalid)?,
+            right.ok_or_else(invalid)?,
+            grid,
+            budget,
+        )?,
+    };
+    Ok(Generated { bound, log, exp })
+}
+
+/// Check accumulated staged evidence before reserving or appending a record.
+fn append<T>(records: &mut Vec<T>, value: T, bytes: u64, budget: &Budget) -> Result<(), Fault> {
+    budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
+    records.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+    records.push(value);
+    Ok(())
 }

@@ -280,6 +280,7 @@ pub(crate) fn predicate(value: &PredicateKind, out: &mut Encoder<'_>) -> Result<
 const fn operator_tag(value: &Operator) -> u8 {
     match value {
         Operator::NaturalLog => 51,
+        Operator::Exponential => 52,
         Operator::Select(_) => 49,
         Operator::AffineReading(_) => 50,
         Operator::SymbolRelation(_) => 48,
@@ -403,6 +404,7 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
             crate::model::ScalarOperation::Divide => 2,
         }),
         Operator::NaturalLog
+        | Operator::Exponential
         | Operator::Conjugate
         | Operator::RealPart
         | Operator::ImagPart
