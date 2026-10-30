@@ -17,26 +17,9 @@ pub(super) fn check(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<CheckedEnclosure, Fault> {
-    super::interval::scratch(budget)?;
-    schema(cas, request, certificate)?;
-    budget.check(
-        BudgetKind::WitnessBytes,
-        crate::graph::size(certificate.scope.len(), AT)?,
-        AT,
-    )?;
-    budget.check(
-        BudgetKind::ProofNodes,
-        crate::graph::size(certificate.records.len(), AT)?,
-        AT,
-    )?;
-    budget.work(crate::graph::size(certificate.scope.len(), AT)?, AT)?;
-    if certificate.scope != super::scope::key(cas, request, budget)? {
-        return Err(invalid());
-    }
-    let schedule = super::scope::schedule(cas, request, budget)?;
-    if schedule.len() != certificate.records.len() {
-        return Err(invalid());
-    }
+    let schedule = prepare(cas, request, certificate, budget)?;
+    let mut analytic = certificate.logarithms.iter();
+    let mut roots = false;
     let mut stack: Vec<usize> = Vec::new();
     stack
         .try_reserve(schedule.len())
@@ -84,9 +67,28 @@ pub(super) fn check(
                     true,
                 )
             }
+            Operator::NaturalLog => {
+                let evidence = analytic.next().ok_or_else(invalid)?;
+                if usize::try_from(evidence.record).ok() != Some(index) {
+                    return Err(invalid());
+                }
+                super::log::check(
+                    &certificate.records[right.ok_or_else(invalid)?],
+                    evidence,
+                    record,
+                    certificate.grid,
+                    budget,
+                    interrupt,
+                )?;
+                stack.push(index);
+                continue;
+            }
             Operator::GeneralPower(crate::model::Branch::StrictReal) => {
+                let exponent = expression.operands.get(1).ok_or_else(invalid)?;
+                super::roots::exponent(&cas.state.expression(*exponent)?.operator)?;
                 let value = &certificate.records[left.ok_or_else(invalid)?];
                 super::roots::check(value, record, certificate.grid, budget)?;
+                roots = true;
                 stack.push(index);
                 continue;
             }
@@ -109,10 +111,10 @@ pub(super) fn check(
         }
         stack.push(index);
     }
-    if stack.len() != 1 {
+    if stack.len() != 1 || analytic.next().is_some() {
         return Err(invalid());
     }
-    finish(request, certificate, budget)
+    finish(request, certificate, roots, budget)
 }
 
 /// Bind the registered family and version to the original expression's derived grammar.
@@ -122,6 +124,12 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_logs
+    {
+        super::EnclosureLaw::LogAtanh
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_roots
@@ -143,26 +151,30 @@ fn schema(
 fn finish(
     request: &EnclosureRequest,
     certificate: &EnclosureCertificate,
+    roots: bool,
     budget: &mut Budget,
 ) -> Result<CheckedEnclosure, Fault> {
     let last = certificate.records.last().ok_or_else(invalid)?;
     let (lower, upper) = grid(last.lower(), last.upper(), certificate.presentation, budget)?;
     let interval = Interval::new(lower, upper, budget)?;
-    let bytes = certificate
-        .records
-        .iter()
-        .fold(
-            u64::try_from(certificate.scope.len())
-                .unwrap_or(u64::MAX)
-                .saturating_add(512),
-            |sum, value| sum.saturating_add(super::interval_bytes(value)),
-        )
-        .saturating_add(super::request_bytes(request))
-        .saturating_add(super::interval_bytes(&interval));
+    let bytes = super::log::bytes(&certificate.logarithms).saturating_add(
+        certificate
+            .records
+            .iter()
+            .fold(
+                u64::try_from(certificate.scope.len())
+                    .unwrap_or(u64::MAX)
+                    .saturating_add(512),
+                |sum, value| sum.saturating_add(super::interval_bytes(value)),
+            )
+            .saturating_add(super::request_bytes(request))
+            .saturating_add(super::interval_bytes(&interval)),
+    );
     budget.check(BudgetKind::OutputBytes, bytes, AT)?;
     budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
     budget.work(bytes, AT)?;
     Ok(CheckedEnclosure {
+        roots,
         request: request.clone(),
         certificate: certificate.clone(),
         interval,
@@ -170,7 +182,7 @@ fn finish(
 }
 
 /// Replay a binary law from exact rational endpoint relations.
-fn relation(
+pub(super) fn relation(
     operator: &Operator,
     a: &Interval,
     b: &Interval,
@@ -234,7 +246,7 @@ fn products(
 }
 
 /// Replay outward rounding using exact division and signed floor.
-fn grid(
+pub(super) fn grid(
     lower: &Rational,
     upper: &Rational,
     q: u32,
@@ -258,4 +270,34 @@ fn grid(
 /// Refuse an endpoint transcript that does not match its reconstructed law.
 const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::EndpointMismatch, AT)
+}
+
+/// Validate the original join and reserve the independent replay schedule.
+fn prepare(
+    cas: &Cas,
+    request: &EnclosureRequest,
+    certificate: &EnclosureCertificate,
+    budget: &mut Budget,
+) -> Result<Vec<crate::graph::LogicalId>, Fault> {
+    super::interval::scratch(budget)?;
+    schema(cas, request, certificate)?;
+    budget.check(
+        BudgetKind::WitnessBytes,
+        crate::graph::size(certificate.scope.len(), AT)?,
+        AT,
+    )?;
+    budget.check(
+        BudgetKind::ProofNodes,
+        crate::graph::size(certificate.records.len(), AT)?,
+        AT,
+    )?;
+    budget.work(crate::graph::size(certificate.scope.len(), AT)?, AT)?;
+    if certificate.scope != super::scope::key(cas, request, budget)? {
+        return Err(invalid());
+    }
+    let schedule = super::scope::schedule(cas, request, budget)?;
+    if schedule.len() != certificate.records.len() {
+        return Err(invalid());
+    }
+    Ok(schedule)
 }

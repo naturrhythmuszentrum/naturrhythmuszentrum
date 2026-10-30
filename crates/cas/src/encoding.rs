@@ -279,6 +279,7 @@ pub(crate) fn predicate(value: &PredicateKind, out: &mut Encoder<'_>) -> Result<
 /// Stable operator tags are independent of Rust's enum layout.
 const fn operator_tag(value: &Operator) -> u8 {
     match value {
+        Operator::NaturalLog => 51,
         Operator::Select(_) => 49,
         Operator::AffineReading(_) => 50,
         Operator::SymbolRelation(_) => 48,
@@ -401,7 +402,8 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
             crate::model::ScalarOperation::Multiply => 1,
             crate::model::ScalarOperation::Divide => 2,
         }),
-        Operator::Conjugate
+        Operator::NaturalLog
+        | Operator::Conjugate
         | Operator::RealPart
         | Operator::ImagPart
         | Operator::ExactCoefficient

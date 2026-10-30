@@ -23,9 +23,22 @@ pub(super) fn preflight(
     if !target.supported_enclosure || policy.version != 1 {
         return Ok(None);
     }
-    let Some(grid) = policy.precision.checked_add(8) else {
+    let Some(mut grid) = policy.precision.checked_add(8) else {
         return Ok(None);
     };
+    if target.enclosure_logs {
+        let Some(plan) = super::log::plan(
+            policy,
+            target
+                .enclosure_log_bound
+                .unwrap_or(policy.reduction_ceiling),
+        ) else {
+            return Ok(None);
+        };
+        grid = grid.max(plan.grid);
+        budget.check(BudgetKind::ProofNodes, u64::from(plan.terms), AT)?;
+        budget.check(BudgetKind::IntegerExponent, u64::from(plan.reduction), AT)?;
+    }
     if policy.rounds == 0 || grid > policy.grid_ceiling {
         return Ok(None);
     }

@@ -65,64 +65,30 @@ fn evaluate(
     let Some(mut grid) = preflight(initial, &mut report, start, budget)? else {
         return Ok(report);
     };
+    let target = cas.state.expression(cas.checked(&request.target)?)?;
+    let mut analytic = if target.enclosure_logs {
+        super::log::plan(
+            policy,
+            target
+                .enclosure_log_bound
+                .unwrap_or(policy.reduction_ceiling),
+        )
+    } else {
+        None
+    };
     for _ in 0..policy.rounds {
         if grid > policy.grid_ceiling {
             break;
         }
-        let attempt = cas.transaction(budget, |cas, budget| {
-            boundary(budget, interrupt)?;
-            let scope = super::scope::key(cas, request, budget)?;
-            let prefix = prefix(&scope, grid, policy.precision + 2, budget)?;
-            if let Some(checked) = cas.retained_enclosure(&prefix, budget)? {
-                let bytes = super::footprint(checked);
-                budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-                budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
-                for record in &checked.certificate.records {
-                    record.lower().check(budget, AT)?;
-                    record.upper().check(budget, AT)?;
-                }
-                budget.work(bytes, AT)?;
-                let checked = checked.clone();
-                let decision = decide(&checked, policy.precision, budget)?;
-                return Ok((checked, decision));
-            }
-            let reserved = super::receipt_reservation(cas, request, scope.len(), budget)?;
-            budget.check(BudgetKind::OutputBytes, reserved, AT)?;
-            let previous = budget.reserve_enclosure_checking(policy.checking_work);
-            let retained = cas
-                .retained_judgment_bytes()
-                .saturating_add(super::request_bytes(request));
-            let generated =
-                budget.with_retained_payload(retained.saturating_add(reserved), AT, |budget| {
-                    super::producer::generate(
-                        cas,
-                        request,
-                        scope,
-                        (grid, policy.precision + 2),
-                        budget,
-                        interrupt,
-                    )
-                });
-            budget.restore_limits(previous);
-            let certificate = generated?;
-            let checked = budget.with_retained_payload(
-                retained.saturating_add(super::certificate_bytes(&certificate)),
-                AT,
-                |budget| super::checker::check(cas, request, &certificate, budget, interrupt),
-            )?;
-            if let Some(previous) = &report.checked {
-                let intersection = previous.interval.intersection(&checked.interval, budget)?;
-                if intersection != checked.interval {
-                    return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
-                }
-            }
-            let decision = decide(&checked, policy.precision, budget)?;
-            boundary(budget, interrupt)?;
-            let key = retention_key(&prefix, &certificate, budget)?;
-            budget.work(super::footprint(&checked), AT)?;
-            cas.retain_enclosure(key, checked.clone(), budget)?;
-            Ok((checked, decision))
-        });
+        let attempt = round(
+            cas,
+            request,
+            policy,
+            (grid, analytic),
+            report.checked.as_ref(),
+            budget,
+            interrupt,
+        );
         match attempt {
             Ok((checked, (outcome, met))) => {
                 report.checked = Some(checked);
@@ -138,10 +104,21 @@ fn evaluate(
                     break;
                 }
             }
+            Err(fault) if fault.location == super::log::UNSEPARATED => {
+                report.outcome = EnclosureOutcome::Undecided(UndecidedReason::DomainBoundary);
+            }
             Err(fault) => {
                 stopping(fault, &mut report)?;
                 break;
             }
+        }
+        if let Some(plan) = analytic {
+            let Some(next) = plan.next(policy) else {
+                break;
+            };
+            grid = next.grid;
+            analytic = Some(next);
+            continue;
         }
         let Some(next) = grid
             .checked_sub(policy.precision)
@@ -177,6 +154,7 @@ fn replay(
     }
     let attempt = cas.transaction(budget, |cas, budget| {
         boundary(budget, interrupt)?;
+        analytic_policy(certificate, policy, budget)?;
         let retained = cas
             .retained_judgment_bytes()
             .saturating_add(super::request_bytes(request));
@@ -336,4 +314,98 @@ fn decide(
         },
         met,
     ))
+}
+
+/// Supplied analytic work cannot bypass the request's term or reduction ceilings.
+fn analytic_policy(
+    certificate: &EnclosureCertificate,
+    policy: RefinementPolicy,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    budget.check(
+        BudgetKind::ProofNodes,
+        crate::graph::size(certificate.logarithms.len(), AT)?,
+        AT,
+    )?;
+    for record in &certificate.logarithms {
+        budget.work(1, AT)?;
+        for endpoint in [&record.lower, &record.upper] {
+            if endpoint.exponent.unsigned_abs() > u64::from(policy.reduction_ceiling)
+                || endpoint.reduced.terms > policy.term_ceiling
+                || endpoint.two.terms > policy.term_ceiling
+            {
+                return Err(Fault::invalid(InvalidCode::Policy, AT));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// One transaction retains only a completed independently checked round.
+fn round(
+    cas: &mut Cas,
+    request: &EnclosureRequest,
+    policy: RefinementPolicy,
+    schedule: (u32, Option<super::log::Plan>),
+    earlier: Option<&CheckedEnclosure>,
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<(CheckedEnclosure, (EnclosureOutcome, bool)), Fault> {
+    let (grid, analytic) = schedule;
+    cas.transaction(budget, |cas, budget| {
+        boundary(budget, interrupt)?;
+        let scope = super::scope::key(cas, request, budget)?;
+        let prefix = prefix(&scope, grid, policy.precision + 2, budget)?;
+        if let Some(checked) = cas.retained_enclosure(&prefix, budget)? {
+            analytic_policy(&checked.certificate, policy, budget)?;
+            let bytes = super::footprint(checked);
+            budget.check(BudgetKind::OutputBytes, bytes, AT)?;
+            budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
+            for record in &checked.certificate.records {
+                record.lower().check(budget, AT)?;
+                record.upper().check(budget, AT)?;
+            }
+            budget.work(bytes, AT)?;
+            let checked = checked.clone();
+            let decision = decide(&checked, policy.precision, budget)?;
+            return Ok((checked, decision));
+        }
+        let reserved = super::receipt_reservation(cas, request, scope.len(), budget)?;
+        budget.check(BudgetKind::OutputBytes, reserved, AT)?;
+        let previous = budget.reserve_enclosure_checking(policy.checking_work);
+        let retained = cas
+            .retained_judgment_bytes()
+            .saturating_add(super::request_bytes(request));
+        let generated =
+            budget.with_retained_payload(retained.saturating_add(reserved), AT, |budget| {
+                super::producer::generate_planned(
+                    cas,
+                    request,
+                    scope,
+                    (grid, policy.precision + 2),
+                    analytic,
+                    budget,
+                    interrupt,
+                )
+            });
+        budget.restore_limits(previous);
+        let certificate = generated?;
+        let checked = budget.with_retained_payload(
+            retained.saturating_add(super::certificate_bytes(&certificate)),
+            AT,
+            |budget| super::checker::check(cas, request, &certificate, budget, interrupt),
+        )?;
+        if let Some(previous) = earlier {
+            let intersection = previous.interval.intersection(&checked.interval, budget)?;
+            if intersection != checked.interval {
+                return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
+            }
+        }
+        let decision = decide(&checked, policy.precision, budget)?;
+        boundary(budget, interrupt)?;
+        let key = retention_key(&prefix, &certificate, budget)?;
+        budget.work(super::footprint(&checked), AT)?;
+        cas.retain_enclosure(key, checked.clone(), budget)?;
+        Ok((checked, decision))
+    })
 }

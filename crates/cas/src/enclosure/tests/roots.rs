@@ -34,6 +34,39 @@ fn root_policy() -> RefinementPolicy {
     }
 }
 
+/// A stale supported-shape flag cannot authorize a changed exponent in root replay.
+/// ´test:unit:enclosure-root-exponent-independent´
+/// ´claim:cas:enclosure-root-exponent-independent´
+#[test]
+fn enclosure_root_exponent_independent() -> TestResult {
+    let (mut fixture, request) = root_case(2, 1, false)?;
+    let target = fixture.cas.checked(&request.target)?;
+    let exponent = fixture.cas.state.expression(target)?.operands[1];
+    let index = fixture.cas.state.indices[&exponent];
+    if let crate::graph::Vertex::Expression(value) = &mut fixture.cas.state.graph[index] {
+        value.operator = Operator::Rational(number(1, 3)?);
+    } else {
+        return Err("expression".into());
+    }
+    assert!(fixture.cas.state.expression(target)?.supported_enclosure);
+    let scope = scope::key(&fixture.cas, &request, &mut ledger()?)?;
+    let forged = producer::generate(
+        &fixture.cas,
+        &request,
+        scope,
+        (12, 6),
+        &mut ledger()?,
+        &mut |_| false,
+    )?;
+    assert!(
+        checker::check(&fixture.cas, &request, &forged, &mut ledger()?, &mut |_| {
+            false
+        })
+        .is_err()
+    );
+    Ok(())
+}
+
 fn pair(value: &Rational) -> TestResult<(i128, i128)> {
     let (numerator, denominator) = value.small_ratio(&mut ledger()?)?.ok_or("small oracle")?;
     Ok((i128::from(numerator), i128::from(denominator)))

@@ -415,6 +415,10 @@ pub(crate) enum ExpressionAttachment {
 pub(crate) struct Expression {
     /// Whether the supported original enclosure grammar contains a root instance.
     pub(crate) enclosure_roots: bool,
+    /// Whether the supported closure uses the logarithm law.
+    pub(crate) enclosure_logs: bool,
+    /// Resident conservative bound, or a request for the declared reduction ceiling.
+    pub(crate) enclosure_log_bound: Option<u32>,
     /// Closed enclosure grammar, derived from the original children at admission.
     pub(crate) supported_enclosure: bool,
     /// Checked scalar registry identity, mandatory for registered scalar sorts.
@@ -1709,7 +1713,11 @@ impl Cas {
             budget,
         )?;
         let ambient = crate::solving::sorts::ambient(state, header, &draft.sort)?;
+        let (enclosure_logs, enclosure_log_bound) =
+            crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
         let expression = Vertex::Expression(Expression {
+            enclosure_logs,
+            enclosure_log_bound,
             enclosure_roots: crate::enclosure::has_roots(state, &draft.operator, &operands)?,
             supported_enclosure: crate::enclosure::supported_shape(
                 state,

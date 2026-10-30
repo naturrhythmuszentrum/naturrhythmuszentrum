@@ -2809,6 +2809,8 @@ impl Cas {
         let expression = crate::graph::Expression {
             supported_enclosure: false,
             enclosure_roots: false,
+            enclosure_logs: false,
+            enclosure_log_bound: None,
             ambient,
             attachment: Some(literal.attachment),
             operator: literal.operator,
