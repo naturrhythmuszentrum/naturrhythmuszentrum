@@ -438,3 +438,110 @@ fn decision_live_complete_lc_work_boundaries() -> TestResult {
     }
     Ok(())
 }
+
+/// The measured scalar prerequisite preserves its complete caller ledger and retirement costs.
+/// ´test:integration:lattice-live-scalar-baseline´
+/// ´claim:matrix:lattice-live-scalar-baseline´
+#[test]
+fn lattice_live_scalar_baseline() -> TestResult {
+    let mut budget = ledger()?;
+    let (association, mut source) =
+        super::decision_frozen::decision_source_budget(false, &mut budget)?;
+    let originals = budget.usage().work;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let bindings = inputs(&mut heap, &association)?;
+    let records = heap.provenance_usage();
+    let frozen = heap.freeze_decision_inputs(&association, &bindings, &mut budget)?;
+    let captured = budget.usage().work;
+    let handle = frozen.operands()[0].input().handle();
+    let stamp = frozen.operands()[0].input().stamp();
+    let center = frozen.operands()[0].coordinates()[0];
+    let witness = source
+        .frame
+        .cas
+        .check_proof(&source.context, &source.steps, &mut budget)?;
+    let selected = budget.usage().work;
+    let graph = Rc::new(source.frame.cas);
+    let graph_records = graph.counts();
+    let prepared = heap.prepare_ratio_decision(
+        frozen,
+        Rc::clone(&graph),
+        witness,
+        &ArithmeticContext::new()?,
+        literals(),
+        &mut budget,
+    )?;
+    let admitted = budget.usage().work;
+    let published = heap.publish_decision(prepared, &mut budget)?;
+    let attached = budget.usage().work;
+    let count = published.count(&heap, 3, &mut budget)?;
+    let materialized = budget.usage().work;
+    assert_eq!(count.current(&heap, &mut budget)?.value(), 3);
+    let current = budget.usage().work;
+    heap.replace_declared_bounds(handle, stamp.version(), &[center], &[1.0 / 1024.0])?;
+    let Err(fault) = count.current(&heap, &mut budget) else {
+        panic!("changed radius must retire the count");
+    };
+    assert!(matches!(fault, LiveDecisionError::Snapshot(_)));
+    let retired = budget.usage().work;
+    let Err(fault) = published.current(&heap, &mut budget) else {
+        panic!("retired parent must refuse");
+    };
+    assert!(matches!(fault, LiveDecisionError::Retired));
+    assert_eq!(graph.counts(), graph_records);
+    assert_eq!(heap.provenance_usage(), records);
+    assert_eq!(originals, 109_290);
+    assert_eq!(captured - originals, 2952);
+    assert_eq!(selected - captured, 166_952);
+    assert_eq!(admitted - selected, 2779);
+    assert_eq!(attached - admitted, 193);
+    assert_eq!(materialized - attached, 125);
+    assert_eq!(current - materialized, 66);
+    assert_eq!(retired - current, 34);
+    assert_eq!(budget.usage().work - retired, 1);
+    assert_eq!(budget.usage().work, 282_392);
+    assert_eq!(graph_records.vertices, 35);
+    assert_eq!(graph_records.edges, 94);
+    assert_eq!(records.records(), 0);
+    Ok(())
+}
+
+/// Numerical origins must be checked independently before any live lattice selection.
+/// ´test:integration:lattice-live-origin-refusal´
+/// ´claim:matrix:lattice-live-origin-refusal´
+#[test]
+fn lattice_live_origin_refusal() -> TestResult {
+    use nrz_bindings::readings::algebra::{
+        FaultKind, InvalidCode, Location, decision::EnclosureOrigin, proof::Certificate,
+    };
+    let source = super::decision_fixture::fixture(false, "3", "10/Pi")?;
+    let proposal = source.steps.last().ok_or("missing selection")?;
+    let Certificate::IntegerSelection(original) = &proposal.certificate else {
+        return Err("missing original enclosure".into());
+    };
+    for origin in [EnclosureOrigin::ScalarKernel, EnclosureOrigin::MatrixKernel] {
+        let mut contract = original.clone();
+        contract.origin = origin;
+        let before = source.frame.cas.counts();
+        let mut budget = ledger()?;
+        budget.work(
+            17,
+            nrz_bindings::readings::algebra::Location::new("prior origin probe"),
+        )?;
+        let Err(fault) = source
+            .frame
+            .cas
+            .check_rational_enclosure(&contract, &mut budget)
+        else {
+            panic!("unsupported numerical origin must refuse");
+        };
+        assert_eq!(source.frame.cas.counts(), before);
+        assert_eq!(
+            fault.kind,
+            FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
+        );
+        assert_eq!(fault.location, Location::new("exact rational enclosure"));
+        assert_eq!(budget.usage().work, 17);
+    }
+    Ok(())
+}
