@@ -75,6 +75,10 @@ output = "docs/design/cas-concept.md"
 requires = []
 
 [[document]]
+output = "docs/design/cas-enclosures.md"
+requires = []
+
+[[document]]
 output = "docs/design/cas-design.md"
 requires = []
 
