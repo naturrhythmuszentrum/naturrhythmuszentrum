@@ -2,7 +2,7 @@
 //! Checked closed CAS graphs own their syntax; canonical keys contain no runtime store identity.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::{ExactConstant, Value, sign};
 use crate::budget::{Budget, BudgetKind};
@@ -104,12 +104,14 @@ fn finish(mut cas: Cas, original: LogicalId, budget: &mut Budget) -> Result<Exac
     let result = copy(&cas.state, normalized, &mut compact, header, budget)?;
     let root = compact.handle(result);
     let key = compact.canonical_snapshot(budget)?;
-    Ok(ExactConstant(Value::Expression(Rc::new(CheckedConstant {
-        cas: compact,
-        root,
-        key,
-        sign,
-    }))))
+    Ok(ExactConstant(Value::Expression(Arc::new(
+        CheckedConstant {
+            cas: compact,
+            root,
+            key,
+            sign,
+        },
+    ))))
 }
 
 /// Reduce an identical-operand quotient only after checking original finiteness and nonzero divisors.

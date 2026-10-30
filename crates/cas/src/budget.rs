@@ -1047,6 +1047,8 @@ pub struct Budget {
     pub(crate) witness_records: crate::wire_memo::Cache,
     /// Exact checked reading statements cite original evidence within this ledger.
     pub(crate) reading_proofs: crate::reading_memo::Cache,
+    /// Store-owned checked scalar records remain reserved after their citing operation.
+    pub(crate) checked_records: crate::decision_kernel::cache::Accounting,
 }
 
 impl Budget {
@@ -1062,6 +1064,7 @@ impl Budget {
             region_partitions: crate::region_cache::Cache::default(),
             witness_records: crate::wire_memo::Cache::default(),
             reading_proofs: crate::reading_memo::Cache::default(),
+            checked_records: crate::decision_kernel::cache::Accounting::default(),
         })
     }
 
@@ -1154,6 +1157,9 @@ impl Budget {
                 return Err(Fault::capacity(kind, at));
             };
             let Some(retained) = retained.checked_add(self.reading_proofs.bytes) else {
+                return Err(Fault::capacity(kind, at));
+            };
+            let Some(retained) = retained.checked_add(self.checked_records.bytes) else {
                 return Err(Fault::capacity(kind, at));
             };
             match needed.checked_add(retained) {

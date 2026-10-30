@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed scalar record replay keeps source coverage separate from endpoint arithmetic.
 
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the store and enclosure dispatcher share checked record retention"
+)]
+pub(crate) mod cache;
 mod input;
 #[expect(
     clippy::redundant_pub_crate,
@@ -81,10 +86,40 @@ pub(super) fn validate(
             ExactConstant::from_expression(cas, &contract.target, budget).map_err(fragment)?;
         let retained = original.retained_payload_bytes()?;
         budget.with_retained_payload(retained, AT, |budget| {
-            replay(contract, certificate, &original, budget)
+            checked_records(cas, contract, certificate, &original, budget)
         })
     })?;
     Ok(bytes)
+}
+
+/// Canonical encoding and lookup use the existing complete-record copying allowance.
+fn checked_records(
+    cas: &Cas,
+    contract: &RationalEnclosure,
+    certificate: &ScalarKernelCertificate,
+    original: &ExactConstant,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let before = budget.usage().work;
+    let key = cache::key(cas, certificate, budget)?;
+    let cached = cache::lookup(cas, &key, budget)?;
+    let copying = certificate.records.iter().fold(0_u64, |total, record| {
+        total.saturating_add(record_bytes(record))
+    });
+    budget.work(copying.saturating_sub(budget.usage().work - before), AT)?;
+    let values = budget.with_retained_payload(size(key.len(), AT)?, AT, |budget| {
+        replay(
+            contract,
+            certificate,
+            original,
+            cached.as_deref().map(Vec::as_slice),
+            budget,
+        )
+    })?;
+    if cached.is_none() {
+        cache::insert(cas, key, values, budget)?;
+    }
+    Ok(())
 }
 
 /// Retain every earlier exact value and full interval while checking the final original value.
@@ -92,8 +127,9 @@ fn replay(
     contract: &RationalEnclosure,
     certificate: &ScalarKernelCertificate,
     original: &ExactConstant,
+    cached: Option<&[ExactConstant]>,
     budget: &mut Budget,
-) -> Result<(), Fault> {
+) -> Result<Vec<ExactConstant>, Fault> {
     let mut values = Vec::new();
     let mut retained = size(certificate.records.len(), AT)?.saturating_mul(64);
     budget.check(BudgetKind::StagedPayloadBytes, retained, AT)?;
@@ -107,7 +143,9 @@ fn replay(
                 return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
             }
             relations::check(record, &certificate.records[..index], budget)?;
-            budget.work(record_bytes(record), AT)?;
+            if let Some(cached) = cached {
+                return cached.get(index).cloned().ok_or_else(unsupported);
+            }
             let expected = (index + 1 == certificate.records.len()).then_some(original);
             exact(&record.law, &values, expected, budget)
         })?;
@@ -126,7 +164,7 @@ fn replay(
     if !(same_lower && same_upper) {
         return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
     }
-    Ok(())
+    Ok(values)
 }
 
 /// Reconstruct exact mathematical meaning using the existing independent constant normalizer.

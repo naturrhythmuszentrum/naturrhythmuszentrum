@@ -1074,6 +1074,10 @@ pub struct GraphCounts {
 
 /// The independently owned symbolic store; it has no engine-package dependency.
 pub struct Cas {
+    /// Checked scalar meanings are local runtime judgments, excluded from canonical graph bytes.
+    pub(crate) receipt_records: std::sync::Mutex<crate::decision_kernel::cache::Cache>,
+    /// Serialize one store's receipt validation and publication without changing its thread traits.
+    pub(crate) receipt_guard: std::sync::Mutex<()>,
     /// Runtime owner of request-local canonical records, excluded from mathematical identity.
     pub(crate) memo_owner: Arc<()>,
     /// Cache namespace generation advances on rollback independently of mathematical state.
@@ -1104,6 +1108,8 @@ impl Cas {
     pub fn new(limits: Limits) -> Result<Self, Fault> {
         limits.validate()?;
         Ok(Self {
+            receipt_records: std::sync::Mutex::default(),
+            receipt_guard: std::sync::Mutex::default(),
             memo_owner: Arc::new(()),
             memo_epoch: 0,
             token: Arc::new(StoreToken::default()),
@@ -1137,6 +1143,11 @@ impl Cas {
         self.state.finish(checkpoint, result.is_ok());
         if result.is_err() {
             self.memo_epoch = self.memo_epoch.saturating_add(1);
+            self.receipt_records
+                .get_mut()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clear();
+            budget.checked_records.forget(&self.memo_owner);
         }
         budget.restore_limits(previous);
         result
@@ -1157,6 +1168,8 @@ impl Cas {
     #[cfg(test)]
     pub(crate) fn full_copy_for_test(&self) -> Self {
         Self {
+            receipt_records: std::sync::Mutex::default(),
+            receipt_guard: std::sync::Mutex::default(),
             memo_owner: Arc::new(()),
             memo_epoch: 0,
             token: Arc::clone(&self.token),
@@ -1306,6 +1319,11 @@ impl Cas {
         staged.finish(checkpoint, result.is_ok());
         if result.is_err() {
             self.memo_epoch = self.memo_epoch.saturating_add(1);
+            self.receipt_records
+                .get_mut()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clear();
+            budget.checked_records.forget(&self.memo_owner);
         }
         self.state = staged;
         result

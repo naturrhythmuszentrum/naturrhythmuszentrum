@@ -8,7 +8,7 @@ pub use cache::{ConstantIdentity, ConstantIdentityKind, ExactConstantCache, Prep
 pub(crate) mod graph;
 mod sign;
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::budget::Budget;
 use crate::error::Fault;
@@ -22,7 +22,7 @@ enum Value {
     /// An already checked CAS rational literal.
     Rational(Rational),
     /// An immutable CAS graph and its reconstructed finite/sign evidence.
-    Expression(Rc<graph::CheckedConstant>),
+    Expression(Arc<graph::CheckedConstant>),
 }
 
 /// A finite real constant expression, never a floating approximation or a free parameter.

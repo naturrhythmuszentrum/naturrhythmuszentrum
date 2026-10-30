@@ -265,37 +265,35 @@ const KERNEL_COSTS: [KernelCost; 3] = [
 #[test]
 fn decision_kernel_work_boundaries() -> TestResult {
     for (kind, cost) in KERNEL_COSTS.iter().enumerate() {
-        let (source, mut request) = prepared(kind.try_into()?)?;
-        assert_eq!(certificate(&mut request)?.records.len(), cost.records);
-        let before = source.cas.counts();
-        let limits = Limits {
-            work: cost.work,
-            ..Limits::default()
-        };
-        let mut budget = Budget::new(limits.clone())?;
-        budget.work(17, Location::new("prior scalar kernel"))?;
-        let checked = source.cas.check_rational_enclosure(&request, &mut budget)?;
-        assert_eq!(budget.usage().work, cost.work);
-        assert_eq!(checked.retained_bytes(), cost.bytes);
-        assert_eq!(checked.contract(), &request);
-        assert_eq!(source.cas.counts(), before);
-        assert_eq!(budget.limits(), &limits);
-        let limits = Limits {
-            work: cost.work - 1,
-            ..Limits::default()
-        };
-        let mut short = Budget::new(limits.clone())?;
-        short.work(17, Location::new("prior scalar kernel"))?;
-        let Err(fault) = source.cas.check_rational_enclosure(&request, &mut short) else {
-            panic!("scalar receipt must refuse below its complete Work boundary");
-        };
-        assert!(matches!(fault.kind, FaultKind::Exhausted {
-            budget: BudgetKind::Work, limit, needed, ..
-        } if limit == cost.work - 1 && needed == cost.work));
-        assert_eq!(fault.location, Location::new("exact rational enclosure"));
-        assert_eq!(short.usage().work, cost.work - cost.bytes);
-        assert_eq!(short.limits(), &limits);
-        assert_eq!(source.cas.counts(), before);
+        for work in [cost.work, cost.work - 1] {
+            let (source, mut request) = prepared(kind.try_into()?)?;
+            assert_eq!(certificate(&mut request)?.records.len(), cost.records);
+            let before = source.cas.counts();
+            let limits = Limits {
+                work,
+                ..Limits::default()
+            };
+            let mut budget = Budget::new(limits.clone())?;
+            budget.work(17, Location::new("prior scalar kernel"))?;
+            let result = source.cas.check_rational_enclosure(&request, &mut budget);
+            if work == cost.work {
+                let checked = result?;
+                assert_eq!(budget.usage().work, cost.work);
+                assert_eq!(checked.retained_bytes(), cost.bytes);
+                assert_eq!(checked.contract(), &request);
+            } else {
+                let Err(fault) = result else {
+                    panic!("cold scalar receipt must refuse below its complete Work boundary");
+                };
+                assert!(matches!(fault.kind, FaultKind::Exhausted {
+                    budget: BudgetKind::Work, limit, needed, ..
+                } if limit == cost.work - 1 && needed == cost.work));
+                assert_eq!(fault.location, Location::new("exact rational enclosure"));
+                assert_eq!(budget.usage().work, cost.work - cost.bytes);
+            }
+            assert_eq!(source.cas.counts(), before);
+            assert_eq!(budget.limits(), &limits);
+        }
     }
     Ok(())
 }
