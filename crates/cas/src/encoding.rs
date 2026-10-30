@@ -283,6 +283,9 @@ const fn operator_tag(value: &Operator) -> u8 {
         Operator::Exponential => 52,
         Operator::Sigmoid => 53,
         Operator::Tanh => 54,
+        Operator::PositivePower => 55,
+        Operator::ClampFloor => 56,
+        Operator::GeneralizedDerivative(_) => 57,
         Operator::Select(_) => 49,
         Operator::AffineReading(_) => 50,
         Operator::SymbolRelation(_) => 48,
@@ -354,7 +357,10 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
         | Operator::DistributionDerivative { order }
         | Operator::TestDerivative { order } => out.unsigned(u64::from(*order)),
         Operator::Rational(number) => out.number(number),
-        Operator::Free(name) | Operator::Call(name) | Operator::Derivative(name) => out.name(name),
+        Operator::Free(name)
+        | Operator::Call(name)
+        | Operator::Derivative(name)
+        | Operator::GeneralizedDerivative(name) => out.name(name),
         Operator::Bound { depth, slot } => {
             out.unsigned(u64::from(*depth))?;
             out.unsigned(u64::from(*slot))
@@ -409,6 +415,8 @@ pub(crate) fn operator(value: &Operator, out: &mut Encoder<'_>) -> Result<(), Fa
         | Operator::Exponential
         | Operator::Sigmoid
         | Operator::Tanh
+        | Operator::PositivePower
+        | Operator::ClampFloor
         | Operator::Conjugate
         | Operator::RealPart
         | Operator::ImagPart

@@ -111,6 +111,10 @@ pub struct EnclosureCertificate {
     pub logarithms: Vec<super::LogEvidence>,
     /// Finite exponential instances, absent from earlier family wire formats.
     pub exponentials: Vec<super::ExpEvidence>,
+    /// Route and component bounds for original positive-power nodes.
+    pub powers: Vec<super::PowerEvidence>,
+    /// Closed derivative identities and their separate full-box bounds.
+    pub derivatives: Vec<super::DerivativeEvidence>,
 }
 
 /// Sealed evidence admitted only after the independent checker has completed.
@@ -120,6 +124,8 @@ pub struct CheckedEnclosure {
     pub(super) roots: bool,
     /// Whether replay encountered a sigmoid composition premise.
     pub(super) sigmoids: bool,
+    /// Whether independent replay encountered hyperbolic tangent.
+    pub(super) tangents: bool,
     /// Authenticated original request, including ordered coordinates.
     pub(super) request: EnclosureRequest,
     /// Independently replayed endpoint transcript.
@@ -157,6 +163,35 @@ impl CheckedEnclosure {
     #[must_use]
     pub fn formal_schemas(&self) -> &'static [crate::emptiness::LemmaSchema] {
         match self.certificate.law {
+            super::EnclosureLaw::ClampGeneralized => {
+                let index = usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(!self.certificate.exponentials.is_empty()) << 2)
+                    | (usize::from(self.sigmoids) << 3)
+                    | (usize::from(self.tangents) << 4)
+                    | (usize::from(!self.certificate.powers.is_empty()) << 5);
+                let (schemas, count) = &CLAMP_SCHEMAS[index];
+                &schemas[..*count]
+            }
+            super::EnclosureLaw::SmoothDerivative => {
+                let index = usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(!self.certificate.exponentials.is_empty()) << 2)
+                    | (usize::from(self.sigmoids) << 3)
+                    | (usize::from(self.tangents) << 4)
+                    | (usize::from(!self.certificate.powers.is_empty()) << 5);
+                let (schemas, count) = &DERIVATIVE_SCHEMAS[index];
+                &schemas[..*count]
+            }
+            super::EnclosureLaw::PositivePower => {
+                let index = usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(!self.certificate.exponentials.is_empty()) << 2)
+                    | (usize::from(self.sigmoids) << 3)
+                    | (usize::from(self.tangents) << 4);
+                let (schemas, count) = &POWER_SCHEMAS[index];
+                &schemas[..*count]
+            }
             super::EnclosureLaw::RationalInclusion => &super::ENCLOSURE_SCHEMAS[..1],
             super::EnclosureLaw::RootGrid => &super::ENCLOSURE_SCHEMAS[..2],
             super::EnclosureLaw::LogAtanh if self.roots => &super::ENCLOSURE_SCHEMAS[..3],
@@ -191,12 +226,45 @@ impl CheckedEnclosure {
     #[must_use]
     pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
         use crate::proof::HypothesisKind;
+        if matches!(self.certificate.law, super::EnclosureLaw::ClampGeneralized) {
+            return if self.certificate.derivatives.is_empty() {
+                &[
+                    HypothesisKind::DomainGuard,
+                    HypothesisKind::Equality,
+                    HypothesisKind::Cover,
+                    HypothesisKind::Enclosure,
+                ]
+            } else {
+                &[
+                    HypothesisKind::DomainGuard,
+                    HypothesisKind::Equality,
+                    HypothesisKind::Cover,
+                    HypothesisKind::Differentiable,
+                    HypothesisKind::Derivative,
+                    HypothesisKind::NonZero,
+                    HypothesisKind::StrictSign,
+                    HypothesisKind::Enclosure,
+                ]
+            };
+        }
+        if matches!(self.certificate.law, super::EnclosureLaw::SmoothDerivative) {
+            return &[
+                HypothesisKind::DomainGuard,
+                HypothesisKind::Differentiable,
+                HypothesisKind::Derivative,
+                HypothesisKind::Equality,
+                HypothesisKind::NonZero,
+                HypothesisKind::StrictSign,
+                HypothesisKind::Enclosure,
+            ];
+        }
         if matches!(
             self.certificate.law,
             super::EnclosureLaw::LogAtanh
                 | super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
                 | super::EnclosureLaw::TanhCompose
+                | super::EnclosureLaw::PositivePower
         ) {
             return &[
                 HypothesisKind::DomainGuard,
@@ -342,3 +410,214 @@ const TANH_SCHEMAS: [&[crate::emptiness::LemmaSchema]; 8] = [
         super::ENCLOSURE_SCHEMAS[5],
     ],
 ];
+
+/// Exact component inventories are compiled once, never allocated during inspection.
+static POWER_SCHEMAS: [([crate::emptiness::LemmaSchema; 7], usize); 32] = [
+    power_schemas(0),
+    power_schemas(1),
+    power_schemas(2),
+    power_schemas(3),
+    power_schemas(4),
+    power_schemas(5),
+    power_schemas(6),
+    power_schemas(7),
+    power_schemas(8),
+    power_schemas(9),
+    power_schemas(10),
+    power_schemas(11),
+    power_schemas(12),
+    power_schemas(13),
+    power_schemas(14),
+    power_schemas(15),
+    power_schemas(16),
+    power_schemas(17),
+    power_schemas(18),
+    power_schemas(19),
+    power_schemas(20),
+    power_schemas(21),
+    power_schemas(22),
+    power_schemas(23),
+    power_schemas(24),
+    power_schemas(25),
+    power_schemas(26),
+    power_schemas(27),
+    power_schemas(28),
+    power_schemas(29),
+    power_schemas(30),
+    power_schemas(31),
+];
+
+/// Unused array slots are inaccessible through each inventory's exact count.
+const fn power_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 7], usize) {
+    let mut schemas = [super::ENCLOSURE_SCHEMAS[0]; 7];
+    let mut count = 1;
+    let mut index = 1;
+    while index < 6 {
+        if mask & (1 << (index - 1)) != 0 {
+            schemas[count] = super::ENCLOSURE_SCHEMAS[index];
+            count += 1;
+        }
+        index += 1;
+    }
+    schemas[count] = super::ENCLOSURE_SCHEMAS[6];
+    (schemas, count + 1)
+}
+
+/// Exact inventories contain only the checked derivative transcript's component laws.
+static DERIVATIVE_SCHEMAS: [([crate::emptiness::LemmaSchema; 8], usize); 64] = [
+    derivative_schemas(0),
+    derivative_schemas(1),
+    derivative_schemas(2),
+    derivative_schemas(3),
+    derivative_schemas(4),
+    derivative_schemas(5),
+    derivative_schemas(6),
+    derivative_schemas(7),
+    derivative_schemas(8),
+    derivative_schemas(9),
+    derivative_schemas(10),
+    derivative_schemas(11),
+    derivative_schemas(12),
+    derivative_schemas(13),
+    derivative_schemas(14),
+    derivative_schemas(15),
+    derivative_schemas(16),
+    derivative_schemas(17),
+    derivative_schemas(18),
+    derivative_schemas(19),
+    derivative_schemas(20),
+    derivative_schemas(21),
+    derivative_schemas(22),
+    derivative_schemas(23),
+    derivative_schemas(24),
+    derivative_schemas(25),
+    derivative_schemas(26),
+    derivative_schemas(27),
+    derivative_schemas(28),
+    derivative_schemas(29),
+    derivative_schemas(30),
+    derivative_schemas(31),
+    derivative_schemas(32),
+    derivative_schemas(33),
+    derivative_schemas(34),
+    derivative_schemas(35),
+    derivative_schemas(36),
+    derivative_schemas(37),
+    derivative_schemas(38),
+    derivative_schemas(39),
+    derivative_schemas(40),
+    derivative_schemas(41),
+    derivative_schemas(42),
+    derivative_schemas(43),
+    derivative_schemas(44),
+    derivative_schemas(45),
+    derivative_schemas(46),
+    derivative_schemas(47),
+    derivative_schemas(48),
+    derivative_schemas(49),
+    derivative_schemas(50),
+    derivative_schemas(51),
+    derivative_schemas(52),
+    derivative_schemas(53),
+    derivative_schemas(54),
+    derivative_schemas(55),
+    derivative_schemas(56),
+    derivative_schemas(57),
+    derivative_schemas(58),
+    derivative_schemas(59),
+    derivative_schemas(60),
+    derivative_schemas(61),
+    derivative_schemas(62),
+    derivative_schemas(63),
+];
+
+/// Construct each small static row without a large temporary stack array.
+const fn derivative_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 8], usize) {
+    let mut schemas = [super::ENCLOSURE_SCHEMAS[0]; 8];
+    let mut count = 1;
+    let mut index = 1;
+    while index < 7 {
+        if mask & (1 << (index - 1)) != 0 {
+            schemas[count] = super::ENCLOSURE_SCHEMAS[index];
+            count += 1;
+        }
+        index += 1;
+    }
+    schemas[count] = super::ENCLOSURE_SCHEMAS[7];
+    (schemas, count + 1)
+}
+
+/// Clamp inventories name only the completed primitive laws actually used.
+static CLAMP_SCHEMAS: [([crate::emptiness::LemmaSchema; 8], usize); 64] = [
+    clamp_schemas(0),
+    clamp_schemas(1),
+    clamp_schemas(2),
+    clamp_schemas(3),
+    clamp_schemas(4),
+    clamp_schemas(5),
+    clamp_schemas(6),
+    clamp_schemas(7),
+    clamp_schemas(8),
+    clamp_schemas(9),
+    clamp_schemas(10),
+    clamp_schemas(11),
+    clamp_schemas(12),
+    clamp_schemas(13),
+    clamp_schemas(14),
+    clamp_schemas(15),
+    clamp_schemas(16),
+    clamp_schemas(17),
+    clamp_schemas(18),
+    clamp_schemas(19),
+    clamp_schemas(20),
+    clamp_schemas(21),
+    clamp_schemas(22),
+    clamp_schemas(23),
+    clamp_schemas(24),
+    clamp_schemas(25),
+    clamp_schemas(26),
+    clamp_schemas(27),
+    clamp_schemas(28),
+    clamp_schemas(29),
+    clamp_schemas(30),
+    clamp_schemas(31),
+    clamp_schemas(32),
+    clamp_schemas(33),
+    clamp_schemas(34),
+    clamp_schemas(35),
+    clamp_schemas(36),
+    clamp_schemas(37),
+    clamp_schemas(38),
+    clamp_schemas(39),
+    clamp_schemas(40),
+    clamp_schemas(41),
+    clamp_schemas(42),
+    clamp_schemas(43),
+    clamp_schemas(44),
+    clamp_schemas(45),
+    clamp_schemas(46),
+    clamp_schemas(47),
+    clamp_schemas(48),
+    clamp_schemas(49),
+    clamp_schemas(50),
+    clamp_schemas(51),
+    clamp_schemas(52),
+    clamp_schemas(53),
+    clamp_schemas(54),
+    clamp_schemas(55),
+    clamp_schemas(56),
+    clamp_schemas(57),
+    clamp_schemas(58),
+    clamp_schemas(59),
+    clamp_schemas(60),
+    clamp_schemas(61),
+    clamp_schemas(62),
+    clamp_schemas(63),
+];
+
+/// A generalized conclusion does not advertise a classical derivative conclusion.
+const fn clamp_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 8], usize) {
+    let (mut schemas, count) = derivative_schemas(mask);
+    schemas[count - 1] = super::ENCLOSURE_SCHEMAS[8];
+    (schemas, count)
+}

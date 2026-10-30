@@ -336,6 +336,12 @@ pub enum Operator {
     Sigmoid,
     /// Real hyperbolic tangent with checked exponential composition and oddness.
     Tanh,
+    /// Positive real base raised to an exact rational exponent.
+    PositivePower,
+    /// The maximum of a real coordinate and a fixed rational wall or independent wall parameter.
+    ClampFloor,
+    /// Terminal enclosure query for all generalized slopes of a clamp, never a classical derivative.
+    GeneralizedDerivative(String),
     /// A call to a declaration with a checked function signature.
     Call(String),
     /// An unevaluated derivative with respect to a free declaration.

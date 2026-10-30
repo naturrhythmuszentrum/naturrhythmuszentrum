@@ -18,16 +18,22 @@ pub(super) fn check(
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<CheckedEnclosure, Fault> {
     let schedule = prepare(cas, request, certificate, budget)?;
-    let mut analytic = certificate.logarithms.iter();
-    let mut exponentials = certificate.exponentials.iter();
-    let mut roots = false;
-    let mut sigmoids = false;
-    let mut log_two = Vec::new();
+    let mut replay = Replay {
+        certificate,
+        logs: certificate.logarithms.iter(),
+        exps: certificate.exponentials.iter(),
+        powers: certificate.powers.iter(),
+        derivatives: certificate.derivatives.iter(),
+        log_two: Vec::new(),
+        roots: false,
+        sigmoids: false,
+        tangents: false,
+    };
     let mut stack: Vec<usize> = Vec::new();
     stack
         .try_reserve(schedule.len())
         .map_err(|_| Fault::allocation(AT))?;
-    for (index, id) in schedule.into_iter().enumerate() {
+    for (index, id) in schedule.iter().copied().enumerate() {
         boundary(budget, interrupt)?;
         let expression = cas.state.expression(id)?;
         let record = &certificate.records[index];
@@ -43,6 +49,71 @@ pub(super) fn check(
         } else {
             None
         };
+        replay.node(
+            cas,
+            request,
+            (id, index, &schedule),
+            (left, right),
+            budget,
+            interrupt,
+        )?;
+        stack.push(index);
+    }
+    if stack.len() != 1
+        || replay.logs.next().is_some()
+        || replay.exps.next().is_some()
+        || replay.powers.next().is_some()
+        || replay.derivatives.next().is_some()
+        || (certificate.law == super::EnclosureLaw::SmoothDerivative
+            && certificate.derivatives.is_empty())
+    {
+        return Err(invalid());
+    }
+    finish(
+        request,
+        certificate,
+        (replay.roots, replay.sigmoids, replay.tangents),
+        budget,
+    )
+}
+
+/// One independent transcript traversal owns its component cursors and checked log-two reuse.
+struct Replay<'a> {
+    /// Proposed records joined to the original source schedule.
+    certificate: &'a EnclosureCertificate,
+    /// Unconsumed logarithm components.
+    logs: std::slice::Iter<'a, super::LogEvidence>,
+    /// Unconsumed exponential components.
+    exps: std::slice::Iter<'a, super::ExpEvidence>,
+    /// Unconsumed positive-power routes.
+    powers: std::slice::Iter<'a, super::PowerEvidence>,
+    /// Unconsumed original derivative subtrees.
+    derivatives: std::slice::Iter<'a, super::DerivativeEvidence>,
+    /// Already checked one-third series for this transcript only.
+    log_two: Vec<(&'a super::LogSeries, Interval)>,
+    /// Encountered root premises.
+    roots: bool,
+    /// Encountered logistic premises.
+    sigmoids: bool,
+    /// Encountered hyperbolic premises.
+    tangents: bool,
+}
+
+impl Replay<'_> {
+    /// Dispatch only the original operator and independently checked earlier endpoints.
+    fn node(
+        &mut self,
+        cas: &Cas,
+        request: &EnclosureRequest,
+        position: (crate::graph::LogicalId, usize, &[crate::graph::LogicalId]),
+        inputs: (Option<usize>, Option<usize>),
+        budget: &mut Budget,
+        interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+    ) -> Result<(), Fault> {
+        let (id, index, schedule) = position;
+        let (left, right) = inputs;
+        let expression = cas.state.expression(id)?;
+        let record = &self.certificate.records[index];
         let (lower, upper, rounded) = match &expression.operator {
             Operator::Rational(value) => (
                 value.add(&Rational::zero(), budget)?,
@@ -50,71 +121,219 @@ pub(super) fn check(
                 false,
             ),
             Operator::Free(_) => coordinate(request, id, budget)?,
-            Operator::Neg => negated(&certificate.records[right.ok_or_else(invalid)?], budget)?,
-            Operator::NaturalLog => {
-                let evidence = analytic.next().ok_or_else(invalid)?;
-                if usize::try_from(evidence.record).ok() != Some(index) {
-                    return Err(invalid());
-                }
-                super::log::check(
-                    &certificate.records[right.ok_or_else(invalid)?],
-                    evidence,
-                    record,
-                    certificate.grid,
-                    &mut log_two,
+            Operator::Neg => negated(
+                &self.certificate.records[right.ok_or_else(invalid)?],
+                budget,
+            )?,
+            Operator::NaturalLog | Operator::Exponential | Operator::Sigmoid | Operator::Tanh => {
+                return self.analytic(
+                    &expression.operator,
+                    right.ok_or_else(invalid)?,
+                    index,
                     budget,
                     interrupt,
-                )?;
-                stack.push(index);
-                continue;
+                );
             }
-            Operator::Exponential | Operator::Sigmoid | Operator::Tanh => {
-                let evidence = exponentials.next().ok_or_else(invalid)?;
-                if usize::try_from(evidence.record).ok() != Some(index) {
-                    return Err(invalid());
-                }
-                sigmoids |= matches!(expression.operator, Operator::Sigmoid);
-                let replay = if matches!(expression.operator, Operator::Tanh) {
-                    super::saturating::check_tanh
-                } else if matches!(expression.operator, Operator::Sigmoid) {
-                    super::saturating::check
-                } else {
-                    super::exp::check
-                };
-                replay(
-                    &certificate.records[right.ok_or_else(invalid)?],
-                    evidence,
-                    record,
-                    certificate.grid,
+            Operator::Derivative(_) | Operator::GeneralizedDerivative(_) => {
+                return self.derivative(cas, expression, (schedule, index), budget, interrupt);
+            }
+            Operator::PositivePower => {
+                return self.power(
+                    cas,
+                    expression,
+                    index,
+                    left.ok_or_else(invalid)?,
                     budget,
                     interrupt,
+                );
+            }
+            Operator::ClampFloor => {
+                let (lo, hi) = super::clamp::check_value(
+                    &cas.state,
+                    expression,
+                    &self.certificate.records[left.ok_or_else(invalid)?],
+                    &self.certificate.records[right.ok_or_else(invalid)?],
+                    self.certificate.grid,
+                    budget,
                 )?;
-                stack.push(index);
-                continue;
+                return endpoint_match(record, (lo, hi), false, self.certificate.grid, budget);
             }
             Operator::GeneralPower(crate::model::Branch::StrictReal) => {
                 let exponent = expression.operands.get(1).ok_or_else(invalid)?;
                 super::roots::exponent(&cas.state.expression(*exponent)?.operator)?;
-                let value = &certificate.records[left.ok_or_else(invalid)?];
-                super::roots::check(value, record, certificate.grid, budget)?;
-                roots = true;
-                stack.push(index);
-                continue;
+                super::roots::check(
+                    &self.certificate.records[left.ok_or_else(invalid)?],
+                    record,
+                    self.certificate.grid,
+                    budget,
+                )?;
+                self.roots = true;
+                return Ok(());
             }
             operator => {
-                let a = &certificate.records[left.ok_or_else(invalid)?];
-                let b = &certificate.records[right.ok_or_else(invalid)?];
-                let (lo, hi) = relation(operator, a, b, certificate.grid, budget)?;
+                let (lo, hi) = relation(
+                    operator,
+                    &self.certificate.records[left.ok_or_else(invalid)?],
+                    &self.certificate.records[right.ok_or_else(invalid)?],
+                    self.certificate.grid,
+                    budget,
+                )?;
                 (lo, hi, true)
             }
         };
-        endpoint_match(record, (lower, upper), rounded, certificate.grid, budget)?;
-        stack.push(index);
+        endpoint_match(
+            record,
+            (lower, upper),
+            rounded,
+            self.certificate.grid,
+            budget,
+        )
     }
-    if stack.len() != 1 || analytic.next().is_some() || exponentials.next().is_some() {
-        return Err(invalid());
+
+    /// Check each analytic record at its exact original index.
+    fn analytic(
+        &mut self,
+        operator: &Operator,
+        input: usize,
+        index: usize,
+        budget: &mut Budget,
+        interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+    ) -> Result<(), Fault> {
+        let value = &self.certificate.records[input];
+        let record = &self.certificate.records[index];
+        if matches!(operator, Operator::NaturalLog) {
+            let evidence = self.logs.next().ok_or_else(invalid)?;
+            if usize::try_from(evidence.record).ok() != Some(index) {
+                return Err(invalid());
+            }
+            return super::log::check(
+                value,
+                evidence,
+                record,
+                self.certificate.grid,
+                &mut self.log_two,
+                budget,
+                interrupt,
+            );
+        }
+        let evidence = self.exps.next().ok_or_else(invalid)?;
+        if usize::try_from(evidence.record).ok() != Some(index) {
+            return Err(invalid());
+        }
+        self.sigmoids |= matches!(operator, Operator::Sigmoid);
+        self.tangents |= matches!(operator, Operator::Tanh);
+        let check = match operator {
+            Operator::Tanh => super::saturating::check_tanh,
+            Operator::Sigmoid => super::saturating::check,
+            _ => super::exp::check,
+        };
+        check(
+            value,
+            evidence,
+            record,
+            self.certificate.grid,
+            budget,
+            interrupt,
+        )
     }
-    finish(request, certificate, (roots, sigmoids), budget)
+
+    /// Reconstruct the power route from its original literal exponent, not grammar flags.
+    fn power(
+        &mut self,
+        cas: &Cas,
+        expression: &crate::graph::Expression,
+        index: usize,
+        input: usize,
+        budget: &mut Budget,
+        interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+    ) -> Result<(), Fault> {
+        if !matches!(
+            self.certificate.law,
+            super::EnclosureLaw::PositivePower
+                | super::EnclosureLaw::SmoothDerivative
+                | super::EnclosureLaw::ClampGeneralized
+        ) {
+            return Err(invalid());
+        }
+        let evidence = self.powers.next().ok_or_else(invalid)?;
+        if usize::try_from(evidence.record).ok() != Some(index) {
+            return Err(invalid());
+        }
+        let Operator::Rational(exponent) = &cas.state.expression(expression.operands[1])?.operator
+        else {
+            return Err(invalid());
+        };
+        let (log, exp) = if evidence.route == super::PowerRoute::LogExp {
+            (
+                Some(self.logs.next().ok_or_else(invalid)?),
+                Some(self.exps.next().ok_or_else(invalid)?),
+            )
+        } else {
+            (None, None)
+        };
+        super::power::check(
+            (&self.certificate.records[input], exponent),
+            evidence,
+            &mut (log, exp, &mut self.log_two),
+            &self.certificate.records[index],
+            self.certificate.grid,
+            budget,
+            interrupt,
+        )?;
+        self.roots |= !evidence.roots.is_empty();
+        Ok(())
+    }
+    /// Authenticate both the symbolic coordinate and the complete original subtree join.
+    fn derivative(
+        &mut self,
+        cas: &Cas,
+        expression: &crate::graph::Expression,
+        position: (&[crate::graph::LogicalId], usize),
+        budget: &mut Budget,
+        interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+    ) -> Result<(), Fault> {
+        if !matches!(
+            self.certificate.law,
+            super::EnclosureLaw::SmoothDerivative | super::EnclosureLaw::ClampGeneralized
+        ) {
+            return Err(invalid());
+        }
+        let (Operator::Derivative(coordinate) | Operator::GeneralizedDerivative(coordinate)) =
+            &expression.operator
+        else {
+            return Err(invalid());
+        };
+        let (schedule, index) = position;
+        if matches!(expression.operator, Operator::GeneralizedDerivative(_))
+            && index + 1 != self.certificate.records.len()
+        {
+            return Err(invalid());
+        }
+        let count = usize::try_from(cas.state.expression(expression.operands[0])?.unfolded)
+            .map_err(|_| invalid())?;
+        let first = index.checked_sub(count).ok_or_else(invalid)?;
+        let evidence = self.derivatives.next().ok_or_else(invalid)?;
+        if usize::try_from(evidence.record).ok() != Some(index)
+            || usize::try_from(evidence.first).ok() != Some(first)
+            || &evidence.coordinate != coordinate
+        {
+            return Err(invalid());
+        }
+        let source = super::derivative::Segment {
+            cas,
+            schedule: &schedule[first..index],
+            values: &self.certificate.records[first..index],
+            generalized: matches!(expression.operator, Operator::GeneralizedDerivative(_)),
+        };
+        super::derivative::check(
+            source,
+            evidence,
+            &self.certificate.records[index],
+            self.certificate.grid,
+            budget,
+            interrupt,
+        )
+    }
 }
 
 /// Bind the registered family and version to the original expression's derived grammar.
@@ -124,6 +343,27 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_clamp
+        != 0
+    {
+        super::EnclosureLaw::ClampGeneralized
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_derivative
+        != 0
+    {
+        super::EnclosureLaw::SmoothDerivative
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_power
+        .present
+    {
+        super::EnclosureLaw::PositivePower
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_saturation
@@ -172,13 +412,15 @@ fn schema(
 fn finish(
     request: &EnclosureRequest,
     certificate: &EnclosureCertificate,
-    families: (bool, bool),
+    families: (bool, bool, bool),
     budget: &mut Budget,
 ) -> Result<CheckedEnclosure, Fault> {
     let last = certificate.records.last().ok_or_else(invalid)?;
     let (lower, upper) = grid(last.lower(), last.upper(), certificate.presentation, budget)?;
     let interval = Interval::new(lower, upper, budget)?;
-    let bytes = super::exp::bytes(&certificate.exponentials)
+    let bytes = super::derivative::bytes(&certificate.derivatives)
+        .saturating_add(super::power::bytes(&certificate.powers))
+        .saturating_add(super::exp::bytes(&certificate.exponentials))
         .saturating_add(super::log::bytes(&certificate.logarithms))
         .saturating_add(
             certificate
@@ -199,6 +441,7 @@ fn finish(
     Ok(CheckedEnclosure {
         roots: families.0,
         sigmoids: families.1,
+        tangents: families.2,
         request: request.clone(),
         certificate: certificate.clone(),
         interval,

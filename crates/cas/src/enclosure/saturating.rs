@@ -60,24 +60,18 @@ fn produce_endpoint(
         argument
     };
     let (proof, exponential) = super::exp::produce_endpoint(&argument, plan, budget, interrupt)?;
-    let one = Interval::singleton(&Rational::one(), budget)?;
-    let denominator = one.add(&exponential, plan.grid, budget)?;
-    if denominator.lower().is_zero() || denominator.lower().is_negative() {
-        return Err(super::exp::invalid());
-    }
-    let difference = if family == Family::Tanh {
-        Some(one.sub(&exponential, plan.grid, budget)?)
+    let increasing = family == Family::Sigmoid && x.is_negative();
+    let (lo, hi) = if increasing {
+        (exponential.lower(), exponential.upper())
     } else {
-        None
+        (exponential.upper(), exponential.lower())
     };
-    let numerator = difference
-        .as_ref()
-        .unwrap_or_else(|| if x.is_negative() { &exponential } else { &one });
-    let bound = numerator.mul(
-        &denominator.reciprocal(plan.grid, budget)?,
-        plan.grid,
+    let bound = Interval::new(
+        produce_quotient(family, x.is_negative(), lo, budget)?,
+        produce_quotient(family, x.is_negative(), hi, budget)?,
         budget,
-    )?;
+    )?
+    .coarsen(plan.grid, budget)?;
     let bound = if family == Family::Tanh && x.is_negative() {
         Interval::new(
             bound.upper().negated(budget)?,
@@ -150,32 +144,15 @@ fn check_endpoint(
         argument
     };
     let exponential = super::exp::check_endpoint(&argument, proof, q, budget, interrupt)?;
-    let one = Interval::new(Rational::one(), Rational::one(), budget)?;
-    let denominator = relation(&crate::model::Operator::Add, &one, &exponential, q, budget)?;
-    if denominator.lower().compare(&Rational::zero(), budget)? != Ordering::Greater {
-        return Err(super::exp::invalid());
-    }
-    let difference = if family == Family::Tanh {
-        Some(relation(
-            &crate::model::Operator::Sub,
-            &one,
-            &exponential,
-            q,
-            budget,
-        )?)
+    let low_image = check_quotient(family, x.is_negative(), exponential.lower(), budget)?;
+    let high_image = check_quotient(family, x.is_negative(), exponential.upper(), budget)?;
+    let (lo, hi) = if family == Family::Sigmoid && x.is_negative() {
+        (low_image, high_image)
     } else {
-        None
+        (high_image, low_image)
     };
-    let numerator = difference
-        .as_ref()
-        .unwrap_or_else(|| if x.is_negative() { &exponential } else { &one });
-    let bound = relation(
-        &crate::model::Operator::Div,
-        numerator,
-        &denominator,
-        q,
-        budget,
-    )?;
+    let (lo, hi) = super::checker::grid(&lo, &hi, q, budget)?;
+    let bound = Interval::new(lo, hi, budget)?;
     let bound = if family == Family::Tanh && x.is_negative() {
         Interval::new(
             bound.upper().negated(budget)?,
@@ -205,17 +182,43 @@ fn check_endpoint(
     Interval::new(lower, upper, budget)
 }
 
-/// Use only the exact core relation checker, not production interval arithmetic.
-fn relation(
-    operator: &crate::model::Operator,
-    a: &Interval,
-    b: &Interval,
-    q: u32,
+/// Evaluate a scalar quotient exactly before the producer rounds outward.
+fn produce_quotient(
+    family: Family,
+    negative: bool,
+    e: &Rational,
     budget: &mut Budget,
-) -> Result<Interval, Fault> {
-    let (lo, hi) = super::checker::relation(operator, a, b, q, budget)?;
-    let (lo, hi) = super::checker::grid(&lo, &hi, q, budget)?;
-    Interval::new(lo, hi, budget)
+) -> Result<Rational, Fault> {
+    let denominator = Rational::one().add(e, budget)?;
+    if denominator.is_zero() || denominator.is_negative() {
+        return Err(super::exp::invalid());
+    }
+    let numerator = match family {
+        Family::Tanh => Rational::one().sub(e, budget)?,
+        Family::Sigmoid if negative => e.add(&Rational::zero(), budget)?,
+        Family::Sigmoid => Rational::one(),
+    };
+    numerator.div(&denominator, budget)
+}
+
+/// Independently reconstruct the exact scalar map and its positive denominator.
+fn check_quotient(
+    family: Family,
+    negative: bool,
+    e: &Rational,
+    budget: &mut Budget,
+) -> Result<Rational, Fault> {
+    let denominator = e.add(&Rational::one(), budget)?;
+    if denominator.compare(&Rational::zero(), budget)? != Ordering::Greater {
+        return Err(super::exp::invalid());
+    }
+    if family == Family::Tanh {
+        Rational::one().sub(e, budget)?.div(&denominator, budget)
+    } else if negative {
+        e.div(&denominator, budget)
+    } else {
+        Rational::one().div(&denominator, budget)
+    }
 }
 
 /// Closed composition choice derived from the original operator, never from evidence.

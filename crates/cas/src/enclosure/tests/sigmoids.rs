@@ -20,6 +20,27 @@ fn sigmoid_case(n: i64, d: u64) -> TestResult<(Fixture, EnclosureRequest)> {
     Ok((f, request))
 }
 
+/// Monotone exponential endpoints improve or retain every existing fixture's bound.
+/// ´test:unit:enclosure-sigmoid-tightening´
+/// ´claim:cas:enclosure-sigmoid-tightening´
+#[test]
+fn enclosure_sigmoid_tightening() -> TestResult {
+    for (n, d) in [(0, 1), (1, 2), (-1, 2), (1, 1), (-1, 1), (2, 1), (-2, 1)] {
+        let (mut f, request) = sigmoid_case(n, d)?;
+        let checked = f
+            .cas
+            .enclose(&request, sigmoid_policy(), &mut ledger()?, &mut |_| false)?
+            .checked
+            .ok_or("sigmoid bound")?;
+        let old = old_saturating_quotient(&checked.certificate, n < 0, false)?;
+        assert!(old.contains(
+            checked.certificate.records.last().ok_or("record")?,
+            &mut ledger()?
+        )?);
+    }
+    Ok(())
+}
+
 /// Product inequalities use exact rational powers, no series or production reduction.
 fn product_oracle(n: i64, d: u64) -> TestResult<Interval> {
     let mut budget = ledger()?;
@@ -291,9 +312,9 @@ fn enclosure_sigmoid_work_pins() -> TestResult {
     )?;
     assert_eq!(
         (cold.work, warm.work, replay.work),
-        (749_495, 18_829, 400_424)
+        (678_455, 18_829, 366_664)
     );
-    for (is_warm, pin) in [(false, 749_495), (true, 18_829)] {
+    for (is_warm, pin) in [(false, 678_455), (true, 18_829)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut store, request) = sigmoid_case(1, 2)?;
             if is_warm {
@@ -321,7 +342,7 @@ fn enclosure_sigmoid_work_pins() -> TestResult {
             }
         }
     }
-    for (available, passes) in [(400_424, true), (400_423, false)] {
+    for (available, passes) in [(366_664, true), (366_663, false)] {
         let (mut store, request) = sigmoid_case(1, 2)?;
         let before = store.cas.canonical_snapshot(&mut ledger()?)?;
         let report = store.cas.check_enclosure(
@@ -380,9 +401,9 @@ fn enclosure_sigmoid_phase_pins() -> TestResult {
             grid,
             plans.exp.ok_or("exp plan")?.terms
         ),
-        (337_100, 387_005, 807, 4367, 18, 5)
+        (299_820, 353_245, 807, 4367, 18, 5)
     );
-    for (pin, generation) in [(337_100, true), (387_005, false)] {
+    for (pin, generation) in [(299_820, true), (353_245, false)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let mut budget = precharged(available)?;
             let result = if generation {

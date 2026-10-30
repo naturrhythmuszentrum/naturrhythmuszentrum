@@ -524,12 +524,7 @@ impl Cas {
         budget.check(BudgetKind::Depth, depth, at)?;
         budget.check(BudgetKind::PeakExpressionSize, unfolded, at)?;
         let ambient = crate::solving::sorts::ambient(state, header, &sort)?;
-        if let Some(ambient) = ambient {
-            edges.push((
-                ambient,
-                Edge::Scalar(crate::graph::ScalarEdge::CheckedAmbient),
-            ));
-        }
+        case_ambient_edge(&mut edges, ambient);
         self.insert(
             state,
             Vertex::Expression(crate::graph::Expression {
@@ -537,6 +532,12 @@ impl Cas {
                 enclosure_roots: false,
                 enclosure_exp: crate::enclosure::AnalyticShape::default(),
                 enclosure_saturation: 0,
+                enclosure_derivative: 0,
+                enclosure_clamp: 0,
+                enclosure_power: crate::enclosure::PowerShape {
+                    present: false,
+                    slots: 1,
+                },
                 enclosure_logs: false,
                 enclosure_log_bound: None,
                 ambient,
@@ -558,5 +559,15 @@ impl Cas {
             pending,
             budget,
         )
+    }
+}
+
+/// Preserve the case expression's checked ambient edge after all arm checks.
+fn case_ambient_edge(edges: &mut Vec<(LogicalId, Edge)>, ambient: Option<LogicalId>) {
+    if let Some(ambient) = ambient {
+        edges.push((
+            ambient,
+            Edge::Scalar(crate::graph::ScalarEdge::CheckedAmbient),
+        ));
     }
 }

@@ -37,6 +37,23 @@ fn floor_root(value: &BigUint, budget: &mut Budget) -> Result<BigUint, Fault> {
 }
 
 impl Rational {
+    /// Fixed-width root repetition metadata for a canonical dyadic exponent.
+    pub(crate) fn bounded_power_roots(&self) -> Option<u32> {
+        let denominator = self.denominator().to_u64()?;
+        denominator
+            .is_power_of_two()
+            .then(|| denominator.trailing_zeros())
+    }
+
+    /// Fixed-width denominator metadata selects bounded dyadic power schedules.
+    pub(crate) fn is_bounded_dyadic(&self) -> bool {
+        self.denominator().bits() <= 64
+            && self
+                .denominator()
+                .to_u64()
+                .is_some_and(u64::is_power_of_two)
+    }
+
     /// Recognize the canonical literal half without performing or charging arithmetic.
     pub(crate) fn is_half(&self) -> bool {
         let numerator_one = self.numerator().is_one();
