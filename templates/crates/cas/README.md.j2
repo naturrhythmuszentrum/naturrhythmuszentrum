@@ -1440,3 +1440,7 @@ After selection, output construction/fresh identity inspection cost 117,834/182,
 **Example (Kernel-origin refusal baseline)** · `ex:cas:kernel-origin-baseline`
 
 The payload-free `ScalarKernel` origin refuses as `Invalid(UnsupportedCertificate)` at `exact rational enclosure` before replay or an additional Work charge; 17 prior Work and every graph record remain unchanged (`test:integration:kernel-origin-baseline`). This is a missing certificate checker rather than a numerical enclosure failure. `MatrixKernel` and provenance-only claims retain the same unsupported boundary (`test:integration:decision-enclosure-unsupported-origins`). The existing exact rational and Machin paths retain their independent costs (`ex:cas:decision-enclosure-examples`), while the root decision design's certificate-origin requirement remains open.
+
+**Requirement (Receiving the scalar certificate record)** · `req:cas:scalar-kernel-record-checker`
+
+The scalar export increment supplies conditional integer-only endpoint records for a closed family, as specified by the root decision design's certificate-origin requirement. CAS still refuses the payload-free scalar origin at the boundary of (`ex:cas:kernel-origin-baseline`): independently replaying those records, binding every operand to the original target and assurance scope, and carrying their wire form into retained proof evidence remain open. No scalar record alone grants the enclosure authority of (`rule:cas:decision-enclosure-authority`), and `MatrixKernel` remains unsupported (`rule:cas:decision-enclosure-refusals`).

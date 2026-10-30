@@ -19,6 +19,12 @@
 |(`test:integration:fused-rounding-is-explicit`)|scalar|Fused cancellation has one rounding and differs from multiply-then-add.|
 |(`test:integration:fused-boundary-oracle`)|scalar|Fused arithmetic covers underflow, ties and overflow in both formats.|
 |(`test:integration:fused-intermediate-range`)|scalar|Fused evaluation does not accidentally round or overflow its product first.|
+|(`test:integration:kernel-certificate-independent-oracles`)|scalar|Rational constants, reciprocals and positive square roots satisfy independent exact relations.|
+|(`test:integration:kernel-certificate-full-boxes`)|scalar|Full interval coverage includes mixed signs and quotient composition retains both laws.|
+|(`test:integration:kernel-certificate-dyadic-boundaries`)|scalar|Integer dyadic export preserves zero, subnormals, minimum normals and finite extrema.|
+|(`test:integration:kernel-certificate-work-boundaries`)|scalar|Every construction and export has a literal Work boundary with 17 prior units.|
+|(`test:integration:kernel-certificate-refusal-ledger`)|scalar|Domain and late decoding refusals retain Work and publish no mathematical records.|
+|(`test:integration:kernel-certificate-quotient-boundary`)|scalar|A quotient records reciprocal then product and both exports under one cumulative ceiling.|
 |(`test:integration:literal-constant-rational-oracles`)|scalar|Mathematical descriptor constants and signed numeric grammar succeed in both formats.|
 |(`test:integration:literal-halfway-ties`)|scalar|Decimal halfway literals contain the exact ties and select the nearest even candidate.|
 |(`test:integration:literal-subnormal-and-underflow-oracles`)|scalar|Scientific notation reaches subnormals without forming an overflowing decimal denominator.|

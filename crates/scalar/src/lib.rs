@@ -8,6 +8,7 @@ mod error;
 mod finite;
 mod format;
 mod fused;
+mod kernel;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "literal tokens and work counters are shared only inside private decoder modules"
@@ -27,6 +28,10 @@ pub use enclosure::Enclosure;
 pub use error::ArithmeticFailure;
 pub use finite::Finite;
 pub use format::{Precision, Scalar};
+pub use kernel::{
+    Dyadic, DyadicInterval, KernelBudget, KernelCertificate, KernelError, KernelEvaluation,
+    KernelLaw, KernelUsage,
+};
 pub use literal::{DecodedLiteral, LiteralLimits, NumericLiteral};
 pub use pi::{PiBounds, PiBudget, PiEnclosure, PiError, PiLimits, PiUsage};
 pub use reduction::{dot, norm_upper, sum};

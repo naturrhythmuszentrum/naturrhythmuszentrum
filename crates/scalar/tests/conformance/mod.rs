@@ -4,6 +4,7 @@
 mod admission;
 mod conversion;
 mod fused;
+mod kernel;
 mod literals;
 mod primitives;
 mod reductions;
