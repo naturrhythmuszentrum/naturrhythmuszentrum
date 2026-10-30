@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original quotient inspection and outward containment use separate exact/numerical routes.
 
-use super::{AT, LiveDecisionError};
-use crate::FrozenDecisionInputs;
-use nrz_bindings::readings::algebra::{Cas, Rational, proof::VerifiedWitness, syntax::Operator};
-use nrz_bindings::{Budget, Declaration};
-use nrz_scalar::{
-    ArithmeticContext, ArithmeticFailure, Enclosure, Finite, LiteralLimits, NumericLiteral, Scalar,
+use super::{
+    AT, LiveDecisionError,
+    arithmetic::{enclosure, endpoint},
 };
+use crate::FrozenDecisionInputs;
+use nrz_bindings::readings::algebra::{Cas, proof::VerifiedWitness, syntax::Operator};
+use nrz_bindings::{Budget, Declaration};
+use nrz_scalar::{ArithmeticContext, LiteralLimits, Scalar};
 
 /// Match the original physical quotient before inspecting any captured floating coordinates.
 pub(super) fn check<P: Scalar>(
@@ -27,8 +28,8 @@ pub(super) fn check<P: Scalar>(
     }
     let order = original(frozen, budget)?;
     let (_, certificate) = graph.integer_selection_evidence(witness, budget)?;
-    let lower = endpoint::<P>(&certificate.lower, arithmetic, literals, budget)?;
-    let upper = endpoint::<P>(&certificate.upper, arithmetic, literals, budget)?;
+    let lower = endpoint::<P>(&certificate.lower, arithmetic, literals, budget, AT)?;
+    let upper = endpoint::<P>(&certificate.upper, arithmetic, literals, budget, AT)?;
     budget.work(32, AT)?;
     let [numerator, denominator] = order.map(|slot| frozen.operands()[slot].coordinates());
     let quotient =
@@ -79,29 +80,4 @@ fn original<P: Scalar>(
         return Err(LiveDecisionError::Recipe);
     }
     Ok(order)
-}
-
-/// Decode only a certified exact endpoint; precharge the explicit bounded attempt on refusal too.
-fn endpoint<P: Scalar>(
-    exact: &Rational,
-    arithmetic: &ArithmeticContext,
-    literals: LiteralLimits,
-    budget: &mut Budget,
-) -> Result<Enclosure<P>, LiveDecisionError> {
-    let text = exact.exact_string(budget)?;
-    budget.work(literals.max_work(), AT)?;
-    Ok(NumericLiteral::new(&text, literals)?
-        .decode::<P>(arithmetic)?
-        .enclosure())
-}
-
-/// The numerical error is already included in the total radius and is never added twice.
-fn enclosure<P: Scalar>(
-    coordinates: [P; 3],
-    arithmetic: &ArithmeticContext,
-) -> Result<Enclosure<P>, ArithmeticFailure> {
-    let [center, total, _] = coordinates;
-    let radius = Finite::new(total)?;
-    Enclosure::singleton(Finite::new(center)?)
-        .add(Enclosure::new(radius.negated().get(), total)?, arithmetic)
 }

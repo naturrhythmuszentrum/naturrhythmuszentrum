@@ -12,6 +12,14 @@ mod decision;
 pub use decision::{LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision};
 mod decision_inputs;
 pub use decision_inputs::{DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs};
+mod lattice;
+pub use lattice::{
+    LiveLatticeIndex, LiveLatticeRepresentative, PreparedLatticeDecision, PublishedLatticeDecision,
+};
+mod lattice_enclosure;
+pub use lattice_enclosure::FrozenLatticeEnclosure;
+mod lattice_inputs;
+pub use lattice_inputs::FrozenLatticeInputs;
 mod evaluate;
 mod fill;
 mod retirement;

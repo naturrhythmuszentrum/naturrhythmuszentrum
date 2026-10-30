@@ -76,3 +76,14 @@ mod decision_fixture;
 mod decision_frozen;
 
 mod decision_live;
+
+mod lattice_fixture;
+mod lattice_input_limits;
+mod lattice_inputs;
+mod lattice_limits;
+mod lattice_live;
+mod lattice_physical;
+mod lattice_refusals;
+mod lattice_selection;
+
+mod lattice_work;

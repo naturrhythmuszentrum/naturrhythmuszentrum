@@ -112,59 +112,10 @@ impl Heap {
         budget: &mut Budget,
     ) -> Result<FrozenDecisionInputs<P>, DecisionSnapshotError> {
         let before = budget.usage();
-        let count = count(inputs.len())?;
-        let bytes = count
-            .checked_mul(count_size::<DecisionInputSnapshot<P>>()?.saturating_add(16))
-            .and_then(|value| value.checked_add(count_size::<FrozenDecisionInputs<P>>().ok()?))
-            .ok_or(HeapError::Capacity)?;
-        let staged = bytes
-            .checked_add(count.saturating_mul(8))
-            .ok_or(HeapError::Capacity)?;
-        budget.check(BudgetKind::MatrixEntries, count, AT)?;
-        budget.check(BudgetKind::StagedPayloadBytes, staged, AT)?;
-        budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-        budget.work(bytes, AT)?;
-        let symbols = inputs.iter().map(ValueBinding::symbols).collect::<Vec<_>>();
-        association
-            .authenticate(association.case(), &symbols, budget)
-            .map_err(|cause| DecisionSnapshotError::Association(Box::new(cause)))?;
-        let mut operands = Vec::new();
-        operands
-            .try_reserve_exact(inputs.len())
-            .map_err(|_| HeapError::Capacity)?;
-        for binding in inputs {
-            charge_scan(self, budget)?;
-            self.refuse_joint_operation(binding.handle())
-                .map_err(|cause| DecisionSnapshotError::Capture(Box::new(cause)))?;
-            let value = self.value_by_symbol(binding.symbol(), binding)?;
-            let native_scalar = value.region().extent().entries() == 1
-                && self.symbols.selection(binding.handle().key).is_none();
-            if !native_scalar {
-                return Err(DecisionSnapshotError::Unsupported);
-            }
-            let center = value.region().get(0, 0)?;
-            let total = self
-                .selected_bound(binding.handle())?
-                .ok_or(DecisionSnapshotError::Unsupported)?
-                .region()
-                .get(0, 0)?;
-            let error = self
-                .companion(
-                    value
-                        .evaluation()
-                        .ok_or(DecisionSnapshotError::Unsupported)?,
-                )?
-                .region()
-                .get(0, 0)?;
-            let input = InputSnapshot::capture(self, binding.handle())
-                .map_err(|cause| DecisionSnapshotError::Capture(Box::new(cause)))?;
-            let dependency = Dependency::from_snapshot(&input);
-            operands.push(DecisionInputSnapshot {
-                input,
-                dependency,
-                coordinates: [center, total, error],
-            });
-        }
+        let bytes = snapshot_bytes::<P, FrozenDecisionInputs<P>>(inputs.len())?;
+        let operands = capture(self, inputs, bytes, budget, |symbols, budget| {
+            association.authenticate(association.case(), symbols, budget)
+        })?;
         Ok(FrozenDecisionInputs {
             scope: self.scope,
             association: association.clone(),
@@ -183,18 +134,7 @@ impl Heap {
         frozen: &FrozenDecisionInputs<P>,
         budget: &mut Budget,
     ) -> Result<(), DecisionSnapshotError> {
-        budget.work(1, AT)?;
-        if frozen.scope != self.scope {
-            return Err(HeapError::ForeignHandle.into());
-        }
-        for operand in &frozen.operands {
-            charge_scan(self, budget)?;
-            self.refuse_joint_operation(operand.input.handle())
-                .map_err(|cause| DecisionSnapshotError::Capture(Box::new(cause)))?;
-            operand.dependency.validate(self)?;
-            self.value(operand.input.handle())?;
-        }
-        Ok(())
+        check(self, frozen.scope, &frozen.operands, budget)
     }
 }
 
@@ -218,4 +158,104 @@ fn count(value: usize) -> Result<u64, HeapError> {
 /// Native fixed-size metadata is accounted without scanning shared exact graphs.
 fn count_size<T>() -> Result<u64, HeapError> {
     count(size_of::<T>())
+}
+
+/// Account the same per-source native metadata for either immutable association wrapper.
+pub(super) fn snapshot_bytes<P: Scalar, T>(length: usize) -> Result<u64, HeapError> {
+    count(length)?
+        .checked_mul(count_size::<DecisionInputSnapshot<P>>()?.saturating_add(16))
+        .and_then(|value| value.checked_add(count_size::<T>().ok()?))
+        .ok_or(HeapError::Capacity)
+}
+
+/// Authenticate all symbols first, then capture the complete ordered native inventory.
+pub(super) fn capture<P: Scalar + 'static>(
+    heap: &Heap,
+    inputs: &[ValueBinding<P>],
+    bytes: u64,
+    budget: &mut Budget,
+    authenticate: impl FnOnce(
+        &[&nrz_bindings::BindingSymbols],
+        &mut Budget,
+    ) -> Result<(), nrz_bindings::DecisionError>,
+) -> Result<Vec<DecisionInputSnapshot<P>>, DecisionSnapshotError> {
+    let count = count(inputs.len())?;
+    let staged = bytes
+        .checked_add(count.saturating_mul(8))
+        .ok_or(HeapError::Capacity)?;
+    budget.check(BudgetKind::MatrixEntries, count, AT)?;
+    budget.check(BudgetKind::StagedPayloadBytes, staged, AT)?;
+    budget.check(BudgetKind::OutputBytes, bytes, AT)?;
+    budget.work(bytes, AT)?;
+    let symbols = inputs.iter().map(ValueBinding::symbols).collect::<Vec<_>>();
+    authenticate(&symbols, budget)
+        .map_err(|cause| DecisionSnapshotError::Association(Box::new(cause)))?;
+    let mut operands = Vec::new();
+    operands
+        .try_reserve_exact(inputs.len())
+        .map_err(|_| HeapError::Capacity)?;
+    for binding in inputs {
+        operands.push(capture_operand(heap, binding, budget)?);
+    }
+    Ok(operands)
+}
+
+/// Preserve every native value, total-radius and numerical-companion dependency.
+fn capture_operand<P: Scalar + 'static>(
+    heap: &Heap,
+    binding: &ValueBinding<P>,
+    budget: &mut Budget,
+) -> Result<DecisionInputSnapshot<P>, DecisionSnapshotError> {
+    charge_scan(heap, budget)?;
+    heap.refuse_joint_operation(binding.handle())
+        .map_err(|cause| DecisionSnapshotError::Capture(Box::new(cause)))?;
+    let value = heap.value_by_symbol(binding.symbol(), binding)?;
+    let native_scalar = value.region().extent().entries() == 1
+        && heap.symbols.selection(binding.handle().key).is_none();
+    if !native_scalar {
+        return Err(DecisionSnapshotError::Unsupported);
+    }
+    let center = value.region().get(0, 0)?;
+    let total = heap
+        .selected_bound(binding.handle())?
+        .ok_or(DecisionSnapshotError::Unsupported)?
+        .region()
+        .get(0, 0)?;
+    let error = heap
+        .companion(
+            value
+                .evaluation()
+                .ok_or(DecisionSnapshotError::Unsupported)?,
+        )?
+        .region()
+        .get(0, 0)?;
+    let input = InputSnapshot::capture(heap, binding.handle())
+        .map_err(|cause| DecisionSnapshotError::Capture(Box::new(cause)))?;
+    let dependency = Dependency::from_snapshot(&input);
+    Ok(DecisionInputSnapshot {
+        input,
+        dependency,
+        coordinates: [center, total, error],
+    })
+}
+
+/// Recheck the identical complete lease relation for scalar and lattice inventories.
+pub(super) fn check<P: Scalar + 'static>(
+    heap: &Heap,
+    scope: u64,
+    operands: &[DecisionInputSnapshot<P>],
+    budget: &mut Budget,
+) -> Result<(), DecisionSnapshotError> {
+    budget.work(1, AT)?;
+    if scope != heap.scope {
+        return Err(HeapError::ForeignHandle.into());
+    }
+    for operand in operands {
+        charge_scan(heap, budget)?;
+        heap.refuse_joint_operation(operand.input.handle())
+            .map_err(|cause| DecisionSnapshotError::Capture(Box::new(cause)))?;
+        operand.dependency.validate(heap)?;
+        heap.value(operand.input.handle())?;
+    }
+    Ok(())
 }

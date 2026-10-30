@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Atomic, externally owned live attachments for the closed two-input quotient subset.
 
+pub(super) mod arithmetic;
 mod ratio;
 
 use crate::{DecisionSnapshotError, FrozenDecisionInputs, Heap, HeapError};
@@ -29,13 +30,13 @@ pub enum LiveDecisionError {
     /// Outward numerical containment could not be established.
     #[error("live decision arithmetic: {0}")]
     Arithmetic(#[from] ArithmeticFailure),
-    /// This subset requires an original quotient of two distinct declared constants.
+    /// The requested original recipe is outside the supported native receiver subset.
     #[error("unsupported original live decision recipe")]
     Recipe,
-    /// The entire frozen numerical quotient does not fit the certified original enclosure.
+    /// The entire frozen numerical result does not fit the certified original enclosure.
     #[error("live decision box exceeds the certified original enclosure")]
     Enclosure,
-    /// This live authority and every derived count have been retired.
+    /// This live authority and every dependent descriptor or lowering have been retired.
     #[error("live decision attachment is retired")]
     Retired,
 }

@@ -344,6 +344,12 @@ pub use private::{
 )]
 mod reciprocal_testing;
 
-pub use publication::{DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs};
+pub use publication::{
+    DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs, FrozenLatticeEnclosure,
+    FrozenLatticeInputs,
+};
+pub use publication::{
+    LiveLatticeIndex, LiveLatticeRepresentative, PreparedLatticeDecision, PublishedLatticeDecision,
+};
 
 pub use publication::{LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision};
