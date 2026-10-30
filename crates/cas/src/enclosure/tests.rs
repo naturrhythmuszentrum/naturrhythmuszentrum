@@ -14,6 +14,54 @@ use crate::{Cas, Fault, Handle, Rational, Reference};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+/// The previous dependency-widened quotient is retained only as a comparison oracle.
+fn old_saturating_quotient(
+    certificate: &EnclosureCertificate,
+    negative: bool,
+    tanh: bool,
+) -> TestResult<Interval> {
+    let mut budget = ledger()?;
+    let proof = &certificate.exponentials[0].lower;
+    let source = certificate.records[0].lower();
+    let argument = if source.is_negative() {
+        source.add(&Rational::zero(), &mut budget)?
+    } else {
+        source.negated(&mut budget)?
+    };
+    let argument = if tanh {
+        argument.mul(&number(2, 1)?, &mut budget)?
+    } else {
+        argument
+    };
+    let e = exp::check_endpoint(&argument, proof, certificate.grid, &mut budget, &mut |_| {
+        false
+    })?;
+    let one = Interval::singleton(&Rational::one(), &mut budget)?;
+    let denominator = one.add(&e, certificate.grid, &mut budget)?;
+    let numerator = if tanh {
+        one.sub(&e, certificate.grid, &mut budget)?
+    } else if negative {
+        e
+    } else {
+        one
+    };
+    let result = numerator.mul(
+        &denominator.reciprocal(certificate.grid, &mut budget)?,
+        certificate.grid,
+        &mut budget,
+    )?;
+    let result = if tanh && negative {
+        Interval::new(
+            result.upper().negated(&mut budget)?,
+            result.lower().negated(&mut budget)?,
+            &mut budget,
+        )?
+    } else {
+        result
+    };
+    Ok(result.intersection(&interval(if tanh { -1 } else { 0 }, 1, 1)?, &mut budget)?)
+}
+
 fn ledger() -> Result<Budget, Fault> {
     Budget::new(Limits::default())
 }

@@ -20,6 +20,27 @@ fn tanh_case(n: i64, d: u64) -> TestResult<(Fixture, EnclosureRequest)> {
     Ok((f, request))
 }
 
+/// Monotone exponential endpoints improve or retain every existing fixture's bound.
+/// ´test:unit:enclosure-tanh-tightening´
+/// ´claim:cas:enclosure-tanh-tightening´
+#[test]
+fn enclosure_tanh_tightening() -> TestResult {
+    for (n, d) in [(0, 1), (1, 2), (-1, 2), (1, 1), (-1, 1), (2, 1), (-2, 1)] {
+        let (mut f, request) = tanh_case(n, d)?;
+        let checked = f
+            .cas
+            .enclose(&request, tanh_policy(), &mut ledger()?, &mut |_| false)?
+            .checked
+            .ok_or("tanh bound")?;
+        let old = old_saturating_quotient(&checked.certificate, n < 0, true)?;
+        assert!(old.contains(
+            checked.certificate.records.last().ok_or("record")?,
+            &mut ledger()?
+        )?);
+    }
+    Ok(())
+}
+
 /// Product inequalities use exact rational powers, no series or production reduction.
 fn product_oracle(n: i64, d: u64) -> TestResult<Interval> {
     let mut budget = ledger()?;
@@ -297,9 +318,9 @@ fn enclosure_tanh_work_pins() -> TestResult {
     )?;
     assert_eq!(
         (cold.work, warm.work, replay.work),
-        (973_430, 18_833, 513_588)
+        (874_566, 18_833, 466_836)
     );
-    for (is_warm, pin) in [(false, 973_430), (true, 18_833)] {
+    for (is_warm, pin) in [(false, 874_566), (true, 18_833)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut store, request) = tanh_case(1, 2)?;
             if is_warm {
@@ -327,7 +348,7 @@ fn enclosure_tanh_work_pins() -> TestResult {
             }
         }
     }
-    for (available, passes) in [(513_588, true), (513_587, false)] {
+    for (available, passes) in [(466_836, true), (466_835, false)] {
         let (mut store, request) = tanh_case(1, 2)?;
         let before = store.cas.canonical_snapshot(&mut ledger()?)?;
         let report = store.cas.check_enclosure(
@@ -386,9 +407,9 @@ fn enclosure_tanh_phase_pins() -> TestResult {
             grid,
             plans.exp.ok_or("exp plan")?.terms
         ),
-        (447_871, 500_167, 805, 4369, 22, 6)
+        (395_759, 453_415, 805, 4369, 22, 6)
     );
-    for (pin, generation) in [(447_871, true), (500_167, false)] {
+    for (pin, generation) in [(395_759, true), (453_415, false)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let mut budget = precharged(available)?;
             let result = if generation {
