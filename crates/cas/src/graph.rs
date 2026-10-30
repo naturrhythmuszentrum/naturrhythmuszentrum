@@ -24,6 +24,7 @@ use crate::model::{Binding, Environment, Operator, PredicateKind, Scope, Sort, S
 use crate::source_model::{SourceForm, SourceFormDraft};
 
 mod intern;
+mod lemmas;
 
 pub(crate) use intern::InterningSnapshot;
 use intern::{InternIndex, StoreToken};
@@ -31,6 +32,8 @@ use intern::{InternIndex, StoreToken};
 /// A disjoint namespace for logical identifiers.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum VertexKind {
+    /// A store-local anonymous checked judgment.
+    AnonymousLemma,
     /// Exact `ParameterBase` syntax.
     ParameterBase,
     /// Exact `SpaceFamily` syntax.
@@ -118,6 +121,7 @@ impl VertexKind {
     /// Stable encoding independent of Rust enum layout.
     pub(crate) const fn tag(self) -> u8 {
         match self {
+            Self::AnonymousLemma => 40,
             Self::Source => 0,
             Self::Context => 1,
             Self::Condition => 2,
@@ -473,6 +477,8 @@ pub(crate) struct RequestRecord {
 /// One authoritative heterogeneous vertex weight.
 #[derive(Clone, Debug)]
 pub(crate) enum Vertex {
+    /// Checked content-keyed evidence, retained in the authoritative graph.
+    AnonymousLemma(Box<lemmas::AnonymousLemma>),
     /// Immutable exact solving payload with checked handles.
     Solve(Box<crate::solving::SolveDraft<Handle>>),
     /// Immutable semantic declarations.
@@ -532,6 +538,8 @@ pub(crate) enum Vertex {
 /// Typed graph edge roles; only internal validated admission can create edges.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Edge {
+    /// Checked original-expression evidence pointing to an anonymous judgment.
+    CheckedEvidence,
     /// Exact scalar-space and family dependency.
     Scalar(ScalarEdge),
     /// Typed solving `Coordinates` dependency.
@@ -793,6 +801,10 @@ enum Undo {
 struct Journal {
     /// Every occupancy counter before the first mutation.
     counts: GraphCounts,
+    /// Graph-owned anonymous payload before the first mutation.
+    judgment_bytes: u64,
+    /// Number of retained anonymous nodes under this checkpoint or state.
+    judgment_count: usize,
     /// At most one next serial per fixed vertex kind.
     next: BTreeMap<VertexKind, u64>,
     /// First undo entry owned by this checkpoint.
@@ -825,6 +837,10 @@ pub(crate) struct State {
     originals: u64,
     /// Conservative logical payload bytes, including owned interning keys.
     payload: u64,
+    /// One retained-payload account for anonymous graph judgments.
+    judgment_bytes: u64,
+    /// Number of retained anonymous nodes under this checkpoint or state.
+    judgment_count: usize,
     /// Shared insertion log for all active transaction checkpoints.
     journal: Option<Vec<Undo>>,
 }
@@ -843,6 +859,8 @@ impl State {
             source_bytes: 0,
             originals: 0,
             payload: 0,
+            judgment_bytes: 0,
+            judgment_count: 0,
             journal: None,
         }
     }
@@ -857,6 +875,8 @@ impl State {
                 original_occurrences: self.originals,
                 payload_bytes: self.payload,
             },
+            judgment_bytes: self.judgment_bytes,
+            judgment_count: self.judgment_count,
             next: self.next.clone(),
             start: self.journal.as_ref().map_or(0, Vec::len),
             nested: self.journal.is_some(),
@@ -907,6 +927,8 @@ impl State {
             let index = NodeIndex::new(self.graph.node_count() - 1);
             let _removed = self.graph.remove_node(index);
         }
+        self.judgment_bytes = checkpoint.judgment_bytes;
+        self.judgment_count = checkpoint.judgment_count;
         self.next = checkpoint.next;
         self.payload = checkpoint.counts.payload_bytes;
         self.source_bytes = checkpoint.counts.source_bytes;
@@ -1883,6 +1905,9 @@ pub(crate) fn vertex_payload(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     let at = Location::new("vertex payload");
+    if let Vertex::AnonymousLemma(node) = vertex {
+        return crate::exact_constant::preparation_bytes(node.constant.value());
+    }
     let certificate_bytes = match vertex {
         Vertex::ScopedApplication(value) => match &value.certificate {
             crate::proof_model::Certificate::SquareFree(certificate) => {
@@ -1955,6 +1980,7 @@ pub(crate) fn vertex_key(
     let mut out = Encoder::new(budget, Location::new("structural key"));
     out.byte(kind.tag())?;
     match vertex {
+        Vertex::AnonymousLemma(node) => out.raw(&node.key[1..])?,
         Vertex::Solve(value) => value.encode(&mut out, &mut crate::statement::handle)?,
         Vertex::Header(_)
         | Vertex::Region(_)
@@ -2032,6 +2058,7 @@ pub(crate) fn vertex_key(
 /// Classify a graph-owned record without exposing physical indices.
 const fn vertex_kind(vertex: &Vertex) -> VertexKind {
     match vertex {
+        Vertex::AnonymousLemma(_) => VertexKind::AnonymousLemma,
         Vertex::Solve(value) => value.kind(),
         Vertex::Header(_) => VertexKind::Header,
         Vertex::Region(_) => VertexKind::Region,

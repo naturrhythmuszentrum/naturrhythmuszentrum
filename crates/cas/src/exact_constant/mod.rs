@@ -3,8 +3,9 @@
 
 mod arithmetic;
 mod cache;
+pub(crate) use cache::footprint as preparation_bytes;
 
-pub use cache::{ConstantIdentity, ConstantIdentityKind, ExactConstantCache, PreparedConstant};
+pub use cache::{ConstantIdentity, ConstantIdentityKind, PreparedConstant};
 pub(crate) mod graph;
 mod sign;
 

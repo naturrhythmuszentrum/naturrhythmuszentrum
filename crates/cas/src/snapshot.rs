@@ -13,6 +13,7 @@ use crate::graph::{Cas, Edge, encode_id, size, vertex_key};
 /// Encode a stable role/position pair instead of a graph edge index.
 const fn role(edge: Edge) -> (u8, u32) {
     match edge {
+        Edge::CheckedEvidence => (100, 0),
         Edge::Scalar(role) => role.tag(),
         Edge::Coordinates => (42, 0),
         Edge::CoefficientCoordinates => (43, 0),

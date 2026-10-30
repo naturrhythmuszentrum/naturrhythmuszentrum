@@ -23,6 +23,7 @@ fn formal_register_standing_is_complete() {
         .map(|entry| &entry.lemma)
         .chain(&EMPTY_SCHEMAS)
         .chain(&nrz_cas::proof::CONSTANT_SCHEMAS)
+        .chain(&nrz_cas::proof::RETAINED_SCHEMAS)
         .chain(&nrz_cas::decision::DECISION_SCHEMAS)
         .chain(&HYPOTHESIS_SCHEMAS)
         .chain(std::iter::once(&ANONYMOUS_LEMMA_SCHEMA));
@@ -223,6 +224,7 @@ fn formal_register_heads_are_bijective() {
         .map(|entry| &entry.lemma)
         .chain(&EMPTY_SCHEMAS)
         .chain(&nrz_cas::proof::CONSTANT_SCHEMAS)
+        .chain(&nrz_cas::proof::RETAINED_SCHEMAS)
         .chain(&nrz_cas::decision::DECISION_SCHEMAS)
         .chain(&HYPOTHESIS_SCHEMAS)
         .chain(std::iter::once(&ANONYMOUS_LEMMA_SCHEMA))
@@ -271,4 +273,41 @@ fn formal_register_heads_are_bijective() {
             }
         }
     }
+}
+
+/// Anonymous local constant evidence changes neither witness bytes nor independent replay.
+/// ´test:integration:anonymous-constant-preserves-witness´
+/// ´claim:cas:anonymous-constant-preserves-witness´
+#[test]
+fn anonymous_constant_preserves_witness() -> TestResult {
+    let mut fixture = Fixture::new()?;
+    let pi = fixture.term(Operator::Constant(nrz_cas::syntax::Constant::Pi), &[])?;
+    let proposal = equality(
+        &fixture.context,
+        &fixture.domain,
+        Primitive::Reflexivity,
+        &pi,
+        &pi,
+    );
+    let witness = fixture.cas.check_proof(
+        &fixture.context,
+        std::slice::from_ref(&proposal),
+        &mut budget()?,
+    )?;
+    let mut before_work = budget()?;
+    let before = fixture.cas.export_witness(&witness, &mut before_work)?;
+    fixture
+        .cas
+        .prepare_constant(&fixture.context, &pi, &mut budget()?)?;
+    let mut after_work = budget()?;
+    assert_eq!(
+        fixture.cas.export_witness(&witness, &mut after_work)?,
+        before
+    );
+    assert_eq!(before_work.usage().work, after_work.usage().work);
+    let mut receiver = Cas::new(budget()?.limits().clone())?;
+    let replayed = receiver.inspect(&before, &mut budget()?)?;
+    assert_eq!(receiver.export_witness(&replayed, &mut budget()?)?, before);
+    assert_eq!(receiver.retained_judgment_count(), 0);
+    Ok(())
 }

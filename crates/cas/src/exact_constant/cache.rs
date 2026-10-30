@@ -1,35 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Caller-owned closed judgments keyed by complete canonical graph references.
-
-use std::collections::BTreeMap;
-use std::sync::Arc;
+//! Borrowed closed judgments reached through checked evidence edges in the source graph.
 
 use super::{ExactConstant, PositiveConstant, Value};
-use crate::budget::{Budget, BudgetKind};
-use crate::error::{Fault, InvalidCode, Location};
-use crate::graph::{Cas, Handle, LogicalId, size};
+use crate::budget::Budget;
+use crate::error::{Fault, Location};
+use crate::graph::{Cas, Handle};
 
 /// Local preparation and borrowed identity citations share one accounting location.
 const AT: Location = Location::new("exact constant cache");
-
-/// Caller-owned retention of checked constants across operations in one source store.
-///
-/// Within one owner and rollback generation, canonical expression and context IDs
-/// identify their complete immutable dependency graphs, including declaration and
-/// assumption identities. Normalized values and printed names are never keys.
-/// Changing stores or rolling back requires fresh admission. Ordinary
-/// `ExactConstant::from_expression` does not consult or allocate this cache.
-#[derive(Debug, Default)]
-pub struct ExactConstantCache {
-    /// Strong ownership prevents an allocator from recycling a source namespace.
-    owner: Option<Arc<()>>,
-    /// Logical IDs may be reused only after this generation changes.
-    epoch: u64,
-    /// Context followed by the original, unnormalized expression.
-    entries: BTreeMap<(LogicalId, LogicalId), PreparedConstant>,
-    /// Conservative retained constants, keys, handles and tree allocation.
-    bytes: u64,
-}
 
 /// Sealed local evidence for one original expression in its exact context.
 ///
@@ -64,112 +42,52 @@ pub struct ConstantIdentity<'a> {
     kind: ConstantIdentityKind,
 }
 
-impl ExactConstantCache {
-    /// Empty retention without global state or a hidden budget.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            owner: None,
-            epoch: 0,
-            entries: BTreeMap::new(),
-            bytes: 0,
-        }
-    }
-
-    /// Number of distinct original expression/context judgments retained.
-    #[must_use]
-    pub fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    /// Whether no checked judgment is retained.
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.entries.is_empty()
-    }
-
-    /// Conservative caller-owned payload, excluding shared source syntax.
-    #[must_use]
-    pub const fn retained_bytes(&self) -> u64 {
-        self.bytes
-    }
-
-    /// Admit once or borrow the existing checked judgment under its full original key.
+impl Cas {
+    /// Admit or cite an anonymous closed-constant lemma in this source graph.
     ///
-    /// A hit pays the bit width of the retained entry count in Work, at least one.
-    /// A miss uses the unchanged admission ledger; its existing graph-construction
-    /// allowance covers the fixed reference key and tree insertion. Retained
-    /// payload remains reserved beside admission scratch. Refusal publishes nothing.
+    /// The original expression reaches its checked preparation through an evidence
+    /// edge. Ordinary `ExactConstant::from_expression` remains independent.
     /// # Errors
-    /// Refuses foreign handles, mismatched headers, unsupported or undefined
-    /// constants, and exhausted caller or source-store storage ceilings.
-    pub fn prepare<'a>(
-        &'a mut self,
-        cas: &Cas,
+    /// Refuses foreign handles, mismatched contexts, undefined constants or
+    /// exhausted caller and source-store ceilings without publishing a prefix.
+    pub fn prepare_constant(
+        &mut self,
         context: &Handle,
         original: &Handle,
         budget: &mut Budget,
-    ) -> Result<&'a PreparedConstant, Fault> {
-        let previous = budget.restrict_storage(&cas.limits);
-        let result = self.retained(cas, context, original, budget);
+    ) -> Result<&PreparedConstant, Fault> {
+        let previous = budget.restrict_storage(&self.limits);
+        let result = self.prepare_constant_node(context, original, budget);
         budget.restore_limits(previous);
-        result
-    }
-
-    /// Authenticate all original identities before either reuse or fresh admission.
-    fn retained<'a>(
-        &'a mut self,
-        cas: &Cas,
-        context: &Handle,
-        original: &Handle,
-        budget: &mut Budget,
-    ) -> Result<&'a PreparedConstant, Fault> {
-        let expression = cas.checked(original)?;
-        let frame = cas.checked(context)?;
-        if cas.state.expression(expression)?.header != cas.state.context(frame)?.header_id {
-            return Err(Fault::invalid(InvalidCode::Scope, AT));
-        }
-        let same_owner = self
-            .owner
-            .as_ref()
-            .is_some_and(|owner| Arc::ptr_eq(owner, &cas.memo_owner));
-        let same_epoch = self.epoch == cas.memo_epoch && cas.memo_epoch != u64::MAX;
-        let same_frame = same_owner && same_epoch;
-        let key = (frame, expression);
-        if same_frame && self.entries.contains_key(&key) {
-            budget.work(
-                u64::from(size(self.entries.len(), AT)?.bit_width().max(1)),
-                AT,
-            )?;
-            retained(self.bytes, self.entries.len(), budget)?;
-            return self.entries.get(&key).ok_or_else(invalid);
-        }
-        let value = budget.with_retained_payload(self.bytes, AT, |budget| {
-            ExactConstant::from_expression(cas, original, budget)
-        })?;
-        let old_bytes = if same_frame { self.bytes } else { 0 };
-        let count = if same_frame { self.entries.len() } else { 0 };
-        let bytes = old_bytes.saturating_add(footprint(&value)?);
-        retained(bytes, count.saturating_add(1), budget)?;
-        if !same_frame {
-            self.entries.clear();
-            self.owner = Some(Arc::clone(&cas.memo_owner));
-            self.epoch = cas.memo_epoch;
-        }
-        self.entries.insert(
-            key,
-            PreparedConstant {
-                original: original.clone(),
-                context: context.clone(),
-                value,
-            },
-        );
-        self.bytes = bytes;
-        self.entries.get(&key).ok_or_else(invalid)
+        self.constant_preparation(result?)
     }
 }
 
 impl PreparedConstant {
+    /// Construct evidence only after the complete original constant checker succeeds.
+    pub(crate) const fn checked(original: Handle, context: Handle, value: ExactConstant) -> Self {
+        Self {
+            original,
+            context,
+            value,
+        }
+    }
+
+    /// Formal schema instantiated by this complete original finite-real judgment.
+    #[must_use]
+    pub const fn formal_schema(&self) -> &'static crate::emptiness::LemmaSchema {
+        &crate::proof::RETAINED_SCHEMAS[0]
+    }
+
+    /// Checked premise shapes; none is a new source assumption.
+    #[must_use]
+    pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
+        &[
+            crate::proof::HypothesisKind::DomainGuard,
+            crate::proof::HypothesisKind::Equality,
+        ]
+    }
+
     /// Original unnormalized target retained by this checked judgment.
     #[must_use]
     pub const fn original(&self) -> &Handle {
@@ -230,15 +148,8 @@ impl<'a> ConstantIdentity<'a> {
     }
 }
 
-/// Bound all simultaneously retained local evidence under the caller's storage ceilings.
-fn retained(bytes: u64, count: usize, budget: &Budget) -> Result<(), Fault> {
-    budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-    budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
-    budget.check(BudgetKind::Vertices, size(count, AT)?, AT)
-}
-
 /// Include the owned exact graph, complete canonical bytes and conservative entry metadata.
-fn footprint(value: &ExactConstant) -> Result<u64, Fault> {
+pub(crate) fn footprint(value: &ExactConstant) -> Result<u64, Fault> {
     let payload = match &value.0 {
         Value::Rational(number) => {
             let (numerator, denominator) = number.component_bits();
@@ -251,14 +162,9 @@ fn footprint(value: &ExactConstant) -> Result<u64, Fault> {
             .cas
             .counts()
             .payload_bytes
-            .saturating_add(size(graph.key.len(), AT)?),
+            .saturating_add(crate::graph::size(graph.key.len(), AT)?),
     };
     Ok(payload.saturating_add(512))
-}
-
-/// Missing retained evidence cannot manufacture a checked result.
-const fn invalid() -> Fault {
-    Fault::invalid(InvalidCode::Reference, AT)
 }
 
 #[cfg(test)]

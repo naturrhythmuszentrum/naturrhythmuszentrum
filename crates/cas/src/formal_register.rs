@@ -630,3 +630,13 @@ pub const CONSTANT_SCHEMAS: [LemmaSchema; 1] = [LemmaSchema {
     statement: "The claimed closed rational interval contains mathematical pi.",
     premises: "Exact finite alternating sums for atan(1/5) and atan(1/239), their signed next-term remainders, Machin's identity and outward rational endpoint comparisons.",
 }];
+
+/// Formal schemas instantiated by graph-owned anonymous retained judgments.
+pub const RETAINED_SCHEMAS: [LemmaSchema; 1] = [LemmaSchema {
+    name: "constant.closed-preparation",
+    label: "thm:cas:constant-closed-preparation",
+    version: 1,
+    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+    statement: "The complete original closed expression is finite real and has the independently checked normalized value and sign.",
+    premises: "Original `DomainGuard` and normalized `Equality` evidence in the identical declaration, context and stratum, checked under (`def:cas:constant-preparation`).",
+}];
