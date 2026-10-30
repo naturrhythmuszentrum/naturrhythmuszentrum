@@ -37,6 +37,7 @@
 //! ```
 
 mod checker;
+mod derivative;
 mod exp;
 mod interval;
 mod log;
@@ -74,7 +75,8 @@ fn boundary(
 
 /// Conservative retained receipt size including all endpoint components and original handles.
 pub(crate) fn footprint(value: &CheckedEnclosure) -> u64 {
-    power::bytes(&value.certificate.powers)
+    derivative::bytes(&value.certificate.derivatives)
+        .saturating_add(power::bytes(&value.certificate.powers))
         .saturating_add(exp::bytes(&value.certificate.exponentials))
         .saturating_add(log::bytes(&value.certificate.logarithms))
         .saturating_add(
@@ -109,7 +111,7 @@ fn receipt_reservation(
     // A log record adds twelve series intervals and four rational reduction fields;
     // sixteen interval slots also cover their fixed metadata and the result record.
     let power_slots = cas.state.expression(cas.checked(&request.target)?)?;
-    if power_slots.enclosure_power.present {
+    if power_slots.enclosure_power.present || power_slots.enclosure_derivative != 0 {
         return Ok(power_slots
             .enclosure_power
             .slots
@@ -146,7 +148,8 @@ fn receipt_reservation(
 
 /// Size the supplied transcript before checking or copying any of its records.
 fn certificate_bytes(value: &EnclosureCertificate) -> u64 {
-    power::bytes(&value.powers)
+    derivative::bytes(&value.derivatives)
+        .saturating_add(power::bytes(&value.powers))
         .saturating_add(exp::bytes(&value.exponentials))
         .saturating_add(log::bytes(&value.logarithms))
         .saturating_add(
@@ -199,6 +202,7 @@ fn interval_bytes(value: &Interval) -> u64 {
         })
 }
 
+pub use derivative::{DerivativeEvidence, DerivativeRule, DerivativeStep};
 pub use exp::{ExpEndpoint, ExpEvidence, ExpSeries};
 pub use interval::Interval;
 pub use log::{LogEndpoint, LogEvidence, LogSeries};
@@ -209,7 +213,7 @@ pub use model::{
 pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 7] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 8] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -266,6 +270,14 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 7] = [
         statement: "A strictly positive base raised to its fixed reduced rational exponent lies in the checked route enclosure. Integral squaring, repeated roots and logarithm-exponential composition denote the same real power; negative exponents reverse endpoint order through reciprocal.",
         premises: "Original `DomainGuard`, `StrictSign` for the base, exact `Equality` for exponent and route identity, `IntegerRange` for bounded powers and roots, and `Enclosure` under each component schema actually used.",
     },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.smooth-derivative",
+        label: "thm:cas:enclosure-smooth-derivative",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The closed first-derivative identities and ordered chain rules enclose the derivative of the original supported expression over its complete ordered coordinate box. Strict domains establish smoothness on a neighborhood; a midpoint or callback grants no authority.",
+        premises: "Original `DomainGuard`, reconstructed `Differentiable` and `Derivative` identities, exact `Equality` of the original coordinate and ordered source, `NonZero` or `StrictSign` for required domains, and separate full-box `Enclosure` premises for every constituent.",
+    },
 ];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
@@ -285,6 +297,8 @@ pub enum EnclosureLaw {
     TanhCompose,
     /// Strictly positive base and exact rational exponent with checked route.
     PositivePower,
+    /// Closed first derivative with independently checked full-box premises.
+    SmoothDerivative,
 }
 
 impl EnclosureLaw {
@@ -299,6 +313,7 @@ impl EnclosureLaw {
             Self::SigmoidCompose => &ENCLOSURE_SCHEMAS[4],
             Self::TanhCompose => &ENCLOSURE_SCHEMAS[5],
             Self::PositivePower => &ENCLOSURE_SCHEMAS[6],
+            Self::SmoothDerivative => &ENCLOSURE_SCHEMAS[7],
         }
     }
 }
@@ -323,6 +338,11 @@ pub(crate) fn supported_shape(
         | Operator::Exponential
         | Operator::Sigmoid
         | Operator::Tanh => 1,
+        Operator::Derivative(_)
+            if operands.len() == 1 && state.expression(operands[0])?.enclosure_derivative == 0 =>
+        {
+            1
+        }
         Operator::PositivePower
             if operands.len() == 2
                 && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if r.component_bits().0 <= 63 && r.component_bits().1 <= 64) =>
@@ -527,6 +547,9 @@ pub(crate) fn receipt_slots(
                 _ => 43,
             }
         }
+        Operator::Derivative(_) if operands.len() == 1 => {
+            state.expression(operands[0])?.unfolded.saturating_add(1)
+        }
         _ => 1,
     };
     for id in operands {
@@ -554,4 +577,20 @@ pub(crate) fn power_metadata(
         present: has_powers(state, operator, operands)?,
         slots: receipt_slots(state, operator, operands)?,
     })
+}
+
+/// Keep unsupported higher derivatives outside the preflight grammar.
+pub(crate) fn derivative_depth(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<u8, crate::Fault> {
+    let mut depth = 0;
+    for id in operands {
+        depth = depth.max(state.expression(*id)?.enclosure_derivative);
+    }
+    Ok(depth.saturating_add(u8::from(matches!(
+        operator,
+        crate::model::Operator::Derivative(_)
+    ))))
 }

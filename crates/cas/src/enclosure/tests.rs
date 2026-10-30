@@ -3,6 +3,7 @@
 
 use super::*;
 
+mod derivatives;
 mod exponentials;
 mod powers;
 mod sigmoids;
@@ -91,12 +92,17 @@ struct Fixture {
 }
 impl Fixture {
     fn new() -> TestResult<Self> {
+        Self::with_names(&["x"])
+    }
+    fn with_names(names: &[&str]) -> TestResult<Self> {
         let mut environment = Environment::default();
-        environment.declarations.push(Declaration {
-            key: "x".into(),
-            display_name: "x".into(),
-            sort: real(),
-        });
+        for name in names {
+            environment.declarations.push(Declaration {
+                key: (*name).into(),
+                display_name: (*name).into(),
+                sort: real(),
+            });
+        }
         let mut cas = Cas::new(Limits::default())?;
         let drafts = [
             Draft::Header(HeaderDraft::Core(environment)),

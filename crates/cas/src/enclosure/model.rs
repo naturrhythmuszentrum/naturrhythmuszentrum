@@ -113,6 +113,8 @@ pub struct EnclosureCertificate {
     pub exponentials: Vec<super::ExpEvidence>,
     /// Route and component bounds for original positive-power nodes.
     pub powers: Vec<super::PowerEvidence>,
+    /// Closed derivative identities and their separate full-box bounds.
+    pub derivatives: Vec<super::DerivativeEvidence>,
 }
 
 /// Sealed evidence admitted only after the independent checker has completed.
@@ -161,6 +163,16 @@ impl CheckedEnclosure {
     #[must_use]
     pub fn formal_schemas(&self) -> &'static [crate::emptiness::LemmaSchema] {
         match self.certificate.law {
+            super::EnclosureLaw::SmoothDerivative => {
+                let index = usize::from(self.roots)
+                    | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
+                    | (usize::from(!self.certificate.exponentials.is_empty()) << 2)
+                    | (usize::from(self.sigmoids) << 3)
+                    | (usize::from(self.tangents) << 4)
+                    | (usize::from(!self.certificate.powers.is_empty()) << 5);
+                let (schemas, count) = &DERIVATIVE_SCHEMAS[index];
+                &schemas[..*count]
+            }
             super::EnclosureLaw::PositivePower => {
                 let index = usize::from(self.roots)
                     | (usize::from(!self.certificate.logarithms.is_empty()) << 1)
@@ -204,6 +216,17 @@ impl CheckedEnclosure {
     #[must_use]
     pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
         use crate::proof::HypothesisKind;
+        if matches!(self.certificate.law, super::EnclosureLaw::SmoothDerivative) {
+            return &[
+                HypothesisKind::DomainGuard,
+                HypothesisKind::Differentiable,
+                HypothesisKind::Derivative,
+                HypothesisKind::Equality,
+                HypothesisKind::NonZero,
+                HypothesisKind::StrictSign,
+                HypothesisKind::Enclosure,
+            ];
+        }
         if matches!(
             self.certificate.law,
             super::EnclosureLaw::LogAtanh
@@ -406,5 +429,89 @@ const fn power_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 7], usiz
         index += 1;
     }
     schemas[count] = super::ENCLOSURE_SCHEMAS[6];
+    (schemas, count + 1)
+}
+
+/// Exact inventories contain only the checked derivative transcript's component laws.
+static DERIVATIVE_SCHEMAS: [([crate::emptiness::LemmaSchema; 8], usize); 64] = [
+    derivative_schemas(0),
+    derivative_schemas(1),
+    derivative_schemas(2),
+    derivative_schemas(3),
+    derivative_schemas(4),
+    derivative_schemas(5),
+    derivative_schemas(6),
+    derivative_schemas(7),
+    derivative_schemas(8),
+    derivative_schemas(9),
+    derivative_schemas(10),
+    derivative_schemas(11),
+    derivative_schemas(12),
+    derivative_schemas(13),
+    derivative_schemas(14),
+    derivative_schemas(15),
+    derivative_schemas(16),
+    derivative_schemas(17),
+    derivative_schemas(18),
+    derivative_schemas(19),
+    derivative_schemas(20),
+    derivative_schemas(21),
+    derivative_schemas(22),
+    derivative_schemas(23),
+    derivative_schemas(24),
+    derivative_schemas(25),
+    derivative_schemas(26),
+    derivative_schemas(27),
+    derivative_schemas(28),
+    derivative_schemas(29),
+    derivative_schemas(30),
+    derivative_schemas(31),
+    derivative_schemas(32),
+    derivative_schemas(33),
+    derivative_schemas(34),
+    derivative_schemas(35),
+    derivative_schemas(36),
+    derivative_schemas(37),
+    derivative_schemas(38),
+    derivative_schemas(39),
+    derivative_schemas(40),
+    derivative_schemas(41),
+    derivative_schemas(42),
+    derivative_schemas(43),
+    derivative_schemas(44),
+    derivative_schemas(45),
+    derivative_schemas(46),
+    derivative_schemas(47),
+    derivative_schemas(48),
+    derivative_schemas(49),
+    derivative_schemas(50),
+    derivative_schemas(51),
+    derivative_schemas(52),
+    derivative_schemas(53),
+    derivative_schemas(54),
+    derivative_schemas(55),
+    derivative_schemas(56),
+    derivative_schemas(57),
+    derivative_schemas(58),
+    derivative_schemas(59),
+    derivative_schemas(60),
+    derivative_schemas(61),
+    derivative_schemas(62),
+    derivative_schemas(63),
+];
+
+/// Construct each small static row without a large temporary stack array.
+const fn derivative_schemas(mask: usize) -> ([crate::emptiness::LemmaSchema; 8], usize) {
+    let mut schemas = [super::ENCLOSURE_SCHEMAS[0]; 8];
+    let mut count = 1;
+    let mut index = 1;
+    while index < 7 {
+        if mask & (1 << (index - 1)) != 0 {
+            schemas[count] = super::ENCLOSURE_SCHEMAS[index];
+            count += 1;
+        }
+        index += 1;
+    }
+    schemas[count] = super::ENCLOSURE_SCHEMAS[7];
     (schemas, count + 1)
 }

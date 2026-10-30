@@ -23,6 +23,7 @@ pub(super) fn check(
         logs: certificate.logarithms.iter(),
         exps: certificate.exponentials.iter(),
         powers: certificate.powers.iter(),
+        derivatives: certificate.derivatives.iter(),
         log_two: Vec::new(),
         roots: false,
         sigmoids: false,
@@ -32,7 +33,7 @@ pub(super) fn check(
     stack
         .try_reserve(schedule.len())
         .map_err(|_| Fault::allocation(AT))?;
-    for (index, id) in schedule.into_iter().enumerate() {
+    for (index, id) in schedule.iter().copied().enumerate() {
         boundary(budget, interrupt)?;
         let expression = cas.state.expression(id)?;
         let record = &certificate.records[index];
@@ -48,13 +49,23 @@ pub(super) fn check(
         } else {
             None
         };
-        replay.node(cas, request, (id, index), (left, right), budget, interrupt)?;
+        replay.node(
+            cas,
+            request,
+            (id, index, &schedule),
+            (left, right),
+            budget,
+            interrupt,
+        )?;
         stack.push(index);
     }
     if stack.len() != 1
         || replay.logs.next().is_some()
         || replay.exps.next().is_some()
         || replay.powers.next().is_some()
+        || replay.derivatives.next().is_some()
+        || (certificate.law == super::EnclosureLaw::SmoothDerivative
+            && certificate.derivatives.is_empty())
     {
         return Err(invalid());
     }
@@ -76,6 +87,8 @@ struct Replay<'a> {
     exps: std::slice::Iter<'a, super::ExpEvidence>,
     /// Unconsumed positive-power routes.
     powers: std::slice::Iter<'a, super::PowerEvidence>,
+    /// Unconsumed original derivative subtrees.
+    derivatives: std::slice::Iter<'a, super::DerivativeEvidence>,
     /// Already checked one-third series for this transcript only.
     log_two: Vec<(&'a super::LogSeries, Interval)>,
     /// Encountered root premises.
@@ -92,12 +105,12 @@ impl Replay<'_> {
         &mut self,
         cas: &Cas,
         request: &EnclosureRequest,
-        position: (crate::graph::LogicalId, usize),
+        position: (crate::graph::LogicalId, usize, &[crate::graph::LogicalId]),
         inputs: (Option<usize>, Option<usize>),
         budget: &mut Budget,
         interrupt: &mut impl FnMut(BudgetUsage) -> bool,
     ) -> Result<(), Fault> {
-        let (id, index) = position;
+        let (id, index, schedule) = position;
         let (left, right) = inputs;
         let expression = cas.state.expression(id)?;
         let record = &self.certificate.records[index];
@@ -120,6 +133,9 @@ impl Replay<'_> {
                     budget,
                     interrupt,
                 );
+            }
+            Operator::Derivative(_) => {
+                return self.derivative(cas, expression, (schedule, index), budget, interrupt);
             }
             Operator::PositivePower => {
                 return self.power(
@@ -220,7 +236,10 @@ impl Replay<'_> {
         budget: &mut Budget,
         interrupt: &mut impl FnMut(BudgetUsage) -> bool,
     ) -> Result<(), Fault> {
-        if self.certificate.law != super::EnclosureLaw::PositivePower {
+        if !matches!(
+            self.certificate.law,
+            super::EnclosureLaw::PositivePower | super::EnclosureLaw::SmoothDerivative
+        ) {
             return Err(invalid());
         }
         let evidence = self.powers.next().ok_or_else(invalid)?;
@@ -251,6 +270,46 @@ impl Replay<'_> {
         self.roots |= !evidence.roots.is_empty();
         Ok(())
     }
+    /// Authenticate both the symbolic coordinate and the complete original subtree join.
+    fn derivative(
+        &mut self,
+        cas: &Cas,
+        expression: &crate::graph::Expression,
+        position: (&[crate::graph::LogicalId], usize),
+        budget: &mut Budget,
+        interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+    ) -> Result<(), Fault> {
+        if self.certificate.law != super::EnclosureLaw::SmoothDerivative {
+            return Err(invalid());
+        }
+        let Operator::Derivative(coordinate) = &expression.operator else {
+            return Err(invalid());
+        };
+        let (schedule, index) = position;
+        let count = usize::try_from(cas.state.expression(expression.operands[0])?.unfolded)
+            .map_err(|_| invalid())?;
+        let first = index.checked_sub(count).ok_or_else(invalid)?;
+        let evidence = self.derivatives.next().ok_or_else(invalid)?;
+        if usize::try_from(evidence.record).ok() != Some(index)
+            || usize::try_from(evidence.first).ok() != Some(first)
+            || &evidence.coordinate != coordinate
+        {
+            return Err(invalid());
+        }
+        let source = super::derivative::Segment {
+            cas,
+            schedule: &schedule[first..index],
+            values: &self.certificate.records[first..index],
+        };
+        super::derivative::check(
+            source,
+            evidence,
+            &self.certificate.records[index],
+            self.certificate.grid,
+            budget,
+            interrupt,
+        )
+    }
 }
 
 /// Bind the registered family and version to the original expression's derived grammar.
@@ -260,6 +319,13 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_derivative
+        != 0
+    {
+        super::EnclosureLaw::SmoothDerivative
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_power
@@ -321,7 +387,8 @@ fn finish(
     let last = certificate.records.last().ok_or_else(invalid)?;
     let (lower, upper) = grid(last.lower(), last.upper(), certificate.presentation, budget)?;
     let interval = Interval::new(lower, upper, budget)?;
-    let bytes = super::power::bytes(&certificate.powers)
+    let bytes = super::derivative::bytes(&certificate.derivatives)
+        .saturating_add(super::power::bytes(&certificate.powers))
         .saturating_add(super::exp::bytes(&certificate.exponentials))
         .saturating_add(super::log::bytes(&certificate.logarithms))
         .saturating_add(

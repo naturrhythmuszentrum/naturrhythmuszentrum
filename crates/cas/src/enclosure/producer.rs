@@ -42,19 +42,14 @@ pub(super) fn generate_planned(
     let mut logarithms = Vec::new();
     let mut exponentials = Vec::new();
     let mut powers = Vec::new();
+    let mut derivatives = Vec::new();
     let schedule = super::scope::schedule(cas, request, budget)?;
-    let mut records: Vec<Interval> = Vec::new();
-    let mut stack: Vec<usize> = Vec::new();
-    records
-        .try_reserve(schedule.len())
-        .map_err(|_| Fault::allocation(AT))?;
-    stack
-        .try_reserve(schedule.len())
-        .map_err(|_| Fault::allocation(AT))?;
+    let mut records: Vec<Interval> = slots(schedule.len())?;
+    let mut stack: Vec<usize> = slots(schedule.len())?;
     let mut bytes = u64::try_from(scope.len())
         .unwrap_or(u64::MAX)
         .saturating_add(512);
-    for id in schedule {
+    for (index, id) in schedule.iter().copied().enumerate() {
         boundary(budget, interrupt)?;
         let expression = cas.state.expression(id)?;
         let right = if expression.operands.is_empty() {
@@ -67,18 +62,34 @@ pub(super) fn generate_planned(
         } else {
             None
         };
-        let generated = node(
-            cas,
-            request,
-            id,
-            (left.map(|i| &records[i]), right.map(|i| &records[i])),
-            (grid, plan, records.len()),
-            budget,
-            interrupt,
-        )?;
+        let generated = if matches!(expression.operator, Operator::Derivative(_)) {
+            derivative_node(
+                cas,
+                expression,
+                (&schedule, &records, index),
+                grid,
+                budget,
+                interrupt,
+            )?
+        } else {
+            node(
+                cas,
+                request,
+                id,
+                (left.map(|i| &records[i]), right.map(|i| &records[i])),
+                (grid, plan, records.len()),
+                budget,
+                interrupt,
+            )?
+        };
         let result = store_generated(
             generated,
-            (&mut logarithms, &mut exponentials, &mut powers),
+            (
+                &mut logarithms,
+                &mut exponentials,
+                &mut powers,
+                &mut derivatives,
+            ),
             bytes,
             budget,
         )?;
@@ -88,7 +99,8 @@ pub(super) fn generate_planned(
             bytes
                 .saturating_add(super::log::bytes(&logarithms))
                 .saturating_add(super::exp::bytes(&exponentials))
-                .saturating_add(super::power::bytes(&powers)),
+                .saturating_add(super::power::bytes(&powers))
+                .saturating_add(super::derivative::bytes(&derivatives)),
             AT,
         )?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
@@ -101,27 +113,16 @@ pub(super) fn generate_planned(
         return Err(invalid());
     }
     Ok(EnclosureCertificate {
-        law: if !powers.is_empty() {
-            super::EnclosureLaw::PositivePower
-        } else if cas
-            .state
-            .expression(cas.checked(&request.target)?)?
-            .enclosure_saturation
-            == 2
-        {
-            super::EnclosureLaw::TanhCompose
-        } else if cas
-            .state
-            .expression(cas.checked(&request.target)?)?
-            .enclosure_saturation
-            == 1
-        {
-            super::EnclosureLaw::SigmoidCompose
-        } else if exponentials.is_empty() {
-            law(cas, request, !logarithms.is_empty())?
-        } else {
-            super::EnclosureLaw::ExpTaylor
-        },
+        law: transcript_law(
+            cas,
+            request,
+            (
+                !logarithms.is_empty(),
+                !exponentials.is_empty(),
+                !powers.is_empty(),
+                !derivatives.is_empty(),
+            ),
+        )?,
         version: 1,
         scope,
         grid,
@@ -130,7 +131,17 @@ pub(super) fn generate_planned(
         logarithms,
         exponentials,
         powers,
+        derivatives,
     })
+}
+
+/// Reserve an already preflighted schedule without unmetered growth.
+fn slots<T>(count: usize) -> Result<Vec<T>, Fault> {
+    let mut slots = Vec::new();
+    slots
+        .try_reserve(count)
+        .map_err(|_| Fault::allocation(AT))?;
+    Ok(slots)
 }
 
 /// Find the explicitly supplied bound for an original free coordinate.
@@ -222,6 +233,8 @@ struct Generated {
     exp: Option<super::ExpEvidence>,
     /// Route evidence for a positive-base power.
     power: Option<super::PowerEvidence>,
+    /// Separate symbolic and full-box derivative premises.
+    derivative: Option<super::DerivativeEvidence>,
 }
 
 /// Produce a single original operation after its operands have been scheduled.
@@ -315,6 +328,7 @@ fn node(
         log,
         exp,
         power: None,
+        derivative: None,
     })
 }
 
@@ -333,16 +347,18 @@ fn store_generated(
         &mut Vec<super::LogEvidence>,
         &mut Vec<super::ExpEvidence>,
         &mut Vec<super::PowerEvidence>,
+        &mut Vec<super::DerivativeEvidence>,
     ),
     bytes: u64,
     budget: &Budget,
 ) -> Result<Interval, Fault> {
-    let (logarithms, exponentials, powers) = stores;
+    let (logarithms, exponentials, powers, derivatives) = stores;
     if let Some(evidence) = generated.log {
         let size = bytes
             .saturating_add(super::log::bytes(logarithms))
             .saturating_add(super::exp::bytes(exponentials))
             .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::derivative::bytes(derivatives))
             .saturating_add(super::log::bytes(std::slice::from_ref(&evidence)));
         append(logarithms, evidence, size, budget)?;
     }
@@ -351,6 +367,7 @@ fn store_generated(
             .saturating_add(super::log::bytes(logarithms))
             .saturating_add(super::exp::bytes(exponentials))
             .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::derivative::bytes(derivatives))
             .saturating_add(super::exp::bytes(std::slice::from_ref(&evidence)));
         append(exponentials, evidence, size, budget)?;
     }
@@ -359,8 +376,18 @@ fn store_generated(
             .saturating_add(super::log::bytes(logarithms))
             .saturating_add(super::exp::bytes(exponentials))
             .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::derivative::bytes(derivatives))
             .saturating_add(super::power::bytes(std::slice::from_ref(&evidence)));
         append(powers, evidence, size, budget)?;
+    }
+    if let Some(evidence) = generated.derivative {
+        let size = bytes
+            .saturating_add(super::log::bytes(logarithms))
+            .saturating_add(super::exp::bytes(exponentials))
+            .saturating_add(super::power::bytes(powers))
+            .saturating_add(super::derivative::bytes(derivatives))
+            .saturating_add(super::derivative::bytes(std::slice::from_ref(&evidence)));
+        append(derivatives, evidence, size, budget)?;
     }
     Ok(generated.bound)
 }
@@ -397,5 +424,80 @@ fn power_node(
         power: Some(result.evidence),
         log: result.log,
         exp: result.exp,
+        derivative: None,
+    })
+}
+
+/// Select only the completed laws actually present in the generated transcript.
+fn transcript_law(
+    cas: &Cas,
+    request: &EnclosureRequest,
+    families: (bool, bool, bool, bool),
+) -> Result<super::EnclosureLaw, Fault> {
+    let (logs, exps, powers, derivatives) = families;
+    if derivatives {
+        return Ok(super::EnclosureLaw::SmoothDerivative);
+    }
+    Ok(if powers {
+        super::EnclosureLaw::PositivePower
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_saturation
+        == 2
+    {
+        super::EnclosureLaw::TanhCompose
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_saturation
+        == 1
+    {
+        super::EnclosureLaw::SigmoidCompose
+    } else if !exps {
+        law(cas, request, logs)?
+    } else {
+        super::EnclosureLaw::ExpTaylor
+    })
+}
+
+/// A derivative proposal covers exactly its original operand subtree.
+fn derivative_node(
+    cas: &Cas,
+    expression: &crate::graph::Expression,
+    source: (&[LogicalId], &[Interval], usize),
+    grid: u32,
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<Generated, Fault> {
+    let Operator::Derivative(coordinate) = &expression.operator else {
+        return Err(invalid());
+    };
+    let (schedule, records, index) = source;
+    let count = usize::try_from(cas.state.expression(expression.operands[0])?.unfolded)
+        .map_err(|_| invalid())?;
+    let first = index.checked_sub(count).ok_or_else(invalid)?;
+    let source = super::derivative::Segment {
+        cas,
+        schedule: &schedule[first..index],
+        values: &records[first..index],
+    };
+    let (bound, evidence) = super::derivative::produce(
+        source,
+        coordinate,
+        (
+            u32::try_from(index).map_err(|_| invalid())?,
+            u32::try_from(first).map_err(|_| invalid())?,
+            grid,
+        ),
+        budget,
+        interrupt,
+    )?;
+    Ok(Generated {
+        bound,
+        log: None,
+        exp: None,
+        power: None,
+        derivative: Some(evidence),
     })
 }

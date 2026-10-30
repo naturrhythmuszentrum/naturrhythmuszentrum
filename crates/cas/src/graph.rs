@@ -417,6 +417,8 @@ pub(crate) struct Expression {
     pub(crate) enclosure_roots: bool,
     /// Whether the original closure contains a positive-base rational power.
     pub(crate) enclosure_power: crate::enclosure::PowerShape,
+    /// Maximum first-derivative nesting in the original expression.
+    pub(crate) enclosure_derivative: u8,
     /// Whether the supported closure uses the logarithm law.
     pub(crate) enclosure_logs: bool,
     /// Present exponential family, with a conservative reduction bound when known.
@@ -1699,7 +1701,6 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let at = Location::new("expression admission");
         let header = self.resolve(state, &draft.header, locals)?;
         let operands = self.resolve_all(state, &draft.operands, locals, budget)?;
         let (depth, unfolded) =
@@ -1725,6 +1726,11 @@ impl Cas {
             crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
         let expression = Vertex::Expression(Expression {
             enclosure_exp,
+            enclosure_derivative: crate::enclosure::derivative_depth(
+                state,
+                &draft.operator,
+                &operands,
+            )?,
             enclosure_power,
             enclosure_saturation: crate::enclosure::saturation_metadata(
                 state,
@@ -1774,6 +1780,21 @@ impl Cas {
         for (position, operand) in operands.iter().enumerate() {
             edges.push((*operand, Edge::Operand(position_u32(position)?)));
         }
+        self.expression_binder(state, draft, &operands, pending, &mut edges, budget)?;
+        self.insert(state, expression, &edges, pending, budget)
+    }
+
+    /// Retain the original binder only after expression preflight has completed.
+    fn expression_binder(
+        &self,
+        state: &mut State,
+        draft: &ExpressionDraft,
+        operands: &[LogicalId],
+        pending: u64,
+        edges: &mut Vec<(LogicalId, Edge)>,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        let at = Location::new("expression admission");
         if let Some(binding) = &draft.binding {
             let mut bodies = Vec::new();
             bodies
@@ -1798,7 +1819,7 @@ impl Cas {
             )?;
             edges.push((binder, Edge::Binder));
         }
-        self.insert(state, expression, &edges, pending, budget)
+        Ok(())
     }
 
     /// Validate distinct occurrences and atomically reserve their parent links.
