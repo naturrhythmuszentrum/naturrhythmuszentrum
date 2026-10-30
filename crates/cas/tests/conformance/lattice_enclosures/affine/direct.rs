@@ -100,8 +100,11 @@ fn lattice_direct_coordinate_boxes() -> TestResult {
             checked.basis_proofs()[0],
             *basis.inverse().nonsingularity().proof()
         );
-        assert_eq!(case.cas.counts(), before);
-        assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        let published = kind != 2 && kind != 3;
+        crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
+        if !published {
+            assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        }
     }
     Ok(())
 }
@@ -194,8 +197,11 @@ fn lattice_direct_coordinate_work() -> TestResult {
             }
             assert!(budget.usage().work > 37);
             assert_eq!(budget.limits(), &limits);
-            assert_eq!(case.cas.counts(), before);
-            assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+            let published = (kind != 2 && kind != 3) && short == 0;
+            crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
+            if !published {
+                assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+            }
         }
     }
     Ok(())

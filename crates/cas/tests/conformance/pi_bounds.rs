@@ -21,6 +21,20 @@ pub(super) fn cycle() -> TestResult<PiBoundCertificate> {
     })
 }
 
+/// A successful cycle citation moves exactly one 936-byte Machin judgment into the graph.
+pub(super) fn graph_after_citation(
+    cas: &nrz_cas::Cas,
+    mut expected: nrz_cas::syntax::GraphCounts,
+    published: bool,
+) {
+    if published {
+        expected.vertices += 1;
+        expected.edges += 2;
+        expected.payload_bytes += 936;
+    }
+    assert_eq!(cas.counts(), expected);
+}
+
 fn tight() -> TestResult<PiBoundCertificate> {
     Ok(PiBoundCertificate {
         version: 1,

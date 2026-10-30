@@ -123,8 +123,11 @@ fn lattice_original_boxes() -> TestResult {
             .cas
             .check_rational_box_enclosure(&request, &mut ledger()?)?;
         assert_eq!(checked.contract(), &request);
-        assert_eq!(case.cas.counts(), before);
-        assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        let published = kind >= 2;
+        crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
+        if !published {
+            assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        }
         if kind >= 2 {
             assert!(matches!(
                 checked.contract().coordinates[0].origin,
@@ -272,8 +275,11 @@ fn lattice_original_box_work() -> TestResult {
             }
             assert!(budget.usage().work > 37);
             assert_eq!(budget.limits(), &limits);
-            assert_eq!(case.cas.counts(), before);
-            assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+            let published = kind >= 2 && short == 0;
+            crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
+            if !published {
+                assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+            }
         }
     }
     Ok(())
@@ -284,9 +290,9 @@ fn lattice_original_box_work() -> TestResult {
 #[test]
 fn lattice_original_box_output() -> TestResult {
     for (kind, bytes) in [(1, 1_840), (2, 1_592)] {
-        let (mut case, request) = fixture(kind)?;
-        let before = case.cas.counts();
         for short in [0, 1] {
+            let (mut case, request) = fixture(kind)?;
+            let before = case.cas.counts();
             let mut budget = Budget::new(Limits {
                 output_bytes: bytes - short,
                 ..Limits::default()
@@ -307,7 +313,8 @@ fn lattice_original_box_output() -> TestResult {
                 ));
                 assert_eq!(fault.location.operation, "original rational box enclosure");
             }
-            assert_eq!(case.cas.counts(), before);
+            let published = kind >= 2 && short == 0;
+            crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
         }
     }
     Ok(())

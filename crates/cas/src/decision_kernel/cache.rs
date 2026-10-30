@@ -15,7 +15,7 @@ use crate::budget::{Budget, BudgetKind};
 use crate::encoding::Encoder;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::exact_constant::ExactConstant;
-use crate::graph::{Cas, PendingScalar, ScalarInventory, size};
+use crate::graph::{Cas, PendingJudgment, ScalarInventory, size};
 
 /// Complete key construction, comparison and retained ownership share one location.
 const AT: Location = Location::new("checked scalar records");
@@ -32,12 +32,10 @@ pub(crate) struct Cache {
     /// Any rollback invalidates the complete inventory before logical IDs can recur.
     epoch: u64,
     /// Attempt-local checked inventories move into the graph only after final receipt copying.
-    pending: Vec<PendingScalar>,
+    pending: Vec<PendingJudgment>,
     /// Nested receipt scopes share the outer attempt and never publish an inner prefix.
     depth: usize,
-    /// Complete checked constant certificates share the same source-store lifetime.
-    pi: Vec<pi::Entry>,
-    /// Remaining Pi retention and unpublished scalar payload; committed scalars live in State.
+    /// Only unpublished scalar and Machin payload; committed judgments live in `State`.
     bytes: u64,
 }
 
@@ -45,7 +43,6 @@ impl Cache {
     /// Expired checked judgments cannot retain reusable authority or storage.
     pub(crate) fn clear(&mut self) {
         self.pending = Vec::new();
-        self.pi = Vec::new();
         self.bytes = 0;
     }
 }
@@ -101,7 +98,6 @@ pub(crate) fn atomic<T>(
         let cache = records(cas)?;
         Snapshot {
             records: cache.pending.len(),
-            pi: cache.pi.len(),
             bytes: cache.bytes,
         }
     };
@@ -110,7 +106,6 @@ pub(crate) fn atomic<T>(
     if result.is_err() {
         let mut cache = records(cas)?;
         restore_entries(&mut cache.pending, snapshot.records);
-        restore_entries(&mut cache.pi, snapshot.pi);
         cache.bytes = snapshot.bytes;
         drop(cache);
         budget.checked_records.restore(&cas.memo_owner, reservation);
@@ -129,8 +124,6 @@ fn restore_entries<T>(entries: &mut Vec<T>, count: usize) {
 struct Snapshot {
     /// Number of exact scalar inventories already checked before the attempt.
     records: usize,
-    /// Number of complete Machin judgments already checked before the attempt.
-    pi: usize,
     /// Existing conservative store-owned retention.
     bytes: u64,
 }
@@ -181,14 +174,22 @@ pub(super) fn lookup(
         return Ok(Some(values));
     }
     let cache = records(cas)?;
-    budget.work(
-        size(key.len(), AT)?.saturating_mul(size(cache.pending.len(), AT)?),
-        AT,
-    )?;
+    let pending = cache
+        .pending
+        .iter()
+        .filter(|entry| {
+            matches!(
+                entry,
+                PendingJudgment::NewScalar(_) | PendingJudgment::RecheckedScalar(_)
+            )
+        })
+        .count();
+    budget.work(size(key.len(), AT)?.saturating_mul(size(pending, AT)?), AT)?;
     for entry in &cache.pending {
         let inventory = match entry {
-            PendingScalar::New(inventory) => inventory,
-            PendingScalar::Rechecked(id) => cas.scalar_inventory(*id)?,
+            PendingJudgment::NewScalar(inventory) => inventory,
+            PendingJudgment::RecheckedScalar(id) => cas.scalar_inventory(*id)?,
+            PendingJudgment::NewPi(_) | PendingJudgment::RecheckedPi(_) => continue,
         };
         if inventory.key.as_ref() == key {
             return Ok(Some(Arc::clone(&inventory.values)));
@@ -216,7 +217,7 @@ pub(super) fn insert(
             .pending
             .try_reserve_exact(1)
             .map_err(|_| Fault::allocation(AT))?;
-        cache.pending.push(PendingScalar::Rechecked(*id));
+        cache.pending.push(PendingJudgment::RecheckedScalar(*id));
         drop(cache);
         return Ok(());
     }
@@ -241,7 +242,6 @@ pub(super) fn insert(
         BudgetKind::Vertices,
         size(cas.counts().vertices, AT)?
             .saturating_add(size(cache.pending.len(), AT)?)
-            .saturating_add(size(cache.pi.len(), AT)?)
             .saturating_add(1),
         AT,
     )?;
@@ -254,12 +254,14 @@ pub(super) fn insert(
         .pending
         .try_reserve_exact(1)
         .map_err(|_| Fault::allocation(AT))?;
-    cache.pending.push(PendingScalar::New(ScalarInventory {
-        key: key.into(),
-        values: Arc::new(values),
-        scope,
-        bytes,
-    }));
+    cache
+        .pending
+        .push(PendingJudgment::NewScalar(ScalarInventory {
+            key: key.into(),
+            values: Arc::new(values),
+            scope,
+            bytes,
+        }));
     cache.bytes = total;
     drop(cache);
     Ok(())

@@ -131,8 +131,8 @@ fn enclosure(two_pi: bool) -> TestResult<(Cas, RationalEnclosure)> {
 fn constant_square_root_pi_enclosures() -> TestResult {
     for two_pi in [false, true] {
         let (mut cas, contract) = enclosure(two_pi)?;
-        let before = cas.canonical_snapshot(&mut ledger()?)?;
         cas.check_rational_enclosure(&contract, &mut ledger()?)?;
+        let before = cas.canonical_snapshot(&mut ledger()?)?;
         let mut inward = contract;
         inward.upper = inward.lower.clone();
         let Err(fault) = cas.check_rational_enclosure(&inward, &mut ledger()?) else {

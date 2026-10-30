@@ -144,7 +144,13 @@ fn replay(
             if certificate.version == 1 && matches!(record.law, ScalarKernelLaw::Input(_)) {
                 return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
             }
-            relations::check(cas, record, &certificate.records[..index], budget)?;
+            relations::check(
+                cas,
+                cas.checked(&certificate.expression)?,
+                record,
+                &certificate.records[..index],
+                budget,
+            )?;
             if let Some(cached) = cached {
                 return cached.get(index).cloned().ok_or_else(unsupported);
             }

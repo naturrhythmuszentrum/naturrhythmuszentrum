@@ -6,7 +6,7 @@ use crate::budget::Budget;
 use crate::error::Fault;
 use crate::graph::Cas;
 
-/// Defer all new scalar graph nodes until the outer operation and its final copy succeed.
+/// Defer all new checked graph nodes until the outer operation and its final copy succeed.
 pub(crate) fn attempt<T, E>(
     cas: &mut Cas,
     budget: &mut Budget,
@@ -22,7 +22,6 @@ where
         cache.depth += 1;
         Snapshot {
             records: cache.pending.len(),
-            pi: cache.pi.len(),
             bytes: cache.bytes,
         }
     };
@@ -42,7 +41,6 @@ where
     if result.is_err() && cas.memo_epoch == epoch {
         let mut cache = records(cas)?;
         restore_entries(&mut cache.pending, snapshot.records);
-        restore_entries(&mut cache.pi, snapshot.pi);
         cache.bytes = snapshot.bytes;
         drop(cache);
         budget.checked_records.restore(&cas.memo_owner, reservation);
@@ -61,7 +59,7 @@ fn publish(cas: &mut Cas, budget: &Budget) -> Result<(), Fault> {
         .get_mut()
         .map_err(|_| Fault::invalid(crate::error::InvalidCode::Reference, super::AT))?;
     let mut pending = std::mem::take(&mut cache.pending);
-    let result = cas.publish_scalar_judgments(&mut pending, budget);
+    let result = cas.publish_staged_judgments(&mut pending, budget);
     // Exclusive access and the successful poison check above preclude a new poison here.
     let cache = cas
         .receipt_records

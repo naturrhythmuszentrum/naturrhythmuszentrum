@@ -112,12 +112,12 @@ fn kernel_live_trace_work_boundary() -> TestResult {
         if work == 393_684 {
             assert_eq!(
                 source.source.frame.cas.counts().vertices,
-                graph.vertices + 1
+                graph.vertices + 2
             );
-            assert_eq!(source.source.frame.cas.counts().edges, graph.edges + 4);
+            assert_eq!(source.source.frame.cas.counts().edges, graph.edges + 6);
             assert_eq!(
                 source.source.frame.cas.counts().payload_bytes,
-                graph.payload_bytes + 12_258
+                graph.payload_bytes + 13_206
             );
         } else {
             assert_eq!(source.source.frame.cas.counts(), graph);

@@ -506,8 +506,8 @@ fn lattice_live_scalar_baseline() -> TestResult {
     assert_eq!(retired - current, 34);
     assert_eq!(budget.usage().work - retired, 1);
     assert_eq!(budget.usage().work, 282_392);
-    assert_eq!(graph_records.vertices, 35);
-    assert_eq!(graph_records.edges, 94);
+    assert_eq!(graph_records.vertices, 36);
+    assert_eq!(graph_records.edges, 96);
     assert_eq!(records.records(), 0);
     Ok(())
 }
@@ -614,8 +614,8 @@ fn kernel_live_baseline() -> TestResult {
     assert_eq!(heap.provenance_usage(), records);
     assert_eq!(capture, 2969);
     assert_eq!(budget.usage().work, 5748);
-    assert_eq!(before.vertices, 35);
-    assert_eq!(before.edges, 94);
+    assert_eq!(before.vertices, 36);
+    assert_eq!(before.edges, 96);
     assert_eq!(
         coordinates,
         [

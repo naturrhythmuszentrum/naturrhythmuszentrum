@@ -264,8 +264,8 @@ fn enclosure_for(mut cas: Cas, target: Handle) -> TestResult<(Cas, RationalEnclo
 #[test]
 fn constant_square_root_enclosures() -> TestResult {
     let (mut cas, contract) = enclosure()?;
-    let before = cas.canonical_snapshot(&mut ledger()?)?;
     cas.check_rational_enclosure(&contract, &mut ledger()?)?;
+    let before = cas.canonical_snapshot(&mut ledger()?)?;
     let mut inward = contract;
     inward.lower = Rational::from_ratio(3, 2, &mut ledger()?)?;
     let Err(fault) = cas.check_rational_enclosure(&inward, &mut ledger()?) else {
@@ -541,8 +541,18 @@ fn pin_enclosure(
         |budget| {
             let (mut cas, contract) = prepare()?;
             let before = cas.canonical_snapshot(&mut ledger()?)?;
+            let counts = cas.counts();
             let result = cas.check_rational_enclosure(&contract, budget);
-            assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
+            let published =
+                result.is_ok() && matches!(contract.origin, EnclosureOrigin::PiBound { .. });
+            if published {
+                assert_eq!(cas.counts().vertices, counts.vertices + 1);
+                assert_eq!(cas.counts().edges, counts.edges + 2);
+                assert_eq!(cas.counts().payload_bytes, counts.payload_bytes + 936);
+            } else {
+                assert_eq!(cas.counts(), counts);
+                assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
+            }
             Ok(result)
         },
         work,

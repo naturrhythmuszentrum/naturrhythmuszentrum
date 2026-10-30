@@ -1,28 +1,21 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Checked Machin judgments keyed by their complete borrowed canonical byte streams.
+//! Checked Machin judgments are graph-owned; pending payloads live only inside an attempt.
 
 use super::{accounting, records};
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, Location};
-use crate::graph::{Cas, size};
+use crate::graph::{Cas, LogicalId, PendingJudgment, PiInventory, size};
 use crate::pi_bounds::PiBoundCertificate;
 use crate::proof::CONSTANT_SCHEMAS;
+use std::sync::Arc;
 
-/// Each retained certificate comparison has a separate small Work charge.
+/// Complete borrowed canonical comparisons preserve the existing citation Work boundary.
 const AT: Location = Location::new("checked Machin certificate");
 
-/// Owning the canonical fields keeps the complete byte key without a duplicate encoding buffer.
-#[derive(Debug)]
-pub(super) struct Entry {
-    /// Only the independent finite certificate checker can establish these fields.
-    certificate: PiBoundCertificate,
-    /// Existing logical certificate ownership returned by the complete checker.
-    bytes: u64,
-}
-
-/// Cite a byte-identical checked theorem or run the unchanged full finite certificate checker.
+/// Cite authenticated graph evidence or independently reconstruct the complete finite theorem.
 pub(crate) fn validate(
     cas: &Cas,
+    original: LogicalId,
     certificate: &PiBoundCertificate,
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
@@ -34,40 +27,86 @@ pub(crate) fn validate(
         return Ok(bytes);
     }
     let bytes = certificate.validate(budget)?;
-    retain(cas, certificate, bytes, budget)?;
+    retain(cas, original, certificate, bytes, budget)?;
     Ok(bytes)
 }
 
-/// Byte iterators inspect every semantic field, including declared bounds and hidden sum digits.
+/// No warm encoding buffer is allocated; each inspected complete canonical key is prepaid.
 fn lookup(
     cas: &Cas,
     certificate: &PiBoundCertificate,
     budget: &mut Budget,
 ) -> Result<Option<u64>, Fault> {
+    let bytes = certificate.key_bytes(budget)?;
+    if cas.state.pi_judgments.current(cas) {
+        let count = size(cas.state.pi_judgments.len(), AT)?;
+        budget.work(bytes.saturating_mul(u64::from(count.bit_width())), AT)?;
+        if let Some((id, key)) = cas.state.pi_judgments.entry(certificate)?
+            && let Some(bytes) = cas.pi_judgment(id)?
+        {
+            let inventory = cas.pi_inventory(id)?;
+            if !Arc::ptr_eq(key, &inventory.certificate) {
+                return Err(Fault::invalid(crate::error::InvalidCode::Reference, AT));
+            }
+            return Ok(Some(bytes));
+        }
+    }
     let cache = records(cas)?;
-    let count = size(cache.pi.len(), AT)?;
-    budget.work(certificate.key_bytes(budget)?.saturating_mul(count), AT)?;
-    for entry in &cache.pi {
+    let count = cache
+        .pending
+        .iter()
+        .filter(|entry| {
+            matches!(
+                entry,
+                PendingJudgment::NewPi(_) | PendingJudgment::RecheckedPi(_)
+            )
+        })
+        .count();
+    budget.work(bytes.saturating_mul(size(count, AT)?), AT)?;
+    for entry in &cache.pending {
+        let inventory = match entry {
+            PendingJudgment::NewPi(inventory) => inventory,
+            PendingJudgment::RecheckedPi(id) => cas.pi_inventory(*id)?,
+            PendingJudgment::NewScalar(_) | PendingJudgment::RecheckedScalar(_) => continue,
+        };
         if certificate
             .canonical_key()?
-            .eq(entry.certificate.canonical_key()?)
+            .eq(inventory.certificate.canonical_key()?)
         {
-            return Ok(Some(entry.bytes));
+            return Ok(Some(inventory.bytes - 256));
         }
     }
     drop(cache);
     Ok(None)
 }
 
-/// The ordinary complete validation allowance covers retaining the already checked fields.
+/// The unchanged full-check allowance covers moving complete fields into staged graph ownership.
 fn retain(
     cas: &Cas,
+    original: LogicalId,
     certificate: &PiBoundCertificate,
     bytes: u64,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
+    cas.state.expression(original)?;
+    let _validated = certificate.canonical_key()?;
+    if let Some((id, key)) = cas.state.pi_judgments.entry(certificate)? {
+        let inventory = cas.pi_inventory(id)?;
+        if !Arc::ptr_eq(key, &inventory.certificate) {
+            return Err(Fault::invalid(crate::error::InvalidCode::Reference, AT));
+        }
+        let mut cache = records(cas)?;
+        cache
+            .pending
+            .try_reserve_exact(1)
+            .map_err(|_| Fault::allocation(AT))?;
+        cache.pending.push(PendingJudgment::RecheckedPi(id));
+        drop(cache);
+        return Ok(());
+    }
     let mut cache = records(cas)?;
-    let total = cache.bytes.saturating_add(bytes).saturating_add(256);
+    let bytes = bytes.saturating_add(256);
+    let total = cache.bytes.saturating_add(bytes);
     budget.check(
         BudgetKind::PayloadBytes,
         cas.counts().payload_bytes.saturating_add(total),
@@ -75,11 +114,8 @@ fn retain(
     )?;
     budget.check(
         BudgetKind::Vertices,
-        size(cache.pi.len(), AT)?
-            .saturating_add(
-                size(cas.state.scalar_judgments.len(), AT)?
-                    .saturating_add(size(cache.pending.len(), AT)?),
-            )
+        size(cas.counts().vertices, AT)?
+            .saturating_add(size(cache.pending.len(), AT)?)
             .saturating_add(1),
         AT,
     )?;
@@ -89,13 +125,14 @@ fn retain(
         budget,
     )?;
     cache
-        .pi
+        .pending
         .try_reserve_exact(1)
         .map_err(|_| Fault::allocation(AT))?;
-    cache.pi.push(Entry {
-        certificate: certificate.clone(),
+    cache.pending.push(PendingJudgment::NewPi(PiInventory {
+        certificate: Arc::new(certificate.clone()),
+        original,
         bytes,
-    });
+    }));
     cache.bytes = total;
     drop(cache);
     Ok(())

@@ -15,6 +15,7 @@ const AT: Location = Location::new("scalar kernel input coverage");
 /// Check both full-set endpoint relations and the separately proved nominal source.
 pub(super) fn check(
     cas: &crate::graph::Cas,
+    original: crate::graph::LogicalId,
     record: &ScalarKernelRecord,
     input: &ScalarKernelInput,
     budget: &mut Budget,
@@ -42,7 +43,7 @@ pub(super) fn check(
             certificate,
         } => {
             factor.check(budget, AT)?;
-            super::cache::validate_pi(cas, certificate, budget)?;
+            super::cache::validate_pi(cas, original, certificate, budget)?;
             relations::contains(record, &factor.mul(&certificate.lower, budget)?, budget)?;
             relations::contains(record, &factor.mul(&certificate.upper, budget)?, budget)
         }

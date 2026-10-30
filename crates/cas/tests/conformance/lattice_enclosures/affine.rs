@@ -135,8 +135,11 @@ fn lattice_affine_boxes() -> TestResult {
                 basis.left_inverse().proof().clone(),
             ]
         );
-        assert_eq!(case.cas.counts(), before);
-        assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        let published = kind < 5;
+        crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
+        if !published {
+            assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        }
     }
     Ok(())
 }
@@ -454,8 +457,11 @@ fn lattice_affine_box_work() -> TestResult {
             }
             assert!(budget.usage().work > 37);
             assert_eq!(budget.limits(), &limits);
-            assert_eq!(case.cas.counts(), before);
-            assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+            let published = kind < 5 && short == 0;
+            crate::conformance::pi_bounds::graph_after_citation(&case.cas, before, published);
+            if !published {
+                assert_eq!(case.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+            }
         }
     }
     Ok(())

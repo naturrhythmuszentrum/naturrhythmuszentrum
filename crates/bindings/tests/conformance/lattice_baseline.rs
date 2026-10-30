@@ -85,7 +85,7 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
     let mut receiver = Cas::new(Limits::default())?;
     let witness = receiver.inspect(&bytes, &mut replay)?;
     assert_eq!(replay.usage().work, 247_365);
-    assert_eq!(receiver.counts().vertices, 35);
+    assert_eq!(receiver.counts().vertices, 36);
     assert_eq!(witness.hypotheses().len(), 1);
     let error = selected
         .count(2, &mut ledger()?)
@@ -185,15 +185,17 @@ fn bindings_lattice_scalar_cumulative_work() -> TestResult {
     for (work, accepted) in [(247_382, true), (247_381, false)] {
         let mut receiver = Cas::new(Limits::default())?;
         let before = receiver.counts();
+        let snapshot = receiver.canonical_snapshot(&mut ledger()?)?;
         let mut budget = prior(work)?;
         let result = receiver.inspect(&bytes, &mut budget);
         if accepted {
             assert_eq!(result?.hypotheses().len(), 1);
-            assert_eq!(receiver.counts().vertices, 35);
+            assert_eq!(receiver.counts().vertices, 36);
             assert_eq!(budget.usage().work, work);
         } else {
             exhausted(&result.err().ok_or("short replay accepted")?.into())?;
             assert_eq!(receiver.counts(), before);
+            assert_eq!(receiver.canonical_snapshot(&mut ledger()?)?, snapshot);
         }
         assert!(budget.usage().work >= 17);
     }

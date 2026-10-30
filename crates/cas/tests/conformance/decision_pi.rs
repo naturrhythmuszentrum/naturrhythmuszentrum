@@ -96,7 +96,7 @@ fn decision_pi_closed_targets() -> TestResult {
             checked.constant_schema(),
             Some(&nrz_cas::proof::CONSTANT_SCHEMAS[0])
         );
-        assert_eq!(source.cas.counts(), before);
+        super::pi_bounds::graph_after_citation(&source.cas, before, true);
     }
     Ok(())
 }
@@ -211,8 +211,10 @@ fn decision_pi_resources() -> TestResult {
         }
         assert!(budget.usage().work > prior);
         assert_eq!(budget.limits(), &limits);
-        assert_eq!(source.cas.counts(), before);
-        assert_eq!(source.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        super::pi_bounds::graph_after_citation(&source.cas, before, accepted);
+        if !accepted {
+            assert_eq!(source.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
+        }
     }
     Ok(())
 }

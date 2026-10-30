@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked anonymous judgments use the graph's canonical index and evidence edges.
 
+mod pi;
+pub(crate) use pi::{PiIndex, PiInventory};
 mod scalar;
-pub(crate) use scalar::{PendingScalar, ScalarInventory};
+pub(crate) use scalar::{PendingJudgment, ScalarInventory};
 
 use super::{
     Cas, Edge, EdgeIndex, LogicalId, State, Undo, Vertex, VertexKind, size, storage_check,
@@ -22,6 +24,8 @@ pub(crate) enum AnonymousLemma {
     Constant(ConstantLemma),
     /// Complete checked scalar record inventory under the original scope.
     Scalar(scalar::ScalarLemma),
+    /// Complete finite Machin argument under the registered constant theorem.
+    Pi(pi::PiLemma),
 }
 
 impl AnonymousLemma {
@@ -31,6 +35,12 @@ impl AnonymousLemma {
         match self {
             Self::Constant(node) => node.key.len(),
             Self::Scalar(node) => node.inventory.key.len(),
+            Self::Pi(node) => node
+                .inventory
+                .certificate
+                .canonical_key()
+                .expect("validated key")
+                .count(),
         }
     }
 
@@ -39,6 +49,7 @@ impl AnonymousLemma {
         match self {
             Self::Constant(node) => crate::exact_constant::preparation_bytes(node.constant.value()),
             Self::Scalar(node) => Ok(node.inventory.bytes),
+            Self::Pi(node) => Ok(node.inventory.bytes),
         }
     }
 
@@ -50,6 +61,14 @@ impl AnonymousLemma {
                 out.byte(1)?;
                 out.unsigned(u64::from(crate::proof::RETAINED_SCHEMAS[1].version))?;
                 out.raw(&node.inventory.key)
+            }
+            Self::Pi(node) => {
+                out.byte(2)?;
+                out.unsigned(u64::from(crate::proof::CONSTANT_SCHEMAS[0].version))?;
+                for byte in node.inventory.certificate.canonical_key()? {
+                    out.byte(byte)?;
+                }
+                Ok(())
             }
         }
     }

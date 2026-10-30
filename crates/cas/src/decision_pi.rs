@@ -140,6 +140,7 @@ pub(super) fn validate(
     let bytes = 384_u64
         .saturating_add(crate::decision_kernel::cache::validate_pi(
             cas,
+            cas.checked(expression)?,
             certificate,
             budget,
         )?)

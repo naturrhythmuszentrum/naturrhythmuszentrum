@@ -44,6 +44,7 @@ pub(super) fn contains(
 /// Replay all domain and endpoint obligations for one complete scalar record.
 pub(super) fn check(
     cas: &crate::graph::Cas,
+    original: crate::graph::LogicalId,
     record: &ScalarKernelRecord,
     earlier: &[ScalarKernelRecord],
     budget: &mut Budget,
@@ -55,7 +56,7 @@ pub(super) fn check(
         return Err(invalid());
     }
     match &record.law {
-        ScalarKernelLaw::Input(value) => super::input::check(cas, record, value, budget),
+        ScalarKernelLaw::Input(value) => super::input::check(cas, original, record, value, budget),
         ScalarKernelLaw::Rational(value) => {
             value.check(budget, AT)?;
             contains(record, value, budget)

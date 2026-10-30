@@ -122,11 +122,11 @@ fn kernel_live_trace_lifecycle() -> TestResult {
     let traced = budget.usage().work;
     let trace_bytes = trace.retained_payload_bytes();
     records(&trace)?;
-    assert_eq!(source.frame.cas.counts().vertices, counts.vertices + 1);
-    assert_eq!(source.frame.cas.counts().edges, counts.edges + 4);
+    assert_eq!(source.frame.cas.counts().vertices, counts.vertices + 2);
+    assert_eq!(source.frame.cas.counts().edges, counts.edges + 6);
     assert_eq!(
         source.frame.cas.counts().payload_bytes,
-        counts.payload_bytes + 12_258
+        counts.payload_bytes + 13_206
     );
     let snapshot = &trace.inputs().operands()[0];
     let handle = snapshot.input().handle();

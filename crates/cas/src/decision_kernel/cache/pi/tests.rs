@@ -3,7 +3,7 @@
 
 use super::*;
 use crate::budget::Limits;
-use crate::decision_kernel::cache::{atomic, retained, synchronized};
+use crate::decision_kernel::cache::{atomic, attempt, retained, synchronized};
 use crate::encoding::Encoder;
 use crate::testing::common::TestResult;
 use crate::{FaultKind, InvalidCode, Rational};
@@ -28,11 +28,52 @@ fn certificate() -> TestResult<PiBoundCertificate> {
     })
 }
 
-/// Match the same guarded, atomic reservation used by both public enclosure origins.
-fn check(cas: &Cas, certificate: &PiBoundCertificate, budget: &mut Budget) -> Result<u64, Fault> {
-    synchronized(cas, budget, |budget| {
-        atomic(cas, budget, |budget| {
-            retained(cas, budget, |budget| validate(cas, certificate, budget))
+/// One original consumer anchors the graph's checked-evidence edge.
+fn store() -> TestResult<Cas> {
+    use crate::domain_model::HeaderDraft;
+    use crate::graph::{Draft, ExpressionDraft};
+    use crate::model::{AtomicSort, Constant, Environment, Field, Operator, Sort};
+    let mut cas = Cas::new(Limits::default())?;
+    cas.admit(
+        &[
+            Draft::Header(HeaderDraft::Core(Environment::default())),
+            Draft::Expression(ExpressionDraft {
+                space: None,
+                operator: Operator::Constant(Constant::Pi),
+                sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+                header: crate::graph::Reference::Local(0),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }),
+        ],
+        &mut ledger()?,
+    )?;
+    Ok(cas)
+}
+
+/// The finite theorem is context independent; this fixture cites its first original expression.
+fn anchor(cas: &Cas) -> LogicalId {
+    *cas.state
+        .indices
+        .keys()
+        .find(|id| id.kind == crate::graph::VertexKind::Expression)
+        .expect("fixture original expression")
+}
+
+/// Match the same guarded attempt and cumulative reservation used by public enclosures.
+fn check(
+    cas: &mut Cas,
+    certificate: &PiBoundCertificate,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
+    attempt(cas, budget, |cas, budget| {
+        synchronized(cas, budget, |budget| {
+            atomic(cas, budget, |budget| {
+                retained(cas, budget, |budget| {
+                    validate(cas, anchor(cas), certificate, budget)
+                })
+            })
         })
     })
 }
@@ -71,16 +112,22 @@ fn machin_cache_canonical_byte_view() -> TestResult {
 /// ´claim:cas:machin-cache-reuses-certificate´
 #[test]
 fn machin_cache_reuses_certificate() -> TestResult {
-    let cas = Cas::new(Limits::default())?;
+    let mut cas = store()?;
     let certificate = certificate()?;
+    let before = cas.counts();
     let mut cold = ledger()?;
-    assert_eq!(check(&cas, &certificate, &mut cold)?, 680);
+    assert_eq!(check(&mut cas, &certificate, &mut cold)?, 680);
+    let committed = cas.canonical_snapshot(&mut ledger()?)?;
     let mut warm = ledger()?;
-    assert_eq!(check(&cas, &certificate, &mut warm)?, 680);
+    assert_eq!(check(&mut cas, &certificate, &mut warm)?, 680);
+    assert_eq!(cas.counts().vertices, before.vertices + 1);
+    assert_eq!(cas.counts().edges, before.edges + 2);
+    assert_eq!(cas.counts().payload_bytes, before.payload_bytes + 936);
+    assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, committed);
     assert_eq!(cold.usage().work, 17_499);
     assert_eq!(warm.usage().work, 70);
-    assert_eq!(records(&cas)?.pi.len(), 1);
-    assert_eq!(records(&cas)?.bytes, 936);
+    assert_eq!(cas.state.pi_judgments.len(), 1);
+    assert_eq!(cas.retained_judgment_bytes(), 936);
     assert_eq!(warm.checked_records.bytes, 1_000);
     let mut independent = ledger()?;
     certificate.check(&mut independent)?;
@@ -127,20 +174,20 @@ fn change(certificate: &mut PiBoundCertificate, kind: u8) -> TestResult<InvalidC
 /// ´claim:cas:machin-cache-forged-fields´
 #[test]
 fn machin_cache_forged_fields() -> TestResult {
-    let cas = Cas::new(Limits::default())?;
+    let mut cas = store()?;
     let original = certificate()?;
-    check(&cas, &original, &mut ledger()?)?;
+    check(&mut cas, &original, &mut ledger()?)?;
     for kind in 0..6 {
         let mut changed = original.clone();
         let expected = change(&mut changed, kind)?;
         assert!(!original.canonical_key()?.eq(changed.canonical_key()?));
-        let Err(fault) = check(&cas, &changed, &mut ledger()?) else {
+        let Err(fault) = check(&mut cas, &changed, &mut ledger()?) else {
             panic!("mutated Machin field must refuse at the finite checker");
         };
         assert_eq!(fault.kind, FaultKind::Invalid(expected));
         assert_eq!(fault.location, Location::new("Machin pi bounds"));
-        assert_eq!(records(&cas)?.pi.len(), 1);
-        assert_eq!(records(&cas)?.bytes, 936);
+        assert_eq!(cas.state.pi_judgments.len(), 1);
+        assert_eq!(cas.retained_judgment_bytes(), 936);
     }
     Ok(())
 }
@@ -150,12 +197,12 @@ fn machin_cache_forged_fields() -> TestResult {
 /// ´claim:cas:machin-cache-owner-and-rollback´
 #[test]
 fn machin_cache_owner_and_rollback() -> TestResult {
-    let mut cas = Cas::new(Limits::default())?;
+    let mut cas = store()?;
     let certificate = certificate()?;
-    check(&cas, &certificate, &mut ledger()?)?;
-    let fresh = Cas::new(Limits::default())?;
+    check(&mut cas, &certificate, &mut ledger()?)?;
+    let mut fresh = cas.full_copy_for_test();
     let mut independent = ledger()?;
-    check(&fresh, &certificate, &mut independent)?;
+    check(&mut fresh, &certificate, &mut independent)?;
     assert_eq!(independent.usage().work, 17_499);
     let Err(fault) = cas.transaction(&mut ledger()?, |cas, budget| {
         check(cas, &certificate, budget)?;
@@ -164,16 +211,16 @@ fn machin_cache_owner_and_rollback() -> TestResult {
         panic!("deliberate Machin transaction refusal");
     };
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
-    assert_eq!(records(&cas)?.pi.len(), 0);
+    assert_eq!(cas.state.pi_judgments.len(), 1);
     let mut after = ledger()?;
-    check(&cas, &certificate, &mut after)?;
+    check(&mut cas, &certificate, &mut after)?;
     assert_eq!(after.usage().work, 17_499);
     cas.memo_epoch = u64::MAX;
     for _ in 0..2 {
         let mut saturated = ledger()?;
-        check(&cas, &certificate, &mut saturated)?;
+        check(&mut cas, &certificate, &mut saturated)?;
         assert_eq!(saturated.usage().work, 17_499);
-        assert_eq!(records(&cas)?.pi.len(), 0);
+        assert_eq!(cas.state.pi_judgments.len(), 1);
     }
     Ok(())
 }
@@ -186,20 +233,20 @@ fn machin_cache_work_boundaries() -> TestResult {
     let certificate = certificate()?;
     for (warm, needed) in [(false, 17_516), (true, 87)] {
         for work in [needed, needed - 1] {
-            let cas = Cas::new(Limits::default())?;
+            let mut cas = store()?;
             if warm {
-                check(&cas, &certificate, &mut ledger()?)?;
+                check(&mut cas, &certificate, &mut ledger()?)?;
             }
             let mut budget = Budget::new(Limits {
                 work,
                 ..Limits::default()
             })?;
             budget.work(17, AT)?;
-            let result = check(&cas, &certificate, &mut budget);
+            let result = check(&mut cas, &certificate, &mut budget);
             if work == needed {
                 assert_eq!(result?, 680);
                 assert_eq!(budget.usage().work, needed);
-                assert_eq!(records(&cas)?.pi.len(), 1);
+                assert_eq!(cas.state.pi_judgments.len(), 1);
             } else {
                 let Err(fault) = result else {
                     panic!("complete Machin validation or citation must refuse below N");
@@ -208,7 +255,7 @@ fn machin_cache_work_boundaries() -> TestResult {
                     budget: BudgetKind::Work, limit, needed: actual, ..
                 } if limit == work && actual == needed));
                 assert!(budget.usage().work >= 17);
-                assert_eq!(records(&cas)?.pi.len(), usize::from(warm));
+                assert_eq!(cas.state.pi_judgments.len(), usize::from(warm));
                 assert_eq!(budget.checked_records.bytes, 0);
             }
         }
@@ -221,12 +268,12 @@ fn machin_cache_work_boundaries() -> TestResult {
 /// ´claim:cas:machin-cache-dyadic-citation´
 #[test]
 fn machin_cache_dyadic_citation() -> TestResult {
-    let cas = Cas::new(Limits::default())?;
+    let mut cas = store()?;
     let mut certificate = certificate()?;
     certificate.lower = Rational::from_ratio(3215, 1024, &mut ledger()?)?;
     certificate.upper = Rational::from_ratio(1609, 512, &mut ledger()?)?;
     let mut cold = ledger()?;
-    assert_eq!(check(&cas, &certificate, &mut cold)?, 692);
+    assert_eq!(check(&mut cas, &certificate, &mut cold)?, 692);
     assert_eq!(cold.usage().work, 18_019);
     for work in [90, 89] {
         let mut budget = Budget::new(Limits {
@@ -234,7 +281,7 @@ fn machin_cache_dyadic_citation() -> TestResult {
             ..Limits::default()
         })?;
         budget.work(17, AT)?;
-        let result = check(&cas, &certificate, &mut budget);
+        let result = check(&mut cas, &certificate, &mut budget);
         if work == 90 {
             assert_eq!(result?, 692);
             assert_eq!(budget.usage().work, 90);
@@ -262,7 +309,7 @@ fn machin_cache_dyadic_citation() -> TestResult {
 /// ´claim:cas:machin-cache-late-refusal´
 #[test]
 fn machin_cache_late_refusal() -> TestResult {
-    let cas = Cas::new(Limits::default())?;
+    let cas = store()?;
     let certificate = certificate()?;
     let mut budget = Budget::new(Limits {
         work: 17_499,
@@ -271,7 +318,7 @@ fn machin_cache_late_refusal() -> TestResult {
     let Err(fault) = synchronized(&cas, &mut budget, |budget| {
         atomic(&cas, budget, |budget| {
             retained(&cas, budget, |budget| {
-                validate(&cas, &certificate, budget)?;
+                validate(&cas, anchor(&cas), &certificate, budget)?;
                 budget.work(1, AT)
             })
         })
@@ -289,9 +336,9 @@ fn machin_cache_late_refusal() -> TestResult {
     ));
     assert_eq!(budget.usage().work, 17_499);
     assert_eq!(budget.checked_records.bytes, 0);
-    assert_eq!(records(&cas)?.pi.len(), 0);
-    assert_eq!(records(&cas)?.bytes, 0);
-    assert_eq!(records(&cas)?.pi.capacity(), 0);
+    assert_eq!(cas.state.pi_judgments.len(), 0);
+    assert_eq!(cas.retained_judgment_bytes(), 0);
+    assert_eq!(records(&cas)?.pending.capacity(), 0);
     Ok(())
 }
 
@@ -300,9 +347,9 @@ fn machin_cache_late_refusal() -> TestResult {
 /// ´claim:cas:machin-cache-refusal-releases-growth´
 #[test]
 fn machin_cache_refusal_releases_growth() -> TestResult {
-    let cas = Cas::new(Limits::default())?;
+    let mut cas = store()?;
     let original = certificate()?;
-    check(&cas, &original, &mut ledger()?)?;
+    check(&mut cas, &original, &mut ledger()?)?;
     let mut budget = ledger()?;
     let Err(fault) = synchronized(&cas, &mut budget, |budget| {
         atomic(&cas, budget, |budget| {
@@ -310,7 +357,7 @@ fn machin_cache_refusal_releases_growth() -> TestResult {
                 for lower in -8..0 {
                     let mut changed = original.clone();
                     changed.lower = Rational::from_ratio(lower, 1, budget)?;
-                    validate(&cas, &changed, budget)?;
+                    validate(&cas, anchor(&cas), &changed, budget)?;
                 }
                 Err::<(), _>(Fault::invalid(InvalidCode::Reference, AT))
             })
@@ -319,13 +366,13 @@ fn machin_cache_refusal_releases_growth() -> TestResult {
         panic!("deliberate enclosing refusal must discard all new Machin judgments");
     };
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
-    assert_eq!(records(&cas)?.pi.len(), 1);
-    assert_eq!(records(&cas)?.pi.capacity(), 1);
-    assert_eq!(records(&cas)?.bytes, 936);
+    assert_eq!(cas.state.pi_judgments.len(), 1);
+    assert_eq!(records(&cas)?.pending.capacity(), 0);
+    assert_eq!(cas.retained_judgment_bytes(), 936);
     assert_eq!(budget.checked_records.bytes, 0);
     assert!(budget.usage().work > 17_499);
     let mut citation = ledger()?;
-    check(&cas, &original, &mut citation)?;
+    check(&mut cas, &original, &mut citation)?;
     assert_eq!(citation.usage().work, 70);
     Ok(())
 }
@@ -335,8 +382,8 @@ fn machin_cache_refusal_releases_growth() -> TestResult {
 /// ´claim:cas:machin-cache-storage-boundaries´
 #[test]
 fn machin_cache_storage_boundaries() -> TestResult {
-    let cas = Cas::new(Limits::default())?;
-    check(&cas, &certificate()?, &mut ledger()?)?;
+    let mut cas = store()?;
+    check(&mut cas, &certificate()?, &mut ledger()?)?;
     for bytes in [1_001, 1_000] {
         let limits = Limits {
             staged_payload_bytes: bytes,
@@ -366,7 +413,66 @@ fn machin_cache_storage_boundaries() -> TestResult {
         }
         assert_eq!(budget.limits(), &limits);
         assert_eq!(budget.usage().work, 0);
-        assert_eq!(records(&cas)?.bytes, 936);
+        assert_eq!(cas.retained_judgment_bytes(), 936);
     }
+    Ok(())
+}
+
+/// A warm Machin citation authenticates the actual incoming graph edge before reuse.
+/// ´test:unit:machin-graph-evidence-authentication´
+/// ´claim:cas:machin-graph-evidence-authentication´
+#[test]
+fn machin_graph_evidence_authentication() -> TestResult {
+    let mut cas = store()?;
+    let certificate = certificate()?;
+    check(&mut cas, &certificate, &mut ledger()?)?;
+    let id = cas
+        .state
+        .pi_judgments
+        .get(&certificate)?
+        .ok_or("Machin node")?;
+    let source = cas.pi_inventory(id)?.original;
+    let edge = cas
+        .state
+        .graph
+        .find_edge(cas.state.indices[&source], cas.state.indices[&id])
+        .ok_or("checked evidence edge")?;
+    cas.state.graph.remove_edge(edge);
+    let before = cas.canonical_snapshot(&mut ledger()?)?;
+    let Err(fault) = check(&mut cas, &certificate, &mut ledger()?) else {
+        panic!("missing Machin checked evidence must refuse");
+    };
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
+    assert_eq!(fault.location, AT);
+    assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
+    Ok(())
+}
+
+/// A later consumer refusal discards the staged Machin node and keeps its full checking Work.
+/// ´test:unit:machin-graph-enclosing-refusal´
+/// ´claim:cas:machin-graph-enclosing-refusal´
+#[test]
+fn machin_graph_enclosing_refusal() -> TestResult {
+    let mut cas = store()?;
+    let certificate = certificate()?;
+    let before = cas.canonical_snapshot(&mut ledger()?)?;
+    let mut budget = ledger()?;
+    let Err(fault) = attempt(&mut cas, &mut budget, |cas, budget| {
+        check(cas, &certificate, budget)?;
+        Err::<(), _>(Fault::invalid(InvalidCode::Reference, AT))
+    }) else {
+        panic!("enclosing consumer must refuse after complete finite checking");
+    };
+    assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
+    assert_eq!(fault.location, AT);
+    assert_eq!(budget.usage().work, 17_499);
+    assert_eq!(budget.checked_records.bytes, 0);
+    assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
+    assert_eq!(cas.retained_judgment_count(), 0);
+    assert_eq!(cas.state.pi_judgments.len(), 0);
+    let cache = records(&cas)?;
+    assert_eq!(cache.pending.len(), 0);
+    assert_eq!(cache.pending.capacity(), 0);
+    drop(cache);
     Ok(())
 }

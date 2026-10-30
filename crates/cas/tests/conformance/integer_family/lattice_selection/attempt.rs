@@ -9,14 +9,13 @@ use nrz_cas::lattice::{
 use nrz_cas::limits::{Budget, BudgetKind, Limits};
 use nrz_cas::{Cas, FaultKind, InvalidCode, Location, Rational};
 
-/// Whole-box torus and phase straddles return typed undecided with the last complete valid evidence.
+/// A valid torus or phase preparation retains its Machin judgment even when the later cut is undecided.
 /// ´test:integration:lattice-tuple-undecided-evidence´
 #[test]
 fn lattice_tuple_undecided_evidence() -> TestResult {
     for kind in [0, 3] {
         let mut source = prepared(kind)?;
         let before = source.source.frame.cas.counts();
-        let snapshot = source.source.frame.cas.canonical_snapshot(&mut ledger()?)?;
         let mut preparation = ledger()?;
         preparation.work(37, Location::new("prior lattice preparation"))?;
         let attempt = source.source.frame.cas.prepare_lattice_selection(
@@ -43,6 +42,7 @@ fn lattice_tuple_undecided_evidence() -> TestResult {
         let cut = attempt.cut(0).ok_or("missing attempted cut")?;
         assert_eq!(cut.candidate, &source.expected.values[0]);
         assert_eq!(attempt.cut(source.expected.values.len()), None);
+        let snapshot = source.source.frame.cas.canonical_snapshot(&mut ledger()?)?;
         let mut budget = preparation;
         let LatticeSelectionOutcome::Undecided(outcome) = source
             .source
@@ -57,7 +57,7 @@ fn lattice_tuple_undecided_evidence() -> TestResult {
         assert_eq!(outcome.spent_work, budget.usage().work);
         assert!(outcome.spent_work > attempt.spent_work());
         assert_eq!(outcome.fault.location.operation, "lattice tuple selection");
-        assert_eq!(source.source.frame.cas.counts(), before);
+        crate::conformance::pi_bounds::graph_after_citation(&source.source.frame.cas, before, true);
         assert_eq!(
             source.source.frame.cas.canonical_snapshot(&mut ledger()?)?,
             snapshot
@@ -155,7 +155,7 @@ fn lattice_tuple_undecided_budget() -> TestResult {
     Ok(())
 }
 
-/// Preparation has exact N/N−1 boundaries including prior Work, without publishing graph records.
+/// Preparation admits a checked Machin node at N; its N−1 refusal preserves every graph byte.
 /// ´test:integration:lattice-tuple-attempt-work´
 /// ´claim:cas:lattice-tuple-attempt-work´
 #[test]
@@ -201,11 +201,18 @@ fn lattice_tuple_attempt_work() -> TestResult {
                 assert!(budget.usage().work <= amount);
             }
             assert_eq!(budget.limits(), &limits);
-            assert_eq!(source.source.frame.cas.counts(), before);
-            assert_eq!(
-                source.source.frame.cas.canonical_snapshot(&mut ledger()?)?,
-                snapshot
+            let published = kind < 5 && succeeds;
+            crate::conformance::pi_bounds::graph_after_citation(
+                &source.source.frame.cas,
+                before,
+                published,
             );
+            if !published {
+                assert_eq!(
+                    source.source.frame.cas.canonical_snapshot(&mut ledger()?)?,
+                    snapshot
+                );
+            }
         }
     }
     Ok(())

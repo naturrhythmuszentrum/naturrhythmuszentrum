@@ -25,7 +25,7 @@ use crate::source_model::{SourceForm, SourceFormDraft};
 
 mod intern;
 mod lemmas;
-pub(crate) use lemmas::{PendingScalar, ScalarInventory};
+pub(crate) use lemmas::{PendingJudgment, PiIndex, PiInventory, ScalarInventory};
 
 pub(crate) use intern::InterningSnapshot;
 use intern::{InternIndex, StoreToken};
@@ -798,6 +798,13 @@ enum Undo {
         /// Shared canonical key, also owned by the graph node.
         key: Arc<[u8]>,
     },
+    /// Remove a complete Machin key when its graph node is rolled back.
+    PiJudgment {
+        /// Logical identity reserved for the checked node.
+        id: LogicalId,
+        /// Immutable canonical fields shared with the graph payload.
+        certificate: Arc<crate::pi_bounds::PiBoundCertificate>,
+    },
     /// A newly claimed source name.
     Source(String),
     /// A previously parentless occurrence assigned to a new parent.
@@ -833,6 +840,8 @@ pub(crate) struct State {
     pub(crate) intern: InternIndex,
     /// Kind-specific scalar keys index graph nodes without retaining a second checked payload.
     pub(crate) scalar_judgments: BTreeMap<Arc<[u8]>, LogicalId>,
+    /// Complete Machin keys index only the authoritative anonymous graph nodes.
+    pub(crate) pi_judgments: PiIndex,
     /// Immutable policy identity lookup, independent of unrelated graph records.
     pub(crate) policies: BTreeMap<(String, u32), LogicalId>,
     /// Next serial per kind, independent of graph indices.
@@ -863,6 +872,7 @@ impl State {
             indices: BTreeMap::new(),
             intern: InternIndex::default(),
             scalar_judgments: BTreeMap::new(),
+            pi_judgments: PiIndex::default(),
             policies: BTreeMap::new(),
             next: BTreeMap::new(),
             sources: BTreeMap::new(),
@@ -961,6 +971,10 @@ impl State {
             Undo::ScalarJudgment { id, key } => {
                 self.indices.remove(&id);
                 self.scalar_judgments.remove(key.as_ref());
+            }
+            Undo::PiJudgment { id, certificate } => {
+                self.indices.remove(&id);
+                self.pi_judgments.remove(certificate);
             }
             Undo::Source(key) => {
                 self.sources.remove(&key);

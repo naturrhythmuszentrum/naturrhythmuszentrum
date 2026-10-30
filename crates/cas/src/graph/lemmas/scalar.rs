@@ -27,11 +27,15 @@ pub(crate) struct ScalarInventory {
 
 /// Only a successful enclosing attempt can turn staged evidence into a graph node.
 #[derive(Debug)]
-pub(crate) enum PendingScalar {
+pub(crate) enum PendingJudgment {
     /// A new complete statement with independently checked values.
-    New(ScalarInventory),
+    NewScalar(ScalarInventory),
     /// An earlier node independently rechecked after rollback or store copying.
-    Rechecked(LogicalId),
+    RecheckedScalar(LogicalId),
+    /// Complete newly checked finite Machin argument.
+    NewPi(super::PiInventory),
+    /// Earlier Machin node independently rechecked in this namespace.
+    RecheckedPi(LogicalId),
 }
 
 /// Graph-owned scalar evidence carries the same namespace authentication as constants.
@@ -93,9 +97,9 @@ impl Cas {
     }
 
     /// Preflight the entire staged suffix before publishing any node or refreshing any epoch.
-    pub(crate) fn publish_scalar_judgments(
+    pub(crate) fn publish_staged_judgments(
         &mut self,
-        pending: &mut Vec<PendingScalar>,
+        pending: &mut Vec<PendingJudgment>,
         budget: &Budget,
     ) -> Result<u64, Fault> {
         if pending.is_empty() {
@@ -103,11 +107,17 @@ impl Cas {
         }
         let count = pending
             .iter()
-            .filter(|entry| matches!(entry, PendingScalar::New(_)))
+            .filter(|entry| {
+                matches!(
+                    entry,
+                    PendingJudgment::NewScalar(_) | PendingJudgment::NewPi(_)
+                )
+            })
             .count();
         let bytes = pending.iter().fold(0_u64, |total, entry| match entry {
-            PendingScalar::New(inventory) => total.saturating_add(inventory.bytes),
-            PendingScalar::Rechecked(_) => total,
+            PendingJudgment::NewScalar(inventory) => total.saturating_add(inventory.bytes),
+            PendingJudgment::NewPi(inventory) => total.saturating_add(inventory.bytes),
+            PendingJudgment::RecheckedScalar(_) | PendingJudgment::RecheckedPi(_) => total,
         });
         preflight(self, pending, count, bytes, budget)?;
         if let Some(journal) = &mut self.state.journal {
@@ -122,22 +132,30 @@ impl Cas {
             .copied()
             .unwrap_or(0);
         for entry in pending.iter() {
-            if let PendingScalar::New(inventory) = entry {
-                let id = LogicalId {
-                    kind: VertexKind::AnonymousLemma,
-                    serial,
-                };
-                self.state.record(Undo::ScalarJudgment {
+            let id = LogicalId {
+                kind: VertexKind::AnonymousLemma,
+                serial,
+            };
+            let undo = match entry {
+                PendingJudgment::NewScalar(inventory) => Undo::ScalarJudgment {
                     id,
                     key: Arc::clone(&inventory.key),
-                })?;
-                serial += 1;
-            }
+                },
+                PendingJudgment::NewPi(inventory) => Undo::PiJudgment {
+                    id,
+                    certificate: Arc::clone(&inventory.certificate),
+                },
+                PendingJudgment::RecheckedScalar(_) | PendingJudgment::RecheckedPi(_) => continue,
+            };
+            self.state.record(undo)?;
+            serial += 1;
         }
         for entry in std::mem::take(pending) {
             match entry {
-                PendingScalar::New(inventory) => append(self, inventory),
-                PendingScalar::Rechecked(id) => {
+                PendingJudgment::NewScalar(inventory) => append(self, inventory),
+                PendingJudgment::NewPi(inventory) => super::pi::append(self, inventory),
+                PendingJudgment::RecheckedPi(id) => self.refresh_pi(id),
+                PendingJudgment::RecheckedScalar(id) => {
                     let index = self.state.indices[&id];
                     if let Vertex::AnonymousLemma(node) = &mut self.state.graph[index]
                         && let AnonymousLemma::Scalar(node) = node.as_mut()
@@ -155,14 +173,21 @@ impl Cas {
 /// All fallible bounds and original references precede the first graph edit.
 fn preflight(
     cas: &Cas,
-    pending: &[PendingScalar],
+    pending: &[PendingJudgment],
     count: usize,
     bytes: u64,
     budget: &Budget,
 ) -> Result<(), Fault> {
     let count = size(count, AT)?;
     let nodes = size(cas.state.graph.node_count(), AT)?.saturating_add(count);
-    let edges = size(cas.state.graph.edge_count(), AT)?.saturating_add(count.saturating_mul(4));
+    let added_edges = pending.iter().fold(0_u64, |total, entry| {
+        total.saturating_add(match entry {
+            PendingJudgment::NewScalar(_) => 4,
+            PendingJudgment::NewPi(_) => 2,
+            PendingJudgment::RecheckedScalar(_) | PendingJudgment::RecheckedPi(_) => 0,
+        })
+    });
+    let edges = size(cas.state.graph.edge_count(), AT)?.saturating_add(added_edges);
     for (kind, amount) in [
         (BudgetKind::Vertices, nodes),
         (BudgetKind::StagedVertices, nodes),
@@ -187,12 +212,19 @@ fn preflight(
         .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?;
     for entry in pending {
         match entry {
-            PendingScalar::New(inventory) => {
+            PendingJudgment::NewScalar(inventory) => {
                 for id in inventory.scope {
                     cas.state.node(id)?;
                 }
             }
-            PendingScalar::Rechecked(id) => {
+            PendingJudgment::NewPi(inventory) => {
+                cas.state.expression(inventory.original)?;
+                let _validated = inventory.certificate.canonical_key()?;
+            }
+            PendingJudgment::RecheckedPi(id) => {
+                cas.pi_inventory(*id)?;
+            }
+            PendingJudgment::RecheckedScalar(id) => {
                 cas.scalar_lemma(*id)?;
             }
         }
