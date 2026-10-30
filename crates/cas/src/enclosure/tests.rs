@@ -96,6 +96,9 @@ impl Fixture {
         Self::with_names(&["x"])
     }
     fn with_names(names: &[&str]) -> TestResult<Self> {
+        Self::with_names_and_limits(names, Limits::default())
+    }
+    fn with_names_and_limits(names: &[&str], limits: Limits) -> TestResult<Self> {
         let mut environment = Environment::default();
         for name in names {
             environment.declarations.push(Declaration {
@@ -104,7 +107,7 @@ impl Fixture {
                 sort: real(),
             });
         }
-        let mut cas = Cas::new(Limits::default())?;
+        let mut cas = Cas::new(limits)?;
         let drafts = [
             Draft::Header(HeaderDraft::Core(environment)),
             Draft::Region(RegionDraft {

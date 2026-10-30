@@ -4,6 +4,8 @@
 use super::*;
 use std::cmp::Ordering;
 
+mod precision;
+
 fn power_policy() -> RefinementPolicy {
     RefinementPolicy {
         checking_work: 0,

@@ -353,14 +353,16 @@ pub(crate) fn supported_shape(
         Operator::Derivative(_)
             if operands.len() == 1
                 && state.expression(operands[0])?.enclosure_derivative == 0
-                && state.expression(operands[0])?.enclosure_clamp == 0 =>
+                && state.expression(operands[0])?.enclosure_clamp
+                    == crate::enclosure::ClampShape::Smooth =>
         {
             1
         }
         Operator::GeneralizedDerivative(_)
             if operands.len() == 1
                 && state.expression(operands[0])?.enclosure_derivative == 0
-                && state.expression(operands[0])?.enclosure_clamp == 1 =>
+                && state.expression(operands[0])?.enclosure_clamp
+                    == crate::enclosure::ClampShape::Value =>
         {
             1
         }
@@ -379,7 +381,7 @@ pub(crate) fn supported_shape(
     }
     for id in operands {
         if !state.expression(*id)?.supported_enclosure
-            || state.expression(*id)?.enclosure_clamp == 2
+            || state.expression(*id)?.enclosure_clamp == crate::enclosure::ClampShape::Generalized
         {
             return Ok(false);
         }
@@ -619,16 +621,27 @@ pub(crate) fn derivative_depth(
     ))))
 }
 
+/// Closed original grammar states, ordered by propagation strength.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub(crate) enum ClampShape {
+    /// No clamp or generalized query occurs.
+    Smooth,
+    /// A clamp occurs without a generalized query.
+    Value,
+    /// A terminal generalized query occurs.
+    Generalized,
+}
+
 /// Distinguish clamp values and generalized derivatives in preflight metadata.
 pub(crate) fn clamp_metadata(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
-) -> Result<u8, crate::Fault> {
+) -> Result<ClampShape, crate::Fault> {
     let mut kind = match operator {
-        crate::model::Operator::ClampFloor => 1,
-        crate::model::Operator::GeneralizedDerivative(_) => 2,
-        _ => 0,
+        crate::model::Operator::ClampFloor => ClampShape::Value,
+        crate::model::Operator::GeneralizedDerivative(_) => ClampShape::Generalized,
+        _ => ClampShape::Smooth,
     };
     for id in operands {
         kind = kind.max(state.expression(*id)?.enclosure_clamp);
