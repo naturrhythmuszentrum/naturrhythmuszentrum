@@ -316,9 +316,6 @@ pub(crate) fn indexed_table(
 ) -> Result<IndexedTable, Fault> {
     let root_key = key(cas, &root, budget)?;
     let mut records = gather(cas, root, budget)?;
-    let mut assigned = BTreeMap::new();
-    let mut unique = BTreeMap::new();
-    let mut bytes = Vec::new();
     let rules: BTreeSet<_> = records
         .values()
         .filter_map(|record| record.source.rule)
@@ -335,19 +332,7 @@ pub(crate) fn indexed_table(
             record.rule_index = Some(index);
         }
     }
-    while !records.is_empty() {
-        let (id, descriptor) = take_ready(cas, &mut records, &assigned, budget)?;
-        let index = if let Some(index) = unique.get(&descriptor) {
-            *index
-        } else {
-            let index = u32::try_from(bytes.len()).map_err(|_| invalid())?;
-            bytes.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
-            bytes.push(descriptor.clone());
-            unique.insert(descriptor.clone(), index);
-            index
-        };
-        assigned.insert(id, (index, descriptor));
-    }
+    let (bytes, assigned) = order(cas, records, budget)?;
     let root = assigned.get(&root_key).ok_or_else(invalid)?.0;
     Ok((bytes, root, rules, assigned))
 }
@@ -492,9 +477,34 @@ fn reorder_rows(
     Ok(())
 }
 
+/// Assign canonical indices in structural Kahn order, coalescing byte-identical records.
+fn order(
+    cas: &Cas,
+    mut records: BTreeMap<Key, PendingRecord>,
+    budget: &mut Budget,
+) -> Result<(Vec<Vec<u8>>, Assignments), Fault> {
+    let mut assigned = BTreeMap::new();
+    let mut unique = BTreeMap::new();
+    let mut bytes = Vec::new();
+    while !records.is_empty() {
+        let (id, descriptor) = take_ready(cas, &mut records, &assigned, budget)?;
+        let index = if let Some(index) = unique.get(&descriptor) {
+            *index
+        } else {
+            let index = u32::try_from(bytes.len()).map_err(|_| invalid())?;
+            bytes.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+            bytes.push(descriptor.clone());
+            unique.insert(descriptor.clone(), index);
+            index
+        };
+        assigned.insert(id, (index, descriptor));
+    }
+    Ok((bytes, assigned))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{Entity, Key, Record, ready};
+    use super::{Entity, Key, PendingRecord, Record, order, ready};
     use crate::budget::{Budget, Limits};
     use crate::domain_model::Layer;
     use crate::graph::{Cas, LogicalId, VertexKind};
@@ -638,6 +648,110 @@ mod tests {
             assert_eq!(actual, descriptor);
         }
         Ok(())
+    }
+
+    /// Every insufficient ordering Work limit refuses without publishing a partial table.
+    /// ´claim:cas:ordering-refuses-below-every-work-boundary´
+    /// ´test:unit:ordering-refuses-below-every-work-boundary´
+    #[test]
+    fn ordering_refuses_below_every_work_boundary() -> Result<(), Box<dyn std::error::Error>> {
+        let cas = Cas::new(Limits::default())?;
+        let mut budget = Budget::new(Limits::default())?;
+        let expected = order(&cas, ordering_boundary_records(), &mut budget)?;
+        let work = budget.usage().work;
+        assert!(work > 0);
+        for limit in 0..work {
+            let mut refused = Budget::new(Limits {
+                work: limit,
+                ..Limits::default()
+            })?;
+            assert!(
+                order(&cas, ordering_boundary_records(), &mut refused).is_err(),
+                "ordering accepted Work limit {limit} below {work}"
+            );
+        }
+        let mut exact = Budget::new(Limits {
+            work,
+            ..Limits::default()
+        })?;
+        assert_eq!(
+            order(&cas, ordering_boundary_records(), &mut exact)?,
+            expected
+        );
+        assert_eq!(exact.usage().work, work);
+        Ok(())
+    }
+
+    /// Distinct object keys with identical descriptors share one backward reference index.
+    /// ´claim:cas:ordering-coalesces-identical-records´
+    /// ´test:unit:ordering-coalesces-identical-records´
+    #[test]
+    fn ordering_coalesces_identical_records() -> Result<(), Box<dyn std::error::Error>> {
+        let cas = Cas::new(Limits::default())?;
+        let mut budget = Budget::new(Limits::default())?;
+        let left = LogicalId {
+            kind: VertexKind::Region,
+            serial: 0,
+        };
+        let right = LogicalId {
+            kind: VertexKind::Region,
+            serial: 1,
+        };
+        let root = LogicalId {
+            kind: VertexKind::Region,
+            serial: 2,
+        };
+        let mut records = BTreeMap::new();
+        for id in [left, right] {
+            records.insert(
+                Key::Object(id),
+                PendingRecord::new(Arc::new(independent_record(1))),
+            );
+        }
+        let mut record = independent_record(2);
+        record.payload = vec![0; 8];
+        record.references = vec![(0, Entity::Object(left)), (4, Entity::Object(right))];
+        records.insert(Key::Object(root), PendingRecord::new(Arc::new(record)));
+        let (bytes, assigned) = order(&cas, records, &mut budget)?;
+        assert_eq!(bytes.len(), 2);
+        assert_eq!(assigned.get(&Key::Object(left)).ok_or("left index")?.0, 0);
+        assert_eq!(assigned.get(&Key::Object(right)).ok_or("right index")?.0, 0);
+        let (index, descriptor) = assigned.get(&Key::Object(root)).ok_or("root index")?;
+        assert_eq!(*index, 1);
+        assert_eq!(descriptor.get(11..), Some([0; 8].as_slice()));
+        assert_eq!(bytes.get(1), Some(descriptor));
+        Ok(())
+    }
+
+    /// Both unordered members and certificate rows exceed the sort's small-input path.
+    fn ordering_boundary_records() -> BTreeMap<Key, PendingRecord> {
+        let mut records = BTreeMap::new();
+        let mut root = independent_record(2);
+        root.payload = vec![0; 128];
+        root.payload.extend(0_u8..32);
+        let mut members = Vec::new();
+        for serial in 0_u8..32 {
+            let id = LogicalId {
+                kind: VertexKind::Region,
+                serial: u64::from(serial),
+            };
+            let mut leaf = independent_record(1);
+            leaf.payload = vec![(serial * 5) % 32];
+            records.insert(Key::Object(id), PendingRecord::new(Arc::new(leaf)));
+            root.references
+                .push((usize::from(serial) * 4, Entity::Object(id)));
+            members.push(Entity::Object(id));
+        }
+        root.sets.push((0..32).collect());
+        root.row_sets.push((128, 1, members));
+        records.insert(
+            Key::Object(LogicalId {
+                kind: VertexKind::Region,
+                serial: 32,
+            }),
+            PendingRecord::new(Arc::new(root)),
+        );
+        records
     }
 
     /// Synthetic independent records isolate ordering from graph admission.
