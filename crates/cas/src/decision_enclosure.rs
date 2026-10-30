@@ -35,6 +35,7 @@ pub(crate) fn check(
     Ok(CheckedRationalEnclosure {
         contract: contract.clone(),
         bytes,
+        uses_pi: contract.origin.uses_pi(),
     })
 }
 

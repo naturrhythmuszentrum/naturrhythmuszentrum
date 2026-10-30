@@ -2,7 +2,9 @@
 //! Atomic, externally owned live attachments for the closed two-input quotient subset.
 
 pub(super) mod arithmetic;
+mod kernel;
 mod ratio;
+pub use kernel::{FrozenRatioKernel, RatioKernelEvidence};
 
 use crate::{DecisionSnapshotError, FrozenDecisionInputs, Heap, HeapError};
 use nrz_bindings::readings::algebra::{
@@ -30,6 +32,9 @@ pub enum LiveDecisionError {
     /// Outward numerical containment could not be established.
     #[error("live decision arithmetic: {0}")]
     Arithmetic(#[from] ArithmeticFailure),
+    /// Pure scalar construction or export refused on the delegated bounded schedule.
+    #[error("live decision kernel: {0}")]
+    Kernel(#[from] nrz_scalar::KernelError),
     /// The requested original recipe is outside the supported native receiver subset.
     #[error("unsupported original live decision recipe")]
     Recipe,
@@ -52,6 +57,8 @@ pub struct PreparedDecision<P: Scalar> {
     arithmetic_revision: u32,
     /// Explicit constant-decoding policy, charged before either attempt.
     literals: LiteralLimits,
+    /// Optional executed trace, retained under these identical complete frozen inputs.
+    kernel: Option<Box<RatioKernelEvidence>>,
 }
 
 /// One shared live authority; descendants cannot independently survive retirement.
@@ -106,6 +113,7 @@ impl Heap {
             selected,
             arithmetic_revision: arithmetic.revision(),
             literals,
+            kernel: None,
         })
     }
 
@@ -120,11 +128,16 @@ impl Heap {
         prepared: PreparedDecision<P>,
         budget: &mut Budget,
     ) -> Result<PublishedDecision<P>, LiveDecisionError> {
+        let kernel_bytes = prepared
+            .kernel
+            .as_ref()
+            .map_or(0, |trace| trace.retained_payload_bytes());
         let bytes = prepared
             .frozen
             .retained_payload_bytes()
             .checked_add(prepared.selected.retained_payload_bytes())
             .and_then(|value| value.checked_add(128))
+            .and_then(|value| value.checked_add(kernel_bytes))
             .ok_or_else(|| LiveDecisionError::Snapshot(HeapError::Capacity.into()))?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
@@ -205,12 +218,25 @@ impl<P: Scalar + 'static> PublishedDecision<P> {
         })
     }
 
+    /// Historical complete source versions for this attachment; current access checks its lease.
+    #[must_use]
+    pub fn inputs(&self) -> &FrozenDecisionInputs<P> {
+        &self.0.prepared.frozen
+    }
+
+    /// Executed pure kernel trace, when this attachment used the optional scalar-origin route.
+    /// The historical record alone grants no current heap authority.
+    #[must_use]
+    pub fn kernel_trace(&self) -> Option<&RatioKernelEvidence> {
+        self.0.prepared.kernel.as_deref()
+    }
+
     /// Recorded floating proof revision; this historical fact is not live authority.
     #[must_use]
     pub fn arithmetic_revision(&self) -> u32 {
         self.0.prepared.arithmetic_revision
     }
-    /// Recorded explicit literal-decoding policy.
+    /// Recorded explicit literal-decoding policy; all-zero means the pure-dyadic trace used none.
     #[must_use]
     pub fn literal_limits(&self) -> LiteralLimits {
         self.0.prepared.literals

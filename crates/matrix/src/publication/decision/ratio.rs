@@ -43,7 +43,7 @@ pub(super) fn check<P: Scalar>(
 }
 
 /// The supported original is exactly two distinct physical constant declarations divided.
-fn original<P: Scalar>(
+pub(super) fn original<P: Scalar>(
     frozen: &FrozenDecisionInputs<P>,
     budget: &mut Budget,
 ) -> Result<[usize; 2], LiveDecisionError> {

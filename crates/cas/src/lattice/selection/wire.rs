@@ -3,7 +3,7 @@
 
 use super::{LatticeEnclosure, LatticeSelection};
 use crate::budget::{Budget, BudgetKind};
-use crate::decision::{EnclosureOrigin, RationalEnclosure};
+use crate::decision::RationalEnclosure;
 use crate::encoding::Encoder;
 use crate::error::{Fault, InvalidCode};
 use crate::graph::{Cas, Edge, Handle, LogicalId, size};
@@ -354,7 +354,7 @@ pub(crate) fn uses_pi(value: &LatticeEnclosure, budget: &mut Budget) -> Result<b
     let mut found = false;
     for scalar in original.coordinates.iter().chain(coefficients) {
         budget.work(1, super::AT)?;
-        found |= matches!(scalar.origin, EnclosureOrigin::PiBound { .. });
+        found |= scalar.origin.pi_citation(budget)?;
     }
     Ok(found)
 }

@@ -67,19 +67,13 @@ impl ProofCitation {
             }
             crate::proof_model::Certificate::IntegerSelection(enclosure) => {
                 budget.work(1, AT)?;
-                matches!(
-                    enclosure.origin,
-                    crate::decision::EnclosureOrigin::PiBound { .. }
-                )
+                enclosure.origin.pi_citation(budget)?
             }
             crate::proof_model::Certificate::Decision(evidence) => {
                 let mut found = false;
                 for enclosure in &evidence.enclosures {
                     budget.work(1, AT)?;
-                    found |= matches!(
-                        enclosure.origin,
-                        crate::decision::EnclosureOrigin::PiBound { .. }
-                    );
+                    found |= enclosure.origin.pi_citation(budget)?;
                 }
                 found
             }

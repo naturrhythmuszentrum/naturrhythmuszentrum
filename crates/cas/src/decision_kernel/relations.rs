@@ -27,7 +27,7 @@ pub(super) fn operand(
 }
 
 /// Replay both inclusive rational inequalities without any floating conversion.
-fn contains(
+pub(super) fn contains(
     record: &ScalarKernelRecord,
     value: &Rational,
     budget: &mut Budget,
@@ -54,6 +54,7 @@ pub(super) fn check(
         return Err(invalid());
     }
     match &record.law {
+        ScalarKernelLaw::Input(value) => super::input::check(record, value, budget),
         ScalarKernelLaw::Rational(value) => {
             value.check(budget, AT)?;
             contains(record, value, budget)

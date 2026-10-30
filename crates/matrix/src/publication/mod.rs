@@ -9,7 +9,10 @@
 
 mod commit;
 mod decision;
-pub use decision::{LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision};
+pub use decision::{
+    FrozenRatioKernel, LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision,
+    RatioKernelEvidence,
+};
 mod decision_inputs;
 pub use decision_inputs::{DecisionInputSnapshot, DecisionSnapshotError, FrozenDecisionInputs};
 mod lattice;

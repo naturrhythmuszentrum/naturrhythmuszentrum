@@ -76,6 +76,7 @@ mod decision_fixture;
 mod decision_frozen;
 
 mod decision_kernel;
+mod decision_kernel_live;
 mod decision_live;
 
 mod lattice_fixture;

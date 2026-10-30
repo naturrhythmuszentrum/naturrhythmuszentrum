@@ -352,4 +352,7 @@ pub use publication::{
     LiveLatticeIndex, LiveLatticeRepresentative, PreparedLatticeDecision, PublishedLatticeDecision,
 };
 
-pub use publication::{LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision};
+pub use publication::{
+    FrozenRatioKernel, LiveDecisionCount, LiveDecisionError, PreparedDecision, PublishedDecision,
+    RatioKernelEvidence,
+};

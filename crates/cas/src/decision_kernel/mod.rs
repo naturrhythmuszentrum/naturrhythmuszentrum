@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed scalar record replay keeps source coverage separate from endpoint arithmetic.
 
+mod input;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "the public decision facade re-exports the pure certificate model"
@@ -43,7 +44,7 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    if certificate.version != 1 {
+    if !matches!(certificate.version, 1 | 2) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     for handle in [
@@ -102,6 +103,9 @@ fn replay(
         .map_err(|_| Fault::allocation(AT))?;
     for (index, record) in certificate.records.iter().enumerate() {
         let value = budget.with_retained_payload(retained, AT, |budget| {
+            if certificate.version == 1 && matches!(record.law, ScalarKernelLaw::Input(_)) {
+                return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+            }
             relations::check(record, &certificate.records[..index], budget)?;
             budget.work(record_bytes(record), AT)?;
             let expected = (index + 1 == certificate.records.len()).then_some(original);
@@ -139,6 +143,7 @@ fn exact(
     };
     match law {
         ScalarKernelLaw::Rational(value) => Ok(value.clone().into()),
+        ScalarKernelLaw::Input(value) => input::exact(value, budget),
         ScalarKernelLaw::Sum { left, right } => child(*left)?.add(child(*right)?, budget),
         ScalarKernelLaw::Product { left, right } => child(*left)?.mul(child(*right)?, budget),
         ScalarKernelLaw::Reciprocal { input } => ExactConstant::one().div(child(*input)?, budget),
@@ -167,6 +172,7 @@ fn fragment(fault: Fault) -> Fault {
 fn record_bytes(record: &ScalarKernelRecord) -> u64 {
     let value = match &record.law {
         ScalarKernelLaw::Rational(value) => number_bytes(value),
+        ScalarKernelLaw::Input(value) => input::bytes(value),
         ScalarKernelLaw::Sum { .. }
         | ScalarKernelLaw::Product { .. }
         | ScalarKernelLaw::Reciprocal { .. }

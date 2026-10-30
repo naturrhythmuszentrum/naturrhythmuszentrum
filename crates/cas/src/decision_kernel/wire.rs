@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Additive versioned scalar-origin encoding; existing origins keep their bytes.
 
-use super::model::{ScalarKernelCertificate, ScalarKernelLaw, ScalarKernelRecord};
+use super::model::{
+    ScalarKernelCertificate, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
+    ScalarKernelRecord,
+};
 use crate::budget::BudgetKind;
 use crate::encoding::Encoder;
 use crate::error::{Fault, InvalidCode, Location};
@@ -29,6 +32,10 @@ pub(crate) fn encode(
     out.count(value.records.len())?;
     for record in &value.records {
         match &record.law {
+            ScalarKernelLaw::Input(value) => {
+                out.byte(5)?;
+                encode_input(value, out)?;
+            }
             ScalarKernelLaw::Rational(value) => {
                 out.byte(0)?;
                 out.number(value)?;
@@ -68,7 +75,7 @@ pub(crate) fn decode(
     objects: &[Decoded],
 ) -> Result<ScalarKernelCertificate, Fault> {
     let version = reader.small()?;
-    if version != 1 {
+    if !matches!(version, 1 | 2) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     let expression = object(reader, objects)?;
@@ -81,6 +88,8 @@ pub(crate) fn decode(
         .map_err(|_| Fault::allocation(AT))?;
     for _ in 0..count {
         let law = match reader.byte()? {
+            5 if version == 2 => ScalarKernelLaw::Input(Box::new(decode_input(reader)?)),
+            5 => return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT)),
             0 => ScalarKernelLaw::Rational(reader.rational()?),
             1 => ScalarKernelLaw::Sum {
                 left: reader.small()?,
@@ -110,5 +119,62 @@ pub(crate) fn decode(
         context,
         input_family,
         records,
+    })
+}
+
+/// Encode the exact native set and closed input source without a live authority claim.
+fn encode_input(value: &ScalarKernelInput, out: &mut Encoder<'_>) -> Result<(), Fault> {
+    out.number(&value.center)?;
+    out.number(&value.radius)?;
+    match &value.value {
+        ScalarKernelInputValue::Rational(value) => {
+            out.byte(0)?;
+            out.number(value)
+        }
+        ScalarKernelInputValue::PiMultiple {
+            factor,
+            certificate,
+        } => {
+            out.byte(1)?;
+            out.number(factor)?;
+            out.unsigned(u64::from(certificate.version))?;
+            for count in certificate.terms {
+                out.unsigned(u64::from(count))?;
+            }
+            for number in [
+                &certificate.sums[0],
+                &certificate.sums[1],
+                &certificate.lower,
+                &certificate.upper,
+            ] {
+                out.number(number)?;
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Decode one bounded input source; nested origins are deliberately absent.
+fn decode_input(reader: &mut Reader<'_, '_>) -> Result<ScalarKernelInput, Fault> {
+    let center = reader.rational()?;
+    let radius = reader.rational()?;
+    let value = match reader.byte()? {
+        0 => ScalarKernelInputValue::Rational(reader.rational()?),
+        1 => ScalarKernelInputValue::PiMultiple {
+            factor: reader.rational()?,
+            certificate: Box::new(crate::pi_bounds::PiBoundCertificate {
+                version: reader.small()?,
+                terms: [reader.small()?, reader.small()?],
+                sums: [reader.rational()?, reader.rational()?],
+                lower: reader.rational()?,
+                upper: reader.rational()?,
+            }),
+        },
+        _ => return Err(invalid()),
+    };
+    Ok(ScalarKernelInput {
+        center,
+        radius,
+        value,
     })
 }

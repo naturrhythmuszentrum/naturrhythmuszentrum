@@ -12,7 +12,8 @@ use crate::graph::{Cas, Handle};
 use crate::number::Rational;
 
 pub use crate::decision_kernel::model::{
-    ScalarKernelCertificate, ScalarKernelLaw, ScalarKernelRecord,
+    ScalarKernelCertificate, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
+    ScalarKernelRecord,
 };
 
 /// An untrusted closed rational interval for one exact declared Real or Integer coordinate.
@@ -185,6 +186,28 @@ pub enum EnclosureOrigin {
     Unverified,
 }
 
+impl EnclosureOrigin {
+    /// Inspect the bounded retained closed inventory for the actual Machin dependency.
+    pub(crate) fn uses_pi(&self) -> bool {
+        match self {
+            Self::PiBound { .. } => true,
+            Self::ScalarKernel(value) => value.records.iter().any(|record| {
+                matches!(&record.law, ScalarKernelLaw::Input(input)
+                    if matches!(input.value, ScalarKernelInputValue::PiMultiple { .. }))
+            }),
+            Self::ExactRational { .. } | Self::MatrixKernel | Self::Unverified => false,
+        }
+    }
+    /// Pay only the new scalar inventory scan when exposing a retained theorem citation.
+    pub(crate) fn pi_citation(&self, budget: &mut Budget) -> Result<bool, Fault> {
+        if let Self::ScalarKernel(value) = self {
+            let at = crate::Location::new("scalar kernel citations");
+            budget.work(crate::graph::size(value.records.len(), at)?, at)?;
+        }
+        Ok(self.uses_pi())
+    }
+}
+
 /// An untrusted rational enclosure of an exact target in its original context.
 ///
 /// Replay supports exact rational results and closed pi arithmetic under an explicit
@@ -217,15 +240,18 @@ pub struct CheckedRationalEnclosure {
     pub(crate) contract: RationalEnclosure,
     /// Conservative prepaid returned ownership, excluding shared immutable graph syntax.
     pub(crate) bytes: u64,
+    /// Precomputed during the prepaid contract copy, keeping metadata reads constant-time.
+    pub(crate) uses_pi: bool,
 }
 
 impl CheckedRationalEnclosure {
     /// The constant theorem retained by this checked enclosure, when pi replay was used.
     #[must_use]
     pub const fn constant_schema(&self) -> Option<&'static crate::proof::LemmaSchema> {
-        match &self.contract.origin {
-            EnclosureOrigin::PiBound { .. } => Some(&crate::proof::CONSTANT_SCHEMAS[0]),
-            _ => None,
+        if self.uses_pi {
+            Some(&crate::proof::CONSTANT_SCHEMAS[0])
+        } else {
+            None
         }
     }
 

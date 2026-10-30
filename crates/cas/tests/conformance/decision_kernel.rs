@@ -204,7 +204,7 @@ fn decision_kernel_nominal_coverage_refuses() -> TestResult {
         "scalar kernel coverage",
     )?;
     let (source, mut request) = prepared(0)?;
-    certificate(&mut request)?.version = 2;
+    certificate(&mut request)?.version = 3;
     refuses(
         &source,
         &request,
@@ -438,4 +438,41 @@ fn decision_kernel_root_reuse_boundary() -> TestResult {
         .cas
         .check_rational_enclosure(&request, &mut ledger()?)?;
     Ok(())
+}
+
+/// Version-two native input laws prove full sets, while negative radii and version-one claims refuse.
+/// ´test:integration:decision-kernel-native-input-domains´
+/// ´claim:cas:decision-kernel-native-input-domains´
+#[test]
+fn decision_kernel_native_input_domains() -> TestResult {
+    let (source, mut request) = prepared(0)?;
+    let candidate = certificate(&mut request)?;
+    candidate.version = 2;
+    candidate.records[0].law =
+        ScalarKernelLaw::Input(Box::new(nrz_cas::decision::ScalarKernelInput {
+            center: rational(1, 10)?,
+            radius: rational(1, 256)?,
+            value: nrz_cas::decision::ScalarKernelInputValue::Rational(rational(1, 10)?),
+        }));
+    source
+        .cas
+        .check_rational_enclosure(&request, &mut ledger()?)?;
+    let mut legacy = request.clone();
+    certificate(&mut legacy)?.version = 1;
+    refuses(
+        &source,
+        &legacy,
+        InvalidCode::UnsupportedVersion,
+        "scalar kernel coverage",
+    )?;
+    let ScalarKernelLaw::Input(input) = &mut certificate(&mut request)?.records[0].law else {
+        return Err("missing native input".into());
+    };
+    input.radius = rational(-1, 256)?;
+    refuses(
+        &source,
+        &request,
+        InvalidCode::RefutedDomain,
+        "scalar kernel input coverage",
+    )
 }
