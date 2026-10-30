@@ -3,10 +3,12 @@
 
 mod arithmetic;
 mod conversion;
+mod counts;
 mod execution;
 mod imports;
 mod roles;
 mod shapes;
+pub use counts::{CountError, CountHistory, CountQuantity, ExactCountRatio};
 
 pub use conversion::NormalizedQuantity;
 pub use imports::QuantityInput;

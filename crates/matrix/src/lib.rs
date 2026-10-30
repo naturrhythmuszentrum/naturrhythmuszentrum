@@ -42,8 +42,9 @@ mod storage;
 
 mod quantity;
 pub use quantity::{
-    DifferenceRole, DynamicRole, NormalizedQuantity, PointRole, Quantity, QuantityContext,
-    QuantityError, QuantityInput, QuantityRole,
+    CountError, CountHistory, CountQuantity, DifferenceRole, DynamicRole, ExactCountRatio,
+    NormalizedQuantity, PointRole, Quantity, QuantityContext, QuantityError, QuantityInput,
+    QuantityRole,
 };
 
 pub use binding::{
@@ -86,6 +87,10 @@ pub use heap::{
     HeapLimits, PublishedBundle, RegionView, SchemaId, Value, ValueId, ValueStamp, ValueVersion,
     ValueView, Workspace,
 };
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/count_quantity_twins.rs"]
+mod count_quantity_twins;
 
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/quantity_twins.rs"]
