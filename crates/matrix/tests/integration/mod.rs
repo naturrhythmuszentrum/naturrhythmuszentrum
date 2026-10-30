@@ -19,6 +19,7 @@ mod conversion;
 mod joint_dense;
 
 mod precision_conversion;
+mod prior_errors;
 mod schema_conversion;
 
 mod kernel_lifecycle;

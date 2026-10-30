@@ -11,6 +11,7 @@ use nrz_scalar::Precision;
 
 /// Narrowing encloses the exact represented source and widening preserves its entire carried bound.
 /// ´test:integration:precision-conversion-retains-errors-and-fresh-identities´
+/// ´claim:matrix:precision-original-errors-and-identities´ Narrowing encloses the original nominal target and widening preserves its numerical error, total and fresh identities.
 #[test]
 fn precision_conversion_retains_errors_and_fresh_identities() -> TestResult {
     let declarations = owner()?;
@@ -73,7 +74,7 @@ fn precision_conversion_retains_errors_and_fresh_identities() -> TestResult {
             .region()
             .get(0, 0)?
             .to_bits(),
-        0.0_f64.to_bits()
+        error.to_bits()
     );
     assert_eq!(heap.value(source.value())?.stamp(), original);
     Ok(())

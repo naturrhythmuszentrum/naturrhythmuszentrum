@@ -13,7 +13,7 @@ pub(crate) struct Entry<P: Scalar> {
     pub(crate) center: P,
     /// Complete propagated deterministic radius.
     pub(crate) total: P,
-    /// New evaluation radius, already covered by the total.
+    /// Numerical-only radius, already covered by the total.
     pub(crate) error: P,
 }
 
@@ -38,6 +38,22 @@ pub(crate) fn operand<P: Scalar + 'static>(
     ))
 }
 
+/// Read the overlapping numerical-only channel in the same selected logical order.
+pub(crate) fn operand_error<P: Scalar + 'static>(
+    view: &NormalizedView<'_, P>,
+    index: usize,
+) -> Result<Nonnegative<P>, OperationError> {
+    if index >= view.extent().entries() {
+        return Err(KernelError::Contract.into());
+    }
+    let row = index % view.extent().rows();
+    let column = index / view.extent().rows();
+    Ok(
+        Nonnegative::new(view.evaluation(row, column)?.unwrap_or(P::ZERO))
+            .map_err(KernelError::from)?,
+    )
+}
+
 /// Compare the candidate to an independently enclosed nominal mathematical image.
 pub(crate) fn finish<P: Scalar>(
     center: P,
@@ -58,6 +74,7 @@ pub(crate) fn finish<P: Scalar>(
 pub(crate) fn sum<P: Scalar + 'static>(
     left: (P, Nonnegative<P>),
     right: (P, Nonnegative<P>),
+    prior_errors: [Nonnegative<P>; 2],
     subtract: bool,
     context: &ArithmeticContext,
 ) -> Result<Entry<P>, KernelError> {
@@ -68,5 +85,12 @@ pub(crate) fn sum<P: Scalar + 'static>(
     } else {
         (left.0 + right.0, first.add(second, context)?)
     };
-    finish(center, nominal, left.1.add(right.1, context)?, context)
+    let mut result = finish(center, nominal, left.1.add(right.1, context)?, context)?;
+    if prior_errors.iter().any(|error| error.get() != P::ZERO) {
+        result.error = prior_errors[0]
+            .add(prior_errors[1], context)?
+            .add(Nonnegative::new(result.error)?, context)?
+            .get();
+    }
+    Ok(result)
 }

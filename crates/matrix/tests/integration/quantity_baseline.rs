@@ -246,9 +246,9 @@ fn quantity_declaration_byte_boundaries() -> TestResult {
     Ok(())
 }
 
-/// Existing widening drops the prior numerical-only channel despite retaining the total.
+/// Widening retains the prior numerical-only channel without adding it again to the total.
 /// ´test:integration:quantity-precision-baseline-measurement´
-/// ´claim:matrix:quantity-precision-baseline´ Existing widening retains the total but resets the separate numerical-error channel.
+/// ´claim:matrix:quantity-precision-baseline´ Widening preserves the declared numerical-error channel and the unchanged total.
 #[test]
 fn quantity_precision_baseline_measurement() -> TestResult {
     let declarations = owner()?;
@@ -295,7 +295,7 @@ fn quantity_precision_baseline_measurement() -> TestResult {
         heap.companion(result.evaluation().ok_or("error")?)?
             .region()
             .get(0, 0)?,
-        0.0
+        0.125
     );
     Ok(())
 }
@@ -364,9 +364,9 @@ fn quantity_array_baseline_measurement() -> TestResult {
     Ok(())
 }
 
-/// The existing sum reports its new rounding error separately from the complete total.
+/// A sum carries prior numerical errors beside new rounding without changing its total.
 /// ´test:integration:quantity-sum-error-baseline-measurement´
-/// ´claim:matrix:quantity-sum-error-baseline´ Existing sum error excludes prior numerical errors while its total still encloses them.
+/// ´claim:matrix:quantity-sum-error-baseline´ Sum error encloses both original nominal targets while its total remains unchanged.
 #[test]
 fn quantity_sum_error_baseline_measurement() -> TestResult {
     let declarations = owner()?;
@@ -407,7 +407,9 @@ fn quantity_sum_error_baseline_measurement() -> TestResult {
         .get(0, 0)?;
     assert!(crate::conversion_oracle::covers(5.0, total, 9, 2)?);
     assert!(crate::conversion_oracle::covers(5.0, total, 11, 2)?);
-    assert!(!crate::conversion_oracle::covers(5.0, error, 19, 4)?);
-    assert!(!crate::conversion_oracle::covers(5.0, error, 21, 4)?);
+    assert!(crate::conversion_oracle::covers(5.0, error, 19, 4)?);
+    assert!(crate::conversion_oracle::covers(5.0, error, 21, 4)?);
+    assert!(error <= total);
+    assert_eq!(total.to_bits(), 0.500_000_000_000_001_1_f64.to_bits());
     Ok(())
 }

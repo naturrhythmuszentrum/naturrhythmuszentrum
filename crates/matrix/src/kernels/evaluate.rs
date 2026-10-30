@@ -82,6 +82,10 @@ fn sum<P: Scalar + 'static>(
         result.push(super::arithmetic::sum(
             operand(left, index)?,
             operand(right, *source)?,
+            [
+                super::arithmetic::operand_error(left, index)?,
+                super::arithmetic::operand_error(right, *source)?,
+            ],
             subtract,
             context,
         )?);

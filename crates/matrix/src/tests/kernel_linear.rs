@@ -8,7 +8,8 @@ use crate::{Extent, Heap, HeapLimits, OperationDraft, ShapeLimits};
 use nrz_bindings::{Descriptor, Role};
 
 /// The total already covers the input evaluation region; adding a zero operand must not add it again.
-/// ´test:crate:sum-consumes-conversion-total-exactly-once´
+/// ´test:unit:sum-consumes-conversion-total-exactly-once´
+/// ´claim:matrix:sum-conversion-total-once´ Adding zero retains the conversion's original numerical error inside an unchanged total, checked against independent rational targets.
 #[test]
 fn sum_consumes_conversion_total_exactly_once() -> TestResult {
     let declarations = owner()?;
@@ -45,12 +46,21 @@ fn sum_consumes_conversion_total_exactly_once() -> TestResult {
     )?;
     let actual = entry(&heap, output(&summed)?, 0)?;
     assert_eq!(actual.1.to_bits(), prior.1.to_bits());
-    assert_eq!(actual.2, 0.0);
+    assert_eq!(
+        actual.2.to_bits(),
+        1.184_237_892_933_500_8e-15_f64.to_bits()
+    );
+    assert_eq!(actual.2.to_bits(), prior.2.to_bits());
+    assert!(actual.2 <= actual.1);
     let target = Rational::new(6, 1)?
         .divide(Rational::new(3, 1)?)?
         .multiply(Rational::new(1, 1)?)?;
     assert!(target.covered(actual.0, actual.1)?);
-    assert!(Rational::binary(prior.0)?.covered(actual.0, actual.2)?);
+    assert!(target.covered(actual.0, actual.2)?);
+    let center = Rational::binary(prior.0)?;
+    let error = Rational::binary(prior.2)?;
+    assert!(center.subtract(error)?.covered(actual.0, actual.2)?);
+    assert!(center.add(error)?.covered(actual.0, actual.2)?);
     Ok(())
 }
 
