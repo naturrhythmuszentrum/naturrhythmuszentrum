@@ -2,6 +2,7 @@
 //! Executed live LC traces select the original 10/Pi target and retain complete source versions.
 
 mod costs;
+mod family;
 mod input_coverage;
 
 use super::decision_fixture::{SelectionFixture, cycle, ledger};

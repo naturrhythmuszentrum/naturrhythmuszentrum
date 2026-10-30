@@ -20,7 +20,7 @@ fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
     let owner = physical_source("1")?;
     let start = budget.usage().work;
     let model = DecisionExpression::declared(Rc::clone(&owner), "model", budget)?;
-    assert_eq!(model.exact(), &ExactConstant::one());
+    assert_eq!(model.exact(), Some(&ExactConstant::one()));
     assert_eq!(budget.usage().work - start, 34_713);
     let physical = DecisionExpression::declared(owner, "quotient", budget)?;
     assert_eq!(budget.usage().work - start, 116_076);

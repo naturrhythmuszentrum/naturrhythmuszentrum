@@ -101,6 +101,7 @@ pub(crate) fn check(
     for premise in premises {
         crate::statement::merge(cas, &mut conditions, &premise.conditions, budget)?;
     }
+    crate::decision_kernel::family::retain(cas, enclosure, &mut conditions, budget)?;
     Ok(conditions)
 }
 

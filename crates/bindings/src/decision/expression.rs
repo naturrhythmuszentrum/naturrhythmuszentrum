@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Frozen physical originals provide closed exact targets without losing source or map identity.
 
-use super::{DecisionError, storage};
+use super::{DecisionError, family, storage};
 use crate::{CheckedDeclarations, Kind, Role};
 use nrz_cas::{ExactConstant, Handle, limits::Budget};
 use std::{collections::BTreeMap, rc::Rc};
 
-/// A closed exact ratio expression with its original physical declaration owner.
+/// A checked ratio expression with its original physical declaration owner.
 ///
-/// This subset covers exact nominal declarations. Free input families and numerical
-/// enclosure origins require their separate correspondence and authenticity contracts.
+/// Closed declarations retain an exact value. Physical families instead retain their
+/// explicit source boxes and qualified endpoint assumptions.
 #[derive(Clone, Debug)]
 pub struct DecisionExpression(Rc<Data>);
 
@@ -23,7 +23,9 @@ struct Data {
     /// Original occurrence identity, before coherent-coordinate normalization.
     original: Handle,
     /// Independently checked source-free exact coherent value.
-    exact: ExactConstant,
+    exact: Option<Rc<ExactConstant>>,
+    /// Explicit qualified source boxes for an open physical question.
+    family: Option<family::Inputs>,
 }
 
 impl DecisionExpression {
@@ -77,7 +79,33 @@ impl DecisionExpression {
             owner,
             name: name.into(),
             original,
-            exact,
+            exact: Some(Rc::new(exact)),
+            family: None,
+        })))
+    }
+
+    /// Declare a two-input physical quotient with explicit coherent source boxes and assumptions.
+    ///
+    /// Every varying declaration is matched to one original CAS source; its endpoint
+    /// assumptions remain conditional. Constant leaves retain their declared exact maps.
+    /// # Errors
+    /// Refuses incomplete source inventories, unsupported originals, changed premises and limits.
+    pub fn family(
+        cas: &nrz_cas::Cas,
+        owner: Rc<CheckedDeclarations>,
+        name: &str,
+        context: &Handle,
+        inputs: Vec<(String, nrz_cas::decision::ScalarKernelFamily)>,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
+        let family = family::Inputs::check(cas, &owner, name, context, inputs, budget)?;
+        let original = owner.checked(name)?.original().syntax.clone();
+        Ok(Self(Rc::new(Data {
+            owner,
+            name: name.into(),
+            original,
+            exact: None,
+            family: Some(family),
         })))
     }
 
@@ -103,10 +131,23 @@ impl DecisionExpression {
     pub fn original(&self) -> &Handle {
         &self.0.original
     }
-    /// Exact coherent value admitted by the closed CAS constant checker.
+    /// Exact coherent value for a closed declaration; an open family has no nominal substitute.
     #[must_use]
-    pub fn exact(&self) -> &ExactConstant {
-        &self.0.exact
+    pub fn exact(&self) -> Option<&ExactConstant> {
+        self.0.exact.as_deref()
+    }
+    /// Complete declared physical source boxes; an empty list denotes a closed source.
+    #[must_use]
+    pub fn input_families(&self) -> &[(String, nrz_cas::decision::ScalarKernelFamily)] {
+        self.0
+            .family
+            .as_ref()
+            .map_or(&[], |family| family.inputs.as_slice())
+    }
+    /// Original scope of the explicitly retained source assumptions, when the source is open.
+    #[must_use]
+    pub fn family_context(&self) -> Option<&Handle> {
+        self.0.family.as_ref().map(|family| &family.context)
     }
 }
 
@@ -114,7 +155,12 @@ impl DecisionExpression {
 ///
 /// This distinct type cannot be passed as the scalar decision's ratio source.
 #[derive(Clone, Debug)]
-pub struct DecisionCoordinate(DecisionExpression);
+pub struct DecisionCoordinate {
+    /// Original closed physical source and its immutable declaration owner.
+    source: DecisionExpression,
+    /// Shared closed exact meaning, guaranteed by the coordinate constructor.
+    exact: Rc<ExactConstant>,
+}
 
 impl DecisionCoordinate {
     /// Reuse closed exact source checking for a continuous physical coordinate.
@@ -125,9 +171,12 @@ impl DecisionCoordinate {
         name: &str,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
-        Ok(Self(DecisionExpression::closed(
-            owner, name, false, budget,
-        )?))
+        let source = DecisionExpression::closed(owner, name, false, budget)?;
+        let exact = source.0.exact.as_ref().ok_or(DecisionError::Source)?;
+        Ok(Self {
+            exact: Rc::clone(exact),
+            source,
+        })
     }
 
     /// Prepare a batch within one operation, retaining one check per original source identity.
@@ -183,29 +232,29 @@ impl DecisionCoordinate {
     /// # Errors
     /// Refuses an unavailable declaration rather than manufacturing a descriptor.
     pub fn checked(&self) -> Result<&crate::CheckedExpression, DecisionError> {
-        self.0.checked()
+        self.source.checked()
     }
 
     /// Exact coherent value, without a dimensionless reinterpretation.
     #[must_use]
     pub fn exact(&self) -> &ExactConstant {
-        self.0.exact()
+        &self.exact
     }
 
     /// Frozen original declarations and semantic revision.
     #[must_use]
     pub fn owner(&self) -> &CheckedDeclarations {
-        self.0.owner()
+        self.source.owner()
     }
 
     /// Original declaration key within its retained owner.
     #[must_use]
     pub fn name(&self) -> &str {
-        self.0.name()
+        self.source.name()
     }
 
     /// Share input association internals without exposing a scalar ratio conversion.
     pub(super) const fn source(&self) -> &DecisionExpression {
-        &self.0
+        &self.source
     }
 }

@@ -2,8 +2,8 @@
 //! Additive versioned scalar-origin encoding; existing origins keep their bytes.
 
 use super::model::{
-    ScalarKernelCertificate, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
-    ScalarKernelRecord,
+    ScalarKernelCertificate, ScalarKernelFamily, ScalarKernelFamilyInput, ScalarKernelInput,
+    ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelRecord,
 };
 use crate::budget::BudgetKind;
 use crate::encoding::Encoder;
@@ -32,6 +32,10 @@ pub(crate) fn encode(
     out.count(value.records.len())?;
     for record in &value.records {
         match &record.law {
+            ScalarKernelLaw::Family(value) => {
+                out.byte(6)?;
+                encode_family(value, out, write)?;
+            }
             ScalarKernelLaw::Input(value) => {
                 out.byte(5)?;
                 encode_input(value, out)?;
@@ -75,7 +79,7 @@ pub(crate) fn decode(
     objects: &[Decoded],
 ) -> Result<ScalarKernelCertificate, Fault> {
     let version = reader.small()?;
-    if !matches!(version, 1 | 2) {
+    if !matches!(version, 1..=3) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     let expression = object(reader, objects)?;
@@ -88,8 +92,9 @@ pub(crate) fn decode(
         .map_err(|_| Fault::allocation(AT))?;
     for _ in 0..count {
         let law = match reader.byte()? {
-            5 if version == 2 => ScalarKernelLaw::Input(Box::new(decode_input(reader)?)),
-            5 => return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT)),
+            6 if version == 3 => ScalarKernelLaw::Family(Box::new(decode_family(reader, objects)?)),
+            5 if version >= 2 => ScalarKernelLaw::Input(Box::new(decode_input(reader)?)),
+            5..=6 => return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT)),
             0 => ScalarKernelLaw::Rational(reader.rational()?),
             1 => ScalarKernelLaw::Sum {
                 left: reader.small()?,
@@ -176,5 +181,57 @@ fn decode_input(reader: &mut Reader<'_, '_>) -> Result<ScalarKernelInput, Fault>
         center,
         radius,
         value,
+    })
+}
+
+/// Add only the new source-box law; existing law encodings retain their exact bytes.
+fn encode_family(
+    value: &ScalarKernelFamilyInput,
+    out: &mut Encoder<'_>,
+    write: &mut impl FnMut(&Handle, &mut Encoder<'_>) -> Result<(), Fault>,
+) -> Result<(), Fault> {
+    for number in [
+        &value.center,
+        &value.radius,
+        &value.family.lower,
+        &value.family.upper,
+    ] {
+        out.number(number)?;
+    }
+    write(&value.family.source, out)?;
+    for premise in &value.family.premises {
+        write(&premise.context, out)?;
+        out.unsigned(u64::from(premise.slot))?;
+    }
+    Ok(())
+}
+
+/// Pure source identity and qualified assumptions require independent checking after decoding.
+fn decode_family(
+    reader: &mut Reader<'_, '_>,
+    objects: &[Decoded],
+) -> Result<ScalarKernelFamilyInput, Fault> {
+    let center = reader.rational()?;
+    let radius = reader.rational()?;
+    let lower = reader.rational()?;
+    let upper = reader.rational()?;
+    let source = object(reader, objects)?;
+    let first = crate::domain::HypothesisRef {
+        context: object(reader, objects)?,
+        slot: reader.small()?,
+    };
+    let second = crate::domain::HypothesisRef {
+        context: object(reader, objects)?,
+        slot: reader.small()?,
+    };
+    Ok(ScalarKernelFamilyInput {
+        center,
+        radius,
+        family: ScalarKernelFamily {
+            source,
+            lower,
+            upper,
+            premises: [first, second],
+        },
     })
 }

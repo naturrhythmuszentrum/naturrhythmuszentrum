@@ -6,7 +6,7 @@ use crate::{BindingSymbols, CheckedExpression, Declaration, Descriptor, Role};
 use nrz_cas::limits::Budget;
 use std::rc::Rc;
 
-/// Complete original constant inputs of one declared decision, in declaration-key order.
+/// Complete original physical inputs of one declared decision, in declaration-key order.
 ///
 /// Each distinct original occurs once; the retained original expression preserves all
 /// operand occurrences, including repetition and operands removed by normalization.
@@ -19,13 +19,13 @@ pub struct DecisionInputs(Rc<Data>);
 struct Data {
     /// Exact source, maps, case and parameter instance.
     case: IntegerDecisionCase,
-    /// Complete original constant dependency inventory.
+    /// Complete original constant and explicit-family dependency inventory.
     operands: Vec<DecisionOperand>,
     /// New association metadata and symbol payloads, excluding shared original graphs.
     bytes: u64,
 }
 
-/// One original physical constant and its designated coherent numerical symbol bundle.
+/// One original physical operand and its designated coherent numerical symbol bundle.
 #[derive(Clone, Debug)]
 pub struct DecisionOperand {
     /// Original name, never used to authenticate a foreign owner.
@@ -37,13 +37,13 @@ pub struct DecisionOperand {
 }
 
 impl IntegerDecisionCase {
-    /// Declare the complete nominal input association before importing numerical values.
+    /// Declare the complete original input association before importing numerical values.
     ///
-    /// The original check supplies the transitive declaration inventory. Only closed
-    /// constant leaves and derived expressions are supported. Each constant retains its
-    /// original physical map and receives coherent scalar symbols with both radii.
+    /// The original check supplies the transitive declaration inventory. Closed constants
+    /// and explicitly admitted input families retain their original physical maps and
+    /// receive coherent scalar symbols with both radii.
     /// # Errors
-    /// Refuses open/uncertainty inputs, points, counts and caller resource exhaustion.
+    /// Refuses inputs without declared families, points, counts and caller resource exhaustion.
     /// No association or mutation of the original declaration graph survives refusal.
     pub fn associate_inputs(&self, budget: &mut Budget) -> Result<DecisionInputs, DecisionError> {
         let source = self.source();
@@ -54,8 +54,11 @@ impl IntegerDecisionCase {
             budget.work(1, storage::AT)?;
             match declaration {
                 Declaration::Constant { descriptor, .. }
+                | Declaration::Input { descriptor, .. }
                     if descriptor.role() == Role::Difference
-                        && descriptor.kind().count_domain().is_none() =>
+                        && descriptor.kind().count_domain().is_none()
+                        && (matches!(declaration, Declaration::Constant { .. })
+                            || source.input_families().iter().any(|(key, _)| key == name)) =>
                 {
                     count = count.checked_add(1).ok_or(DecisionError::Capacity)?;
                     bytes = bytes
@@ -76,7 +79,9 @@ impl IntegerDecisionCase {
             .try_reserve_exact(count)
             .map_err(|_| DecisionError::Capacity)?;
         for (name, declaration) in original.declarations() {
-            if let Declaration::Constant { descriptor, .. } = declaration {
+            if let Declaration::Constant { descriptor, .. }
+            | Declaration::Input { descriptor, .. } = declaration
+            {
                 operands.push(operand(source, name, descriptor, &mut bytes, budget)?);
             }
         }
@@ -122,6 +127,14 @@ impl DecisionInputs {
 }
 
 impl DecisionOperand {
+    /// Explicit original source box and qualified premises, when this operand varies physically.
+    #[must_use]
+    pub fn family(&self) -> Option<&nrz_cas::decision::ScalarKernelFamily> {
+        self.source
+            .input_families()
+            .iter()
+            .find_map(|(name, family)| (name == &self.name).then_some(family))
+    }
     /// Original declaration key, scoped by the retained physical source owner.
     #[must_use]
     pub fn name(&self) -> &str {

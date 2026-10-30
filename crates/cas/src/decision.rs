@@ -14,8 +14,8 @@ use crate::number::Rational;
 pub use crate::decision_enclosure::EnclosureAttempt;
 
 pub use crate::decision_kernel::model::{
-    ScalarKernelCertificate, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
-    ScalarKernelRecord,
+    ScalarKernelCertificate, ScalarKernelFamily, ScalarKernelFamilyInput, ScalarKernelInput,
+    ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelRecord,
 };
 
 /// An untrusted closed rational interval for one exact declared Real or Integer coordinate.
@@ -247,6 +247,24 @@ pub struct CheckedRationalEnclosure {
 }
 
 impl CheckedRationalEnclosure {
+    /// Explicit source-box assumptions; repeated uses keep their qualified context and slot.
+    pub fn input_premises(&self) -> impl Iterator<Item = &crate::domain::HypothesisRef> {
+        let records = if let EnclosureOrigin::ScalarKernel(certificate) = &self.contract.origin {
+            certificate.records.as_slice()
+        } else {
+            &[]
+        };
+        records
+            .iter()
+            .filter_map(|record| {
+                if let ScalarKernelLaw::Family(input) = &record.law {
+                    Some(&input.family.premises)
+                } else {
+                    None
+                }
+            })
+            .flatten()
+    }
     /// The constant theorem retained by this checked enclosure, when pi replay was used.
     #[must_use]
     pub const fn constant_schema(&self) -> Option<&'static crate::proof::LemmaSchema> {

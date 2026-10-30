@@ -133,5 +133,6 @@ pub(crate) fn dependencies(
     } else if let EnclosureOrigin::ScalarKernel(certificate) = &value.origin {
         edges.push((cas.checked(&certificate.expression)?, Edge::DependsOn));
     }
+    crate::decision_kernel::family::dependencies(cas, value, edges, budget)?;
     Ok(())
 }

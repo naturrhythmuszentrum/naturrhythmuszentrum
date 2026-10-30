@@ -14,6 +14,8 @@ pub enum ScalarKernelLaw {
     Rational(Rational),
     /// Version-two closed input, including its entire center-plus-total-radius set.
     Input(Box<ScalarKernelInput>),
+    /// Version-three physical family, conditional on two retained endpoint assumptions.
+    Family(Box<ScalarKernelFamilyInput>),
     /// Exact real addition of the ordered earlier records.
     Sum {
         /// Earlier left operand.
@@ -55,10 +57,11 @@ pub struct ScalarKernelRecord {
 ///
 /// Version one has rational leaves and closed sums, products, reciprocals and
 /// positive square roots. Version two additionally checks complete native input
-/// sets with closed rational or rational-times-pi sources. The last record is the original target. A quotient
-/// uses reciprocal then product; every record is checked before any result.
-/// Closed leaves establish coverage throughout the retained family without a
-/// new input assumption. General physical input families remain unsupported.
+/// sets with closed rational or rational-times-pi sources. Version three additionally
+/// retains explicit physical source-box assumptions. The last record is the original
+/// target. A quotient uses reciprocal then product; every record is checked before
+/// any result. Closed leaves add no assumptions; family leaves retain both qualified
+/// endpoint premises through mathematical selection and independent wire replay.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ScalarKernelCertificate {
     /// Independently versioned closed law and endpoint-reduction grammar.
@@ -99,4 +102,28 @@ pub enum ScalarKernelInputValue {
         /// Untrusted bounds; reuse requires the complete store-local checked certificate key.
         certificate: Box<PiBoundCertificate>,
     },
+}
+
+/// An exact declared source box whose qualified endpoint assumptions remain conditional.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScalarKernelFamily {
+    /// Original Real source expression, never inferred from a center or display name.
+    pub source: Handle,
+    /// Exact included lower endpoint of the declared physical family.
+    pub lower: Rational,
+    /// Exact included upper endpoint of the declared physical family.
+    pub upper: Rational,
+    /// Qualified assumptions for source-minus-lower and upper-minus-source being nonnegative.
+    pub premises: [crate::domain::HypothesisRef; 2],
+}
+
+/// A complete native input set covering an explicitly assumed physical family.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ScalarKernelFamilyInput {
+    /// Exact binary center of the executed input sum.
+    pub center: Rational,
+    /// Nonnegative total radius, including numerical error exactly once.
+    pub radius: Rational,
+    /// Original source identity, declared box and retained endpoint assumptions.
+    pub family: ScalarKernelFamily,
 }

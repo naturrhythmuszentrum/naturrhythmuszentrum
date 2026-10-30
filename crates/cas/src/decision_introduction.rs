@@ -69,6 +69,7 @@ pub(crate) fn check(
             coordinate(cas, draft, bound, enclosure, premise)?;
             crate::decision_enclosure::check(cas, enclosure, budget)?;
             crate::statement::merge(cas, &mut conditions, &premise.conditions, budget)?;
+            crate::decision_kernel::family::retain(cas, enclosure, &mut conditions, budget)?;
         }
         Ok(())
     })?;
@@ -184,6 +185,9 @@ pub(crate) fn dependencies(
         .chain(value.enclosures.iter().map(|enclosure| &enclosure.target))
     {
         edges.push((cas.checked(object)?, crate::graph::Edge::DependsOn));
+    }
+    for enclosure in &value.enclosures {
+        crate::decision_kernel::family::dependencies(cas, enclosure, edges, budget)?;
     }
     Ok(())
 }

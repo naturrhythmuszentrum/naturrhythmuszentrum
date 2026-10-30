@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original LC floor selection assembled solely through public CAS constructors.
 
+mod family;
+
 use crate::binding_testing::TestResult;
 use nrz_bindings::readings::algebra::decision::{
     EnclosureOrigin, IntegerFamily, IntegerSelection, RationalEnclosure,
@@ -195,7 +197,11 @@ impl Frame {
 
 /// Declare projected coverage without asserting its proof.
 fn cover(bounded: bool) -> TestResult<(Frame, IntegerFamily)> {
-    let mut frame = Frame::new()?;
+    cover_in(Frame::new()?, bounded)
+}
+
+/// A family fixture adds its physical declaration before constructing the unchanged floor relation.
+fn cover_in(mut frame: Frame, bounded: bool) -> TestResult<(Frame, IntegerFamily)> {
     let (relation, [q, n]) = frame.relation(bounded)?;
     let (function, _) = frame.cases(&relation, n.clone())?;
     let zero = frame.term(
@@ -244,6 +250,14 @@ pub(super) struct SelectionFixture {
     pub(super) context: Handle,
     /// Independently checked proof proposal.
     pub(super) steps: Vec<ApplicationDraft>,
+}
+
+/// The original varying LC duration and its retained exact source-box premises.
+pub(super) fn family_fixture() -> TestResult<(
+    SelectionFixture,
+    nrz_bindings::readings::algebra::decision::ScalarKernelFamily,
+)> {
+    family::fixture()
 }
 
 /// Admit an exact rational with explicit mathematical sort.

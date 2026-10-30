@@ -99,7 +99,7 @@ fn bindings_lc_count_complete() -> TestResult {
     let owner = physical_source("1")?;
     let mut budget = ledger()?;
     let model = DecisionExpression::declared(Rc::clone(&owner), "model", &mut budget)?;
-    assert_eq!(model.exact(), &ExactConstant::one());
+    assert_eq!(model.exact(), Some(&ExactConstant::one()));
     let model_work = budget.usage().work;
     let physical = DecisionExpression::declared(owner, "quotient", &mut budget)?;
     let physical_work = budget.usage().work - model_work;
@@ -171,7 +171,7 @@ fn bindings_lc_count_cumulative_boundary() -> TestResult {
         })?;
         budget.work(17, nrz_cas::Location::new("prior nominal LC work"))?;
         let model = DecisionExpression::declared(Rc::clone(&owner), "model", &mut budget)?;
-        assert_eq!(model.exact(), &ExactConstant::one());
+        assert_eq!(model.exact(), Some(&ExactConstant::one()));
         let physical = DecisionExpression::declared(Rc::clone(&owner), "quotient", &mut budget)?;
         let mut source = fixture(false, "3", "10/Pi")?;
         let case = IntegerDecisionCase::declare(

@@ -186,7 +186,7 @@ fn coefficients(
         // One-coordinate maps retain the original validation cost without reuse keys.
         if contract.original.coordinates.len() == 1 {
             let scalar = budget.with_retained_payload(bytes, AT, |budget| {
-                crate::decision_enclosure::validate(cas, coefficient, budget)
+                crate::decision_enclosure::validate_closed(cas, coefficient, budget)
             })?;
             bytes = bytes.saturating_add(scalar);
             budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
@@ -211,7 +211,7 @@ fn coefficients(
             let scalar = budget.with_retained_payload(
                 bytes.saturating_add(keys).saturating_add(key_bytes),
                 AT,
-                |budget| crate::decision_enclosure::validate(cas, coefficient, budget),
+                |budget| crate::decision_enclosure::validate_closed(cas, coefficient, budget),
             )?;
             keys = keys.saturating_add(key_bytes);
             checked.insert(key, scalar);

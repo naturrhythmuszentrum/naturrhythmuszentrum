@@ -67,6 +67,20 @@ pub(crate) fn validate(
     validate_inner(cas, contract, budget)
 }
 
+/// Lattice consumers currently retain only closed scalar prerequisites.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "lattice proof consumers require a closed scalar prerequisite"
+)]
+pub(crate) fn validate_closed(
+    cas: &Cas,
+    contract: &RationalEnclosure,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
+    crate::decision_kernel::family::closed(contract)?;
+    validate(cas, contract, budget)
+}
+
 /// Only origins with independently checked reusable judgments acquire the store guard.
 const fn reusable(origin: &EnclosureOrigin) -> bool {
     matches!(

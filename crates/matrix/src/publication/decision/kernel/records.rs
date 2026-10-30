@@ -5,7 +5,10 @@ use super::{AT, LiveDecisionError};
 use crate::FrozenDecisionInputs;
 use nrz_bindings::readings::algebra::{
     ExactConstant, Rational,
-    decision::{ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw, ScalarKernelRecord},
+    decision::{
+        ScalarKernelFamilyInput, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
+        ScalarKernelRecord,
+    },
     pi_bounds::PiBoundCertificate,
     syntax::Constant,
 };
@@ -103,6 +106,18 @@ pub(super) fn convert<P: Scalar>(
         let KernelLaw::Sum { left, right } = value.law else {
             return Err(LiveDecisionError::Recipe);
         };
+        if let Some(family) = frozen.association().operands()[slot].family() {
+            result.push(record(
+                value,
+                ScalarKernelLaw::Family(Box::new(ScalarKernelFamilyInput {
+                    center: exact(left.lower, budget)?,
+                    radius: exact(right.upper, budget)?,
+                    family: family.clone(),
+                })),
+                budget,
+            )?);
+            continue;
+        }
         let source = source(frozen, slot, pi, budget)?;
         let input = ScalarKernelInput {
             center: exact(left.lower, budget)?,
@@ -177,6 +192,30 @@ pub(super) fn pi_bytes(pi: &PiBoundCertificate) -> u64 {
                     .saturating_add(second.div_ceil(8))
                     .saturating_mul(4)
                     .saturating_add(128),
+            )
+        })
+}
+
+/// Complete family boxes and qualified source handles are reserved before cloning their laws.
+pub(super) fn family_bytes<P: Scalar>(frozen: &FrozenDecisionInputs<P>) -> u64 {
+    frozen
+        .association()
+        .operands()
+        .iter()
+        .filter_map(|operand| operand.family())
+        .fold(0_u64, |total, family| {
+            [&family.lower, &family.upper].into_iter().fold(
+                total.saturating_add(192),
+                |total, value| {
+                    let (first, second) = value.component_bits();
+                    total.saturating_add(
+                        first
+                            .div_ceil(8)
+                            .saturating_add(second.div_ceil(8))
+                            .saturating_mul(4)
+                            .saturating_add(128),
+                    )
+                },
             )
         })
 }

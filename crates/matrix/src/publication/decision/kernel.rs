@@ -98,8 +98,9 @@ impl<P: Scalar> FrozenRatioKernel<P> {
 impl Heap {
     /// Execute and certify the closed original quotient over the complete frozen total-radius sets.
     ///
-    /// Only declared native constant inputs with rational or rational-times-pi coherent
-    /// values are supported. The supplied Machin data is independently replayed by CAS.
+    /// Native inputs may be declared rational or rational-times-pi constants, or explicit
+    /// physical families admitted by bindings. CAS retains every family premise and
+    /// independently replays the supplied Machin data.
     /// Numerical error is already in each total radius and is never added twice.
     /// # Errors
     /// Refuses stale or foreign versions, unsupported originals, a nominal source outside
@@ -126,6 +127,7 @@ impl Heap {
             let scratch = frozen
                 .retained_payload_bytes()
                 .saturating_add(records::pi_bytes(pi))
+                .saturating_add(records::family_bytes(&frozen))
                 .saturating_add(4096);
             budget.check(BudgetKind::OutputBytes, scratch, AT)?;
             budget.work(scratch - frozen.retained_payload_bytes(), AT)?;
@@ -141,7 +143,17 @@ impl Heap {
                     lower: output.lower.clone(),
                     upper: output.upper.clone(),
                     origin: EnclosureOrigin::ScalarKernel(Box::new(ScalarKernelCertificate {
-                        version: 2,
+                        version: if frozen
+                            .association()
+                            .case()
+                            .source()
+                            .input_families()
+                            .is_empty()
+                        {
+                            2
+                        } else {
+                            3
+                        },
                         expression: spec.target.clone(),
                         context: spec.context.clone(),
                         input_family: spec.family.domain.clone(),

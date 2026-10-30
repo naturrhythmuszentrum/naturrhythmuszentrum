@@ -5,6 +5,7 @@ mod association;
 mod case;
 mod count;
 mod expression;
+mod family;
 mod lattice;
 mod snapshot;
 mod storage;

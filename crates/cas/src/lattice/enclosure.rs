@@ -115,7 +115,7 @@ pub(super) fn validate(
             return Err(mismatch());
         }
         let scalar = budget.with_retained_payload(bytes, AT, |budget| {
-            crate::decision_enclosure::validate(cas, coordinate, budget)
+            crate::decision_enclosure::validate_closed(cas, coordinate, budget)
         })?;
         bytes = bytes.saturating_add(scalar);
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Scalar law certificates replay pure rational relations under the original target scope.
 
+mod family;
 mod input_coverage;
 
 use super::decision_baseline::{Example, Fixture};
@@ -207,7 +208,7 @@ fn decision_kernel_nominal_coverage_refuses() -> TestResult {
         "scalar kernel coverage",
     )?;
     let (mut source, mut request) = prepared(0)?;
-    certificate(&mut request)?.version = 3;
+    certificate(&mut request)?.version = u32::MAX;
     refuses(
         &mut source,
         &request,

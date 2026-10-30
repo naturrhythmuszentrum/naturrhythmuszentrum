@@ -63,6 +63,34 @@ impl IntegerDecisionCase {
         specification: IntegerDecisionSpec,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
+        if source.exact().is_none() {
+            return Err(DecisionError::Source);
+        }
+        Self::checked(cas, source, specification, budget)
+    }
+
+    /// Declare an original quotient under an explicit physical input-family correspondence.
+    /// # Errors
+    /// Refuses closed substitutes, changed source identities, boxes, assumptions, targets and limits.
+    pub fn declare_family(
+        cas: &Cas,
+        source: DecisionExpression,
+        specification: IntegerDecisionSpec,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
+        if source.input_families().is_empty() {
+            return Err(DecisionError::Source);
+        }
+        Self::checked(cas, source, specification, budget)
+    }
+
+    /// Both source forms share the original case and parameter admission owner.
+    fn checked(
+        cas: &Cas,
+        source: DecisionExpression,
+        specification: IntegerDecisionSpec,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
         budget.work(8, storage::AT)?;
         let Kind::Count(name, _) = specification.count.kind() else {
             return Err(DecisionError::CountKind);
@@ -108,13 +136,17 @@ impl IntegerDecisionCase {
                 return Err(DecisionError::Parameter);
             }
         }
-        let exact = ExactConstant::from_expression(cas, &specification.target, budget)?;
-        budget.work(
-            storage::constant_bytes(&exact).max(storage::constant_bytes(source.exact())),
-            storage::AT,
-        )?;
-        if &exact != source.exact() {
-            return Err(DecisionError::Target);
+        if let Some(expected) = source.exact() {
+            let exact = ExactConstant::from_expression(cas, &specification.target, budget)?;
+            budget.work(
+                storage::constant_bytes(&exact).max(storage::constant_bytes(expected)),
+                storage::AT,
+            )?;
+            if &exact != expected {
+                return Err(DecisionError::Target);
+            }
+        } else {
+            super::family::correspondence(cas, &source, &specification, budget)?;
         }
         let mut comparison = 128_u64;
         if let Some(domain) = &specification.family.count {

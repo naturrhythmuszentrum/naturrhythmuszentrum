@@ -6,6 +6,11 @@
     reason = "the store and enclosure dispatcher share checked record retention"
 )]
 pub(crate) mod cache;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "scalar proof consumers share qualified family retention"
+)]
+pub(super) mod family;
 mod input;
 #[expect(
     clippy::redundant_pub_crate,
@@ -49,7 +54,7 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    if !matches!(certificate.version, 1 | 2) {
+    if !matches!(certificate.version, 1..=3) {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     for handle in [
@@ -81,6 +86,12 @@ pub(super) fn validate(
         .saturating_add(number_bytes(&contract.lower))
         .saturating_add(number_bytes(&contract.upper));
     budget.check(BudgetKind::OutputBytes, bytes, AT)?;
+    if certificate.version == 3 {
+        budget.with_retained_payload(bytes, AT, |budget| {
+            family::validate(cas, contract, certificate, budget)
+        })?;
+        return Ok(bytes);
+    }
     budget.with_retained_payload(bytes, AT, |budget| {
         let original =
             ExactConstant::from_expression(cas, &contract.target, budget).map_err(fragment)?;
@@ -144,6 +155,9 @@ fn replay(
             if certificate.version == 1 && matches!(record.law, ScalarKernelLaw::Input(_)) {
                 return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
             }
+            if matches!(record.law, ScalarKernelLaw::Family(_)) {
+                return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
+            }
             relations::check(
                 cas,
                 cas.checked(&certificate.expression)?,
@@ -190,6 +204,7 @@ fn exact(
     match law {
         ScalarKernelLaw::Rational(value) => Ok(value.clone().into()),
         ScalarKernelLaw::Input(value) => input::exact(value, budget),
+        ScalarKernelLaw::Family(_) => Err(unsupported()),
         ScalarKernelLaw::Sum { left, right } => child(*left)?.add(child(*right)?, budget),
         ScalarKernelLaw::Product { left, right } => child(*left)?.mul(child(*right)?, budget),
         ScalarKernelLaw::Reciprocal { input } => ExactConstant::one().div(child(*input)?, budget),
@@ -219,6 +234,7 @@ fn record_bytes(record: &ScalarKernelRecord) -> u64 {
     let value = match &record.law {
         ScalarKernelLaw::Rational(value) => number_bytes(value),
         ScalarKernelLaw::Input(value) => input::bytes(value),
+        ScalarKernelLaw::Family(value) => family::bytes(value),
         ScalarKernelLaw::Sum { .. }
         | ScalarKernelLaw::Product { .. }
         | ScalarKernelLaw::Reciprocal { .. }
