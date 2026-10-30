@@ -16,7 +16,7 @@ use nrz_bindings::readings::algebra::{
     proof::VerifiedWitness,
 };
 use nrz_scalar::{ArithmeticContext, KernelCertificate, KernelUsage, LiteralLimits, Scalar};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Every optional trace charge is separate from the existing exact-box receiver.
 const AT: Location = Location::new("matrix live scalar kernel");
@@ -108,7 +108,7 @@ impl Heap {
     pub fn trace_ratio_decision<P: Scalar + 'static>(
         &self,
         frozen: FrozenDecisionInputs<P>,
-        graph: &Cas,
+        graph: &mut Cas,
         pi: &PiBoundCertificate,
         arithmetic: &ArithmeticContext,
         budget: &mut Budget,
@@ -176,18 +176,24 @@ impl Heap {
     pub fn prepare_ratio_kernel_decision<P: Scalar + 'static>(
         &self,
         trace: FrozenRatioKernel<P>,
-        graph: Rc<Cas>,
+        graph: Arc<Mutex<Cas>>,
         witness: VerifiedWitness,
         budget: &mut Budget,
     ) -> Result<PreparedDecision<P>, LiveDecisionError> {
         self.check_decision_inputs(&trace.frozen, budget)?;
         let selected =
             budget.with_retained_payload(trace.retained_payload_bytes(), AT, |budget| {
-                let (_, supplied) = graph.integer_selection_evidence(&witness, budget)?;
+                let authority = graph.lock().map_err(|_| {
+                    LiveDecisionError::Admission(Box::new(
+                        nrz_bindings::DecisionError::GraphPoisoned,
+                    ))
+                })?;
+                let (_, supplied) = authority.integer_selection_evidence(&witness, budget)?;
                 budget.work(trace.evidence.original.retained_bytes(), AT)?;
                 if supplied != trace.evidence.contract() {
                     return Err(LiveDecisionError::Recipe);
                 }
+                drop(authority);
                 let case = trace.frozen.association().case();
                 case.admit(graph, witness, case.attachment(), budget)
                     .map_err(|cause| LiveDecisionError::Admission(Box::new(cause)))

@@ -682,6 +682,28 @@ All migrated judgment kinds contribute to one graph-owned retained-payload accou
 
 A fresh store reconstructs its own checked judgments independently. A retained node is neither a portable witness nor a new source hypothesis: witness export and replay continue to use their existing canonical statements and complete independent checks under (`thm:cas:lemma-cache`) and (`rule:cas:scalar-kernel-wire`). Store identity, rollback generation and runtime index state do not enter portable witness bytes. The immutable graph and its publication synchronization preserve `Cas` as `Send` and `Sync`, following (`rule:cas:anonymous-judgment-rollback`).
 
+## Shared judgment ownership · `sec:cas:shared-judgment-ownership`
+
+**Decision (Guard the existing store)** · `dec:cas:shared-judgment-owner`
+
+Choose `Arc<Mutex<Cas>>` for the selected scalar and lattice graph owners. Their fallible `cas` accessors return one exclusive guard; live enclosure receivers accept the guard's `&mut Cas`. The guard protects the existing `State.graph`, whose borrowed records remain valid until that guard is released, under (`def:cas:anonymous-judgment-node`). An outer owner lock avoids a second graph and does not require interior mutability in graph records. This ownership-only change precedes the two remaining migrations; their current retention remains as described by (`def:cas:scalar-record-cache`) and (`def:cas:pi-bound-cache`).
+
+**Rule (One enclosing attempt)** · `rule:cas:shared-judgment-attempt`
+
+The migration boundary is one held guard and one staged graph attempt spanning independent checking, judgment admission and the enclosing receiver's final receipt copy and containment checks. Nested checks receive the same mutable store borrow and the caller's cumulative ledger; they never acquire the owner lock again. Any refusal restores every newly added node, evidence edge, index entry and payload counter while preserving earlier evidence and spent Work under (`rule:cas:anonymous-judgment-rollback`). The ownership commit supplies the mutable route; the migrations must extend the staged attempt through both matrix receivers before admitting either new graph judgment under (`dec:cas:shared-judgment-owner`).
+
+**Rule (Generation and retained ownership)** · `rule:cas:shared-judgment-ledger`
+
+A failed staged graph attempt advances the rollback generation before logical identifiers can recur, invalidates reusable authority in the previous generation and restores the caller's reservation without refunding Work. Saturation disables retained hits. All three migrated judgment kinds update `State`'s single judgment count and retained-payload total, and each citing ledger registers that total once beside subsequent scratch under (`rule:cas:anonymous-judgment-accounting`), (`rule:cas:constant-cache-key`). The two existing side tables and their separate account are deleted in their respective migration commits; ownership alone does not change those accounts under (`rule:cas:shared-judgment-attempt`).
+
+**Rule (Synchronization and cost boundary)** · `rule:cas:shared-judgment-cost`
+
+`Cas` remains `Send` and `Sync`: the graph continues to use its existing thread-safe fields, and `Mutex<Cas>` permits only one borrower for inspection or admission. A poisoned owner refuses access. Guard acquisition performs no graph copy, key encoding, registration or mathematical check; its fixed runtime synchronization and owner allocation must be measured separately from the caller's logical Work before accepting this route. Existing fixed owner metadata allowances must cover the wrapper, and no Work, storage limit or default may rise under (`dec:cas:shared-judgment-owner`), (`rule:cas:anonymous-judgment-accounting`). The measured comparison in (`ex:cas:shared-judgment-owner-cost`) covers cold and warm receipt Work, retained bytes and wrapper size; existing literal boundaries check the complete routed receivers.
+
+**Example (Measured shared owner cost)** · `ex:cas:shared-judgment-owner-cost`
+
+Deliberately failing host probes measured identical scalar receipt costs through `Mutex` and `RwLock`: 22,560 cold Work, 22,016 warm Work, 1,424 retained bytes and 1,488 ledger bytes, matching (`ex:cas:scalar-record-cache-costs`). On the measured target the mutex wrapper adds 8 bytes and the reader/writer wrapper 16; both shared pointers have the same width as the replaced `Rc`. The existing 256-byte selected-owner metadata envelope covers the mutex wrapper without raising its bound. The selected owners already share through single-threaded physical snapshots, and every potentially admitting check would require an initial write guard; choose the smaller mutex under (`dec:cas:shared-judgment-owner`). Synchronization itself spends no logical Work and performs no graph traversal; this is an explicit fixed runtime cost, not a key, registration or transaction charge. The ownership change introduces none of those three operations under (`rule:cas:shared-judgment-cost`).
+
 **Theorem (Closed constant preparation)** · `thm:cas:constant-closed-preparation`
 
 Formal schema `constant.closed-preparation`, version 1. The complete original closed expression is finite real and has the independently checked normalized value and sign. Required premises: Original `DomainGuard` and normalized `Equality` evidence in the identical declaration, context and stratum, checked under (`def:cas:constant-preparation`). Standing: Lemma; instances are CAS-checked.

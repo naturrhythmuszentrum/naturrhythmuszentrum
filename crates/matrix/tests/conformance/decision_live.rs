@@ -9,7 +9,7 @@ use crate::binding_testing::TestResult;
 use nrz_bindings::readings::algebra::{Cas, proof::VerifiedWitness};
 use nrz_matrix::{Coverage, DecisionSnapshotError, Heap, HeapError, HeapLimits, LiveDecisionError};
 use nrz_scalar::{ArithmeticContext, LiteralLimits};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// A bounded exact-endpoint decode attempt; both attempts are prepaid on the original ledger.
 const fn literals() -> LiteralLimits {
@@ -37,7 +37,7 @@ fn decision_live_lc_costs() -> TestResult {
     assert_eq!(selection - capture, 166_952);
     let prepared = heap.prepare_ratio_decision(
         frozen,
-        Rc::new(source.frame.cas),
+        Arc::new(Mutex::new(source.frame.cas)),
         witness,
         &ArithmeticContext::new()?,
         literals(),
@@ -99,8 +99,8 @@ fn decision_live_radius_crossing_refuses_readmission() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     let mut heap = Heap::new(HeapLimits::default())?;
     let mut bindings = Vec::new();
     for operand in association.operands() {
@@ -122,7 +122,7 @@ fn decision_live_radius_crossing_refuses_readmission() -> TestResult {
     assert!(matches!(
         heap.prepare_ratio_decision(
             frozen,
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             witness,
             &ArithmeticContext::new()?,
             literals(),
@@ -131,7 +131,10 @@ fn decision_live_radius_crossing_refuses_readmission() -> TestResult {
         Err(LiveDecisionError::Enclosure)
     ));
     assert_eq!(heap.provenance_usage(), retained);
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     Ok(())
 }
 
@@ -140,13 +143,13 @@ fn prepared(
     heap: &Heap,
     association: &nrz_bindings::DecisionInputs,
     inputs: &[nrz_matrix::ValueBinding<f64>],
-    graph: &Rc<Cas>,
+    graph: &Arc<Mutex<Cas>>,
     witness: &VerifiedWitness,
 ) -> TestResult<nrz_matrix::PreparedDecision<f64>> {
     let frozen = heap.freeze_decision_inputs(association, inputs, &mut ledger()?)?;
     Ok(heap.prepare_ratio_decision(
         frozen,
-        Rc::clone(graph),
+        Arc::clone(graph),
         witness.clone(),
         &ArithmeticContext::new()?,
         literals(),
@@ -163,7 +166,7 @@ fn decision_live_publication_refusals() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
+    let graph = Arc::new(Mutex::new(source.frame.cas));
     let mut heap = Heap::new(HeapLimits::default())?;
     let inputs = inputs(&mut heap, &association)?;
     let foreign = Heap::new(HeapLimits::default())?;
@@ -204,7 +207,7 @@ fn decision_live_publication_work_boundaries() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
+    let graph = Arc::new(Mutex::new(source.frame.cas));
     let mut heap = Heap::new(HeapLimits::default())?;
     let inputs = inputs(&mut heap, &association)?;
     let before = heap.provenance_usage();
@@ -278,7 +281,7 @@ fn decision_live_exact_map_refusal() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
+    let graph = Arc::new(Mutex::new(source.frame.cas));
     let mut heap = Heap::new(HeapLimits::default())?;
     let bindings = inputs(&mut heap, &association)?;
     let candidate = prepared(&heap, &association, &bindings, &graph, &witness)?;
@@ -320,7 +323,7 @@ fn decision_live_exact_map_refusal() -> TestResult {
     )?;
     let candidate = heap.prepare_ratio_decision(
         frozen,
-        Rc::new(changed_source.frame.cas),
+        Arc::new(Mutex::new(changed_source.frame.cas)),
         witness,
         &ArithmeticContext::new()?,
         literals(),
@@ -341,7 +344,7 @@ fn decision_live_admission_work_boundaries() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
+    let graph = Arc::new(Mutex::new(source.frame.cas));
     let mut heap = Heap::new(HeapLimits::default())?;
     let bindings = inputs(&mut heap, &association)?;
     let before = heap.provenance_usage();
@@ -357,7 +360,7 @@ fn decision_live_admission_work_boundaries() -> TestResult {
         )?;
         let result = heap.prepare_ratio_decision(
             frozen,
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             witness.clone(),
             &ArithmeticContext::new()?,
             literals(),
@@ -419,7 +422,7 @@ fn decision_live_complete_lc_work_boundaries() -> TestResult {
             .check_proof(&source.context, &source.steps, &mut budget)?;
         let candidate = heap.prepare_ratio_decision(
             frozen,
-            Rc::new(source.frame.cas),
+            Arc::new(Mutex::new(source.frame.cas)),
             witness,
             &ArithmeticContext::new()?,
             literals(),
@@ -461,11 +464,11 @@ fn lattice_live_scalar_baseline() -> TestResult {
         .cas
         .check_proof(&source.context, &source.steps, &mut budget)?;
     let selected = budget.usage().work;
-    let graph = Rc::new(source.frame.cas);
-    let graph_records = graph.counts();
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let graph_records = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     let prepared = heap.prepare_ratio_decision(
         frozen,
-        Rc::clone(&graph),
+        Arc::clone(&graph),
         witness,
         &ArithmeticContext::new()?,
         literals(),
@@ -488,7 +491,10 @@ fn lattice_live_scalar_baseline() -> TestResult {
         panic!("retired parent must refuse");
     };
     assert!(matches!(fault, LiveDecisionError::Retired));
-    assert_eq!(graph.counts(), graph_records);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        graph_records
+    );
     assert_eq!(heap.provenance_usage(), records);
     assert_eq!(originals, 109_290);
     assert_eq!(captured - originals, 2952);
@@ -590,18 +596,21 @@ fn kernel_live_baseline() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     let records = heap.provenance_usage();
     heap.prepare_ratio_decision(
         frozen,
-        Rc::clone(&graph),
+        Arc::clone(&graph),
         witness,
         &context,
         literals(),
         &mut budget,
     )?;
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     assert_eq!(heap.provenance_usage(), records);
     assert_eq!(capture, 2969);
     assert_eq!(budget.usage().work, 5748);

@@ -52,7 +52,7 @@ impl Ready {
                 .freeze_lattice_inputs(&self.association, &self.inputs, &mut ledger()?)?;
         Ok(self.heap.enclose_lattice_inputs(
             frozen,
-            self.selected.cas(),
+            &mut *self.selected.cas()?,
             &self.contract,
             &ArithmeticContext::new()?,
             lattice_live::literals(),
@@ -98,7 +98,7 @@ fn exhausted(error: &LiveDecisionError, expected: BudgetKind) -> TestResult {
 fn lattice_enclosure_work_boundaries() -> TestResult {
     for (kind, limits) in [(0, [42_052, 42_051]), (1, [21_299, 21_298])] {
         let ready = Ready::new(kind)?;
-        let graph = ready.selected.cas().counts();
+        let graph = ready.selected.cas()?.counts();
         let records = ready.heap.provenance_usage();
         for (position, work) in limits.into_iter().enumerate() {
             let frozen = ready.heap.freeze_lattice_inputs(
@@ -112,7 +112,7 @@ fn lattice_enclosure_work_boundaries() -> TestResult {
             })?;
             let result = ready.heap.enclose_lattice_inputs(
                 frozen,
-                ready.selected.cas(),
+                &mut *ready.selected.cas()?,
                 &ready.contract,
                 &ArithmeticContext::new()?,
                 lattice_live::literals(),
@@ -132,7 +132,7 @@ fn lattice_enclosure_work_boundaries() -> TestResult {
             }
             assert!(budget.usage().work > 17);
             assert!(budget.usage().work <= work);
-            assert_eq!(ready.selected.cas().counts(), graph);
+            assert_eq!(ready.selected.cas()?.counts(), graph);
             assert_eq!(ready.heap.provenance_usage(), records);
         }
     }
@@ -146,7 +146,7 @@ fn lattice_enclosure_work_boundaries() -> TestResult {
 fn lattice_preparation_work_boundaries() -> TestResult {
     for (kind, limits) in [(0, [1711, 1710]), (1, [2039, 2038])] {
         let ready = Ready::new(kind)?;
-        let graph = ready.selected.cas().counts();
+        let graph = ready.selected.cas()?.counts();
         let records = ready.heap.provenance_usage();
         for (position, work) in limits.into_iter().enumerate() {
             let enclosed = ready.enclose(&mut ledger()?)?;
@@ -172,7 +172,7 @@ fn lattice_preparation_work_boundaries() -> TestResult {
             }
             assert!(budget.usage().work > 17);
             assert!(budget.usage().work <= work);
-            assert_eq!(ready.selected.cas().counts(), graph);
+            assert_eq!(ready.selected.cas()?.counts(), graph);
             assert_eq!(ready.heap.provenance_usage(), records);
         }
     }
@@ -189,7 +189,7 @@ fn lattice_publication_boundaries() -> TestResult {
         (1, [306, 305], [65_790, 65_789]),
     ] {
         let ready = Ready::new(kind)?;
-        let graph = ready.selected.cas().counts();
+        let graph = ready.selected.cas()?.counts();
         let records = ready.heap.provenance_usage();
         for (work, staged_payload_bytes, output_bytes, refusal) in [
             (work_limits[0], byte_limits[0] + 13, byte_limits[0], None),
@@ -235,7 +235,7 @@ fn lattice_publication_boundaries() -> TestResult {
             }
             assert!(budget.usage().work >= 17);
             assert!(budget.usage().work <= work);
-            assert_eq!(ready.selected.cas().counts(), graph);
+            assert_eq!(ready.selected.cas()?.counts(), graph);
             assert_eq!(ready.heap.provenance_usage(), records);
         }
     }
@@ -323,7 +323,7 @@ fn lattice_access_work_boundaries() -> TestResult {
 fn lattice_enclosure_output_boundaries() -> TestResult {
     for (kind, limits) in [(0, [5848, 5847]), (1, [8480, 8479])] {
         let ready = Ready::new(kind)?;
-        let graph = ready.selected.cas().counts();
+        let graph = ready.selected.cas()?.counts();
         let records = ready.heap.provenance_usage();
         for (position, output_bytes) in limits.into_iter().enumerate() {
             let frozen = ready.heap.freeze_lattice_inputs(
@@ -337,7 +337,7 @@ fn lattice_enclosure_output_boundaries() -> TestResult {
             })?;
             let result = ready.heap.enclose_lattice_inputs(
                 frozen,
-                ready.selected.cas(),
+                &mut *ready.selected.cas()?,
                 &ready.contract,
                 &ArithmeticContext::new()?,
                 lattice_live::literals(),
@@ -352,7 +352,7 @@ fn lattice_enclosure_output_boundaries() -> TestResult {
                 exhausted(&fault, BudgetKind::OutputBytes)?;
             }
             assert!(budget.usage().work > 17);
-            assert_eq!(ready.selected.cas().counts(), graph);
+            assert_eq!(ready.selected.cas()?.counts(), graph);
             assert_eq!(ready.heap.provenance_usage(), records);
         }
     }

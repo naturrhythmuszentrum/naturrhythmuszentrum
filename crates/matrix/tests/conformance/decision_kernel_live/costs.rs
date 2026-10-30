@@ -14,7 +14,7 @@ use nrz_bindings::{Budget, DecisionInputs, Limits};
 use nrz_matrix::{FrozenRatioKernel, Heap, HeapLimits, LiveDecisionError, ValueBinding};
 use nrz_scalar::ArithmeticContext;
 use std::cmp::Ordering;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Independent setup outside the owner being bounded.
 struct Fixture {
@@ -41,7 +41,7 @@ impl Fixture {
         })
     }
     /// Capture outside the trace owner's budget and execute only the measured trace owner.
-    fn trace(&self, budget: &mut Budget) -> Result<FrozenRatioKernel<f64>, LiveDecisionError> {
+    fn trace(&mut self, budget: &mut Budget) -> Result<FrozenRatioKernel<f64>, LiveDecisionError> {
         let frozen = self.heap.freeze_decision_inputs(
             &self.association,
             &self.bindings,
@@ -49,7 +49,7 @@ impl Fixture {
         )?;
         self.heap.trace_ratio_decision(
             frozen,
-            &self.source.frame.cas,
+            &mut self.source.frame.cas,
             &pi().map_err(|_| LiveDecisionError::Recipe)?,
             &ArithmeticContext::new()?,
             budget,
@@ -89,7 +89,7 @@ fn exhausted(fault: &Fault, limit: u64, expected: u64) {
 #[test]
 fn kernel_live_trace_work_boundary() -> TestResult {
     for work in [393_684, 393_683] {
-        let source = Fixture::new()?;
+        let mut source = Fixture::new()?;
         let graph = source.source.frame.cas.counts();
         let heap = source.heap.provenance_usage();
         let mut budget = allowance(work)?;
@@ -162,14 +162,14 @@ fn kernel_live_preparation_work_boundary() -> TestResult {
         let mut source = Fixture::new()?;
         let trace = source.trace(&mut ledger()?)?;
         let witness = select(&mut source.source, &trace, &mut ledger()?)?;
-        let graph = Rc::new(source.source.frame.cas);
-        let counts = graph.counts();
+        let graph = Arc::new(Mutex::new(source.source.frame.cas));
+        let counts = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
         let before = source.heap.provenance_usage();
         let mut budget = allowance(work)?;
         let limits = budget.limits().clone();
         let result = source.heap.prepare_ratio_kernel_decision(
             trace,
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             witness,
             &mut budget,
         );
@@ -187,7 +187,10 @@ fn kernel_live_preparation_work_boundary() -> TestResult {
             assert!(budget.usage().work >= 17);
         }
         assert_eq!(budget.limits(), &limits);
-        assert_eq!(graph.counts(), counts);
+        assert_eq!(
+            graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+            counts
+        );
         assert_eq!(source.heap.provenance_usage(), before);
     }
     Ok(())
@@ -320,7 +323,7 @@ fn meaning(records: &[ScalarKernelRecord], budget: &mut Budget) -> TestResult {
 /// ´claim:matrix:kernel-live-trace-cost-components´
 #[test]
 fn kernel_live_trace_cost_components() -> TestResult {
-    let source = Fixture::new()?;
+    let mut source = Fixture::new()?;
     let trace = source.trace(&mut ledger()?)?;
     let contract = trace.evidence().contract();
     let EnclosureOrigin::ScalarKernel(certificate) = &contract.origin else {

@@ -85,7 +85,7 @@ impl Heap {
     pub fn enclose_lattice_inputs<P: Scalar + 'static>(
         &self,
         frozen: FrozenLatticeInputs<P>,
-        graph: &Cas,
+        graph: &mut Cas,
         contract: &RationalBoxEnclosure,
         arithmetic: &ArithmeticContext,
         literals: LiteralLimits,

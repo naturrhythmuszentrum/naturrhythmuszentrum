@@ -68,9 +68,10 @@ impl Heap {
             .case()
             .validate_attachment(selected.attachment(), budget)
             .map_err(|cause| LiveDecisionError::Admission(Box::new(cause)))?;
-        let (_, evidence) = selected
+        let authority = selected
             .cas()
-            .lattice_selection_evidence(selected.witness(), budget)?;
+            .map_err(|cause| LiveDecisionError::Admission(Box::new(cause)))?;
+        let (_, evidence) = authority.lattice_selection_evidence(selected.witness(), budget)?;
         let LatticeEnclosure::Original(original) = evidence else {
             return Err(LiveDecisionError::Recipe);
         };
@@ -78,6 +79,7 @@ impl Heap {
         if &original.original != enclosure.original.contract() {
             return Err(LiveDecisionError::Enclosure);
         }
+        drop(authority);
         Ok(PreparedLatticeDecision {
             enclosure,
             selected,
@@ -193,12 +195,10 @@ impl<P: Scalar + 'static> PublishedLatticeDecision<P> {
         budget: &mut Budget,
     ) -> Result<LiveLatticeIndex<P>, LiveDecisionError> {
         let selected = self.current(heap, budget)?;
-        let value = selected.cas().materialize_lattice_index(
-            selected.witness(),
-            coordinate,
-            capacity,
-            budget,
-        )?;
+        let value = selected
+            .cas()
+            .map_err(|cause| LiveDecisionError::Admission(Box::new(cause)))?
+            .materialize_lattice_index(selected.witness(), coordinate, capacity, budget)?;
         Ok(LiveLatticeIndex {
             decision: self.clone(),
             value,

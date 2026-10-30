@@ -15,7 +15,7 @@ use nrz_bindings::readings::algebra::{
     syntax::{AtomicSort, Operator, Sort},
 };
 use nrz_bindings::{LatticeDecisionCase, SelectedLattice};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Original mathematical graph, physical declaration and complete candidate evidence.
 pub(super) struct Selection {
@@ -200,7 +200,7 @@ pub(super) fn select(mut value: Selection) -> TestResult<SelectedLattice> {
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
     Ok(value.case.admit(
-        Rc::new(value.fixture.frame.cas),
+        Arc::new(Mutex::new(value.fixture.frame.cas)),
         &outputs,
         value.case.attachment(),
         &mut ledger()?,

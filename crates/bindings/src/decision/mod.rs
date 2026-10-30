@@ -23,6 +23,9 @@ pub use snapshot::SelectedDecision;
 /// Exact admission refusals; executable count capacity remains a separate operation.
 #[derive(Debug, thiserror::Error)]
 pub enum DecisionError {
+    /// A panic while holding exclusive graph access invalidated the shared owner.
+    #[error("decision graph owner is poisoned")]
+    GraphPoisoned,
     /// The original dependency is outside the supported closed constant subset.
     #[error("decision source has no closed constant input association")]
     Source,

@@ -14,6 +14,7 @@ use nrz_cas::{
     syntax::Constant,
 };
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// A nominal period and duration carry physical time units before their ratio is checked.
 pub(super) fn physical_source(
@@ -129,9 +130,9 @@ fn bindings_decision_admission() -> TestResult {
         .check_proof(&source.context, &source.steps, &mut budget)?;
     let proof_end = budget.usage().work;
     let repeated = witness.clone();
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
-    let selected = case.admit(Rc::clone(&graph), witness, attachment, &mut budget)?;
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
+    let selected = case.admit(Arc::clone(&graph), witness, attachment, &mut budget)?;
     let admission_work = budget.usage().work - proof_end;
     assert_eq!(
         selected.value(),
@@ -147,9 +148,12 @@ fn bindings_decision_admission() -> TestResult {
     assert_eq!(selected.retained_payload_bytes(), 13_842);
     assert_eq!(selected.usage()[1].work - selected.usage()[0].work, 496);
     let mut reused = ledger()?;
-    case.admit(Rc::clone(&graph), repeated, case.attachment(), &mut reused)?;
+    case.admit(Arc::clone(&graph), repeated, case.attachment(), &mut reused)?;
     assert_eq!(reused.usage().work, 496);
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     Ok(())
 }
 
@@ -209,19 +213,22 @@ fn bindings_decision_attachment_refusals() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     for other in alternatives {
         assert!(matches!(
             other.admit(
-                Rc::clone(&graph),
+                Arc::clone(&graph),
                 witness.clone(),
                 attachment.clone(),
                 &mut ledger()?
             ),
             Err(nrz_bindings::DecisionError::Attachment)
         ));
-        assert_eq!(graph.counts(), before);
+        assert_eq!(
+            graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+            before
+        );
     }
     Ok(())
 }
@@ -272,11 +279,11 @@ fn bindings_decision_domain_refusals() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     assert!(matches!(
         narrow.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             witness.clone(),
             narrow.attachment(),
             &mut ledger()?
@@ -287,14 +294,17 @@ fn bindings_decision_domain_refusals() -> TestResult {
     ));
     assert!(matches!(
         changed.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             witness,
             changed.attachment(),
             &mut ledger()?
         ),
         Err(nrz_bindings::DecisionError::Case)
     ));
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     Ok(())
 }
 
@@ -353,8 +363,8 @@ fn bindings_decision_snapshot_boundaries() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     for (work, output_bytes, accepted) in [
         (513, 13_842, true),
         (512, 13_842, false),
@@ -367,7 +377,7 @@ fn bindings_decision_snapshot_boundaries() -> TestResult {
         })?;
         budget.work(17, nrz_cas::Location::new("prior physical decision work"))?;
         let result = case.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             witness.clone(),
             case.attachment(),
             &mut budget,
@@ -377,7 +387,10 @@ fn bindings_decision_snapshot_boundaries() -> TestResult {
             assert_eq!(budget.usage().work, 513);
         }
         assert!(budget.usage().work >= 17);
-        assert_eq!(graph.counts(), before);
+        assert_eq!(
+            graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+            before
+        );
     }
     Ok(())
 }
@@ -405,14 +418,17 @@ fn bindings_decision_cumulative_boundary() -> TestResult {
             .frame
             .cas
             .check_proof(&source.context, &source.steps, &mut budget)?;
-        let graph = Rc::new(source.frame.cas);
-        let before = graph.counts();
-        let result = case.admit(Rc::clone(&graph), witness, case.attachment(), &mut budget);
+        let graph = Arc::new(Mutex::new(source.frame.cas));
+        let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
+        let result = case.admit(Arc::clone(&graph), witness, case.attachment(), &mut budget);
         assert_eq!(result.is_ok(), accepted);
         if accepted {
             assert_eq!(budget.usage().work, 252_344);
         }
-        assert_eq!(graph.counts(), before);
+        assert_eq!(
+            graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+            before
+        );
     }
     Ok(())
 }

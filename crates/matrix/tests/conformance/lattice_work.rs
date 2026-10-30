@@ -42,7 +42,7 @@ struct Costs {
 fn lattice_owner_costs() -> TestResult {
     let mut measurements = Vec::new();
     for kind in [0, 1] {
-        let source = lattice_selection::prepared(kind, false)?;
+        let mut source = lattice_selection::prepared(kind, false)?;
         let association = source.case.associate_inputs(&mut ledger()?)?;
         let mut heap = Heap::new(HeapLimits::default())?;
         let inputs = lattice_live::inputs(&mut heap, &association, kind)?;
@@ -52,10 +52,11 @@ fn lattice_owner_costs() -> TestResult {
         let capture = budget.usage().work;
         let capture_bytes = frozen.retained_payload_bytes();
         assert!(frozen.operands()[0].coordinates()[2] > 0.0);
+        let contract = lattice_selection::original_box(&source)?.clone();
         let enclosed = heap.enclose_lattice_inputs(
             frozen,
-            &source.fixture.frame.cas,
-            lattice_selection::original_box(&source)?,
+            &mut source.fixture.frame.cas,
+            &contract,
             &ArithmeticContext::new()?,
             lattice_live::literals(),
             &mut budget,
@@ -64,7 +65,7 @@ fn lattice_owner_costs() -> TestResult {
         let enclosure_bytes = enclosed.retained_payload_bytes();
         let selected = lattice_selection::select(source)?;
         let publication_bytes = enclosure_bytes + selected.retained_payload_bytes() + 128;
-        let graph = selected.cas().counts();
+        let graph = selected.cas()?.counts();
         let archived = selected.clone();
         let prepared = heap.prepare_lattice_decision(enclosed, selected, &mut budget)?;
         let preparation = budget.usage().work;
@@ -91,7 +92,7 @@ fn lattice_owner_costs() -> TestResult {
             enclosure_bytes,
             publication_bytes,
         });
-        assert_eq!(archived.cas().counts(), graph);
+        assert_eq!(archived.cas()?.counts(), graph);
         assert_eq!(heap.provenance_usage(), before);
     }
     assert_eq!(measurements, expected());

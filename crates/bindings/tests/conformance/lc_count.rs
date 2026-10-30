@@ -11,6 +11,7 @@ use nrz_bindings::{
 };
 use nrz_cas::{ExactConstant, Rational};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Exact nominal data and an explicit complete-turn period retain all original physical operands.
 pub(super) fn physical_source(cycle_value: &str) -> TestResult<Rc<CheckedDeclarations>> {
@@ -113,16 +114,19 @@ fn bindings_lc_count_complete() -> TestResult {
         .frame
         .cas
         .check_proof(&source.context, &source.steps, &mut budget)?;
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
-    let selected = case.admit(Rc::clone(&graph), witness, case.attachment(), &mut budget)?;
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
+    let selected = case.admit(Arc::clone(&graph), witness, case.attachment(), &mut budget)?;
     let count = selected.count(3, &mut budget)?;
     assert_eq!(count.value(), 3);
     assert_eq!(
         count.descriptor().kind(),
         &Kind::Count("complete_lc_cycles".into(), CountDomain::NONNEGATIVE)
     );
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     assert_eq!(model_work, 34_713);
     assert_eq!(physical_work, 81_363);
     assert_eq!(budget.usage().work, 315_878);
@@ -181,12 +185,12 @@ fn bindings_lc_count_cumulative_boundary() -> TestResult {
             .cas
             .check_proof(&source.context, &source.steps, &mut budget)?;
         let selected = case.admit(
-            Rc::new(source.frame.cas),
+            Arc::new(Mutex::new(source.frame.cas)),
             witness,
             case.attachment(),
             &mut budget,
         )?;
-        let before = selected.cas().counts();
+        let before = selected.cas()?.counts();
         let result = selected.count(3, &mut budget);
         if accepted {
             assert_eq!(result?.value(), 3);
@@ -209,7 +213,7 @@ fn bindings_lc_count_cumulative_boundary() -> TestResult {
             selected.value(),
             &Rational::from_ratio(3, 1, &mut ledger()?)?
         );
-        assert_eq!(selected.cas().counts(), before);
+        assert_eq!(selected.cas()?.counts(), before);
     }
     Ok(())
 }

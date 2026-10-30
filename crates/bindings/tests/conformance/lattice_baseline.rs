@@ -13,6 +13,7 @@ use nrz_bindings::{
 };
 use nrz_cas::{Cas, ExactConstant, FaultKind, InvalidCode, Location, limits::BudgetKind};
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Reuse the complete physical LC declaration and check each independently owned increment.
 fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
@@ -36,11 +37,14 @@ fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
         .cas
         .check_proof(&source.context, &source.steps, budget)?;
     assert_eq!(budget.usage().work - start, 315_323);
-    let graph = Rc::new(source.frame.cas);
-    let before = graph.counts();
-    let result = case.admit(Rc::clone(&graph), witness, case.attachment(), budget)?;
+    let graph = Arc::new(Mutex::new(source.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
+    let result = case.admit(Arc::clone(&graph), witness, case.attachment(), budget)?;
     assert_eq!(budget.usage().work - start, 315_819);
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     Ok(result)
 }
 
@@ -72,9 +76,10 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
         .collect::<Vec<_>>();
     associated.authenticate(case, &symbols, &mut budget)?;
     assert_eq!(budget.usage().work, 364_580);
-    let graph = selected.cas();
+    let graph = selected.cas()?;
     let before = graph.counts();
     let bytes = graph.export_witness(selected.witness(), &mut ledger()?)?;
+    drop(graph);
     assert_eq!(bytes.len(), 1_562);
     let mut replay = ledger()?;
     let mut receiver = Cas::new(Limits::default())?;
@@ -94,10 +99,12 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
         FaultKind::Invalid(InvalidCode::DecisionMaterializationCapacity)
     );
     assert_eq!(
-        graph.export_witness(selected.witness(), &mut ledger()?)?,
+        selected
+            .cas()?
+            .export_witness(selected.witness(), &mut ledger()?)?,
         bytes
     );
-    assert_eq!(graph.counts(), before);
+    assert_eq!(selected.cas()?.counts(), before);
     Ok(())
 }
 
@@ -152,7 +159,7 @@ fn bindings_lattice_scalar_cumulative_work() -> TestResult {
     for (work, accepted) in [(364_597, true), (364_596, false)] {
         let mut budget = prior(work)?;
         let selected = selected(&mut budget)?;
-        let before = selected.cas().counts();
+        let before = selected.cas()?.counts();
         let count = selected.count(3, &mut budget)?;
         let association = selected.case().associate_inputs(&mut budget)?;
         let symbols = association
@@ -168,12 +175,12 @@ fn bindings_lattice_scalar_cumulative_work() -> TestResult {
             exhausted(&result.err().ok_or("short lifecycle accepted")?)?;
         }
         assert_eq!(count.value(), 3);
-        assert_eq!(selected.cas().counts(), before);
+        assert_eq!(selected.cas()?.counts(), before);
         assert!(budget.usage().work >= 17);
     }
     let selected = selected(&mut ledger()?)?;
     let bytes = selected
-        .cas()
+        .cas()?
         .export_witness(selected.witness(), &mut ledger()?)?;
     for (work, accepted) in [(247_382, true), (247_381, false)] {
         let mut receiver = Cas::new(Limits::default())?;
@@ -221,4 +228,48 @@ fn work_fault(fault: &nrz_cas::Fault) {
             ..
         }
     ));
+}
+
+/// Selected aliases share the same guarded graph and see post-sharing checked constants.
+/// ´test:integration:bindings-selected-scalar-graph-guards´
+/// ´claim:bindings:selected-scalar-graph-guards´
+#[test]
+fn bindings_selected_scalar_graph_guards() -> TestResult {
+    let selected = selected(&mut ledger()?)?;
+    let alias = selected.clone();
+    let first = selected.cas()?;
+    let before = first.retained_judgment_count();
+    let bytes = first.export_witness(selected.witness(), &mut ledger()?)?;
+    drop(first);
+    let spec = selected.case().specification();
+    let mut authority = selected.cas()?;
+    authority.prepare_constant(&spec.context, &spec.target, &mut ledger()?)?;
+    drop(authority);
+    let authority = alias.cas()?;
+    assert_eq!(authority.retained_judgment_count(), before + 1);
+    assert_eq!(
+        authority.export_witness(alias.witness(), &mut ledger()?)?,
+        bytes
+    );
+    drop(authority);
+    Ok(())
+}
+
+/// A poisoned selected owner refuses all guarded authority without a replacement store.
+/// ´test:integration:bindings-selected-scalar-graph-poison´
+/// ´claim:bindings:selected-scalar-graph-poison´
+#[test]
+fn bindings_selected_scalar_graph_poison() -> TestResult {
+    let selected = selected(&mut ledger()?)?;
+    let alias = selected.clone();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _guard = selected.cas().expect("unpoisoned selected owner");
+        panic!("deliberate owner poison");
+    }));
+    assert!(result.is_err());
+    let Err(fault) = alias.cas() else {
+        panic!("poisoned owner must refuse read access");
+    };
+    assert!(matches!(fault, DecisionError::GraphPoisoned));
+    Ok(())
 }

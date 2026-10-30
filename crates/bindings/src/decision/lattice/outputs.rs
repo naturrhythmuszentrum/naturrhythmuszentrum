@@ -14,6 +14,7 @@ use nrz_cas::{
     syntax::{AtomicSort, Operator, Sort},
 };
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Fully checked owned outputs, assembled privately before publishing a selected snapshot.
 pub(super) struct Values {
@@ -45,22 +46,24 @@ impl LatticeDecisionCase {
     /// values and exhausted resources. No selected physical tuple is published on failure.
     pub fn admit(
         &self,
-        graph: Rc<Cas>,
+        graph: Arc<Mutex<Cas>>,
         outputs: &CheckedLatticeOutputs<'_>,
         attachment: LatticeAttachment,
         budget: &mut Budget,
     ) -> Result<SelectedLattice, DecisionError> {
         let before = budget.usage();
         self.validate_attachment(&attachment, budget)?;
-        self.check_outputs(&graph, outputs, budget)?;
+        let authority = graph.lock().map_err(|_| DecisionError::GraphPoisoned)?;
+        self.check_outputs(&authority, outputs, budget)?;
         let mut bytes = storage::witness_bytes(outputs.selection())?
             .saturating_add(storage::witness_bytes(outputs.identity())?)
             .saturating_add(512);
         storage::retained(bytes, budget)?;
         budget.work(bytes, storage::AT)?;
         let physical = budget.with_retained_payload(bytes, storage::AT, |budget| {
-            self.physical_outputs(&graph, outputs, budget)
+            self.physical_outputs(&authority, outputs, budget)
         })?;
+        drop(authority);
         bytes = bytes.saturating_add(physical.preparations.usage().bytes);
         for value in &physical.indices {
             bytes = bytes.saturating_add(storage::rational_bytes(value));

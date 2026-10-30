@@ -12,7 +12,11 @@ use nrz_bindings::readings::algebra::{
 };
 use nrz_bindings::{Budget, CountDescriptor, SelectedDecision};
 use nrz_scalar::{ArithmeticContext, ArithmeticFailure, LiteralLimits, Scalar};
-use std::{cell::Cell, rc::Rc};
+use std::{
+    cell::Cell,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 /// One location for the separate live admission and publication owner.
 const AT: Location = Location::new("matrix live quotient decision");
@@ -94,7 +98,7 @@ impl Heap {
     pub fn prepare_ratio_decision<P: Scalar + 'static>(
         &self,
         frozen: FrozenDecisionInputs<P>,
-        graph: Rc<Cas>,
+        graph: Arc<Mutex<Cas>>,
         witness: VerifiedWitness,
         arithmetic: &ArithmeticContext,
         literals: LiteralLimits,
@@ -103,7 +107,11 @@ impl Heap {
         self.check_decision_inputs(&frozen, budget)?;
         let bytes = frozen.retained_payload_bytes();
         let selected = budget.with_retained_payload(bytes, AT, |budget| {
-            ratio::check(&frozen, &graph, &witness, arithmetic, literals, budget)?;
+            let authority = graph.lock().map_err(|_| {
+                LiveDecisionError::Admission(Box::new(nrz_bindings::DecisionError::GraphPoisoned))
+            })?;
+            ratio::check(&frozen, &authority, &witness, arithmetic, literals, budget)?;
+            drop(authority);
             let case = frozen.association().case();
             case.admit(graph, witness, case.attachment(), budget)
                 .map_err(|cause| LiveDecisionError::Admission(Box::new(cause)))

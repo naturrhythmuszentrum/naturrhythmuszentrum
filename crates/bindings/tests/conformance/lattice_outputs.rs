@@ -10,7 +10,7 @@ use nrz_bindings::{DecisionError, Kind, LatticeDecisionCase, LatticeIndexKind, L
 use nrz_cas::{
     ExactConstant, Rational, lattice::LatticeConvention, proof::Statement, syntax::Constant,
 };
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Selected phase and torus coordinates keep angular representatives and explicitly named winding kinds.
 /// ´claim:bindings:lattice-selected-angles´
@@ -117,11 +117,11 @@ fn bindings_lattice_selected_convention() -> TestResult {
         .frame
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
-    let graph = Rc::new(value.fixture.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(value.fixture.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     assert!(matches!(
         changed.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             &outputs,
             value.case.attachment(),
             &mut ledger()?
@@ -130,14 +130,17 @@ fn bindings_lattice_selected_convention() -> TestResult {
     ));
     assert!(matches!(
         changed.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             &outputs,
             changed.attachment(),
             &mut ledger()?
         ),
         Err(DecisionError::Case)
     ));
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     assert_eq!(outputs.selection().proof(), witness.proof());
     Ok(())
 }
@@ -157,7 +160,7 @@ fn bindings_lattice_selected_points() -> TestResult {
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
     let selected = value.case.admit(
-        Rc::new(value.fixture.frame.cas),
+        Arc::new(Mutex::new(value.fixture.frame.cas)),
         &outputs,
         value.case.attachment(),
         &mut ledger()?,
@@ -198,11 +201,11 @@ fn bindings_lattice_selected_source_identity() -> TestResult {
         .frame
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
-    let graph = Rc::new(value.fixture.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(value.fixture.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     assert!(matches!(
         changed.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             &outputs,
             value.case.attachment(),
             &mut ledger()?
@@ -211,14 +214,17 @@ fn bindings_lattice_selected_source_identity() -> TestResult {
     ));
     assert!(matches!(
         value.case.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             &outputs,
             changed.attachment(),
             &mut ledger()?
         ),
         Err(DecisionError::Attachment)
     ));
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     assert_eq!(outputs.selection().proof(), witness.proof());
     Ok(())
 }
@@ -245,18 +251,21 @@ fn bindings_lattice_selected_count_domain() -> TestResult {
         .frame
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
-    let graph = Rc::new(value.fixture.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(value.fixture.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     assert!(matches!(
         counted.admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             &outputs,
             counted.attachment(),
             &mut ledger()?
         ),
         Err(DecisionError::Units(nrz_bindings::UnitError::CountValue))
     ));
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     assert_eq!(outputs.selection().proof(), witness.proof());
     Ok(())
 }
@@ -327,4 +336,31 @@ fn records(value: &ExactConstant) -> TestResult<usize> {
     let (graph, _) = value.graph().ok_or("missing exact value graph")?;
     let counts = graph.counts();
     Ok(counts.vertices + counts.edges)
+}
+
+/// Selected tuple aliases share one graph through reads and a later exclusive constant admission.
+/// ´test:integration:bindings-selected-lattice-graph-guards´
+/// ´claim:bindings:selected-lattice-graph-guards´
+#[test]
+fn bindings_selected_lattice_graph_guards() -> TestResult {
+    let selected = admitted(0, LatticeConvention::Floor)?;
+    let alias = selected.clone();
+    let first = selected.cas()?;
+    let before = first.retained_judgment_count();
+    let bytes = first.export_witness(selected.witness(), &mut ledger()?)?;
+    drop(first);
+    let mut authority = selected.cas()?;
+    let spec = selected.case().specification();
+    let operands = authority.operands(&spec.target, &mut ledger()?)?;
+    let original = operands.first().ok_or("phase coordinate")?;
+    authority.prepare_constant(spec.frame.context(), original, &mut ledger()?)?;
+    drop(authority);
+    let authority = alias.cas()?;
+    assert_eq!(authority.retained_judgment_count(), before + 1);
+    assert_eq!(
+        authority.export_witness(alias.witness(), &mut ledger()?)?,
+        bytes
+    );
+    drop(authority);
+    Ok(())
 }

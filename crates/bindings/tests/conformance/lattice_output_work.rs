@@ -9,7 +9,7 @@ use super::{
 use crate::testing::declarations::TestResult;
 use nrz_bindings::{Budget, DecisionError, Limits};
 use nrz_cas::{FaultKind, Location, lattice::LatticeConvention, limits::BudgetKind};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Separate physical admission and optional-site ownership counters.
 struct Cost {
@@ -63,12 +63,12 @@ fn bindings_lattice_output_work() -> TestResult {
             .frame
             .cas
             .lattice_selection_outputs(&witness, &mut ledger()?)?;
-        let graph = Rc::new(value.fixture.frame.cas);
-        let before = graph.counts();
+        let graph = Arc::new(Mutex::new(value.fixture.frame.cas));
+        let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
         for (work, accepted) in [(cost.admission + 17, true), (cost.admission + 16, false)] {
             let mut budget = prior(work)?;
             let result = value.case.admit(
-                Rc::clone(&graph),
+                Arc::clone(&graph),
                 &outputs,
                 value.case.attachment(),
                 &mut budget,
@@ -87,7 +87,10 @@ fn bindings_lattice_output_work() -> TestResult {
                 exhausted(&result.err().ok_or("short physical admission accepted")?)?;
             }
             assert!(budget.usage().work >= 17);
-            assert_eq!(graph.counts(), before);
+            assert_eq!(
+                graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+                before
+            );
         }
     }
     Ok(())
@@ -100,7 +103,7 @@ fn bindings_lattice_output_work() -> TestResult {
 fn bindings_lattice_site_work() -> TestResult {
     for cost in COSTS {
         let selected = admitted(cost.kind, LatticeConvention::Floor)?;
-        let before = selected.cas().counts();
+        let before = selected.cas()?.counts();
         let proof = selected.witness().proof().clone();
         for (work, accepted) in [(cost.site + 17, true), (cost.site + 16, false)] {
             let mut budget = prior(work)?;
@@ -114,7 +117,7 @@ fn bindings_lattice_site_work() -> TestResult {
                 exhausted(&result.err().ok_or("short optional site accepted")?)?;
             }
             assert!(budget.usage().work >= 17);
-            assert_eq!(selected.cas().counts(), before);
+            assert_eq!(selected.cas()?.counts(), before);
         }
     }
     Ok(())
@@ -132,8 +135,8 @@ fn bindings_lattice_output_storage() -> TestResult {
         .frame
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
-    let graph = Rc::new(value.fixture.frame.cas);
-    let before = graph.counts();
+    let graph = Arc::new(Mutex::new(value.fixture.frame.cas));
+    let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     let mut budget = Budget::new(Limits {
         output_bytes: 1,
         ..Limits::default()
@@ -141,7 +144,7 @@ fn bindings_lattice_output_storage() -> TestResult {
     let error = value
         .case
         .admit(
-            Rc::clone(&graph),
+            Arc::clone(&graph),
             &outputs,
             value.case.attachment(),
             &mut budget,
@@ -158,7 +161,10 @@ fn bindings_lattice_output_storage() -> TestResult {
             ..
         }
     ));
-    assert_eq!(graph.counts(), before);
+    assert_eq!(
+        graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+        before
+    );
     let selected = value
         .case
         .admit(graph, &outputs, value.case.attachment(), &mut ledger()?)?;

@@ -9,6 +9,7 @@ use nrz_cas::{
     syntax::{AtomicSort, Operator, Sort},
 };
 use std::rc::Rc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 /// An exact decided outcome; executable materialization may still refuse separately.
 #[derive(Clone, Debug)]
@@ -17,8 +18,8 @@ pub struct SelectedDecision(Rc<Data>);
 /// The graph, mathematical theorem and physical declaration remain alive together.
 #[derive(Debug)]
 struct Data {
-    /// Immutable graph authority of the certified theorem.
-    graph: Rc<Cas>,
+    /// Guarded graph authority of the certified theorem.
+    graph: Arc<Mutex<Cas>>,
     /// Original physical source, map, native case and parameter tuple.
     case: IntegerDecisionCase,
     /// Authenticated complete attachment identity.
@@ -43,14 +44,15 @@ impl IntegerDecisionCase {
     /// and caller limits. No selected state is published on any refusal.
     pub fn admit(
         &self,
-        graph: Rc<Cas>,
+        graph: Arc<Mutex<Cas>>,
         witness: VerifiedWitness,
         attachment: DecisionAttachment,
         budget: &mut Budget,
     ) -> Result<SelectedDecision, DecisionError> {
         let before = budget.usage();
         self.validate_attachment(&attachment, budget)?;
-        let (selection, enclosure) = graph.integer_selection_evidence(&witness, budget)?;
+        let authority = graph.lock().map_err(|_| DecisionError::GraphPoisoned)?;
+        let (selection, enclosure) = authority.integer_selection_evidence(&witness, budget)?;
         budget.work(self.0.comparison, storage::AT)?;
         let expected = &self.0.specification;
         if selection.family != expected.family
@@ -60,7 +62,7 @@ impl IntegerDecisionCase {
         {
             return Err(DecisionError::Case);
         }
-        let (operator, sort) = graph.expression(&selection.value)?;
+        let (operator, sort) = authority.expression(&selection.value)?;
         let Operator::Rational(value) = operator else {
             return Err(DecisionError::Case);
         };
@@ -83,6 +85,7 @@ impl IntegerDecisionCase {
             storage::AT,
         )?;
         let value = value.clone();
+        drop(authority);
         Ok(SelectedDecision(Rc::new(Data {
             graph,
             case: self.clone(),
@@ -116,11 +119,18 @@ impl SelectedDecision {
     pub fn witness(&self) -> &VerifiedWitness {
         &self.0.witness
     }
-    /// Retained mathematical authority, with no mutable graph access.
-    #[must_use]
-    pub fn cas(&self) -> &Cas {
-        &self.0.graph
+    /// Hold the retained graph guard across a complete inspection or judgment attempt.
+    ///
+    /// Pass this guard into nested checks instead of acquiring it again.
+    /// # Errors
+    /// Refuses a poisoned graph owner.
+    pub fn cas(&self) -> Result<MutexGuard<'_, Cas>, DecisionError> {
+        self.0
+            .graph
+            .lock()
+            .map_err(|_| DecisionError::GraphPoisoned)
     }
+
     /// Caller ledger snapshots around admission; no fresh private budget was created.
     #[must_use]
     pub fn usage(&self) -> [BudgetUsage; 2] {

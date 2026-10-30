@@ -55,17 +55,18 @@ pub(super) fn inputs(
 /// Prepare all live containment before the complete independent mathematical/physical selection.
 pub(super) fn candidate(
     heap: &Heap,
-    source: Selection,
+    mut source: Selection,
     association: &LatticeInputs,
     inputs: &[ValueBinding<f64>],
     budget: &mut Budget,
 ) -> TestResult<(PreparedLatticeDecision<f64>, Handle<Value, f64>)> {
     let frozen = heap.freeze_lattice_inputs(association, inputs, budget)?;
     let original = frozen.operands()[0].input().handle();
+    let contract = lattice_selection::original_box(&source)?.clone();
     let enclosed = heap.enclose_lattice_inputs(
         frozen,
-        &source.fixture.frame.cas,
-        lattice_selection::original_box(&source)?,
+        &mut source.fixture.frame.cas,
+        &contract,
         &ArithmeticContext::new()?,
         literals(),
         budget,
@@ -221,7 +222,7 @@ fn lattice_live_fresh_equal_tuple() -> TestResult {
     let frozen = heap.freeze_lattice_inputs(&association, &inputs, &mut ledger()?)?;
     let enclosed = heap.enclose_lattice_inputs(
         frozen,
-        selected.cas(),
+        &mut *selected.cas()?,
         &contract,
         &ArithmeticContext::new()?,
         literals(),
@@ -254,7 +255,7 @@ fn lattice_live_kernel_origins_refuse() -> TestResult {
     use nrz_bindings::readings::algebra::{
         FaultKind, InvalidCode, Location, decision::EnclosureOrigin,
     };
-    let source = lattice_selection::prepared(1, false)?;
+    let mut source = lattice_selection::prepared(1, false)?;
     let association = source.case.associate_inputs(&mut ledger()?)?;
     let mut heap = Heap::new(HeapLimits::default())?;
     let inputs = inputs(&mut heap, &association, 1)?;
@@ -273,7 +274,7 @@ fn lattice_live_kernel_origins_refuse() -> TestResult {
         contract.coordinates[1].origin = origin;
         let Err(fault) = heap.enclose_lattice_inputs(
             frozen,
-            &source.fixture.frame.cas,
+            &mut source.fixture.frame.cas,
             &contract,
             &ArithmeticContext::new()?,
             literals(),

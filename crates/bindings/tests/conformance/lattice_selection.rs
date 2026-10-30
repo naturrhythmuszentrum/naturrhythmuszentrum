@@ -18,7 +18,7 @@ use nrz_cas::{
     proof::{Statement, VerifiedWitness},
     syntax::{AtomicSort, Operator, Sort},
 };
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Exact original question, checked cover and closed original affine enclosure.
 pub(super) struct Selection {
@@ -220,7 +220,7 @@ pub(super) fn admitted(kind: u8, convention: LatticeConvention) -> TestResult<Se
         .cas
         .lattice_selection_outputs(&witness, &mut ledger()?)?;
     Ok(value.case.admit(
-        Rc::new(value.fixture.frame.cas),
+        Arc::new(Mutex::new(value.fixture.frame.cas)),
         &outputs,
         value.case.attachment(),
         &mut ledger()?,

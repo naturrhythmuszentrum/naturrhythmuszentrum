@@ -9,6 +9,7 @@ use nrz_cas::{
     proof::VerifiedWitness,
 };
 use std::rc::Rc;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 /// An exact selected physical tuple, independent of executable representation and capacity.
 #[derive(Clone, Debug)]
@@ -17,8 +18,8 @@ pub struct SelectedLattice(Rc<Data>);
 /// Complete mathematical and physical evidence lives with every exact output.
 #[derive(Debug)]
 struct Data {
-    /// Immutable mathematical authority.
-    graph: Rc<Cas>,
+    /// Guarded mathematical authority.
+    graph: Arc<Mutex<Cas>>,
     /// Original physical axes, maps, sources and declared index kinds.
     case: LatticeDecisionCase,
     /// Declaration identity authenticated before selected publication.
@@ -67,7 +68,7 @@ impl LatticeCoordinate<'_> {
 impl SelectedLattice {
     /// Publish only after all physical values, proof ownership and identity checks succeed.
     pub(super) fn new(
-        graph: Rc<Cas>,
+        graph: Arc<Mutex<Cas>>,
         case: LatticeDecisionCase,
         attachment: LatticeAttachment,
         values: super::outputs::Values,
@@ -129,10 +130,16 @@ impl SelectedLattice {
         &self.0.reconstruction
     }
 
-    /// Immutable mathematical authority retained with both proofs.
-    #[must_use]
-    pub fn cas(&self) -> &Cas {
-        &self.0.graph
+    /// Hold the retained graph guard across a complete inspection or judgment attempt.
+    ///
+    /// Pass this guard into nested checks instead of acquiring it again.
+    /// # Errors
+    /// Refuses a poisoned graph owner.
+    pub fn cas(&self) -> Result<MutexGuard<'_, Cas>, DecisionError> {
+        self.0
+            .graph
+            .lock()
+            .map_err(|_| DecisionError::GraphPoisoned)
     }
 
     /// Unique checked output preparations retained within this selected owner.

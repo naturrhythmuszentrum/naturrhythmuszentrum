@@ -14,6 +14,7 @@ use nrz_cas::{
     proof::{ApplicationDraft, Certificate, DomainContract, Primitive, Statement, VerifiedWitness},
 };
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// Reuse the nominal physically checked complete-period decision.
 fn selected() -> TestResult<SelectedDecision> {
@@ -34,7 +35,7 @@ fn selected() -> TestResult<SelectedDecision> {
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
     Ok(case.admit(
-        Rc::new(source.frame.cas),
+        Arc::new(Mutex::new(source.frame.cas)),
         witness,
         case.attachment(),
         &mut ledger()?,
@@ -138,7 +139,7 @@ fn bindings_count_descriptor_routes() -> TestResult {
 #[test]
 fn bindings_count_capacity_refusal() -> TestResult {
     let selected = selected()?;
-    let before = selected.cas().counts();
+    let before = selected.cas()?.counts();
     let fault = selected
         .count(2, &mut ledger()?)
         .err()
@@ -149,7 +150,7 @@ fn bindings_count_capacity_refusal() -> TestResult {
         &Rational::from_ratio(3, 1, &mut ledger()?)?
     );
     assert_eq!(selected.count(3, &mut ledger()?)?.value(), 3);
-    assert_eq!(selected.cas().counts(), before);
+    assert_eq!(selected.cas()?.counts(), before);
     let owner = declared("3", CountDomain::NONNEGATIVE)?;
     assert_capacity(
         &CountDescriptor::declared(Rc::clone(&owner), "cycles", 2, &mut ledger()?)
@@ -394,12 +395,12 @@ fn bindings_decided_count_representation() -> TestResult {
         .cas
         .check_proof(&source.context, &source.steps, &mut ledger()?)?;
     let selected = case.admit(
-        Rc::new(source.frame.cas),
+        Arc::new(Mutex::new(source.frame.cas)),
         witness,
         case.attachment(),
         &mut ledger()?,
     )?;
-    let before = selected.cas().counts();
+    let before = selected.cas()?.counts();
     assert_capacity(
         &selected
             .count(u64::MAX, &mut ledger()?)
@@ -407,7 +408,7 @@ fn bindings_decided_count_representation() -> TestResult {
             .ok_or("unrepresentable decision accepted")?,
     )?;
     assert_eq!(selected.value(), &Rational::parse(text, &mut ledger()?)?);
-    assert_eq!(selected.cas().counts(), before);
+    assert_eq!(selected.cas()?.counts(), before);
     Ok(())
 }
 

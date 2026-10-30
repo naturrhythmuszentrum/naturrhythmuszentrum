@@ -64,7 +64,7 @@ impl SelectedDecision {
         let descriptor = &self.case().specification().count;
         let bytes = prepare(descriptor, budget)?;
         let value = self
-            .cas()
+            .cas()?
             .materialize_integer_selection(self.witness(), capacity, budget)?;
         Ok(CountDescriptor(Rc::new(Data {
             descriptor: descriptor.clone(),

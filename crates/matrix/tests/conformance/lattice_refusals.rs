@@ -75,7 +75,7 @@ fn lattice_live_complete_dependency_retirement() -> TestResult {
             .published
             .current(&fixture.heap, &mut ledger()?)?
             .clone();
-        let graph = archived.cas().counts();
+        let graph = archived.cas()?.counts();
         let records = fixture.heap.provenance_usage();
         fixture.heap.replace_declared_bounds(
             alias,
@@ -105,7 +105,7 @@ fn lattice_live_complete_dependency_retirement() -> TestResult {
         };
         assert!(matches!(fault, LiveDecisionError::Retired));
         assert_eq!(archived.indices().len(), 2);
-        assert_eq!(archived.cas().counts(), graph);
+        assert_eq!(archived.cas()?.counts(), graph);
         assert_eq!(fixture.heap.provenance_usage(), records);
     }
     Ok(())
@@ -176,7 +176,7 @@ fn lattice_live_widening_refuses_old_selection() -> TestResult {
         .published
         .current(&fixture.heap, &mut ledger()?)?
         .clone();
-    let graph = selected.cas().counts();
+    let graph = selected.cas()?.counts();
     widen(&mut fixture)?;
     let records = fixture.heap.provenance_usage();
     let frozen = fixture.heap.freeze_lattice_inputs(
@@ -186,7 +186,7 @@ fn lattice_live_widening_refuses_old_selection() -> TestResult {
     )?;
     let Err(fault) = fixture.heap.enclose_lattice_inputs(
         frozen,
-        selected.cas(),
+        &mut *selected.cas()?,
         &fixture.contract,
         &ArithmeticContext::new()?,
         lattice_live::literals(),
@@ -204,7 +204,7 @@ fn lattice_live_widening_refuses_old_selection() -> TestResult {
     )?;
     let enclosed = fixture.heap.enclose_lattice_inputs(
         frozen,
-        selected.cas(),
+        &mut *selected.cas()?,
         &fixture.contract,
         &ArithmeticContext::new()?,
         lattice_live::literals(),
@@ -218,7 +218,7 @@ fn lattice_live_widening_refuses_old_selection() -> TestResult {
         panic!("a wider certified box must not reuse the old selection box");
     };
     assert!(matches!(fault, LiveDecisionError::Enclosure));
-    assert_eq!(selected.cas().counts(), graph);
+    assert_eq!(selected.cas()?.counts(), graph);
     assert_eq!(fixture.heap.provenance_usage(), records);
     Ok(())
 }

@@ -16,7 +16,7 @@ use nrz_matrix::{
     DecisionSnapshotError, FrozenRatioKernel, Heap, HeapError, HeapLimits, LiveDecisionError,
 };
 use nrz_scalar::{ArithmeticContext, KernelLaw};
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 /// The same two/one Machin sums with outward endpoints fitting the actual period input box.
 fn pi() -> TestResult<PiBoundCertificate> {
@@ -114,7 +114,7 @@ fn kernel_live_trace_lifecycle() -> TestResult {
     let counts = source.frame.cas.counts();
     let trace = heap.trace_ratio_decision(
         frozen,
-        &source.frame.cas,
+        &mut source.frame.cas,
         &pi()?,
         &ArithmeticContext::new()?,
         &mut budget,
@@ -138,8 +138,12 @@ fn kernel_live_trace_lifecycle() -> TestResult {
     let inspected = wire.usage().work;
     citations(&receiver, &fresh)?;
     assert_eq!(receiver.export_witness(&fresh, &mut ledger()?)?, bytes);
-    let prepared =
-        heap.prepare_ratio_kernel_decision(trace, Rc::new(source.frame.cas), witness, &mut budget)?;
+    let prepared = heap.prepare_ratio_kernel_decision(
+        trace,
+        Arc::new(Mutex::new(source.frame.cas)),
+        witness,
+        &mut budget,
+    )?;
     let prepared_work = budget.usage().work;
     let published = heap.publish_decision(prepared, &mut budget)?;
     let publication = budget.usage().work;
@@ -187,13 +191,13 @@ fn kernel_live_trace_lifecycle() -> TestResult {
 /// ´claim:matrix:kernel-live-trace-input-forgery´
 #[test]
 fn kernel_live_trace_input_forgery() -> TestResult {
-    let (association, source) = decision_source()?;
+    let (association, mut source) = decision_source()?;
     let mut heap = Heap::new(HeapLimits::default())?;
     let bindings = inputs(&mut heap, &association)?;
     let frozen = heap.freeze_decision_inputs(&association, &bindings, &mut ledger()?)?;
     let trace = heap.trace_ratio_decision(
         frozen,
-        &source.frame.cas,
+        &mut source.frame.cas,
         &pi()?,
         &ArithmeticContext::new()?,
         &mut ledger()?,
@@ -266,7 +270,7 @@ fn kernel_live_trace_preparation_refuses() -> TestResult {
         let frozen = heap.freeze_decision_inputs(&association, &bindings, &mut ledger()?)?;
         let trace = heap.trace_ratio_decision(
             frozen,
-            &source.frame.cas,
+            &mut source.frame.cas,
             &pi()?,
             &ArithmeticContext::new()?,
             &mut ledger()?,
@@ -315,11 +319,11 @@ fn kernel_live_trace_preparation_refuses() -> TestResult {
                 .cas
                 .check_proof(&source.context, &source.steps, &mut ledger()?)?
         };
-        let graph = Rc::new(source.frame.cas);
-        let counts = graph.counts();
+        let graph = Arc::new(Mutex::new(source.frame.cas));
+        let counts = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
         let before = heap.provenance_usage();
         let Err(fault) =
-            heap.prepare_ratio_kernel_decision(trace, Rc::clone(&graph), witness, &mut ledger()?)
+            heap.prepare_ratio_kernel_decision(trace, Arc::clone(&graph), witness, &mut ledger()?)
         else {
             panic!("substituted trace preparation must refuse");
         };
@@ -331,7 +335,10 @@ fn kernel_live_trace_preparation_refuses() -> TestResult {
         } else {
             assert!(matches!(fault, LiveDecisionError::Recipe));
         }
-        assert_eq!(graph.counts(), counts);
+        assert_eq!(
+            graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
+            counts
+        );
         assert_eq!(heap.provenance_usage(), before);
     }
     Ok(())
@@ -342,7 +349,7 @@ fn kernel_live_trace_preparation_refuses() -> TestResult {
 /// ´claim:matrix:kernel-live-trace-total-error-once´
 #[test]
 fn kernel_live_trace_total_error_once() -> TestResult {
-    let (association, source) = decision_source()?;
+    let (association, mut source) = decision_source()?;
     let mut expected = None;
     for numerical in [0.0, 1.0 / 524_288.0] {
         let mut heap = Heap::new(HeapLimits::default())?;
@@ -364,7 +371,7 @@ fn kernel_live_trace_total_error_once() -> TestResult {
         let frozen = heap.freeze_decision_inputs(&association, &bindings, &mut ledger()?)?;
         let trace = heap.trace_ratio_decision(
             frozen,
-            &source.frame.cas,
+            &mut source.frame.cas,
             &pi()?,
             &ArithmeticContext::new()?,
             &mut ledger()?,
