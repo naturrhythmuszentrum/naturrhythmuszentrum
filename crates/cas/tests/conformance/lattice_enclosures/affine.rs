@@ -161,6 +161,7 @@ fn lattice_affine_box_whole_source() -> TestResult {
 
 /// Complete transport costs include original replay and full-contract coefficient reuse.
 /// ´test:integration:lattice-affine-box-costs´
+/// ´claim:cas:lattice-affine-box-costs´
 #[test]
 fn lattice_affine_box_costs() -> TestResult {
     let mut rows = Vec::new();
@@ -177,8 +178,8 @@ fn lattice_affine_box_costs() -> TestResult {
         [
             (0, 119_257, 8_728),
             (1, 119_025, 8_720),
-            (2, 131_645, 4_508),
-            (3, 130_661, 4_516),
+            (2, 114_216, 4_508),
+            (3, 113_232, 4_516),
             (4, 80_471, 3_948),
             (5, 74_753, 7_648),
         ]
@@ -414,20 +415,21 @@ fn lattice_affine_box_reuse_identity() -> TestResult {
 
 /// Literal N/N−1 transport ceilings retain prior Work without exposing a partial H.
 /// ´test:integration:lattice-affine-box-work´
+/// ´claim:cas:lattice-affine-box-work´
 #[test]
 fn lattice_affine_box_work() -> TestResult {
     for (kind, work) in [
         (0, 119_257),
         (1, 119_025),
-        (2, 131_645),
-        (3, 130_661),
+        (2, 114_216),
+        (3, 113_232),
         (4, 80_471),
         (5, 74_753),
     ] {
-        let (case, basis, request) = prepared(kind)?;
-        let before = case.cas.counts();
-        let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
         for short in [0, 1] {
+            let (case, basis, request) = prepared(kind)?;
+            let before = case.cas.counts();
+            let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
             let limits = Limits {
                 work: work + 37 - short,
                 ..Limits::default()

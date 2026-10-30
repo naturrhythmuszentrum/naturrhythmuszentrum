@@ -3,7 +3,8 @@
 
 use super::{
     Cas, Constant, Costs, ExactConstant, FaultKind, Handle, InvalidCode, Operator, Rational,
-    RationalEnclosure, TestResult, enclosure_for, ledger, pin, rational, refused, root, rooted,
+    RationalEnclosure, TestResult, enclosure_for, ledger, pin, pin_enclosure, rational, refused,
+    root, rooted,
 };
 
 /// Preserve the original rational coefficient, Pi power and multiplication before the root.
@@ -151,30 +152,28 @@ fn constant_square_root_pi_enclosures() -> TestResult {
 fn constant_square_root_pi_costs() -> TestResult {
     let cases = [
         (
-            enclosure(false)?,
+            false,
             Costs {
                 admission: 59_574,
                 enclosure: 89_711,
             },
         ),
         (
-            enclosure(true)?,
+            true,
             Costs {
                 admission: 81_440,
                 enclosure: 119_183,
             },
         ),
     ];
-    for ((cas, contract), costs) in cases {
+    for (product, costs) in cases {
+        let (cas, contract) = enclosure(product)?;
         let before = cas.canonical_snapshot(&mut ledger()?)?;
         pin(
             |budget| ExactConstant::from_expression(&cas, &contract.target, budget),
             costs.admission,
         )?;
-        pin(
-            |budget| cas.check_rational_enclosure(&contract, budget),
-            costs.enclosure,
-        )?;
+        pin_enclosure(|| enclosure(product), costs.enclosure)?;
         assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
     }
     Ok(())
@@ -240,6 +239,25 @@ fn constant_square_root_pi_original_square() -> TestResult {
             );
             assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
         }
+    }
+    Ok(())
+}
+
+/// Repeated Pi-root enclosures cite the retained certificate under the same store generation.
+/// ´test:integration:constant-square-root-pi-warm-costs´
+/// ´claim:cas:constant-square-root-pi-warm-costs´
+#[test]
+fn constant_square_root_pi_warm_costs() -> TestResult {
+    for (product, work) in [(false, 72_282), (true, 101_754)] {
+        let (cas, contract) = enclosure(product)?;
+        cas.check_rational_enclosure(&contract, &mut ledger()?)?;
+        let mut warm = ledger()?;
+        cas.check_rational_enclosure(&contract, &mut warm)?;
+        assert_eq!(warm.usage().work, work);
+        pin(
+            |budget| cas.check_rational_enclosure(&contract, budget),
+            work,
+        )?;
     }
     Ok(())
 }

@@ -1074,7 +1074,7 @@ pub struct GraphCounts {
 
 /// The independently owned symbolic store; it has no engine-package dependency.
 pub struct Cas {
-    /// Checked scalar meanings are local runtime judgments, excluded from canonical graph bytes.
+    /// Checked receipt judgments are local runtime evidence, excluded from canonical graph bytes.
     pub(crate) receipt_records: std::sync::Mutex<crate::decision_kernel::cache::Cache>,
     /// Serialize one store's receipt validation and publication without changing its thread traits.
     pub(crate) receipt_guard: std::sync::Mutex<()>,

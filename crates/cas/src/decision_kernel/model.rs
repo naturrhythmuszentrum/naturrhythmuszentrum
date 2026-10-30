@@ -92,11 +92,11 @@ pub struct ScalarKernelInput {
 pub enum ScalarKernelInputValue {
     /// Exact coherent rational source.
     Rational(Rational),
-    /// Exact rational multiple of pi, with a freshly replayed finite Machin argument.
+    /// Exact rational multiple of pi, with an independently checked finite Machin argument.
     PiMultiple {
         /// Signed exact coherent rational coefficient.
         factor: Rational,
-        /// Untrusted bounds; no checked-pi receipt is reused across enclosures.
+        /// Untrusted bounds; reuse requires the complete store-local checked certificate key.
         certificate: Box<PiBoundCertificate>,
     },
 }

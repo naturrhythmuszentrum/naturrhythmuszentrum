@@ -9,7 +9,7 @@ use nrz_cas::{Cas, Fault, FaultKind, Location};
 /// Kind, proof Work, fresh inspection Work and portable witness bytes.
 const COSTS: [(u32, u64, u64, usize); 4] = [
     (1, 404_211, 1_071_050, 4_004),
-    (2, 398_592, 978_609, 4_120),
+    (2, 381_163, 961_180, 4_120),
     (4, 313_199, 758_686, 3_575),
     (5, 335_639, 876_456, 3_745),
 ];
@@ -96,6 +96,7 @@ pub(super) fn replay_boundary(bytes: &[u8], amount: u64, succeeds: bool) -> Test
 
 /// Proof and fresh replay each succeed at N and refuse atomically at N−1 after 37 prior Work.
 /// ´test:integration:lattice-tuple-work´
+/// ´claim:cas:lattice-tuple-work´
 #[test]
 fn lattice_tuple_work() -> TestResult {
     for (kind, proof, replay, length) in COSTS {
@@ -111,10 +112,11 @@ fn lattice_tuple_work() -> TestResult {
 
 /// Direct-H proof and replay have independent literal boundaries, including the owned wrap face.
 /// ´test:integration:lattice-tuple-direct-work´
+/// ´claim:cas:lattice-tuple-direct-work´
 #[test]
 fn lattice_tuple_direct_work() -> TestResult {
     for (kind, proof, replay, length) in [
-        (1, 473_783, 1_173_089, 4_113),
+        (1, 456_354, 1_155_660, 4_113),
         (2, 303_727, 884_277, 4_042),
         (3, 295_200, 857_936, 3_872),
         (4, 305_136, 759_867, 3_619),

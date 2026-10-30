@@ -1047,7 +1047,7 @@ pub struct Budget {
     pub(crate) witness_records: crate::wire_memo::Cache,
     /// Exact checked reading statements cite original evidence within this ledger.
     pub(crate) reading_proofs: crate::reading_memo::Cache,
-    /// Store-owned checked scalar records remain reserved after their citing operation.
+    /// Store-owned checked certificate records remain reserved after their citing operation.
     pub(crate) checked_records: crate::decision_kernel::cache::Accounting,
 }
 

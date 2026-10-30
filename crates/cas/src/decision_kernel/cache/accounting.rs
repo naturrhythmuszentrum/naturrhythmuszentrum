@@ -26,7 +26,7 @@ impl Accounting {
             .map(|(_, bytes)| *bytes)
     }
 
-    /// Restore only this store's earlier registration; its previous slot is already allocated.
+    /// Restore only this store's earlier reservation without revising spent Work.
     pub(super) fn restore(&mut self, owner: &Arc<()>, bytes: Option<u64>) {
         self.forget(owner);
         if let Some(bytes) = bytes {
@@ -43,6 +43,9 @@ impl Accounting {
             .position(|(entry, _)| Arc::ptr_eq(entry, owner))
         {
             let (_, bytes) = self.entries.remove(index);
+            self.entries = std::mem::take(&mut self.entries)
+                .into_boxed_slice()
+                .into_vec();
             self.bytes -= bytes.saturating_add(64);
         }
     }
@@ -80,7 +83,7 @@ pub(super) fn retain(cas: &Cas, bytes: u64, budget: &mut Budget) -> Result<(), F
         budget
             .checked_records
             .entries
-            .try_reserve(1)
+            .try_reserve_exact(1)
             .map_err(|_| Fault::allocation(AT))?;
         budget
             .checked_records

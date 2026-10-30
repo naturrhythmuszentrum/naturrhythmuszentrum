@@ -567,6 +567,35 @@ impl Rational {
         self.encode_magnitudes(budget, BudgetKind::PayloadBytes)
     }
 
+    /// Borrow the complete canonical byte stream without allocating a second magnitude buffer.
+    /// The caller prepays every inspected byte; this constructor only checks fixed-size lengths.
+    pub(crate) fn canonical_byte_iter(&self) -> Result<impl Iterator<Item = u8> + '_, Fault> {
+        let at = Location::new("rational encoding");
+        let numerator = u32::try_from(self.numerator().bits().div_ceil(8))
+            .map_err(|_| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+        let denominator = u32::try_from(self.denominator().bits().div_ceil(8))
+            .map_err(|_| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+        let first = usize::try_from(numerator)
+            .map_err(|_| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+        let second = usize::try_from(denominator)
+            .map_err(|_| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+        Ok(std::iter::once(u8::from(self.negative))
+            .chain(numerator.to_le_bytes())
+            .chain(
+                self.numerator()
+                    .iter_u32_digits()
+                    .flat_map(u32::to_le_bytes)
+                    .take(first),
+            )
+            .chain(denominator.to_le_bytes())
+            .chain(
+                self.denominator()
+                    .iter_u32_digits()
+                    .flat_map(u32::to_le_bytes)
+                    .take(second),
+            ))
+    }
+
     /// Share the exact magnitude layout while keeping admission and export limits distinct.
     fn encode_magnitudes(&self, budget: &mut Budget, limit: BudgetKind) -> Result<Vec<u8>, Fault> {
         let at = Location::new("rational encoding");

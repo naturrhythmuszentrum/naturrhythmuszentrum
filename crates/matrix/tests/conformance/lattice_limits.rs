@@ -96,7 +96,7 @@ fn exhausted(error: &LiveDecisionError, expected: BudgetKind) -> TestResult {
 /// ´claim:matrix:lattice-enclosure-work-boundaries´
 #[test]
 fn lattice_enclosure_work_boundaries() -> TestResult {
-    for (kind, limits) in [(0, [59_481, 59_480]), (1, [21_299, 21_298])] {
+    for (kind, limits) in [(0, [42_052, 42_051]), (1, [21_299, 21_298])] {
         let ready = Ready::new(kind)?;
         let graph = ready.selected.cas().counts();
         let records = ready.heap.provenance_usage();

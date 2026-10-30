@@ -236,6 +236,7 @@ fn lattice_original_box_costs() -> TestResult {
 
 /// Literal N/N−1 Work limits include prior usage and return no partial vector.
 /// ´test:integration:lattice-original-box-work´
+/// ´claim:cas:lattice-original-box-work´
 #[test]
 fn lattice_original_box_work() -> TestResult {
     for (kind, work) in [
@@ -245,10 +246,10 @@ fn lattice_original_box_work() -> TestResult {
         (3, 55_878),
         (4, 58_049),
     ] {
-        let (case, request) = fixture(kind)?;
-        let before = case.cas.counts();
-        let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
         for short in [0, 1] {
+            let (case, request) = fixture(kind)?;
+            let before = case.cas.counts();
+            let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
             let limits = Limits {
                 work: work + 37 - short,
                 ..Limits::default()

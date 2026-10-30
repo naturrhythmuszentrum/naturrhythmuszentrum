@@ -279,12 +279,20 @@ fn constant_square_root_enclosures() -> TestResult {
 
 /// Pin each complete operation at literal N/N−1, including prior Work and a spent ledger.
 fn pin<T>(operation: impl Fn(&mut Budget) -> Result<T, Fault>, work: u64) -> TestResult {
+    pin_with(|budget| Ok(operation(budget)), work)
+}
+
+/// Independent setup may fail before the measured operation consumes its own ledger.
+fn pin_with<T>(
+    operation: impl Fn(&mut Budget) -> TestResult<Result<T, Fault>>,
+    work: u64,
+) -> TestResult {
     for ceiling in [work, work - 1] {
         let mut budget = Budget::new(Limits {
             work: ceiling,
             ..Limits::default()
         })?;
-        let result = operation(&mut budget);
+        let result = operation(&mut budget)?;
         if ceiling == work {
             result?;
             assert_eq!(budget.usage().work, work);
@@ -307,9 +315,9 @@ fn pin<T>(operation: impl Fn(&mut Budget) -> Result<T, Fault>, work: u64) -> Tes
         ..Limits::default()
     })?;
     prior.work(7, nrz_cas::Location::new("prior caller work"))?;
-    operation(&mut prior)?;
+    operation(&mut prior)??;
     assert_eq!(prior.usage().work, work + 7);
-    let Err(fault) = operation(&mut prior) else {
+    let Err(fault) = operation(&mut prior)? else {
         panic!("spent square-root ledger");
     };
     assert!(matches!(
@@ -338,30 +346,28 @@ struct Costs {
 fn constant_square_root_costs() -> TestResult {
     let cases = [
         (
-            enclosure()?,
+            enclosure as fn() -> TestResult<(Cas, RationalEnclosure)>,
             Costs {
                 admission: 57_657,
                 enclosure: 82_954,
             },
         ),
         (
-            lc_enclosure()?,
+            lc_enclosure,
             Costs {
                 admission: 31_324,
                 enclosure: 33_668,
             },
         ),
     ];
-    for ((cas, contract), costs) in cases {
+    for (prepare, costs) in cases {
+        let (cas, contract) = prepare()?;
         let before = cas.canonical_snapshot(&mut ledger()?)?;
         pin(
             |budget| ExactConstant::from_expression(&cas, &contract.target, budget),
             costs.admission,
         )?;
-        pin(
-            |budget| cas.check_rational_enclosure(&contract, budget),
-            costs.enclosure,
-        )?;
+        pin_enclosure(prepare, costs.enclosure)?;
         assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
     }
     Ok(())
@@ -524,4 +530,37 @@ fn constant_square_root_nested_boundary() -> TestResult {
         "finite coefficient jets",
     )?;
     Ok(())
+}
+
+/// Keep cold enclosure boundaries independent of earlier successful retention.
+fn pin_enclosure(
+    prepare: impl Fn() -> TestResult<(Cas, RationalEnclosure)>,
+    work: u64,
+) -> TestResult {
+    pin_with(
+        |budget| {
+            let (cas, contract) = prepare()?;
+            let before = cas.canonical_snapshot(&mut ledger()?)?;
+            let result = cas.check_rational_enclosure(&contract, budget);
+            assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
+            Ok(result)
+        },
+        work,
+    )
+}
+
+/// A repeated rational-radicand `PiBound` enclosure cites the retained full Machin theorem.
+/// ´test:integration:constant-square-root-warm-cost´
+/// ´claim:cas:constant-square-root-warm-cost´
+#[test]
+fn constant_square_root_warm_cost() -> TestResult {
+    let (cas, contract) = enclosure()?;
+    cas.check_rational_enclosure(&contract, &mut ledger()?)?;
+    let mut warm = ledger()?;
+    cas.check_rational_enclosure(&contract, &mut warm)?;
+    assert_eq!(warm.usage().work, 65_525);
+    pin(
+        |budget| cas.check_rational_enclosure(&contract, budget),
+        65_525,
+    )
 }

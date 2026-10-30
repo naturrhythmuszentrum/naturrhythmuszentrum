@@ -125,28 +125,53 @@ fn exhausted(work: u64) -> TestResult {
 
 /// Exhaustion before checking or at publication borrows complete evidence and publishes no tuple.
 /// ´test:integration:lattice-tuple-undecided-budget´
+/// ´claim:cas:lattice-tuple-undecided-budget´
 #[test]
 fn lattice_tuple_undecided_budget() -> TestResult {
     exhausted(37)?;
-    exhausted(404_247)
+    exhausted(386_818)?;
+    let mut source = prepared(1)?;
+    let attempt = source.source.frame.cas.prepare_lattice_selection(
+        &source.cover,
+        &source.expected,
+        &source.enclosure,
+        &mut ledger()?,
+    )?;
+    let mut budget = Budget::new(Limits {
+        work: 386_819,
+        ..Limits::default()
+    })?;
+    budget.work(37, Location::new("spent before lattice decision"))?;
+    let LatticeSelectionOutcome::Decided(witness) = source
+        .source
+        .frame
+        .cas
+        .select_lattice_attempt(&attempt, &mut budget)?
+    else {
+        panic!("prepared selection must succeed at its measured warm Work boundary");
+    };
+    assert!(witness.is_discharged());
+    assert_eq!(budget.usage().work, 386_819);
+    Ok(())
 }
 
 /// Preparation has exact N/N−1 boundaries including prior Work, without publishing graph records.
 /// ´test:integration:lattice-tuple-attempt-work´
+/// ´claim:cas:lattice-tuple-attempt-work´
 #[test]
 fn lattice_tuple_attempt_work() -> TestResult {
     for (kind, work) in [
         (0, 144_697),
         (1, 144_407),
-        (2, 149_721),
-        (3, 148_795),
+        (2, 132_292),
+        (3, 131_366),
         (4, 96_932),
         (5, 95_395),
     ] {
-        let source = prepared(kind)?;
-        let before = source.source.frame.cas.counts();
-        let snapshot = source.source.frame.cas.canonical_snapshot(&mut ledger()?)?;
         for succeeds in [false, true] {
+            let source = prepared(kind)?;
+            let before = source.source.frame.cas.counts();
+            let snapshot = source.source.frame.cas.canonical_snapshot(&mut ledger()?)?;
             let amount = work + 36 + u64::from(succeeds);
             let limits = Limits {
                 work: amount,

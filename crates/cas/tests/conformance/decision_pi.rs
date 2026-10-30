@@ -180,11 +180,9 @@ fn decision_pi_costs() -> TestResult {
 
 /// Literal Work and returned-ownership boundaries preserve the store and cumulative ledger.
 /// ´test:integration:decision-pi-resources´
+/// ´claim:cas:decision-pi-resources´
 #[test]
 fn decision_pi_resources() -> TestResult {
-    let (source, request) = prepared()?;
-    let before = source.cas.counts();
-    let snapshot = source.cas.canonical_snapshot(&mut ledger()?)?;
     for (kind, amount, prior, accepted) in [
         (BudgetKind::Work, 57_786, 0, true),
         (BudgetKind::Work, 57_785, 0, false),
@@ -193,6 +191,9 @@ fn decision_pi_resources() -> TestResult {
         (BudgetKind::OutputBytes, 1_336, 0, true),
         (BudgetKind::OutputBytes, 1_335, 0, false),
     ] {
+        let (source, request) = prepared()?;
+        let before = source.cas.counts();
+        let snapshot = source.cas.canonical_snapshot(&mut ledger()?)?;
         let mut limits = Limits::default();
         if kind == BudgetKind::Work {
             limits.work = amount;

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Store-local checked exact records under complete scoped certificate bytes.
+//! Store-local checked exact records and complete finite constant judgments.
 
 mod accounting;
 pub(crate) use accounting::Accounting;
+mod pi;
+pub(crate) use pi::validate as validate_pi;
 
 use std::sync::{Arc, MutexGuard};
 
@@ -29,7 +31,9 @@ pub(crate) struct Cache {
     epoch: u64,
     /// Append-only successful inventories permit atomic refusal without a full copy.
     entries: Vec<Entry>,
-    /// Conservative complete keys, exact graphs and entry allocation.
+    /// Complete checked constant certificates share the same source-store lifetime.
+    pi: Vec<pi::Entry>,
+    /// Conservative complete keys, exact graphs, constant certificates and entry allocation.
     bytes: u64,
 }
 
@@ -45,7 +49,8 @@ struct Entry {
 impl Cache {
     /// Expired checked judgments cannot retain reusable authority or storage.
     pub(crate) fn clear(&mut self) {
-        self.entries.clear();
+        self.entries = Vec::new();
+        self.pi = Vec::new();
         self.bytes = 0;
     }
 }
@@ -97,20 +102,42 @@ pub(crate) fn atomic<T>(
     operation: impl FnOnce(&mut Budget) -> Result<T, Fault>,
 ) -> Result<T, Fault> {
     prepare(cas)?;
-    let (count, bytes) = {
+    let snapshot = {
         let cache = records(cas)?;
-        (cache.entries.len(), cache.bytes)
+        Snapshot {
+            records: cache.entries.len(),
+            pi: cache.pi.len(),
+            bytes: cache.bytes,
+        }
     };
     let reservation = budget.checked_records.snapshot(&cas.memo_owner);
     let result = operation(budget);
     if result.is_err() {
         let mut cache = records(cas)?;
-        cache.entries.truncate(count);
-        cache.bytes = bytes;
+        restore_entries(&mut cache.entries, snapshot.records);
+        restore_entries(&mut cache.pi, snapshot.pi);
+        cache.bytes = snapshot.bytes;
         drop(cache);
         budget.checked_records.restore(&cas.memo_owner, reservation);
     }
     result
+}
+
+/// Release speculative vector capacity before restoring its earlier logical storage bound.
+fn restore_entries<T>(entries: &mut Vec<T>, count: usize) {
+    let mut kept = std::mem::take(entries);
+    kept.truncate(count);
+    *entries = kept.into_boxed_slice().into_vec();
+}
+
+/// Both retained judgment kinds roll back together when an enclosure refuses.
+struct Snapshot {
+    /// Number of exact scalar inventories already checked before the attempt.
+    records: usize,
+    /// Number of complete Machin judgments already checked before the attempt.
+    pi: usize,
+    /// Existing conservative store-owned retention.
+    bytes: u64,
 }
 
 /// Previously retained store payload remains reserved beside this validation's scratch.
@@ -184,14 +211,16 @@ pub(super) fn insert(
     )?;
     budget.check(
         BudgetKind::Vertices,
-        size(cache.entries.len(), AT)?.saturating_add(1),
+        size(cache.entries.len(), AT)?
+            .saturating_add(size(cache.pi.len(), AT)?)
+            .saturating_add(1),
         AT,
     )?;
+    accounting::retain(cas, total, budget)?;
     cache
         .entries
-        .try_reserve(1)
+        .try_reserve_exact(1)
         .map_err(|_| Fault::allocation(AT))?;
-    accounting::retain(cas, total, budget)?;
     cache.entries.push(Entry {
         key,
         values: Arc::new(values),

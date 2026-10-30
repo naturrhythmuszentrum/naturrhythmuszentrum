@@ -56,6 +56,33 @@ impl CheckedPiBounds {
 }
 
 impl PiBoundCertificate {
+    /// Complete canonical certificate bytes are a borrowed view of the owned checked fields.
+    pub(crate) fn canonical_key(&self) -> Result<impl Iterator<Item = u8> + '_, Fault> {
+        Ok(u64::from(self.version)
+            .to_le_bytes()
+            .into_iter()
+            .chain(u64::from(self.terms[0]).to_le_bytes())
+            .chain(u64::from(self.terms[1]).to_le_bytes())
+            .chain(self.sums[0].canonical_byte_iter()?)
+            .chain(self.sums[1].canonical_byte_iter()?)
+            .chain(self.lower.canonical_byte_iter()?)
+            .chain(self.upper.canonical_byte_iter()?))
+    }
+
+    /// Bound every canonical byte comparison under the current rational component policy.
+    pub(crate) fn key_bytes(&self, budget: &Budget) -> Result<u64, Fault> {
+        let mut bytes = 24_u64;
+        for value in [&self.sums[0], &self.sums[1], &self.lower, &self.upper] {
+            value.check(budget, AT)?;
+            let (numerator, denominator) = value.component_bits();
+            bytes = bytes
+                .saturating_add(9)
+                .saturating_add(numerator.div_ceil(8))
+                .saturating_add(denominator.div_ceil(8));
+        }
+        Ok(bytes)
+    }
+
     /// Reconstruct both exact sums and their signed next-term remainder bounds.
     ///
     /// No scalar certificate, floating approximation or caller success flag is used.

@@ -28,12 +28,8 @@ pub(crate) fn check(
     contract: &RationalEnclosure,
     budget: &mut Budget,
 ) -> Result<CheckedRationalEnclosure, Fault> {
-    if matches!(contract.origin, EnclosureOrigin::ScalarKernel(_)) {
-        return crate::decision_kernel::cache::synchronized(cas, budget, |budget| {
-            crate::decision_kernel::cache::atomic(cas, budget, |budget| {
-                receipt(cas, contract, budget)
-            })
-        });
+    if reusable(&contract.origin) {
+        return retained(cas, budget, |budget| receipt(cas, contract, budget));
     }
     receipt(cas, contract, budget)
 }
@@ -44,11 +40,7 @@ fn receipt(
     contract: &RationalEnclosure,
     budget: &mut Budget,
 ) -> Result<CheckedRationalEnclosure, Fault> {
-    let bytes = if let EnclosureOrigin::ScalarKernel(certificate) = &contract.origin {
-        scalar(cas, contract, certificate, budget)?
-    } else {
-        validate(cas, contract, budget)?
-    };
+    let bytes = validate_inner(cas, contract, budget)?;
     budget.check(BudgetKind::OutputBytes, bytes, AT)?;
     budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
     budget.work(bytes, AT)?;
@@ -69,10 +61,41 @@ pub(crate) fn validate(
     contract: &RationalEnclosure,
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
+    if reusable(&contract.origin) {
+        return retained(cas, budget, |budget| validate_inner(cas, contract, budget));
+    }
+    validate_inner(cas, contract, budget)
+}
+
+/// Only origins with independently checked reusable judgments acquire the store guard.
+const fn reusable(origin: &EnclosureOrigin) -> bool {
+    matches!(
+        origin,
+        EnclosureOrigin::ScalarKernel(_) | EnclosureOrigin::PiBound { .. }
+    )
+}
+
+/// Both judgment kinds publish atomically and share one cumulative storage reservation.
+fn retained<T>(
+    cas: &Cas,
+    budget: &mut Budget,
+    operation: impl FnOnce(&mut Budget) -> Result<T, Fault>,
+) -> Result<T, Fault> {
+    crate::decision_kernel::cache::synchronized(cas, budget, |budget| {
+        crate::decision_kernel::cache::atomic(cas, budget, |budget| {
+            crate::decision_kernel::cache::retained(cas, budget, operation)
+        })
+    })
+}
+
+/// Replay the supported origin while its caller holds any required store guard.
+fn validate_inner(
+    cas: &Cas,
+    contract: &RationalEnclosure,
+    budget: &mut Budget,
+) -> Result<u64, Fault> {
     if let EnclosureOrigin::ScalarKernel(certificate) = &contract.origin {
-        return crate::decision_kernel::cache::synchronized(cas, budget, |budget| {
-            scalar(cas, contract, certificate, budget)
-        });
+        return crate::decision_kernel::validate(cas, contract, certificate, budget);
     }
     if let EnclosureOrigin::PiBound {
         expression,
@@ -105,18 +128,6 @@ pub(crate) fn validate(
         replay(cas, contract, value, budget)
     })?;
     Ok(bytes)
-}
-
-/// The caller holds the store's receipt guard while retaining or citing exact records.
-fn scalar(
-    cas: &Cas,
-    contract: &RationalEnclosure,
-    certificate: &crate::decision::ScalarKernelCertificate,
-    budget: &mut Budget,
-) -> Result<u64, Fault> {
-    crate::decision_kernel::cache::retained(cas, budget, |budget| {
-        crate::decision_kernel::validate(cas, contract, certificate, budget)
-    })
 }
 
 /// The context's actual region and header cannot be replaced by caller descriptions.

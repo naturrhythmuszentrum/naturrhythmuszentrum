@@ -109,6 +109,7 @@ fn checked_records(
     budget.work(copying.saturating_sub(budget.usage().work - before), AT)?;
     let values = budget.with_retained_payload(size(key.len(), AT)?, AT, |budget| {
         replay(
+            cas,
             contract,
             certificate,
             original,
@@ -124,6 +125,7 @@ fn checked_records(
 
 /// Retain every earlier exact value and full interval while checking the final original value.
 fn replay(
+    cas: &Cas,
     contract: &RationalEnclosure,
     certificate: &ScalarKernelCertificate,
     original: &ExactConstant,
@@ -142,7 +144,7 @@ fn replay(
             if certificate.version == 1 && matches!(record.law, ScalarKernelLaw::Input(_)) {
                 return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
             }
-            relations::check(record, &certificate.records[..index], budget)?;
+            relations::check(cas, record, &certificate.records[..index], budget)?;
             if let Some(cached) = cached {
                 return cached.get(index).cloned().ok_or_else(unsupported);
             }

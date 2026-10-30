@@ -135,6 +135,7 @@ fn lattice_direct_coordinate_correspondence() -> TestResult {
 
 /// Direct affine-expression replay keeps its own measured ownership boundary.
 /// ´test:integration:lattice-direct-coordinate-costs´
+/// ´claim:cas:lattice-direct-coordinate-costs´
 #[test]
 fn lattice_direct_coordinate_costs() -> TestResult {
     let mut rows = Vec::new();
@@ -149,8 +150,8 @@ fn lattice_direct_coordinate_costs() -> TestResult {
     assert_eq!(
         rows,
         [
-            (0, 219_119, 3_440),
-            (1, 219_119, 3_440),
+            (0, 201_690, 3_440),
+            (1, 201_690, 3_440),
             (2, 60_913, 1_560),
             (3, 59_633, 1_560),
             (4, 83_132, 2_104),
@@ -161,13 +162,14 @@ fn lattice_direct_coordinate_costs() -> TestResult {
 
 /// Literal N/N−1 boundaries retain prior Work and refuse without a partial transformed box.
 /// ´test:integration:lattice-direct-coordinate-work´
+/// ´claim:cas:lattice-direct-coordinate-work´
 #[test]
 fn lattice_direct_coordinate_work() -> TestResult {
-    for (kind, work) in [(0, 219_119), (2, 60_913), (3, 59_633), (4, 83_132)] {
-        let (case, basis, request) = direct(kind)?;
-        let before = case.cas.counts();
-        let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
+    for (kind, work) in [(0, 201_690), (2, 60_913), (3, 59_633), (4, 83_132)] {
         for short in [0, 1] {
+            let (case, basis, request) = direct(kind)?;
+            let before = case.cas.counts();
+            let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
             let limits = Limits {
                 work: work + 37 - short,
                 ..Limits::default()

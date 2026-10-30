@@ -138,7 +138,11 @@ pub(super) fn validate(
         return Err(Fault::invalid(InvalidCode::DecisionBox, AT));
     }
     let bytes = 384_u64
-        .saturating_add(certificate.validate(budget)?)
+        .saturating_add(crate::decision_kernel::cache::validate_pi(
+            cas,
+            certificate,
+            budget,
+        )?)
         .saturating_add(number_bytes(&contract.lower))
         .saturating_add(number_bytes(&contract.upper));
     let scratch = budget
