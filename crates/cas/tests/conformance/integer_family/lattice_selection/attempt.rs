@@ -169,7 +169,7 @@ fn lattice_tuple_attempt_work() -> TestResult {
         (5, 95_395),
     ] {
         for succeeds in [false, true] {
-            let source = prepared(kind)?;
+            let mut source = prepared(kind)?;
             let before = source.source.frame.cas.counts();
             let snapshot = source.source.frame.cas.canonical_snapshot(&mut ledger()?)?;
             let amount = work + 36 + u64::from(succeeds);

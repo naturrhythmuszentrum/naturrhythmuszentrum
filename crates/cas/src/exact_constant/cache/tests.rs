@@ -176,7 +176,7 @@ fn constant_graph_checked_evidence() -> TestResult {
             }
         })
         .ok_or("retained anonymous lemma")?;
-    assert_eq!(node.key.len(), 24);
+    assert_eq!(node.key_bytes(), 24);
     let after = case.cas.counts();
     assert_eq!(after.vertices, before.vertices + 1);
     assert_eq!(after.edges, before.edges + 3);

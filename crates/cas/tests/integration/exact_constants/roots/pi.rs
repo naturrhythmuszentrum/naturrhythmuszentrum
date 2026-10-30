@@ -130,7 +130,7 @@ fn enclosure(two_pi: bool) -> TestResult<(Cas, RationalEnclosure)> {
 #[test]
 fn constant_square_root_pi_enclosures() -> TestResult {
     for two_pi in [false, true] {
-        let (cas, contract) = enclosure(two_pi)?;
+        let (mut cas, contract) = enclosure(two_pi)?;
         let before = cas.canonical_snapshot(&mut ledger()?)?;
         cas.check_rational_enclosure(&contract, &mut ledger()?)?;
         let mut inward = contract;
@@ -184,7 +184,7 @@ fn constant_square_root_pi_costs() -> TestResult {
 /// ´claim:cas:constant-square-root-pi-certificate-refusal´
 #[test]
 fn constant_square_root_pi_certificate_refusal() -> TestResult {
-    let (cas, mut contract) = enclosure(true)?;
+    let (mut cas, mut contract) = enclosure(true)?;
     let before = cas.canonical_snapshot(&mut ledger()?)?;
     let nrz_cas::decision::EnclosureOrigin::PiBound { certificate, .. } = &mut contract.origin
     else {
@@ -249,7 +249,7 @@ fn constant_square_root_pi_original_square() -> TestResult {
 #[test]
 fn constant_square_root_pi_warm_costs() -> TestResult {
     for (product, work) in [(false, 72_282), (true, 101_754)] {
-        let (cas, contract) = enclosure(product)?;
+        let (mut cas, contract) = enclosure(product)?;
         cas.check_rational_enclosure(&contract, &mut ledger()?)?;
         let mut warm = ledger()?;
         cas.check_rational_enclosure(&contract, &mut warm)?;

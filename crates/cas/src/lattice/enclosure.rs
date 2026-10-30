@@ -56,23 +56,22 @@ impl Cas {
     ///
     /// Each original coordinate is independently replayed by the existing scalar
     /// checker. All coordinates must succeed before any owned evidence is returned.
-    /// The operation is read-only; no graph records or partial vector are published.
+    /// New checked scalar judgments publish only with the complete returned vector.
     /// # Errors
     /// Refuses changed target order, context or family, malformed vector shapes,
     /// unsupported scalar origins, invalid original operands and exhausted resources.
     pub fn check_rational_box_enclosure(
-        &self,
+        &mut self,
         contract: &RationalBoxEnclosure,
         budget: &mut Budget,
     ) -> Result<CheckedRationalBoxEnclosure, Fault> {
-        let previous = budget.restrict_storage(&self.limits);
-        let result = self.rational_box_enclosure(contract, budget);
-        budget.restore_limits(previous);
-        result
+        self.with_enclosure_attempt(budget, |attempt, budget| {
+            attempt.check_rational_box_enclosure(contract, budget)
+        })
     }
 
     /// Prepay the complete result after validating every coordinate in place.
-    fn rational_box_enclosure(
+    pub(crate) fn rational_box_enclosure(
         &self,
         contract: &RationalBoxEnclosure,
         budget: &mut Budget,

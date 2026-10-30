@@ -89,7 +89,7 @@ fn direct(
 #[test]
 fn lattice_direct_coordinate_boxes() -> TestResult {
     for kind in 0..5 {
-        let (case, basis, request) = direct(kind)?;
+        let (mut case, basis, request) = direct(kind)?;
         let before = case.cas.counts();
         let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
         let checked =
@@ -140,7 +140,7 @@ fn lattice_direct_coordinate_correspondence() -> TestResult {
 fn lattice_direct_coordinate_costs() -> TestResult {
     let mut rows = Vec::new();
     for kind in 0..5 {
-        let (case, basis, request) = direct(kind)?;
+        let (mut case, basis, request) = direct(kind)?;
         let mut budget = ledger()?;
         let checked = case
             .cas
@@ -167,7 +167,7 @@ fn lattice_direct_coordinate_costs() -> TestResult {
 fn lattice_direct_coordinate_work() -> TestResult {
     for (kind, work) in [(0, 201_690), (2, 60_913), (3, 59_633), (4, 83_132)] {
         for short in [0, 1] {
-            let (case, basis, request) = direct(kind)?;
+            let (mut case, basis, request) = direct(kind)?;
             let before = case.cas.counts();
             let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
             let limits = Limits {

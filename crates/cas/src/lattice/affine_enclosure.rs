@@ -76,13 +76,15 @@ impl Cas {
     /// or coefficient boxes, unsupported reciprocal bounds and exhausted resources.
     /// The operation changes no graph state and returns no partial coordinate result.
     pub fn check_lattice_box_enclosure(
-        &self,
+        &mut self,
         basis: &CheckedLatticeBasis,
         contract: &LatticeBoxEnclosure,
         budget: &mut Budget,
     ) -> Result<CheckedLatticeBoxEnclosure, Fault> {
         let previous = budget.restrict_storage(&self.limits);
-        let result = self.lattice_box_enclosure(basis, contract, budget);
+        let result = crate::decision_kernel::cache::attempt(self, budget, |cas, budget| {
+            cas.lattice_box_enclosure(basis, contract, budget)
+        });
         budget.restore_limits(previous);
         result
     }

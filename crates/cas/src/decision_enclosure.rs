@@ -194,3 +194,65 @@ fn number_bytes(value: &Rational) -> u64 {
         .saturating_mul(4)
         .saturating_add(128)
 }
+
+/// One exclusive caller's staged enclosure checks, ending at its final owned receipt.
+///
+/// This view permits receipt checking and exposes no general graph mutation. New
+/// scalar judgments remain attempt-local until the enclosing callback succeeds.
+#[derive(Debug)]
+pub struct EnclosureAttempt<'a> {
+    /// The owner keeps its exclusive guard while nested checkers borrow this graph.
+    cas: &'a Cas,
+}
+
+impl Cas {
+    /// Stage checked judgments through an enclosing consumer's final fallible copy or containment.
+    ///
+    /// Nested receipt checks use the supplied view without acquiring the owner lock again.
+    /// Successful publication moves every staged scalar payload into the existing graph;
+    /// a refusal drops the complete suffix and preserves spent caller Work.
+    /// # Errors
+    /// Preserves the callback's refusal or reports graph publication capacity exhaustion.
+    pub fn with_enclosure_attempt<T, E>(
+        &mut self,
+        budget: &mut Budget,
+        operation: impl FnOnce(&mut EnclosureAttempt<'_>, &mut Budget) -> Result<T, E>,
+    ) -> Result<T, E>
+    where
+        E: From<Fault>,
+    {
+        crate::decision_kernel::cache::attempt(self, budget, |cas, budget| {
+            operation(&mut EnclosureAttempt { cas }, budget)
+        })
+    }
+}
+
+impl EnclosureAttempt<'_> {
+    /// Check the complete scalar receipt without publishing an inner judgment prefix.
+    /// # Errors
+    /// Refuses invalid scope, unsupported or false origins and exhausted caller resources.
+    pub fn check_rational_enclosure(
+        &mut self,
+        contract: &RationalEnclosure,
+        budget: &mut Budget,
+    ) -> Result<CheckedRationalEnclosure, Fault> {
+        let previous = budget.restrict_storage(&self.cas.limits);
+        let result = check(self.cas, contract, budget);
+        budget.restore_limits(previous);
+        result
+    }
+
+    /// Check every original coordinate and the final box copy in this same staged attempt.
+    /// # Errors
+    /// Refuses malformed identities, any invalid coordinate or exhausted resources.
+    pub fn check_rational_box_enclosure(
+        &mut self,
+        contract: &crate::lattice::RationalBoxEnclosure,
+        budget: &mut Budget,
+    ) -> Result<crate::lattice::CheckedRationalBoxEnclosure, Fault> {
+        let previous = budget.restrict_storage(&self.cas.limits);
+        let result = self.cas.rational_box_enclosure(contract, budget);
+        budget.restore_limits(previous);
+        result
+    }
+}

@@ -109,7 +109,19 @@ fn kernel_live_trace_work_boundary() -> TestResult {
             assert_eq!(budget.usage().work, 389_012);
         }
         assert_eq!(budget.limits(), &limits);
-        assert_eq!(source.source.frame.cas.counts(), graph);
+        if work == 393_684 {
+            assert_eq!(
+                source.source.frame.cas.counts().vertices,
+                graph.vertices + 1
+            );
+            assert_eq!(source.source.frame.cas.counts().edges, graph.edges + 4);
+            assert_eq!(
+                source.source.frame.cas.counts().payload_bytes,
+                graph.payload_bytes + 12_258
+            );
+        } else {
+            assert_eq!(source.source.frame.cas.counts(), graph);
+        }
         assert_eq!(source.heap.provenance_usage(), heap);
     }
     Ok(())

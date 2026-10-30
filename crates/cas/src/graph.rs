@@ -25,6 +25,7 @@ use crate::source_model::{SourceForm, SourceFormDraft};
 
 mod intern;
 mod lemmas;
+pub(crate) use lemmas::{PendingScalar, ScalarInventory};
 
 pub(crate) use intern::InterningSnapshot;
 use intern::{InternIndex, StoreToken};
@@ -790,6 +791,13 @@ enum Undo {
         /// Policy identity indexed by this insertion, if present.
         policy: Option<(String, u32)>,
     },
+    /// A scalar inventory index contains only its complete canonical key and node identifier.
+    ScalarJudgment {
+        /// Newly allocated anonymous node identifier.
+        id: LogicalId,
+        /// Shared canonical key, also owned by the graph node.
+        key: Arc<[u8]>,
+    },
     /// A newly claimed source name.
     Source(String),
     /// A previously parentless occurrence assigned to a new parent.
@@ -823,6 +831,8 @@ pub(crate) struct State {
     pub(crate) indices: BTreeMap<LogicalId, NodeIndex<u32>>,
     /// Exact canonical syntax/context/condition keys.
     pub(crate) intern: InternIndex,
+    /// Kind-specific scalar keys index graph nodes without retaining a second checked payload.
+    pub(crate) scalar_judgments: BTreeMap<Arc<[u8]>, LogicalId>,
     /// Immutable policy identity lookup, independent of unrelated graph records.
     pub(crate) policies: BTreeMap<(String, u32), LogicalId>,
     /// Next serial per kind, independent of graph indices.
@@ -852,6 +862,7 @@ impl State {
             graph: DiGraph::new(),
             indices: BTreeMap::new(),
             intern: InternIndex::default(),
+            scalar_judgments: BTreeMap::new(),
             policies: BTreeMap::new(),
             next: BTreeMap::new(),
             sources: BTreeMap::new(),
@@ -946,6 +957,10 @@ impl State {
                 if let Some(identity) = policy {
                     self.policies.remove(&identity);
                 }
+            }
+            Undo::ScalarJudgment { id, key } => {
+                self.indices.remove(&id);
+                self.scalar_judgments.remove(key.as_ref());
             }
             Undo::Source(key) => {
                 self.sources.remove(&key);
@@ -1161,7 +1176,7 @@ impl Cas {
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
         let previous = budget.reserve_temporary(bytes, at)?;
         let checkpoint = self.state.begin();
-        let result = f(self, budget);
+        let result = crate::decision_kernel::cache::attempt(self, budget, f);
         self.state.finish(checkpoint, result.is_ok());
         if result.is_err() {
             self.memo_epoch = self.memo_epoch.saturating_add(1);
@@ -1906,7 +1921,7 @@ pub(crate) fn vertex_payload(
 ) -> Result<u64, Fault> {
     let at = Location::new("vertex payload");
     if let Vertex::AnonymousLemma(node) = vertex {
-        return crate::exact_constant::preparation_bytes(node.constant.value());
+        return node.payload();
     }
     let certificate_bytes = match vertex {
         Vertex::ScopedApplication(value) => match &value.certificate {
@@ -1980,7 +1995,7 @@ pub(crate) fn vertex_key(
     let mut out = Encoder::new(budget, Location::new("structural key"));
     out.byte(kind.tag())?;
     match vertex {
-        Vertex::AnonymousLemma(node) => out.raw(&node.key[1..])?,
+        Vertex::AnonymousLemma(node) => node.encode(&mut out)?,
         Vertex::Solve(value) => value.encode(&mut out, &mut crate::statement::handle)?,
         Vertex::Header(_)
         | Vertex::Region(_)

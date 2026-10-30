@@ -92,7 +92,7 @@ fn certificate(request: &mut RationalEnclosure) -> TestResult<&mut ScalarKernelC
 
 /// Pin the exact rejecting checker and preserve graph state and nonzero prior Work.
 fn refuses(
-    source: &Fixture,
+    source: &mut Fixture,
     request: &RationalEnclosure,
     code: InvalidCode,
     checker: &'static str,
@@ -110,19 +110,20 @@ fn refuses(
     Ok(())
 }
 
-/// Every closed law's exact rational reductions preserve its original enclosure and graph.
+/// Every closed law preserves its original enclosure and admits one checked scalar graph inventory.
 /// ´test:integration:decision-kernel-closed-oracles´
 /// ´claim:cas:decision-kernel-closed-oracles´
 #[test]
 fn decision_kernel_closed_oracles() -> TestResult {
     for kind in 0..3 {
-        let (source, request) = prepared(kind)?;
+        let (mut source, request) = prepared(kind)?;
         let before = source.cas.counts();
         let checked = source
             .cas
             .check_rational_enclosure(&request, &mut ledger()?)?;
         assert_eq!(checked.contract(), &request);
-        assert_eq!(source.cas.counts(), before);
+        assert_eq!(source.cas.counts().vertices, before.vertices + 1);
+        assert_eq!(source.cas.counts().edges, before.edges + 4);
     }
     Ok(())
 }
@@ -132,27 +133,27 @@ fn decision_kernel_closed_oracles() -> TestResult {
 /// ´claim:cas:decision-kernel-endpoint-forgeries´
 #[test]
 fn decision_kernel_endpoint_forgeries() -> TestResult {
-    let (source, mut request) = prepared(2)?;
+    let (mut source, mut request) = prepared(2)?;
     request.upper = request.lower.clone();
     certificate(&mut request)?.records[1].upper = request.upper.clone();
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::DecisionBox,
         "scalar kernel endpoint relations",
     )?;
-    let (source, mut request) = prepared(1)?;
+    let (mut source, mut request) = prepared(1)?;
     certificate(&mut request)?.records[0] = constant((0, 1), (0, 1), (0, 1))?;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::RefutedDomain,
         "scalar kernel endpoint relations",
     )?;
-    let (source, mut request) = prepared(1)?;
+    let (mut source, mut request) = prepared(1)?;
     certificate(&mut request)?.records[1].law = ScalarKernelLaw::Reciprocal { input: 1 };
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::Reference,
         "scalar kernel endpoint relations",
@@ -188,7 +189,7 @@ fn decision_kernel_nominal_coverage_refuses() -> TestResult {
     candidate.input_family = family;
     candidate.records = vec![constant((3, 2), (3, 2), (3, 2))?];
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::UnsupportedCertificate,
         "scalar kernel coverage",
@@ -198,15 +199,15 @@ fn decision_kernel_nominal_coverage_refuses() -> TestResult {
     let narrow = source.interval(&coordinate, (1, 1), (2, 1), false)?;
     certificate(&mut request)?.input_family = narrow;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::Scope,
         "scalar kernel coverage",
     )?;
-    let (source, mut request) = prepared(0)?;
+    let (mut source, mut request) = prepared(0)?;
     certificate(&mut request)?.version = 3;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::UnsupportedVersion,
         "scalar kernel coverage",
@@ -218,12 +219,12 @@ fn decision_kernel_nominal_coverage_refuses() -> TestResult {
 /// ´claim:cas:decision-kernel-target-forgery´
 #[test]
 fn decision_kernel_target_forgery() -> TestResult {
-    let (source, mut request) = prepared(0)?;
+    let (mut source, mut request) = prepared(0)?;
     certificate(&mut request)?.records[0] = constant((1, 8), (1, 8), (1, 8))?;
     request.lower = rational(1, 8)?;
     request.upper = rational(1, 8)?;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::EndpointMismatch,
         "scalar kernel coverage",
@@ -266,7 +267,7 @@ const KERNEL_COSTS: [KernelCost; 3] = [
 fn decision_kernel_work_boundaries() -> TestResult {
     for (kind, cost) in KERNEL_COSTS.iter().enumerate() {
         for work in [cost.work, cost.work - 1] {
-            let (source, mut request) = prepared(kind.try_into()?)?;
+            let (mut source, mut request) = prepared(kind.try_into()?)?;
             assert_eq!(certificate(&mut request)?.records.len(), cost.records);
             let before = source.cas.counts();
             let limits = Limits {
@@ -291,7 +292,12 @@ fn decision_kernel_work_boundaries() -> TestResult {
                 assert_eq!(fault.location, Location::new("exact rational enclosure"));
                 assert_eq!(budget.usage().work, cost.work - cost.bytes);
             }
-            assert_eq!(source.cas.counts(), before);
+            if work == cost.work {
+                assert_eq!(source.cas.counts().vertices, before.vertices + 1);
+                assert_eq!(source.cas.counts().edges, before.edges + 4);
+            } else {
+                assert_eq!(source.cas.counts(), before);
+            }
             assert_eq!(budget.limits(), &limits);
         }
     }
@@ -337,7 +343,7 @@ fn decision_kernel_full_box_relations() -> TestResult {
         candidate.records[2].lower = lower;
         candidate.records[2].upper = upper;
         refuses(
-            &source,
+            &mut source,
             &request,
             InvalidCode::DecisionBox,
             "scalar kernel endpoint relations",
@@ -387,12 +393,12 @@ fn decision_kernel_root_reuse_boundary() -> TestResult {
     request.target = negative.clone();
     certificate(&mut request)?.expression = negative;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::EndpointMismatch,
         "scalar kernel coverage",
     )?;
-    let (source, mut request) = prepared(2)?;
+    let (mut source, mut request) = prepared(2)?;
     request.lower = rational(221, 128)?;
     request.upper = rational(111, 64)?;
     let lower = request.lower.clone();
@@ -402,7 +408,7 @@ fn decision_kernel_root_reuse_boundary() -> TestResult {
     candidate.records[1].lower = lower;
     candidate.records[1].upper = upper;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::EndpointMismatch,
         "scalar kernel coverage",
@@ -443,7 +449,7 @@ fn decision_kernel_root_reuse_boundary() -> TestResult {
 /// ´claim:cas:decision-kernel-native-input-domains´
 #[test]
 fn decision_kernel_native_input_domains() -> TestResult {
-    let (source, mut request) = prepared(0)?;
+    let (mut source, mut request) = prepared(0)?;
     let candidate = certificate(&mut request)?;
     candidate.version = 2;
     candidate.records[0].law =
@@ -458,7 +464,7 @@ fn decision_kernel_native_input_domains() -> TestResult {
     let mut legacy = request.clone();
     certificate(&mut legacy)?.version = 1;
     refuses(
-        &source,
+        &mut source,
         &legacy,
         InvalidCode::UnsupportedVersion,
         "scalar kernel coverage",
@@ -468,7 +474,7 @@ fn decision_kernel_native_input_domains() -> TestResult {
     };
     input.radius = rational(-1, 256)?;
     refuses(
-        &source,
+        &mut source,
         &request,
         InvalidCode::RefutedDomain,
         "scalar kernel input coverage",

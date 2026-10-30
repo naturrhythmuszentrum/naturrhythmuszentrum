@@ -158,7 +158,7 @@ fn lattice_nearest_ties() -> TestResult {
 /// ´test:integration:lattice-nearest-skew-refusal´
 #[test]
 fn lattice_nearest_skew_refusal() -> TestResult {
-    let source = skew()?;
+    let mut source = skew()?;
     let before = source.source.frame.cas.counts();
     let mut budget = ledger()?;
     let fault = source

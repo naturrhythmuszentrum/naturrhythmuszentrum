@@ -160,20 +160,22 @@ impl Cas {
     /// Refuses a foreign or mismatched cover, altered original target, invalid tuple or enclosure,
     /// excluded range entry and exhausted preparation storage or Work. No graph record is added.
     pub fn prepare_lattice_selection(
-        &self,
+        &mut self,
         cover: &VerifiedWitness,
         expected: &LatticeSelection,
         enclosure: &LatticeEnclosure,
         budget: &mut Budget,
     ) -> Result<CheckedLatticeAttempt, Fault> {
         let previous = budget.restrict_storage(&self.limits);
-        let result = self.lattice_selection_attempt(
-            cover,
-            expected,
-            enclosure,
-            LatticeConvention::Floor,
-            budget,
-        );
+        let result = crate::decision_kernel::cache::attempt(self, budget, |cas, budget| {
+            cas.lattice_selection_attempt(
+                cover,
+                expected,
+                enclosure,
+                LatticeConvention::Floor,
+                budget,
+            )
+        });
         budget.restore_limits(previous);
         result
     }
@@ -183,20 +185,22 @@ impl Cas {
     /// Refuses unsupported or nonorthogonal bases and the same malformed evidence and
     /// resources as floor preparation. The receipt itself confers no selected tuple authority.
     pub fn prepare_lattice_nearest_selection(
-        &self,
+        &mut self,
         cover: &VerifiedWitness,
         expected: &LatticeSelection,
         enclosure: &LatticeEnclosure,
         budget: &mut Budget,
     ) -> Result<CheckedLatticeAttempt, Fault> {
         let previous = budget.restrict_storage(&self.limits);
-        let result = self.lattice_selection_attempt(
-            cover,
-            expected,
-            enclosure,
-            LatticeConvention::Nearest,
-            budget,
-        );
+        let result = crate::decision_kernel::cache::attempt(self, budget, |cas, budget| {
+            cas.lattice_selection_attempt(
+                cover,
+                expected,
+                enclosure,
+                LatticeConvention::Nearest,
+                budget,
+            )
+        });
         budget.restore_limits(previous);
         result
     }

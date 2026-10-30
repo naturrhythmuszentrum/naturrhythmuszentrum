@@ -263,7 +263,7 @@ fn enclosure_for(mut cas: Cas, target: Handle) -> TestResult<(Cas, RationalEnclo
 /// ´claim:cas:constant-square-root-enclosures´
 #[test]
 fn constant_square_root_enclosures() -> TestResult {
-    let (cas, contract) = enclosure()?;
+    let (mut cas, contract) = enclosure()?;
     let before = cas.canonical_snapshot(&mut ledger()?)?;
     cas.check_rational_enclosure(&contract, &mut ledger()?)?;
     let mut inward = contract;
@@ -278,13 +278,13 @@ fn constant_square_root_enclosures() -> TestResult {
 }
 
 /// Pin each complete operation at literal N/N−1, including prior Work and a spent ledger.
-fn pin<T>(operation: impl Fn(&mut Budget) -> Result<T, Fault>, work: u64) -> TestResult {
+fn pin<T>(mut operation: impl FnMut(&mut Budget) -> Result<T, Fault>, work: u64) -> TestResult {
     pin_with(|budget| Ok(operation(budget)), work)
 }
 
 /// Independent setup may fail before the measured operation consumes its own ledger.
 fn pin_with<T>(
-    operation: impl Fn(&mut Budget) -> TestResult<Result<T, Fault>>,
+    mut operation: impl FnMut(&mut Budget) -> TestResult<Result<T, Fault>>,
     work: u64,
 ) -> TestResult {
     for ceiling in [work, work - 1] {
@@ -409,7 +409,7 @@ fn lc_enclosure() -> TestResult<(Cas, RationalEnclosure)> {
 /// ´claim:cas:constant-square-root-lc-enclosure´
 #[test]
 fn constant_square_root_lc_enclosure() -> TestResult {
-    let (cas, contract) = lc_enclosure()?;
+    let (mut cas, contract) = lc_enclosure()?;
     cas.check_rational_enclosure(&contract, &mut ledger()?)?;
     let mut changed = contract;
     changed.origin = EnclosureOrigin::ExactRational {
@@ -494,7 +494,7 @@ fn constant_square_root_fractional_enclosure() -> TestResult {
         Operator::Rational(Rational::from_ratio(2, 3, &mut ledger()?)?),
         vec![],
     )])?;
-    let (cas, mut contract) = enclosure_for(cas, target)?;
+    let (mut cas, mut contract) = enclosure_for(cas, target)?;
     contract.lower = Rational::from_ratio(2, 3, &mut ledger()?)?;
     contract.upper = Rational::one();
     cas.check_rational_enclosure(&contract, &mut ledger()?)?;
@@ -539,7 +539,7 @@ fn pin_enclosure(
 ) -> TestResult {
     pin_with(
         |budget| {
-            let (cas, contract) = prepare()?;
+            let (mut cas, contract) = prepare()?;
             let before = cas.canonical_snapshot(&mut ledger()?)?;
             let result = cas.check_rational_enclosure(&contract, budget);
             assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
@@ -554,7 +554,7 @@ fn pin_enclosure(
 /// ´claim:cas:constant-square-root-warm-cost´
 #[test]
 fn constant_square_root_warm_cost() -> TestResult {
-    let (cas, contract) = enclosure()?;
+    let (mut cas, contract) = enclosure()?;
     cas.check_rational_enclosure(&contract, &mut ledger()?)?;
     let mut warm = ledger()?;
     cas.check_rational_enclosure(&contract, &mut warm)?;

@@ -268,8 +268,8 @@ fn lattice_reduced_work() -> TestResult {
             .frame
             .cas
             .export_witness(&source.cover, &mut ledger()?)?;
-        super::costs::preparation(&source, cost.preparation + 36, false)?;
-        super::costs::preparation(&source, cost.preparation + 37, true)?;
+        super::costs::preparation(&mut source, cost.preparation + 36, false)?;
+        super::costs::preparation(&mut source, cost.preparation + 37, true)?;
         super::costs::proof(&mut source, cost.proof + 36, false)?;
         let witness = super::costs::proof(&mut source, cost.proof + 37, true)?
             .ok_or("missing reduced tuple")?;

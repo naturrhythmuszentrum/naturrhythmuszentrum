@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked anonymous judgments use the graph's canonical index and evidence edges.
 
+mod scalar;
+pub(crate) use scalar::{PendingScalar, ScalarInventory};
+
 use super::{
     Cas, Edge, EdgeIndex, LogicalId, State, Undo, Vertex, VertexKind, size, storage_check,
 };
@@ -12,9 +15,49 @@ use crate::graph::Handle;
 /// Preserve the existing constant admission and citation accounting boundary.
 const AT: Location = Location::new("exact constant cache");
 
+/// The graph owns each checked payload; kind tags separate otherwise equal statement bytes.
+#[derive(Clone, Debug)]
+pub(crate) enum AnonymousLemma {
+    /// Original closed finite-real preparation and its normalized value.
+    Constant(ConstantLemma),
+    /// Complete checked scalar record inventory under the original scope.
+    Scalar(scalar::ScalarLemma),
+}
+
+impl AnonymousLemma {
+    /// Canonical payload key length, independent of the disjoint graph kind discriminator.
+    #[cfg(test)]
+    pub(crate) fn key_bytes(&self) -> usize {
+        match self {
+            Self::Constant(node) => node.key.len(),
+            Self::Scalar(node) => node.inventory.key.len(),
+        }
+    }
+
+    /// Complete graph payload is accounted by the independently checked judgment kind.
+    pub(crate) fn payload(&self) -> Result<u64, Fault> {
+        match self {
+            Self::Constant(node) => crate::exact_constant::preparation_bytes(node.constant.value()),
+            Self::Scalar(node) => Ok(node.inventory.bytes),
+        }
+    }
+
+    /// Graph snapshots retain the disjoint formal schema tag and complete canonical statement.
+    pub(crate) fn encode(&self, out: &mut crate::encoding::Encoder<'_>) -> Result<(), Fault> {
+        match self {
+            Self::Constant(node) => out.raw(&node.key[1..]),
+            Self::Scalar(node) => {
+                out.byte(1)?;
+                out.unsigned(u64::from(crate::proof::RETAINED_SCHEMAS[1].version))?;
+                out.raw(&node.inventory.key)
+            }
+        }
+    }
+}
+
 /// One graph-owned checked statement, never a portable proof or source assumption.
 #[derive(Debug)]
-pub(crate) struct AnonymousLemma {
+pub(crate) struct ConstantLemma {
     /// Complete kind-qualified statement under this graph's canonical reference namespace.
     pub(crate) key: Vec<u8>,
     /// Strong runtime ownership prevents a copied store from inheriting checked authority.
@@ -27,7 +70,7 @@ pub(crate) struct AnonymousLemma {
     pub(crate) constant: PreparedConstant,
 }
 
-impl Clone for AnonymousLemma {
+impl Clone for ConstantLemma {
     fn clone(&self) -> Self {
         Self {
             key: self.key.clone(),
@@ -101,6 +144,9 @@ impl Cas {
             let Vertex::AnonymousLemma(node) = &mut self.state.graph[index] else {
                 return Err(invalid(InvalidCode::Reference));
             };
+            let AnonymousLemma::Constant(node) = node.as_mut() else {
+                return Err(invalid(InvalidCode::Reference));
+            };
             node.epoch = self.memo_epoch;
             node.owner = std::sync::Arc::clone(&self.memo_owner);
             return Ok(id);
@@ -127,8 +173,11 @@ impl Cas {
     }
 
     /// A structural index entry can refer only to the expected checked vertex kind.
-    fn lemma(&self, id: LogicalId) -> Result<&AnonymousLemma, Fault> {
+    fn lemma(&self, id: LogicalId) -> Result<&ConstantLemma, Fault> {
         let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+            return Err(invalid(InvalidCode::Reference));
+        };
+        let AnonymousLemma::Constant(node) = node.as_ref() else {
             return Err(invalid(InvalidCode::Reference));
         };
         Ok(node)
@@ -200,13 +249,15 @@ fn publish(
     let citation = EdgeIndex::new(state.graph.edge_count() + 2);
     let index = state
         .graph
-        .add_node(Vertex::AnonymousLemma(Box::new(AnonymousLemma {
-            key: key.clone(),
-            owner: std::sync::Arc::clone(&cas.memo_owner),
-            epoch: cas.memo_epoch,
-            citation,
-            constant,
-        })));
+        .add_node(Vertex::AnonymousLemma(Box::new(AnonymousLemma::Constant(
+            ConstantLemma {
+                key: key.clone(),
+                owner: std::sync::Arc::clone(&cas.memo_owner),
+                epoch: cas.memo_epoch,
+                citation,
+                constant,
+            },
+        ))));
     state.graph.add_edge(index, original, Edge::Input(0));
     state.graph.add_edge(index, context, Edge::InContext);
     state.graph.add_edge(original, index, Edge::CheckedEvidence);

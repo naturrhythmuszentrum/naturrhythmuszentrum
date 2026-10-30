@@ -91,33 +91,35 @@ impl Heap {
         literals: LiteralLimits,
         budget: &mut Budget,
     ) -> Result<FrozenLatticeEnclosure<P>, LiveDecisionError> {
-        self.check_lattice_inputs(&frozen, budget)?;
-        let spec = frozen.association().case().specification();
-        if contract.target != spec.target || contract.context != *spec.frame.context() {
-            return Err(LiveDecisionError::Recipe);
-        }
-        let original =
-            budget.with_retained_payload(frozen.retained_payload_bytes(), AT, |budget| {
-                graph.check_rational_box_enclosure(contract, budget)
+        graph.with_enclosure_attempt(budget, |attempt, budget| {
+            self.check_lattice_inputs(&frozen, budget)?;
+            let spec = frozen.association().case().specification();
+            if contract.target != spec.target || contract.context != *spec.frame.context() {
+                return Err(LiveDecisionError::Recipe);
+            }
+            let original =
+                budget.with_retained_payload(frozen.retained_payload_bytes(), AT, |budget| {
+                    attempt.check_rational_box_enclosure(contract, budget)
+                })?;
+            let count = u64::try_from(spec.axes.len()).map_err(|_| LiveDecisionError::Recipe)?;
+            let bytes = frozen
+                .retained_payload_bytes()
+                .saturating_add(original.retained_bytes())
+                .saturating_add(count.saturating_mul(128))
+                .saturating_add(128);
+            budget.check(BudgetKind::OutputBytes, bytes, AT)?;
+            let coordinates = budget.with_retained_payload(bytes, AT, |budget| {
+                budget.work(count.saturating_mul(128).saturating_add(128), AT)?;
+                contain(&frozen, contract, arithmetic, literals, budget)
             })?;
-        let count = u64::try_from(spec.axes.len()).map_err(|_| LiveDecisionError::Recipe)?;
-        let bytes = frozen
-            .retained_payload_bytes()
-            .saturating_add(original.retained_bytes())
-            .saturating_add(count.saturating_mul(128))
-            .saturating_add(128);
-        budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-        let coordinates = budget.with_retained_payload(bytes, AT, |budget| {
-            budget.work(count.saturating_mul(128).saturating_add(128), AT)?;
-            contain(&frozen, contract, arithmetic, literals, budget)
-        })?;
-        Ok(FrozenLatticeEnclosure {
-            frozen,
-            original,
-            coordinates,
-            arithmetic_revision: arithmetic.revision(),
-            literals,
-            bytes,
+            Ok(FrozenLatticeEnclosure {
+                frozen,
+                original,
+                coordinates,
+                arithmetic_revision: arithmetic.revision(),
+                literals,
+                bytes,
+            })
         })
     }
 }

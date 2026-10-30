@@ -11,6 +11,8 @@ use crate::error::Fault;
 use crate::graph::{Cas, Handle};
 use crate::number::Rational;
 
+pub use crate::decision_enclosure::EnclosureAttempt;
+
 pub use crate::decision_kernel::model::{
     ScalarKernelCertificate, ScalarKernelInput, ScalarKernelInputValue, ScalarKernelLaw,
     ScalarKernelRecord,
@@ -281,16 +283,15 @@ impl Cas {
     /// # Errors
     /// Refuses foreign identities, changed targets or input families, false results,
     /// reversed or excluding boxes, unsupported origins or constants, free inputs,
-    /// invalid pi certificates and unproved divisor domains. No caller graph state changes.
+    /// invalid pi certificates and unproved divisor domains. A refusal publishes no graph judgment.
     pub fn check_rational_enclosure(
-        &self,
+        &mut self,
         contract: &RationalEnclosure,
         budget: &mut Budget,
     ) -> Result<CheckedRationalEnclosure, Fault> {
-        let previous = budget.restrict_storage(&self.limits);
-        let result = crate::decision_enclosure::check(self, contract, budget);
-        budget.restore_limits(previous);
-        result
+        self.with_enclosure_attempt(budget, |attempt, budget| {
+            attempt.check_rational_enclosure(contract, budget)
+        })
     }
 }
 

@@ -118,7 +118,7 @@ fn checked_records(
         )
     })?;
     if cached.is_none() {
-        cache::insert(cas, key, values, budget)?;
+        cache::insert(cas, certificate, key, values, budget)?;
     }
     Ok(())
 }

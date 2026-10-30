@@ -101,7 +101,7 @@ fn decision_pi_closed_targets() -> TestResult {
     Ok(())
 }
 
-fn refusal(source: &Fixture, request: &RationalEnclosure, code: InvalidCode) -> TestResult {
+fn refusal(source: &mut Fixture, request: &RationalEnclosure, code: InvalidCode) -> TestResult {
     let before = source.cas.counts();
     let snapshot = source.cas.canonical_snapshot(&mut ledger()?)?;
     let mut budget = ledger()?;
@@ -121,30 +121,30 @@ fn refusal(source: &Fixture, request: &RationalEnclosure, code: InvalidCode) -> 
 /// ´test:integration:decision-pi-refusals´
 #[test]
 fn decision_pi_refusals() -> TestResult {
-    let (source, original) = prepared()?;
+    let (mut source, original) = prepared()?;
     let mut request = original.clone();
     request.origin = EnclosureOrigin::ExactRational {
         expression: request.target.clone(),
         value: rational(51, 16)?,
     };
-    refusal(&source, &request, InvalidCode::UnsupportedCertificate)?;
+    refusal(&mut source, &request, InvalidCode::UnsupportedCertificate)?;
     request.clone_from(&original);
     let EnclosureOrigin::PiBound { certificate, .. } = &mut request.origin else {
         return Err("missing pi certificate".into());
     };
     certificate.lower = rational(3, 1)?;
     certificate.upper = rational(4, 1)?;
-    refusal(&source, &request, InvalidCode::DecisionBox)?;
+    refusal(&mut source, &request, InvalidCode::DecisionBox)?;
     request.clone_from(&original);
     request.lower = rational(51, 16)?;
     request.upper = rational(51, 16)?;
-    refusal(&source, &request, InvalidCode::DecisionBox)?;
+    refusal(&mut source, &request, InvalidCode::DecisionBox)?;
     request.clone_from(&original);
     let EnclosureOrigin::PiBound { certificate, .. } = &mut request.origin else {
         return Err("missing pi certificate".into());
     };
     certificate.upper = rational(3, 1)?;
-    refusal(&source, &request, InvalidCode::DecisionBox)?;
+    refusal(&mut source, &request, InvalidCode::DecisionBox)?;
     Ok(())
 }
 
@@ -155,20 +155,20 @@ fn decision_pi_original_domain() -> TestResult {
     let mut source = Fixture::new(Example::Integer)?;
     let e = source.term(Operator::Constant(Constant::E), &[])?;
     let request = question(&source, e, (2, 1), (3, 1))?;
-    refusal(&source, &request, InvalidCode::UnsupportedCertificate)?;
+    refusal(&mut source, &request, InvalidCode::UnsupportedCertificate)?;
     let pi = source.term(Operator::Constant(Constant::Pi), &[])?;
     let zero = source.number(0, 1)?;
     let invalid = source.term(Operator::Div, &[pi, zero.clone()])?;
     let hidden = source.term(Operator::Mul, &[zero, invalid])?;
     let request = question(&source, hidden, (0, 1), (0, 1))?;
-    refusal(&source, &request, InvalidCode::RefutedDomain)
+    refusal(&mut source, &request, InvalidCode::RefutedDomain)
 }
 
 /// The complete LC replay includes its independently checked pi certificate.
 /// ´test:integration:decision-pi-costs´
 #[test]
 fn decision_pi_costs() -> TestResult {
-    let (source, request) = prepared()?;
+    let (mut source, request) = prepared()?;
     let mut budget = ledger()?;
     let checked = source.cas.check_rational_enclosure(&request, &mut budget)?;
     assert_eq!(
@@ -191,7 +191,7 @@ fn decision_pi_resources() -> TestResult {
         (BudgetKind::OutputBytes, 1_336, 0, true),
         (BudgetKind::OutputBytes, 1_335, 0, false),
     ] {
-        let (source, request) = prepared()?;
+        let (mut source, request) = prepared()?;
         let before = source.cas.counts();
         let snapshot = source.cas.canonical_snapshot(&mut ledger()?)?;
         let mut limits = Limits::default();

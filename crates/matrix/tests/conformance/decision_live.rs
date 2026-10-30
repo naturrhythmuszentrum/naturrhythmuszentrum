@@ -520,7 +520,7 @@ fn lattice_live_origin_refusal() -> TestResult {
     use nrz_bindings::readings::algebra::{
         FaultKind, InvalidCode, Location, decision::EnclosureOrigin, proof::Certificate,
     };
-    let source = super::decision_fixture::fixture(false, "3", "10/Pi")?;
+    let mut source = super::decision_fixture::fixture(false, "3", "10/Pi")?;
     let proposal = source.steps.last().ok_or("missing selection")?;
     let Certificate::IntegerSelection(original) = &proposal.certificate else {
         return Err("missing original enclosure".into());

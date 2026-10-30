@@ -92,8 +92,8 @@ pub(super) fn proof(
     Ok(result)
 }
 
-pub(super) fn preparation(source: &Selection, work: u64, succeeds: bool) -> TestResult {
-    let cas = &source.source.frame.cas;
+pub(super) fn preparation(source: &mut Selection, work: u64, succeeds: bool) -> TestResult {
+    let cas = &mut source.source.frame.cas;
     let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
     let mut budget = budget(work)?;
@@ -145,8 +145,8 @@ fn lattice_nearest_work() -> TestResult {
         COSTS.into_iter().enumerate()
     {
         let mut source = fixture(kind)?;
-        preparation(&source, prepare + 36, false)?;
-        preparation(&source, prepare + 37, true)?;
+        preparation(&mut source, prepare + 36, false)?;
+        preparation(&mut source, prepare + 37, true)?;
         proof(&mut source, selection + 36, false)?;
         let witness = proof(&mut source, selection + 37, true)?.ok_or("missing nearest tuple")?;
         let encoded = source

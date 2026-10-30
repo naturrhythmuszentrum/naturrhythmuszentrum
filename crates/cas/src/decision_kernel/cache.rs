@@ -3,6 +3,8 @@
 
 mod accounting;
 pub(crate) use accounting::Accounting;
+mod attempt;
+pub(crate) use attempt::attempt;
 mod pi;
 pub(crate) use pi::validate as validate_pi;
 
@@ -13,7 +15,7 @@ use crate::budget::{Budget, BudgetKind};
 use crate::encoding::Encoder;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::exact_constant::ExactConstant;
-use crate::graph::{Cas, size};
+use crate::graph::{Cas, PendingScalar, ScalarInventory, size};
 
 /// Complete key construction, comparison and retained ownership share one location.
 const AT: Location = Location::new("checked scalar records");
@@ -29,27 +31,20 @@ pub(crate) struct Cache {
     owner: Option<Arc<()>>,
     /// Any rollback invalidates the complete inventory before logical IDs can recur.
     epoch: u64,
-    /// Append-only successful inventories permit atomic refusal without a full copy.
-    entries: Vec<Entry>,
+    /// Attempt-local checked inventories move into the graph only after final receipt copying.
+    pending: Vec<PendingScalar>,
+    /// Nested receipt scopes share the outer attempt and never publish an inner prefix.
+    depth: usize,
     /// Complete checked constant certificates share the same source-store lifetime.
     pi: Vec<pi::Entry>,
-    /// Conservative complete keys, exact graphs, constant certificates and entry allocation.
+    /// Remaining Pi retention and unpublished scalar payload; committed scalars live in State.
     bytes: u64,
-}
-
-/// The complete ordered inventory also identifies every backwards record dependency.
-#[derive(Debug)]
-struct Entry {
-    /// Existing canonical wire grammar with authenticated local scope references.
-    key: Vec<u8>,
-    /// Independently reconstructed meanings in exactly the original record order.
-    values: Arc<Vec<ExactConstant>>,
 }
 
 impl Cache {
     /// Expired checked judgments cannot retain reusable authority or storage.
     pub(crate) fn clear(&mut self) {
-        self.entries = Vec::new();
+        self.pending = Vec::new();
         self.pi = Vec::new();
         self.bytes = 0;
     }
@@ -105,7 +100,7 @@ pub(crate) fn atomic<T>(
     let snapshot = {
         let cache = records(cas)?;
         Snapshot {
-            records: cache.entries.len(),
+            records: cache.pending.len(),
             pi: cache.pi.len(),
             bytes: cache.bytes,
         }
@@ -114,7 +109,7 @@ pub(crate) fn atomic<T>(
     let result = operation(budget);
     if result.is_err() {
         let mut cache = records(cas)?;
-        restore_entries(&mut cache.entries, snapshot.records);
+        restore_entries(&mut cache.pending, snapshot.records);
         restore_entries(&mut cache.pi, snapshot.pi);
         cache.bytes = snapshot.bytes;
         drop(cache);
@@ -151,7 +146,9 @@ pub(crate) fn retained<T>(
     operation: impl FnOnce(&mut Budget) -> Result<T, Fault>,
 ) -> Result<T, Fault> {
     prepare(cas)?;
-    let bytes = records(cas)?.bytes;
+    let bytes = records(cas)?
+        .bytes
+        .saturating_add(cas.retained_judgment_bytes());
     accounting::retain(cas, bytes, budget)?;
     operation(budget)
 }
@@ -175,21 +172,36 @@ pub(super) fn lookup(
     key: &[u8],
     budget: &mut Budget,
 ) -> Result<Option<Arc<Vec<ExactConstant>>>, Fault> {
-    let cache = records(cas)?;
+    let count = size(cas.state.scalar_judgments.len(), AT)?;
     budget.work(
-        size(key.len(), AT)?.saturating_mul(size(cache.entries.len(), AT)?),
+        size(key.len(), AT)?.saturating_mul(u64::from(count.bit_width())),
         AT,
     )?;
-    Ok(cache
-        .entries
-        .iter()
-        .find(|entry| entry.key == key)
-        .map(|entry| Arc::clone(&entry.values)))
+    if let Some(values) = cas.scalar_records(key)? {
+        return Ok(Some(values));
+    }
+    let cache = records(cas)?;
+    budget.work(
+        size(key.len(), AT)?.saturating_mul(size(cache.pending.len(), AT)?),
+        AT,
+    )?;
+    for entry in &cache.pending {
+        let inventory = match entry {
+            PendingScalar::New(inventory) => inventory,
+            PendingScalar::Rechecked(id) => cas.scalar_inventory(*id)?,
+        };
+        if inventory.key.as_ref() == key {
+            return Ok(Some(Arc::clone(&inventory.values)));
+        }
+    }
+    drop(cache);
+    Ok(None)
 }
 
 /// Publish only fully checked meanings, moving their existing allocation into retention.
 pub(super) fn insert(
     cas: &Cas,
+    certificate: &ScalarKernelCertificate,
     key: Vec<u8>,
     values: Vec<ExactConstant>,
     budget: &mut Budget,
@@ -197,6 +209,22 @@ pub(super) fn insert(
     if cas.memo_epoch == u64::MAX {
         return Ok(());
     }
+    if let Some(id) = cas.state.scalar_judgments.get(key.as_slice()) {
+        cas.scalar_inventory(*id)?;
+        let mut cache = records(cas)?;
+        cache
+            .pending
+            .try_reserve_exact(1)
+            .map_err(|_| Fault::allocation(AT))?;
+        cache.pending.push(PendingScalar::Rechecked(*id));
+        drop(cache);
+        return Ok(());
+    }
+    let scope = [
+        cas.checked(&certificate.expression)?,
+        cas.checked(&certificate.context)?,
+        cas.checked(&certificate.input_family)?,
+    ];
     let mut bytes = size(key.capacity(), AT)?.saturating_add(256);
     for value in &values {
         bytes = bytes.saturating_add(value.retained_payload_bytes()?);
@@ -211,20 +239,27 @@ pub(super) fn insert(
     )?;
     budget.check(
         BudgetKind::Vertices,
-        size(cache.entries.len(), AT)?
+        size(cas.counts().vertices, AT)?
+            .saturating_add(size(cache.pending.len(), AT)?)
             .saturating_add(size(cache.pi.len(), AT)?)
             .saturating_add(1),
         AT,
     )?;
-    accounting::retain(cas, total, budget)?;
+    accounting::retain(
+        cas,
+        total.saturating_add(cas.retained_judgment_bytes()),
+        budget,
+    )?;
     cache
-        .entries
+        .pending
         .try_reserve_exact(1)
         .map_err(|_| Fault::allocation(AT))?;
-    cache.entries.push(Entry {
-        key,
+    cache.pending.push(PendingScalar::New(ScalarInventory {
+        key: key.into(),
         values: Arc::new(values),
-    });
+        scope,
+        bytes,
+    }));
     cache.bytes = total;
     drop(cache);
     Ok(())

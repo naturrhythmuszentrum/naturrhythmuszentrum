@@ -113,57 +113,59 @@ impl Heap {
         arithmetic: &ArithmeticContext,
         budget: &mut Budget,
     ) -> Result<FrozenRatioKernel<P>, LiveDecisionError> {
-        self.check_decision_inputs(&frozen, budget)?;
-        let declared = frozen
-            .operands()
-            .iter()
-            .all(|operand| operand.input().coverage == Coverage::DeclaredBounds);
-        if !declared {
-            return Err(LiveDecisionError::Recipe);
-        }
-        let order = ratio::original(&frozen, budget)?;
-        let scratch = frozen
-            .retained_payload_bytes()
-            .saturating_add(records::pi_bytes(pi))
-            .saturating_add(4096);
-        budget.check(BudgetKind::OutputBytes, scratch, AT)?;
-        budget.work(scratch - frozen.retained_payload_bytes(), AT)?;
-        let evidence = budget.with_retained_payload(scratch, AT, |budget| {
-            let (records, scalar_usage) = records::execute(&frozen, order, arithmetic, budget)?;
-            let laws = records::convert(&frozen, order, &records, pi, budget)?;
-            let output = laws.last().ok_or(LiveDecisionError::Recipe)?;
-            let spec = frozen.association().case().specification();
-            let contract = RationalEnclosure {
-                target: spec.target.clone(),
-                context: spec.context.clone(),
-                input_family: spec.family.domain.clone(),
-                lower: output.lower.clone(),
-                upper: output.upper.clone(),
-                origin: EnclosureOrigin::ScalarKernel(Box::new(ScalarKernelCertificate {
-                    version: 2,
-                    expression: spec.target.clone(),
+        graph.with_enclosure_attempt(budget, |attempt, budget| {
+            self.check_decision_inputs(&frozen, budget)?;
+            let declared = frozen
+                .operands()
+                .iter()
+                .all(|operand| operand.input().coverage == Coverage::DeclaredBounds);
+            if !declared {
+                return Err(LiveDecisionError::Recipe);
+            }
+            let order = ratio::original(&frozen, budget)?;
+            let scratch = frozen
+                .retained_payload_bytes()
+                .saturating_add(records::pi_bytes(pi))
+                .saturating_add(4096);
+            budget.check(BudgetKind::OutputBytes, scratch, AT)?;
+            budget.work(scratch - frozen.retained_payload_bytes(), AT)?;
+            let evidence = budget.with_retained_payload(scratch, AT, |budget| {
+                let (records, scalar_usage) = records::execute(&frozen, order, arithmetic, budget)?;
+                let laws = records::convert(&frozen, order, &records, pi, budget)?;
+                let output = laws.last().ok_or(LiveDecisionError::Recipe)?;
+                let spec = frozen.association().case().specification();
+                let contract = RationalEnclosure {
+                    target: spec.target.clone(),
                     context: spec.context.clone(),
                     input_family: spec.family.domain.clone(),
-                    records: laws,
-                })),
-            };
-            let original = graph.check_rational_enclosure(&contract, budget)?;
-            let bytes = original.retained_bytes().saturating_add(768);
-            budget.check(
-                BudgetKind::OutputBytes,
-                bytes.saturating_add(frozen.retained_payload_bytes()),
-                AT,
-            )?;
-            Ok::<_, LiveDecisionError>(RatioKernelEvidence {
-                order,
-                records,
-                original,
-                scalar_usage,
-                revision: arithmetic.revision(),
-                bytes,
-            })
-        })?;
-        Ok(FrozenRatioKernel { frozen, evidence })
+                    lower: output.lower.clone(),
+                    upper: output.upper.clone(),
+                    origin: EnclosureOrigin::ScalarKernel(Box::new(ScalarKernelCertificate {
+                        version: 2,
+                        expression: spec.target.clone(),
+                        context: spec.context.clone(),
+                        input_family: spec.family.domain.clone(),
+                        records: laws,
+                    })),
+                };
+                let original = attempt.check_rational_enclosure(&contract, budget)?;
+                let bytes = original.retained_bytes().saturating_add(768);
+                budget.check(
+                    BudgetKind::OutputBytes,
+                    bytes.saturating_add(frozen.retained_payload_bytes()),
+                    AT,
+                )?;
+                Ok::<_, LiveDecisionError>(RatioKernelEvidence {
+                    order,
+                    records,
+                    original,
+                    scalar_usage,
+                    revision: arithmetic.revision(),
+                    bytes,
+                })
+            })?;
+            Ok(FrozenRatioKernel { frozen, evidence })
+        })
     }
 
     /// Prepare a selected live quotient only from the identical checked executed-trace contract.

@@ -76,11 +76,18 @@ fn retain(
     budget.check(
         BudgetKind::Vertices,
         size(cache.pi.len(), AT)?
-            .saturating_add(size(cache.entries.len(), AT)?)
+            .saturating_add(
+                size(cas.state.scalar_judgments.len(), AT)?
+                    .saturating_add(size(cache.pending.len(), AT)?),
+            )
             .saturating_add(1),
         AT,
     )?;
-    accounting::retain(cas, total, budget)?;
+    accounting::retain(
+        cas,
+        total.saturating_add(cas.retained_judgment_bytes()),
+        budget,
+    )?;
     cache
         .pi
         .try_reserve_exact(1)

@@ -67,7 +67,7 @@ pub(crate) fn check(
         {
             budget.work(1, AT)?;
             coordinate(cas, draft, bound, enclosure, premise)?;
-            cas.check_rational_enclosure(enclosure, budget)?;
+            crate::decision_enclosure::check(cas, enclosure, budget)?;
             crate::statement::merge(cas, &mut conditions, &premise.conditions, budget)?;
         }
         Ok(())

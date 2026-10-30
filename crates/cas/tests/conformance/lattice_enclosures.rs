@@ -116,7 +116,7 @@ fn fixture(kind: u32) -> TestResult<(Fixture, RationalBoxEnclosure)> {
 #[test]
 fn lattice_original_boxes() -> TestResult {
     for kind in 0..5 {
-        let (case, request) = fixture(kind)?;
+        let (mut case, request) = fixture(kind)?;
         let before = case.cas.counts();
         let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
         let checked = case
@@ -136,7 +136,7 @@ fn lattice_original_boxes() -> TestResult {
 }
 
 fn refuses(
-    case: &Fixture,
+    case: &mut Fixture,
     request: &RationalBoxEnclosure,
     expected: InvalidCode,
     at: &'static str,
@@ -165,43 +165,43 @@ fn lattice_original_box_identities() -> TestResult {
     let at = "original rational box enclosure";
     let mut changed = request.clone();
     changed.coordinates.swap(0, 1);
-    refuses(&case, &changed, InvalidCode::EndpointMismatch, at)?;
+    refuses(&mut case, &changed, InvalidCode::EndpointMismatch, at)?;
     changed.clone_from(&request);
     changed.coordinates.pop();
-    refuses(&case, &changed, InvalidCode::ReadingShape, at)?;
+    refuses(&mut case, &changed, InvalidCode::ReadingShape, at)?;
     changed.clone_from(&request);
     let replacement = number(&mut case, 21)?;
     changed.target = column(
         &mut case,
         &[replacement, request.coordinates[1].target.clone()],
     )?;
-    refuses(&case, &changed, InvalidCode::EndpointMismatch, at)?;
+    refuses(&mut case, &changed, InvalidCode::EndpointMismatch, at)?;
     changed.clone_from(&request);
     let foreign = fixture(1)?;
     changed.coordinates[0].context = foreign.1.context;
-    refuses(&case, &changed, InvalidCode::EndpointMismatch, at)?;
+    refuses(&mut case, &changed, InvalidCode::EndpointMismatch, at)?;
     changed.clone_from(&request);
     changed.coordinates[0].input_family = foreign.1.input_family;
-    refuses(&case, &changed, InvalidCode::EndpointMismatch, at)
+    refuses(&mut case, &changed, InvalidCode::EndpointMismatch, at)
 }
 
 /// A false final coordinate or missing constant proof never returns a partial box.
 /// ´test:integration:lattice-original-box-refusals´
 #[test]
 fn lattice_original_box_refusals() -> TestResult {
-    let (case, mut request) = fixture(1)?;
+    let (mut case, mut request) = fixture(1)?;
     request.coordinates[1].lower = Rational::from_ratio(11, 1, &mut ledger()?)?;
     request.coordinates[1].upper = Rational::from_ratio(12, 1, &mut ledger()?)?;
     refuses(
-        &case,
+        &mut case,
         &request,
         InvalidCode::DecisionBox,
         "exact rational enclosure",
     )?;
-    let (case, mut request) = fixture(2)?;
+    let (mut case, mut request) = fixture(2)?;
     request.coordinates[0].origin = EnclosureOrigin::Unverified;
     refuses(
-        &case,
+        &mut case,
         &request,
         InvalidCode::UnsupportedCertificate,
         "exact rational enclosure",
@@ -214,7 +214,7 @@ fn lattice_original_box_refusals() -> TestResult {
 fn lattice_original_box_costs() -> TestResult {
     let mut rows = Vec::new();
     for kind in 0..5 {
-        let (case, request) = fixture(kind)?;
+        let (mut case, request) = fixture(kind)?;
         let mut budget = ledger()?;
         let checked = case
             .cas
@@ -247,7 +247,7 @@ fn lattice_original_box_work() -> TestResult {
         (4, 58_049),
     ] {
         for short in [0, 1] {
-            let (case, request) = fixture(kind)?;
+            let (mut case, request) = fixture(kind)?;
             let before = case.cas.counts();
             let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
             let limits = Limits {
@@ -284,7 +284,7 @@ fn lattice_original_box_work() -> TestResult {
 #[test]
 fn lattice_original_box_output() -> TestResult {
     for (kind, bytes) in [(1, 1_840), (2, 1_592)] {
-        let (case, request) = fixture(kind)?;
+        let (mut case, request) = fixture(kind)?;
         let before = case.cas.counts();
         for short in [0, 1] {
             let mut budget = Budget::new(Limits {

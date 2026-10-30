@@ -54,7 +54,7 @@ fn prepared(index: usize) -> TestResult<(Fixture, RationalEnclosure)> {
     Ok((source, request))
 }
 
-fn refuses(source: &Fixture, request: &RationalEnclosure, expected: InvalidCode) -> TestResult {
+fn refuses(source: &mut Fixture, request: &RationalEnclosure, expected: InvalidCode) -> TestResult {
     let before = source.cas.counts();
     let fault = source
         .cas
@@ -71,7 +71,7 @@ fn refuses(source: &Fixture, request: &RationalEnclosure, expected: InvalidCode)
 #[test]
 fn decision_enclosure_closed_examples() -> TestResult {
     for index in 0..3 {
-        let (source, request) = prepared(index)?;
+        let (mut source, request) = prepared(index)?;
         let before = source.cas.counts();
         let checked = source
             .cas
@@ -97,33 +97,33 @@ fn decision_enclosure_original_target() -> TestResult {
     let (mut source, mut request) = prepared(0)?;
     let original = request.clone();
     request.target = source.number(75, 1)?;
-    refuses(&source, &request, InvalidCode::EndpointMismatch)?;
+    refuses(&mut source, &request, InvalidCode::EndpointMismatch)?;
     request.clone_from(&original);
     request.origin = EnclosureOrigin::ExactRational {
         expression: request.target.clone(),
         value: rational(-74, 1)?,
     };
-    refuses(&source, &request, InvalidCode::EndpointMismatch)?;
+    refuses(&mut source, &request, InvalidCode::EndpointMismatch)?;
     let foreign = prepared(0)?;
     request.origin = EnclosureOrigin::ExactRational {
         expression: foreign.1.target,
         value: rational(-75, 1)?,
     };
-    refuses(&source, &request, InvalidCode::ForeignHandle)
+    refuses(&mut source, &request, InvalidCode::ForeignHandle)
 }
 
 /// Kernel and provenance-only claims have no exact replay authority.
 /// ´test:integration:decision-enclosure-unsupported-origins´
 #[test]
 fn decision_enclosure_unsupported_origins() -> TestResult {
-    let (source, mut request) = prepared(0)?;
+    let (mut source, mut request) = prepared(0)?;
     for origin in [
         unsupported_scalar(&request),
         EnclosureOrigin::MatrixKernel,
         EnclosureOrigin::Unverified,
     ] {
         request.origin = origin;
-        refuses(&source, &request, InvalidCode::UnsupportedCertificate)?;
+        refuses(&mut source, &request, InvalidCode::UnsupportedCertificate)?;
     }
     Ok(())
 }
@@ -132,12 +132,12 @@ fn decision_enclosure_unsupported_origins() -> TestResult {
 /// ´test:integration:decision-enclosure-false-boxes´
 #[test]
 fn decision_enclosure_false_boxes() -> TestResult {
-    let (source, mut request) = prepared(0)?;
+    let (mut source, mut request) = prepared(0)?;
     request.lower = rational(1, 1)?;
     request.upper = rational(2, 1)?;
-    refuses(&source, &request, InvalidCode::DecisionBox)?;
+    refuses(&mut source, &request, InvalidCode::DecisionBox)?;
     std::mem::swap(&mut request.lower, &mut request.upper);
-    refuses(&source, &request, InvalidCode::DecisionBox)
+    refuses(&mut source, &request, InvalidCode::DecisionBox)
 }
 
 /// The exact local context and its admitted family survive; a widened family refuses.
@@ -164,7 +164,7 @@ fn decision_enclosure_qualified_family() -> TestResult {
     assert_eq!(checked.contract().context, request.context);
     assert_eq!(checked.contract().input_family, request.input_family);
     request.input_family = source.ambient.clone();
-    refuses(&source, &request, InvalidCode::EndpointMismatch)
+    refuses(&mut source, &request, InvalidCode::EndpointMismatch)
 }
 
 /// Zero multiplication and quotient cancellation never erase an original undefined divisor.
@@ -179,7 +179,7 @@ fn decision_enclosure_hidden_domain() -> TestResult {
     let quotient = source.term(Operator::Div, &[invalid.clone(), invalid])?;
     for target in [product, quotient] {
         let request = question(&source, target, (0, 1), (-1, 1), (1, 1))?;
-        refuses(&source, &request, InvalidCode::RefutedDomain)?;
+        refuses(&mut source, &request, InvalidCode::RefutedDomain)?;
     }
     Ok(())
 }
@@ -198,7 +198,7 @@ fn decision_enclosure_named_constant_boundary() -> TestResult {
     let ten = source.number(10, 1)?;
     let cycles = source.term(Operator::Div, &[ten, pi])?;
     let request = question(&source, cycles, (51, 16), (203, 64), (205, 64))?;
-    refuses(&source, &request, InvalidCode::UnsupportedCertificate)
+    refuses(&mut source, &request, InvalidCode::UnsupportedCertificate)
 }
 
 /// Free inputs remain unsupported even when multiplication would cancel them.
@@ -210,7 +210,7 @@ fn decision_enclosure_free_input_boundary() -> TestResult {
     let zero = source.number(0, 1)?;
     let target = source.term(Operator::Mul, &[zero, coordinate])?;
     let request = question(&source, target, (0, 1), (0, 1), (0, 1))?;
-    refuses(&source, &request, InvalidCode::UnsupportedCertificate)
+    refuses(&mut source, &request, InvalidCode::UnsupportedCertificate)
 }
 
 /// A checked constant bound introduces no fact about an independent reciprocal coordinate.
@@ -257,7 +257,7 @@ fn allowance(kind: BudgetKind, amount: u64) -> Limits {
 }
 
 fn boundary(
-    source: &Fixture,
+    source: &mut Fixture,
     request: &RationalEnclosure,
     kind: BudgetKind,
     amount: u64,
@@ -292,7 +292,7 @@ const ENCLOSURE_COSTS: [(u64, u64, u64, u64); 3] = [
 #[test]
 fn decision_enclosure_resource_boundaries() -> TestResult {
     for (index, (work, staged, graph, output)) in ENCLOSURE_COSTS.into_iter().enumerate() {
-        let (source, request) = prepared(index)?;
+        let (mut source, request) = prepared(index)?;
         let mut budget = ledger()?;
         let checked = source.cas.check_rational_enclosure(&request, &mut budget)?;
         assert_eq!(budget.usage().work, work);
@@ -303,10 +303,10 @@ fn decision_enclosure_resource_boundaries() -> TestResult {
             (BudgetKind::PayloadBytes, graph),
             (BudgetKind::OutputBytes, output),
         ] {
-            assert!(boundary(&source, &request, kind, amount, 0)?);
-            assert!(!boundary(&source, &request, kind, amount - 1, 0)?);
+            assert!(boundary(&mut source, &request, kind, amount, 0)?);
+            assert!(!boundary(&mut source, &request, kind, amount - 1, 0)?);
         }
-        assert!(!boundary(&source, &request, BudgetKind::Work, work, 1)?);
+        assert!(!boundary(&mut source, &request, BudgetKind::Work, work, 1)?);
         let limits = allowance(BudgetKind::StagedPayloadBytes, staged);
         let mut budget = Budget::new(limits.clone())?;
         let before = source.cas.counts();
@@ -327,7 +327,7 @@ fn decision_enclosure_resource_boundaries() -> TestResult {
 #[test]
 fn decision_enclosure_cumulative_ledger() -> TestResult {
     for (index, (work, _, _, _)) in ENCLOSURE_COSTS.into_iter().enumerate() {
-        let (source, request) = prepared(index)?;
+        let (mut source, request) = prepared(index)?;
         let limits = allowance(BudgetKind::Work, 2 * work);
         let mut budget = Budget::new(limits.clone())?;
         let before = source.cas.counts();
@@ -349,7 +349,7 @@ fn decision_enclosure_cumulative_ledger() -> TestResult {
 /// ´claim:cas:kernel-origin-baseline´
 #[test]
 fn kernel_origin_baseline() -> TestResult {
-    let (source, mut request) = prepared(0)?;
+    let (mut source, mut request) = prepared(0)?;
     request.origin = unsupported_scalar(&request);
     let mut budget = ledger()?;
     budget.work(17, Location::new("prior kernel probe"))?;

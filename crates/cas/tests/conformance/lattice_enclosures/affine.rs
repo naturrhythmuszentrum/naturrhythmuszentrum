@@ -120,7 +120,7 @@ fn prepared(kind: u32) -> TestResult<(Fixture, Box<CheckedLatticeBasis>, Lattice
 #[test]
 fn lattice_affine_boxes() -> TestResult {
     for kind in 0..6 {
-        let (case, basis, request) = prepared(kind)?;
+        let (mut case, basis, request) = prepared(kind)?;
         let before = case.cas.counts();
         let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
         let checked = case
@@ -145,7 +145,7 @@ fn lattice_affine_boxes() -> TestResult {
 /// ´test:integration:lattice-affine-box-whole-source´
 #[test]
 fn lattice_affine_box_whole_source() -> TestResult {
-    let (case, basis, mut request) = prepared(0)?;
+    let (mut case, basis, mut request) = prepared(0)?;
     request.bounds[0].0 = Rational::from_ratio(3, 1, &mut ledger()?)?;
     let before = case.cas.counts();
     let fault = case
@@ -166,7 +166,7 @@ fn lattice_affine_box_whole_source() -> TestResult {
 fn lattice_affine_box_costs() -> TestResult {
     let mut rows = Vec::new();
     for kind in 0..6 {
-        let (case, basis, request) = prepared(kind)?;
+        let (mut case, basis, request) = prepared(kind)?;
         let mut budget = ledger()?;
         let checked = case
             .cas
@@ -188,7 +188,7 @@ fn lattice_affine_box_costs() -> TestResult {
 }
 
 fn refusal(
-    case: &Fixture,
+    case: &mut Fixture,
     basis: &CheckedLatticeBasis,
     request: &LatticeBoxEnclosure,
     expected: InvalidCode,
@@ -218,7 +218,7 @@ fn lattice_affine_box_identities() -> TestResult {
     let mut changed = request.clone();
     changed.inverse = basis.forward().expression().clone();
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::EndpointMismatch,
@@ -227,7 +227,7 @@ fn lattice_affine_box_identities() -> TestResult {
     changed.clone_from(&request);
     changed.coefficients.swap(0, 1);
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::EndpointMismatch,
@@ -236,7 +236,7 @@ fn lattice_affine_box_identities() -> TestResult {
     changed.clone_from(&request);
     changed.coefficients.pop();
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::ReadingShape,
@@ -249,7 +249,7 @@ fn lattice_affine_box_identities() -> TestResult {
         &[replacement, request.original.coordinates[1].target.clone()],
     )?;
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::EndpointMismatch,
@@ -259,7 +259,7 @@ fn lattice_affine_box_identities() -> TestResult {
     let one = number(&mut case, 1)?;
     changed.basis.offset = column(&mut case, &[one.clone(), one])?;
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::EndpointMismatch,
@@ -271,14 +271,14 @@ fn lattice_affine_box_identities() -> TestResult {
 /// ´test:integration:lattice-affine-box-reciprocal´
 #[test]
 fn lattice_affine_box_reciprocal() -> TestResult {
-    let (case, basis, mut request) = prepared(2)?;
+    let (mut case, basis, mut request) = prepared(2)?;
     let EnclosureOrigin::PiBound { certificate, .. } = &mut request.coefficients[0].origin else {
         return Err("missing inverse Machin certificate".into());
     };
     certificate.lower = Rational::from_ratio(-4, 1, &mut ledger()?)?;
     certificate.upper = Rational::from_ratio(4, 1, &mut ledger()?)?;
     refusal(
-        &case,
+        &mut case,
         &basis,
         &request,
         InvalidCode::UnsupportedCertificate,
@@ -286,7 +286,7 @@ fn lattice_affine_box_reciprocal() -> TestResult {
     )?;
     request.coefficients[0].origin = EnclosureOrigin::Unverified;
     refusal(
-        &case,
+        &mut case,
         &basis,
         &request,
         InvalidCode::UnsupportedCertificate,
@@ -362,12 +362,12 @@ fn skew() -> TestResult<(Fixture, Box<CheckedLatticeBasis>, LatticeBoxEnclosure)
 /// ´test:integration:lattice-affine-box-skew´
 #[test]
 fn lattice_affine_box_skew() -> TestResult {
-    let (case, basis, mut request) = skew()?;
+    let (mut case, basis, mut request) = skew()?;
     case.cas
         .check_lattice_box_enclosure(&basis, &request, &mut ledger()?)?;
     request.bounds[1].0 = Rational::from_ratio(-12, 1, &mut ledger()?)?;
     refusal(
-        &case,
+        &mut case,
         &basis,
         &request,
         InvalidCode::DecisionBox,
@@ -379,12 +379,12 @@ fn lattice_affine_box_skew() -> TestResult {
 /// ´test:integration:lattice-affine-box-reuse-identity´
 #[test]
 fn lattice_affine_box_reuse_identity() -> TestResult {
-    let (case, basis, request) = prepared(1)?;
+    let (mut case, basis, request) = prepared(1)?;
     assert_eq!(request.coefficients[0], request.coefficients[4]);
     let mut changed = request.clone();
     changed.coefficients[4].upper = Rational::one();
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::DecisionBox,
@@ -396,7 +396,7 @@ fn lattice_affine_box_reuse_identity() -> TestResult {
     };
     certificate.sums[0] = Rational::zero();
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::EndpointMismatch,
@@ -405,7 +405,7 @@ fn lattice_affine_box_reuse_identity() -> TestResult {
     changed.clone_from(&request);
     changed.coefficients[4].origin = EnclosureOrigin::Unverified;
     refusal(
-        &case,
+        &mut case,
         &basis,
         &changed,
         InvalidCode::UnsupportedCertificate,
@@ -427,7 +427,7 @@ fn lattice_affine_box_work() -> TestResult {
         (5, 74_753),
     ] {
         for short in [0, 1] {
-            let (case, basis, request) = prepared(kind)?;
+            let (mut case, basis, request) = prepared(kind)?;
             let before = case.cas.counts();
             let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
             let limits = Limits {

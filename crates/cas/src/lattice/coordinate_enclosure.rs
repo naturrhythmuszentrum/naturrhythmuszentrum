@@ -70,13 +70,15 @@ impl Cas {
     /// Refuses changed basis, original target, inverse, context or affine-expression
     /// correspondence, invalid scalar evidence and exhausted cumulative resources.
     pub fn check_lattice_coordinate_enclosure(
-        &self,
+        &mut self,
         basis: &CheckedLatticeBasis,
         contract: &LatticeCoordinateEnclosure,
         budget: &mut Budget,
     ) -> Result<CheckedLatticeCoordinateEnclosure, Fault> {
         let previous = budget.restrict_storage(&self.limits);
-        let result = self.lattice_coordinate_enclosure(basis, contract, budget);
+        let result = crate::decision_kernel::cache::attempt(self, budget, |cas, budget| {
+            cas.lattice_coordinate_enclosure(basis, contract, budget)
+        });
         budget.restore_limits(previous);
         result
     }

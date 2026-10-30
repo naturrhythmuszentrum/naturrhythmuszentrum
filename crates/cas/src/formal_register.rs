@@ -632,11 +632,21 @@ pub const CONSTANT_SCHEMAS: [LemmaSchema; 1] = [LemmaSchema {
 }];
 
 /// Formal schemas instantiated by graph-owned anonymous retained judgments.
-pub const RETAINED_SCHEMAS: [LemmaSchema; 1] = [LemmaSchema {
-    name: "constant.closed-preparation",
-    label: "thm:cas:constant-closed-preparation",
-    version: 1,
-    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
-    statement: "The complete original closed expression is finite real and has the independently checked normalized value and sign.",
-    premises: "Original `DomainGuard` and normalized `Equality` evidence in the identical declaration, context and stratum, checked under (`def:cas:constant-preparation`).",
-}];
+pub const RETAINED_SCHEMAS: [LemmaSchema; 2] = [
+    LemmaSchema {
+        name: "constant.closed-preparation",
+        label: "thm:cas:constant-closed-preparation",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The complete original closed expression is finite real and has the independently checked normalized value and sign.",
+        premises: "Original `DomainGuard` and normalized `Equality` evidence in the identical declaration, context and stratum, checked under (`def:cas:constant-preparation`).",
+    },
+    LemmaSchema {
+        name: "scalar.checked-record-inventory",
+        label: "thm:cas:scalar-checked-record-inventory",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "Every ordered record in the complete scoped scalar certificate has the independently reconstructed exact meaning retained at its position.",
+        premises: "Complete canonical original scope and ordered record laws, exact closed native meanings, backwards record dependencies and original-target equality checked under (`rule:cas:scalar-kernel-certificate`).",
+    },
+];
