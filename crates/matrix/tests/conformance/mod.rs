@@ -89,3 +89,5 @@ mod lattice_refusals;
 mod lattice_selection;
 
 mod lattice_work;
+
+mod lattice_revalidation;
