@@ -3,6 +3,62 @@
 
 use super::*;
 
+/// Generalized queries reject complex operands at admission while ordinary derivatives retain them.
+/// ´test:unit:enclosure-clamp-real-sort´
+/// ´claim:cas:enclosure-clamp-real-sort´
+#[test]
+fn enclosure_clamp_real_sort() -> TestResult {
+    let sort = Sort::Value(AtomicSort::Scalar(Field::Complex));
+    let mut cas = Cas::new(Limits::default())?;
+    let header = cas
+        .admit(
+            &[Draft::Header(HeaderDraft::Core(Environment {
+                declarations: vec![Declaration {
+                    key: "z".into(),
+                    display_name: "z".into(),
+                    sort: sort.clone(),
+                }],
+                ..Environment::default()
+            }))],
+            &mut ledger()?,
+        )?
+        .remove(0);
+    let operand = cas
+        .admit(
+            &[Draft::Expression(ExpressionDraft {
+                space: None,
+                operator: Operator::Free("z".into()),
+                sort: sort.clone(),
+                header: Reference::Existing(header.clone()),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            })],
+            &mut ledger()?,
+        )?
+        .remove(0);
+    for generalized in [false, true] {
+        let result = cas.admit(
+            &[Draft::Expression(ExpressionDraft {
+                space: None,
+                operator: if generalized {
+                    Operator::GeneralizedDerivative("z".into())
+                } else {
+                    Operator::Derivative("z".into())
+                },
+                sort: sort.clone(),
+                header: Reference::Existing(header.clone()),
+                scope: Vec::new(),
+                binding: None,
+                operands: vec![Reference::Existing(operand.clone())],
+            })],
+            &mut ledger()?,
+        );
+        assert_eq!(result.is_err(), generalized);
+    }
+    Ok(())
+}
+
 fn clamp_policy() -> RefinementPolicy {
     RefinementPolicy {
         checking_work: 0,

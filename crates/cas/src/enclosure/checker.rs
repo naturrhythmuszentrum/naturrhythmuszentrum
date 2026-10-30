@@ -346,7 +346,7 @@ fn schema(
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_clamp
-        != 0
+        != crate::enclosure::ClampShape::Smooth
     {
         super::EnclosureLaw::ClampGeneralized
     } else if cas

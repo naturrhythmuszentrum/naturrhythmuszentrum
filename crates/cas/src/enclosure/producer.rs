@@ -443,7 +443,7 @@ fn transcript_law(
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_clamp
-        != 0
+        != crate::enclosure::ClampShape::Smooth
     {
         return Ok(super::EnclosureLaw::ClampGeneralized);
     }

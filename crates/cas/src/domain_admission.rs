@@ -533,7 +533,7 @@ impl Cas {
                 enclosure_exp: crate::enclosure::AnalyticShape::default(),
                 enclosure_saturation: 0,
                 enclosure_derivative: 0,
-                enclosure_clamp: 0,
+                enclosure_clamp: crate::enclosure::ClampShape::Smooth,
                 enclosure_power: crate::enclosure::PowerShape {
                     present: false,
                     slots: 1,

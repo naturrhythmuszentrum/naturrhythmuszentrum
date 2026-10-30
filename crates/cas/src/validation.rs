@@ -759,6 +759,8 @@ fn operator_sorts(
             children.len() == 1
                 && same
                 && matches!(result, Sort::Value(AtomicSort::Scalar(_)))
+                && (!matches!(operator, Operator::GeneralizedDerivative(_))
+                    || *result == Sort::Value(AtomicSort::Scalar(Field::Real)))
                 && indexed_sort(environment, key, budget)?.is_some_and(|sort| *sort == *result)
         }
         Operator::IntegerEmbed => {
