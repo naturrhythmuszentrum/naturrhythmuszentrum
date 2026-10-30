@@ -13,6 +13,8 @@
 
 //! Independent exact rational replay of the closed exported scalar laws.
 
+mod input_coverage;
+
 use crate::testing::{Binary, Rational, point};
 use nrz_scalar::{
     ArithmeticContext, Dyadic, DyadicInterval, Enclosure, KernelBudget, KernelCertificate,

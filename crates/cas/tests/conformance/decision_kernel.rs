@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Scalar law certificates replay pure rational relations under the original target scope.
 
+mod input_coverage;
+
 use super::decision_baseline::{Example, Fixture};
 use super::decision_partitions::rational;
 use crate::testing::common::TestResult;
