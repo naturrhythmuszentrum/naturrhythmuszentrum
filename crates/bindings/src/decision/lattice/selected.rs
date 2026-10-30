@@ -5,6 +5,7 @@ use super::{DecisionError, LatticeAttachment, LatticeDecisionCase, LatticeIndexK
 use crate::{Descriptor, decision::storage};
 use nrz_cas::{
     Cas, ExactConstant, Rational,
+    lattice::CheckedLatticeOutputs,
     limits::{Budget, BudgetUsage},
     proof::VerifiedWitness,
 };
@@ -140,6 +141,26 @@ impl SelectedLattice {
             .graph
             .lock()
             .map_err(|_| DecisionError::GraphPoisoned)
+    }
+
+    /// Admit newly checked outputs under the identical retained graph and physical declaration.
+    ///
+    /// Release any held graph guard before calling. The new mathematical/physical snapshot
+    /// grants no live authority and cannot revive any retired native attachment.
+    /// # Errors
+    /// Refuses changed questions, foreign outputs, invalid physical meanings and exhausted
+    /// resources under the same complete checks as `LatticeDecisionCase::admit`.
+    pub fn admit_outputs(
+        &self,
+        outputs: &CheckedLatticeOutputs<'_>,
+        budget: &mut Budget,
+    ) -> Result<Self, DecisionError> {
+        self.case().admit(
+            Arc::clone(&self.0.graph),
+            outputs,
+            self.case().attachment(),
+            budget,
+        )
     }
 
     /// Unique checked output preparations retained within this selected owner.

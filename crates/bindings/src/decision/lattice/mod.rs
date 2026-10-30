@@ -18,7 +18,8 @@ use crate::{Descriptor, Kind, readings::CoordinateNormalization};
 use nrz_cas::{
     Cas, Handle,
     lattice::{
-        CheckedLatticeBasis, CheckedLatticeIndexDomain, LatticeConvention, LatticeIndexQuestion,
+        CheckedLatticeAttempt, CheckedLatticeBasis, CheckedLatticeIndexDomain, LatticeConvention,
+        LatticeIndexQuestion,
     },
     limits::Budget,
 };
@@ -133,6 +134,38 @@ impl LatticeDecisionCase {
     #[must_use]
     pub fn question(&self) -> &LatticeIndexQuestion {
         self.0.specification.index.question()
+    }
+
+    /// Match complete prepared evidence to this physical question without selecting any index.
+    ///
+    /// The CAS receipt retains its original context, cover, target, convention and pending
+    /// cuts. Physical inputs remain associated with this declaration; a matching attempted
+    /// tuple confers no selected descriptor or live authority.
+    /// # Errors
+    /// Refuses another mathematical question or convention and exhausted comparison Work.
+    pub fn validate_attempt(
+        &self,
+        attempt: &CheckedLatticeAttempt,
+        budget: &mut Budget,
+    ) -> Result<(), DecisionError> {
+        let expected = self.specification();
+        let candidate = attempt.candidate();
+        budget.work(
+            u64::from(expected.basis.dimension())
+                .saturating_mul(256)
+                .saturating_add(8),
+            super::storage::AT,
+        )?;
+        if candidate.cover.index != *self.question()
+            || candidate.cover.forward != *expected.basis.forward().expression()
+            || candidate.cover.inverse != *expected.basis.inverse().map().expression()
+            || candidate.cover.determinant != *expected.basis.inverse().determinant()
+            || candidate.target != expected.target
+            || attempt.convention() != expected.convention
+        {
+            return Err(DecisionError::Case);
+        }
+        Ok(())
     }
 
     /// Capture the immutable declaration identity without copying sources or proof bytes.

@@ -21,6 +21,7 @@ pub use lattice::{
 };
 mod lattice_enclosure;
 pub use lattice_enclosure::FrozenLatticeEnclosure;
+mod lattice_attempt;
 mod lattice_inputs;
 pub use lattice_inputs::FrozenLatticeInputs;
 mod evaluate;
