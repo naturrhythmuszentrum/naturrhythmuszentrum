@@ -112,6 +112,13 @@ pub(super) fn generate_planned(
             .state
             .expression(cas.checked(&request.target)?)?
             .enclosure_saturation
+            == 2
+        {
+            super::EnclosureLaw::TanhCompose
+        } else if cas
+            .state
+            .expression(cas.checked(&request.target)?)?
+            .enclosure_saturation
             == 1
         {
             super::EnclosureLaw::SigmoidCompose
@@ -250,8 +257,13 @@ fn node(
             log = Some(evidence);
             bound
         }
-        Operator::Sigmoid => {
-            let (bound, evidence) = super::saturating::produce(
+        Operator::Sigmoid | Operator::Tanh => {
+            let compose = if matches!(expression.operator, Operator::Tanh) {
+                super::saturating::produce_tanh
+            } else {
+                super::saturating::produce
+            };
+            let (bound, evidence) = compose(
                 right.ok_or_else(invalid)?,
                 u32::try_from(index).map_err(|_| invalid())?,
                 plan.exp.ok_or_else(invalid)?,

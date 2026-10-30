@@ -21,6 +21,7 @@ pub(super) fn check(
     let mut analytic = certificate.logarithms.iter();
     let mut exponentials = certificate.exponentials.iter();
     let mut roots = false;
+    let mut sigmoids = false;
     let mut log_two = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
     stack
@@ -67,12 +68,15 @@ pub(super) fn check(
                 stack.push(index);
                 continue;
             }
-            Operator::Exponential | Operator::Sigmoid => {
+            Operator::Exponential | Operator::Sigmoid | Operator::Tanh => {
                 let evidence = exponentials.next().ok_or_else(invalid)?;
                 if usize::try_from(evidence.record).ok() != Some(index) {
                     return Err(invalid());
                 }
-                let replay = if matches!(expression.operator, Operator::Sigmoid) {
+                sigmoids |= matches!(expression.operator, Operator::Sigmoid);
+                let replay = if matches!(expression.operator, Operator::Tanh) {
+                    super::saturating::check_tanh
+                } else if matches!(expression.operator, Operator::Sigmoid) {
                     super::saturating::check
                 } else {
                     super::exp::check
@@ -110,7 +114,7 @@ pub(super) fn check(
     if stack.len() != 1 || analytic.next().is_some() || exponentials.next().is_some() {
         return Err(invalid());
     }
-    finish(request, certificate, roots, budget)
+    finish(request, certificate, (roots, sigmoids), budget)
 }
 
 /// Bind the registered family and version to the original expression's derived grammar.
@@ -120,6 +124,13 @@ fn schema(
     certificate: &EnclosureCertificate,
 ) -> Result<(), Fault> {
     let expected_law = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_saturation
+        == 2
+    {
+        super::EnclosureLaw::TanhCompose
+    } else if cas
         .state
         .expression(cas.checked(&request.target)?)?
         .enclosure_saturation
@@ -161,7 +172,7 @@ fn schema(
 fn finish(
     request: &EnclosureRequest,
     certificate: &EnclosureCertificate,
-    roots: bool,
+    families: (bool, bool),
     budget: &mut Budget,
 ) -> Result<CheckedEnclosure, Fault> {
     let last = certificate.records.last().ok_or_else(invalid)?;
@@ -186,7 +197,8 @@ fn finish(
     budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
     budget.work(bytes, AT)?;
     Ok(CheckedEnclosure {
-        roots,
+        roots: families.0,
+        sigmoids: families.1,
         request: request.clone(),
         certificate: certificate.clone(),
         interval,

@@ -38,18 +38,24 @@ impl EnclosureCertificate {
             super::EnclosureLaw::LogAtanh
                 | super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
+                | super::EnclosureLaw::TanhCompose
         ) {
             super::log::encode(&self.logarithms, &mut out)?;
         } else if !self.logarithms.is_empty() {
             return Err(Fault::invalid(InvalidCode::Encoding, AT));
         }
-        if self.law == super::EnclosureLaw::SigmoidCompose {
+        if matches!(
+            self.law,
+            super::EnclosureLaw::SigmoidCompose | super::EnclosureLaw::TanhCompose
+        ) {
             out.name(super::ENCLOSURE_SCHEMAS[3].name)?;
             out.unsigned(u64::from(super::ENCLOSURE_SCHEMAS[3].version))?;
         }
         if matches!(
             self.law,
-            super::EnclosureLaw::ExpTaylor | super::EnclosureLaw::SigmoidCompose
+            super::EnclosureLaw::ExpTaylor
+                | super::EnclosureLaw::SigmoidCompose
+                | super::EnclosureLaw::TanhCompose
         ) {
             super::exp::encode(&self.exponentials, &mut out)?;
         } else if !self.exponentials.is_empty() {
@@ -73,6 +79,7 @@ impl EnclosureCertificate {
             "enclosure.log-atanh" => super::EnclosureLaw::LogAtanh,
             "enclosure.exp-taylor" => super::EnclosureLaw::ExpTaylor,
             "enclosure.sigmoid-compose" => super::EnclosureLaw::SigmoidCompose,
+            "enclosure.tanh-compose" => super::EnclosureLaw::TanhCompose,
             _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
         };
         let version = reader.small()?;
@@ -98,19 +105,24 @@ impl EnclosureCertificate {
             super::EnclosureLaw::LogAtanh
                 | super::EnclosureLaw::ExpTaylor
                 | super::EnclosureLaw::SigmoidCompose
+                | super::EnclosureLaw::TanhCompose
         ) {
             super::log::decode(&mut reader)?
         } else {
             Vec::new()
         };
-        if law == super::EnclosureLaw::SigmoidCompose
-            && (reader.name()? != super::ENCLOSURE_SCHEMAS[3].name || reader.small()? != 1)
+        if matches!(
+            law,
+            super::EnclosureLaw::SigmoidCompose | super::EnclosureLaw::TanhCompose
+        ) && (reader.name()? != super::ENCLOSURE_SCHEMAS[3].name || reader.small()? != 1)
         {
             return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
         }
         let exponentials = if matches!(
             law,
-            super::EnclosureLaw::ExpTaylor | super::EnclosureLaw::SigmoidCompose
+            super::EnclosureLaw::ExpTaylor
+                | super::EnclosureLaw::SigmoidCompose
+                | super::EnclosureLaw::TanhCompose
         ) {
             super::exp::decode(&mut reader)?
         } else {

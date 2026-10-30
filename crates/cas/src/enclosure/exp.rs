@@ -27,7 +27,7 @@ pub struct ExpSeries {
     pub tail: Interval,
 }
 
-/// Proposed nonnegative reduction of one original signed argument.
+/// Proposed nonnegative reduction of one signed exponential argument.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExpEndpoint {
     /// Number of interval squarings after reduction.
@@ -38,10 +38,10 @@ pub struct ExpEndpoint {
     pub series: ExpSeries,
 }
 
-/// Monotone exponential evidence joined to an original postorder record.
+/// Exponential premises joined to an original exponential or composition record.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ExpEvidence {
-    /// Index of the exponential node's proposed bound.
+    /// Index of the original node whose exponential premises are recorded.
     pub record: u32,
     /// Lower argument endpoint evidence.
     pub lower: ExpEndpoint,
