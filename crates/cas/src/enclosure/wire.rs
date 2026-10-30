@@ -33,6 +33,11 @@ impl EnclosureCertificate {
             out.number(record.lower())?;
             out.number(record.upper())?;
         }
+        if self.law == super::EnclosureLaw::LogAtanh {
+            super::log::encode(&self.logarithms, &mut out)?;
+        } else if !self.logarithms.is_empty() {
+            return Err(Fault::invalid(InvalidCode::Encoding, AT));
+        }
         Ok(out.finish())
     }
 
@@ -48,6 +53,7 @@ impl EnclosureCertificate {
         let law = match reader.name()?.as_str() {
             "enclosure.rational-inclusion" => super::EnclosureLaw::RationalInclusion,
             "enclosure.root-grid" => super::EnclosureLaw::RootGrid,
+            "enclosure.log-atanh" => super::EnclosureLaw::LogAtanh,
             _ => return Err(Fault::invalid(InvalidCode::Encoding, AT)),
         };
         let version = reader.small()?;
@@ -68,6 +74,11 @@ impl EnclosureCertificate {
             let upper = reader.rational()?;
             records.push(Interval::new(lower, upper, reader.budget)?);
         }
+        let logarithms = if law == super::EnclosureLaw::LogAtanh {
+            super::log::decode(&mut reader)?
+        } else {
+            Vec::new()
+        };
         reader.finished()?;
         Ok(Self {
             law,
@@ -76,6 +87,7 @@ impl EnclosureCertificate {
             grid,
             presentation,
             records,
+            logarithms,
         })
     }
 }

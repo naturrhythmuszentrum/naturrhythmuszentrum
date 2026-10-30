@@ -328,6 +328,8 @@ pub enum Operator {
     IntegerPower(i64),
     /// A general power with an expression-valued exponent.
     GeneralPower(Branch),
+    /// Real natural logarithm, defined only for a strictly positive operand.
+    NaturalLog,
     /// A call to a declaration with a checked function signature.
     Call(String),
     /// An unevaluated derivative with respect to a free declaration.

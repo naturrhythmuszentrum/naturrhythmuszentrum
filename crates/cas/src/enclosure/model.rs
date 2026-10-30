@@ -52,9 +52,9 @@ pub struct RefinementPolicy {
     pub grid_ceiling: u32,
     /// Maximum number of complete refinement attempts.
     pub rounds: u32,
-    /// Maximum permitted reduction exponent for later analytic families.
+    /// Maximum magnitude of an executed analytic reduction exponent.
     pub reduction_ceiling: u32,
-    /// Maximum permitted series terms for later analytic families.
+    /// Maximum included terms in each analytic series.
     pub term_ceiling: u32,
     /// Work reserved from generation for independent checking and publication.
     pub checking_work: u64,
@@ -69,6 +69,8 @@ pub enum UndecidedReason {
     WidthLimit,
     /// Work ended after an earlier complete checked bound.
     WorkExhausted,
+    /// A computed argument bound has not yet separated from the logarithm domain boundary.
+    DomainBoundary,
 }
 
 /// Honest mathematical outcome, separate from achieved width and accounting.
@@ -105,11 +107,15 @@ pub struct EnclosureCertificate {
     pub presentation: u32,
     /// Child-before-parent bounds in original operand traversal order.
     pub records: Vec<Interval>,
+    /// Finite analytic instances, present only for the logarithm family.
+    pub logarithms: Vec<super::LogEvidence>,
 }
 
 /// Sealed evidence admitted only after the independent checker has completed.
 #[derive(Clone, Debug)]
 pub struct CheckedEnclosure {
+    /// Whether independent replay encountered a checked root-grid instance.
+    pub(super) roots: bool,
     /// Authenticated original request, including ordered coordinates.
     pub(super) request: EnclosureRequest,
     /// Independently replayed endpoint transcript.
@@ -148,7 +154,9 @@ impl CheckedEnclosure {
     pub fn formal_schemas(&self) -> &'static [crate::emptiness::LemmaSchema] {
         match self.certificate.law {
             super::EnclosureLaw::RationalInclusion => &super::ENCLOSURE_SCHEMAS[..1],
-            super::EnclosureLaw::RootGrid => &super::ENCLOSURE_SCHEMAS,
+            super::EnclosureLaw::RootGrid => &super::ENCLOSURE_SCHEMAS[..2],
+            super::EnclosureLaw::LogAtanh if self.roots => &super::ENCLOSURE_SCHEMAS,
+            super::EnclosureLaw::LogAtanh => &LOG_SCHEMAS,
         }
     }
 
@@ -156,6 +164,17 @@ impl CheckedEnclosure {
     #[must_use]
     pub const fn premise_kinds(&self) -> &'static [crate::proof::HypothesisKind] {
         use crate::proof::HypothesisKind;
+        if matches!(self.certificate.law, super::EnclosureLaw::LogAtanh) {
+            return &[
+                HypothesisKind::DomainGuard,
+                HypothesisKind::Equality,
+                HypothesisKind::NonZero,
+                HypothesisKind::Enclosure,
+                HypothesisKind::NonNegative,
+                HypothesisKind::IntegerRange,
+                HypothesisKind::StrictSign,
+            ];
+        }
         if matches!(self.certificate.law, super::EnclosureLaw::RootGrid) {
             return &[
                 HypothesisKind::DomainGuard,
@@ -174,6 +193,10 @@ impl CheckedEnclosure {
         ]
     }
 }
+
+/// The exact schema inventory for logarithms without a root operand.
+const LOG_SCHEMAS: [crate::emptiness::LemmaSchema; 2] =
+    [super::ENCLOSURE_SCHEMAS[0], super::ENCLOSURE_SCHEMAS[2]];
 
 /// Result with actual Work and achieved precision; no stopping reason supplies evidence.
 #[derive(Debug)]

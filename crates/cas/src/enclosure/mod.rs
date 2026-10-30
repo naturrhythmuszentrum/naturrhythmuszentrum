@@ -38,6 +38,7 @@
 
 mod checker;
 mod interval;
+mod log;
 mod model;
 mod producer;
 mod roots;
@@ -69,13 +70,15 @@ fn boundary(
 
 /// Conservative retained receipt size including all endpoint components and original handles.
 pub(crate) fn footprint(value: &CheckedEnclosure) -> u64 {
-    value.certificate.records.iter().fold(
-        u64::try_from(value.certificate.scope.len())
-            .unwrap_or(u64::MAX)
-            .saturating_add(request_bytes(&value.request))
-            .saturating_add(interval_bytes(&value.interval))
-            .saturating_add(512),
-        |size, interval| size.saturating_add(interval_bytes(interval)),
+    log::bytes(&value.certificate.logarithms).saturating_add(
+        value.certificate.records.iter().fold(
+            u64::try_from(value.certificate.scope.len())
+                .unwrap_or(u64::MAX)
+                .saturating_add(request_bytes(&value.request))
+                .saturating_add(interval_bytes(&value.interval))
+                .saturating_add(512),
+            |size, interval| size.saturating_add(interval_bytes(interval)),
+        ),
     )
 }
 
@@ -96,7 +99,19 @@ fn receipt_reservation(
         .div_ceil(8)
         .saturating_mul(16)
         .saturating_add(128);
+    // A log record adds twelve series intervals and four rational reduction fields;
+    // sixteen interval slots also cover their fixed metadata and the result record.
+    let multiplier = if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_logs
+    {
+        16
+    } else {
+        1
+    };
     Ok(count
+        .saturating_mul(multiplier)
         .saturating_add(1)
         .saturating_mul(endpoint)
         .saturating_add(u64::try_from(scope_len).unwrap_or(u64::MAX))
@@ -106,11 +121,13 @@ fn receipt_reservation(
 
 /// Size the supplied transcript before checking or copying any of its records.
 fn certificate_bytes(value: &EnclosureCertificate) -> u64 {
-    value.records.iter().fold(
-        u64::try_from(value.scope.len())
-            .unwrap_or(u64::MAX)
-            .saturating_add(128),
-        |bytes, record| bytes.saturating_add(interval_bytes(record)),
+    log::bytes(&value.logarithms).saturating_add(
+        value.records.iter().fold(
+            u64::try_from(value.scope.len())
+                .unwrap_or(u64::MAX)
+                .saturating_add(128),
+            |bytes, record| bytes.saturating_add(interval_bytes(record)),
+        ),
     )
 }
 
@@ -155,13 +172,14 @@ fn interval_bytes(value: &Interval) -> u64 {
 }
 
 pub use interval::Interval;
+pub use log::{LogEndpoint, LogEvidence, LogSeries};
 pub use model::{
     CheckedEnclosure, CoordinateBound, EnclosureCertificate, EnclosureGoal, EnclosureOutcome,
     EnclosureReport, EnclosureRequest, RefinementPolicy, UndecidedReason,
 };
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 2] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 3] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -178,6 +196,14 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 2] = [
         statement: "The nonnegative square root lies between the checked dyadic endpoints; nested instances enclose fourth roots and rational operand steps retain their own inclusion law.",
         premises: "Original `DomainGuard`, `NonNegative` radicand, `IntegerRange` for the grid, exact `Equality` for scaling and operand `Enclosure`; every rational operand step is independently checked.",
     },
+    crate::emptiness::LemmaSchema {
+        name: "enclosure.log-atanh",
+        label: "thm:cas:enclosure-log-atanh",
+        version: 1,
+        standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+        statement: "The positive target reduced as x=2^k*m is enclosed by finite atanh sums and geometric tails, including the one-third instance for log two. The law includes the analytic identity, convergence, monotonicity and tail inequality; finite tests do not prove those analytic premises.",
+        premises: "Original `DomainGuard`, `StrictSign` for the argument, exact `Equality` for reduction, `IntegerRange` for the exponent and term count, and `Enclosure` for reconstructed partial sums and log two.",
+    },
 ];
 
 /// Exhaustive implemented-law dispatcher; analytic families have no accepting arm.
@@ -187,6 +213,8 @@ pub enum EnclosureLaw {
     RationalInclusion,
     /// Zero-capable square-root grid relations, composed with checked rational operands.
     RootGrid,
+    /// Finite atanh tails over positive inputs, with checked operand laws.
+    LogAtanh,
 }
 
 impl EnclosureLaw {
@@ -196,6 +224,7 @@ impl EnclosureLaw {
         match self {
             Self::RationalInclusion => &ENCLOSURE_SCHEMAS[0],
             Self::RootGrid => &ENCLOSURE_SCHEMAS[1],
+            Self::LogAtanh => &ENCLOSURE_SCHEMAS[2],
         }
     }
 }
@@ -215,7 +244,7 @@ pub(crate) fn supported_shape(
         {
             2
         }
-        Operator::Neg => 1,
+        Operator::Neg | Operator::NaturalLog => 1,
         Operator::Add | Operator::Sub | Operator::Mul | Operator::Div => 2,
         _ => return Ok(false),
     };
@@ -248,4 +277,38 @@ pub(crate) fn has_roots(
         }
     }
     Ok(false)
+}
+
+/// Fixed-size log metadata avoids an unpaid closure walk during sizing preflight.
+pub(crate) fn log_metadata(
+    state: &crate::graph::State,
+    operator: &crate::model::Operator,
+    operands: &[crate::graph::LogicalId],
+) -> Result<(bool, Option<u32>), crate::Fault> {
+    use crate::model::Operator;
+    if !supported_shape(state, operator, operands)? {
+        return Ok((false, None));
+    }
+    if matches!(operator, Operator::NaturalLog) {
+        let child = state.expression(operands[0])?;
+        let bound = if let Operator::Rational(value) = &child.operator {
+            let (n, d) = value.component_bits();
+            u32::try_from(n.abs_diff(d))
+                .ok()
+                .and_then(|k| k.checked_add(1))
+        } else {
+            None
+        };
+        return Ok((true, bound));
+    }
+    let mut found = false;
+    let mut bound = Some(0);
+    for id in operands {
+        let child = state.expression(*id)?;
+        if child.enclosure_logs {
+            found = true;
+            bound = bound.zip(child.enclosure_log_bound).map(|(a, b)| a.max(b));
+        }
+    }
+    Ok((found, bound))
 }

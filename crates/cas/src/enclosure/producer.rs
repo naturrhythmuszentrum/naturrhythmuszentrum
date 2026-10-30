@@ -8,6 +8,7 @@ use crate::graph::{Cas, LogicalId};
 use crate::model::Operator;
 
 /// Produce a bounded postorder transcript for the unchanged source expression.
+#[cfg(test)]
 pub(super) fn generate(
     cas: &Cas,
     request: &EnclosureRequest,
@@ -16,7 +17,21 @@ pub(super) fn generate(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<EnclosureCertificate, Fault> {
+    generate_planned(cas, request, scope, grids, None, budget, interrupt)
+}
+
+/// Generate with the preflighted analytic schedule; no analytic family is inferred from a name.
+pub(super) fn generate_planned(
+    cas: &Cas,
+    request: &EnclosureRequest,
+    scope: Vec<u8>,
+    grids: (u32, u32),
+    plan: Option<super::log::Plan>,
+    budget: &mut Budget,
+    interrupt: &mut impl FnMut(BudgetUsage) -> bool,
+) -> Result<EnclosureCertificate, Fault> {
     let (grid, presentation) = grids;
+    let mut logarithms = Vec::new();
     let schedule = super::scope::schedule(cas, request, budget)?;
     let mut records: Vec<Interval> = Vec::new();
     let mut stack: Vec<usize> = Vec::new();
@@ -45,6 +60,33 @@ pub(super) fn generate(
         let result = match &expression.operator {
             Operator::Rational(value) => Interval::singleton(value, budget)?,
             Operator::Free(_) => coordinate(cas, request, id, budget)?.copied(budget)?,
+            Operator::NaturalLog => {
+                let input = &records[right.ok_or_else(invalid)?];
+                if input.lower().is_zero() || input.lower().is_negative() {
+                    let original = cas.state.expression(expression.operands[0])?;
+                    if matches!(original.operator, Operator::Free(_) | Operator::Rational(_)) {
+                        return Err(Fault::invalid(InvalidCode::RefutedDomain, AT));
+                    }
+                }
+                let index = u32::try_from(records.len()).map_err(|_| invalid())?;
+                let (result, evidence) = super::log::produce(
+                    input,
+                    index,
+                    plan.ok_or_else(invalid)?,
+                    budget,
+                    interrupt,
+                )?;
+                budget.check(
+                    BudgetKind::StagedPayloadBytes,
+                    bytes.saturating_add(super::log::bytes(std::slice::from_ref(&evidence))),
+                    AT,
+                )?;
+                logarithms
+                    .try_reserve(1)
+                    .map_err(|_| Fault::allocation(AT))?;
+                logarithms.push(evidence);
+                result
+            }
             Operator::Neg => {
                 let value = &records[right.ok_or_else(invalid)?];
                 Interval::new(
@@ -63,6 +105,11 @@ pub(super) fn generate(
             )?,
         };
         bytes = bytes.saturating_add(interval_bytes(&result));
+        budget.check(
+            BudgetKind::StagedPayloadBytes,
+            bytes.saturating_add(super::log::bytes(&logarithms)),
+            AT,
+        )?;
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
         budget.check(BudgetKind::WitnessBytes, bytes, AT)?;
         budget.work(interval_bytes(&result), AT)?;
@@ -73,20 +120,13 @@ pub(super) fn generate(
         return Err(invalid());
     }
     Ok(EnclosureCertificate {
-        law: if cas
-            .state
-            .expression(cas.checked(&request.target)?)?
-            .enclosure_roots
-        {
-            super::EnclosureLaw::RootGrid
-        } else {
-            super::EnclosureLaw::RationalInclusion
-        },
+        law: law(cas, request, !logarithms.is_empty())?,
         version: 1,
         scope,
         grid,
         presentation,
         records,
+        logarithms,
     })
 }
 
@@ -129,4 +169,19 @@ fn binary(
 /// Refuse a malformed original rational expression.
 const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::Encoding, AT)
+}
+
+/// Select the implemented family without granting the proposed transcript authority.
+fn law(cas: &Cas, request: &EnclosureRequest, logs: bool) -> Result<super::EnclosureLaw, Fault> {
+    Ok(if logs {
+        super::EnclosureLaw::LogAtanh
+    } else if cas
+        .state
+        .expression(cas.checked(&request.target)?)?
+        .enclosure_roots
+    {
+        super::EnclosureLaw::RootGrid
+    } else {
+        super::EnclosureLaw::RationalInclusion
+    })
 }

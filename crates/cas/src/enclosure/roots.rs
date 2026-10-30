@@ -7,6 +7,15 @@ use crate::error::{Fault, InvalidCode};
 use crate::number::Rational;
 use std::cmp::Ordering;
 
+/// Authenticate the original exponent itself, independently of admission metadata.
+pub(super) fn exponent(operator: &crate::model::Operator) -> Result<(), Fault> {
+    if matches!(operator, crate::model::Operator::Rational(value) if value.is_half()) {
+        Ok(())
+    } else {
+        Err(invalid())
+    }
+}
+
 /// Monotonicity lifts the two independently bounded rational endpoint roots.
 pub(super) fn produce(value: &Interval, grid: u32, budget: &mut Budget) -> Result<Interval, Fault> {
     super::interval::scratch(budget)?;

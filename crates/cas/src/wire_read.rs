@@ -420,6 +420,7 @@ impl<'a, 'b> Reader<'a, 'b> {
             29 => Ok(Operator::NamedCase(Box::new(crate::named_case::decode(
                 self,
             )?))),
+            51 => Ok(Operator::NaturalLog),
             10 => Ok(Operator::GeneralPower(self.branch()?)),
             11 => Ok(Operator::Call(self.name()?)),
             12 => Ok(Operator::Derivative(self.name()?)),

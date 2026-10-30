@@ -1032,4 +1032,5 @@ fn enclosure_staged_publication() -> TestResult {
     Ok(())
 }
 
+mod logarithms;
 mod roots;
