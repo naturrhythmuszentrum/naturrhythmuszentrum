@@ -150,6 +150,26 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
         heap: &'h mut Heap,
         budget: &nrz_bindings::Budget,
     ) -> Result<Bound<'h, P, Q>, OperationError> {
+        self.validate_inventory(heap, budget, None)
+    }
+
+    /// Quantity outputs were completely declared on the caller's cumulative ledger.
+    pub(crate) fn validate_quantity<'h>(
+        self,
+        heap: &'h mut Heap,
+        budget: &nrz_bindings::Budget,
+        symbols: Vec<nrz_bindings::BindingSymbols>,
+    ) -> Result<Bound<'h, P, Q>, OperationError> {
+        self.validate_inventory(heap, budget, Some(symbols))
+    }
+
+    /// Ordinary transactions and quantity transactions share every live and resource check.
+    fn validate_inventory<'h>(
+        self,
+        heap: &'h mut Heap,
+        budget: &nrz_bindings::Budget,
+        symbols: Option<Vec<nrz_bindings::BindingSymbols>>,
+    ) -> Result<Bound<'h, P, Q>, OperationError> {
         match self.operation.recipe {
             NativeRecipe::Precision { source, target }
                 if source == P::PRECISION && target == Q::PRECISION => {}
@@ -218,7 +238,7 @@ impl<P: Scalar + 'static, Q: Scalar + 'static> Binding<P, Q> {
                     .ok_or(OperationError::ResourceLimit)?,
             )?;
         }
-        let reservations = Reservations::prepare(heap, &dependencies, &self.operation)?;
+        let reservations = Reservations::prepare(heap, &dependencies, &self.operation, symbols)?;
         reservations.validate(heap)?;
         Ok(Bound {
             heap,

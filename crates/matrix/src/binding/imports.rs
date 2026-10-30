@@ -89,6 +89,19 @@ impl Heap {
         errors: Option<&[P]>,
         coverage: crate::Coverage,
     ) -> Result<crate::ValueBinding<P>, HeapError> {
+        check_quantity(symbols.value().descriptor())?;
+        self.import_quantity_symbols(symbols, centers, bounds, errors, coverage)
+    }
+
+    /// Checked quantity admission may retain an explicit noncoherent coordinate measure.
+    pub(crate) fn import_quantity_symbols<P: Scalar + 'static>(
+        &mut self,
+        symbols: &nrz_bindings::BindingSymbols,
+        centers: &[P],
+        bounds: Option<&[P]>,
+        errors: Option<&[P]>,
+        coverage: crate::Coverage,
+    ) -> Result<crate::ValueBinding<P>, HeapError> {
         symbols.check_import()?;
         let prepared = self.prepare_symbol_bundle(symbols, centers, bounds, errors, coverage)?;
         let binding = imported_binding(self.scope, &prepared, symbols)?;
@@ -131,7 +144,9 @@ impl Heap {
         coverage: crate::Coverage,
     ) -> Result<PreparedImport<P>, HeapError> {
         let quantity = symbols.value().descriptor();
-        check_quantity(quantity)?;
+        if quantity.kind().count_domain().is_some() {
+            return Err(HeapError::CountStorage);
+        }
         let [rows, columns] = symbols.value().shape();
         let extent = Extent::new(
             usize::try_from(rows).map_err(|_| HeapError::ExtentOverflow)?,

@@ -61,6 +61,34 @@ impl ProvenanceView<'_> {
 }
 
 impl Heap {
+    /// Borrow the published ordered shape without inventing equal-named coordinate identities.
+    pub(crate) fn quantity_shape<P: Scalar + 'static>(
+        &self,
+        handle: Handle<Value, P>,
+    ) -> Result<Option<&crate::CheckedShape>, HeapError> {
+        self.validate_provenance(handle)?;
+        let base = self.base_handle(handle)?;
+        let Meaning::Value { stamp, .. } = self.record(base)?.meaning else {
+            return Err(HeapError::CategoryMismatch);
+        };
+        let Some(id) = self.provenance.find(stamp) else {
+            return Ok(None);
+        };
+        let node = self
+            .provenance
+            .nodes
+            .get(id.index)
+            .ok_or(HeapError::StaleEvidence)?;
+        Ok(Some(
+            self.historical_record(node.record)?
+                .operation
+                .outputs
+                .get(node.slot)
+                .ok_or(HeapError::StaleEvidence)?
+                .shape(),
+        ))
+    }
+
     /// Set provenance policy after checking all already retained metadata against it.
     /// # Errors
     /// Refuses a limit smaller than current graph usage; existing policy stays unchanged.

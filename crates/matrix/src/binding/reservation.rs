@@ -85,9 +85,15 @@ impl<Q: Scalar + 'static> Reservations<Q> {
         heap: &mut Heap,
         inputs: &[InputSnapshot<P>],
         operation: &crate::CheckedOperation,
+        supplied: Option<Vec<nrz_bindings::BindingSymbols>>,
     ) -> Result<Self, OperationError> {
         let specifications = specifications(inputs, operation)?;
-        let (symbols, copies) = output_symbols(inputs, operation, &specifications)?;
+        let (symbols, copies) = if let Some(symbols) = supplied {
+            quantity_symbols(&symbols, operation, &specifications)?;
+            (symbols, Vec::new())
+        } else {
+            output_symbols(inputs, operation, &specifications)?
+        };
         let (plans, schemas) = schema_plans(heap, &specifications, operation)?;
         let count = plans.iter().try_fold(0_usize, |total, plan| {
             total
@@ -286,6 +292,34 @@ type OutputSymbols = (
     Vec<nrz_bindings::BindingSymbols>,
     Vec<nrz_bindings::CopyWitness>,
 );
+
+/// Predeclared quantity results must match every output and both companion contracts.
+fn quantity_symbols(
+    symbols: &[nrz_bindings::BindingSymbols],
+    operation: &crate::CheckedOperation,
+    specifications: &[OutputSpecification],
+) -> Result<(), OperationError> {
+    if matches!(operation.recipe, super::NativeRecipe::Copy)
+        || symbols.len() != specifications.len()
+    {
+        return Err(OperationError::CandidateContract);
+    }
+    for ((inventory, specification), output) in symbols
+        .iter()
+        .zip(specifications)
+        .zip(operation.outputs.iter())
+    {
+        inventory.check_import().map_err(HeapError::from)?;
+        let descriptor = inventory.value().descriptor() == output.descriptor();
+        let shape = inventory.value().shape() == super::symbols::shape(specification.extent)?;
+        let bound = inventory.bound().is_some() == specification.bounded;
+        let error = inventory.error().is_some() == specification.evaluation;
+        if !(descriptor && shape && bound && error) {
+            return Err(OperationError::CandidateContract);
+        }
+    }
+    Ok(())
+}
 
 /// Bindings derives exact output/companion meanings before the float allocation schedule.
 fn output_symbols<P: Scalar>(

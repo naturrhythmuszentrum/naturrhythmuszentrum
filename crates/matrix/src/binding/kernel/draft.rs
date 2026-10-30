@@ -10,6 +10,36 @@ use crate::{
 };
 
 impl OperationDraft {
+    /// Retain bindings-admitted affine meanings beside the existing tangent sum law.
+    pub(crate) fn quantity_sum(
+        mut self,
+        left: &nrz_bindings::Descriptor,
+        right: &nrz_bindings::Descriptor,
+        output: &nrz_bindings::Descriptor,
+    ) -> Result<Self, OperationError> {
+        let kernel = self
+            .kernel
+            .as_mut()
+            .ok_or(OperationError::UnsupportedShape)?;
+        if !matches!(kernel.recipe, Recipe::Sum { .. }) || kernel.inputs.len() != 2 {
+            return Err(OperationError::UnsupportedShape);
+        }
+        for (contract, descriptor) in std::rc::Rc::make_mut(&mut kernel.inputs)
+            .iter_mut()
+            .zip([left, right])
+        {
+            if contract.descriptor() != &descriptor.difference().coherent() {
+                return Err(OperationError::UnsupportedShape);
+            }
+            contract.quantity = descriptor.clone();
+        }
+        if kernel.output.descriptor() != &output.difference().coherent() {
+            return Err(OperationError::UnsupportedShape);
+        }
+        kernel.output.quantity = output.clone();
+        Ok(self)
+    }
+
     /// Propose an aligned sum of two homogeneous coherent difference regions.
     /// # Errors
     /// Refuses mismatched ordered axes, snapshots, kinds, structure or shape limits.

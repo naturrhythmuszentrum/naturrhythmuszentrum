@@ -40,6 +40,12 @@ mod shape;
 )]
 mod storage;
 
+mod quantity;
+pub use quantity::{
+    DifferenceRole, DynamicRole, NormalizedQuantity, PointRole, Quantity, QuantityContext,
+    QuantityError, QuantityInput, QuantityRole,
+};
+
 pub use binding::{
     AffineAdapter, CompanionAdapter, CompanionEvaluation, CompanionExecution,
     CompanionExecutionError, CompanionExecutionUsage, CoordinateContract, CoordinateError,
@@ -80,6 +86,10 @@ pub use heap::{
     HeapLimits, PublishedBundle, RegionView, SchemaId, Value, ValueId, ValueStamp, ValueVersion,
     ValueView, Workspace,
 };
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/quantity_twins.rs"]
+mod quantity_twins;
 
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/type_twins.rs"]
