@@ -12,6 +12,8 @@ use nrz_cas::proof::{ApplicationDraft, Certificate, Primitive, Statement, Verifi
 use nrz_cas::syntax::{Draft, Operator, PredicateKind};
 use nrz_cas::{Cas, Handle, Reference};
 
+#[path = "decision_introductions/kernel.rs"]
+mod kernel;
 #[path = "decision_introductions/pi.rs"]
 mod pi;
 #[path = "decision_introductions/refusals.rs"]

@@ -118,7 +118,7 @@ fn decision_enclosure_original_target() -> TestResult {
 fn decision_enclosure_unsupported_origins() -> TestResult {
     let (source, mut request) = prepared(0)?;
     for origin in [
-        EnclosureOrigin::ScalarKernel,
+        unsupported_scalar(&request),
         EnclosureOrigin::MatrixKernel,
         EnclosureOrigin::Unverified,
     ] {
@@ -344,13 +344,13 @@ fn decision_enclosure_cumulative_ledger() -> TestResult {
     Ok(())
 }
 
-/// Unsupported scalar origins refuse before replay while preserving all prior Work.
+/// Unsupported scalar origins refuse before arithmetic replay while retaining prior Work.
 /// ´test:integration:kernel-origin-baseline´
 /// ´claim:cas:kernel-origin-baseline´
 #[test]
 fn kernel_origin_baseline() -> TestResult {
     let (source, mut request) = prepared(0)?;
-    request.origin = EnclosureOrigin::ScalarKernel;
+    request.origin = unsupported_scalar(&request);
     let mut budget = ledger()?;
     budget.work(17, Location::new("prior kernel probe"))?;
     let before = source.cas.counts();
@@ -361,8 +361,19 @@ fn kernel_origin_baseline() -> TestResult {
         fault.kind,
         FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
     );
-    assert_eq!(fault.location, Location::new("exact rational enclosure"));
+    assert_eq!(fault.location, Location::new("scalar kernel coverage"));
     assert_eq!(source.cas.counts(), before);
-    assert_eq!(budget.usage().work, 17);
+    assert_eq!(budget.usage().work, 21);
     Ok(())
+}
+
+/// A missing trace has no authority, even with the correct original scope.
+pub(super) fn unsupported_scalar(request: &RationalEnclosure) -> EnclosureOrigin {
+    EnclosureOrigin::ScalarKernel(Box::new(nrz_cas::decision::ScalarKernelCertificate {
+        version: 1,
+        expression: request.target.clone(),
+        context: request.context.clone(),
+        input_family: request.input_family.clone(),
+        records: Vec::new(),
+    }))
 }

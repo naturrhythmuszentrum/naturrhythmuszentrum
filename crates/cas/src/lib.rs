@@ -36,6 +36,7 @@ mod decision_family_wire;
 mod decision_integer_selection;
 mod decision_integer_wire;
 mod decision_introduction;
+mod decision_kernel;
 mod decision_pi;
 mod decision_selection;
 mod decision_sign;

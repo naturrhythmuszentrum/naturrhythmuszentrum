@@ -115,6 +115,7 @@ mod decision_baseline;
 mod decision_cuts;
 
 mod decision_enclosures;
+mod decision_kernel;
 mod decision_partitions;
 
 mod decision_introductions;

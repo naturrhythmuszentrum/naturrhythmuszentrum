@@ -11,6 +11,10 @@ use crate::error::Fault;
 use crate::graph::{Cas, Handle};
 use crate::number::Rational;
 
+pub use crate::decision_kernel::model::{
+    ScalarKernelCertificate, ScalarKernelLaw, ScalarKernelRecord,
+};
+
 /// An untrusted closed rational interval for one exact declared Real or Integer coordinate.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CoordinateInterval {
@@ -156,7 +160,7 @@ impl Cas {
     }
 }
 
-/// A closed replay origin; numerical kernel and unverified claims have no authority.
+/// A closed replay origin; only independently checked mathematical records confer authority.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EnclosureOrigin {
     /// Replay every original operand through the existing exact-constant checker.
@@ -173,8 +177,8 @@ pub enum EnclosureOrigin {
         /// Untrusted constant theorem instance, retained and rechecked on every replay.
         certificate: Box<crate::pi_bounds::PiBoundCertificate>,
     },
-    /// Scalar numerical certificates require a separate, presently unsupported checker.
-    ScalarKernel,
+    /// Closed scalar records checked by independent rational endpoint and scope reductions.
+    ScalarKernel(Box<ScalarKernelCertificate>),
     /// Matrix numerical certificates require a separate, presently unsupported checker.
     MatrixKernel,
     /// A provenance label, success flag or finite radius alone establishes no enclosure.
@@ -184,8 +188,9 @@ pub enum EnclosureOrigin {
 /// An untrusted rational enclosure of an exact target in its original context.
 ///
 /// Replay supports exact rational results and closed pi arithmetic under an explicit
-/// checked Machin certificate. Its bound holds throughout the stated family without
-/// using an input assumption. Free-input interval arguments remain unsupported.
+/// checked Machin certificate, plus closed scalar law records under their original
+/// context and family. Each bound holds throughout that family without a new input
+/// assumption. Free-input interval arguments remain unsupported.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RationalEnclosure {
     /// Exact original expression, including operands that normalization could erase.
@@ -244,6 +249,8 @@ impl Cas {
     /// independently check the normalized equality. `ExactRational` requires an
     /// exactly rational result; `PiBound` additionally checks a finite Machin theorem
     /// and propagates outward rational intervals through the closed expression.
+    /// `ScalarKernel` additionally checks every rational endpoint relation in its
+    /// finite closed trace and matches the reconstructed exact target and scope.
     /// All original operands are checked even when cancellation could hide them.
     /// # Errors
     /// Refuses foreign identities, changed targets or input families, false results,

@@ -260,7 +260,14 @@ fn lattice_live_kernel_origins_refuse() -> TestResult {
     let inputs = inputs(&mut heap, &association, 1)?;
     let records = source.fixture.frame.cas.counts();
     let heap_records = heap.provenance_usage();
-    for origin in [EnclosureOrigin::ScalarKernel, EnclosureOrigin::MatrixKernel] {
+    let original = lattice_selection::original_box(&source)?;
+    for (origin, checker) in [
+        (
+            super::decision_live::unsupported_scalar(&original.coordinates[1]),
+            "scalar kernel coverage",
+        ),
+        (EnclosureOrigin::MatrixKernel, "exact rational enclosure"),
+    ] {
         let frozen = heap.freeze_lattice_inputs(&association, &inputs, &mut ledger()?)?;
         let mut contract = lattice_selection::original_box(&source)?.clone();
         contract.coordinates[1].origin = origin;
@@ -281,7 +288,7 @@ fn lattice_live_kernel_origins_refuse() -> TestResult {
             fault.kind,
             FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
         );
-        assert_eq!(fault.location, Location::new("exact rational enclosure"));
+        assert_eq!(fault.location, Location::new(checker));
         assert_eq!(source.fixture.frame.cas.counts(), records);
         assert_eq!(heap.provenance_usage(), heap_records);
     }

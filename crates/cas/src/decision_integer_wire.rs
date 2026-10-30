@@ -130,6 +130,8 @@ pub(crate) fn dependencies(
     | EnclosureOrigin::PiBound { expression, .. } = &value.origin
     {
         edges.push((cas.checked(expression)?, Edge::DependsOn));
+    } else if let EnclosureOrigin::ScalarKernel(certificate) = &value.origin {
+        edges.push((cas.checked(&certificate.expression)?, Edge::DependsOn));
     }
     Ok(())
 }

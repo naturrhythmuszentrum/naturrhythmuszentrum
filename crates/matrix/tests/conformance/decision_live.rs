@@ -519,7 +519,14 @@ fn lattice_live_origin_refusal() -> TestResult {
     let Certificate::IntegerSelection(original) = &proposal.certificate else {
         return Err("missing original enclosure".into());
     };
-    for origin in [EnclosureOrigin::ScalarKernel, EnclosureOrigin::MatrixKernel] {
+    for (origin, checker, work) in [
+        (unsupported_scalar(original), "scalar kernel coverage", 21),
+        (
+            EnclosureOrigin::MatrixKernel,
+            "exact rational enclosure",
+            17,
+        ),
+    ] {
         let mut contract = original.clone();
         contract.origin = origin;
         let before = source.frame.cas.counts();
@@ -540,8 +547,8 @@ fn lattice_live_origin_refusal() -> TestResult {
             fault.kind,
             FaultKind::Invalid(InvalidCode::UnsupportedCertificate)
         );
-        assert_eq!(fault.location, Location::new("exact rational enclosure"));
-        assert_eq!(budget.usage().work, 17);
+        assert_eq!(fault.location, Location::new(checker));
+        assert_eq!(budget.usage().work, work);
     }
     Ok(())
 }
@@ -616,4 +623,18 @@ fn kernel_live_baseline() -> TestResult {
         ]
     );
     Ok(())
+}
+
+/// Empty scalar records cannot certify a live result despite matching scope handles.
+pub(super) fn unsupported_scalar(
+    request: &nrz_bindings::readings::algebra::decision::RationalEnclosure,
+) -> nrz_bindings::readings::algebra::decision::EnclosureOrigin {
+    use nrz_bindings::readings::algebra::decision::{EnclosureOrigin, ScalarKernelCertificate};
+    EnclosureOrigin::ScalarKernel(Box::new(ScalarKernelCertificate {
+        version: 1,
+        expression: request.target.clone(),
+        context: request.context.clone(),
+        input_family: request.input_family.clone(),
+        records: Vec::new(),
+    }))
 }

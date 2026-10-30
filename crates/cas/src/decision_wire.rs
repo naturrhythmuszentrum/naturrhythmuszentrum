@@ -112,7 +112,10 @@ pub(crate) fn encode_enclosure(
             }
             Ok(())
         }
-        EnclosureOrigin::ScalarKernel => out.byte(1),
+        EnclosureOrigin::ScalarKernel(certificate) => {
+            out.byte(5)?;
+            crate::decision_kernel::encode(certificate, out, write)
+        }
         EnclosureOrigin::MatrixKernel => out.byte(2),
         EnclosureOrigin::Unverified => out.byte(3),
     }
@@ -235,7 +238,10 @@ pub(crate) fn decode_enclosure(
             expression: object(reader, records)?,
             value: reader.rational()?,
         },
-        1 => EnclosureOrigin::ScalarKernel,
+        1 => return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT)),
+        5 => EnclosureOrigin::ScalarKernel(Box::new(crate::decision_kernel::decode(
+            reader, records,
+        )?)),
         2 => EnclosureOrigin::MatrixKernel,
         3 => EnclosureOrigin::Unverified,
         4 => EnclosureOrigin::PiBound {

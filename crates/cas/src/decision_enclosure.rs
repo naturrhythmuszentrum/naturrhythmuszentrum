@@ -48,6 +48,9 @@ pub(crate) fn validate(
     contract: &RationalEnclosure,
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
+    if let EnclosureOrigin::ScalarKernel(certificate) = &contract.origin {
+        return crate::decision_kernel::validate(cas, contract, certificate, budget);
+    }
     if let EnclosureOrigin::PiBound {
         expression,
         certificate,

@@ -138,6 +138,30 @@ impl ExactConstant {
         (self.sign() == sign::Sign::Positive).then(|| PositiveConstant(self.clone()))
     }
 
+    /// Account for retained exact graphs and canonical keys beside a scalar trace.
+    pub(crate) fn retained_payload_bytes(&self) -> Result<u64, Fault> {
+        let payload = match &self.0 {
+            Value::Rational(number) => {
+                let (numerator, denominator) = number.component_bits();
+                numerator
+                    .div_ceil(8)
+                    .saturating_add(denominator.div_ceil(8))
+                    .saturating_mul(4)
+            }
+            Value::Expression(graph) => {
+                graph
+                    .cas
+                    .counts()
+                    .payload_bytes
+                    .saturating_add(crate::graph::size(
+                        graph.key.len(),
+                        crate::Location::new("scalar kernel coverage"),
+                    )?)
+            }
+        };
+        Ok(payload.saturating_add(512))
+    }
+
     /// Read the sign established by the closed checker, never by a display name.
     fn sign(&self) -> sign::Sign {
         match &self.0 {

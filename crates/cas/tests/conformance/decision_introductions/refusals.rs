@@ -57,7 +57,10 @@ fn decision_introduction_rejects_incomplete_evidence() -> TestResult {
                 evidence(&mut fixture)?.enclosures[0].lower =
                     super::super::decision_partitions::rational(-76, 1)?;
             }
-            7 => evidence(&mut fixture)?.enclosures[0].origin = EnclosureOrigin::ScalarKernel,
+            7 => {
+                let enclosure = &mut evidence(&mut fixture)?.enclosures[0];
+                enclosure.origin = super::super::decision_enclosures::unsupported_scalar(enclosure);
+            }
             _ => evidence(&mut fixture)?.enclosures[0].origin = EnclosureOrigin::MatrixKernel,
         }
         refuses(&mut fixture)?;
