@@ -42,9 +42,9 @@ mod storage;
 
 mod quantity;
 pub use quantity::{
-    CountError, CountHistory, CountQuantity, DifferenceRole, DynamicRole, ExactCountRatio,
-    NormalizedQuantity, PointRole, Quantity, QuantityContext, QuantityError, QuantityInput,
-    QuantityRole,
+    CountArray, CountError, CountHistory, CountQuantity, DifferenceRole, DynamicRole,
+    ExactCountRatio, NormalizedQuantity, PointRole, Quantity, QuantityContext, QuantityError,
+    QuantityInput, QuantityRole,
 };
 
 pub use binding::{

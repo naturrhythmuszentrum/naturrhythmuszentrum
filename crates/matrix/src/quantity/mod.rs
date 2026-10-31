@@ -9,7 +9,7 @@ mod imports;
 mod lineage;
 mod roles;
 mod shapes;
-pub use counts::{CountError, CountHistory, CountQuantity, ExactCountRatio};
+pub use counts::{CountArray, CountError, CountHistory, CountQuantity, ExactCountRatio};
 
 pub use conversion::NormalizedQuantity;
 pub use imports::QuantityInput;

@@ -2,9 +2,11 @@
 //! Exact finite counts share their checked source owner and never enter a floating arena.
 
 mod arithmetic;
+mod arrays;
 mod materialize;
 mod ratio;
 
+pub use arrays::CountArray;
 pub use ratio::ExactCountRatio;
 
 use super::QuantityContext;
@@ -49,6 +51,9 @@ pub enum CountHistory {
 /// A count refusal has no partially published integer or floating result.
 #[derive(Debug, thiserror::Error)]
 pub enum CountError {
+    /// Array extents, element length or requested coordinates do not agree.
+    #[error("exact count array shape mismatch")]
+    Shape,
     /// The original exact source did not satisfy bindings admission.
     #[error("count source: {0}")]
     Source(Box<nrz_bindings::DecisionError>),
