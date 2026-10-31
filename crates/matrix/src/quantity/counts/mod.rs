@@ -22,7 +22,7 @@ struct Data {
     /// Original checked counted-kind authority and exact source evidence.
     source: CountDescriptor,
     /// Only computed nodes need another exact integer; imports borrow the source's value.
-    value: Option<u64>,
+    value: Option<i128>,
     /// Original operands and exact operation, with no numerical certificate or wire format.
     history: CountHistory,
     /// Conservative complete retained lineage envelope, including shared parents in full.
@@ -38,12 +38,12 @@ pub enum CountHistory {
     Source,
     /// Compatible counted things were added with checked integer arithmetic.
     Add(CountQuantity, CountQuantity),
-    /// Compatible counted things were subtracted within nonnegative finite storage.
+    /// Compatible counted things were subtracted within signed finite storage.
     Subtract(CountQuantity, CountQuantity),
     /// A whole-number multiplicity scales the original count.
-    Scale(CountQuantity, u64),
+    Scale(CountQuantity, i128),
     /// An exact whole-number partition preserves counted meaning.
-    Quotient(CountQuantity, u64),
+    Quotient(CountQuantity, i128),
 }
 
 /// A count refusal has no partially published integer or floating result.
@@ -58,8 +58,8 @@ pub enum CountError {
     /// Exact construction or immutable lineage exceeded caller resources.
     #[error("count resources: {0}")]
     Resources(#[from] Fault),
-    /// The exact integer result cannot be represented by unsigned 64-bit count storage.
-    #[error("exact count exceeds unsigned 64-bit storage")]
+    /// The exact integer result cannot be represented by signed 128-bit count storage.
+    #[error("exact count exceeds signed 128-bit storage")]
     Overflow,
     /// The result exceeds the caller's explicit executable count capacity.
     #[error("exact count exceeds caller capacity")]
@@ -85,7 +85,7 @@ impl QuantityContext {
     pub fn count(
         &self,
         name: &str,
-        capacity: u64,
+        capacity: u128,
         budget: &mut Budget,
     ) -> Result<CountQuantity, CountError> {
         let source =
@@ -118,7 +118,7 @@ impl CountQuantity {
 
     /// The exact whole-number value, never rounded, wrapped or clamped.
     #[must_use]
-    pub fn value(&self) -> u64 {
+    pub fn value(&self) -> i128 {
         self.0.value.unwrap_or_else(|| self.0.source.value())
     }
 
@@ -143,20 +143,20 @@ impl CountQuantity {
     /// Check the actual known result rather than assuming whole-domain arithmetic closure.
     fn result(
         &self,
-        value: u64,
-        capacity: u64,
+        value: i128,
+        capacity: u128,
         history: CountHistory,
         budget: &mut Budget,
     ) -> Result<Self, CountError> {
-        if value > capacity {
-            return Err(CountError::Capacity);
-        }
         let exact = integer(value, budget)?;
         self.descriptor()
             .kind()
             .count_domain()
             .ok_or(nrz_bindings::UnitError::CountDomain)?
             .check_with_budget(&exact, budget)?;
+        if value.unsigned_abs() > capacity {
+            return Err(CountError::Capacity);
+        }
         let (parents, depth) = history.envelope()?;
         let bytes = envelope(parents, depth, budget)?;
         Ok(Self(Rc::new(Data {
@@ -192,8 +192,8 @@ fn charge(budget: &mut Budget) -> Result<(), Fault> {
     budget.work(1, Location::new("exact quantity count"))
 }
 
-/// Existing exact rational parsing admits the entire unsigned representation without a lossy cast.
-fn integer(value: u64, budget: &mut Budget) -> Result<Rational, Fault> {
+/// Existing exact rational parsing admits the entire signed representation without a lossy cast.
+fn integer(value: i128, budget: &mut Budget) -> Result<Rational, Fault> {
     Rational::parse(&value.to_string(), budget)
 }
 

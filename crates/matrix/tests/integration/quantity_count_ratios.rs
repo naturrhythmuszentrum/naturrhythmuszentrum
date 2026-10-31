@@ -17,10 +17,10 @@ fn ratio(
     denominator: u64,
 ) -> TestResult<ExactCountRatio> {
     let mut setup = Budget::new(Limits::default())?;
-    let three = context.count("three", u64::MAX, &mut setup)?;
-    let one = three.quotient(3, u64::MAX, &mut setup)?;
-    let left = one.scale(numerator, u64::MAX, &mut setup)?;
-    let right = one.scale(denominator, u64::MAX, &mut setup)?;
+    let three = context.count("three", u128::MAX, &mut setup)?;
+    let one = three.quotient(3, u128::MAX, &mut setup)?;
+    let left = one.scale(i128::from(numerator), u128::MAX, &mut setup)?;
+    let right = one.scale(i128::from(denominator), u128::MAX, &mut setup)?;
     Ok(context.count_ratio(&left, &right, &mut setup)?)
 }
 
@@ -62,7 +62,7 @@ fn oracle<P: Scalar + 'static>(numerator: u64, denominator: u64) -> TestResult<[
     assert_eq!(retained.exact(), source.exact());
     assert_eq!(
         retained.operands().each_ref().map(CountQuantity::value),
-        [numerator, denominator]
+        [i128::from(numerator), i128::from(denominator)]
     );
     for operand in retained.operands() {
         assert!(

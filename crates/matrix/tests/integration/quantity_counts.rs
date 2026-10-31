@@ -35,6 +35,10 @@ pub(super) fn context() -> TestResult<QuantityContext> {
             "expected",
             "metadata",
             "inputcount",
+            "negative",
+            "signed_two",
+            "signed_min",
+            "signed_max",
         ],
     )?;
     let events = Kind::Count("events".into(), CountDomain::NONNEGATIVE);
@@ -46,7 +50,7 @@ pub(super) fn context() -> TestResult<QuantityContext> {
         (
             "maximum",
             Kind::Count("events".into(), CountDomain::NONNEGATIVE),
-            "18446744073709551615",
+            "170141183460469231731687303715884105727",
         ),
         (
             "other",
@@ -85,11 +89,36 @@ pub(super) fn context() -> TestResult<QuantityContext> {
         Declaration::Metadata("sample count".into()),
     )?;
     input_count(&mut owner)?;
+    signed_counts(&mut owner)?;
     Ok(QuantityContext::new(
         Rc::new(owner.freeze()?),
         ShapeLimits::default(),
         ExecutionLimits::default(),
     ))
+}
+
+/// Signed source declarations share one explicit counted kind and unbounded integer domain.
+fn signed_counts(owner: &mut Context) -> TestResult {
+    for (name, value) in [
+        ("negative", "-3"),
+        ("signed_two", "2"),
+        ("signed_min", "-170141183460469231731687303715884105728"),
+        ("signed_max", "170141183460469231731687303715884105727"),
+    ] {
+        owner.declare(
+            name.into(),
+            Declaration::Constant {
+                descriptor: Descriptor::new(
+                    Kind::Count("signed-events".into(), CountDomain::SIGNED),
+                    Measure::coherent(),
+                    Role::Difference,
+                )?,
+                value: Rational::parse(value, &mut Budget::new(Limits::default())?)?,
+                evidence: Evidence::default(),
+            },
+        )?;
+    }
+    Ok(())
 }
 
 /// An input descriptor alone supplies no exact whole-number value.
@@ -116,13 +145,13 @@ fn input_count(owner: &mut Context) -> TestResult {
 fn quantity_count_arithmetic_retains_exact_values() -> TestResult {
     let context = context()?;
     let mut budget = Budget::new(Limits::default())?;
-    let three = context.count("three", u64::MAX, &mut budget)?;
-    let two = context.count("two", u64::MAX, &mut budget)?;
-    let sum = three.add(&two, u64::MAX, &mut budget)?;
+    let three = context.count("three", u128::MAX, &mut budget)?;
+    let two = context.count("two", u128::MAX, &mut budget)?;
+    let sum = three.add(&two, u128::MAX, &mut budget)?;
     assert_eq!(sum.value(), 5);
-    assert_eq!(three.subtract(&two, u64::MAX, &mut budget)?.value(), 1);
-    assert_eq!(three.scale(2, u64::MAX, &mut budget)?.value(), 6);
-    assert_eq!(two.quotient(2, u64::MAX, &mut budget)?.value(), 1);
+    assert_eq!(three.subtract(&two, u128::MAX, &mut budget)?.value(), 1);
+    assert_eq!(three.scale(2, u128::MAX, &mut budget)?.value(), 6);
+    assert_eq!(two.quotient(2, u128::MAX, &mut budget)?.value(), 1);
     assert_eq!(sum.descriptor(), three.descriptor());
     let CountHistory::Add(left, right) = sum.history() else {
         panic!("sum retains both exact operands");
@@ -131,15 +160,15 @@ fn quantity_count_arithmetic_retains_exact_values() -> TestResult {
     assert!(
         matches!(sum.source().evidence(), nrz_bindings::CountEvidence::Declared { name, .. } if name == "three")
     );
-    let bounded_three = context.count("bounded_three", u64::MAX, &mut budget)?;
-    let bounded_two = context.count("bounded_two", u64::MAX, &mut budget)?;
+    let bounded_three = context.count("bounded_three", u128::MAX, &mut budget)?;
+    let bounded_two = context.count("bounded_two", u128::MAX, &mut budget)?;
     assert_eq!(
         bounded_three
-            .subtract(&bounded_two, u64::MAX, &mut budget)?
+            .subtract(&bounded_two, u128::MAX, &mut budget)?
             .value(),
         1
     );
-    let Err(CountError::Units(fault)) = bounded_three.add(&bounded_two, u64::MAX, &mut budget)
+    let Err(CountError::Units(fault)) = bounded_three.add(&bounded_two, u128::MAX, &mut budget)
     else {
         panic!("the actual result must remain in its declared range");
     };
@@ -149,44 +178,48 @@ fn quantity_count_arithmetic_retains_exact_values() -> TestResult {
 
 /// Fractional and overflowing results never replace or round their original exact operands.
 /// ´test:integration:quantity-count-fraction-overflow-and-kind-refusals´
-/// ´claim:matrix:quantity-count-refusals´ Counts refuse fractional results, unsigned overflow, capacity overflow, zero divisors and incompatible counted things atomically.
+/// ´claim:matrix:quantity-count-refusals´ Counts refuse fractional results, signed overflow, capacity overflow, zero divisors and incompatible counted things atomically.
 #[test]
 fn quantity_count_fraction_overflow_and_kind_refusals() -> TestResult {
     let context = context()?;
     let mut budget = Budget::new(Limits::default())?;
-    let three = context.count("three", u64::MAX, &mut budget)?;
-    let two = context.count("two", u64::MAX, &mut budget)?;
-    let maximum = context.count("maximum", u64::MAX, &mut budget)?;
-    let other = context.count("other", u64::MAX, &mut budget)?;
-    let zero = context.count("zero", u64::MAX, &mut budget)?;
-    assert_eq!(maximum.add(&zero, u64::MAX, &mut budget)?.value(), u64::MAX);
+    let three = context.count("three", u128::MAX, &mut budget)?;
+    let two = context.count("two", u128::MAX, &mut budget)?;
+    let maximum = context.count("maximum", u128::MAX, &mut budget)?;
+    let other = context.count("other", u128::MAX, &mut budget)?;
+    let zero = context.count("zero", u128::MAX, &mut budget)?;
+    assert_eq!(
+        maximum.add(&zero, u128::MAX, &mut budget)?.value(),
+        i128::MAX
+    );
     let spent = budget.usage().work;
-    let Err(CountError::Fractional) = three.quotient(2, u64::MAX, &mut budget) else {
+    let Err(CountError::Fractional) = three.quotient(2, u128::MAX, &mut budget) else {
         panic!("a fractional count must refuse");
     };
     assert_eq!(budget.usage().work, spent + 1);
-    let Err(CountError::Overflow) = maximum.add(&two, u64::MAX, &mut budget) else {
+    let Err(CountError::Overflow) = maximum.add(&two, u128::MAX, &mut budget) else {
         panic!("integer addition must not wrap");
     };
-    let Err(CountError::Overflow) = maximum.scale(2, u64::MAX, &mut budget) else {
+    let Err(CountError::Overflow) = maximum.scale(2, u128::MAX, &mut budget) else {
         panic!("integer multiplication must not wrap");
     };
-    let Err(CountError::Overflow) = two.subtract(&three, u64::MAX, &mut budget) else {
-        panic!("negative result cannot enter unsigned storage");
+    let Err(CountError::Units(fault)) = two.subtract(&three, u128::MAX, &mut budget) else {
+        panic!("negative result must obey the nonnegative domain");
     };
+    assert_eq!(fault, UnitError::CountValue);
     let Err(CountError::Capacity) = three.add(&two, 4, &mut budget) else {
         panic!("explicit capacity must hold");
     };
-    let Err(CountError::ZeroDivisor) = three.quotient(0, u64::MAX, &mut budget) else {
+    let Err(CountError::ZeroDivisor) = three.quotient(0, u128::MAX, &mut budget) else {
         panic!("zero original divisor must refuse");
     };
-    let Err(CountError::Units(fault)) = three.add(&other, u64::MAX, &mut budget) else {
+    let Err(CountError::Units(fault)) = three.add(&other, u128::MAX, &mut budget) else {
         panic!("different counted things must refuse");
     };
     assert_eq!(fault, UnitError::KindMismatch);
     assert_eq!(
         [three.value(), two.value(), maximum.value()],
-        [3, 2, u64::MAX]
+        [3, 2, i128::MAX]
     );
     Ok(())
 }
@@ -198,10 +231,10 @@ fn quantity_count_fraction_overflow_and_kind_refusals() -> TestResult {
 fn quantity_count_ratio_retains_original_divisor() -> TestResult {
     let context = context()?;
     let mut budget = Budget::new(Limits::default())?;
-    let three = context.count("three", u64::MAX, &mut budget)?;
-    let two = context.count("two", u64::MAX, &mut budget)?;
-    let zero = context.count("zero", u64::MAX, &mut budget)?;
-    let other = context.count("other", u64::MAX, &mut budget)?;
+    let three = context.count("three", u128::MAX, &mut budget)?;
+    let two = context.count("two", u128::MAX, &mut budget)?;
+    let zero = context.count("zero", u128::MAX, &mut budget)?;
+    let other = context.count("other", u128::MAX, &mut budget)?;
     assert!(
         context
             .count_ratio(&zero, &three, &mut budget)?
@@ -232,7 +265,7 @@ fn quantity_count_ratio_retains_original_divisor() -> TestResult {
 fn quantity_count_storage_separates_continuous_meanings() -> TestResult {
     let context = context()?;
     let mut budget = Budget::new(Limits::default())?;
-    context.count("three", u64::MAX, &mut budget)?;
+    context.count("three", u128::MAX, &mut budget)?;
     let mut heap = nrz_matrix::Heap::new(nrz_matrix::HeapLimits::default())?;
     for (name, center) in [
         ("ratio", 2.0_f64),
@@ -268,7 +301,7 @@ fn quantity_count_storage_separates_continuous_meanings() -> TestResult {
         "unknown",
         "inputcount",
     ] {
-        let Err(CountError::Source(fault)) = context.count(name, u64::MAX, &mut budget) else {
+        let Err(CountError::Source(fault)) = context.count(name, u128::MAX, &mut budget) else {
             panic!("a noncount source must refuse");
         };
         assert!(matches!(*fault, nrz_bindings::DecisionError::CountKind));
@@ -293,8 +326,8 @@ fn quantity_count_work_boundaries() -> TestResult {
         for limit in [needed, needed - 1] {
             let context = context()?;
             let mut setup = Budget::new(Limits::default())?;
-            let three = context.count("three", u64::MAX, &mut setup)?;
-            let two = context.count("two", u64::MAX, &mut setup)?;
+            let three = context.count("three", u128::MAX, &mut setup)?;
+            let two = context.count("two", u128::MAX, &mut setup)?;
             let mut budget = Budget::new(Limits {
                 work: limit,
                 ..Limits::default()
@@ -329,22 +362,22 @@ fn count_operation(
 ) -> Result<(), CountError> {
     match action {
         0 => {
-            context.count("three", u64::MAX, budget)?;
+            context.count("three", u128::MAX, budget)?;
         }
         1 => {
             CountQuantity::capture(three.source().clone(), budget)?;
         }
         2 => {
-            three.add(two, u64::MAX, budget)?;
+            three.add(two, u128::MAX, budget)?;
         }
         3 => {
-            three.subtract(two, u64::MAX, budget)?;
+            three.subtract(two, u128::MAX, budget)?;
         }
         4 => {
-            three.scale(2, u64::MAX, budget)?;
+            three.scale(2, u128::MAX, budget)?;
         }
         5 => {
-            two.quotient(2, u64::MAX, budget)?;
+            two.quotient(2, u128::MAX, budget)?;
         }
         6 => {
             context.count_ratio(three, two, budget)?;
@@ -388,7 +421,7 @@ fn count_work_refusal(error: &CountError, expected_limit: u64, expected_needed: 
 fn quantity_count_standard_uncertainty_is_continuous() -> TestResult {
     let context = context()?;
     let mut budget = Budget::new(Limits::default())?;
-    let count = context.count("three", u64::MAX, &mut budget)?;
+    let count = context.count("three", u128::MAX, &mut budget)?;
     let standard = nrz_bindings::uncertainty(
         nrz_bindings::UncertaintyMode::Standard,
         count.descriptor(),
@@ -426,14 +459,14 @@ fn quantity_count_standard_uncertainty_is_continuous() -> TestResult {
 fn quantity_count_lineage_capacity_refusals() -> TestResult {
     let context = context()?;
     let mut setup = Budget::new(Limits::default())?;
-    let three = context.count("three", u64::MAX, &mut setup)?;
-    let two = context.count("two", u64::MAX, &mut setup)?;
+    let three = context.count("three", u128::MAX, &mut setup)?;
+    let two = context.count("two", u128::MAX, &mut setup)?;
     for depth in [2, 1] {
         let mut budget = Budget::new(Limits {
             depth,
             ..Limits::default()
         })?;
-        let result = three.add(&two, u64::MAX, &mut budget);
+        let result = three.add(&two, u128::MAX, &mut budget);
         if depth == 2 {
             assert_eq!(result?.value(), 5);
         } else {
@@ -471,5 +504,178 @@ fn quantity_count_lineage_capacity_refusals() -> TestResult {
     ));
     assert_eq!(budget.usage().work, 1);
     assert_eq!(three.value(), 3);
+    Ok(())
+}
+
+/// Signed arithmetic preserves exact integer values and refuses every failed result atomically.
+/// ´test:integration:quantity-signed-count-arithmetic´
+/// ´claim:matrix:quantity-signed-count-arithmetic´ Signed counts admit negative arithmetic, preserve domain-before-capacity ordering and refuse i128 overflow including minimum divided by minus one.
+#[test]
+fn quantity_signed_count_arithmetic() -> TestResult {
+    let context = context()?;
+    let mut budget = Budget::new(Limits::default())?;
+    let negative = context.count("negative", 3, &mut budget)?;
+    let two = context.count("signed_two", 2, &mut budget)?;
+    let minimum = context.count("signed_min", u128::MAX, &mut budget)?;
+    let maximum = context.count("signed_max", u128::MAX, &mut budget)?;
+    assert_eq!(negative.add(&two, 1, &mut budget)?.value(), -1);
+    assert_eq!(negative.subtract(&two, 5, &mut budget)?.value(), -5);
+    assert_eq!(negative.scale(-2, 6, &mut budget)?.value(), 6);
+    assert_eq!(negative.scale(2, 6, &mut budget)?.value(), -6);
+    assert_eq!(negative.quotient(-3, 1, &mut budget)?.value(), 1);
+    assert_eq!(
+        minimum.quotient(1, 1_u128 << 127, &mut budget)?.value(),
+        i128::MIN
+    );
+    assert_eq!(maximum.scale(1, u128::MAX, &mut budget)?.value(), i128::MAX);
+    for result in [
+        maximum.add(&two, u128::MAX, &mut budget),
+        minimum.subtract(&two, u128::MAX, &mut budget),
+        maximum.scale(2, u128::MAX, &mut budget),
+        minimum.quotient(-1, u128::MAX, &mut budget),
+    ] {
+        let Err(CountError::Overflow) = result else {
+            panic!("signed overflow must refuse");
+        };
+    }
+    let Err(CountError::Fractional) = negative.quotient(2, u128::MAX, &mut budget) else {
+        panic!("negative fractional tally must refuse");
+    };
+    let Err(CountError::Capacity) = negative.scale(2, 5, &mut budget) else {
+        panic!("absolute-magnitude capacity must hold");
+    };
+    let ordinary = context.count("two", u128::MAX, &mut budget)?;
+    let three = context.count("three", u128::MAX, &mut budget)?;
+    for result in [
+        ordinary.subtract(&three, 0, &mut budget),
+        ordinary.scale(i128::MIN, 0, &mut budget),
+    ] {
+        let Err(CountError::Units(fault)) = result else {
+            panic!("mathematical domain must precede machine capacity");
+        };
+        assert_eq!(fault, UnitError::CountValue);
+    }
+    assert_eq!(
+        [
+            negative.value(),
+            two.value(),
+            minimum.value(),
+            maximum.value()
+        ],
+        [-3, 2, i128::MIN, i128::MAX]
+    );
+    Ok(())
+}
+
+/// Signed source evidence survives the numerical ratio boundary and original divisor checks.
+/// ´test:integration:quantity-signed-count-ratios´
+/// ´claim:matrix:quantity-signed-count-ratios´ Signed count ratios preserve both original operands and exact negative dyadic or nonrepresentable rational meaning in each scalar format.
+#[test]
+fn quantity_signed_count_ratios() -> TestResult {
+    signed_ratio::<f32>()?;
+    signed_ratio::<f64>()
+}
+
+/// Independent exact rational containment checks both signs of the original divisor.
+fn signed_ratio<P: nrz_scalar::Scalar + 'static>() -> TestResult {
+    let context = context()?;
+    let mut budget = Budget::new(Limits::default())?;
+    let negative = context.count("negative", 3, &mut budget)?;
+    let two = context.count("signed_two", 2, &mut budget)?;
+    let mut heap = nrz_matrix::Heap::new(nrz_matrix::HeapLimits::default())?;
+    for (left, right, numerator, denominator) in
+        [(&negative, &two, -3, 2), (&two, &negative, -2, 3)]
+    {
+        let ratio = context.count_ratio(left, right, &mut budget)?;
+        let value = context.materialize_count_ratio::<P>(&mut heap, &ratio, &mut budget)?;
+        let view = value.view(&heap)?;
+        let center = view.region().get(0, 0)?.to_f64();
+        let error = heap
+            .companion(view.evaluation().ok_or("numerical error")?)?
+            .region()
+            .get(0, 0)?
+            .to_f64();
+        assert!(crate::conversion_oracle::covers(
+            center,
+            error,
+            numerator,
+            denominator
+        )?);
+        if denominator == 2 {
+            assert_eq!([center, error], [-1.5, 0.0]);
+        }
+        assert_eq!(
+            value.count_ratio_sources()[0]
+                .operands()
+                .each_ref()
+                .map(CountQuantity::value),
+            [left.value(), right.value()]
+        );
+    }
+    Ok(())
+}
+
+/// Every signed operation has a fresh-store literal N/N−1 Work boundary.
+/// ´test:integration:quantity-signed-count-work-boundaries´
+/// ´claim:matrix:quantity-signed-count-work-boundaries´ Signed construction, addition, subtraction, scaling, partition and ratio construction publish only at their measured Work boundaries and preserve prior spending on refusal.
+#[test]
+fn quantity_signed_count_work_boundaries() -> TestResult {
+    for (action, needed) in [(0, 95), (1, 228), (2, 228), (3, 227), (4, 227), (5, 996)] {
+        for accepted in [true, false] {
+            let context = context()?;
+            let mut setup = Budget::new(Limits::default())?;
+            let negative = context.count("negative", 3, &mut setup)?;
+            let two = context.count("signed_two", 2, &mut setup)?;
+            let work = needed - u64::from(!accepted);
+            let mut budget = Budget::new(Limits {
+                work,
+                ..Limits::default()
+            })?;
+            let result = signed_operation(action, &context, &negative, &two, &mut budget);
+            if accepted {
+                result?;
+                assert_eq!(budget.usage().work, needed);
+            } else {
+                let Err(fault) = result else {
+                    panic!("signed operation must exhaust one below Work");
+                };
+                count_work_refusal(&fault, work, needed)?;
+                assert!(budget.usage().work > 0);
+            }
+            assert_eq!([negative.value(), two.value()], [-3, 2]);
+        }
+    }
+    Ok(())
+}
+
+/// Apply only the measured operation to the caller's independent cumulative ledger.
+fn signed_operation(
+    action: u8,
+    context: &QuantityContext,
+    negative: &CountQuantity,
+    two: &CountQuantity,
+    budget: &mut Budget,
+) -> Result<(), CountError> {
+    match action {
+        0 => {
+            context.count("negative", 3, budget)?;
+        }
+        1 => {
+            negative.add(two, 1, budget)?;
+        }
+        2 => {
+            negative.subtract(two, 5, budget)?;
+        }
+        3 => {
+            negative.scale(-2, 6, budget)?;
+        }
+        4 => {
+            negative.quotient(-3, 1, budget)?;
+        }
+        5 => {
+            context.count_ratio(negative, two, budget)?;
+        }
+        _ => unreachable!("closed signed operation inventory"),
+    }
     Ok(())
 }

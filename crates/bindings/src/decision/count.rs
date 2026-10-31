@@ -44,7 +44,7 @@ struct Data {
     /// Declared counted kind and mathematical domain.
     descriptor: Descriptor,
     /// Exact executable representation; never rounded, wrapped or clamped.
-    value: u64,
+    value: i128,
     /// Original data, structural proof or decided snapshot.
     evidence: CountEvidence,
     /// Conservative owned result bytes, excluding shared declaration and graph owners.
@@ -58,14 +58,21 @@ impl SelectedDecision {
     /// A refusal leaves this immutable exact selected snapshot available for another use.
     pub fn count(
         &self,
-        capacity: u64,
+        capacity: u128,
         budget: &mut Budget,
     ) -> Result<CountDescriptor, DecisionError> {
         let descriptor = &self.case().specification().count;
         let bytes = prepare(descriptor, budget)?;
-        let value = self
-            .cas()?
-            .materialize_integer_selection(self.witness(), capacity, budget)?;
+        let value = if !self.value().is_negative() && self.value().component_bits().0 <= 64 {
+            let capacity = u64::try_from(capacity).unwrap_or(u64::MAX);
+            i128::from(self.cas()?.materialize_integer_selection(
+                self.witness(),
+                capacity,
+                budget,
+            )?)
+        } else {
+            materialize(self.value(), capacity, budget)?
+        };
         Ok(CountDescriptor(Rc::new(Data {
             descriptor: descriptor.clone(),
             value,
@@ -82,7 +89,7 @@ impl CountDescriptor {
     pub fn declared(
         owner: Rc<CheckedDeclarations>,
         name: &str,
-        capacity: u64,
+        capacity: u128,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
         let length = u64::try_from(name.len()).map_err(|_| DecisionError::Capacity)?;
@@ -127,7 +134,7 @@ impl CountDescriptor {
         source: Handle,
         descriptor: Descriptor,
         witness: VerifiedWitness,
-        capacity: u64,
+        capacity: u128,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
         let retained = prepare(&descriptor, budget)?;
@@ -180,9 +187,9 @@ impl CountDescriptor {
     pub fn descriptor(&self) -> &Descriptor {
         &self.0.descriptor
     }
-    /// Exact executable tally within the capacity declared to its constructor.
+    /// Exact signed tally within the absolute-magnitude capacity declared to its constructor.
     #[must_use]
-    pub fn value(&self) -> u64 {
+    pub fn value(&self) -> i128 {
         self.0.value
     }
     /// Complete retained evidence, distinguishing direct exact and decision-derived routes.
@@ -249,7 +256,11 @@ fn structural(
 }
 
 /// Exact public rational export preserves the same distinct materialization refusal as CAS.
-fn materialize(value: &Rational, capacity: u64, budget: &mut Budget) -> Result<u64, DecisionError> {
+fn materialize(
+    value: &Rational,
+    capacity: u128,
+    budget: &mut Budget,
+) -> Result<i128, DecisionError> {
     let refused = || {
         DecisionError::Algebra(Fault::invalid(
             InvalidCode::DecisionMaterializationCapacity,
@@ -258,7 +269,7 @@ fn materialize(value: &Rational, capacity: u64, budget: &mut Budget) -> Result<u
     };
     value.check(budget, storage::AT)?;
     budget.work(1, storage::AT)?;
-    if value.is_negative() || !value.is_integer() || value.component_bits().0 > 64 {
+    if !value.is_integer() || value.component_bits().0 > 128 {
         return Err(refused());
     }
     let exact = value.exact_string(budget)?;
@@ -267,8 +278,8 @@ fn materialize(value: &Rational, capacity: u64, budget: &mut Budget) -> Result<u
         storage::AT,
     )?;
     exact
-        .parse::<u64>()
+        .parse::<i128>()
         .ok()
-        .filter(|value| *value <= capacity)
+        .filter(|value| value.unsigned_abs() <= capacity)
         .ok_or_else(refused)
 }

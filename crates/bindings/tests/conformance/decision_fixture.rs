@@ -125,7 +125,7 @@ impl Frame {
         })
     }
     /// Declare the half-open floor relation and exact Integer range.
-    fn relation(&mut self, bounded: bool) -> TestResult<(Handle, [Handle; 2])> {
+    fn relation(&mut self, bounded: bool, signed: bool) -> TestResult<(Handle, [Handle; 2])> {
         let q = self.term(Operator::Free("q".into()), real(), &[])?;
         let n = self.term(
             Operator::Free("n".into()),
@@ -153,7 +153,7 @@ impl Frame {
                 &[],
             )?;
             regions.push(self.guard(PredicateKind::IntegerRange, &[n.clone(), zero, five])?);
-        } else {
+        } else if !signed {
             regions.push(self.guard(PredicateKind::NonNegative, std::slice::from_ref(&n))?);
         }
         let relation = self.region(RegionExpr::Meet(
@@ -192,16 +192,20 @@ impl Frame {
 }
 
 /// Declare projected coverage without asserting its proof.
-fn cover(bounded: bool) -> TestResult<(Frame, IntegerFamily)> {
+fn cover(bounded: bool, signed: bool) -> TestResult<(Frame, IntegerFamily)> {
     let mut frame = Frame::new()?;
-    let (relation, [q, n]) = frame.relation(bounded)?;
+    let (relation, [q, n]) = frame.relation(bounded, signed)?;
     let (function, _) = frame.cases(&relation, n.clone())?;
     let zero = frame.term(
         Operator::Rational(Rational::zero()),
         Sort::Value(AtomicSort::Integer),
         &[],
     )?;
-    let mut domain = frame.guard(PredicateKind::NonNegative, std::slice::from_ref(&q))?;
+    let mut domain = if signed {
+        frame.ambient.clone()
+    } else {
+        frame.guard(PredicateKind::NonNegative, std::slice::from_ref(&q))?
+    };
     let upper = if bounded {
         let five = Rational::from_ratio(5, 1, &mut ledger()?)?;
         let bound = frame.term(
@@ -227,7 +231,7 @@ fn cover(bounded: bool) -> TestResult<(Frame, IntegerFamily)> {
             coordinate: q,
             index: n,
             domain,
-            lower: Some(zero),
+            lower: if signed { None } else { Some(zero) },
             upper,
             count: None,
         },
@@ -257,8 +261,14 @@ fn exact(frame: &mut Frame, text: &str, integer: bool) -> TestResult<Handle> {
 
 /// Build the original LC target or an exact rational refusal twin.
 pub(super) fn fixture(bounded: bool, selected: &str, target: &str) -> TestResult<SelectionFixture> {
-    let (frame, family) = cover(bounded)?;
+    let (frame, family) = cover(bounded, false)?;
     assemble(frame, family, Vec::new(), selected, target)
+}
+
+/// An unconstrained floor family admits negative Integer selections without a zero lower bound.
+pub(super) fn signed_fixture(selected: &str) -> TestResult<SelectionFixture> {
+    let (frame, family) = cover(false, true)?;
+    assemble(frame, family, Vec::new(), selected, selected)
 }
 
 /// Keep original source equality as an explicit qualified assumption.

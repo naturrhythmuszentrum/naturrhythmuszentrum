@@ -213,7 +213,7 @@ impl<P: Scalar + 'static> PublishedDecision<P> {
     pub fn count(
         &self,
         heap: &Heap,
-        capacity: u64,
+        capacity: u128,
         budget: &mut Budget,
     ) -> Result<LiveDecisionCount<P>, LiveDecisionError> {
         let selected = self.current(heap, budget)?;
