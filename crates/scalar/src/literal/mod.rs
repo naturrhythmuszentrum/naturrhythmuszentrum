@@ -5,9 +5,12 @@
 //!
 //! `NumericLiteral::new` checks a borrowed signed integer, decimal or scientific spelling, or one fraction whose sides are such literals. `LiteralLimits` bounds combined significand digits, written and effective decimal exponents, and work. Eight work units per input byte prepay grammar and candidate scans; each enclosure operation costs one additional unit. Defaults permit 1024 digits, exponent magnitude 4096 and 100000 work units. Zero limits are valid refusing policies. Whitespace, expressions, separators and nonfinite spellings are rejected.
 //!
-//! Decoding accumulates digits by enclosed multiply-by-ten/add and applies decimal scale by bounded repeated multiplication or division by ten. This avoids building an overflowing power-of-ten denominator for subnormal literals. A native parser selects a finite candidate for a single literal; a fraction uses its lower endpoint. `DecodedLiteral` exposes the candidate, the exact-spelling enclosure, its numerical displacement bound and charged work. It promises containment rather than tight or correctly rounded fraction candidates. Overflowing intermediates and zero-containing denominator enclosures refuse even when another conversion algorithm could succeed. Production decoding has no rational or CAS dependency.
+//! Integer fractions first use exact bounded reduction to recognize representable normal dyadics; these return a singleton and zero displacement. Unsupported sizes, subnormals and nonrepresentable fractions retain the conservative path.
+//!
+//! Conservative decoding accumulates digits by enclosed multiply-by-ten/add and applies decimal scale by bounded repeated multiplication or division by ten. This avoids building an overflowing power-of-ten denominator for subnormal literals. A native parser selects a finite candidate for a single literal; a fraction uses its lower endpoint. `DecodedLiteral` exposes the candidate, the exact-spelling enclosure, its numerical displacement bound and charged work. It promises containment rather than tight or correctly rounded fraction candidates. Overflowing intermediates and zero-containing denominator enclosures refuse even when another conversion algorithm could succeed. Production decoding has no rational or CAS dependency.
 
 mod evaluate;
+mod exact;
 mod limits;
 mod syntax;
 
@@ -92,7 +95,24 @@ impl<'a> NumericLiteral<'a> {
         &self,
         context: &ArithmeticContext,
     ) -> Result<DecodedLiteral<P>, ArithmeticFailure> {
-        self.evaluate(context).map_err(|error| match error {
+        let mut used = 0;
+        self.decode_with_work(context, &mut used)
+    }
+
+    /// Decode under the same literal ceiling and report consumed Work even when evaluation refuses.
+    ///
+    /// The reported count includes the scanning reservation from successful literal construction.
+    /// # Errors
+    /// Preserves every refusal of `decode` and reports this attempt's consumed Work on error.
+    pub fn decode_with_work<P: Scalar>(
+        &self,
+        context: &ArithmeticContext,
+        work_used: &mut u64,
+    ) -> Result<DecodedLiteral<P>, ArithmeticFailure> {
+        let mut work = self.work;
+        let result = self.evaluate(context, &mut work);
+        *work_used = work.used();
+        result.map_err(|error| match error {
             ArithmeticFailure::Overflow | ArithmeticFailure::NonFinite => {
                 ArithmeticFailure::LiteralRange
             }
@@ -104,11 +124,16 @@ impl<'a> NumericLiteral<'a> {
     fn evaluate<P: Scalar>(
         &self,
         context: &ArithmeticContext,
+        work: &mut Work,
     ) -> Result<DecodedLiteral<P>, ArithmeticFailure> {
-        let mut work = self.work;
-        let numerator = evaluate::decimal(&self.numerator, context, &mut work)?;
+        if let Some(denominator) = self.denominator
+            && let Some(decoded) = exact::fraction(&self.numerator, &denominator, work)?
+        {
+            return Ok(decoded);
+        }
+        let numerator = evaluate::decimal(&self.numerator, context, work)?;
         let enclosure = if let Some(denominator) = self.denominator {
-            let divisor = evaluate::decimal(&denominator, context, &mut work)?;
+            let divisor = evaluate::decimal(&denominator, context, work)?;
             work.charge(1)?;
             numerator.div(divisor, context)?
         } else {

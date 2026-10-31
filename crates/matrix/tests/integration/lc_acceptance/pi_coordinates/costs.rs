@@ -13,7 +13,7 @@ fn pi_live_coordinate_owner_boundaries() -> TestResult {
     let plan = fixture::plan()?;
     boundaries::<f32>(
         &plan,
-        [209_253, 31_021, 5401],
+        [209_249, 31_021, 5401],
         [96_223, 79_544],
         [116_430, 368],
         [80_216, 80_184, 80_680],
@@ -21,7 +21,7 @@ fn pi_live_coordinate_owner_boundaries() -> TestResult {
     )?;
     boundaries::<f64>(
         &plan,
-        [209_253, 31_021, 5401],
+        [209_249, 31_021, 5401],
         [96_223, 79_544],
         [116_590, 496],
         [80_520, 80_368, 81_144],
@@ -36,7 +36,7 @@ fn pi_live_coordinate_point_owner_boundaries() -> TestResult {
     let plan = super::point::point_plan()?;
     boundaries::<f32>(
         &plan,
-        [298_620, 33_854, 5979],
+        [298_608, 33_854, 5979],
         [100_220, 81_969],
         [122_266, 368],
         [82_641, 82_609, 83_105],
@@ -44,7 +44,7 @@ fn pi_live_coordinate_point_owner_boundaries() -> TestResult {
     )?;
     boundaries::<f64>(
         &plan,
-        [298_620, 33_854, 5979],
+        [298_608, 33_854, 5979],
         [100_220, 81_969],
         [122_426, 496],
         [82_945, 82_793, 83_569],
@@ -188,13 +188,13 @@ fn cumulative<P: Scalar + 'static>() -> TestResult {
     let plan = fixture::plan()?;
     let context = ArithmeticContext::new()?;
     let circle = pi::<P>(&context, &mut ledger()?)?;
-    for limit in [215_943, 215_942] {
+    for limit in [215_939, 215_938] {
         let mut budget = prior([limit, 116_590, 81_192])?;
         let contract = PiCoordinateContract::new(
             &plan.graph,
             &plan.contract,
             &circle,
-            &policy([209_253, 31_021, 5401]),
+            &policy([209_249, 31_021, 5401]),
             &context,
             &mut budget,
         )?;
@@ -217,7 +217,7 @@ fn cumulative<P: Scalar + 'static>() -> TestResult {
             normalized.coefficients().as_ptr(),
             warm.coefficients().as_ptr()
         ));
-        assert_eq!(budget.usage().work, 215_766);
+        assert_eq!(budget.usage().work, 215_762);
         let before = budget.usage();
         let result = heap.restore_certified_reading(
             &normalized,
@@ -226,7 +226,7 @@ fn cumulative<P: Scalar + 'static>() -> TestResult {
             &context,
             &mut budget,
         );
-        if limit == 215_943 {
+        if limit == 215_939 {
             result?;
             assert_eq!(budget.usage().work, limit);
         } else {

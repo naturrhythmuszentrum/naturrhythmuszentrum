@@ -32,6 +32,9 @@
 |(`test:integration:literal-syntax-refusals`)|scalar|Grammar rejects expressions, unsupported spellings and malformed fraction components.|
 |(`test:integration:literal-resource-boundaries`)|scalar|Limits are enforced at, below and above each resource boundary.|
 |(`test:integration:literal-range-and-divisor-refusals`)|scalar|Overflow and zero-containing denominator enclosures refuse even when an exact quotient is small.|
+|(`test:integration:literal-representable-fraction-oracles`)|scalar|Representable normal integer fractions preserve exact signs and significands with singleton enclosures and zero displacement.|
+|(`test:integration:literal-fraction-fallback-oracles`)|scalar|Nonrepresentable fractions and subnormal edges retain conservative enclosures while range overflow still refuses.|
+|(`test:integration:literal-exact-fraction-work-boundaries`)|scalar|Exact fraction imports enforce measured Work limits and report consumed Work on atomic one-below refusal.|
 |(`test:integration:pi-independent-rational-bounds`)|scalar|Every refinement and format encloses pi by an independent exact rational theorem.|
 |(`test:integration:pi-refinement-is-nested`)|scalar|Tightened requests retain nested rational evidence and include binary quantization.|
 |(`test:integration:pi-tolerance-refusals-are-atomic`)|scalar|Invalid tolerances and exhausted fixed resolution preserve nonzero caller usage.|

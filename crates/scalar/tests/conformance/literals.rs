@@ -9,6 +9,9 @@
 //! | [`literal_syntax_refusals`] | scalar | Grammar rejects expressions, unsupported spellings and malformed fraction components. |
 //! | [`literal_resource_boundaries`] | scalar | Limits are enforced at, below and above each resource boundary. |
 //! | [`literal_range_and_divisor_refusals`] | scalar | Overflow and zero-containing denominator enclosures refuse even when an exact quotient is small. |
+//! | [`literal_representable_fraction_oracles`] | scalar | Representable normal integer fractions preserve exact signs and significands with singleton enclosures and zero displacement. |
+//! | [`literal_fraction_fallback_oracles`] | scalar | Nonrepresentable fractions and subnormal edges retain conservative enclosures while range overflow still refuses. |
+//! | [`literal_exact_fraction_work_boundaries`] | scalar | Exact fraction imports enforce measured Work limits and report consumed Work on atomic one-below refusal. |
 
 //! Exact rational expectations for bounded literal decoding.
 
@@ -193,4 +196,133 @@ fn literal_range_and_divisor_refusals() -> TestResult {
         ));
     }
     Ok(())
+}
+
+/// Check exact binary meaning and zero displacement without calling production rounding.
+fn exact_fraction<P: Binary>(
+    text: &str,
+    numerator: i64,
+    denominator: u64,
+) -> Result<u64, ArithmeticFailure> {
+    let exact = Ratio::new(BigInt::from(numerator), BigInt::from(denominator));
+    let decoded = NumericLiteral::new(text, LiteralLimits::default())?
+        .decode::<P>(&ArithmeticContext::new()?)?;
+    assert_eq!(decoded.center().get().rational(), exact);
+    assert_eq!(decoded.enclosure().lower().get().rational(), exact);
+    assert_eq!(decoded.enclosure().upper().get().rational(), exact);
+    assert_eq!(
+        decoded.displacement().get().rational(),
+        Ratio::from_integer(BigInt::from(0))
+    );
+    Ok(decoded.work_used())
+}
+
+/// Representable normal integer fractions preserve exact signs and significands with singleton enclosures and zero displacement.
+/// ´claim:scalar:literal-representable-fraction-oracles´
+/// ´test:integration:literal-representable-fraction-oracles´
+#[test]
+fn literal_representable_fraction_oracles() -> TestResult {
+    for (text, numerator, denominator) in [
+        ("3/2", 3, 2),
+        ("-3/4", -3, 4),
+        ("3/-4", -3, 4),
+        ("-3/-4", 3, 4),
+        ("1/1024", 1, 1024),
+        ("6/4", 3, 2),
+        ("0/3", 0, 1),
+    ] {
+        exact_fraction::<f32>(text, numerator, denominator)?;
+        exact_fraction::<f64>(text, numerator, denominator)?;
+    }
+    exact_fraction::<f32>("16777215/2", 16_777_215, 2)?;
+    exact_fraction::<f64>("9007199254740991/2", 9_007_199_254_740_991, 2)?;
+    Ok(())
+}
+
+/// Nonrepresentable fractions and subnormal edges retain conservative enclosures while range overflow still refuses.
+/// ´claim:scalar:literal-fraction-fallback-oracles´
+/// ´test:integration:literal-fraction-fallback-oracles´
+#[test]
+fn literal_fraction_fallback_oracles() -> TestResult {
+    for (text, numerator, denominator) in [("1/3", 1, 3), ("2/3", 2, 3)] {
+        let exact = Ratio::new(BigInt::from(numerator), BigInt::from(denominator));
+        decoded::<f32>(text, &exact)?;
+        decoded::<f64>(text, &exact)?;
+    }
+    decoded::<f32>(
+        "16777217/2",
+        &Ratio::new(BigInt::from(16_777_217), BigInt::from(2)),
+    )?;
+    decoded::<f64>(
+        "9007199254740993/2",
+        &Ratio::new(BigInt::from(9_007_199_254_740_993_i64), BigInt::from(2)),
+    )?;
+    let context = ArithmeticContext::new()?;
+    let normal = "1/85070591730234615865843651857942052864";
+    let subnormal = "1/170141183460469231731687303715884105728";
+    for (text, exponent) in [(normal, 126), (subnormal, 127)] {
+        let exact = Ratio::new(BigInt::one(), BigInt::one() << exponent);
+        decoded::<f32>(text, &exact)?;
+    }
+    assert_eq!(
+        NumericLiteral::new(normal, LiteralLimits::default())?
+            .decode::<f32>(&context)?
+            .displacement()
+            .get(),
+        0.0
+    );
+    assert!(
+        NumericLiteral::new(subnormal, LiteralLimits::default())?
+            .decode::<f32>(&context)?
+            .displacement()
+            .get()
+            > 0.0
+    );
+    for (text, wide) in [("1e39/1", false), ("1e309/1", true)] {
+        let literal = NumericLiteral::new(text, LiteralLimits::default())?;
+        let result = if wide {
+            literal.decode::<f64>(&context).map(|_| ())
+        } else {
+            literal.decode::<f32>(&context).map(|_| ())
+        };
+        let Err(fault) = result else {
+            panic!("range overflow must refuse");
+        };
+        assert_eq!(fault, ArithmeticFailure::LiteralRange);
+    }
+    Ok(())
+}
+
+/// Fresh literal owners retain the measured scan and numerical Work on refusal.
+fn fraction_boundary<P: Binary>(text: &str, needed: u64) -> TestResult {
+    let context = ArithmeticContext::new()?;
+    for limit in [needed, needed - 1] {
+        let literal = NumericLiteral::new(text, LiteralLimits::new(128, 1024, limit))?;
+        let mut used = 0;
+        let result = literal.decode_with_work::<P>(&context, &mut used);
+        if limit == needed {
+            assert_eq!(result?.work_used(), needed);
+            assert_eq!(used, needed);
+        } else {
+            let Err(fault) = result else {
+                panic!("one-below exact fraction Work must refuse");
+            };
+            assert_eq!(fault, ArithmeticFailure::ResourceLimit);
+            assert_eq!(used, limit);
+        }
+    }
+    Ok(())
+}
+
+/// Exact fraction imports enforce measured Work limits and report consumed Work on atomic one-below refusal.
+/// ´claim:scalar:literal-exact-fraction-work-boundaries´
+/// ´test:integration:literal-exact-fraction-work-boundaries´
+#[test]
+fn literal_exact_fraction_work_boundaries() -> TestResult {
+    for (text, needed) in [("3/2", 26), ("-3/4", 35), ("1/1024", 59)] {
+        fraction_boundary::<f32>(text, needed)?;
+        fraction_boundary::<f64>(text, needed)?;
+    }
+    fraction_boundary::<f32>("16777215/2", 82)?;
+    fraction_boundary::<f64>("9007199254740991/2", 146)
 }
