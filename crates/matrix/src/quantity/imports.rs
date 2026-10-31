@@ -77,6 +77,7 @@ impl QuantityContext {
         )?;
         Ok(Quantity {
             binding: Rc::new(binding),
+            counts: None,
             role: PhantomData,
         })
     }

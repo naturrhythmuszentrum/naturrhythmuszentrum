@@ -2,6 +2,7 @@
 //! Exact finite counts share their checked source owner and never enter a floating arena.
 
 mod arithmetic;
+mod materialize;
 mod ratio;
 
 pub use ratio::ExactCountRatio;

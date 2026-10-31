@@ -49,6 +49,7 @@ impl QuantityContext {
         let result = self.sum(heap, left, right, BinaryOp::Subtract, budget)?;
         Ok(Quantity {
             binding: result.binding,
+            counts: result.counts,
             role: PhantomData,
         })
     }
@@ -66,6 +67,7 @@ impl QuantityContext {
         let result = self.sum(heap, point, difference, BinaryOp::Add, budget)?;
         Ok(Quantity {
             binding: result.binding,
+            counts: result.counts,
             role: PhantomData,
         })
     }
@@ -124,12 +126,15 @@ impl QuantityContext {
         let checked = draft
             .quantity_sum(left.descriptor(), right.descriptor(), &output)?
             .check(self.execution)?;
-        self.execute(
+        let counts = super::lineage::merge(&left.counts, &right.counts, budget)?;
+        let mut result = self.execute(
             heap,
             checked,
             vec![left.binding().clone(), right.binding().clone()],
             budget,
-        )
+        )?;
+        result.counts = counts;
+        Ok(result)
     }
 }
 

@@ -20,6 +20,8 @@ struct Data {
     value: Rational,
     /// Both original counts remain visible, including the nonzero divisor obligation.
     operands: [CountQuantity; 2],
+    /// Conservative retained ratio and complete count-source envelope.
+    bytes: u64,
 }
 
 impl ExactCountRatio {
@@ -32,6 +34,11 @@ impl ExactCountRatio {
     #[must_use]
     pub fn exact(&self) -> &Rational {
         &self.0.value
+    }
+    /// Conservative logical bytes of this exact ratio and both retained count lineages.
+    #[must_use]
+    pub fn retained_payload_bytes(&self) -> u64 {
+        self.0.bytes
     }
     /// Original ordered numerator and denominator with their exact count evidence.
     #[must_use]
@@ -80,11 +87,12 @@ impl QuantityContext {
             .and_then(|bytes| bytes.checked_add(components.0.div_ceil(8)))
             .and_then(|bytes| bytes.checked_add(components.1.div_ceil(8)))
             .ok_or(CountError::Capacity)?;
-        envelope(bytes, depth, budget)?;
+        let bytes = envelope(bytes, depth, budget)?;
         Ok(ExactCountRatio(Rc::new(Data {
             descriptor,
             value,
             operands: [left.clone(), right.clone()],
+            bytes,
         })))
     }
 }

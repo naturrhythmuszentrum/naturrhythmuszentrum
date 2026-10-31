@@ -50,6 +50,7 @@ impl QuantityContext {
         let output = self.map(heap, input, map, budget)?;
         Ok(Quantity {
             binding: output.binding,
+            counts: input.counts.clone(),
             role: PhantomData,
         })
     }
@@ -76,6 +77,7 @@ impl QuantityContext {
         Ok(NormalizedQuantity {
             value: Quantity {
                 binding: value.binding,
+                counts: value.counts,
                 role: PhantomData,
             },
             map: retained,
@@ -157,7 +159,9 @@ impl QuantityContext {
             ConversionMode::Deterministic,
         )?;
         let operation = OperationDraft::convert(vec![contract]).check(self.execution)?;
-        self.execute(heap, operation, vec![input.binding().clone()], budget)
+        let mut output = self.execute(heap, operation, vec![input.binding().clone()], budget)?;
+        output.counts.clone_from(&input.counts);
+        Ok(output)
     }
 
     /// Keep distinct source/target scalar types while reusing the same precision transaction.
@@ -181,6 +185,7 @@ impl QuantityContext {
         let output = Self::publish(heap, binding, symbols, budget)?;
         Ok(Quantity {
             binding: output.binding,
+            counts: input.counts.clone(),
             role: PhantomData,
         })
     }

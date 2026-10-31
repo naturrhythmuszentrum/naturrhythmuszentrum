@@ -61,6 +61,7 @@ impl QuantityContext {
             .clone();
         let result = Quantity {
             binding: Rc::new(result),
+            counts: None,
             role: PhantomData,
         };
         let candidate = bound.evaluate(bound.normalized_inputs()?)?;

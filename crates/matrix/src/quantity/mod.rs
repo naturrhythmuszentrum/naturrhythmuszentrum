@@ -6,6 +6,7 @@ mod conversion;
 mod counts;
 mod execution;
 mod imports;
+mod lineage;
 mod roles;
 mod shapes;
 pub use counts::{CountError, CountHistory, CountQuantity, ExactCountRatio};
@@ -28,6 +29,8 @@ pub struct Quantity<P: Scalar, R: QuantityRole = DynamicRole> {
     binding: Rc<ValueBinding<P>>,
     /// A sealed role can be obtained only after descriptor validation.
     role: PhantomData<R>,
+    /// Original exact count ratios contributing to this numerical quantity.
+    counts: Option<Rc<[ExactCountRatio]>>,
 }
 
 impl<P: Scalar, R: QuantityRole> Quantity<P, R> {
@@ -35,6 +38,14 @@ impl<P: Scalar, R: QuantityRole> Quantity<P, R> {
     #[must_use]
     pub fn descriptor(&self) -> &Descriptor {
         self.binding.symbol().descriptor()
+    }
+
+    /// Original exact count ratios, retained through arithmetic and coordinate conversions.
+    ///
+    /// Entries are source evidence, not claims that a transformed result equals each ratio.
+    #[must_use]
+    pub fn count_ratio_sources(&self) -> &[ExactCountRatio] {
+        self.counts.as_deref().unwrap_or(&[])
     }
 
     /// Original checked symbol, including its immutable graph identity.
@@ -54,6 +65,7 @@ impl<P: Scalar, R: QuantityRole> Quantity<P, R> {
     pub fn dynamic(&self) -> Quantity<P> {
         Quantity {
             binding: Rc::clone(&self.binding),
+            counts: self.counts.clone(),
             role: PhantomData,
         }
     }
@@ -115,6 +127,7 @@ impl QuantityContext {
         allocation::<P>(budget)?;
         Ok(Quantity {
             binding: Rc::new(binding),
+            counts: None,
             role: PhantomData,
         })
     }
@@ -149,6 +162,9 @@ pub enum QuantityError<P: Scalar> {
     /// An evaluated or published candidate failed without exposing any result prefix.
     #[error("quantity execution: {0}")]
     Execution(#[from] crate::Failure<P>),
+    /// The existing scalar literal authority refused numerical representation.
+    #[error("quantity numerical representation: {0}")]
+    Numerical(#[from] nrz_scalar::ArithmeticFailure),
     /// Arithmetic requires explicit conversion to common coordinate scales and origins.
     #[error("quantity arithmetic requires a common measure")]
     CommonMeasure,

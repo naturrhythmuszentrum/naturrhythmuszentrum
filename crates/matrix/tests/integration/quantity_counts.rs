@@ -17,7 +17,7 @@ use std::rc::Rc;
     clippy::default_trait_access,
     reason = "CAS policies are inferred through the bindings facade"
 )]
-fn context() -> TestResult<QuantityContext> {
+pub(super) fn context() -> TestResult<QuantityContext> {
     let mut owner = Context::with_real_symbols(
         Registry::new(ExponentPolicy::Rational),
         Default::default(),

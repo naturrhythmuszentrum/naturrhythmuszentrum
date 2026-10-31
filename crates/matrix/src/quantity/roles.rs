@@ -47,6 +47,7 @@ impl<P: Scalar + 'static, R: QuantityRole> Quantity<P, R> {
         self.check_role(heap, Role::Point, budget)?;
         Ok(Quantity {
             binding: Rc::clone(&self.binding),
+            counts: self.counts.clone(),
             role: PhantomData,
         })
     }
@@ -62,6 +63,7 @@ impl<P: Scalar + 'static, R: QuantityRole> Quantity<P, R> {
         self.check_role(heap, Role::Difference, budget)?;
         Ok(Quantity {
             binding: Rc::clone(&self.binding),
+            counts: self.counts.clone(),
             role: PhantomData,
         })
     }
