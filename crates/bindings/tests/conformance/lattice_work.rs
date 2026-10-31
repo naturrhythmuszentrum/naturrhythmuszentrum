@@ -35,7 +35,7 @@ const COSTS: [Costs; 3] = [
     Costs {
         kind: 0,
         question: 67_825,
-        association: 36_567,
+        association: 33_990,
         authentication: 11,
         question_bytes: 7_025,
         input_bytes: 13_426,
@@ -44,7 +44,7 @@ const COSTS: [Costs; 3] = [
     Costs {
         kind: 1,
         question: 53_780,
-        association: 60_881,
+        association: 56_586,
         authentication: 17,
         question_bytes: 5_711,
         input_bytes: 22_293,
@@ -53,7 +53,7 @@ const COSTS: [Costs; 3] = [
     Costs {
         kind: 2,
         question: 34_395,
-        association: 60_881,
+        association: 56_586,
         authentication: 17,
         question_bytes: 3_297,
         input_bytes: 22_293,
@@ -62,7 +62,7 @@ const COSTS: [Costs; 3] = [
 ];
 
 /// Original physical questions and their associations retain exact figures and add zero CAS records.
-/// ´claim:bindings:lattice-question-costs´
+/// ´claim:bindings:lattice-question-costs´ Frozen input environments reduce association Work to 33990 or 56586 while physical question costs and retained bytes stay fixed.
 /// ´test:integration:bindings-lattice-question-costs´
 #[test]
 fn bindings_lattice_question_costs() -> TestResult {
@@ -95,7 +95,7 @@ fn bindings_lattice_question_costs() -> TestResult {
 }
 
 /// Each question and association owner has one literal N/N−1 pair including prior caller spending.
-/// ´claim:bindings:lattice-question-work´
+/// ´claim:bindings:lattice-question-work´ Literal question and association boundaries retain prior spending and preserve the source graph on one-below refusal.
 /// ´test:integration:bindings-lattice-question-work´
 #[test]
 fn bindings_lattice_question_work() -> TestResult {
@@ -112,10 +112,10 @@ fn bindings_lattice_question_work() -> TestResult {
                 assert_eq!(result?.retained_payload_bytes(), cost.question_bytes);
                 assert_eq!(budget.usage().work, work);
             } else {
-                work_error(
-                    &result.err().ok_or("short physical question accepted")?,
-                    false,
-                )?;
+                let Err(fault) = result else {
+                    panic!("short physical question accepted");
+                };
+                work_error(&fault, false)?;
             }
             assert!(budget.usage().work >= 17);
             assert_eq!(fixture.frame.cas.counts(), before);
@@ -131,10 +131,10 @@ fn bindings_lattice_question_work() -> TestResult {
                 assert_eq!(result?.operands().len(), cost.inputs);
                 assert_eq!(budget.usage().work, work);
             } else {
-                work_error(
-                    &result.err().ok_or("short input association accepted")?,
-                    true,
-                )?;
+                let Err(fault) = result else {
+                    panic!("short input association accepted");
+                };
+                work_error(&fault, true)?;
             }
             assert!(budget.usage().work >= 17);
             assert_eq!(fixture.frame.cas.counts(), before);
@@ -170,7 +170,7 @@ fn authenticate(case: &LatticeDecisionCase, cost: &Costs) -> TestResult {
 }
 
 /// One caller ledger accumulates question, association and authentication without private resets.
-/// ´claim:bindings:lattice-question-cumulative-work´
+/// ´claim:bindings:lattice-question-cumulative-work´ One caller ledger accumulates the measured question, association and authentication costs without refunding refusal Work.
 /// ´test:integration:bindings-lattice-question-cumulative-work´
 #[test]
 fn bindings_lattice_question_cumulative_work() -> TestResult {
@@ -194,10 +194,10 @@ fn bindings_lattice_question_cumulative_work() -> TestResult {
                 result?;
                 assert_eq!(budget.usage().work, work);
             } else {
-                work_error(
-                    &result.err().ok_or("short complete question accepted")?,
-                    false,
-                )?;
+                let Err(fault) = result else {
+                    panic!("short complete question accepted");
+                };
+                work_error(&fault, false)?;
             }
             assert_eq!(case.question(), fixture.index.question());
             assert_eq!(fixture.frame.cas.counts(), before);

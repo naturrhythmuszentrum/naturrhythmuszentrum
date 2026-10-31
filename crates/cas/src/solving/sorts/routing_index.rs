@@ -39,14 +39,14 @@ pub(super) fn resolve(
     while let Some((index, exiting)) = pending.pop() {
         let id = *headers.get(&index).ok_or_else(invalid)?;
         let header = cas.state.header(id)?;
-        budget.work(size(header.declarations.len().saturating_add(1), AT)?, AT)?;
+        budget.work(size(header.declarations().len().saturating_add(1), AT)?, AT)?;
         if exiting {
-            for declaration in &header.declarations {
+            for declaration in header.declarations() {
                 active.remove(declaration.key.as_str());
             }
             continue;
         }
-        insert(&mut active, id, &header.declarations, budget)?;
+        insert(&mut active, id, header.declarations(), budget)?;
         if let Some(queries) = uses.get(&index) {
             resolve_uses(
                 cas,
@@ -195,7 +195,7 @@ fn scratch(
     for id in headers.values() {
         budget.work(256, AT)?;
         bytes = bytes.saturating_add(
-            size(cas.state.header(*id)?.declarations.len(), AT)?.saturating_mul(256),
+            size(cas.state.header(*id)?.declarations().len(), AT)?.saturating_mul(256),
         );
     }
     for queries in uses.values() {

@@ -61,6 +61,32 @@ impl From<Rational> for ExactConstant {
 }
 
 impl ExactConstant {
+    /// Compare the existing normalized structural identity on a caller's ledger.
+    ///
+    /// This is exact representation equality, not a general mathematical identity proof.
+    /// # Errors
+    /// Refuses exhausted comparison Work before comparing variable-size payloads.
+    pub fn structurally_equal(&self, other: &Self, budget: &mut Budget) -> Result<bool, Fault> {
+        let at = crate::Location::new("exact constant structural comparison");
+        let bytes = match (&self.0, &other.0) {
+            (Value::Rational(left), Value::Rational(right)) => {
+                let left = left.component_bits();
+                let right = right.component_bits();
+                left.0
+                    .min(right.0)
+                    .div_ceil(8)
+                    .saturating_add(left.1.min(right.1).div_ceil(8))
+            }
+            (Value::Expression(left), Value::Expression(right)) => {
+                crate::graph::size(left.key.len().min(right.key.len()), at)?
+            }
+            (Value::Rational(_), Value::Expression(_))
+            | (Value::Expression(_), Value::Rational(_)) => 0,
+        };
+        budget.work(bytes.saturating_add(1), at)?;
+        Ok(self == other)
+    }
+
     /// Literal zero, without an allocation or a numerical evaluation.
     #[must_use]
     pub fn zero() -> Self {

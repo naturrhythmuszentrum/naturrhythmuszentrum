@@ -47,6 +47,8 @@ pub struct DeclarationSpaceDraft {
 pub enum HeaderDraft {
     /// Existing space-free declaration language.
     Core(Environment),
+    /// Shared checked declarations, authenticated under their frozen admission policy.
+    Frozen(crate::header::FrozenEnvironment),
     /// Conservative addition of fresh declarations to an earlier header.
     Extend {
         /// Earlier header whose signatures remain unchanged.
@@ -195,15 +197,22 @@ pub(crate) struct Header {
     /// Installed scalar specification nodes, independent of distribution spaces.
     pub(crate) scalar_spaces: Vec<LogicalId>,
     /// Full inherited and fresh scalar signatures.
-    pub(crate) environment: Environment,
-    /// Canonical complete declaration signature.
-    pub(crate) bytes: Vec<u8>,
+    pub(crate) environment: crate::header::FrozenEnvironment,
     /// Earlier conservative parent, absent for Core.
     pub(crate) parent: Option<LogicalId>,
     /// Fresh declaration records for this header only.
-    pub(crate) declarations: Vec<Declaration>,
+    pub(crate) declarations: Option<Vec<Declaration>>,
     /// Fresh space-dependent declaration links.
     pub(crate) spaces: Vec<(String, LogicalId)>,
+}
+
+impl Header {
+    /// Core headers borrow their frozen table; extensions retain only their fresh declarations.
+    pub(crate) fn declarations(&self) -> &[Declaration] {
+        self.declarations
+            .as_deref()
+            .unwrap_or(&self.environment.declarations)
+    }
 }
 
 /// Graph-owned exact region syntax.

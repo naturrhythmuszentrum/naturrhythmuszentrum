@@ -9,6 +9,8 @@
 
 pub use crate::graph::AssumptionDraft;
 
+pub use crate::header::FrozenEnvironment;
+
 pub use crate::domain_model::{
     AmbientDomain, BoundaryDraft, CaseArmDraft, CasesDraft, ContextDraft, DeclarationSpaceDraft,
     HeaderDraft, HypothesisRef, Layer, RegionDraft, RegionExpr, Side, SpaceDraft,

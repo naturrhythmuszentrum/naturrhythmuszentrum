@@ -16,9 +16,13 @@ pub use imports::QuantityInput;
 pub use roles::{DifferenceRole, DynamicRole, PointRole, QuantityRole};
 
 use crate::{ExecutionLimits, Heap, HeapError, ShapeLimits, ValueBinding, ValueView};
-use nrz_bindings::{Budget, CheckedDeclarations, Descriptor, QuantitySymbol};
+use nrz_bindings::{Budget, CheckedDeclarations, Descriptor, QuantitySymbol, SymbolSchema};
 use nrz_scalar::Scalar;
-use std::{marker::PhantomData, rc::Rc};
+use std::{
+    marker::PhantomData,
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 /// A selected quantity, retaining its existing descriptor, versions and companion bindings.
 ///
@@ -89,12 +93,14 @@ pub struct QuantityContext {
     shapes: ShapeLimits,
     /// Existing numerical scan, kernel and scratch ceilings.
     execution: ExecutionLimits,
+    /// One compatible frozen declaration schema, shared only by this immutable snapshot owner.
+    schema: Arc<Mutex<Option<SymbolSchema>>>,
 }
 
 impl QuantityContext {
     /// Retain a checked declaration owner and explicit existing numerical policies.
     #[must_use]
-    pub const fn new(
+    pub fn new(
         declarations: Rc<CheckedDeclarations>,
         shapes: ShapeLimits,
         execution: ExecutionLimits,
@@ -103,6 +109,7 @@ impl QuantityContext {
             declarations,
             shapes,
             execution,
+            schema: Arc::new(Mutex::new(None)),
         }
     }
 

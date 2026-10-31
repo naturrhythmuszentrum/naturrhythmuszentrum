@@ -146,7 +146,7 @@ fn kernel_mapped_family_lifecycle() -> TestResult {
     };
     assert!(matches!(fault, LiveDecisionError::Retired));
     assert_eq!(heap.provenance_usage(), heap_before);
-    assert_eq!(setup.usage().work, 97_513);
+    assert_eq!(setup.usage().work, 95_795);
     assert_eq!(captured - 17, 2952);
     assert_eq!(traced - captured, 351_397);
     assert_eq!(selected - traced, 365_135);
@@ -155,7 +155,7 @@ fn kernel_mapped_family_lifecycle() -> TestResult {
     assert_eq!(current - publication, 191);
     assert_eq!(budget.usage().work - current, 35);
     assert_eq!(budget.usage().work, 727_192);
-    assert_eq!(setup.usage().work + budget.usage().work - 17, 824_688);
+    assert_eq!(setup.usage().work + budget.usage().work - 17, 822_970);
     assert_eq!(retained, 10_408);
     assert_eq!(exported, 2877);
     assert_eq!(bytes.len(), 2877);

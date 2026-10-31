@@ -133,10 +133,19 @@ fn reference(value: &Reference, out: &mut Encoder<'_>) -> Result<(), Fault> {
     }
 }
 
-/// Account for all caller-owned drafts before copying the published graph.
-pub(crate) fn draft_payload(drafts: &[Draft], budget: &mut Budget) -> Result<u64, Fault> {
+/// Scratch containment and actual copying differ for a shared frozen environment.
+pub(crate) struct DraftPayload {
+    /// Conservative simultaneous ownership, including referenced immutable declarations.
+    pub(crate) bytes: u64,
+    /// Only metadata actually copied by this admission, excluding shared declarations.
+    pub(crate) work: u64,
+}
+
+/// Account for all caller-owned drafts and retained declaration authority before admission.
+pub(crate) fn draft_payload(drafts: &[Draft], budget: &mut Budget) -> Result<DraftPayload, Fault> {
     budget.check(BudgetKind::StagedVertices, size(drafts.len(), AT)?, AT)?;
     let mut total = 0_u64;
+    let mut work = 0_u64;
     for draft in drafts {
         match draft {
             Draft::Source { text, .. } => {
@@ -153,12 +162,26 @@ pub(crate) fn draft_payload(drafts: &[Draft], budget: &mut Budget) -> Result<u64
             .checked_mul(3)
             .and_then(|n| n.checked_add(256))
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+        work = work
+            .checked_add(amount)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
+        let retained = if let Draft::Header(crate::domain_model::HeaderDraft::Frozen(value)) = draft
+        {
+            // Preserve the prior complete-header containment without charging a skipped copy.
+            size(value.canonical_bytes().len(), AT)?
+                .saturating_add(1)
+                .saturating_sub(size(bytes.len(), AT)?)
+                .saturating_mul(3)
+        } else {
+            0
+        };
         total = total
             .checked_add(amount)
+            .and_then(|sum| sum.checked_add(retained))
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
         budget.check(BudgetKind::StagedPayloadBytes, total, AT)?;
     }
-    Ok(total)
+    Ok(DraftPayload { bytes: total, work })
 }
 
 /// Measure a draft's complete nonrecursive payload through a bounded key sink.

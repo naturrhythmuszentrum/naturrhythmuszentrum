@@ -3,10 +3,12 @@
 
 use crate::budget::{Budget, BudgetKind};
 use crate::domain_model::{DeclarationSpaceDraft, Header, HeaderDraft};
-use crate::encoding::{self, Encoder};
+
+mod frozen;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Edge, LogicalId, State, Vertex, position_u32, size};
 use crate::model::{Declaration, Operator, Sort};
+pub use frozen::FrozenEnvironment;
 
 /// Header admission and embedding location.
 const AT: Location = Location::new("semantic header");
@@ -22,17 +24,15 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         let (parent, environment, declarations, spaces) = match draft {
-            HeaderDraft::Core(environment) => {
-                if environment
-                    .declarations
-                    .iter()
-                    .any(|item| space_sort(&item.sort))
-                {
-                    return Err(Fault::invalid(InvalidCode::Context, AT));
-                }
-                let environment = crate::validation::environment(environment, budget)?;
-                let declarations = environment.declarations.clone();
-                (None, environment, declarations, Vec::new())
+            HeaderDraft::Core(environment) => (
+                None,
+                FrozenEnvironment::freeze(environment, budget)?,
+                None,
+                Vec::new(),
+            ),
+            HeaderDraft::Frozen(environment) => {
+                environment.authenticate(budget)?;
+                (None, environment.clone(), None, Vec::new())
             }
             HeaderDraft::Extend {
                 parent,
@@ -41,7 +41,7 @@ impl Cas {
             } => {
                 let parent = self.resolve(state, parent, locals)?;
                 let inherited = state.header(parent)?;
-                let mut environment = inherited.environment.clone();
+                let mut environment = inherited.environment.environment().clone();
                 for declaration in declarations {
                     if declaration_index(
                         &inherited.environment.declarations,
@@ -64,17 +64,18 @@ impl Cas {
                 sort_declarations(&mut declarations, budget, AT)?;
                 let spaces =
                     self.declaration_spaces(state, &declarations, spaces, locals, budget)?;
-                (Some(parent), environment, declarations, spaces)
+                (
+                    Some(parent),
+                    FrozenEnvironment::validated(environment, budget)?,
+                    Some(declarations),
+                    spaces,
+                )
             }
         };
-        let mut out = Encoder::new(budget, AT);
-        encoding::environment(&environment, &mut out)?;
-        let bytes = out.finish();
         let scalar_spaces = self.registered_scalar_spaces(state, pending, budget)?;
         let header = Header {
             scalar_spaces,
             environment,
-            bytes,
             parent,
             declarations,
             spaces,

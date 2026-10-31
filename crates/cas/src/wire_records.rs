@@ -504,9 +504,9 @@ fn describe_header(
     if let Some(parent) = value.parent {
         object(out, &mut record.references, parent)?;
     }
-    let mut environment = value.environment.clone();
+    let mut environment = value.environment.environment().clone();
     if value.parent.is_some() {
-        environment.declarations.clone_from(&value.declarations);
+        environment.declarations = value.declarations().to_vec();
     }
     encoding::environment(&environment, out)?;
     out.count(value.scalar_spaces.len())?;

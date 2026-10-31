@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Closed CAS association edges join independently declared symbols without growing headers.
 
-use super::{AdmissionError, BindingSymbols, CompanionKind, QuantitySymbol, SymbolKind};
+use super::{
+    AdmissionError, BindingSymbols, CompanionKind, QuantitySymbol, SymbolKind, SymbolSchema,
+};
 use crate::{Descriptor, UncertaintyMode, uncertainty};
 use nrz_cas::syntax::{
     AtomicSort, Declaration, Draft, Environment, ExpressionDraft, Extent, Field, Operator, Sort,
     SymbolRelation as CasRelation,
 };
-use nrz_cas::{Cas, Handle, Reference, domain::HeaderDraft, limits::Budget};
+use nrz_cas::{
+    Cas, Handle, Reference,
+    domain::{FrozenEnvironment, HeaderDraft},
+    limits::Budget,
+};
 use std::{cell::RefCell, rc::Rc};
 
 /// Mutable construction state; previously admitted graph nodes remain immutable.
@@ -67,6 +73,53 @@ struct Plan {
     relations: Vec<Option<usize>>,
 }
 
+/// Validate physical companion meaning before freezing the exact mathematical declarations.
+pub(super) fn freeze_environment(
+    quantity: &Descriptor,
+    shape: [u32; 2],
+    companions: [bool; 2],
+    budget: &mut Budget,
+) -> Result<FrozenEnvironment, AdmissionError> {
+    if companions[1] && !companions[0] {
+        return Err(AdmissionError::CompanionMismatch);
+    }
+    if companions[0] {
+        uncertainty(UncertaintyMode::Radius, quantity, None, None)?;
+    }
+    let environment = environment(&atomic(shape), companions, 0);
+    Ok(FrozenEnvironment::freeze(&environment, budget)?)
+}
+
+/// Each admitted bundle owns an independent graph while borrowing only the frozen environment.
+pub(super) fn declare_schema(
+    schema: &SymbolSchema,
+    budget: &mut Budget,
+) -> Result<BindingSymbols, AdmissionError> {
+    let data = &schema.0;
+    let radius = data.companions[0]
+        .then(|| uncertainty(UncertaintyMode::Radius, &data.quantity, None, None))
+        .transpose()?;
+    let plan = plan(
+        &atomic(data.shape),
+        data.companions,
+        None,
+        0,
+        Some(&data.environment),
+    );
+    let mut cas = Cas::new(budget.limits().clone())?;
+    let handles = cas.admit(&plan.drafts, budget)?;
+    let graph = Rc::new(RefCell::new(Store { cas, next: 1 }));
+    assemble(
+        &graph,
+        &data.quantity,
+        radius.as_ref(),
+        data.shape,
+        None,
+        &plan,
+        &handles,
+    )
+}
+
 /// Construct one bounded symbol bundle using one caller-owned CAS ledger.
 pub(crate) fn declare(
     quantity: &Descriptor,
@@ -102,7 +155,7 @@ pub(crate) fn declare(
         .ok_or(AdmissionError::ResourceLimit)?;
     let sort = atomic(shape);
     let local_source = source.filter(|symbol| matches!(symbol.0.graph, Authority::Local(_)));
-    let plan = plan(&sort, companions, local_source, state.next);
+    let plan = plan(&sort, companions, local_source, state.next, None);
     let handles = state.cas.admit(&plan.drafts, budget)?;
     state.next = next;
     drop(state);
@@ -132,6 +185,7 @@ fn plan(
     companions: [bool; 2],
     source: Option<&QuantitySymbol>,
     serial: u64,
+    frozen: Option<&FrozenEnvironment>,
 ) -> Plan {
     let mut plan = Plan {
         companions,
@@ -147,21 +201,11 @@ fn plan(
             plan.kinds.push(SymbolKind::Companion(kind));
         }
     }
-    let declarations = (0..plan.kinds.len())
-        .map(|index| {
-            let key = format!("q{serial:020}_{index}");
-            Declaration {
-                display_name: key.clone(),
-                key,
-                sort: Sort::Value(sort.clone()),
-            }
-        })
-        .collect();
-    plan.drafts
-        .push(Draft::Header(HeaderDraft::Core(Environment {
-            declarations,
-            ..Environment::default()
-        })));
+    let header = frozen.map_or_else(
+        || HeaderDraft::Core(environment(sort, companions, serial)),
+        |environment| HeaderDraft::Frozen(environment.clone()),
+    );
+    plan.drafts.push(Draft::Header(header));
     for index in 0..plan.kinds.len() {
         plan.drafts.push(expression(
             Operator::Free(format!("q{serial:020}_{index}")),
@@ -171,6 +215,25 @@ fn plan(
     }
     relation_nodes(&mut plan, source);
     plan
+}
+
+/// The closed declaration vocabulary is constructed only at its explicit freeze boundary.
+fn environment(sort: &AtomicSort, companions: [bool; 2], serial: u64) -> Environment {
+    let count = 1 + usize::from(companions[0]) + usize::from(companions[1]);
+    let declarations = (0..count)
+        .map(|index| {
+            let key = format!("q{serial:020}_{index}");
+            Declaration {
+                display_name: key.clone(),
+                key,
+                sort: Sort::Value(sort.clone()),
+            }
+        })
+        .collect();
+    Environment {
+        declarations,
+        ..Environment::default()
+    }
 }
 
 /// These constructors declare associations and never grant arithmetic proof authority.

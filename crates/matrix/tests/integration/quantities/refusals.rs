@@ -255,3 +255,83 @@ fn quantity_published_axes_and_snapshots_remain_checked() -> TestResult {
     assert_eq!(heap.provenance_usage(), usage);
     Ok(())
 }
+
+/// Numerical refusal cannot publish a new schema or evict an existing compatible authority.
+/// ´test:integration:quantity-schema-publication-is-atomic´
+/// ´claim:matrix:quantity-schema-publication´ A late narrowing refusal leaves a cold schema slot empty and preserves a previously published warm schema and all input versions.
+#[test]
+fn quantity_schema_publication_is_atomic() -> TestResult {
+    let context = context()?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let ordinary = represented(&context, &mut heap, &Descriptor::ratio(), 1.0_f64)?;
+    let overflow = represented(&context, &mut heap, &Descriptor::ratio(), f64::MAX)?;
+    let stamps = [ordinary.view(&heap)?.stamp(), overflow.view(&heap)?.stamp()];
+    for expected in [11_150, 8_129] {
+        let usage = heap.provenance_usage();
+        let mut refused = Budget::new(Limits::default())?;
+        let Err(QuantityError::Execution(fault)) =
+            context.narrow(&mut heap, &overflow, &mut refused)
+        else {
+            panic!("overflow must refuse before schema publication");
+        };
+        assert!(matches!(
+            fault.cause(),
+            nrz_matrix::OperationError::Conversion(nrz_matrix::ConversionError::Arithmetic(
+                nrz_scalar::ArithmeticFailure::Overflow
+            ))
+        ));
+        assert_eq!(refused.usage().work, expected);
+        assert_eq!(heap.provenance_usage(), usage);
+        let mut accepted = Budget::new(Limits {
+            work: expected,
+            ..Limits::default()
+        })?;
+        let output = context.narrow(&mut heap, &ordinary, &mut accepted)?;
+        assert_eq!(accepted.usage().work, expected);
+        assert_eq!(output.view(&heap)?.region().get(0, 0)?, 1.0_f32);
+        assert_eq!(
+            [ordinary.view(&heap)?.stamp(), overflow.view(&heap)?.stamp()],
+            stamps,
+        );
+    }
+    Ok(())
+}
+
+/// A retained environment authenticates policy before the numerical transaction begins.
+/// ´test:integration:quantity-retained-policy-is-checked´
+/// ´claim:matrix:quantity-retained-policy´ A changed name-comparison policy refuses a warm quantity schema without changing the heap or evicting compatible authority.
+#[test]
+fn quantity_retained_policy_is_checked() -> TestResult {
+    let context = context()?;
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let input = represented(&context, &mut heap, &Descriptor::ratio(), 1.0_f64)?;
+    let first = context.narrow(&mut heap, &input, &mut Budget::new(Limits::default())?)?;
+    let usage = heap.provenance_usage();
+    let stamp = first.view(&heap)?.stamp();
+    let mut budget = Budget::new(Limits {
+        name_bytes: 255,
+        ..Limits::default()
+    })?;
+    let Err(QuantityError::Operation(error)) = context.narrow(&mut heap, &input, &mut budget)
+    else {
+        panic!("changed retained policy must refuse");
+    };
+    let nrz_matrix::OperationError::Heap(HeapError::Symbols(
+        nrz_bindings::AdmissionError::Algebra(fault),
+    )) = *error
+    else {
+        panic!("expected frozen environment policy refusal");
+    };
+    assert_eq!(
+        fault.kind,
+        nrz_bindings::readings::algebra::FaultKind::Invalid(
+            nrz_bindings::readings::algebra::InvalidCode::Policy,
+        ),
+    );
+    assert!(budget.usage().work > 0);
+    assert_eq!(heap.provenance_usage(), usage);
+    assert_eq!(first.view(&heap)?.stamp(), stamp);
+    let second = context.narrow(&mut heap, &input, &mut Budget::new(Limits::default())?)?;
+    assert_ne!(first.symbol(), second.symbol());
+    Ok(())
+}

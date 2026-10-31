@@ -179,10 +179,9 @@ impl QuantityContext {
         let contract = PrecisionContract::new(shape, input.descriptor())?;
         let operation = OperationDraft::precision(vec![contract], P::PRECISION, Q::PRECISION)
             .check(self.execution)?;
-        let symbols = Self::outputs(&operation, budget)?;
         let binding =
             Binding::convert_precision(operation, vec![input.binding().handle()], self.execution);
-        let output = Self::publish(heap, binding, symbols, budget)?;
+        let output = self.finish(heap, binding, budget)?;
         Ok(Quantity {
             binding: output.binding,
             counts: input.counts.clone(),

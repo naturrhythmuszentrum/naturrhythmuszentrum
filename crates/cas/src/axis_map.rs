@@ -93,7 +93,7 @@ impl Mapping {
     ) -> Result<(), Fault> {
         let old = cas.state.header(left)?;
         let new = cas.state.header(right)?;
-        let mut expected = old.environment.clone();
+        let mut expected = old.environment.environment().clone();
         for declaration in &mut expected.declarations {
             budget.work(1, AT)?;
             if let Some(key) = self.coordinates.get(&declaration.key) {
@@ -114,7 +114,7 @@ impl Mapping {
             .parent
             .map(|id| self.headers.get(&id).copied().ok_or_else(invalid))
             .transpose()?;
-        if expected != new.environment
+        if &expected != new.environment.environment()
             || parent != new.parent
             || old.scalar_spaces != new.scalar_spaces
             || old.spaces.len() != new.spaces.len()

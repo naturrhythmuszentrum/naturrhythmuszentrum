@@ -199,7 +199,7 @@ fn kernel_physical_family_lifecycle() -> TestResult {
     };
     assert!(matches!(fault, LiveDecisionError::Retired));
     assert_eq!(heap.provenance_usage(), heap_before);
-    assert_eq!(setup.usage().work, 96_200);
+    assert_eq!(setup.usage().work, 94_482);
     assert_eq!(captured - 17, 2952);
     assert_eq!(traced - captured, 312_744);
     assert_eq!(selected - traced, 328_319);
@@ -208,7 +208,7 @@ fn kernel_physical_family_lifecycle() -> TestResult {
     assert_eq!(current - publication, 191);
     assert_eq!(budget.usage().work - current, 35);
     assert_eq!(budget.usage().work, 650_110);
-    assert_eq!(setup.usage().work + budget.usage().work - 17, 746_293);
+    assert_eq!(setup.usage().work + budget.usage().work - 17, 744_575);
     assert_eq!(retained, 8672);
     assert_eq!(exported, 2487);
     assert_eq!(bytes.len(), 2487);

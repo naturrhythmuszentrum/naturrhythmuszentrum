@@ -61,7 +61,7 @@ struct Plan {
 impl Plan {
     /// Append one metered typed draft, returning only a backward local reference.
     fn push(&mut self, node: Draft, budget: &mut Budget) -> Result<Reference, Fault> {
-        let bytes = crate::validation::draft_payload(std::slice::from_ref(&node), budget)?;
+        let bytes = crate::validation::draft_payload(std::slice::from_ref(&node), budget)?.bytes;
         self.bytes = self
             .bytes
             .checked_add(bytes)
@@ -367,7 +367,7 @@ impl Cas {
         let header = self.state.header(header_id)?;
         let mut result = BTreeMap::new();
         for substitution in substitutions {
-            budget.work(size(header.bytes.len(), AT)?, AT)?;
+            budget.work(size(header.environment.canonical_bytes().len(), AT)?, AT)?;
             let id = self.checked(&substitution.replacement)?;
             *workspace = self.prepay_transform(id, None, *workspace, budget)?;
             let value = self.state.expression(id)?;
@@ -413,7 +413,7 @@ impl Cas {
         }
         let length = scope.len().checked_sub(1).ok_or_else(invalid)?;
         let outer = scope.get(..length).ok_or_else(invalid)?.to_vec();
-        let header_bytes = &self.state.header(header)?.bytes;
+        let header_bytes = self.state.header(header)?.environment.canonical_bytes();
         let mut result = Vec::new();
         result
             .try_reserve_exact(replacements.len())

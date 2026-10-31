@@ -50,8 +50,9 @@ impl Fixture {
     /// Build identical fresh stores for every measured success or refusal.
     fn new() -> TestResult<Self> {
         let descriptor = celsius()?;
+        let declarations = crate::conversion_testing::reference_owner(&descriptor)?;
         let context = QuantityContext::new(
-            crate::conversion_testing::reference_owner(&descriptor)?,
+            std::rc::Rc::clone(&declarations),
             ShapeLimits::default(),
             ExecutionLimits::default(),
         );
@@ -73,6 +74,11 @@ impl Fixture {
             Some("origin"),
             &mut Budget::new(Limits::default())?,
         )?;
+        let context = QuantityContext::new(
+            declarations,
+            ShapeLimits::default(),
+            ExecutionLimits::default(),
+        );
         Ok(Self {
             context,
             heap,
@@ -168,15 +174,15 @@ fn quantity_operation_work_boundaries() -> TestResult {
         (Action::Import, 2),
         (Action::Point, 1),
         (Action::Difference, 1),
-        (Action::Add, 12_008),
-        (Action::Subtract, 12_008),
-        (Action::PointDifference, 12_008),
-        (Action::Translate, 12_008),
-        (Action::Convert, 12_008),
-        (Action::Normalize, 12_008),
-        (Action::Restore, 12_008),
-        (Action::Narrow, 12_008),
-        (Action::Widen, 12_008),
+        (Action::Add, 11_150),
+        (Action::Subtract, 11_150),
+        (Action::PointDifference, 11_150),
+        (Action::Translate, 11_150),
+        (Action::Convert, 11_150),
+        (Action::Normalize, 11_150),
+        (Action::Restore, 11_150),
+        (Action::Narrow, 11_150),
+        (Action::Widen, 11_150),
     ] {
         for limit in [needed, needed - 1] {
             let mut fixture = Fixture::new()?;
@@ -231,10 +237,10 @@ fn work_refusal(error: &(dyn std::error::Error + 'static), limit: u64, needed: u
 
 /// A warm store still admits a fresh complete graph owner for each result.
 /// ´test:integration:quantity-warm-conversion-work-boundary´
-/// ´claim:matrix:quantity-warm-conversion-work´ Cold and warm conversions each cost 12008 caller Work and retain distinct complete output symbols.
+/// ´claim:matrix:quantity-warm-conversion-work´ Cold and warm conversions cost 11150 and 8157 caller Work and retain distinct complete output symbols.
 #[test]
 fn quantity_warm_conversion_work_boundary() -> TestResult {
-    for limit in [24_016, 24_015] {
+    for limit in [19_307, 19_306] {
         let mut fixture = Fixture::new()?;
         let target = fixture.point.descriptor().coherent();
         let mut budget = Budget::new(Limits {
@@ -245,15 +251,15 @@ fn quantity_warm_conversion_work_boundary() -> TestResult {
             fixture
                 .context
                 .convert(&mut fixture.heap, &fixture.point, &target, &mut budget)?;
-        assert_eq!(budget.usage().work, 12_008);
+        assert_eq!(budget.usage().work, 11_150);
         let usage = fixture.heap.provenance_usage();
         let result =
             fixture
                 .context
                 .convert(&mut fixture.heap, &fixture.point, &target, &mut budget);
-        if limit == 24_016 {
+        if limit == 19_307 {
             let second = result?;
-            assert_eq!(budget.usage().work - 12_008, 12_008);
+            assert_eq!(budget.usage().work - 11_150, 8_157);
             assert_eq!(first.descriptor(), second.descriptor());
             assert_ne!(first.symbol().node(), second.symbol().node());
             assert_ne!(
@@ -264,11 +270,35 @@ fn quantity_warm_conversion_work_boundary() -> TestResult {
                 first.binding().symbols().error(),
                 second.binding().symbols().error()
             );
+            let third = fixture.context.convert(
+                &mut fixture.heap,
+                &fixture.point,
+                &target,
+                &mut Budget::new(Limits::default())?,
+            )?;
+            assert_ne!(second.symbol(), third.symbol());
+            for (a, b) in [
+                (
+                    second.binding().symbols().bound(),
+                    third.binding().symbols().bound(),
+                ),
+                (
+                    second.binding().symbols().error(),
+                    third.binding().symbols().error(),
+                ),
+            ] {
+                let a = a.ok_or("second companion")?;
+                let b = b.ok_or("third companion")?;
+                assert_ne!(a, b);
+                assert_ne!(a.relation(), b.relation());
+                assert_eq!(a.target(), Some(second.symbol().node()));
+                assert_eq!(b.target(), Some(third.symbol().node()));
+            }
         } else {
             let Err(fault) = result else {
                 panic!("one-below warm conversion must refuse");
             };
-            work_refusal(&fault, 24_015, 24_016)?;
+            work_refusal(&fault, 19_306, 19_307)?;
             assert_eq!(fixture.heap.provenance_usage(), usage);
         }
         assert_eq!(budget.usage().work, limit);
@@ -277,42 +307,55 @@ fn quantity_warm_conversion_work_boundary() -> TestResult {
     Ok(())
 }
 
-/// Array entry work increases without repeating exact symbol construction for every element.
+/// Array entry work increases without repeating environment freezing for a compatible schema.
 /// ´test:integration:quantity-array-conversion-work-boundary´
-/// ´claim:matrix:quantity-array-conversion-work´ A four-entry quantity conversion costs 12011 caller Work and refuses atomically at 12010.
+/// ´claim:matrix:quantity-array-conversion-work´ Four-entry conversions cost 11153 cold or 8132 warm caller Work and refuse atomically one unit below.
 #[test]
 fn quantity_array_conversion_work_boundary() -> TestResult {
-    for limit in [12_011, 12_010] {
-        let context = super::context()?;
-        let mut heap = Heap::new(HeapLimits::default())?;
-        let mut setup = Budget::new(Limits::default())?;
-        let descriptor = Descriptor::ratio();
-        let symbols = BindingSymbols::declare(&descriptor, [4, 1], [false, false], &mut setup)?;
-        let input = context.import(
-            &mut heap,
-            &symbols,
-            QuantityInput::represented(&[1.0_f64, 2.0, 3.0, 4.0]),
-            &mut setup,
-        )?;
-        let usage = heap.provenance_usage();
-        let mut budget = Budget::new(Limits {
-            work: limit,
-            ..Limits::default()
-        })?;
-        let result = context.convert(&mut heap, &input, &descriptor, &mut budget);
-        if limit == 12_011 {
-            assert_eq!(
-                result?.view(&heap)?.region().export()?,
-                [1.0, 2.0, 3.0, 4.0]
-            );
-        } else {
-            let Err(fault) = result else {
-                panic!("one-below array conversion must refuse");
+    for (warm, needed) in [(false, 11_153), (true, 8_132)] {
+        for limit in [needed, needed - 1] {
+            let context = super::context()?;
+            let mut heap = Heap::new(HeapLimits::default())?;
+            let mut setup = Budget::new(Limits::default())?;
+            let descriptor = Descriptor::ratio();
+            let symbols = BindingSymbols::declare(&descriptor, [4, 1], [false, false], &mut setup)?;
+            let input = context.import(
+                &mut heap,
+                &symbols,
+                QuantityInput::represented(&[1.0_f64, 2.0, 3.0, 4.0]),
+                &mut setup,
+            )?;
+            let prior = if warm {
+                Some(context.convert(&mut heap, &input, &descriptor, &mut setup)?)
+            } else {
+                None
             };
-            work_refusal(&fault, 12_010, 12_011)?;
-            assert_eq!(heap.provenance_usage(), usage);
+            let usage = heap.provenance_usage();
+            let stamp = input.view(&heap)?.stamp();
+            let mut budget = Budget::new(Limits {
+                work: limit,
+                ..Limits::default()
+            })?;
+            let result = context.convert(&mut heap, &input, &descriptor, &mut budget);
+            if limit == needed {
+                let output = result?;
+                assert_eq!(output.view(&heap)?.region().export()?, [1.0, 2.0, 3.0, 4.0]);
+                if let Some(prior) = &prior {
+                    assert_ne!(prior.symbol(), output.symbol());
+                }
+            } else {
+                let Err(fault) = result else {
+                    panic!("one-below array conversion must refuse");
+                };
+                work_refusal(&fault, limit, needed)?;
+                assert_eq!(heap.provenance_usage(), usage);
+            }
+            assert_eq!(budget.usage().work, limit);
+            assert_eq!(input.view(&heap)?.stamp(), stamp);
+            if let Some(prior) = prior {
+                prior.view(&heap)?;
+            }
         }
-        assert_eq!(budget.usage().work, limit);
     }
     Ok(())
 }

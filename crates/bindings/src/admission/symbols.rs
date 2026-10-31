@@ -150,7 +150,7 @@ impl BindingSymbols {
         companions: [bool; 2],
         budget: &mut Budget,
     ) -> Result<Self, AdmissionError> {
-        graph::declare(quantity, shape, companions, None, budget)
+        super::SymbolSchema::freeze(quantity, shape, companions, budget)?.declare(budget)
     }
 
     /// Derive fresh result and companion symbols before a selected exact copy runs.

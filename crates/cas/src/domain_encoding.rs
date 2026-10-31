@@ -96,7 +96,7 @@ pub(crate) fn vertex(value: &Vertex, out: &mut Encoder<'_>) -> Result<(), Fault>
             if let Some(parent) = value.parent {
                 encode_id(parent, out)?;
             }
-            encoding::environment(&value.environment, out)?;
+            value.environment.encode(out)?;
             out.count(value.scalar_spaces.len())?;
             for space in &value.scalar_spaces {
                 encode_id(*space, out)?;
@@ -277,6 +277,18 @@ fn header_draft(value: &HeaderDraft, out: &mut Encoder<'_>) -> Result<(), Fault>
         HeaderDraft::Core(environment) => {
             out.byte(0)?;
             encoding::environment(environment, out)
+        }
+        HeaderDraft::Frozen(environment) => {
+            // Draft scratch owns a shared authority, not another declaration-table copy.
+            out.byte(2)?;
+            out.unsigned(crate::graph::size(
+                environment.canonical_bytes().len(),
+                Location::new("frozen header draft"),
+            )?)?;
+            out.unsigned(crate::graph::size(
+                environment.declarations.len(),
+                Location::new("frozen header draft"),
+            )?)
         }
         HeaderDraft::Extend {
             parent,

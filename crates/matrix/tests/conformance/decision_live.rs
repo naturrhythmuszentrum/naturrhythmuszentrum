@@ -399,9 +399,10 @@ fn decision_live_admission_work_boundaries() -> TestResult {
 
 /// Physical source, case, association and every live stage share the original caller allowance.
 /// ´test:integration:decision-live-complete-lc-work-boundaries´
+/// ´claim:matrix:decision-live-complete-lc-work-boundaries´ Frozen input environments reduce complete cumulative LC Work from 282308 to 280590 with atomic one-below refusal.
 #[test]
 fn decision_live_complete_lc_work_boundaries() -> TestResult {
-    for (work, accepted) in [(282_308, true), (282_307, false)] {
+    for (work, accepted) in [(280_590, true), (280_589, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()
@@ -430,10 +431,23 @@ fn decision_live_complete_lc_work_boundaries() -> TestResult {
         )?;
         let published = heap.publish_decision(candidate, &mut budget)?;
         let result = published.count(&heap, 3, &mut budget);
-        assert_eq!(result.is_ok(), accepted);
         if accepted {
             assert_eq!(result?.current(&heap, &mut ledger()?)?.value(), 3);
-            assert_eq!(budget.usage().work, 282_308);
+            assert_eq!(budget.usage().work, 280_590);
+        } else {
+            let Err(LiveDecisionError::Admission(error)) = result else {
+                panic!("one-below complete LC Work must refuse");
+            };
+            let nrz_bindings::DecisionError::Algebra(fault) = *error else {
+                panic!("expected count-construction Work refusal");
+            };
+            assert!(matches!(
+                fault.kind,
+                nrz_bindings::readings::algebra::FaultKind::Exhausted {
+                    budget: nrz_bindings::readings::algebra::limits::BudgetKind::Work,
+                    ..
+                }
+            ));
         }
         let monotone = budget.usage().work >= 17 && budget.usage().work <= work;
         assert!(monotone);
@@ -496,7 +510,7 @@ fn lattice_live_scalar_baseline() -> TestResult {
         graph_records
     );
     assert_eq!(heap.provenance_usage(), records);
-    assert_eq!(originals, 109_290);
+    assert_eq!(originals, 107_572);
     assert_eq!(captured - originals, 2952);
     assert_eq!(selected - captured, 166_952);
     assert_eq!(admitted - selected, 2779);
@@ -505,7 +519,7 @@ fn lattice_live_scalar_baseline() -> TestResult {
     assert_eq!(current - materialized, 66);
     assert_eq!(retired - current, 34);
     assert_eq!(budget.usage().work - retired, 1);
-    assert_eq!(budget.usage().work, 282_392);
+    assert_eq!(budget.usage().work, 280_674);
     assert_eq!(graph_records.vertices, 36);
     assert_eq!(graph_records.edges, 96);
     assert_eq!(records.records(), 0);

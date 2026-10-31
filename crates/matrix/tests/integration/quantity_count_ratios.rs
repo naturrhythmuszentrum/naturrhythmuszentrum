@@ -182,50 +182,72 @@ fn work_refusal<P: Scalar>(error: &QuantityError<P>, limit: u64, needed: u64) ->
     Ok(())
 }
 
-/// Both formats exercise fresh sources and an otherwise empty three-region heap.
+/// Each boundary has a fresh context; warm trials retain one successful import first.
 fn import_boundary<P: Scalar + 'static>() -> TestResult {
-    for limit in [12_104, 12_103] {
-        let context = context()?;
-        let source = ratio(&context, 1, 3)?;
-        let mut heap = Heap::new(HeapLimits::new(3, 3, 2))?;
-        let mut budget = Budget::new(Limits {
-            work: limit,
-            ..Limits::default()
-        })?;
-        let result = context.materialize_count_ratio::<P>(&mut heap, &source, &mut budget);
-        if limit == 12_104 {
-            let [center, total, _] = channels(&result?, &heap)?;
-            assert!(covers(center, total, 1, 3)?);
-            assert_eq!(budget.usage().work, 12_104);
-        } else {
-            let Err(fault) = result else {
-                panic!("one-below import Work must refuse");
+    for (warm, needed) in [(false, 11_246), (true, 8_225)] {
+        for limit in [needed, needed - 1] {
+            let context = context()?;
+            let source = ratio(&context, 1, 3)?;
+            let regions = if warm { 6 } else { 3 };
+            let mut heap = Heap::new(HeapLimits::new(regions, regions, 2))?;
+            let prior = if warm {
+                Some(context.materialize_count_ratio::<P>(
+                    &mut heap,
+                    &source,
+                    &mut Budget::new(Limits::default())?,
+                )?)
+            } else {
+                None
             };
-            work_refusal(&fault, 12_103, 12_104)?;
-            assert!(budget.usage().work > 0);
-            assert!(budget.usage().work <= limit);
-            context.materialize_count_ratio::<P>(
-                &mut heap,
-                &source,
-                &mut Budget::new(Limits::default())?,
-            )?;
+            let usage = heap.provenance_usage();
+            let mut budget = Budget::new(Limits {
+                work: limit,
+                ..Limits::default()
+            })?;
+            let result = context.materialize_count_ratio::<P>(&mut heap, &source, &mut budget);
+            if limit == needed {
+                let output = result?;
+                let [center, total, _] = channels(&output, &heap)?;
+                assert!(covers(center, total, 1, 3)?);
+                assert_eq!(budget.usage().work, needed);
+                if let Some(prior) = &prior {
+                    assert_ne!(prior.symbol(), output.symbol());
+                }
+            } else {
+                let Err(fault) = result else {
+                    panic!("one-below import Work must refuse");
+                };
+                work_refusal(&fault, limit, needed)?;
+                assert!(budget.usage().work > 0);
+                assert!(budget.usage().work <= limit);
+                assert_eq!(heap.provenance_usage(), usage);
+                context.materialize_count_ratio::<P>(
+                    &mut heap,
+                    &source,
+                    &mut Budget::new(Limits::default())?,
+                )?;
+            }
+            if let Some(prior) = prior {
+                let [center, total, _] = channels(&prior, &heap)?;
+                assert!(covers(center, total, 1, 3)?);
+            }
+            assert_eq!(
+                source.operands().each_ref().map(CountQuantity::value),
+                [1, 3]
+            );
         }
-        assert_eq!(
-            source.operands().each_ref().map(CountQuantity::value),
-            [1, 3]
-        );
     }
     Ok(())
 }
 
 /// Exact scalar import and source-retaining arithmetic have literal fresh-store boundaries.
 /// ´test:integration:quantity-count-ratio-materialization-work´
-/// ´claim:matrix:quantity-count-ratio-materialization-work´ Ratio imports require 12104 Work in either format and source-retaining sums require 12010, with atomic refusal one unit below.
+/// ´claim:matrix:quantity-count-ratio-materialization-work´ Ratio imports require 11246 cold or 8225 warm Work in either format and source-retaining warm sums require 8131, with atomic refusal one unit below.
 #[test]
 fn quantity_count_ratio_materialization_work() -> TestResult {
     import_boundary::<f32>()?;
     import_boundary::<f64>()?;
-    for limit in [12_010, 12_009] {
+    for limit in [8_131, 8_130] {
         let context = context()?;
         let source = ratio(&context, 1, 3)?;
         let mut heap = Heap::new(HeapLimits::new(6, 6, 2))?;
@@ -239,14 +261,14 @@ fn quantity_count_ratio_materialization_work() -> TestResult {
             ..Limits::default()
         })?;
         let result = context.add(&mut heap, &input, &input, &mut budget);
-        if limit == 12_010 {
+        if limit == 8_131 {
             assert_eq!(result?.count_ratio_sources().len(), 2);
-            assert_eq!(budget.usage().work, 12_010);
+            assert_eq!(budget.usage().work, 8_131);
         } else {
             let Err(fault) = result else {
                 panic!("one-below sum Work must refuse");
             };
-            work_refusal(&fault, 12_009, 12_010)?;
+            work_refusal(&fault, 8_130, 8_131)?;
             assert!(budget.usage().work > 0);
             assert!(budget.usage().work <= limit);
             context.add(

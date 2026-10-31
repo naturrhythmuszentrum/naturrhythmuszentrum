@@ -120,8 +120,8 @@ impl Cas {
                     restriction: None,
                     frame: Vec::new(),
                     depth: 0,
-                    environment: header.environment.clone(),
-                    header: header.bytes.clone(),
+                    environment: header.environment.environment().clone(),
+                    header: header.environment.canonical_bytes().to_vec(),
                     assumptions,
                     canonical_assumptions,
                 }

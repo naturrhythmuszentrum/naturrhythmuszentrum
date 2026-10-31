@@ -1356,7 +1356,8 @@ impl Cas {
                 crate::solving::graph::preflight(value, budget)?;
             }
         }
-        let pending = crate::validation::draft_payload(drafts, budget)?;
+        let payload = crate::validation::draft_payload(drafts, budget)?;
+        let pending = payload.bytes;
         let reserved = size(self.state.next.len(), at)?
             .checked_mul(64)
             .and_then(|n| n.checked_add(pending))
@@ -1379,7 +1380,7 @@ impl Cas {
         ] {
             storage_check(&self.limits, budget, kind, needed, at)?;
         }
-        budget.work(pending, at)?;
+        budget.work(payload.work, at)?;
         // The fixed vertex-kind inventory bounds checkpoint counter copying.
         budget.work(256, at)?;
         let mut staged = std::mem::replace(&mut self.state, State::new());
@@ -1465,7 +1466,7 @@ impl Cas {
             operands: references,
         };
         let pending =
-            crate::validation::draft_payload(&[Draft::Expression(draft.clone())], budget)?;
+            crate::validation::draft_payload(&[Draft::Expression(draft.clone())], budget)?.bytes;
         let mut staged = std::mem::replace(&mut self.state, State::new());
         let result = self.admit_expression(&mut staged, &draft, &locals, pending, budget);
         self.state = staged;

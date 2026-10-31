@@ -19,6 +19,8 @@ pub(crate) struct Encoder<'a> {
     at: Location,
     /// Byte ceiling appropriate to admission or public export.
     limit: BudgetKind,
+    /// Largest checked name, retained with a frozen canonical signature.
+    name_bytes: usize,
 }
 
 impl<'a> Encoder<'a> {
@@ -34,6 +36,7 @@ impl<'a> Encoder<'a> {
             budget,
             at,
             limit: BudgetKind::PayloadBytes,
+            name_bytes: 0,
         }
     }
 
@@ -44,6 +47,7 @@ impl<'a> Encoder<'a> {
             budget,
             at,
             limit: BudgetKind::OutputBytes,
+            name_bytes: 0,
         }
     }
 
@@ -54,6 +58,7 @@ impl<'a> Encoder<'a> {
             budget,
             at,
             limit: BudgetKind::WitnessBytes,
+            name_bytes: 0,
         }
     }
 
@@ -105,8 +110,26 @@ impl<'a> Encoder<'a> {
                 .map_err(|_| Fault::capacity(BudgetKind::NameBytes, self.at))?,
             self.at,
         )?;
+        self.name_bytes = self.name_bytes.max(value.len());
         self.count(value.len())?;
         self.raw(value.as_bytes())
+    }
+
+    /// Copy a frozen signature while enforcing the names already encoded inside it.
+    pub(crate) fn frozen(&mut self, bytes: &[u8], name_bytes: usize) -> Result<(), Fault> {
+        self.budget.check(
+            BudgetKind::NameBytes,
+            u64::try_from(name_bytes)
+                .map_err(|_| Fault::capacity(BudgetKind::NameBytes, self.at))?,
+            self.at,
+        )?;
+        self.name_bytes = self.name_bytes.max(name_bytes);
+        self.raw(bytes)
+    }
+
+    /// Finish a declaration signature together with its checked name-containment bound.
+    pub(crate) fn finish_names(self) -> (Vec<u8>, usize) {
+        (self.bytes, self.name_bytes)
     }
 
     /// Finish the immutable key.

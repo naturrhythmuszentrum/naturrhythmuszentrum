@@ -62,7 +62,8 @@ fn parse_bounded<'a>(
         originals: cas.counts().original_occurrences,
         vertices: size(cas.counts().vertices, AT).map_err(|fault| input.fault(fault))?,
         scratch: cas.counts().payload_bytes,
-        metadata_bytes: size(header.bytes.len(), AT).map_err(|fault| input.fault(fault))?,
+        metadata_bytes: size(header.environment.canonical_bytes().len(), AT)
+            .map_err(|fault| input.fault(fault))?,
     };
     parser.initialize()?;
     let (drafts, root, end) = parser.parse()?;

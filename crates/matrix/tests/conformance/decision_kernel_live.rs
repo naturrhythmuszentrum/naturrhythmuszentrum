@@ -187,9 +187,9 @@ fn kernel_live_trace_lifecycle() -> TestResult {
     assert_eq!(inspected - exported, 477_740);
     assert_eq!(trace_bytes, 8320);
     assert_eq!(bytes.len(), 1900);
-    assert_eq!(physical.usage().work, 109_290);
+    assert_eq!(physical.usage().work, 107_572);
     assert_eq!(budget.usage().work - current, 35);
-    assert_eq!(physical.usage().work + budget.usage().work - 17, 765_193);
+    assert_eq!(physical.usage().work + budget.usage().work - 17, 763_475);
     Ok(())
 }
 

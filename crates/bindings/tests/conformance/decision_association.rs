@@ -62,7 +62,7 @@ fn decision_association_costs() -> TestResult {
         associated.operands()[1].original()?.descriptor(),
         symbols[1].value().descriptor()
     );
-    assert_eq!(construction, 24_411);
+    assert_eq!(construction, 22_693);
     assert_eq!(budget.usage().work - construction, 8);
     assert_eq!(associated.retained_payload_bytes(), 8996);
     Ok(())
@@ -114,21 +114,33 @@ fn decision_association_refusals() -> TestResult {
 
 /// New association Work is cumulative, including usage spent before either operation.
 /// ´test:integration:decision-association-work-boundaries´
+/// ´claim:bindings:decision-association-work-boundaries´ Frozen source environments reduce cumulative association Work from 24428 to 22710 while one-below refusal preserves its source.
 #[test]
 fn decision_association_work_boundaries() -> TestResult {
     let original = case("original LC source", false, 0)?;
     let before = original.source().owner().cas()?.counts();
-    for (work, accepted) in [(24_428, true), (24_427, false)] {
+    for (work, accepted) in [(22_710, true), (22_709, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()
         })?;
         budget.work(17, nrz_cas::Location::new("prior association caller"))?;
         let result = original.associate_inputs(&mut budget);
-        assert_eq!(result.is_ok(), accepted);
         if accepted {
             assert_eq!(result?.operands().len(), 2);
-            assert_eq!(budget.usage().work, 24_428);
+            assert_eq!(budget.usage().work, 22_710);
+        } else {
+            let Err(DecisionError::Symbols(nrz_bindings::AdmissionError::Algebra(fault))) = result
+            else {
+                panic!("one-below association Work must refuse");
+            };
+            assert!(matches!(
+                fault.kind,
+                nrz_cas::FaultKind::Exhausted {
+                    budget: nrz_cas::limits::BudgetKind::Work,
+                    ..
+                }
+            ));
         }
         let monotone = budget.usage().work >= 17 && budget.usage().work <= work;
         assert!(monotone);

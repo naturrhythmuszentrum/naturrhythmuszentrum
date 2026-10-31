@@ -2,10 +2,10 @@
 //! Exact ratio imports use the established scalar decoder and complete heap import transaction.
 
 use super::ExactCountRatio;
+use crate::Heap;
 use crate::quantity::{Quantity, QuantityContext, QuantityError, QuantityInput, lineage};
-use crate::{Heap, HeapError};
+use nrz_bindings::Budget;
 use nrz_bindings::readings::algebra::Location;
-use nrz_bindings::{BindingSymbols, Budget};
 use nrz_scalar::{ArithmeticContext, DecodedLiteral, LiteralLimits, NumericLiteral, Scalar};
 
 impl QuantityContext {
@@ -29,16 +29,20 @@ impl QuantityContext {
             Location::new("materialized count ratio"),
             |budget| {
                 let decoded = decode::<P>(ratio, budget)?;
-                let symbols =
-                    BindingSymbols::declare(ratio.descriptor(), [1, 1], [true, true], budget)
-                        .map_err(HeapError::from)?;
                 let center = [decoded.center().get()];
                 let error = [decoded.displacement().get()];
-                let mut quantity = self.import(
-                    heap,
-                    &symbols,
-                    QuantityInput::bounded(&center, &error, Some(&error)),
+                let mut quantity = self.with_output_symbols(
+                    ratio.descriptor(),
+                    [1, 1],
                     budget,
+                    |symbols, budget| {
+                        self.import(
+                            heap,
+                            symbols,
+                            QuantityInput::bounded(&center, &error, Some(&error)),
+                            budget,
+                        )
+                    },
                 )?;
                 quantity.counts = counts;
                 Ok(quantity)

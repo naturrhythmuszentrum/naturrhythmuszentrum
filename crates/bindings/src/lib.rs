@@ -71,7 +71,7 @@ pub use nrz_cas::limits::{Budget, Limits, LimitsOverride};
 
 pub use admission::{
     AdmissionError, BindingSymbols, CompanionKind, CopyWitness, HomogeneousRecipe, ParameterEntry,
-    ParameterSymbol, ParameterTarget, QuantitySymbol, SymbolBinding, SymbolKind,
+    ParameterSymbol, ParameterTarget, QuantitySymbol, SymbolBinding, SymbolKind, SymbolSchema,
 };
 
 pub use checked::{CheckedExpression, CompanionEvidence, NodeEvidence};

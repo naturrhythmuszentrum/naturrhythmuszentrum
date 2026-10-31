@@ -61,7 +61,7 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
     assert_eq!(count.retained_payload_bytes(), 2_068);
     let case = selected.case();
     let associated = case.associate_inputs(&mut budget)?;
-    assert_eq!(budget.usage().work, 364_566);
+    assert_eq!(budget.usage().work, 361_130);
     assert_eq!(associated.retained_payload_bytes(), 17_858);
     let originals = associated
         .operands()
@@ -75,7 +75,7 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
         .map(DecisionOperand::symbols)
         .collect::<Vec<_>>();
     associated.authenticate(case, &symbols, &mut budget)?;
-    assert_eq!(budget.usage().work, 364_580);
+    assert_eq!(budget.usage().work, 361_144);
     let graph = selected.cas()?;
     let before = graph.counts();
     let bytes = graph.export_witness(selected.witness(), &mut ledger()?)?;
@@ -110,21 +110,21 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
 
 /// Distinct association and authentication owners retain literal cumulative Work boundaries.
 /// ´test:integration:bindings-lattice-scalar-association-work´
+/// ´claim:bindings:lattice-scalar-association-work´ Frozen environments reduce cumulative association Work from 48705 to 45269 and preserve atomic one-below refusal.
 #[test]
 fn bindings_lattice_scalar_association_work() -> TestResult {
     let selected = selected(&mut ledger()?)?;
     let case = selected.case();
     let before = case.source().owner().cas()?.counts();
-    for (work, accepted) in [(48_705, true), (48_704, false)] {
+    for (work, accepted) in [(45_269, true), (45_268, false)] {
         let mut budget = prior(work)?;
         let result = case.associate_inputs(&mut budget);
         if accepted {
             assert_eq!(result?.operands().len(), 4);
             assert_eq!(budget.usage().work, work);
         } else {
-            let error = result.err().ok_or("short association accepted")?;
-            let DecisionError::Symbols(AdmissionError::Algebra(fault)) = error else {
-                return Err("not a symbol-construction refusal".into());
+            let Err(DecisionError::Symbols(AdmissionError::Algebra(fault))) = result else {
+                panic!("one-below symbol association must refuse");
             };
             work_fault(&fault);
         }
@@ -144,7 +144,10 @@ fn bindings_lattice_scalar_association_work() -> TestResult {
             result?;
             assert_eq!(budget.usage().work, work);
         } else {
-            exhausted(&result.err().ok_or("short authentication accepted")?)?;
+            let Err(fault) = result else {
+                panic!("one-below authentication must refuse");
+            };
+            exhausted(&fault)?;
         }
         assert!(budget.usage().work >= 17);
         assert_eq!(case.source().owner().cas()?.counts(), before);
@@ -154,9 +157,10 @@ fn bindings_lattice_scalar_association_work() -> TestResult {
 
 /// Complete lifecycle exhaustion and fresh replay publish no partial physical or CAS result.
 /// ´test:integration:bindings-lattice-scalar-cumulative-work´
+/// ´claim:bindings:lattice-scalar-cumulative-work´ The complete scalar lifecycle falls from 364597 to 361161 Work with unchanged evidence and atomic one-below refusal.
 #[test]
 fn bindings_lattice_scalar_cumulative_work() -> TestResult {
-    for (work, accepted) in [(364_597, true), (364_596, false)] {
+    for (work, accepted) in [(361_161, true), (361_160, false)] {
         let mut budget = prior(work)?;
         let selected = selected(&mut budget)?;
         let before = selected.cas()?.counts();
@@ -172,7 +176,10 @@ fn bindings_lattice_scalar_cumulative_work() -> TestResult {
             result?;
             assert_eq!(budget.usage().work, work);
         } else {
-            exhausted(&result.err().ok_or("short lifecycle accepted")?)?;
+            let Err(fault) = result else {
+                panic!("one-below complete lifecycle must refuse");
+            };
+            exhausted(&fault)?;
         }
         assert_eq!(count.value(), 3);
         assert_eq!(selected.cas()?.counts(), before);

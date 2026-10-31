@@ -18,12 +18,14 @@ mod graph;
 mod parameter_graph;
 mod parameters;
 mod recipe;
+mod schema;
 mod selected;
 mod symbols;
 
 pub use binding::SymbolBinding;
 pub use parameters::{ParameterEntry, ParameterSymbol, ParameterTarget};
 pub use recipe::{CopyWitness, HomogeneousRecipe};
+pub use schema::SymbolSchema;
 pub use symbols::{BindingSymbols, CompanionKind, QuantitySymbol, SymbolKind};
 
 /// A refused exact symbol relation, independent of any numerical heap.
