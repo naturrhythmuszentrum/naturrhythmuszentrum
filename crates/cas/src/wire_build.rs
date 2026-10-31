@@ -337,33 +337,42 @@ pub(crate) fn indexed_table(
     Ok((bytes, root, rules, assigned))
 }
 
-/// A ready descriptor is immutable: later assignments cannot change any earlier child index.
-/// Reuse its complete bytes through subsequent minimum scans, including every evidence edge.
+/// Reuse complete ready descriptors and collect every key tied for the minimum.
+/// Assigning the whole content class together makes parent readiness independent of serials.
 fn take_ready(
     cas: &Cas,
     records: &mut BTreeMap<Key, PendingRecord>,
     assigned: &Assignments,
     budget: &mut Budget,
-) -> Result<(Key, Vec<u8>), Fault> {
-    let mut least: Option<(&Key, &Vec<u8>)> = None;
+) -> Result<(Vec<Key>, Vec<u8>), Fault> {
+    let mut least: Option<&Vec<u8>> = None;
+    let mut keys = Vec::new();
     for (id, record) in records.iter_mut() {
         budget.work(1, AT)?;
         if record.canonical.is_none() {
             record.canonical = ready(cas, &record.source, assigned, record.rule_index, budget)?;
         }
-        if let Some(candidate) = &record.canonical
-            && least.is_none_or(|(_, previous)| candidate < previous)
-        {
-            least = Some((id, candidate));
+        let Some(candidate) = &record.canonical else {
+            continue;
+        };
+        if least.is_some_and(|previous| candidate > previous) {
+            continue;
+        }
+        if least.is_none_or(|previous| candidate < previous) {
+            least = Some(candidate);
+            keys.clear();
+        }
+        keys.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+        keys.push(id.clone());
+    }
+    let mut descriptor = None;
+    for id in &keys {
+        let record = records.remove(id).ok_or_else(invalid)?;
+        if descriptor.is_none() {
+            descriptor = record.canonical;
         }
     }
-    let id = least.ok_or_else(invalid)?.0.clone();
-    let descriptor = records
-        .remove(&id)
-        .ok_or_else(invalid)?
-        .canonical
-        .ok_or_else(invalid)?;
-    Ok((id, descriptor))
+    Ok((keys, descriptor.ok_or_else(invalid)?))
 }
 
 /// Encode a theorem DAG with a sorted manifest; table-local framing patches primitive indices.
@@ -487,7 +496,7 @@ fn order(
     let mut unique = BTreeMap::new();
     let mut bytes = Vec::new();
     while !records.is_empty() {
-        let (id, descriptor) = take_ready(cas, &mut records, &assigned, budget)?;
+        let (keys, descriptor) = take_ready(cas, &mut records, &assigned, budget)?;
         let index = if let Some(index) = unique.get(&descriptor) {
             *index
         } else {
@@ -497,7 +506,9 @@ fn order(
             unique.insert(descriptor.clone(), index);
             index
         };
-        assigned.insert(id, (index, descriptor));
+        for id in keys {
+            assigned.insert(id, (index, descriptor.clone()));
+        }
     }
     Ok((bytes, assigned))
 }
@@ -721,6 +732,96 @@ mod tests {
         assert_eq!(descriptor.get(11..), Some([0; 8].as_slice()));
         assert_eq!(bytes.get(1), Some(descriptor));
         Ok(())
+    }
+
+    /// Tied leaves release both lower-sorting parents independently of allocation serials.
+    /// ´claim:cas:ordering-tied-leaves-ignore-allocation-order´
+    /// ´test:unit:ordering-tied-leaves-ignore-allocation-order´
+    #[test]
+    fn ordering_tied_leaves_ignore_allocation_order() -> Result<(), Box<dyn std::error::Error>> {
+        let cas = Cas::new(Limits::default())?;
+        let mut tables = Vec::new();
+        for reverse in [false, true] {
+            let mut budget = Budget::new(Limits::default())?;
+            let (bytes, assigned) = order(&cas, tied_leaf_records(reverse), &mut budget)?;
+            for serial in 0..2 {
+                let key = Key::Object(LogicalId {
+                    kind: VertexKind::Occurrence,
+                    serial,
+                });
+                assert_eq!(assigned.get(&key).ok_or("leaf index")?.0, 0);
+            }
+            tables.push(bytes);
+        }
+        assert_eq!(tables[0], tables[1]);
+        assert_eq!(
+            tables[0],
+            vec![
+                vec![3, 6, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+                vec![1, 10, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                vec![2, 10, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            ]
+        );
+        Ok(())
+    }
+
+    /// Coalescing tied keys refuses every insufficient Work budget without a partial table.
+    /// ´claim:cas:ordering-tied-leaves-work-boundaries´
+    /// ´test:unit:ordering-tied-leaves-work-boundaries´
+    #[test]
+    fn ordering_tied_leaves_work_boundaries() -> Result<(), Box<dyn std::error::Error>> {
+        let cas = Cas::new(Limits::default())?;
+        for reverse in [false, true] {
+            let mut budget = Budget::new(Limits::default())?;
+            let expected = order(&cas, tied_leaf_records(reverse), &mut budget)?;
+            let work = budget.usage().work;
+            for limit in 0..work {
+                let mut refused = Budget::new(Limits {
+                    work: limit,
+                    ..Limits::default()
+                })?;
+                let rejected = order(&cas, tied_leaf_records(reverse), &mut refused).is_err();
+                assert!(
+                    rejected,
+                    "ordering accepted Work limit {limit} below {work}"
+                );
+            }
+            let mut exact = Budget::new(Limits {
+                work,
+                ..Limits::default()
+            })?;
+            assert_eq!(
+                order(&cas, tied_leaf_records(reverse), &mut exact)?,
+                expected
+            );
+            assert_eq!(exact.usage().work, work);
+        }
+        Ok(())
+    }
+
+    /// Reverse only the serials of identical leaves, retaining each parent's content.
+    fn tied_leaf_records(reverse: bool) -> BTreeMap<Key, PendingRecord> {
+        let mut records = BTreeMap::new();
+        for serial in 0_u8..2 {
+            let leaf = LogicalId {
+                kind: VertexKind::Occurrence,
+                serial: u64::from(if reverse { 1 - serial } else { serial }),
+            };
+            let mut record = independent_record(3);
+            record.payload.clear();
+            records.insert(Key::Object(leaf), PendingRecord::new(Arc::new(record)));
+            let mut parent = independent_record(serial + 1);
+            parent.payload = vec![0; 4];
+            parent.references.push((0, Entity::Object(leaf)));
+            records.insert(
+                Key::Object(LogicalId {
+                    kind: VertexKind::Expression,
+                    serial: u64::from(serial),
+                }),
+                PendingRecord::new(Arc::new(parent)),
+            );
+        }
+        records
     }
 
     /// Both unordered members and certificate rows exceed the sort's small-input path.
