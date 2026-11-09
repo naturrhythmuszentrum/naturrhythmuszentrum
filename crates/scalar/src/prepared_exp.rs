@@ -87,14 +87,19 @@ impl<'a> ExpProgram<'a> {
         }
         // Validation precedes even the exact zero shortcut. This also admits
         // subnormal nominal interiors without admitting below-normal endpoints.
-        self.basis.evaluate(
-            Expm1Input {
-                endpoints: input.endpoints,
-                center: input.center,
-                bits: self.basis.bits,
-            },
-            context,
-        )?;
+        {
+            let _validation =
+                tracing::trace_span!("nrz.validation", family = "prepared-exp", revision = 1_u64)
+                    .entered();
+            self.basis.evaluate(
+                Expm1Input {
+                    endpoints: input.endpoints,
+                    center: input.center,
+                    bits: self.basis.bits,
+                },
+                context,
+            )?;
+        }
         let left = self.image(input.endpoints[0], context)?;
         let right = self.image(input.endpoints[1], context)?;
         let nominal = self.image(input.center, context)?;
