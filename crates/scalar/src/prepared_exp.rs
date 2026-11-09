@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked addition of one, conditional on an admitted expm1 basis.
 
-use super::{Expm1Failure, Expm1Input, Expm1Program};
+use super::{Expm1Failure, Expm1Input, Expm1Program, PointReading};
 use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite};
 
 /// Native exp application outcomes, independent of basis preparation.
@@ -91,7 +91,7 @@ impl<'a> ExpProgram<'a> {
             let _validation =
                 tracing::trace_span!("nrz.validation", family = "prepared-exp", revision = 1_u64)
                     .entered();
-            self.basis.evaluate(
+            self.basis.validate(
                 Expm1Input {
                     endpoints: input.endpoints,
                     center: input.center,
@@ -100,9 +100,17 @@ impl<'a> ExpProgram<'a> {
                 context,
             )?;
         }
-        let left = self.image(input.endpoints[0], context)?;
-        let right = self.image(input.endpoints[1], context)?;
-        let nominal = self.image(input.center, context)?;
+        let points = [
+            self.basis.point(input.endpoints[0]),
+            self.basis.point(input.endpoints[1]),
+            self.basis.point(input.center),
+        ];
+        // Conditional programs can fail these checks even after operand admission.
+        // Preserve the basis cause and its precedence before composing any image.
+        Expm1Program::readings(points, context)?;
+        let left = Self::image(input.endpoints[0], points[0], context)?;
+        let right = Self::image(input.endpoints[1], points[1], context)?;
+        let nominal = Self::image(input.center, points[2], context)?;
         let epsilon = if self.bits <= 1022 {
             f64::from_bits(u64::from(1023 - self.bits) << 52)
         } else if self.bits <= 1074 {
@@ -146,14 +154,13 @@ impl<'a> ExpProgram<'a> {
 
     /// Outward addition, with the validated exact zero identity as the only shortcut.
     fn image(
-        &self,
         x: f64,
+        (endpoints, center, _): PointReading,
         context: &ArithmeticContext,
     ) -> Result<(Enclosure<f64>, f64), ArithmeticFailure> {
         if x == 0.0 {
             return Ok((Enclosure::new(1.0, 1.0)?, 1.0));
         }
-        let (endpoints, center, _) = self.basis.point(x);
         let image =
             Enclosure::new(endpoints[0], endpoints[1])?.add(Enclosure::new(1.0, 1.0)?, context)?;
         Ok((image, center + 1.0))
@@ -164,6 +171,178 @@ impl<'a> ExpProgram<'a> {
 mod tests {
     use super::*;
     use crate::Expm1Parameters;
+
+    /// Operand checks keep their typed order, including zero and subnormal nominal interiors.
+    /// # Panics
+    /// Panics if shared validation changes a refusal or a zero bypasses admission.
+    /// ´claim:scalar:prepared-exp-validation-order´
+    /// ´test:unit:prepared-exp-validation-order´
+    #[test]
+    fn prepared_exp_validation_order() -> Result<(), Box<dyn std::error::Error>> {
+        let context = ArithmeticContext::new()?;
+        let mut basis = Expm1Program::new(
+            &[1.0],
+            Expm1Parameters {
+                domain: [-2.0, 0.0],
+                bits: 40,
+                radius_bits: 45,
+                absolute_error: 0.0,
+                environment: 1,
+            },
+            &context,
+        )?;
+        let zero = ExpInput {
+            endpoints: [0.0, 0.0],
+            center: 0.0,
+            bits: 40,
+        };
+        let program = ExpProgram::new(&basis, 40);
+        for (endpoints, center, cause) in [
+            ([0.0, -1.0], 0.0, Expm1Failure::OutsideDomain),
+            ([-1.0, 0.0], 0.25, Expm1Failure::OutsideDomain),
+            ([f64::NAN, 0.0], 0.0, Expm1Failure::OutsideDomain),
+            ([-2.0, 0.0], f64::INFINITY, Expm1Failure::OutsideDomain),
+            ([0.0, f64::MIN_POSITIVE], 0.0, Expm1Failure::OutsideDomain),
+            (
+                [-f64::from_bits(1), 0.0],
+                0.0,
+                Expm1Failure::BelowNormalOperand,
+            ),
+        ] {
+            assert_eq!(
+                program
+                    .evaluate(
+                        ExpInput {
+                            endpoints,
+                            center,
+                            ..zero
+                        },
+                        &context
+                    )
+                    .expect_err("operand admission"),
+                ExpFailure::Basis(cause)
+            );
+        }
+        let interior = program.evaluate(
+            ExpInput {
+                endpoints: [-f64::MIN_POSITIVE, 0.0],
+                center: -f64::MIN_POSITIVE / 2.0,
+                ..zero
+            },
+            &context,
+        )?;
+        assert_eq!(interior.center, 1.0);
+        basis.domain = [-2.0, -0.25];
+        assert_eq!(
+            ExpProgram::new(&basis, 40)
+                .evaluate(zero, &context)
+                .expect_err("zero outside domain"),
+            ExpFailure::Basis(Expm1Failure::OutsideDomain)
+        );
+        basis.revision = 2;
+        assert_eq!(
+            ExpProgram::new(&basis, 40)
+                .evaluate(zero, &context)
+                .expect_err("environment first"),
+            ExpFailure::Basis(Expm1Failure::Environment)
+        );
+        assert_eq!(
+            ExpProgram::new(&basis, 39)
+                .evaluate(zero, &context)
+                .expect_err("exp target first"),
+            ExpFailure::Target
+        );
+        Ok(())
+    }
+
+    /// Structural admission alone does not establish monotonicity or finite nominal exports.
+    /// # Panics
+    /// Panics if operand admission or composition changes an arithmetic refusal.
+    /// ´claim:scalar:prepared-exp-basis-readings´
+    /// ´test:unit:prepared-exp-basis-readings´
+    #[test]
+    fn prepared_exp_basis_readings() -> Result<(), Box<dyn std::error::Error>> {
+        let context = ArithmeticContext::new()?;
+        let basis = Expm1Program::new(
+            &[1.0, 1.0],
+            Expm1Parameters {
+                domain: [-2.0, 0.0],
+                bits: 40,
+                radius_bits: 45,
+                absolute_error: f64::MAX,
+                environment: 1,
+            },
+            &context,
+        )?;
+        let program = ExpProgram::new(&basis, 40);
+        assert_eq!(
+            program
+                .evaluate(
+                    ExpInput {
+                        endpoints: [-2.0, 0.0],
+                        center: -1.0,
+                        bits: 40
+                    },
+                    &context
+                )
+                .expect_err("nonmonotone conditional basis"),
+            ExpFailure::Basis(Expm1Failure::Arithmetic(
+                ArithmeticFailure::InvertedEndpoints
+            ))
+        );
+        assert_eq!(
+            program
+                .evaluate(
+                    ExpInput {
+                        endpoints: [-f64::MIN_POSITIVE, 0.0],
+                        center: -f64::MIN_POSITIVE / 2.0,
+                        bits: 40,
+                    },
+                    &context
+                )
+                .expect_err("nonfinite nominal export"),
+            ExpFailure::Arithmetic(ArithmeticFailure::NonFinite)
+        );
+        Ok(())
+    }
+
+    /// Basis inversion takes precedence over a competing nonfinite composition.
+    /// # Panics
+    /// Panics if composition runs before the complete basis reading checks.
+    /// ´claim:scalar:prepared-exp-competing-failures´
+    /// ´test:unit:prepared-exp-competing-failures´
+    #[test]
+    fn prepared_exp_competing_failures() -> Result<(), Box<dyn std::error::Error>> {
+        let context = ArithmeticContext::new()?;
+        let basis = Expm1Program::new(
+            &[1.0, 1.0],
+            Expm1Parameters {
+                domain: [-2.0, 0.0],
+                bits: 40,
+                radius_bits: 45,
+                absolute_error: f64::MAX,
+                environment: 1,
+            },
+            &context,
+        )?;
+        assert_eq!(
+            ExpProgram::new(&basis, 40)
+                .evaluate(
+                    ExpInput {
+                        endpoints: [-2.0, 0.0],
+                        center: -f64::MIN_POSITIVE / 2.0,
+                        bits: 40,
+                    },
+                    &context,
+                )
+                .expect_err("basis inversion before nonfinite composition"),
+            ExpFailure::Basis(Expm1Failure::Arithmetic(
+                ArithmeticFailure::InvertedEndpoints
+            ))
+        );
+        Ok(())
+    }
+
     /// Final target checks apply to exp's addition, independently of auxiliary bits.
     /// A conditional degree-one program is enough to expose addition spacing:
     /// near one the checked addition has nonzero width even when expm1 is tiny.

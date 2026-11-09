@@ -13,6 +13,9 @@ use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite};
 mod exp;
 pub use exp::{ExpFailure, ExpInput, ExpOutput, ExpProgram};
 
+/// One rounded schedule's endpoints, nominal value and numerical radius.
+type PointReading = ([f64; 2], f64, f64);
+
 /// Structural and native application refusals, without an exact Work ledger.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Expm1Failure {
@@ -177,6 +180,19 @@ impl Expm1Program {
     ) -> Result<Expm1Output, Expm1Failure> {
         let _span = tracing::trace_span!("nrz.kernel", family = "prepared-expm1", revision = 1_u64)
             .entered();
+        self.validate(input, context)?;
+        Self::readings(
+            [
+                self.point(input.endpoints[0]),
+                self.point(input.endpoints[1]),
+                self.point(input.center),
+            ],
+            context,
+        )
+    }
+
+    /// Validate original operands in refusal order before any point shortcut.
+    fn validate(&self, input: Expm1Input, context: &ArithmeticContext) -> Result<(), Expm1Failure> {
         if context.revision() != self.revision {
             return Err(Expm1Failure::Environment);
         }
@@ -199,9 +215,14 @@ impl Expm1Program {
                 return Err(Expm1Failure::BelowNormalOperand);
             }
         }
-        let left = self.point(lower);
-        let right = self.point(upper);
-        let nominal = self.point(input.center);
+        Ok(())
+    }
+
+    /// Preserve finite endpoint ordering and nominal displacement checks for conditional programs.
+    fn readings(
+        [left, right, nominal]: [PointReading; 3],
+        context: &ArithmeticContext,
+    ) -> Result<Expm1Output, Expm1Failure> {
         let endpoints = [left.0[0], right.0[1]];
         let enclosure = Enclosure::new(endpoints[0], endpoints[1])?;
         let displacement = enclosure
@@ -218,7 +239,7 @@ impl Expm1Program {
     }
 
     /// One separate multiply/add schedule and the exact checked neighbour export.
-    fn point(&self, x: f64) -> ([f64; 2], f64, f64) {
+    fn point(&self, x: f64) -> PointReading {
         if x == 0.0 {
             return ([0.0, 0.0], 0.0, 0.0);
         }

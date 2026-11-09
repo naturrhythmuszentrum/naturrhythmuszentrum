@@ -14,7 +14,7 @@ use tracing::{
 static DISPATCHERS: Mutex<()> = Mutex::new(());
 
 /// Exp composition reuses authority; a spent ledger never enters either kernel span.
-/// Six spans is a regression pin for three exp and three basis calls, not a Work tariff.
+/// Three spans is a regression pin for three exp calls without discarded basis calls, not a Work tariff.
 /// # Panics
 /// Panics if native reuse emits construction events or unpaid traversal reaches a kernel.
 /// ´claim:matrix:prepared-exp-observed-reuse´
@@ -59,7 +59,7 @@ fn prepared_exp_observed_reuse() -> TestResult {
             constructions
         );
         let kernels = observer.kernels.load(Ordering::Relaxed);
-        assert_eq!(kernels, 6);
+        assert_eq!(kernels, 3);
         let mut empty = Budget::new(Limits {
             work: 7,
             ..Limits::default()
