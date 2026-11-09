@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Bounded analysis of completed host wall-time observations.
+//! Cooperative collection and bounded analysis of host wall-time observations.
 //!
 //! Times are seconds and never enter engine Work, limits or proof evidence.
 //! [`analyze`] requires the complete requested row count and bootstrap count.
-//! The caller supplies a cooperative cancellation check; no timer, operation,
-//! reset, receipt collection or process-global state is owned by this module.
+//! [`sample`] borrows a prepared problem and an isolated host adapter. It owns
+//! repetition, deadline admission and analysis, without process-global changes.
 
+mod collect;
 mod criterion;
 mod memory;
 mod report;
 mod run;
 mod settings;
 
+pub use collect::{
+    AdapterBounds, HostOperation, InstantClock, IterationOutcome, IterationRecord, ReceiptStatus,
+    Representative, SamplerBounds, SamplingClock, SamplingDeadline, SamplingError,
+    SamplingIdentity, SamplingPhase, SamplingReport, SamplingSettings, SamplingStop,
+    SchedulePosition, WorkReceipt, sample, sample_with_clock,
+};
 pub use run::analyze;
 
 /// Criterion source revision from which the private analysis is adapted.

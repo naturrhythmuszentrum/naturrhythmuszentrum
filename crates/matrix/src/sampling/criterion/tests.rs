@@ -263,6 +263,19 @@ fn index_rejection_bounds() -> Result<(), AnalysisError> {
         Err(AnalysisError::IndexRejectionLimit)
     );
     assert_eq!(draws, 128);
+    let mut equality_draws = 0;
+    assert_eq!(
+        random::uniform(
+            3,
+            || {
+                equality_draws += 1;
+                12_297_829_382_473_034_411
+            },
+            &mut control
+        )?,
+        2
+    );
+    assert_eq!(equality_draws, 1);
     let mut draws = [0, u64::MAX].into_iter();
     assert_eq!(
         random::uniform(3, || draws.next().expect("two draws"), &mut control)?,

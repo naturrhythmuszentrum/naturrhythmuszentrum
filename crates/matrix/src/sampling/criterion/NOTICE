@@ -24,6 +24,11 @@ src/stats/bivariate/regression.rs Slope::fit; src/stats/mod.rs dot.
 estimate.rs: src/stats/mod.rs Distribution::from/confidence_interval;
 src/estimate.rs Estimate, ConfidenceInterval, build_estimates;
 src/analysis/mod.rs estimates and regression estimate assembly.
+schedule.rs: src/routine.rs Function::warm_up and Routine::sample scheduling;
+src/lib.rs linear ActualSamplingMode::iteration_counts. Checked integer
+nanosecond ceilings and finite caps replace floating casts and wrapping doubling.
+Collection uses individual timers, adjacent Work snapshots and a cooperative
+admission deadline, with no harness, warning output or automatic mode.
 random.rs: src/stats/rand_util.rs Rng/new_rng and resample index selection.
 The multiply-high index algorithm follows oorandom 11.1.5 Rand64::rand_range;
 the dependency's MIT attribution accompanies its separately linked license.
@@ -44,7 +49,8 @@ are unchanged. A seed reproduces fixed-row statistics, not live timings.
 Omitted: two-sample bootstrap (the supplied univariate/mod.rs is provenance
 context only), generic float/tuple machinery, r_squared, p values, tails,
 relative comparisons, KDE, mixed distributions, parallel execution, clocks,
-harnesses, plots, baseline/file/console plumbing and collection/scheduling.
+harnesses, plots and baseline/file/console plumbing. Collection is NRZ-owned;
+only the selected geometric/linear scheduling algorithms are adapted here.
 The independent NRZ tests are original additions, not imported upstream tests.
 
 SHA-256 of the original, unmodified source files supplied for this extraction:
@@ -61,3 +67,5 @@ f605ef3535aa77c777a910b2c8aa7bb9aebba1f8c74b1358ee909e10b3251b76  src/estimate.r
 7195f628c52d0145838af0266c8db3a760a12718d0d788df62ed5068975e0cad  src/analysis/mod.rs
 fcadb36c2dd65534d9ad01f5a1e167f208ab965919608220abc02bbdf9a4a95b  src/stats/rand_util.rs
 4594f18866be94a3ce309ed8f94d92699f5b87739b76e1216addca75f5253fa7  LICENSE-MIT
+13576af7505b5e4837c533ab97dbb5845ea573c9bff5c19cc07913da599aa890  src/routine.rs
+5d673f670c9d6233980f905ec707fa0ebbb05c247c8ac57cf28cc163f8d32ad9  src/lib.rs

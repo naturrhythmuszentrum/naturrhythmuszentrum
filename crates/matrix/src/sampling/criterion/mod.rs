@@ -13,6 +13,7 @@ mod percentiles;
 mod random;
 mod regression;
 mod sample;
+pub(super) mod schedule;
 mod tukey;
 
 use super::{
