@@ -81,7 +81,7 @@ impl<P: Scalar + 'static> BundlePin<P> {
             })
     }
     /// Private sealed attachment checks add no use edge and borrow the complete owner.
-    fn checked_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
+    pub(super) fn checked_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
         let pin = self.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
         let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
         let layout_matches = bundle.layout.axis == bundle.declaration.axis
@@ -185,6 +185,33 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
         account: &mut ExecutionAccount,
     ) -> Result<P, LoanError> {
         account.authenticate(self.account)?;
+        let owner = self.selected_owner(channel, cell, component)?;
+        account
+            .ledger
+            .with_work_phase(super::FAMILY, "selected load", |budget| {
+                charge(budget, 1)?;
+                owner.matrix.read(cell + self.capacity() * component)
+            })
+    }
+    /// The prepaid application reader shares every address and attachment check.
+    pub(super) fn read_prepaid(
+        &self,
+        channel: HostChannel,
+        cell: usize,
+        component: usize,
+        _permit: &super::application::evaluation::Traversal,
+    ) -> Result<P, LoanError> {
+        self.selected_owner(channel, cell, component)?
+            .matrix
+            .read(cell + self.capacity() * component)
+    }
+    /// Refuse holes and invalid attachment authority before touching numerical storage.
+    fn selected_owner(
+        &self,
+        channel: HostChannel,
+        cell: usize,
+        component: usize,
+    ) -> Result<&super::payload::PublishedChannel, LoanError> {
         if cell >= self.capacity() || component >= self.bundle.declaration.extent.columns() {
             return Err(LoanError::LayoutMismatch);
         }
@@ -196,20 +223,30 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
         if qualified.identity != self.bundle.identity || qualified.channel != channel {
             return Err(LoanError::CoverageMismatch);
         }
-        let owner = self.bundle.channels[channel.index()]
+        self.bundle.channels[channel.index()]
             .as_ref()
-            .ok_or(LoanError::UnsupportedContract)?;
+            .ok_or(LoanError::UnsupportedContract)
+    }
+    /// Inspect one immutable result outcome on this pin's original account.
+    /// # Errors
+    /// Refuses host origins, out-of-capacity cells, foreign accounts and exhausted Work.
+    pub fn application_outcome(
+        &self,
+        cell: usize,
+        account: &mut ExecutionAccount,
+    ) -> Result<&super::application::CellOutcome, LoanError> {
+        account.authenticate(self.account)?;
         account
             .ledger
-            .with_work_phase(super::FAMILY, "selected load", |budget| {
+            .with_work_phase(super::application::FAMILY, "result outcome", |budget| {
                 charge(budget, 1)?;
-                owner.matrix.read(cell + self.capacity() * component)
+                self.bundle.origin.outcome(cell)
             })
     }
 }
 impl Heap {
     /// Current access pairs the supplied pin with the exact live registry root.
-    fn current_bundle<P: Scalar + 'static>(
+    pub(super) fn current_bundle<P: Scalar + 'static>(
         &self,
         pin: &BundlePin<P>,
         budget: &mut nrz_bindings::Budget,
@@ -254,14 +291,13 @@ impl Heap {
         budget: &mut nrz_bindings::Budget,
     ) -> Result<(), LoanError> {
         let channels = bundle.channels.iter().flatten().count();
-        charge(budget, channels + 5)?;
+        charge(
+            budget,
+            channels + 5 + usize::from(bundle.origin.evidence.is_some()),
+        )?;
         self.validate_published_bundle(bundle)?;
         charge(budget, channels + 1)?;
-        bundle
-            .declaration
-            .symbols
-            .check_import()
-            .map_err(|_| LoanError::StaleDependency)?;
+        bundle.origin.validate_current(bundle)?;
         if bundle.layout.axis != bundle.declaration.axis
             || bundle.layout.components.extent() != bundle.declaration.extent
         {

@@ -4,6 +4,14 @@
 use super::LoanError;
 use std::cell::Cell;
 thread_local! {
+    /// Actual filled-membership visits during publication, independent of charged Work.
+    static PUBLICATION_CELLS: Cell<usize> = const { Cell::new(0) };
+    /// A test watches one exact application's source edge at final witness destruction.
+    static WITNESS_SOURCE: std::cell::RefCell<Option<(u64, std::rc::Weak<super::registry::PinRecord>)>> = const { std::cell::RefCell::new(None) };
+    /// Observed source strong count at that precise destruction boundary.
+    static WITNESS_SOURCE_COUNT: Cell<Option<usize>> = const { Cell::new(None) };
+    /// Scalar helper entries observed at the shared dense/selected seam.
+    static SCALARS: Cell<usize> = const { Cell::new(0) };
     /// Only the current diagnostic test's allocation schedule is affected.
     static REMAINING: Cell<Option<usize>> = const { Cell::new(None) };
     /// Number of acquisition boundaries reached by this diagnostic attempt.
@@ -155,4 +163,54 @@ pub(crate) fn entered_write_buffer(bytes: usize) {
 pub(crate) fn entered_statistical_headers(bytes: usize) {
     let [allocations, total] = STATISTICAL_HEADERS.get();
     STATISTICAL_HEADERS.set([allocations + usize::from(bytes != 0), total + bytes]);
+}
+
+/// Count every scalar helper invocation independently of the traversal plan.
+pub(crate) fn entered_scalar() {
+    SCALARS.set(SCALARS.get() + 1);
+}
+/// Reset independent scalar invocation observations.
+pub(super) fn reset_scalars() {
+    SCALARS.set(0);
+}
+/// Actual scalar helper invocations.
+pub(super) fn scalars() -> usize {
+    SCALARS.get()
+}
+
+/// Watch the exact receipt's input edge without retaining numerical ownership.
+pub(super) fn watch_source_release(
+    receipt: u64,
+    source: std::rc::Weak<super::registry::PinRecord>,
+) {
+    WITNESS_SOURCE.with_borrow_mut(|watch| *watch = Some((receipt, source)));
+    WITNESS_SOURCE_COUNT.set(None);
+}
+/// Observe input release before the final liveness witness expires.
+pub(super) fn witness_expiring(receipt: u64) {
+    WITNESS_SOURCE.with_borrow_mut(|watch| {
+        if let Some((expected, source)) = watch
+            && *expected == receipt
+        {
+            WITNESS_SOURCE_COUNT.set(Some(source.strong_count()));
+            *watch = None;
+        }
+    });
+}
+/// Last exact source-edge count captured at witness destruction.
+pub(super) fn source_at_witness() -> Option<usize> {
+    WITNESS_SOURCE_COUNT.get()
+}
+
+/// Count the actual shared publication membership operation.
+pub(super) fn visited_publication_cell() {
+    PUBLICATION_CELLS.set(PUBLICATION_CELLS.get() + 1);
+}
+/// Reset actual publication membership observations for one attempt.
+pub(super) fn reset_publication_cells() {
+    PUBLICATION_CELLS.set(0);
+}
+/// Actual membership visits in this thread's publication attempt.
+pub(super) fn publication_cells() -> usize {
+    PUBLICATION_CELLS.get()
 }

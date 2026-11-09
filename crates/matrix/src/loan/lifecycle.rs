@@ -2,7 +2,7 @@
 //! Admission, initialized setters and recoverable handback retain one unchanged owner core.
 
 pub(super) mod admission;
-mod publication;
+pub(super) mod publication;
 
 use super::{
     ExecutionAccount, HostChannel, HostTileDeclaration, LoanError, charge,
@@ -386,7 +386,7 @@ impl Heap {
             .and_then(Option::as_ref)
         {
             let keys = group.debits;
-            for (slot, key) in keys.into_iter().flatten() {
+            for (slot, key) in keys.entries().iter().copied().flatten() {
                 self.loans.release(slot, key);
             }
         }
@@ -415,7 +415,10 @@ impl Heap {
     }
 }
 /// Derive complete channel masks directly from actual component flags.
-fn complete(core: &mut HostCore, budget: &mut nrz_bindings::Budget) -> Result<(), LoanError> {
+pub(super) fn complete(
+    core: &mut HostCore,
+    budget: &mut nrz_bindings::Budget,
+) -> Result<(), LoanError> {
     let cells = core.declaration.extent.rows();
     let components = core.declaration.extent.columns();
     for channel in core.channels.iter_mut().flatten() {

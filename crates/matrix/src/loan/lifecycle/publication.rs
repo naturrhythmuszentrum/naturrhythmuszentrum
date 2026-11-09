@@ -93,6 +93,7 @@ pub(super) fn handback<P: Scalar + 'static>(
         receipt: identity.receipt,
     };
     bundle_shell.payload = Some(Bundle {
+        origin: crate::loan::application::Origin::host(),
         declaration: loan.core.declaration,
         identity,
         channels,
@@ -195,7 +196,7 @@ fn prepare<P: Scalar + 'static>(
     charge(budget, word_count)?;
     filled.resize(word_count, 0);
     derive_filled(loan, &mut filled, budget)?;
-    validate_payload(loan, &filled, budget)?;
+    validate_payload::<P>(&loan.core, &filled, budget)?;
     let channels = loan.core.channels.iter().flatten().count();
     charge(budget, channels + 1)?;
     loan.core
@@ -208,7 +209,7 @@ fn prepare<P: Scalar + 'static>(
     {
         return Err(LoanError::LayoutMismatch);
     }
-    validate_shells(heap, loan, budget)?;
+    validate_shells(heap, &loan.core, budget)?;
     charge(budget, channels + 6)?;
     #[cfg(test)]
     crate::loan::fault::before()?;
@@ -247,7 +248,7 @@ fn prepare<P: Scalar + 'static>(
 }
 
 /// Move native payloads and destroy prepaid tracking allocations during the final commit.
-fn take_channels(
+pub(in crate::loan) fn take_channels(
     channels: &mut [Option<crate::loan::payload::LoanChannel>; 3],
     registry: &mut crate::loan::Registry,
 ) -> [Option<PublishedChannel>; 3] {
@@ -267,7 +268,7 @@ fn take_channels(
 }
 
 /// Install only prepared native owners and descriptor attachments under the exclusive borrow.
-fn install_native(
+pub(in crate::loan) fn install_native(
     heap: &mut Heap,
     identity: crate::loan::registry::Identity,
     layout: Rc<crate::mask::storage::LayoutRecord>,
@@ -294,38 +295,50 @@ fn install_native(
 }
 
 /// Numerical validation never visits a hole, even when its safe initialized bytes are invalid.
-fn validate_payload<P: Scalar + 'static>(
-    loan: &OwnedLoan<P>,
+pub(in crate::loan) fn validate_payload<P: Scalar + 'static>(
+    core: &super::HostCore,
     filled: &[u64],
     budget: &mut nrz_bindings::Budget,
 ) -> Result<(), LoanError> {
-    let cells = loan.capacity();
-    let components = loan.components();
-    for cell in 0..cells {
-        if !bit(filled, cell) {
-            continue;
+    for cell in 0..core.declaration.extent.rows() {
+        if filled_cell(filled, cell) {
+            validate_cell::<P>(core, cell, budget)?;
         }
-        for component in 0..components {
-            let address = cell + cells * component;
-            let mut total = None;
-            for (channel, owner) in HostChannel::ALL.into_iter().zip(&loan.core.channels) {
-                if let Some(owner) = owner {
-                    charge(budget, 1)?;
-                    let value: P = owner.matrix.read(address)?;
-                    let valid = value.is_finite()
-                        && (channel == HostChannel::Center || value >= P::ZERO)
-                        && (channel != HostChannel::Error
-                            || total.is_some_and(|total| value <= total));
-                    if !valid {
-                        return Err(LoanError::InvalidPayload {
-                            channel,
-                            cell,
-                            component,
-                        });
-                    }
-                    if channel == HostChannel::Total {
-                        total = Some(value);
-                    }
+    }
+    Ok(())
+}
+/// One actual filled-membership visit, shared by host and application publication.
+pub(in crate::loan) fn filled_cell(filled: &[u64], cell: usize) -> bool {
+    #[cfg(test)]
+    crate::loan::fault::visited_publication_cell();
+    bit(filled, cell)
+}
+/// Validate only the completed cell already selected by the caller's paid traversal.
+pub(in crate::loan) fn validate_cell<P: Scalar + 'static>(
+    core: &super::HostCore,
+    cell: usize,
+    budget: &mut nrz_bindings::Budget,
+) -> Result<(), LoanError> {
+    let cells = core.declaration.extent.rows();
+    for component in 0..core.declaration.extent.columns() {
+        let address = cell + cells * component;
+        let mut total = None;
+        for (channel, owner) in HostChannel::ALL.into_iter().zip(&core.channels) {
+            if let Some(owner) = owner {
+                charge(budget, 1)?;
+                let value: P = owner.matrix.read(address)?;
+                let valid = value.is_finite()
+                    && (channel == HostChannel::Center || value >= P::ZERO)
+                    && (channel != HostChannel::Error || total.is_some_and(|total| value <= total));
+                if !valid {
+                    return Err(LoanError::InvalidPayload {
+                        channel,
+                        cell,
+                        component,
+                    });
+                }
+                if channel == HostChannel::Total {
+                    total = Some(value);
                 }
             }
         }
@@ -348,12 +361,12 @@ fn publish_group(
         .get_mut(identity.root.slot)
         .and_then(Option::as_mut)
     {
-        for entry in &mut group.debits {
+        for entry in group.debits.entries_mut() {
             if *entry == Some(pin_debit) {
                 *entry = None;
             }
         }
-        group.debits[14] = Some(mask_debit);
+        group.debits.entries_mut()[14] = Some(mask_debit);
         group.state = State::Published(bundle);
         group.outcome = ProducerOutcome::Published(receipt);
         group.delivered = true;
@@ -361,14 +374,14 @@ fn publish_group(
 }
 
 /// Native reservations and private publication shells are stable under the exclusive heap borrow.
-fn validate_shells<P: Scalar + 'static>(
+pub(in crate::loan) fn validate_shells(
     heap: &Heap,
-    loan: &OwnedLoan<P>,
+    core: &super::HostCore,
     budget: &mut nrz_bindings::Budget,
 ) -> Result<(), LoanError> {
     // Two native reserved owners and the two private publication shells are checked again.
     charge(budget, 4)?;
-    let identity = loan.core.identity;
+    let identity = core.identity;
     for entry in [
         heap.masks.layouts.get(identity.layout.key)?.reserved_root(),
         heap.masks.masks.get(identity.mask.key)?.reserved_root(),
@@ -377,10 +390,10 @@ fn validate_shells<P: Scalar + 'static>(
             return Err(LoanError::StaleDependency);
         }
     }
-    if Rc::strong_count(&loan.core.bundle) != 1
-        || Rc::weak_count(&loan.core.bundle) != 0
-        || Rc::strong_count(&loan.core.pin) != 1
-        || Rc::weak_count(&loan.core.pin) != 0
+    if Rc::strong_count(&core.bundle) != 1
+        || Rc::weak_count(&core.bundle) != 0
+        || Rc::strong_count(&core.pin) != 1
+        || Rc::weak_count(&core.pin) != 0
     {
         return Err(LoanError::WrongLoan);
     }

@@ -330,12 +330,12 @@ fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared) -> OwnedLoan<P> {
         outcome: ProducerOutcome::Pending,
         delivered: false,
         pin: prepared.pin_slot,
-        debits: [None; 15],
+        debits: crate::loan::registry::DebitInventory::Host([None; 15]),
     });
     for (index, debit) in prepared.debits.into_iter().enumerate() {
         let slot = prepared.debit_slots[index];
         if let Some(group) = heap.loans.groups[identity.root.slot].as_mut() {
-            group.debits[index] = Some((slot, debit.key));
+            group.debits.entries_mut()[index] = Some((slot, debit.key));
         }
         heap.loans.install(slot, debit);
     }

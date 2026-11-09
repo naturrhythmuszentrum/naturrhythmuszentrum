@@ -2,6 +2,7 @@
 //! Owned host input follows the matrix loans design without a heap-wide execution borrow.
 
 mod account;
+mod application;
 mod declaration;
 mod error;
 #[cfg(test)]
@@ -15,6 +16,10 @@ mod registry;
 mod scans;
 
 pub use account::ExecutionAccount;
+pub use application::{
+    ApplicationCancellation, ApplicationError, ApplicationEvaluation, ApplicationPublication,
+    ApplicationRequest, CellOutcome, OwnedApplication, PointwiseRequest,
+};
 pub use declaration::{HostChannel, HostTileDeclaration};
 pub use error::LoanError;
 pub use inventory::LoanInventory;

@@ -19,7 +19,7 @@ mod evaluate;
 pub(crate) mod linear;
 mod linear_evaluate;
 pub(crate) mod lowering;
-mod nonlinear;
+pub(crate) mod nonlinear;
 mod product;
 pub(crate) mod reciprocal;
 mod resources;

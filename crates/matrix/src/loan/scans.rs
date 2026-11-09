@@ -217,6 +217,11 @@ impl Heap {
                 return Err(LoanError::WrongLoan);
             }
         }
+        if let Some(evidence) = &bundle.origin.evidence
+            && !self.loans.authentic_token(&evidence.token, bundle.identity)
+        {
+            return Err(LoanError::WrongLoan);
+        }
         let layout = self
             .masks
             .layouts
@@ -374,8 +379,14 @@ impl Heap {
             return Err(LoanError::StaleOccupation);
         }
         if let State::Published(owner) = &group.state {
-            charge(budget, identity.channels.iter().flatten().count() + 5)?;
-            self.validate_published_bundle(owner.payload.as_ref().ok_or(LoanError::WrongLoan)?)?;
+            let bundle = owner.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+            charge(
+                budget,
+                identity.channels.iter().flatten().count()
+                    + 5
+                    + usize::from(bundle.origin.evidence.is_some()),
+            )?;
+            self.validate_published_bundle(bundle)?;
         }
         let revision = self.loans.next_revision()?;
         let edges = identity.channels.into_iter().flatten().count() + 4;
@@ -383,7 +394,7 @@ impl Heap {
         let debits = group.debits;
         self.loans.groups[slot] = None;
         self.retire_native_reservations(identity);
-        for (position, key) in debits.into_iter().flatten() {
+        for (position, key) in debits.entries().iter().copied().flatten() {
             self.loans.release(position, key);
         }
         for key in identity.channels.into_iter().flatten() {

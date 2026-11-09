@@ -25,6 +25,21 @@ pub(crate) fn allocate_identity(counter: &AtomicU64) -> Result<u64, HeapError> {
         .map_err(|_| HeapError::CounterExhausted)
 }
 
+/// Reserve a bounded application identity inventory before any physical constructor.
+pub(crate) fn identity_block<const N: usize>() -> Result<[u64; N], HeapError> {
+    allocate_block(&NEXT_ID)
+}
+/// Isolated counters exercise block exhaustion without changing another test's identity stream.
+pub(crate) fn allocate_block<const N: usize>(counter: &AtomicU64) -> Result<[u64; N], HeapError> {
+    let count = u64::try_from(N).map_err(|_| HeapError::CounterExhausted)?;
+    let first = counter
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |next| {
+            next.checked_add(count)
+        })
+        .map_err(|_| HeapError::CounterExhausted)?;
+    Ok(std::array::from_fn(|index| first + index as u64))
+}
+
 /// Closed set of descriptor categories.
 pub trait Category: sealed::Sealed + Copy + std::fmt::Debug {}
 

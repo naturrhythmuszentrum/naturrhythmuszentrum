@@ -48,22 +48,29 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
     let mut result = buffer(input.extent().entries())?;
     for index in 0..input.extent().entries() {
         let (center, radius) = operand(input, index)?;
-        result.push(
-            evaluate_entry(center, radius, function, index, context).map_err(
-                |cause| match cause {
-                    KernelError::Arithmetic(nrz_scalar::ArithmeticFailure::Overflow) => {
-                        KernelError::Domain {
-                            function,
-                            entry: index,
-                            reason: DomainReason::UnboundedImage,
-                        }
-                    }
-                    other => other,
-                },
-            )?,
-        );
+        result.push(evaluate_selected(center, radius, function, index, context)?);
     }
     Ok(result)
+}
+
+/// Preserve the dense wrapper's original-entry overflow mapping for selected access.
+pub(crate) fn evaluate_selected<P: Scalar>(
+    center: P,
+    radius: Nonnegative<P>,
+    function: Elementwise,
+    index: usize,
+    context: &ArithmeticContext,
+) -> Result<Entry<P>, KernelError> {
+    #[cfg(test)]
+    crate::loan::fault::entered_scalar();
+    evaluate_entry(center, radius, function, index, context).map_err(|cause| match cause {
+        KernelError::Arithmetic(nrz_scalar::ArithmeticFailure::Overflow) => KernelError::Domain {
+            function,
+            entry: index,
+            reason: DomainReason::UnboundedImage,
+        },
+        other => other,
+    })
 }
 
 /// Direct inclusion avoids a sampled derivative or a first-order-only nonlinear radius.

@@ -204,6 +204,12 @@ pub(super) struct Liveness {
     /// Same receipt identity through every move and repair.
     pub(super) receipt: u64,
 }
+#[cfg(test)]
+impl Drop for Liveness {
+    fn drop(&mut self) {
+        super::fault::witness_expiring(self.receipt);
+    }
+}
 /// Complete immutable bundle retained by its one registry root and explicit pins.
 #[derive(Debug)]
 pub(super) struct BundleOwner {
@@ -213,6 +219,8 @@ pub(super) struct BundleOwner {
 /// The entire mutually dependent channel group has no strong backedges.
 #[derive(Debug)]
 pub(super) struct Bundle {
+    /// Producer origin and sealed completion evidence, without a source retaining edge.
+    pub(super) origin: super::application::Origin,
     /// Exact original declaration.
     pub(super) declaration: Declaration,
     /// Exact occupations and request.
@@ -286,7 +294,31 @@ pub(super) struct Group {
     /// Initial pin-index occupation reserved before the detached core escapes.
     pub(super) pin: usize,
     /// Fixed cancellation inventory; each locator authenticates its exact allocation identity.
-    pub(super) debits: [Option<(usize, u64)>; 15],
+    pub(super) debits: DebitInventory,
+}
+/// Bounded cancellation inventories preserve the host's fifteen-entry representation.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum DebitInventory {
+    /// Host admission and its later filled owner.
+    Host([Option<(usize, u64)>; 15]),
+    /// Application admission includes its filled words, outcomes and per-cell extent.
+    Application([Option<(usize, u64)>; 17]),
+}
+impl DebitInventory {
+    /// Exact active variant, without inventing extra host debit positions.
+    pub(super) const fn entries(&self) -> &[Option<(usize, u64)>] {
+        match self {
+            Self::Host(entries) => entries,
+            Self::Application(entries) => entries,
+        }
+    }
+    /// Mutate only the fixed inventory selected at admission.
+    pub(super) const fn entries_mut(&mut self) -> &mut [Option<(usize, u64)>] {
+        match self {
+            Self::Host(entries) => entries,
+            Self::Application(entries) => entries,
+        }
+    }
 }
 /// Managed allocation states are independent of legacy arena occupations.
 #[derive(Debug)]
@@ -427,10 +459,17 @@ impl Registry {
     }
     /// Plan fixed per-occupation debit positions, reusing vacant entries before growing.
     pub(super) fn vacant_debits(&self, count: usize) -> Result<[usize; 15], LoanError> {
-        if count > 15 {
+        self.vacant_inventory(count)
+    }
+    /// Application admission selects a separately bounded seventeen-row inventory.
+    pub(super) fn vacant_inventory<const N: usize>(
+        &self,
+        count: usize,
+    ) -> Result<[usize; N], LoanError> {
+        if count > N {
             return Err(LoanError::CountOverflow);
         }
-        let mut slots = [0; 15];
+        let mut slots = [0; N];
         let mut found = 0;
         for (slot, entry) in self.debits.iter().enumerate() {
             if entry.is_none() && found < count {
