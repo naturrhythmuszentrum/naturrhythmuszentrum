@@ -136,8 +136,6 @@ use nrz_matrix::{PreparedExpm1, PreparedExpm1Error};
 use nrz_scalar::{ArithmeticContext, Expm1Failure, Expm1Input};
 #[path = "prepared_expm1/exp.rs"]
 mod exp;
-#[path = "prepared_expm1/observation.rs"]
-mod observation;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "independent oracle helpers remain private to this test target"
