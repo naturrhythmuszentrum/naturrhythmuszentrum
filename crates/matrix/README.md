@@ -1046,3 +1046,43 @@ For exact rational upper bound B on |expm1|, choose the smallest integer k with 
 The scalar composition follows checked addition and absolute endpoint admission, including the nominal-centre reading; it retains the prepare-and-freeze contract and `Cas::with_retained_graph` bookkeeping. The standalone scope (`dec:matrix:prepared-expm1-standalone-scope`) also covers this slice-and-`Vec` producer. Its fixed composition storage, complete basis ownership and input/output inventories are admitted once, before allocation or traversal. Fresh and reused ledgers, a warm graph and a caller prefix have independently reconstructed exact and one-below boundaries (`test:integration:prepared-exp-resources`). The complete constructor output boundary includes both the existing CAS registration and the returned composition inventory (`test:integration:prepared-exp-constructor-output`); a direct guard control isolates the returned output boundary when the earlier CAS check dominates (`test:unit:prepared-exp-output-boundary`). Observation runs in the isolated `prepared_observation` target under the same shared guard and proves no construction or exact events in reuse, with no kernel span on prepaid Work refusal (`test:integration:prepared-exp-observed-reuse`). The composition uses the expm1 authority and CAS surface through the declared dependencies, without a managed physical plan.
 
 Independent exact alternating sums and rational ties-to-even reconstruction test 73 distinct unsorted points and three boxes, including the exp image-midpoint and subnormal nominal interior (`test:integration:prepared-exp-independent-oracles`). Native controls distinguish exact zero, domain neighbours, signed below-normal magnitude, changed target and final spacing refusal using a checked basis (`test:integration:prepared-exp-native-refusals`). The public golden reader selects exp rows structurally and keeps E1, E2, E3, R2 and R4 with their own input and target (`test:integration:prepared-exp-golden-values`). A rational golden input is enclosed in binary64 neighbours; containment plus the entire composed image width proves the absolute slack at that original rational point. The R4 auxiliary request has no basis under the existing conservative law and reports basis failure, while a separate native test with an available basis isolates the final spacing refusal. Golden evidence is never re-derived in the fixture test.
+
+## Host sample analysis · `sec:matrix:host-sample-analysis`
+
+**Definition (Completed observations and bounded analysis)** · `def:matrix:host-sample-analysis`
+
+`sampling::analyze` consumes completed `SampleRow` values in seconds with validated `AnalysisSettings`, optional positive elements per item and a caller-supplied cancellation check. Success requires exactly the requested sample count (at least ten) and both complete bootstraps (at least one thousand draws each). Settings retain confidence, seed and independent report/scratch caps; the immutable `AnalysisReport` records settings, source/estimator revisions, all original observations and Tukey labels/counts/fences, mean, median, sample standard deviation, scaled MAD and the primary paired through-origin slope. Every estimate includes a percentile confidence interval and bootstrap sample standard error. No outlier is removed. Times never enter engine Work, resource limits, pins, refusals or numerical proof evidence. Collection, scheduling, warm-up, operation/reset/receipt adapters and measured build/timer overhead remain separate obligations in the design.
+
+**Rule (Cooperative analysis admission)** · `rule:matrix:host-analysis-admission`
+
+Sample and resample counts are bounded by `u32::MAX`; row, element and batch counts convert exactly within `0..=2^53`, with zero row/element counts refused. Count products, byte capacities, finite arithmetic, positive normalized times and regression denominators are checked. Report caps include the report record and observation capacity. Scratch caps include persistent buffer/workspace records and all temporary vector capacities; allocator metadata, bounded scalar call frames, caller input and callback storage are excluded. Reservations are fallible and checked against actual vector capacities. Bootstrap work allocates nothing after its buffers are admitted. Each traversal/draw, sorting heap level and random rejection attempt checks the caller's cancellation policy; allocation checks bracket each reservation. Uniform multiply-high rejection follows oorandom with a finite 128-attempt cap and an explicit error on exhaustion. Allocation/deallocation and callback execution bounds remain host assumptions. Cancellation or failure returns a typed `AnalysisError`, never a partial-confidence report. Fixed-data replay uses independent per-analysis generator state.
+
+**Rule (Rates and homogeneous batch scope)** · `rule:matrix:host-analysis-rates`
+
+`Throughput` reports items per second and, only for a declared element count, elements per second, reversing both primary-time interval endpoints. A nonpositive or nonfinite reciprocal produces an error. `AnalysisReport::extrapolate_batch` scales the slope and its interval by the nonnegative batch count, returns exact zeros for an empty batch, and checks count conversion and overflow. `BatchEstimate` describes uncertainty in the estimated mean serial total under the same warmed operation, representative population, machine, tracing and sequential execution conditions. It is not a future-batch prediction interval, worst-case bound or numerical certificate. Cold preparation, I/O, contention, throttling, changing caches and different parallelism require separately measured scopes. Bootstrap coverage is approximate and assumes representative, sufficiently stable observations; a narrow interval does not establish those assumptions. Separate class intervals do not imply a joint-confidence interval for their sum.
+
+**Example (Analyze fixed completed rows)** · `ex:matrix:host-analysis-rows`
+
+```rust
+use nrz_matrix::sampling::{analyze, AnalysisCaps, AnalysisSettings, SampleRow};
+
+let settings = AnalysisSettings::new(
+    10, 1000, 0.95, 42,
+    AnalysisCaps { report_bytes: 8192, scratch_bytes: 65536 },
+)?;
+let rows = [SampleRow { iterations: 1, elapsed_seconds: 2.0 }; 10];
+let report = analyze(&rows, settings, Some(8), |_| false)?;
+assert_eq!(report.observations().len(), 10);
+assert_eq!(report.extrapolate_batch(100)?.estimated_seconds.to_bits(), 200.0_f64.to_bits());
+# Ok::<(), nrz_matrix::sampling::AnalysisError>(())
+```
+
+**Observation (Independent fixed-data evidence)** · `obs:matrix:host-analysis-oracles`
+
+The analysis tests derive point statistics and Tukey fences by hand, enumerate all 27 ordered triples for normalized times `(2,3,4)` and paired rows `(1,2),(2,6),(3,12)`, and compare complete distributions, confidence endpoints and standard errors without calling extracted helpers in the oracle. Explicit indices separate estimator evidence from the seeded-generator/index-stream pin. Additional controls cover exact fence equality, equal data, retained outliers, phase cancellation, seed isolation, invalid settings/rows, arithmetic and allocation boundaries, reciprocal and batch overflow. No live-clock estimate or engine Work pin supplies statistical truth.
+
+## Licensing · `sec:matrix:licensing`
+
+**Rule (Owned additions and attributed statistics)** · `rule:matrix:license-inventory`
+
+Matrix additions remain AGPL-3.0-only under the unchanged root [LICENSE-CODE](../../LICENSE-CODE). The private Criterion 0.8.2 statistics extraction elects its MIT option and retains the complete [Criterion license](LICENSE-CRITERION), including Jorge Aparicio's copyright. Its [extraction notice](src/sampling/criterion/NOTICE) records selected upstream items, source revision, original SHA-256 hashes and safety adaptations. The separately linked `oorandom =11.1.5` dependency retains its [MIT notice](LICENSE-OORANDOM), including Simon Heath's copyright. Documentation and templates are CC0-1.0 under the root [LICENSE-DOCS](../../LICENSE-DOCS). Upstream changes require explicit source comparison, adaptation review and independent statistical evidence.

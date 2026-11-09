@@ -664,6 +664,7 @@ dependencies = [
  "nrz-bindings",
  "nrz-docgen",
  "nrz-scalar",
+ "oorandom",
  "thiserror 2.0.21",
  "tracing",
 ]
@@ -749,6 +750,12 @@ name = "once_cell_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
+
+[[package]]
+name = "oorandom"
+version = "11.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6790f58c7ff633d8771f42965289203411a5e5c68388703c06e14f24770b41e"
 
 [[package]]
 name = "paste"

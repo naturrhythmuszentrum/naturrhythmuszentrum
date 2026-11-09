@@ -86,6 +86,7 @@
         "nrz-accuracy",
         "nrz-bindings",
         "nrz-scalar",
+        "oorandom",
         "thiserror",
         "tracing"
       ],

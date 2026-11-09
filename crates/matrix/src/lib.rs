@@ -47,6 +47,8 @@ mod storage;
 mod loan;
 pub use loan::*;
 
+pub mod sampling;
+
 mod lc_relation;
 mod prepared_expm1;
 pub use prepared_expm1::{ExpEvaluation, ExpPreparationPolicy, PreparedExp, PreparedExpError};

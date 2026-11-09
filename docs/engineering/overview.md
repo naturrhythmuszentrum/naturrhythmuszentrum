@@ -13,7 +13,7 @@ This set records the adopted scalar, accuracy and documentation-generator surfac
 |`nrz-docgen`|Deterministic documentation datasets, rendering, and fixed-point checks|clap, minijinja, nrz-bindings, nrz-cas, serde, serde_json, thiserror, toml, tracing|tempfile||
 |`nrz-scalar`|Finite binary element arithmetic with outward enclosures|thiserror, tracing|num-bigint, num-rational, num-traits||
 |`nrz-accuracy`|Dimension-neutral nonnegative bounds and conservative accuracy policies|nrz-scalar, tracing|num-bigint, num-rational, num-traits||
-|`nrz-matrix`|Typed descriptor heap with owned numerical regions and bound companions|faer, nrz-accuracy, nrz-bindings, nrz-scalar, thiserror, tracing|nrz-docgen||
+|`nrz-matrix`|Typed descriptor heap with owned numerical regions and bound companions|faer, nrz-accuracy, nrz-bindings, nrz-scalar, oorandom, thiserror, tracing|nrz-docgen||
 |`nrz-bindings`|Data-time quantity descriptors and checks over original symbolic expressions|nrz-cas, thiserror, tracing|||
 |`nrz-cas`|Exact graph construction and checked symbolic derivations|num-bigint, num-complex, num-integer, num-rational, num-traits, petgraph, tracing|||
 

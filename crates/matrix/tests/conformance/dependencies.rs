@@ -57,6 +57,8 @@ const PACKAGES: [Package; 6] = [
         name: "nrz-matrix",
         manifest: "crates/matrix/Cargo.toml",
         normal: &[
+            // dec:nrz:host-sampling selects Criterion's generator for matrix alone.
+            "oorandom",
             "tracing",
             "faer",
             "nrz-scalar",

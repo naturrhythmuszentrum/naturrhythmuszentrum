@@ -1,0 +1,63 @@
+Criterion statistics extraction for nrz-matrix
+
+Criterion 0.8.2; source revision 7f0d745532e3c7b2e11bbf9de9b911f91790d3b1.
+Copyright (c) 2014 Jorge Aparicio. The MIT option of MIT OR Apache-2.0
+is elected. The complete upstream notice is in crates/matrix/LICENSE-CRITERION.
+NRZ additions are AGPL-3.0-only under the unchanged root LICENSE-CODE.
+The separately linked oorandom 11.1.5 MIT notice is in
+crates/matrix/LICENSE-OORANDOM (Copyright (c) 2019 Simon Heath).
+
+Extraction inventory:
+mod.rs: src/analysis/mod.rs common normalization/classification, estimates and
+regression; src/estimate.rs concrete point/distribution assembly.
+sample.rs: src/stats/univariate/sample.rs Sample::new, sum, mean, var, std_dev,
+percentiles, median_abs_dev; src/stats/mod.rs sum.
+percentiles.rs: src/stats/univariate/percentiles.rs at, median, quartiles and
+at_unchecked interpolation; sample.rs percentile ordering.
+tukey.rs: src/stats/univariate/outliers/tukey.rs classify, Label and LabeledSample
+fences/counts/iteration, exposed as original-order diagnostic records.
+bootstrap.rs: src/stats/univariate/sample.rs sequential single-sample bootstrap;
+src/stats/univariate/resamples.rs Resamples::new/next; src/stats/bivariate/mod.rs
+sequential paired bootstrap; src/stats/bivariate/resamples.rs Resamples::new/next.
+regression.rs: src/stats/bivariate/mod.rs Data::new/iter;
+src/stats/bivariate/regression.rs Slope::fit; src/stats/mod.rs dot.
+estimate.rs: src/stats/mod.rs Distribution::from/confidence_interval;
+src/estimate.rs Estimate, ConfidenceInterval, build_estimates;
+src/analysis/mod.rs estimates and regression estimate assembly.
+random.rs: src/stats/rand_util.rs Rng/new_rng and resample index selection.
+The multiply-high index algorithm follows oorandom 11.1.5 Rand64::rand_range;
+the dependency's MIT attribution accompanies its separately linked license.
+
+Safety adaptations: f64-only validated slice views replace representation casts;
+checked counts and finite intermediates replace assertions and unchecked access;
+fallible buffers replace unchecked allocation; in-place heapsort and loop
+checkpoints make ordinary analysis cooperative. Counts convert exactly within
+the documented domains. A sampler-owned recorded seed replaces clock-seeded
+thread-local state. Uniform multiply-high rejection checks cancellation on every
+attempt and returns a typed error after 128 rejections. No rejected sample becomes
+an estimate. All original rows, including Tukey outliers, remain in estimation.
+Estimator revision: criterion-0.8.2-nrz-safe-1. Variance uses n-1, scaled MAD uses
+1.4826, confidence uses interpolated percentiles, and bootstrap standard error
+is the bootstrap sample standard deviation. Successful statistical definitions
+are unchanged. A seed reproduces fixed-row statistics, not live timings.
+
+Omitted: two-sample bootstrap (the supplied univariate/mod.rs is provenance
+context only), generic float/tuple machinery, r_squared, p values, tails,
+relative comparisons, KDE, mixed distributions, parallel execution, clocks,
+harnesses, plots, baseline/file/console plumbing and collection/scheduling.
+The independent NRZ tests are original additions, not imported upstream tests.
+
+SHA-256 of the original, unmodified source files supplied for this extraction:
+5747789ae510ff9dc9f21a32fff7cda3c5d46f38f10caac80fb2d0ed3ac1cbab  src/stats/mod.rs
+81a534825eb660ad48861da4d126d1d55a8c618dc55f486cb18a7b154ece8890  src/stats/univariate/sample.rs
+0aa72ca3700f9f06af0ad520ffd14f1c7b2a3ee7956dec071b4784d31e455aa9  src/stats/univariate/resamples.rs
+e9b02b54a17f174b3ebae4985d9ecbcc3da317f19e4b5b732aa2cebc209ec589  src/stats/univariate/percentiles.rs
+d665f706ec51588f2608d41038dd098240d2ee43a6cd752b1bfe817958bff5f5  src/stats/univariate/outliers/tukey.rs
+229916b3ddb3f9ff83a977e465c142a937c8b3121213856d625409b4159563fc  src/stats/univariate/mod.rs
+f64311738640d15b73132d29cbbf1d32185984bb674dfe03c14dff328f912a3d  src/stats/bivariate/mod.rs
+a47c716d093cea72bae7b207929c14f1a1748c053ba2b06e6f91624fc60bf4df  src/stats/bivariate/resamples.rs
+4f4ad06cab2a9a78e218676029a9fe5d3a3b7f5289b5297395b30b9735228b92  src/stats/bivariate/regression.rs
+f605ef3535aa77c777a910b2c8aa7bb9aebba1f8c74b1358ee909e10b3251b76  src/estimate.rs
+7195f628c52d0145838af0266c8db3a760a12718d0d788df62ed5068975e0cad  src/analysis/mod.rs
+fcadb36c2dd65534d9ad01f5a1e167f208ab965919608220abc02bbdf9a4a95b  src/stats/rand_util.rs
+4594f18866be94a3ce309ed8f94d92699f5b87739b76e1216addca75f5253fa7  LICENSE-MIT
