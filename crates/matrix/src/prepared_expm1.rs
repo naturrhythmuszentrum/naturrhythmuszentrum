@@ -115,8 +115,16 @@ impl<'a> PreparedExpm1<'a> {
                 let proof = authority.proof();
                 let mut coefficients = [0.0; 128];
                 // Inventory admission prepaid all coefficient reads, before this walk.
-                for (slot, value) in coefficients.iter_mut().zip(&proof.coefficients) {
-                    *slot = coefficient(value.significand, value.exponent)?;
+                {
+                    let _import = tracing::trace_span!(
+                        "nrz.import",
+                        family = "prepared-expm1-coefficients",
+                        revision = 1_u64
+                    )
+                    .entered();
+                    for (slot, value) in coefficients.iter_mut().zip(&proof.coefficients) {
+                        *slot = coefficient(value.significand, value.exponent)?;
+                    }
                 }
                 let last = proof.stages.last().ok_or(Expm1Failure::MalformedPlan)?;
                 let absolute = last.error.add(&proof.absolute_tail, budget)?;
