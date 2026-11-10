@@ -2,6 +2,9 @@
 //! Controls for the shared standalone measurement implementation.
 use super::*;
 
+#[path = "sampling_controls.rs"]
+mod sampling_controls;
+
 /// Independent five-plus-five tariff separates children from the remainder.
 /// Seven prior Work is outside observation; eleven trailing Work is unclassified.
 /// # Errors

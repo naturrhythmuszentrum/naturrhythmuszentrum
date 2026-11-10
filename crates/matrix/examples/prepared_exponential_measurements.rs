@@ -21,11 +21,27 @@ mod support;
 )]
 mod trace;
 
+#[path = "prepared_exponential/common.rs"]
+#[allow(
+    clippy::redundant_pub_crate,
+    reason = "shared at different module depths in example and integration target"
+)]
+mod common;
+#[cfg(test)]
+use common::admitted_inputs;
+use common::{Snapshot, inputs, snapshot_exp, snapshot_expm1};
+#[cfg(test)]
+#[path = "prepared_exponential/sampling.rs"]
+#[allow(dead_code, reason = "controls exercise adapters rather than their CLI")]
+#[allow(
+    clippy::redundant_pub_crate,
+    reason = "shared at different module depths in example and integration target"
+)]
+mod sampling;
+
 use nrz_bindings::readings::algebra::enclosure::prepared_expm1::{Counts, Outcome, Policy};
 use nrz_matrix::{PreparedExp, PreparedExpm1};
-use nrz_scalar::{
-    ArithmeticContext, ExpFailure, ExpInput, ExpOutput, Expm1Failure, Expm1Input, Expm1Output,
-};
+use nrz_scalar::{ArithmeticContext, ExpFailure, ExpInput, Expm1Failure, Expm1Input};
 use std::hint::black_box;
 use std::io::{self, Write};
 use std::time::Instant;
@@ -50,43 +66,6 @@ struct Observation {
     seconds: f64,
     /// Every output is consumed; this reproducible checksum is not a reference value.
     checksum: u64,
-}
-
-/// Exact represented result identity, including typed refusals.
-#[derive(Debug, PartialEq, Eq)]
-enum Snapshot {
-    /// Endpoints, centre, total radius and numerical error, or the expm1 cause.
-    Expm1(Result<[u64; 5], Expm1Failure>),
-    /// Endpoints, centre, total radius and numerical error, or the exp cause.
-    Exp(Result<[u64; 5], ExpFailure>),
-}
-
-/// Preserve every expm1 field rather than a lossy centre checksum.
-fn snapshot_expm1(result: Result<Expm1Output, Expm1Failure>) -> Snapshot {
-    Snapshot::Expm1(result.map(|value| {
-        [
-            value.endpoints[0],
-            value.endpoints[1],
-            value.center,
-            value.total_radius,
-            value.numerical_error,
-        ]
-        .map(f64::to_bits)
-    }))
-}
-
-/// Preserve every exp field and its exact refusal variant.
-fn snapshot_exp(result: Result<ExpOutput, ExpFailure>) -> Snapshot {
-    Snapshot::Exp(result.map(|value| {
-        [
-            value.endpoints[0],
-            value.endpoints[1],
-            value.center,
-            value.total_radius,
-            value.numerical_error,
-        ]
-        .map(f64::to_bits)
-    }))
 }
 
 /// Compare the actual timed native results with ordered materialized batch results.
@@ -164,29 +143,6 @@ fn write_run(count: u32, enabled: bool, out: &mut impl Write) -> TestResult {
     }
     out.flush()?;
     Ok(())
-}
-
-/// Bound supplied populations before allocation; the fixture is not a public numerical API.
-fn inputs(count: u32) -> TestResult<Vec<f64>> {
-    admitted_inputs(count, |count| {
-        // Multiplication by an odd number permutes a power-of-two population.
-        // The last two entries are replaced by distinct cancellation-sensitive points.
-        let mut values: Vec<_> = (0..count)
-            .map(|i| -2.0 * f64::from((i * 13) % count) / f64::from(count))
-            .collect();
-        let end = values.len();
-        values[end - 2] = -2.0_f64.powi(-40);
-        values[end - 1] = -2.0_f64.powi(-10) / f64::from(count);
-        values
-    })
-}
-
-/// Admission precedes calling the allocation-producing population builder.
-fn admitted_inputs(count: u32, build: impl FnOnce(u32) -> Vec<f64>) -> TestResult<Vec<f64>> {
-    if !(4..=4096).contains(&count) || !count.is_power_of_two() {
-        return Err("cell count must be a power of two between 4 and 4096".into());
-    }
-    Ok(build(count))
 }
 
 /// Observation loss invalidates the measurement, never changes the numerical outcome.
