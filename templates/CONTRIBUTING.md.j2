@@ -11,7 +11,23 @@ A commit on main is one meaningful unit of work: one coherent change that is rev
 
 **Rule (Commit subject and body)** · `rule:nrz:commit-subject-and-body`
 
-Each commit has one Conventional Commits subject of at most 72 characters and a non-empty body stating why the change is needed. The subject names the coherent change; the body supplies its justification so the reviewer can assess purpose as well as implementation. The gate checks the commit policy over every commit past the base (`gate:nrz:verification-of-candidate`).
+Each commit has one Conventional Commits subject of at most 72 characters in total and a non-empty body stating why the change is needed. The subject names the coherent change; the body supplies its justification so the reviewer can assess purpose as well as implementation. The gate checks subject syntax and body presence over every commit past the base (`gate:nrz:verification-of-candidate`).
+
+The accepted subject forms are `type: description`, `type(scope): description`, `type!: description`, and `type(scope)!: description`. The optional scope contains one or more lowercase ASCII letters, digits, `.`, `_`, or `-`; the optional `!` immediately before the colon marks a breaking change. The colon is followed by one space and a description starting with a lowercase ASCII letter (`a` through `z`). The project's 72-character total limit includes the type, scope, punctuation, spaces, and description.
+
+Use one of these nine types:
+
+- `feat`: add engine or tooling capabilities.
+- `fix`: correct faulty behavior.
+- `docs`: change documentation, including measurement and dataset records; use the scope `engineering` for engineering records.
+- `chore`: maintain repository housekeeping.
+- `refactor`: restructure code without changing its behavior.
+- `test`: add or correct tests and their supporting fixtures.
+- `perf`: improve runtime or memory performance.
+- `build`: change build configuration or dependencies.
+- `style`: change code formatting or whitespace without changing behavior.
+
+Generated renders travel with their cause under the cause's type (`rule:nrz:generated-artifacts-with-causes`). Subjects starting with `squash:` never ship; fold working squashes before shipping (`rule:nrz:fold-working-squashes`). The body must remain non-empty after ignoring blank lines and `Co-Authored-By:`, `Signed-off-by:`, and `Reviewed-by:` trailers; trailers alone do not explain why the change is needed.
 
 **Rule (Generated artifacts accompany their causes)** · `rule:nrz:generated-artifacts-with-causes`
 
