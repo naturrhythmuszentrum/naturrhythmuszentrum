@@ -13,6 +13,7 @@ mod payload;
 pub(crate) mod preparation;
 mod reader;
 mod registry;
+mod retained_expm1;
 mod scans;
 
 pub use account::ExecutionAccount;
@@ -30,6 +31,7 @@ pub use registry::{
     QualifiedMaskVersion,
 };
 pub(crate) use registry::{ManagedDescriptor, Registry};
+pub use retained_expm1::{RetainedExpm1, RetainedExpm1Error, RetainedExpm1Inventory};
 pub use scans::{Residence, ScanCursor, ScanOutcome};
 
 use nrz_bindings::{Budget, readings::algebra::Location};

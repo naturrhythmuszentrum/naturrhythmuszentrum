@@ -93,6 +93,7 @@ pub(super) fn handback<P: Scalar + 'static>(
         receipt: identity.receipt,
     };
     bundle_shell.payload = Some(Bundle {
+        retained_law: loan.core.retained_law,
         origin: crate::loan::application::Origin::host(),
         declaration: loan.core.declaration,
         identity,
@@ -235,7 +236,7 @@ fn prepare<P: Scalar + 'static>(
         debit_slot,
         debit: Debit {
             kind: crate::loan::registry::AllocationKind::Filled,
-            owner: identity,
+            owner: crate::loan::registry::DebitOwner::Bundle(identity),
             key,
             elements: 0,
             bytes,

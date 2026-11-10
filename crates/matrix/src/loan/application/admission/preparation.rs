@@ -111,6 +111,7 @@ pub(super) fn prepare<P: Scalar + 'static>(
         population: extra.population,
         candidate: false,
         host: crate::loan::lifecycle::HostCore {
+            retained_law: None,
             identity,
             declaration,
             channels,
@@ -284,7 +285,7 @@ fn token(
     let slot = *slots.get(debits.len()).ok_or(LoanError::WrongLoan)?;
     debits.push(Debit {
         kind,
-        owner: identity,
+        owner: crate::loan::registry::DebitOwner::Bundle(identity),
         key,
         elements,
         bytes,

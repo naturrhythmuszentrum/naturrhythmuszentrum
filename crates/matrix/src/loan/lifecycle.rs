@@ -54,6 +54,8 @@ pub struct OwnedLoan<P: Scalar> {
 /// Destruction order releases numerical owners and all use edges before the final witness.
 #[derive(Debug)]
 pub(super) struct HostCore {
+    /// A later checked consumer may move one funded law use through every wrapper.
+    pub(super) retained_law: Option<super::retained_expm1::Attachment>,
     /// Complete exact ownership authority.
     pub(super) identity: Identity,
     /// Original binding declaration.
@@ -280,6 +282,9 @@ impl Heap {
         account: &ExecutionAccount,
     ) -> Result<(), LoanError> {
         account.authenticate(core.identity.account)?;
+        if let Some(law) = &core.retained_law {
+            law.validate_current(self)?;
+        }
         self.authenticate_identity(core.identity)?;
         let State::Out(witness) = &self.loans.group(core.identity)?.state else {
             return Err(LoanError::DuplicateReturn);
@@ -312,7 +317,12 @@ impl Heap {
             .ledger
             .with_work_phase(super::FAMILY, "return authentication", |budget| {
                 // Request authentication, two group lookups, each channel/debit row and witness.
-                charge(budget, 9 + 4 * loan.core.channels.iter().flatten().count())
+                charge(
+                    budget,
+                    9 + 4 * loan.core.channels.iter().flatten().count()
+                        + super::retained_expm1::Attachment::WORK
+                            * usize::from(loan.core.retained_law.is_some()),
+                )
             })
             .and_then(|()| self.authenticate_core(&loan.core, account));
         if let Err(error) = authenticated {

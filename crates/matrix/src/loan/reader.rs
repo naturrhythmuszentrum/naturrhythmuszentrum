@@ -76,11 +76,20 @@ impl<P: Scalar + 'static> BundlePin<P> {
         account
             .ledger
             .with_work_phase(super::FAMILY, "historical reader", |budget| {
-                charge(budget, 3)?;
+                let has_law = pin
+                    .bundle
+                    .payload
+                    .as_ref()
+                    .is_some_and(|bundle| bundle.retained_law.is_some());
+                charge(budget, 3 + usize::from(has_law))?;
+                let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+                if let Some(law) = &bundle.retained_law {
+                    law.validate()?;
+                }
                 self.checked_reader()
             })
     }
-    /// Private sealed attachment checks add no use edge and borrow the complete owner.
+    /// Private layout checks borrow the complete owner after its charged law authentication.
     pub(super) fn checked_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
         let pin = self.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
         let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
@@ -293,7 +302,11 @@ impl Heap {
         let channels = bundle.channels.iter().flatten().count();
         charge(
             budget,
-            channels + 5 + usize::from(bundle.origin.evidence.is_some()),
+            channels
+                + 5
+                + usize::from(bundle.origin.evidence.is_some())
+                + super::retained_expm1::Attachment::WORK
+                    * usize::from(bundle.retained_law.is_some()),
         )?;
         self.validate_published_bundle(bundle)?;
         charge(budget, channels + 1)?;
@@ -457,7 +470,7 @@ impl Heap {
                     debit_slot,
                     Debit {
                         kind: super::registry::AllocationKind::Pin,
-                        owner: identity,
+                        owner: crate::loan::registry::DebitOwner::Bundle(identity),
                         key,
                         elements: 0,
                         bytes,

@@ -102,54 +102,21 @@ impl<'a> PreparedExpm1<'a> {
         budget: &mut Budget,
         counts: &mut Counts,
     ) -> Result<Self, PreparedExpm1Error> {
-        let Outcome::Ready(authority) = cas.prepare_expm1(request, policy, budget, counts)? else {
-            return Err(PreparedExpm1Error::TargetNotCertifiable);
-        };
-        budget.with_work_phase("prepared-expm1", "nrz.lower", |budget| {
-            let bytes = inventory(&authority, budget)?.saturating_add(size_of::<Self>() as u64);
-            budget.check(BudgetKind::OutputBytes, bytes, AT)?;
-            let retained = bytes.saturating_add(size_of::<[f64; 128]>() as u64);
-            let program = cas.with_retained_graph(budget, |budget| {
-                budget.with_retained_payload(retained, AT, |budget| {
-                correspondence(cas, authority.request(), domain, budget)?;
-                let proof = authority.proof();
-                let mut coefficients = [0.0; 128];
-                // Inventory admission prepaid all coefficient reads, before this walk.
-                {
-                    let _import = tracing::trace_span!(
-                        "nrz.import",
-                        family = "prepared-expm1-coefficients",
-                        revision = 1_u64
-                    )
-                    .entered();
-                    for (slot, value) in coefficients.iter_mut().zip(&proof.coefficients) {
-                        *slot = coefficient(value.significand, value.exponent)?;
-                    }
-                }
-                let last = proof.stages.last().ok_or(Expm1Failure::MalformedPlan)?;
-                let absolute = last.error.add(&proof.absolute_tail, budget)?;
-                let absolute_error = outward_power(&absolute, budget)?;
-                let parameters = Expm1Parameters {
-                    domain,
-                    bits: authority.request().bits,
-                    radius_bits: proof.radius_bits,
-                    absolute_error,
-                    environment: authority.request().environment,
-                };
-                let program =
-                    Expm1Program::new(&coefficients[..proof.degree as usize], parameters, context)?;
-                tracing::event!(name: "nrz.construct", target: "nrz::work", tracing::Level::TRACE,
-                    family = "prepared-expm1", revision = 1_u64,
-                    operation = "native program", count = 1_u64);
-                Ok::<_, PreparedExpm1Error>(program)
-                })
-            })?;
-            Ok(Self {
-                graph: cas,
-                authority,
-                program,
-                bytes,
-            })
+        let parts = owned_parts(
+            cas,
+            request,
+            domain,
+            policy,
+            context,
+            budget,
+            counts,
+            size_of::<Self>() as u64,
+        )?;
+        Ok(Self {
+            graph: cas,
+            bytes: parts.evidence.saturating_add(size_of::<Self>() as u64),
+            authority: parts.authority,
+            program: parts.program,
         })
     }
 
@@ -219,6 +186,96 @@ impl<'a> PreparedExpm1<'a> {
             })
         })
     }
+}
+
+/// Provenance-bound owned parts, moved into either borrowing or encapsulating ownership.
+#[derive(Debug)]
+pub(crate) struct OwnedParts {
+    /// The actual authority returned by this preparation, never an admitted substitute.
+    pub(crate) authority: Box<Prepared>,
+    /// Inline fixed-capacity native program.
+    pub(crate) program: Expm1Program,
+    /// Conservative exact-evidence allowance, excluding graph and owner headers.
+    pub(crate) evidence: u64,
+}
+impl OwnedParts {
+    /// Native reuse borrows its paired authority without entering the graph.
+    pub(crate) fn evaluate(
+        &self,
+        input: Expm1Input,
+        context: &ArithmeticContext,
+    ) -> Result<Expm1Evaluation<'_>, Expm1Failure> {
+        self.program
+            .evaluate(input, context)
+            .map(|output| Expm1Evaluation {
+                output,
+                authority: &self.authority,
+            })
+    }
+}
+/// Only preparation can produce owned authority/program parts; the mutable borrow ends here.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the shared prelude preserves the borrowed API and its header allowance"
+)]
+pub(crate) fn owned_parts(
+    cas: &mut Cas,
+    request: &Request,
+    domain: [f64; 2],
+    policy: Policy,
+    context: &ArithmeticContext,
+    budget: &mut Budget,
+    counts: &mut Counts,
+    header_bytes: u64,
+) -> Result<OwnedParts, PreparedExpm1Error> {
+    let Outcome::Ready(authority) = cas.prepare_expm1(request, policy, budget, counts)? else {
+        return Err(PreparedExpm1Error::TargetNotCertifiable);
+    };
+    budget.with_work_phase("prepared-expm1", "nrz.lower", |budget| {
+        let bytes = inventory(&authority, budget)?.saturating_add(header_bytes);
+        budget.check(BudgetKind::OutputBytes, bytes, AT)?;
+        let retained = bytes.saturating_add(size_of::<[f64; 128]>() as u64);
+        let program = cas.with_retained_graph(budget, |budget| {
+            budget.with_retained_payload(retained, AT, |budget| {
+                correspondence(cas, authority.request(), domain, budget)?;
+                let proof = authority.proof();
+                let mut coefficients = [0.0; 128];
+                // Inventory admission prepaid all coefficient reads, before this walk.
+                {
+                    let _import = tracing::trace_span!(
+                        "nrz.import",
+                        family = "prepared-expm1-coefficients",
+                        revision = 1_u64
+                    )
+                    .entered();
+                    for (slot, value) in coefficients.iter_mut().zip(&proof.coefficients) {
+                        *slot = coefficient(value.significand, value.exponent)?;
+                    }
+                }
+                let last = proof.stages.last().ok_or(Expm1Failure::MalformedPlan)?;
+                let absolute = last.error.add(&proof.absolute_tail, budget)?;
+                let absolute_error = outward_power(&absolute, budget)?;
+                let parameters = Expm1Parameters {
+                    domain,
+                    bits: authority.request().bits,
+                    radius_bits: proof.radius_bits,
+                    absolute_error,
+                    environment: authority.request().environment,
+                };
+                let program =
+                    Expm1Program::new(&coefficients[..proof.degree as usize], parameters, context)?;
+                tracing::event!(name: "nrz.construct", target: "nrz::work", tracing::Level::TRACE,
+                    family = "prepared-expm1", revision = 1_u64,
+                    operation = "native program", count = 1_u64);
+                Ok::<_, PreparedExpm1Error>(program)
+            })
+        })?;
+        Ok(OwnedParts {
+            authority,
+            program,
+            evidence: bytes - header_bytes,
+        })
+    })
 }
 
 /// Inventory ceilings and its traversal tariff precede every supplied-record walk.

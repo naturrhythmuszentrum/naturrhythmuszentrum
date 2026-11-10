@@ -44,7 +44,11 @@ pub(super) fn publish<P: Scalar + 'static>(
         super::FAMILY,
         "application return authentication",
         |budget| {
-            charge(budget, 25)?;
+            charge(
+                budget,
+                25 + crate::loan::retained_expm1::Attachment::WORK
+                    * usize::from(owner.core.host.retained_law.is_some()),
+            )?;
             authenticate(heap, &owner.core, account.identity)
         },
     );
@@ -78,6 +82,9 @@ fn authenticate<P: Scalar>(
         return Err(LoanError::ForeignAccount);
     }
     heap.authenticate_identity(core.host.identity)?;
+    if let Some(law) = &core.host.retained_law {
+        law.validate_current(heap)?;
+    }
     if core.host.channels.iter().any(Option::is_none)
         || core.host.identity.channels.iter().any(Option::is_none)
     {
@@ -313,6 +320,7 @@ fn finish<P: Scalar + 'static>(
     let pin_identity = pin_token.key;
     if let Some(bundle) = Rc::get_mut(&mut host.bundle) {
         bundle.payload = Some(Bundle {
+            retained_law: host.retained_law,
             origin: Origin::application(evidence),
             declaration: host.declaration,
             identity,

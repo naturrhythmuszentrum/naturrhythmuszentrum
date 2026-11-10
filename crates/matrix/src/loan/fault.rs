@@ -4,6 +4,8 @@
 use super::LoanError;
 use std::cell::Cell;
 thread_local! {
+    /// Diagnostic unwind at a refused allocation, confined to this test thread.
+    static UNWIND: Cell<bool> = const { Cell::new(false) };
     /// Actual filled-membership visits during publication, independent of charged Work.
     static PUBLICATION_CELLS: Cell<usize> = const { Cell::new(0) };
     /// A test watches one exact application's source edge at final witness destruction.
@@ -52,6 +54,12 @@ impl Injection {
         PREFIX.set([0; 3]);
         Self
     }
+    /// Unwind at an acquisition boundary to exercise lexical prefix destruction.
+    pub(crate) fn unwinding_after(allocations: usize) -> Self {
+        let injection = Self::after(allocations);
+        UNWIND.set(true);
+        injection
+    }
     /// Last preparation's precise acquired-prefix cleanup, independent of allocator attempts.
     pub(super) fn prefix() -> [usize; 3] {
         PREFIX.get()
@@ -92,6 +100,7 @@ impl Injection {
 impl Drop for Injection {
     fn drop(&mut self) {
         REMAINING.set(None);
+        UNWIND.set(false);
     }
 }
 /// Call immediately before an actual allocation, after cleanup prepayment.
@@ -101,6 +110,7 @@ pub(crate) fn before() -> Result<(), LoanError> {
     };
     ATTEMPTS.set(ATTEMPTS.get() + 1);
     if remaining == 0 {
+        assert!(!UNWIND.get(), "injected allocation unwind");
         return Err(LoanError::AllocationRefused);
     }
     REMAINING.set(Some(remaining - 1));
@@ -188,6 +198,7 @@ pub(super) fn watch_source_release(
 }
 /// Observe input release before the final liveness witness expires.
 pub(super) fn witness_expiring(receipt: u64) {
+    super::retained_expm1::tests::witness_expiring(receipt);
     WITNESS_SOURCE.with_borrow_mut(|watch| {
         if let Some((expected, source)) = watch
             && *expected == receipt

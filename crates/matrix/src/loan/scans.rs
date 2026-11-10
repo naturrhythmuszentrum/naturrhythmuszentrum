@@ -148,6 +148,7 @@ impl Heap {
             self.executions.trace_work(),
             self.loans.groups.len(),
             self.loans.pins.len(),
+            self.loans.debits.len(),
         ]
         .into_iter()
         .try_fold(0usize, |sum, work| {
@@ -175,6 +176,11 @@ impl Heap {
                 .pins
                 .iter()
                 .fold(false, |found, pin| pin.is_some() | found)
+            | self
+                .loans
+                .debits
+                .iter()
+                .fold(false, |found, debit| debit.is_some() | found)
             | self.storage.has_owners()
             | self.executions.has_payload()
             | (self.masks.layouts.iter().count() != 0)
@@ -202,6 +208,9 @@ impl Heap {
         &self,
         bundle: &super::registry::Bundle,
     ) -> Result<(), LoanError> {
+        if let Some(law) = &bundle.retained_law {
+            law.validate_current(self)?;
+        }
         let receipt_matches = bundle.cleanup.identity == bundle.identity.receipt;
         if !receipt_matches {
             return Err(LoanError::WrongLoan);
@@ -240,7 +249,12 @@ impl Heap {
             revision: self.loans.revision,
             reclaim,
             next: 0,
-            end: self.loans.groups.len() + if reclaim { 0 } else { self.loans.pins.len() },
+            end: self.loans.groups.len()
+                + if reclaim {
+                    0
+                } else {
+                    self.loans.pins.len() + self.loans.debits.len()
+                },
             changed: false,
         }
     }
@@ -300,6 +314,10 @@ impl Heap {
         slot: usize,
         budget: &mut nrz_bindings::Budget,
     ) -> Result<(), LoanError> {
+        let prepared_start = self.loans.groups.len() + self.loans.pins.len();
+        if slot >= prepared_start {
+            return self.reconcile_prepared(slot - prepared_start, budget);
+        }
         if slot >= self.loans.groups.len() {
             let index = slot - self.loans.groups.len();
             if let Some(pin) = self.loans.pins.get(index).and_then(Option::as_ref)
@@ -346,6 +364,44 @@ impl Heap {
         self.loans.pending -= 1;
         Ok(())
     }
+    /// A law owner and each expired use are distinct authenticated removal events.
+    fn reconcile_prepared(
+        &mut self,
+        slot: usize,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<(), LoanError> {
+        use super::registry::{AllocationKind, DebitOwner};
+        let Some(debit) = self.loans.debits.get(slot).and_then(Option::as_ref) else {
+            return Ok(());
+        };
+        let expired = match &debit.kind {
+            AllocationKind::PreparedOwner { witness, .. } => witness.strong_count() == 0,
+            AllocationKind::PreparedUse(witness) => witness.strong_count() == 0,
+            AllocationKind::Numerical
+            | AllocationKind::Tracking
+            | AllocationKind::Owner
+            | AllocationKind::Pin
+            | AllocationKind::Filled => return Ok(()),
+        };
+        let DebitOwner::Prepared(identity) = debit.owner else {
+            return Err(LoanError::WrongLoan);
+        };
+        if identity.scope != self.scope || identity.owner == 0 || identity.account == 0 {
+            return Err(LoanError::WrongLoan);
+        }
+        if matches!(debit.kind, AllocationKind::PreparedOwner { .. }) && debit.key != identity.owner
+        {
+            return Err(LoanError::WrongLoan);
+        }
+        if expired {
+            let revision = self.loans.next_revision()?;
+            charge(budget, 1)?;
+            let key = debit.key;
+            self.loans.release(slot, key);
+            self.loans.revision = revision;
+        }
+        Ok(())
+    }
     /// Prepay outgoing/index traversal before removing a protected root or any related record.
     fn reclaim_slot(
         &mut self,
@@ -384,7 +440,9 @@ impl Heap {
                 budget,
                 identity.channels.iter().flatten().count()
                     + 5
-                    + usize::from(bundle.origin.evidence.is_some()),
+                    + usize::from(bundle.origin.evidence.is_some())
+                    + super::retained_expm1::Attachment::WORK
+                        * usize::from(bundle.retained_law.is_some()),
             )?;
             self.validate_published_bundle(bundle)?;
         }

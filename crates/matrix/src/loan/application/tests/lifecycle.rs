@@ -45,7 +45,7 @@ fn source_reclamation<P: Scalar + 'static>() -> TestResult {
             .debits
             .iter()
             .flatten()
-            .all(|debit| debit.owner != source.identity)
+            .all(|debit| debit.owner != crate::loan::registry::DebitOwner::Bundle(source.identity))
     );
     let current = tile.reader(&heap, &mut account)?;
     assert!(matches!(

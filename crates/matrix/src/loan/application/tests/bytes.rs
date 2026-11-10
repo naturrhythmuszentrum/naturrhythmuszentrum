@@ -28,6 +28,7 @@ struct Slot<T> {
 /// Independent host-core field inventory, including the final strong liveness handle.
 #[repr(C)]
 struct HostMirror {
+    retained_law: Option<crate::loan::retained_expm1::tests::bytes::AttachmentMirror>,
     identity: Identity,
     declaration: Declaration,
     channels: [Option<crate::loan::payload::LoanChannel>; 3],
@@ -294,17 +295,15 @@ fn pointwise_literal_abi_byte_totals() {
             size_of::<Shared<MaskRecord>>(),
         ],
     ];
-    // Slot/header field mirrors give descriptor 256, group 888, native 32,
-    // debit 248 and weak pin 40 bytes. Temporary backings are
-    // 17*248 + 5*16 + 3*248 + 2*24 = 5088 bytes.
-    // Retained table delta is 3*(256+888) + 2*32 + 40 + (15-2*h)*248.
-    // H=6008 is the sum of the independent core/shared field mirrors above.
-    // Empty B is 6008 + 7256 - 496*h; replaced old backings are
-    // h*(256+888) + 3*32 + (3*h+6)*248 + 40.
-    // C=3 adds 3*(64+8+8)+8+3*24=320 in either format.
-    // Binary32 C=17 rounds to 128 slab bytes and adds 432+8+408=848;
-    // binary64 C=9 also rounds to 128 and adds 432+8+216=656.
-    // Final vacant capacity: 48 + 6*256 + 6*888 + 5*32 + 24*248 + 2*40.
+    // Debit variants retain inline weak witnesses: rows grow from 248 to 264 bytes.
+    // The detached core and bundle each add one 8-byte optional retained-law attachment;
+    // H therefore grows from 6008 to 6024, even when that private field is empty.
+    // Temporary backings: 17*264 + 5*16 + 3*248 + 2*24 = 5360.
+    // Retained table delta: 3*(256+888) + 2*32 + 40 + (15-2*h)*264.
+    // Empty B: 6024 + 7496 - 528*h. Replaced old backings:
+    // h*(256+888) + 3*32 + (3*h+6)*264 + 40.
+    // C=3 adds 320; binary32 C=17 adds 848; binary64 C=9 adds 656.
+    // Vacant tables: 48 + 6*256 + 6*888 + 5*32 + 24*264 + 2*40 = 13488.
     assert_eq!(
         [
             size_of::<Slot<DescriptorRecord>>(),
@@ -313,18 +312,18 @@ fn pointwise_literal_abi_byte_totals() {
             size_of::<Option<Debit>>(),
             size_of::<Option<PinIndex>>()
         ],
-        [256, 888, 32, 248, 40]
+        [256, 888, 32, 264, 40]
     );
     assert_eq!(
         independently_laid_out,
         [
-            [12768, 24880],
-            [11776, 31440],
-            [12096, 31760],
-            [12096, 31760],
-            [13120, 29008],
-            [12928, 28816],
-            [6008, 13104],
+            [12_992, 25_664],
+            [11_936, 32_352],
+            [12_256, 32_672],
+            [12_256, 32_672],
+            [13_312, 29_856],
+            [13_120, 29_664],
+            [6024, 13_488],
             [24, 64]
         ]
     );

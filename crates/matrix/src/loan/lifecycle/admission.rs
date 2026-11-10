@@ -89,7 +89,7 @@ fn token(
     let slot = slots[debits.len()];
     debits.push(Debit {
         kind,
-        owner: identity,
+        owner: crate::loan::registry::DebitOwner::Bundle(identity),
         key,
         elements,
         bytes,
@@ -193,6 +193,7 @@ fn prepare<P: Scalar + 'static>(
     #[cfg(test)]
     crate::loan::fault::before()?;
     let mut core = Box::new(HostCore {
+        retained_law: None,
         identity,
         declaration,
         channels,

@@ -50,6 +50,10 @@ pub use loan::*;
 pub mod sampling;
 
 mod lc_relation;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "owned preparation parts are shared with managed law retention"
+)]
 mod prepared_expm1;
 pub use prepared_expm1::{ExpEvaluation, ExpPreparationPolicy, PreparedExp, PreparedExpError};
 pub use prepared_expm1::{Expm1Evaluation, PreparedExpm1, PreparedExpm1Error};
@@ -122,6 +126,10 @@ mod quantity_twins;
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/loan_twins.rs"]
 mod loan_twins;
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/retained_expm1_twins.rs"]
+mod retained_expm1_twins;
 
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/type_twins.rs"]

@@ -145,7 +145,7 @@ pub(super) struct Token {
     pub(super) receipt: u64,
 }
 /// Allocation classes keep residence observations separate from inline owner headers.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub(super) enum AllocationKind {
     /// Rounded numerical slab, including unused admitted capacity.
     Numerical,
@@ -157,6 +157,23 @@ pub(super) enum AllocationKind {
     Pin,
     /// One shared filled-word owner and its aligned shell.
     Filled,
+    /// Unique frozen law allocation and its returned exact-evidence allowance.
+    PreparedOwner {
+        /// Expiration only; the registry never upgrades this witness.
+        witness: Weak<super::retained_expm1::PreparedExpm1Owner>,
+        /// Separately reported logical evidence allowance.
+        evidence: usize,
+    },
+    /// Each charged law-use header has its own expiration witness.
+    PreparedUse(Weak<super::retained_expm1::PreparedExpm1UseRecord>),
+}
+/// Closed authority classes prevent a bundle occupation authenticating a law debit.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum DebitOwner {
+    /// Numerical group occupation.
+    Bundle(Identity),
+    /// Heap/account/owner identity, without fictitious numerical occupations.
+    Prepared(super::retained_expm1::LawIdentity),
 }
 /// The accounting record owns no payload and never duplicates its charge.
 #[derive(Debug)]
@@ -164,7 +181,7 @@ pub(super) struct Debit {
     /// Fixed allocation role, independent of whether its owner is detached or published.
     pub(super) kind: AllocationKind,
     /// Exact occupation funded by this record.
-    pub(super) owner: Identity,
+    pub(super) owner: DebitOwner,
     /// Allocation identity.
     pub(super) key: u64,
     /// Addressable scalar count; padding belongs only to bytes.
@@ -219,6 +236,8 @@ pub(super) struct BundleOwner {
 /// The entire mutually dependent channel group has no strong backedges.
 #[derive(Debug)]
 pub(super) struct Bundle {
+    /// One transferred charged law edge; this is ownership, not completion evidence.
+    pub(super) retained_law: Option<super::retained_expm1::Attachment>,
     /// Producer origin and sealed completion evidence, without a source retaining edge.
     pub(super) origin: super::application::Origin,
     /// Exact original declaration.
@@ -365,7 +384,13 @@ impl Registry {
     pub(crate) fn elements(&self) -> Result<[usize; 2], crate::HeapError> {
         let mut elements = [0_usize; 2];
         for debit in self.debits.iter().flatten() {
-            let index = debit.owner.format.index();
+            let DebitOwner::Bundle(identity) = debit.owner else {
+                if debit.elements != 0 {
+                    return Err(crate::HeapError::Capacity);
+                }
+                continue;
+            };
+            let index = identity.format.index();
             elements[index] = elements[index]
                 .checked_add(debit.elements)
                 .ok_or(crate::HeapError::Capacity)?;
@@ -509,7 +534,7 @@ impl Registry {
                 .and_then(Option::as_ref)
                 .is_some_and(|debit| {
                     let same_allocation = debit.key == token.key;
-                    let same_owner = debit.owner == identity;
+                    let same_owner = debit.owner == DebitOwner::Bundle(identity);
                     same_allocation && same_owner
                 })
     }

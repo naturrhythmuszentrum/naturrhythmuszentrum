@@ -142,6 +142,8 @@ mod exp;
 )]
 #[path = "prepared_expm1/oracles.rs"]
 mod oracles;
+#[path = "prepared_expm1/retained.rs"]
+mod retained;
 
 /// Read the validated payload structurally, retaining each row's associations.
 /// # Errors
@@ -698,7 +700,21 @@ fn check_oracle(
     context: &ArithmeticContext,
     budget: &mut Budget,
 ) -> TestResult {
-    let output = plan.evaluate(input, context)?.reading();
+    check_reading(
+        plan.authority(),
+        input,
+        plan.evaluate(input, context)?.reading(),
+        budget,
+    )
+}
+
+/// Shared independent rational truth accepts either ownership route's actual reading.
+fn check_reading(
+    authority: &nrz_bindings::readings::algebra::enclosure::prepared_expm1::Prepared,
+    input: Expm1Input,
+    output: nrz_scalar::Expm1Output,
+    budget: &mut Budget,
+) -> TestResult {
     let truth = input
         .endpoints
         .map(|x| represented(-x, budget))
@@ -722,7 +738,7 @@ fn check_oracle(
     let center = represented(output.center, budget)?;
     // Independent rational midpoint/tie search, not native float arithmetic.
     let exact_input = represented(input.center, budget)?;
-    let proof = plan.authority().proof();
+    let proof = authority.proof();
     let mut rounded = Rational::zero();
     for coefficient in proof.coefficients.iter().rev() {
         rounded = oracles::nearest(&rounded.mul(&exact_input, budget)?, budget)?;
@@ -732,7 +748,7 @@ fn check_oracle(
     assert_eq!(center, rounded);
     let error = represented(output.numerical_error, budget)?;
     let radius = represented(output.total_radius, budget)?;
-    check_export(plan, input, output, budget)?;
+    check_export(authority, input, output, budget)?;
     for endpoint in &nominal {
         oracles::le(
             &oracles::absolute(&center.sub(endpoint, budget)?, budget)?,
@@ -758,7 +774,7 @@ fn check_oracle(
 /// # Panics
 /// Panics if an export stage changes or numerical error is added twice.
 fn check_export(
-    plan: &PreparedExpm1<'_>,
+    authority: &nrz_bindings::readings::algebra::enclosure::prepared_expm1::Prepared,
     input: Expm1Input,
     output: nrz_scalar::Expm1Output,
     budget: &mut Budget,
@@ -769,7 +785,7 @@ fn check_export(
     let error = represented(output.numerical_error, budget)?;
     if input.endpoints[0].to_bits() == input.endpoints[1].to_bits() && input.center != 0.0 {
         let a = represented(-input.center, budget)?;
-        let q = power(-i64::from(plan.authority().proof().radius_bits))?;
+        let q = power(-i64::from(authority.proof().radius_bits))?;
         let rho = oracles::neighbour(
             &oracles::nearest(&a.mul(&q, budget)?, budget)?,
             true,
