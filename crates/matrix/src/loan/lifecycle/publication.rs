@@ -95,6 +95,7 @@ pub(super) fn handback<P: Scalar + 'static>(
     bundle_shell.payload = Some(Bundle {
         retained_law: loan.core.retained_law,
         origin: crate::loan::application::Origin::host(),
+        endpoints: None,
         declaration: loan.core.declaration,
         identity,
         channels,
@@ -139,15 +140,18 @@ pub(super) fn handback<P: Scalar + 'static>(
     heap.loans.release(liveness_token.slot, liveness_token.key);
     heap.loans.revision = prepared.revision;
     heap.loans.pending -= 1;
-    HandbackOutcome::Published(
-        PublishedTile {
-            pin: BundlePin {
-                record: loan.core.pin,
-                marker: PhantomData,
-            },
+    HandbackOutcome::Published(tile(loan.core.pin), receipt)
+}
+/// Wrap the already admitted initial pin with no new allocation or strong edge.
+pub(in crate::loan) const fn tile<P: Scalar>(
+    record: Rc<crate::loan::registry::PinRecord>,
+) -> PublishedTile<P> {
+    PublishedTile {
+        pin: BundlePin {
+            record,
+            marker: PhantomData,
         },
-        receipt,
-    )
+    }
 }
 /// Derive cell-local conjunctive coverage, then validate only selected initialized values.
 fn prepare<P: Scalar + 'static>(

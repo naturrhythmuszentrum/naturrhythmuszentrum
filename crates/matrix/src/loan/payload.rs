@@ -28,6 +28,17 @@ impl std::fmt::Debug for Numerical {
     }
 }
 impl Numerical {
+    /// Check format and logical extent without loading any numerical component.
+    pub(super) fn matches(&self, format: crate::storage::Format, length: usize) -> bool {
+        match self {
+            Self::Single(matrix) => {
+                format == crate::storage::Format::Binary32 && matrix.nrows() == length
+            }
+            Self::Double(matrix) => {
+                format == crate::storage::Format::Binary64 && matrix.nrows() == length
+            }
+        }
+    }
     /// Construct only after rounded capacity and initialization Work are reserved.
     pub(super) fn zeroed<P: Scalar + 'static>(length: usize) -> Result<Self, LoanError> {
         let expected = crate::heap::resources::slab_bytes::<P>(length)? / size_of::<P>();
@@ -84,7 +95,36 @@ impl Numerical {
             }
             Self::Single(_) | Self::Double(_) => return Err(LoanError::LayoutMismatch),
         }
+        #[cfg(test)]
+        super::fault::stored();
         Ok(())
+    }
+}
+/// Test sentinels run after the actual native backing has been destroyed, without retaining it.
+#[cfg(test)]
+impl Drop for Numerical {
+    fn drop(&mut self) {
+        let (length, bytes) = match self {
+            Self::Single(matrix) => {
+                let counts = (
+                    matrix.nrows(),
+                    matrix.col_stride().unsigned_abs() * size_of::<f32>(),
+                );
+                drop(std::mem::replace(matrix, Mat::new()));
+                counts
+            }
+            Self::Double(matrix) => {
+                let counts = (
+                    matrix.nrows(),
+                    matrix.col_stride().unsigned_abs() * size_of::<f64>(),
+                );
+                drop(std::mem::replace(matrix, Mat::new()));
+                counts
+            }
+        };
+        if length != 0 {
+            super::fault::released_numerical(length, bytes);
+        }
     }
 }
 /// A channel's separately owned payload and both initialization maps.

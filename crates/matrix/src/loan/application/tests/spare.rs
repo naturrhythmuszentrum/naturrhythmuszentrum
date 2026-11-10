@@ -5,7 +5,7 @@ use super::{Fixture, TestResult, fixture, ready};
 use crate::{ApplicationCancellation, ApplicationError, ApplicationRequest, LoanError};
 use nrz_bindings::{Budget, Limits};
 
-/// Spare-capacity B=6024 headers + 240 channels + 8 filled words + 72 outcomes = 6344.
+/// Spare-capacity B=7112 headers + 240 channels + 8 filled words + 96 outcomes = 7456.
 /// No table is replaced, so the peak adds only the 5360 temporary backing inventory.
 /// ´test:unit:pointwise-spare-capacity-both-byte-ceiling-neighbours´
 #[test]
@@ -37,7 +37,12 @@ fn pointwise_spare_capacity_both_byte_ceiling_neighbours() -> TestResult {
                 crate::ScanOutcome::Complete
             ));
             let mut limits = Limits::default();
-            let required = if staged { 11_704 } else { 6344 };
+            let retained = crate::loan::abi::application_headers::<f64>()
+                + 3 * (64 + 8 + 8)
+                + 8
+                + 3 * crate::loan::abi::outcome_width();
+            assert_eq!(retained, 7456);
+            let required = u64::try_from(retained + usize::from(staged) * 5360)?;
             if staged {
                 limits.staged_payload_bytes = required - u64::from(!succeeds);
             } else {
@@ -65,7 +70,7 @@ fn pointwise_spare_capacity_both_byte_ceiling_neighbours() -> TestResult {
             match heap.request_pointwise_square(request, &mut continuation) {
                 ApplicationRequest::ApplicationReady(owner) => {
                     assert!(succeeds);
-                    assert_eq!(heap.resource_bytes()? - before, 6344);
+                    assert_eq!(heap.resource_bytes()? - before, retained);
                     assert!(matches!(
                         heap.cancel_application(owner, &mut continuation),
                         ApplicationCancellation::ApplicationCancelled(_)

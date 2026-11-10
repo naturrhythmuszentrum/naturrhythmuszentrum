@@ -11,7 +11,11 @@ use tracing::{
 };
 
 /// Shared interest-rebuild guard for every subscriber in this integration target.
-static DISPATCHERS: Mutex<()> = Mutex::new(());
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the shared dispatcher guard remains private to this integration target"
+)]
+pub(super) static DISPATCHERS: Mutex<()> = Mutex::new(());
 
 /// Exp composition reuses authority; a spent ledger never enters either kernel span.
 /// Three spans is a regression pin for three exp calls without discarded basis calls, not a Work tariff.

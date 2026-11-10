@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! One transferred source pin and one boxed core implement the closed square lifting.
+//! One transferred source pin and one boxed core implement the closed pointwise laws.
 
 mod admission;
 mod contract;
+mod endpoints;
 pub(super) mod evaluation;
+mod prepared;
 mod publication;
+pub use prepared::{Expm1ApplicationRequest, PointwiseExpm1Request, PreparedExpm1Operation};
 
 use super::registry::{
     Bundle, CancellationReceipt, Declaration, Identity, LoanTicket, PublicationReceipt,
@@ -103,8 +106,15 @@ pub enum CellOutcome {
     MissingInput,
     /// Available input, before the single complete evaluation attempt.
     Pending,
-    /// Every component has successful square evidence.
+    /// Every component has successful evidence from the selected closed law.
     Completed,
+    /// First prepared numerical refusal; every later component still runs.
+    PreparedRefused {
+        /// Original component within the cell.
+        component: usize,
+        /// Lossless native validation or arithmetic refusal.
+        reason: nrz_scalar::Expm1Failure,
+    },
     /// First numerical refusal in component order; later components are still evaluated.
     CellRefused {
         /// Original component within this logical cell.
@@ -120,6 +130,8 @@ pub struct OwnedApplication<P: Scalar> {
 }
 /// Input and per-cell owners precede the common core's final liveness witness in drop order.
 pub(super) struct ApplicationCore<P: Scalar> {
+    /// Fixed Lower/Upper result storage; no endpoint descriptor or separate header.
+    pub(super) endpoints: Option<[super::payload::LoanChannel; 2]>,
     /// Exact transferred use edge, released before witness expiration.
     pub(super) input: Option<BundlePin<P>>,
     /// Private checked one-cell numerical law; its extent allocation ends at publication.
@@ -174,13 +186,19 @@ impl<P: Scalar> std::fmt::Debug for ApplicationCore<P> {
 }
 /// Immutable application evidence owns outcomes and symbolic metadata, never a source pin.
 pub(super) struct Evidence {
+    /// Closed prepared correspondence, absent for Square.
+    pub(super) prepared: Option<PreparedExpm1Operation>,
+    /// Fixed Lower/Upper payload identities sealed before evaluation.
+    pub(super) endpoint_tokens: Option<[(usize, u64, u64); 2]>,
+    /// Non-owning identity of the immutable completed mask, installed only at publication.
+    pub(super) completed_mask: Option<std::ptr::NonNull<crate::mask::storage::MaskRecord>>,
     /// Original checked operation, including frozen declarations.
     pub(super) operation: CheckedOperation,
     /// Structural exclusion is sealed to these exact immutable input contracts.
     pub(super) excluded_inputs: Rc<[crate::RegionContract]>,
     /// Structural exclusion is sealed to these exact immutable output contracts.
     pub(super) excluded_outputs: Rc<[crate::RegionContract]>,
-    /// Original independently checked square recipe identity.
+    /// Original checked closed recipe identity.
     pub(super) law: Rc<crate::kernels::KernelContract>,
     /// Historical source declaration retains only symbolic witnesses.
     pub(super) source: Declaration,
@@ -230,6 +248,7 @@ impl Origin {
     }
     /// Authenticate the result itself, without resolving historical numerical occupations.
     pub(super) fn validate_current(&self, bundle: &Bundle) -> Result<(), LoanError> {
+        endpoints::validate_bundle(bundle)?;
         self.evidence.as_ref().map_or_else(
             || {
                 bundle

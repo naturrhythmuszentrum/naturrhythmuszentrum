@@ -220,7 +220,14 @@ impl Heap {
                 .channels
                 .iter()
                 .flatten()
-                .map(|channel| &channel.token),
+                .map(|channel| &channel.token)
+                .chain(
+                    bundle
+                        .endpoints
+                        .iter()
+                        .flatten()
+                        .map(|channel| &channel.token),
+                ),
         ) {
             if !self.loans.authentic_token(token, bundle.identity) {
                 return Err(LoanError::WrongLoan);
@@ -439,6 +446,7 @@ impl Heap {
             charge(
                 budget,
                 identity.channels.iter().flatten().count()
+                    + 2 * usize::from(bundle.endpoints.is_some())
                     + 5
                     + usize::from(bundle.origin.evidence.is_some())
                     + super::retained_expm1::Attachment::WORK

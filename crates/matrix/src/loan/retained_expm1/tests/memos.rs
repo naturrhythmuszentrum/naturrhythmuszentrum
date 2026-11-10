@@ -100,7 +100,7 @@ fn reading_key_backing() -> usize {
     backing
 }
 /// All three expected memo allowances follow their public fixture records, never ledger probes.
-fn memo_bytes() -> TestResult<u64> {
+pub(in crate::loan) fn memo_bytes() -> TestResult<u64> {
     assert_eq!(size_of::<HandleMirror>(), size_of::<Handle>());
     assert_eq!(size_of::<[u64; 71]>(), size_of::<Limits>());
     // Two identical ambient syntax roots, each an envelope (20) and the first four records.
@@ -119,7 +119,7 @@ fn memo_bytes() -> TestResult<u64> {
     Ok(u64::try_from(region + reading + witness)?)
 }
 /// Prepare exact evidence on a separate build ledger; the tested original ceiling is fixed later.
-fn seed() -> TestResult<(Cas, Request, Handle, usize)> {
+pub(in crate::loan) fn seed() -> TestResult<(Cas, Request, Handle, usize)> {
     let (mut cas, request) = fixture::request()?;
     let mut build = Budget::new(fixture::limits())?;
     let coordinate = &request.original.coordinates[0].coordinate;
@@ -144,7 +144,12 @@ fn seed() -> TestResult<(Cas, Request, Handle, usize)> {
     Ok((cas, request, reading, evidence))
 }
 /// Seed every memo through its public service and verify the independent canonical record census.
-fn populate(cas: &mut Cas, request: &Request, reading: &Handle, budget: &mut Budget) -> TestResult {
+pub(in crate::loan) fn populate(
+    cas: &mut Cas,
+    request: &Request,
+    reading: &Handle,
+    budget: &mut Budget,
+) -> TestResult {
     cas.prepare_expm1(request, Policy::default(), budget, &mut Counts::default())?;
     let ambient = cas.admissible_region(&request.original.context)?;
     let step = ApplicationDraft {

@@ -33,8 +33,8 @@ struct Geometry {
 }
 /// Prechecked finite preparation inventory; all counts are fixed before construction.
 pub(super) struct Plan {
-    /// Receipt, request, nonce and all seventeen debit identities reserved before allocation.
-    pub(super) identities: [u64; 20],
+    /// Receipt, request, nonce and every selected debit identity reserved before allocation.
+    pub(super) identities: [u64; 26],
     /// Complete admitted scope, account and storage epoch.
     pub(super) permit: ResourcePermit,
     /// Extra filled-word, outcome and per-cell-extent allocations.
@@ -43,6 +43,8 @@ pub(super) struct Plan {
     pub(super) present: [bool; 3],
     /// Present channel count.
     pub(super) channels: usize,
+    /// Complete storage-role count, including result-specific endpoints.
+    pub(super) roles: usize,
     /// Scalar entries per channel.
     pub(super) length: usize,
     /// Component flag words per channel.
@@ -56,7 +58,7 @@ pub(super) struct Plan {
     /// Number of individual allocation debit records.
     pub(super) debit_count: usize,
     /// Fixed indexed debit destinations.
-    pub(super) debit_slots: [usize; 17],
+    pub(super) debit_slots: [usize; 23],
     /// Parallel group capacity required by descriptor occupations.
     pub(super) group_capacity: usize,
     /// Debit index capacity after vacancy reuse.
@@ -74,7 +76,7 @@ impl Plan {
     /// Authenticate inventory and prepay every acquisition/failure prefix on the original ledger.
     pub(super) fn new<P: Scalar + 'static>(
         heap: &Heap,
-        request: &super::super::PointwiseRequest<P>,
+        request: &super::super::prepared::Request<'_, P>,
         budget: &mut nrz_bindings::Budget,
     ) -> Result<Self, LoanError> {
         let declaration = &request.destination;
@@ -105,9 +107,9 @@ impl Plan {
             cell_words: words(declaration.capacity()),
             rounded: slab_bytes::<P>(length)?,
         };
-        let debit_count = 17;
+        let debit_count = if request.prepared.is_some() { 23 } else { 17 };
         charge(budget, heap.loans.debits.len())?;
-        let debit_slots = heap.loans.vacant_inventory::<17>(debit_count)?;
+        let debit_slots = heap.loans.vacant_inventory::<23>(debit_count)?;
         let group_capacity = heap
             .descriptors
             .slots
@@ -119,7 +121,12 @@ impl Plan {
         let pin_slot = heap.loans.vacant_pin();
         let pin_capacity = add(pin_slot, 1)?.max(heap.loans.pins.capacity());
         let headers = header_bytes::<P>();
-        let identities = crate::heap::identity::identity_block::<20>()?;
+        let identities = if debit_count == 23 {
+            crate::heap::identity::identity_block::<26>()?
+        } else {
+            let source = crate::heap::identity::identity_block::<20>()?;
+            std::array::from_fn(|index| source.get(index).copied().unwrap_or(0))
+        };
         let input_channels = super::super::contract::source(request)?
             .channels
             .iter()
@@ -127,24 +134,19 @@ impl Plan {
             .count();
         let cleanup = CleanupReceipt {
             identity: identities[0],
-            allocations: channels
+            allocations: (channels + 2 * usize::from(request.prepared.is_some()))
                 * (usize::from(length != 0)
                     + usize::from(geometry.component_words != 0)
                     + usize::from(geometry.cell_words != 0))
                 + 13
                 + usize::from(geometry.cell_words != 0)
                 + usize::from(declaration.capacity() != 0)
-                + usize::from(heap.descriptors.slots.growth_bytes_reserved(channels)?.0 != 0)
-                + usize::from(heap.masks.layouts.growth_bytes_reserved(1)?.0 != 0)
-                + usize::from(heap.masks.masks.growth_bytes_reserved(1)?.0 != 0)
-                + usize::from(group_capacity > heap.loans.groups.capacity())
-                + usize::from(debit_capacity > heap.loans.debits.capacity())
-                + usize::from(pin_capacity > heap.loans.pins.capacity()),
+                + geometry.replacements(heap, group_capacity, debit_capacity, pin_capacity)?,
             records: channels + debit_count + 6,
             // Destination symbol handles and common owners; input declaration handles,
             // three operation handles, three exclusion witnesses and the one-cell extent.
             // The transferred numerical pin's drop was already prepaid by its creator.
-            edges: channels + 3 + input_channels + 7,
+            edges: channels + 3 + input_channels + 7 + 7 * usize::from(request.prepared.is_some()),
         };
         let extras = geometry.extra_bytes(declaration.capacity())?;
         let mut plan = Self {
@@ -159,6 +161,7 @@ impl Plan {
             extras,
             present: geometry.present,
             channels: geometry.channels,
+            roles: channels + 2 * usize::from(request.prepared.is_some()),
             length: geometry.length,
             component_words: geometry.component_words,
             cell_words: geometry.cell_words,
@@ -180,18 +183,18 @@ impl Plan {
     fn prepay<P: Scalar + 'static>(
         &mut self,
         heap: &Heap,
-        request: &super::super::PointwiseRequest<P>,
+        request: &super::super::prepared::Request<'_, P>,
         budget: &mut nrz_bindings::Budget,
     ) -> Result<(), LoanError> {
         charge(budget, heap.resource_work()?)?;
-        self.permit = self.preflight::<P>(heap, budget)?;
+        self.permit = self.preflight::<P>(heap, request.prepared.is_some(), budget)?;
         self.permit.account = Some(request.destination.account);
         let cleanup_work = add(
             add(self.cleanup.allocations, self.cleanup.records)?,
             add(self.cleanup.edges, 15 + 4 * self.channels)?,
         )?;
         let initialization = self
-            .channels
+            .roles
             .checked_mul(add(
                 self.length,
                 add(self.component_words, self.cell_words)?,
@@ -226,6 +229,7 @@ impl Plan {
     fn preflight<P: Scalar + 'static>(
         &self,
         heap: &Heap,
+        prepared: bool,
         budget: &nrz_bindings::Budget,
     ) -> Result<ResourcePermit, LoanError> {
         let channel_bytes = add(
@@ -235,7 +239,7 @@ impl Plan {
                 .ok_or(LoanError::ByteOverflow)?,
         )?;
         let mut retained = add(
-            self.channels
+            self.roles
                 .checked_mul(channel_bytes)
                 .ok_or(LoanError::ByteOverflow)?,
             self.headers.into_iter().try_fold(0_usize, add)?,
@@ -245,9 +249,13 @@ impl Plan {
         for (growth, old) in [
             heap.descriptors
                 .slots
-                .growth_bytes_reserved(self.channels)?,
-            heap.masks.layouts.growth_bytes_reserved(1)?,
-            heap.masks.masks.growth_bytes_reserved(1)?,
+                .growth_bytes_reserved_limit(self.channels, heap.limits.descriptors)?,
+            heap.masks
+                .layouts
+                .growth_bytes_reserved_limit(1, heap.limits.descriptors)?,
+            heap.masks
+                .masks
+                .growth_bytes_reserved_limit(1, heap.limits.descriptors)?,
             crate::loan::lifecycle::admission::growth(&heap.loans.groups, self.group_capacity)?,
             crate::loan::lifecycle::admission::growth(&heap.loans.debits, self.debit_capacity)?,
             crate::loan::lifecycle::admission::growth(&heap.loans.pins, self.pin_capacity)?,
@@ -288,8 +296,15 @@ impl Plan {
         };
         resources.elements[Format::of::<P>().index()] = self
             .length
-            .checked_mul(self.channels)
+            .checked_mul(self.roles)
             .ok_or(LoanError::CountOverflow)?;
+        if prepared {
+            budget.check(
+                nrz_bindings::readings::algebra::limits::BudgetKind::StagedPayloadBytes,
+                u64::try_from(add(retained, scratch)?).map_err(|_| LoanError::ByteOverflow)?,
+                crate::loan::AT,
+            )?;
+        }
         Ok(heap.preflight_resources(resources, ResourcePolicy::from_budget(budget))?)
     }
 }
@@ -305,6 +320,33 @@ const fn header_bytes<P: Scalar>() -> [usize; 5] {
     ]
 }
 impl Geometry {
+    /// Capacity refusal uses the same already prepaid vacancy scans as replacement planning.
+    fn replacements(
+        &self,
+        heap: &Heap,
+        groups: usize,
+        debits: usize,
+        pins: usize,
+    ) -> Result<usize, LoanError> {
+        let replacements = [
+            heap.descriptors
+                .slots
+                .growth_bytes_reserved_limit(self.channels, heap.limits.descriptors)?,
+            heap.masks
+                .layouts
+                .growth_bytes_reserved_limit(1, heap.limits.descriptors)?,
+            heap.masks
+                .masks
+                .growth_bytes_reserved_limit(1, heap.limits.descriptors)?,
+        ]
+        .into_iter()
+        .filter(|(growth, _)| *growth != 0)
+        .count();
+        Ok(replacements
+            + usize::from(groups > heap.loans.groups.capacity())
+            + usize::from(debits > heap.loans.debits.capacity())
+            + usize::from(pins > heap.loans.pins.capacity()))
+    }
     /// Three disjoint extra backings have no hidden per-cell allocations.
     fn extra_bytes(&self, cells: usize) -> Result<[usize; 3], LoanError> {
         Ok([

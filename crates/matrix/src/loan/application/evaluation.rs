@@ -7,6 +7,7 @@ use super::{
 use crate::loan::{ExecutionAccount, HostChannel, LoanError, charge, payload::set};
 use crate::{Elementwise, KernelError, kernels::arithmetic::Entry};
 use nrz_scalar::{ArithmeticContext, Scalar};
+mod prepared;
 
 /// Single-use private traversal authority; only whole-phase prepayment constructs it.
 pub(in crate::loan) struct Traversal {
@@ -32,6 +33,17 @@ pub(super) fn evaluate<P: Scalar + 'static>(
             .ledger
             .with_work_phase(super::FAMILY, "pointwise evaluation", |budget| {
                 charge(budget, 1)?;
+                if owner.core.evidence.prepared.is_some() {
+                    charge(budget, 1)?;
+                    owner
+                        .core
+                        .host
+                        .retained_law
+                        .as_ref()
+                        .ok_or(LoanError::WrongLoan)?
+                        .validate()?;
+                    charge(budget, 1)?;
+                }
                 validate(&owner.core)?;
                 let context = ArithmeticContext::new()
                     .map_err(KernelError::from)
@@ -45,10 +57,14 @@ pub(super) fn evaluate<P: Scalar + 'static>(
                 } else {
                     1
                 };
-                let per_cell = (15_usize + loads)
-                    .checked_mul(components)
-                    .and_then(|steps| steps.checked_add(2))
-                    .ok_or(LoanError::CountOverflow)?;
+                let per_cell = (if owner.core.evidence.prepared.is_some() {
+                    6_usize
+                } else {
+                    15_usize + loads
+                })
+                .checked_mul(components)
+                .and_then(|steps| steps.checked_add(2))
+                .ok_or(LoanError::CountOverflow)?;
                 let work = owner
                     .core
                     .population
@@ -69,7 +85,17 @@ pub(super) fn evaluate<P: Scalar + 'static>(
         Ok(permit) => permit,
         Err(error) => return ApplicationEvaluation::ApplicationNotStarted(error, owner),
     };
-    run(&mut owner.core, &permit);
+    if owner.core.evidence.prepared.is_some() {
+        account
+            .ledger
+            .with_work_phase(super::FAMILY, "prepared native traversal", |_| {
+                prepared::run(&mut owner.core, &permit);
+                Ok::<(), std::convert::Infallible>(())
+            })
+            .unwrap_or_else(|never| match never {});
+    } else {
+        run(&mut owner.core, &permit);
+    }
     owner.core.evidence.revision = permit.context.revision();
     owner.core.candidate = true;
     ApplicationEvaluation::ApplicationCandidate(owner)
@@ -78,6 +104,8 @@ pub(super) fn evaluate<P: Scalar + 'static>(
 fn validate<P: Scalar + 'static>(core: &ApplicationCore<P>) -> Result<(), LoanError> {
     core.evidence
         .validate_revision(&core.host.declaration, core.host.identity, 0)?;
+    super::endpoints::validate_core(core)?;
+    let prepared = core.evidence.prepared.is_some();
     let extent = crate::Extent::new(1, core.host.declaration.extent.columns())?;
     let law = &core.contract;
     if law.inputs.as_ref() != [extent]
@@ -85,12 +113,16 @@ fn validate<P: Scalar + 'static>(core: &ApplicationCore<P>) -> Result<(), LoanEr
         || law.work
             != extent
                 .entries()
-                .checked_mul(12)
+                .checked_mul(if prepared { 0 } else { 12 })
                 .ok_or(LoanError::CountOverflow)?
-        || !matches!(
-            law.recipe,
-            crate::kernels::contract::Recipe::Elementwise(Elementwise::Square)
-        )
+        || !(if prepared {
+            matches!(law.recipe, crate::kernels::contract::Recipe::PreparedExpm1)
+        } else {
+            matches!(
+                law.recipe,
+                crate::kernels::contract::Recipe::Elementwise(Elementwise::Square)
+            )
+        })
     {
         return Err(LoanError::WrongLoan);
     }

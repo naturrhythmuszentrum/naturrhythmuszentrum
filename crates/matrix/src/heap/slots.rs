@@ -302,14 +302,6 @@ impl<T> Slots<T> {
             .ok_or(HeapError::Capacity)
     }
 
-    /// Conservative capacity before exact growth, retaining the current allocation.
-    pub(crate) fn reserved_bytes(&self, count: usize) -> Result<usize, HeapError> {
-        self.planned_len(count)?
-            .max(self.entries.capacity())
-            .checked_mul(size_of::<Slot<T>>())
-            .ok_or(HeapError::Capacity)
-    }
-
     /// Reuse vacant nonexhausted slots before extending the stable table.
     pub(crate) fn planned_len(&self, count: usize) -> Result<usize, HeapError> {
         self.planned_len_retiring(count, &[])
@@ -347,8 +339,24 @@ impl<T> Slots<T> {
 
     /// Retained growth and the old buffer that coexists during exact replacement.
     pub(crate) fn growth_bytes_reserved(&self, count: usize) -> Result<(usize, usize), HeapError> {
+        self.growth_bytes_reserved_limit(count, usize::MAX)
+    }
+
+    /// The same vacancy scan also checks the immutable occupation ceiling before allocation.
+    pub(crate) fn growth_bytes_reserved_limit(
+        &self,
+        count: usize,
+        limit: usize,
+    ) -> Result<(usize, usize), HeapError> {
+        let required = self.planned_len(count)?;
+        if required > limit {
+            return Err(HeapError::Capacity);
+        }
         let old = self.owned_bytes()?;
-        let next = self.reserved_bytes(count)?;
+        let next = required
+            .max(self.entries.capacity())
+            .checked_mul(size_of::<Slot<T>>())
+            .ok_or(HeapError::Capacity)?;
         Ok((
             next.checked_sub(old).ok_or(HeapError::Capacity)?,
             if next > old { old } else { 0 },

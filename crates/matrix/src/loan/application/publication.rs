@@ -19,7 +19,7 @@ use crate::{
     mask::storage::MaskRecord,
 };
 use nrz_scalar::Scalar;
-use std::{marker::PhantomData, rc::Rc};
+use std::rc::Rc;
 
 /// Empty mask shell and separately prepaid destruction, prepared before ownership moves.
 struct Prepared {
@@ -46,8 +46,9 @@ pub(super) fn publish<P: Scalar + 'static>(
         |budget| {
             charge(
                 budget,
-                25 + crate::loan::retained_expm1::Attachment::WORK
-                    * usize::from(owner.core.host.retained_law.is_some()),
+                25 + 7 * usize::from(owner.core.evidence.prepared.is_some())
+                    + crate::loan::retained_expm1::Attachment::WORK
+                        * usize::from(owner.core.host.retained_law.is_some()),
             )?;
             authenticate(heap, &owner.core, account.identity)
         },
@@ -85,6 +86,7 @@ fn authenticate<P: Scalar>(
     if let Some(law) = &core.host.retained_law {
         law.validate_current(heap)?;
     }
+    super::endpoints::validate_core(core)?;
     if core.host.channels.iter().any(Option::is_none)
         || core.host.identity.channels.iter().any(Option::is_none)
     {
@@ -94,10 +96,16 @@ fn authenticate<P: Scalar>(
     let State::Out(witness) = &group.state else {
         return Err(LoanError::DuplicateReturn);
     };
-    if !matches!(
-        group.debits,
-        crate::loan::registry::DebitInventory::Application(_)
-    ) || !witness.ptr_eq(&Rc::downgrade(&core.host.witness))
+    let inventory_matches = matches!(
+        (core.evidence.prepared.is_some(), &group.debits),
+        (false, crate::loan::registry::DebitInventory::Application(_))
+            | (
+                true,
+                crate::loan::registry::DebitInventory::PreparedApplication(_)
+            )
+    );
+    if !inventory_matches
+        || !witness.ptr_eq(&Rc::downgrade(&core.host.witness))
         || core.host.witness.identity != core.host.identity
         || core.host.witness.receipt != core.host.cleanup.identity
     {
@@ -110,6 +118,12 @@ fn authenticate<P: Scalar>(
         .chain(
             core.host
                 .channels
+                .iter()
+                .flatten()
+                .flat_map(|channel| channel.tokens.iter()),
+        )
+        .chain(
+            core.endpoints
                 .iter()
                 .flatten()
                 .flat_map(|channel| channel.tokens.iter()),
@@ -130,7 +144,7 @@ fn prepare<P: Scalar + 'static>(
 ) -> Result<Prepared, LoanError> {
     let identity = core.host.identity;
     let revision = heap.loans.terminal_revision()?;
-    shell_preflight(heap, identity.account, budget)?;
+    shell_preflight(heap, core, budget)?;
     charge(budget, 5)?;
     let mut guard = Preparation::new(crate::loan::registry::CleanupReceipt {
         identity: identity.receipt,
@@ -189,13 +203,21 @@ fn prepare<P: Scalar + 'static>(
         cleanup: guard.finish()?,
     })
 }
-/// Isolated shell admission uses the same complete common resource authority as publication.
-pub(super) fn shell_preflight(
+/// Publication and isolated shell admission derive the byte policy from the same checked core.
+pub(super) fn shell_preflight<P: Scalar>(
     heap: &Heap,
-    account: u64,
+    core: &ApplicationCore<P>,
     budget: &mut nrz_bindings::Budget,
 ) -> Result<(), LoanError> {
     charge(budget, heap.resource_work()?)?;
+    if core.evidence.prepared.is_some() {
+        budget.check(
+            nrz_bindings::readings::algebra::limits::BudgetKind::StagedPayloadBytes,
+            u64::try_from(crate::loan::rc_bytes::<MaskRecord>())
+                .map_err(|_| LoanError::ByteOverflow)?,
+            crate::loan::AT,
+        )?;
+    }
     let mut permit = heap.preflight_resources(
         ResourcePlan {
             retained: crate::loan::rc_bytes::<MaskRecord>(),
@@ -203,7 +225,7 @@ pub(super) fn shell_preflight(
         },
         ResourcePolicy::from_budget(budget),
     )?;
-    permit.account = Some(account);
+    permit.account = Some(core.host.identity.account);
     permit.storage(heap.storage.epoch())?;
     if permit.scope != heap.scope {
         return Err(LoanError::ForeignOwner);
@@ -216,9 +238,16 @@ fn derive<P: Scalar + 'static>(
     budget: &mut nrz_bindings::Budget,
 ) -> Result<(), LoanError> {
     crate::loan::lifecycle::complete(&mut core.host, budget)?;
+    super::endpoints::complete(core, budget)?;
     for (index, word) in core.filled.iter().enumerate() {
         let mut intersection = u64::MAX;
-        for channel in core.host.channels.iter().flatten() {
+        for channel in core
+            .host
+            .channels
+            .iter()
+            .flatten()
+            .chain(core.endpoints.iter().flatten())
+        {
             charge(budget, 1)?;
             intersection &= channel.complete[index];
         }
@@ -246,10 +275,22 @@ fn derive<P: Scalar + 'static>(
             return Err(LoanError::CoverageMismatch);
         }
         if completed {
-            crate::loan::lifecycle::publication::validate_cell::<P>(&core.host, cell, budget)?;
+            if core.evidence.prepared.is_some() {
+                super::endpoints::validate_cell(core, cell, budget)?;
+            } else {
+                crate::loan::lifecycle::publication::validate_cell::<P>(&core.host, cell, budget)?;
+            }
+        }
+        if let CellOutcome::PreparedRefused { component, .. } = outcome
+            && (*component >= core.host.declaration.extent.columns()
+                || core.evidence.prepared.is_none())
+        {
+            return Err(LoanError::WrongLoan);
         }
         if let CellOutcome::CellRefused { component, reason } = outcome {
-            if *component >= core.host.declaration.extent.columns() {
+            if core.evidence.prepared.is_some()
+                || *component >= core.host.declaration.extent.columns()
+            {
                 return Err(LoanError::WrongLoan);
             }
             if let crate::KernelError::Domain {
@@ -284,12 +325,13 @@ fn finish<P: Scalar + 'static>(
     mut prepared: Prepared,
 ) -> ApplicationPublication<P> {
     let ApplicationCore {
+        endpoints,
         input,
         contract,
         extent_token,
         filled,
         filled_token,
-        evidence,
+        mut evidence,
         population: _,
         candidate: _,
         mut host,
@@ -305,9 +347,13 @@ fn finish<P: Scalar + 'static>(
     if let Some(mask) = Rc::get_mut(&mut prepared.mask) {
         mask.words = filled;
     }
+    if evidence.prepared.is_some() {
+        evidence.completed_mask = Some(std::ptr::NonNull::from(prepared.mask.as_ref()));
+    }
     host.cleanup.allocations += prepared.cleanup.allocations;
     host.cleanup.records += prepared.cleanup.records;
     host.cleanup.edges += prepared.cleanup.edges;
+    let endpoints = endpoints.map(|pair| super::endpoints::publish(pair, &mut heap.loans));
     let channels =
         crate::loan::lifecycle::publication::take_channels(&mut host.channels, &mut heap.loans);
     let [
@@ -322,6 +368,7 @@ fn finish<P: Scalar + 'static>(
         bundle.payload = Some(Bundle {
             retained_law: host.retained_law,
             origin: Origin::application(evidence),
+            endpoints,
             declaration: host.declaration,
             identity,
             channels,
@@ -375,12 +422,7 @@ fn finish<P: Scalar + 'static>(
     heap.loans.revision = prepared.revision;
     heap.loans.pending -= 1;
     ApplicationPublication::ApplicationPublished(
-        crate::loan::PublishedTile {
-            pin: crate::loan::BundlePin {
-                record: host.pin,
-                marker: PhantomData,
-            },
-        },
+        crate::loan::lifecycle::publication::tile(host.pin),
         receipt,
     )
 }

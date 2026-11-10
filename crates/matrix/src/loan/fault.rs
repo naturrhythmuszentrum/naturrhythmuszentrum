@@ -4,6 +4,10 @@
 use super::LoanError;
 use std::cell::Cell;
 thread_local! {
+    /// Actual backing destructions, logical elements and rounded bytes after native owner drop.
+    static RELEASED_NUMERICAL: Cell<[usize; 3]> = const { Cell::new([0; 3]) };
+    /// Actual stores include failed-component placeholders and never count zero initialization.
+    static STORES: Cell<usize> = const { Cell::new(0) };
     /// Diagnostic unwind at a refused allocation, confined to this test thread.
     static UNWIND: Cell<bool> = const { Cell::new(false) };
     /// Actual filled-membership visits during publication, independent of charged Work.
@@ -224,4 +228,27 @@ pub(super) fn reset_publication_cells() {
 /// Actual membership visits in this thread's publication attempt.
 pub(super) fn publication_cells() -> usize {
     PUBLICATION_CELLS.get()
+}
+
+/// Observe each actual selected scalar store independently of the traversal formula.
+pub(super) fn stored() {
+    STORES.set(STORES.get() + 1);
+}
+/// Start one selected evaluation's store observation.
+pub(super) fn reset_stores() {
+    STORES.set(0);
+}
+/// Actual initialized component stores.
+pub(super) fn stores() -> usize {
+    STORES.get()
+}
+
+/// Called only after the actual matrix backing's destructor has completed.
+pub(super) fn released_numerical(elements: usize, bytes: usize) {
+    let [owners, old_elements, old_bytes] = RELEASED_NUMERICAL.get();
+    RELEASED_NUMERICAL.set([owners + 1, old_elements + elements, old_bytes + bytes]);
+}
+/// Observe real native backing release without retaining a payload edge.
+pub(super) fn numerical_releases() -> [usize; 3] {
+    RELEASED_NUMERICAL.get()
 }

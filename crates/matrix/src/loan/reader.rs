@@ -29,9 +29,9 @@ pub struct PublishedTile<P: Scalar> {
 /// Borrowed selected access never exposes a dense rectangle or a mutable numerical view.
 pub struct TileReader<'a, P: Scalar> {
     /// Complete immutable bundle borrowed from an authenticated pin.
-    bundle: &'a Bundle,
+    pub(super) bundle: &'a Bundle,
     /// Pin's original continuation account.
-    account: u64,
+    pub(super) account: u64,
     /// Sealed scalar type.
     marker: PhantomData<P>,
 }
@@ -81,10 +81,21 @@ impl<P: Scalar + 'static> BundlePin<P> {
                     .payload
                     .as_ref()
                     .is_some_and(|bundle| bundle.retained_law.is_some());
-                charge(budget, 3 + usize::from(has_law))?;
+                let prepared = pin.bundle.payload.as_ref().is_some_and(|bundle| {
+                    bundle.endpoints.is_some()
+                        || bundle
+                            .origin
+                            .evidence
+                            .as_ref()
+                            .is_some_and(|evidence| evidence.prepared.is_some())
+                });
+                charge(budget, 3 + usize::from(has_law) + 3 * usize::from(prepared))?;
                 let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
                 if let Some(law) = &bundle.retained_law {
                     law.validate()?;
+                }
+                if prepared {
+                    bundle.origin.validate_current(bundle)?;
                 }
                 self.checked_reader()
             })
@@ -227,6 +238,19 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
         if !bit(&self.bundle.mask.words, cell) {
             return Err(LoanError::CoverageMismatch);
         }
+        if self
+            .bundle
+            .origin
+            .evidence
+            .as_ref()
+            .is_some_and(|evidence| evidence.prepared.is_some())
+            && !matches!(
+                self.bundle.origin.outcome(cell)?,
+                super::application::CellOutcome::Completed
+            )
+        {
+            return Err(LoanError::CoverageMismatch);
+        }
         let qualified =
             self.bundle.qualified[channel.index()].ok_or(LoanError::CoverageMismatch)?;
         if qualified.identity != self.bundle.identity || qualified.channel != channel {
@@ -303,13 +327,17 @@ impl Heap {
         charge(
             budget,
             channels
+                + 2 * usize::from(bundle.endpoints.is_some())
                 + 5
                 + usize::from(bundle.origin.evidence.is_some())
                 + super::retained_expm1::Attachment::WORK
                     * usize::from(bundle.retained_law.is_some()),
         )?;
         self.validate_published_bundle(bundle)?;
-        charge(budget, channels + 1)?;
+        charge(
+            budget,
+            channels + 1 + 3 * usize::from(bundle.endpoints.is_some()),
+        )?;
         bundle.origin.validate_current(bundle)?;
         if bundle.layout.axis != bundle.declaration.axis
             || bundle.layout.components.extent() != bundle.declaration.extent

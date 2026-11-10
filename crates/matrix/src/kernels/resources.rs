@@ -13,6 +13,7 @@ impl KernelContract {
     ) -> Result<usize, OperationError> {
         match &self.recipe {
             Recipe::Product => self.product_scratch::<P, Q>(),
+            Recipe::PreparedExpm1 => Err(super::KernelError::Contract.into()),
             Recipe::Linear(map) => {
                 let coefficients = bytes(
                     map.coefficients.len(),

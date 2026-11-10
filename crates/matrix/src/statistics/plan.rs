@@ -258,6 +258,7 @@ impl CheckedOperation {
         match &self.recipe {
             NativeRecipe::Reciprocal { .. } => false,
             NativeRecipe::Kernel(contract) => match &contract.recipe {
+                Recipe::PreparedExpm1 => false,
                 Recipe::Quantity(_) => matches!(
                     contract.kind(),
                     crate::KernelKind::ScalarQuantityProduct

@@ -100,6 +100,27 @@ pub struct RetainedExpm1 {
     record: Rc<PreparedExpm1UseRecord>,
 }
 impl RetainedExpm1 {
+    /// The operation constructor must use the law's original continuation account.
+    pub(in crate::loan) fn authenticate_account(
+        &self,
+        account: &super::ExecutionAccount,
+    ) -> Result<(), LoanError> {
+        account.authenticate(self.owner()?.identity.account)
+    }
+    /// Admission compares the same account before current debit authentication.
+    pub(in crate::loan) fn authenticate_identity_account(
+        &self,
+        account: u64,
+    ) -> Result<(), LoanError> {
+        if self.owner()?.identity.account != account {
+            return Err(LoanError::ForeignAccount);
+        }
+        Ok(())
+    }
+    /// Borrowed current authentication never allocates or acquires another law edge.
+    pub(in crate::loan) fn validate_current(&self, heap: &crate::Heap) -> Result<(), LoanError> {
+        retention::authenticate(heap, self)
+    }
     /// Native evaluation borrows this use and performs no exact operation or allocation.
     /// # Errors
     /// Preserves the native domain, target, environment and below-normal causes.
@@ -151,6 +172,43 @@ pub(in crate::loan) struct Attachment {
     law: RetainedExpm1,
 }
 impl Attachment {
+    /// Match the consumer's captured use in addition to this attachment's own binding.
+    pub(in crate::loan) fn validate_binding(
+        &self,
+        expected: Binding,
+        bits: u32,
+    ) -> Result<(), LoanError> {
+        let request = self.law.authority()?.request();
+        if Binding::of(&self.law)? != expected || request.bits != bits || request.environment != 1 {
+            return Err(LoanError::WrongLoan);
+        }
+        Ok(())
+    }
+    /// The only execution route borrows the admitted authority with its exact use edge.
+    pub(in crate::loan) fn evaluate(
+        &self,
+        input: Expm1Input,
+        context: &ArithmeticContext,
+    ) -> Result<crate::Expm1Evaluation<'_>, Expm1Failure> {
+        self.law.evaluate(input, context)
+    }
+    /// Prepay validation and cancellation before an application's acquired allocation prefix.
+    pub(in crate::loan) fn prepare_validation(
+        law: &RetainedExpm1,
+        binding: Binding,
+        heap: &crate::Heap,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<(), LoanError> {
+        super::charge(budget, 2 * Self::WORK)?;
+        if Binding::of(law)? != binding {
+            return Err(LoanError::WrongLoan);
+        }
+        retention::authenticate(heap, law)
+    }
+    /// No-fail transfer after the checked application finishes every fallible preparation.
+    pub(in crate::loan) const fn prepared(law: RetainedExpm1) -> Self {
+        Self { law }
+    }
     /// No current or historical path can substitute another law with an equal statement.
     pub(in crate::loan) fn validate(&self) -> Result<(), LoanError> {
         let actual = Binding::of(&self.law)?;
@@ -170,13 +228,7 @@ impl Attachment {
     /// One owner validation and two exact debit/index inspections.
     pub(in crate::loan) const WORK: usize = 3;
     /// A checked consumer moves its funded use only after validating the captured pairing.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "private seam awaits the checked prepared application"
-        )
-    )]
+    #[cfg(test)]
     pub(in crate::loan) fn prepare(
         law: RetainedExpm1,
         binding: Binding,

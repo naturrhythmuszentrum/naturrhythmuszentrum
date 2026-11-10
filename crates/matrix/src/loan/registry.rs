@@ -244,6 +244,8 @@ pub(super) struct Bundle {
     pub(super) declaration: Declaration,
     /// Exact occupations and request.
     pub(super) identity: Identity,
+    /// Prepared result endpoints in immutable Lower/Upper role order.
+    pub(super) endpoints: Option<[PublishedChannel; 2]>,
     /// Moved separately allocated native channels.
     pub(super) channels: [Option<PublishedChannel>; 3],
     /// One native shared identity layout.
@@ -322,6 +324,8 @@ pub(super) enum DebitInventory {
     Host([Option<(usize, u64)>; 15]),
     /// Application admission includes its filled words, outcomes and per-cell extent.
     Application([Option<(usize, u64)>; 17]),
+    /// Five-role prepared application, including both endpoint tracking inventories.
+    PreparedApplication([Option<(usize, u64)>; 23]),
 }
 impl DebitInventory {
     /// Exact active variant, without inventing extra host debit positions.
@@ -329,6 +333,7 @@ impl DebitInventory {
         match self {
             Self::Host(entries) => entries,
             Self::Application(entries) => entries,
+            Self::PreparedApplication(entries) => entries,
         }
     }
     /// Mutate only the fixed inventory selected at admission.
@@ -336,6 +341,7 @@ impl DebitInventory {
         match self {
             Self::Host(entries) => entries,
             Self::Application(entries) => entries,
+            Self::PreparedApplication(entries) => entries,
         }
     }
 }

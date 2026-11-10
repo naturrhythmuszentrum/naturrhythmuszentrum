@@ -3,14 +3,11 @@
 
 use super::{Fixture, TestResult, fixture, ready};
 use crate::heap::{descriptors::DescriptorRecord, identity::Key};
-use crate::loan::registry::{
-    BundleOwner, CleanupReceipt, Debit, Declaration, Group, Identity, Liveness, PinIndex,
-    PinRecord, QualifiedMaskVersion, Token,
-};
+use crate::loan::abi;
+use crate::loan::registry::{Debit, PinIndex};
 use crate::mask::storage::{LayoutRecord, MaskRecord, Native};
 use nrz_bindings::Limits;
 use nrz_scalar::Scalar;
-use std::rc::Rc;
 
 /// The explicit shared-allocation ABI has two counters followed by its aligned payload.
 #[repr(C)]
@@ -25,70 +22,6 @@ struct Slot<T> {
     generation: u64,
     value: Option<T>,
 }
-/// Independent host-core field inventory, including the final strong liveness handle.
-#[repr(C)]
-struct HostMirror {
-    retained_law: Option<crate::loan::retained_expm1::tests::bytes::AttachmentMirror>,
-    identity: Identity,
-    declaration: Declaration,
-    channels: [Option<crate::loan::payload::LoanChannel>; 3],
-    layout: Rc<LayoutRecord>,
-    bundle: Rc<BundleOwner>,
-    pin: Rc<PinRecord>,
-    headers: [Token; 5],
-    cleanup: CleanupReceipt,
-    witness: Rc<Liveness>,
-}
-/// Fixed symbolic/evidence fields and the independently owned outcomes have no hidden allocation.
-#[repr(C)]
-struct EvidenceMirror {
-    operation: crate::CheckedOperation,
-    inputs: Rc<[crate::RegionContract]>,
-    outputs: Rc<[crate::RegionContract]>,
-    law: Rc<crate::kernels::KernelContract>,
-    source: Declaration,
-    source_identity: Identity,
-    attachments: [Option<QualifiedMaskVersion>; 3],
-    demand: crate::MaskVersion,
-    destination: Identity,
-    revision: u32,
-    outcomes: Vec<crate::CellOutcome>,
-    token: Token,
-}
-/// One application box includes the shared host fields and every additional inline owner.
-#[repr(C)]
-struct CoreMirror<P: Scalar> {
-    input: Option<crate::BundlePin<P>>,
-    contract: crate::kernels::KernelContract,
-    extent_token: Token,
-    filled: Vec<u64>,
-    filled_token: Token,
-    evidence: EvidenceMirror,
-    population: usize,
-    candidate: bool,
-    host: HostMirror,
-}
-/// Independent field layouts are checked against actual Rust owners before byte-neighbour tests.
-fn headers<P: Scalar>() -> usize {
-    assert_eq!(
-        size_of::<HostMirror>(),
-        size_of::<crate::loan::lifecycle::HostCore>()
-    );
-    assert_eq!(
-        size_of::<EvidenceMirror>(),
-        size_of::<crate::loan::application::Evidence>()
-    );
-    assert_eq!(
-        size_of::<CoreMirror<P>>(),
-        size_of::<crate::loan::application::ApplicationCore<P>>()
-    );
-    size_of::<CoreMirror<P>>()
-        + size_of::<Shared<LayoutRecord>>()
-        + size_of::<Shared<Liveness>>()
-        + size_of::<Shared<BundleOwner>>()
-        + size_of::<Shared<PinRecord>>()
-        + size_of::<Shared<[crate::Extent; 1]>>()
-}
 /// Initial host publication frees 2h tracking rows and two headers before application admission.
 fn byte_fixture<P: Scalar>(cells: usize, components: usize, channels: usize) -> [usize; 2] {
     let length = cells * components;
@@ -98,7 +31,7 @@ fn byte_fixture<P: Scalar>(cells: usize, components: usize, channels: usize) -> 
     let old_debits = 3 * channels + 6;
     let new_debits = old_debits + 17 - (2 * channels + 2);
     let descriptor_delta = 3 * size_of::<Slot<DescriptorRecord>>();
-    let group_delta = 3 * size_of::<Option<Group>>();
+    let group_delta = 3 * abi::group_row();
     let delta = descriptor_delta
         + group_delta
         + size_of::<Slot<Native<LayoutRecord>>>()
@@ -107,11 +40,11 @@ fn byte_fixture<P: Scalar>(cells: usize, components: usize, channels: usize) -> 
         + size_of::<Option<PinIndex>>();
     let retained = 3 * (rounded + 8 * tracking + 8 * words)
         + 8 * words
-        + cells * size_of::<crate::CellOutcome>()
-        + headers::<P>()
+        + cells * abi::outcome_width()
+        + abi::application_headers::<P>()
         + delta;
     let old = channels * size_of::<Slot<DescriptorRecord>>()
-        + channels * size_of::<Option<Group>>()
+        + channels * abi::group_row()
         + size_of::<Slot<Native<LayoutRecord>>>()
         + 2 * size_of::<Slot<Native<MaskRecord>>>()
         + old_debits * size_of::<Option<Debit>>()
@@ -122,6 +55,20 @@ fn byte_fixture<P: Scalar>(cells: usize, components: usize, channels: usize) -> 
         + size_of::<Native<LayoutRecord>>()
         + size_of::<Native<MaskRecord>>();
     [retained, retained + 2 * old + temporary]
+}
+/// Prepared staging checks the original ledger before the common heap permit.
+pub(super) fn staged_fault(fault: &nrz_bindings::readings::algebra::Fault, required: u64) {
+    use nrz_bindings::readings::algebra::{Exhaustion, FaultKind, limits::BudgetKind};
+    assert_eq!(
+        fault.kind,
+        FaultKind::Exhausted {
+            reason: Exhaustion::Limit,
+            budget: BudgetKind::StagedPayloadBytes,
+            limit: required - 1,
+            needed: required
+        }
+    );
+    assert_eq!(fault.location, crate::loan::AT);
 }
 /// Independent exact-growth totals are enforced at N and N minus one for both byte ceilings.
 fn boundaries<P: Scalar + 'static>() -> TestResult {
@@ -228,7 +175,8 @@ fn pointwise_spare_capacity_byte_inventory() -> TestResult {
     let before = heap.resource_bytes()?;
     let owner = ready(heap.request_pointwise_square(request, &mut account))?;
     // Three rounded slabs, six tracking words, one prospective word and three inline outcomes.
-    let retained = 3 * (64 + 8 + 8) + 8 + 3 * size_of::<crate::CellOutcome>() + headers::<f64>();
+    let retained =
+        3 * (64 + 8 + 8) + 8 + 3 * abi::outcome_width() + abi::application_headers::<f64>();
     assert_eq!(heap.resource_bytes()? - before, retained);
     assert!(matches!(
         heap.cancel_application(owner, &mut account),
@@ -241,7 +189,7 @@ fn pointwise_spare_capacity_byte_inventory() -> TestResult {
 pub(super) const fn vacant_after_single_application() -> usize {
     size_of::<crate::mask::storage::Store>()
         + 6 * size_of::<Slot<DescriptorRecord>>()
-        + 6 * size_of::<Option<Group>>()
+        + 6 * abi::group_row()
         + 2 * size_of::<Slot<Native<LayoutRecord>>>()
         + 3 * size_of::<Slot<Native<MaskRecord>>>()
         + 24 * size_of::<Option<Debit>>()
@@ -251,6 +199,12 @@ pub(super) const fn vacant_after_single_application() -> usize {
 /// ´test:unit:pointwise-publication-shell-isolated-byte-neighbours´
 #[test]
 fn pointwise_publication_shell_isolated_byte_neighbours() -> TestResult {
+    let Fixture {
+        mut heap,
+        mut account,
+        request,
+    } = fixture::<f64>(3, 1, 3, 2, false, Limits::default())?;
+    let owner = ready(heap.request_pointwise_square(request, &mut account))?;
     for staging in [false, true] {
         for succeeds in [false, true] {
             let mut limits = Limits::default();
@@ -260,19 +214,23 @@ fn pointwise_publication_shell_isolated_byte_neighbours() -> TestResult {
             } else {
                 limits.output_bytes = u64::try_from(required - usize::from(!succeeds))?;
             }
-            let heap = crate::Heap::new(crate::HeapLimits::default())?;
             let mut budget = nrz_bindings::Budget::new(limits)?;
-            let result =
-                crate::loan::application::publication::shell_preflight(&heap, 1, &mut budget);
+            let result = crate::loan::application::publication::shell_preflight(
+                &heap,
+                &owner.core,
+                &mut budget,
+            );
             assert_eq!(result.is_ok(), succeeds);
-            if let Err(crate::LoanError::Heap(crate::HeapError::ResourceBytes {
-                staged,
-                used,
-                ..
-            })) = result
-            {
-                assert_eq!(staged, staging);
-                assert_eq!(used, u64::try_from(required)?);
+            match result {
+                Err(crate::LoanError::Heap(crate::HeapError::ResourceBytes {
+                    staged,
+                    used,
+                    ..
+                })) => {
+                    assert_eq!((staged, used), (staging, u64::try_from(required)?));
+                }
+                Err(error) => return Err(error.into()),
+                Ok(()) => assert!(succeeds),
             }
         }
     }
@@ -289,42 +247,43 @@ fn pointwise_literal_abi_byte_totals() {
         byte_fixture::<f64>(3, 1, 3),
         byte_fixture::<f32>(17, 1, 2),
         byte_fixture::<f64>(9, 1, 2),
-        [headers::<f64>(), vacant_after_single_application()],
         [
-            size_of::<crate::CellOutcome>(),
-            size_of::<Shared<MaskRecord>>(),
+            abi::application_headers::<f64>(),
+            vacant_after_single_application(),
         ],
+        [abi::outcome_width(), size_of::<Shared<MaskRecord>>()],
     ];
-    // Debit variants retain inline weak witnesses: rows grow from 248 to 264 bytes.
-    // The detached core and bundle each add one 8-byte optional retained-law attachment;
-    // H therefore grows from 6008 to 6024, even when that private field is empty.
-    // Temporary backings: 17*264 + 5*16 + 3*248 + 2*24 = 5360.
-    // Retained table delta: 3*(256+888) + 2*32 + 40 + (15-2*h)*264.
-    // Empty B: 6024 + 7496 - 528*h. Replaced old backings:
-    // h*(256+888) + 3*32 + (3*h+6)*264 + 40.
-    // C=3 adds 320; binary32 C=17 adds 848; binary64 C=9 adds 656.
-    // Vacant tables: 48 + 6*256 + 6*888 + 5*32 + 24*264 + 2*40 = 13488.
+    // Optional endpoints add 2*LoanChannel to the core and 2*PublishedChannel to the bundle.
+    // Captured correspondence, endpoint identities and completed-mask identity add 272 to both evidence copies.
+    // H = core 3296 + layout 120 + witness 256 + bundle 3216 + pin 184 + extent 40 = 7112.
+    // Outcomes grow 24 -> 32 for the lossless prepared refusal; every group row grows 888 -> 1032.
+    // Temporary backings remain 17*264 + 5*16 + 3*248 + 2*24 = 5360.
+    // Table delta: 3*(256+1032) + 2*32 + 40 + (15-2*h)*264.
+    // Empty B: 7112 + 7928 - 528*h. Replaced old backings:
+    // h*(256+1032) + 3*32 + (3*h+6)*264 + 40.
+    // C=3 adds 344; binary32 C=17 adds 984; binary64 C=9 adds 728.
+    // Vacant tables: 48 + 6*256 + 6*1032 + 5*32 + 24*264 + 2*40 = 14352.
     assert_eq!(
         [
             size_of::<Slot<DescriptorRecord>>(),
-            size_of::<Option<Group>>(),
+            abi::group_row(),
             size_of::<Slot<Native<MaskRecord>>>(),
             size_of::<Option<Debit>>(),
             size_of::<Option<PinIndex>>()
         ],
-        [256, 888, 32, 264, 40]
+        [256, 1032, 32, 264, 40]
     );
     assert_eq!(
         independently_laid_out,
         [
-            [12_992, 25_664],
-            [11_936, 32_352],
-            [12_256, 32_672],
-            [12_256, 32_672],
-            [13_312, 29_856],
-            [13_120, 29_664],
-            [6024, 13_488],
-            [24, 64]
+            [14_512, 27_472],
+            [13_456, 34_736],
+            [13_800, 35_080],
+            [13_800, 35_080],
+            [14_968, 32_088],
+            [14_712, 31_832],
+            [7_112, 14_352],
+            [32, 64],
         ]
     );
 }

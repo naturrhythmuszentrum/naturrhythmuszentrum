@@ -28,7 +28,7 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
         return Ok((payload, claim::<Q>(contract, reservation, &context)));
     }
     let (entries, contributions) = match &contract.recipe {
-        Recipe::PositiveReciprocal(_) | Recipe::Quantity(_) => {
+        Recipe::PositiveReciprocal(_) | Recipe::Quantity(_) | Recipe::PreparedExpm1 => {
             return Err(KernelError::Contract.into());
         }
         Recipe::Sum { subtract, right } => (sum(views, *subtract, right, &context)?, None),

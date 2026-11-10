@@ -33,7 +33,7 @@ impl<P: Scalar> Prepared<P> {
 /// Complete all owned output allocations while borrowing the original request.
 pub(super) fn prepare<P: Scalar + 'static>(
     heap: &mut Heap,
-    request: &PointwiseRequest<P>,
+    request: &super::super::prepared::Request<'_, P>,
     mut plan: Plan,
 ) -> Result<Prepared<P>, LoanError> {
     plan.permit.storage(heap.storage.epoch())?;
@@ -63,23 +63,103 @@ pub(super) fn prepare<P: Scalar + 'static>(
         .change_tracked(1, heap.limits.descriptors, &mut guard)?;
     let identity = identity(
         heap.scope,
-        &request.destination,
+        request.destination,
         &plan,
         &descriptors,
         &layouts,
         &masks,
     )?;
-    let mut debits = vector(17)?;
+    let mut debits = vector(plan.debit_count)?;
     guard.acquired(true)?;
-    let channels = channels::<P>(&plan, identity, &mut debits, &mut guard)?;
+    let reading_channels =
+        channels::<P, 3>(&plan, plan.present, identity, &mut debits, &mut guard)?;
+    let endpoints = endpoint_channels(
+        &plan,
+        request.prepared.is_some(),
+        identity,
+        &mut debits,
+        &mut guard,
+    )?;
     let headers = header_tokens(identity, &plan, &mut debits)?;
-    let Shells {
-        layout,
-        bundle,
-        pin,
-        witness,
-    } = shells(&request.destination, identity, &mut guard)?;
-    let extra = extras(heap, request, &plan, identity, &mut debits, &mut guard)?;
+    let shells = shells(request.destination, identity, &mut guard)?;
+    let endpoint_tokens = endpoints.as_ref().map(endpoint_identities);
+    let extra = extras(
+        heap,
+        request,
+        &plan,
+        identity,
+        &mut debits,
+        &mut guard,
+        endpoint_tokens,
+    )?;
+    let Records {
+        descriptors,
+        layouts,
+        masks,
+    } = records(identity, descriptors, layouts, masks, &mut guard)?;
+    let declaration = declaration(request.destination);
+    #[cfg(test)]
+    crate::loan::fault::before()?;
+    let mut core = Box::new(ApplicationCore {
+        endpoints,
+        input: None,
+        contract: extra.contract,
+        extent_token: extra.extent_token,
+        filled: extra.filled,
+        filled_token: extra.filled_token,
+        evidence: extra.evidence,
+        population: extra.population,
+        candidate: false,
+        host: crate::loan::lifecycle::HostCore {
+            retained_law: None,
+            identity,
+            declaration,
+            channels: reading_channels,
+            layout: shells.layout,
+            bundle: shells.bundle,
+            pin: shells.pin,
+            headers,
+            cleanup: crate::loan::registry::CleanupReceipt::empty(receipt_identity),
+            witness: shells.witness,
+        },
+    });
+    guard.acquired(false)?;
+    core.host.cleanup = guard.finish()?;
+    Ok(Prepared {
+        core,
+        descriptors,
+        layouts,
+        masks,
+        debits,
+        debit_slots: plan.debit_slots,
+        pin_slot: plan.pin_slot,
+        revision: plan.revision,
+    })
+}
+/// Fixed Lower/Upper identity order is captured before publication moves any token.
+fn endpoint_identities(pair: &[LoanChannel; 2]) -> [(usize, u64, u64); 2] {
+    pair.each_ref().map(|channel| {
+        let token = &channel.tokens[0];
+        (token.slot, token.key, token.receipt)
+    })
+}
+/// Common prepared occupations retain their existing slot-table ownership.
+struct Records {
+    /// Three ordinary reading descriptors.
+    descriptors: crate::heap::slots::PreparedSlots<DescriptorRecord>,
+    /// One identity layout.
+    layouts: crate::heap::slots::PreparedSlots<Native<LayoutRecord>>,
+    /// One shared completed mask.
+    masks: crate::heap::slots::PreparedSlots<Native<crate::mask::storage::MaskRecord>>,
+}
+/// Bind the three descriptor occupations and the two reserved native records without new authority.
+fn records(
+    identity: Identity,
+    descriptors: SlotPlan,
+    layouts: SlotPlan,
+    masks: SlotPlan,
+    guard: &mut Preparation,
+) -> Result<Records, LoanError> {
     let mut records = vector(3)?;
     guard.acquired(true)?;
     for channel in HostChannel::ALL {
@@ -95,46 +175,28 @@ pub(super) fn prepare<P: Scalar + 'static>(
     let mut mask_records = vector(1)?;
     guard.acquired(true)?;
     mask_records.push(Native::Reserved(identity.root));
-    let descriptors = descriptors.bind(records)?;
-    let layouts = layouts.bind(layout_records)?;
-    let masks = masks.bind(mask_records)?;
-    let declaration = declaration(&request.destination);
-    #[cfg(test)]
-    crate::loan::fault::before()?;
-    let mut core = Box::new(ApplicationCore {
-        input: None,
-        contract: extra.contract,
-        extent_token: extra.extent_token,
-        filled: extra.filled,
-        filled_token: extra.filled_token,
-        evidence: extra.evidence,
-        population: extra.population,
-        candidate: false,
-        host: crate::loan::lifecycle::HostCore {
-            retained_law: None,
-            identity,
-            declaration,
-            channels,
-            layout,
-            bundle,
-            pin,
-            headers,
-            cleanup: crate::loan::registry::CleanupReceipt::empty(receipt_identity),
-            witness,
-        },
-    });
-    guard.acquired(false)?;
-    core.host.cleanup = guard.finish()?;
-    Ok(Prepared {
-        core,
-        descriptors,
-        layouts,
-        masks,
-        debits,
-        debit_slots: plan.debit_slots,
-        pin_slot: plan.pin_slot,
-        revision: plan.revision,
+    Ok(Records {
+        descriptors: descriptors.bind(records)?,
+        layouts: layouts.bind(layout_records)?,
+        masks: masks.bind(mask_records)?,
     })
+}
+/// Endpoint payload and tracking owners use the same disjoint allocation preparation as readings.
+fn endpoint_channels(
+    plan: &Plan,
+    prepared: bool,
+    identity: Identity,
+    debits: &mut Vec<Debit>,
+    guard: &mut Preparation,
+) -> Result<Option<[LoanChannel; 2]>, LoanError> {
+    if !prepared {
+        return Ok(None);
+    }
+    let [Some(lower), Some(upper)] = channels::<f64, 2>(plan, [true; 2], identity, debits, guard)?
+    else {
+        return Err(LoanError::WrongLoan);
+    };
+    Ok(Some([lower, upper]))
 }
 /// The application has precisely three additional separately owned allocations.
 struct Extras {
@@ -154,11 +216,12 @@ struct Extras {
 /// Construct A and D classifications without retaining the ordinary demand owner.
 fn extras<P: Scalar + 'static>(
     heap: &Heap,
-    request: &PointwiseRequest<P>,
+    request: &super::super::prepared::Request<'_, P>,
     plan: &Plan,
     identity: Identity,
     debits: &mut Vec<Debit>,
     guard: &mut Preparation,
+    endpoint_tokens: Option<[(usize, u64, u64); 2]>,
 ) -> Result<Extras, LoanError> {
     let source = super::super::contract::source(request)?;
     let demand = heap.mask(request.demand, source.identity.layout)?;
@@ -178,33 +241,13 @@ fn extras<P: Scalar + 'static>(
             .checked_add(word.count_ones() as usize)
             .ok_or(LoanError::CountOverflow)
     })?;
-    let mut outcomes = vector(request.destination.capacity())?;
-    if request.destination.capacity() != 0 {
-        guard.acquired(false)?;
-    }
-    for cell in 0..request.destination.capacity() {
-        outcomes.push(if crate::loan::payload::bit(&filled, cell) {
-            CellOutcome::Pending
-        } else if crate::loan::payload::bit(demand.words(), cell) {
-            CellOutcome::MissingInput
-        } else {
-            CellOutcome::NotRequested
-        });
-    }
-    let extent = crate::Extent::new(1, request.destination.components())?;
-    #[cfg(test)]
-    crate::loan::fault::before()?;
-    let inputs: Rc<[crate::Extent]> = Rc::new([extent]);
-    guard.acquired(false)?;
-    let contract = crate::kernels::KernelContract {
-        inputs,
-        output: extent,
-        recipe: crate::kernels::contract::Recipe::Elementwise(crate::Elementwise::Square),
-        work: extent
-            .entries()
-            .checked_mul(12)
-            .ok_or(LoanError::CountOverflow)?,
-    };
+    let outcomes = outcomes(
+        request.destination.capacity(),
+        &filled,
+        demand.words(),
+        guard,
+    )?;
+    let contract = cell_contract(request, guard)?;
     let filled_token = token(
         identity,
         AllocationKind::Filled,
@@ -233,10 +276,16 @@ fn extras<P: Scalar + 'static>(
         &plan.identities,
     )?;
     let evidence = Evidence {
+        prepared: request.prepared.cloned(),
+        endpoint_tokens,
+        completed_mask: None,
         operation: request.operation.clone(),
         excluded_inputs: Rc::clone(&request.operation.inputs),
         excluded_outputs: Rc::clone(&request.operation.outputs),
-        law: Rc::clone(super::super::contract::square(&request.operation)?),
+        law: Rc::clone(super::super::contract::kernel(
+            request.operation,
+            request.prepared.is_some(),
+        )?),
         source: Declaration {
             symbols: source.declaration.symbols.clone(),
             axis: source.declaration.axis,
@@ -260,6 +309,52 @@ fn extras<P: Scalar + 'static>(
         population,
     })
 }
+/// The one-cell extent and closed allowance use the same separately owned numerical contract.
+fn cell_contract<P: Scalar>(
+    request: &super::super::prepared::Request<'_, P>,
+    guard: &mut Preparation,
+) -> Result<crate::kernels::KernelContract, LoanError> {
+    let extent = crate::Extent::new(1, request.destination.components())?;
+    #[cfg(test)]
+    crate::loan::fault::before()?;
+    let inputs: Rc<[crate::Extent]> = Rc::new([extent]);
+    guard.acquired(false)?;
+    Ok(crate::kernels::KernelContract {
+        inputs,
+        output: extent,
+        recipe: if request.prepared.is_some() {
+            crate::kernels::contract::Recipe::PreparedExpm1
+        } else {
+            crate::kernels::contract::Recipe::Elementwise(crate::Elementwise::Square)
+        },
+        work: extent
+            .entries()
+            .checked_mul(if request.prepared.is_some() { 0 } else { 12 })
+            .ok_or(LoanError::CountOverflow)?,
+    })
+}
+/// The fixed outcome array preserves D and A independently of caller mask retirement.
+fn outcomes(
+    cells: usize,
+    filled: &[u64],
+    demand: &[u64],
+    guard: &mut Preparation,
+) -> Result<Vec<CellOutcome>, LoanError> {
+    let mut outcomes = vector(cells)?;
+    if cells != 0 {
+        guard.acquired(false)?;
+    }
+    for cell in 0..cells {
+        outcomes.push(if crate::loan::payload::bit(filled, cell) {
+            CellOutcome::Pending
+        } else if crate::loan::payload::bit(demand, cell) {
+            CellOutcome::MissingInput
+        } else {
+            CellOutcome::NotRequested
+        });
+    }
+    Ok(outcomes)
+}
 /// Shared symbolic declaration owners add no numerical allocation or retaining edge.
 fn declaration<P: Scalar>(declaration: &HostTileDeclaration<P>) -> Declaration {
     Declaration {
@@ -276,8 +371,8 @@ fn token(
     elements: usize,
     bytes: usize,
     debits: &mut Vec<Debit>,
-    slots: &[usize; 17],
-    identities: &[u64; 20],
+    slots: &[usize; 23],
+    identities: &[u64; 26],
 ) -> Result<Token, LoanError> {
     let key = *identities
         .get(3 + debits.len())
@@ -337,14 +432,15 @@ fn identity<P: Scalar + 'static>(
     })
 }
 /// Numerical and flag allocations remain individually owned throughout preparation.
-fn channels<P: Scalar + 'static>(
+fn channels<P: Scalar + 'static, const N: usize>(
     plan: &Plan,
+    present: [bool; N],
     identity: Identity,
     debits: &mut Vec<Debit>,
     guard: &mut Preparation,
-) -> Result<[Option<LoanChannel>; 3], LoanError> {
-    let mut owners: [Option<LoanChannel>; 3] = [None, None, None];
-    for (owner, present) in owners.iter_mut().zip(plan.present) {
+) -> Result<[Option<LoanChannel>; N], LoanError> {
+    let mut owners: [Option<LoanChannel>; N] = std::array::from_fn(|_| None);
+    for (owner, present) in owners.iter_mut().zip(present) {
         if present {
             let matrix = Numerical::zeroed::<P>(plan.length)?;
             if plan.length != 0 {

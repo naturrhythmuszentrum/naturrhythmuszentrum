@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! The complete seventeen-entry plan precedes every private application allocation.
+//! The complete closed application inventory precedes every private allocation.
 
 mod plan;
 mod preparation;
@@ -31,7 +31,7 @@ struct Prepared<P: Scalar> {
     /// Exact individual allocation records.
     debits: Vec<Debit>,
     /// Disjoint fixed debit destinations.
-    debit_slots: [usize; 17],
+    debit_slots: [usize; 23],
     /// Initial result-pin index reservation.
     pin_slot: usize,
     /// Admission revision with terminal headroom.
@@ -46,15 +46,49 @@ pub(super) fn request<P: Scalar + 'static>(
     let checked = account
         .ledger
         .with_work_phase(super::FAMILY, "pointwise admission", |budget| {
-            super::contract::check(heap, &request, account.identity, budget)?;
-            let plan = plan::Plan::new(heap, &request, budget)?;
-            preparation::prepare(heap, &request, plan).map_err(ApplicationError::from)
+            let borrowed = super::prepared::Request::from(&request);
+            super::contract::check(heap, &borrowed, account.identity, budget)?;
+            let plan = plan::Plan::new(heap, &borrowed, budget)?;
+            preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)
         });
     match checked {
         Ok(prepared) => {
             ApplicationRequest::ApplicationReady(install(heap, prepared.finish(request)))
         }
         Err(error) => ApplicationRequest::ApplicationRefused(error, request),
+    }
+}
+/// The original funded law use moves only after the common private preparation succeeds.
+pub(super) fn request_expm1(
+    heap: &mut Heap,
+    request: super::PointwiseExpm1Request,
+    account: &mut ExecutionAccount,
+) -> super::Expm1ApplicationRequest {
+    let checked =
+        account
+            .ledger
+            .with_work_phase(super::FAMILY, "prepared application admission", |budget| {
+                super::prepared::authenticate(&request, heap, account.identity, budget)?;
+                let borrowed = super::prepared::Request::from(&request);
+                super::contract::check(heap, &borrowed, account.identity, budget)?;
+                let plan = plan::Plan::new(heap, &borrowed, budget)?;
+                crate::loan::retained_expm1::Attachment::prepare_validation(
+                    &request.law,
+                    request.operation.binding,
+                    heap,
+                    budget,
+                )?;
+                preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)
+            });
+    match checked {
+        Ok(mut prepared) => {
+            prepared.core.input = Some(request.input);
+            prepared.core.host.retained_law = Some(
+                crate::loan::retained_expm1::Attachment::prepared(request.law),
+            );
+            super::Expm1ApplicationRequest::ApplicationReady(install(heap, prepared))
+        }
+        Err(error) => super::Expm1ApplicationRequest::ApplicationRefused(error, request),
     }
 }
 /// Install only complete private records; no fallible work or allocation follows the input move.
@@ -67,7 +101,7 @@ fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared<P>) -> OwnedApplicatio
     while heap.loans.groups.len() < heap.descriptors.slots.scan_work() {
         heap.loans.groups.push(None);
     }
-    let mut inventory = [None; 17];
+    let mut inventory = [None; 23];
     for (index, debit) in prepared.debits.into_iter().enumerate() {
         let slot = prepared.debit_slots[index];
         inventory[index] = Some((slot, debit.key));
@@ -79,7 +113,11 @@ fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared<P>) -> OwnedApplicatio
         outcome: ProducerOutcome::Pending,
         delivered: false,
         pin: prepared.pin_slot,
-        debits: DebitInventory::Application(inventory),
+        debits: if prepared.core.evidence.prepared.is_some() {
+            DebitInventory::PreparedApplication(inventory)
+        } else {
+            DebitInventory::Application(std::array::from_fn(|index| inventory[index]))
+        },
     });
     let pin = &prepared.core.host.headers[4];
     heap.loans.install_pin(
@@ -95,4 +133,14 @@ fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared<P>) -> OwnedApplicatio
     OwnedApplication {
         core: prepared.core,
     }
+}
+
+/// Isolate the identical complete internal plan from independently funded fixture setup.
+#[cfg(test)]
+pub(super) fn check_plan(
+    heap: &Heap,
+    request: &super::PointwiseExpm1Request,
+    budget: &mut nrz_bindings::Budget,
+) -> Result<(), LoanError> {
+    plan::Plan::new(heap, &super::prepared::Request::from(request), budget).map(|_| ())
 }

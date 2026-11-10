@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original meanings and full-shape exclusion precede every numerical allocation.
 
-use super::{ApplicationError, Evidence, PointwiseRequest};
+use super::{ApplicationError, Evidence, prepared::Request};
 use crate::loan::{
     HostChannel, LoanError, charge,
     registry::{Bundle, Declaration, Identity},
@@ -16,7 +16,7 @@ use nrz_scalar::Scalar;
 use std::rc::Rc;
 
 /// Borrow the exact source owner without creating another numerical edge.
-pub(super) fn source<P: Scalar>(request: &PointwiseRequest<P>) -> Result<&Bundle, LoanError> {
+pub(super) fn source<'a, P: Scalar>(request: &Request<'a, P>) -> Result<&'a Bundle, LoanError> {
     request
         .input
         .record
@@ -28,7 +28,7 @@ pub(super) fn source<P: Scalar>(request: &PointwiseRequest<P>) -> Result<&Bundle
 /// Validate all immutable metadata and every original structural entry before allocation.
 pub(super) fn check<P: Scalar + 'static>(
     heap: &Heap,
-    request: &PointwiseRequest<P>,
+    request: &Request<'_, P>,
     account: u64,
     budget: &mut Budget,
 ) -> Result<(), ApplicationError> {
@@ -42,12 +42,12 @@ pub(super) fn check<P: Scalar + 'static>(
     if pin.account != account || request.destination.account != account {
         return Err(LoanError::ForeignAccount.into());
     }
-    heap.current_bundle(&request.input, budget)?;
+    heap.current_bundle(request.input, budget)?;
     let bundle = source(request)?;
     if bundle.origin.evidence.is_some() {
         return Err(LoanError::UnsupportedContract.into());
     }
-    let law = square(&request.operation)?;
+    let law = kernel(request.operation, request.prepared.is_some())?;
     let destination = &request.destination;
     let extent = bundle.declaration.extent;
     if destination.extent != extent || extent.columns() == 0 {
@@ -87,11 +87,21 @@ pub(super) fn check<P: Scalar + 'static>(
     if destination.coverage != bundle.declaration.coverage {
         return Err(LoanError::CoverageMismatch.into());
     }
-    declarations(
-        &bundle.declaration,
-        &destination.symbols,
-        &request.operation,
-    )?;
+    declarations(&bundle.declaration, &destination.symbols, request.operation)?;
+    if let Some(prepared) = request.prepared {
+        if bundle.declaration.symbols.bound().is_some()
+            || bundle.declaration.symbols.error().is_some()
+            || crate::storage::Format::of::<P>() != crate::storage::Format::Binary64
+        {
+            return Err(LoanError::UnsupportedContract.into());
+        }
+        prepared.validate_destination(
+            &bundle.declaration,
+            &destination.symbols,
+            destination.axis,
+            destination.coverage,
+        )?;
+    }
     attachments(bundle)?;
     charge(budget, bundle.channels.iter().flatten().count() + 3)?;
     let mask = heap
@@ -107,10 +117,14 @@ pub(super) fn check<P: Scalar + 'static>(
     {
         return Err(LoanError::CoverageMismatch.into());
     }
-    let work = crate::kernels::contract::work(extent.columns(), 12)?;
+    let work = if request.prepared.is_some() {
+        0
+    } else {
+        crate::kernels::contract::work(extent.columns(), 12)?
+    };
     let payload = extent
         .entries()
-        .checked_mul(3)
+        .checked_mul(if request.prepared.is_some() { 5 } else { 3 })
         .ok_or(LoanError::CountOverflow)?;
     request.limits.check(1, work.max(payload))?;
     Ok(())
@@ -173,9 +187,10 @@ fn attachments(bundle: &Bundle) -> Result<(), LoanError> {
     }
     Ok(())
 }
-/// Only this closed original law can establish the masked exclusion pairing.
-pub(super) fn square(
+/// Original closed recipe selection preserves its independently checked whole-shape allowance.
+pub(super) fn kernel(
     operation: &crate::CheckedOperation,
+    prepared: bool,
 ) -> Result<&Rc<KernelContract>, LoanError> {
     if operation.inputs().len() != 1 || operation.outputs().len() != 1 || operation.revision() != 1
     {
@@ -184,7 +199,12 @@ pub(super) fn square(
     let NativeRecipe::Kernel(law) = &operation.recipe else {
         return Err(LoanError::UnsupportedContract);
     };
-    if !matches!(law.recipe, Recipe::Elementwise(Elementwise::Square)) {
+    let supported = if prepared {
+        matches!(law.recipe, Recipe::PreparedExpm1) && law.work == 0
+    } else {
+        matches!(law.recipe, Recipe::Elementwise(Elementwise::Square))
+    };
+    if !supported {
         return Err(LoanError::UnsupportedContract);
     }
     Ok(law)
@@ -205,7 +225,15 @@ impl Evidence {
         identity: Identity,
         revision: u32,
     ) -> Result<(), LoanError> {
-        let law = square(&self.operation)?;
+        let law = kernel(&self.operation, self.prepared.is_some())?;
+        if let Some(prepared) = &self.prepared {
+            let original = Rc::ptr_eq(&prepared.operation.inputs, &self.operation.inputs)
+                && Rc::ptr_eq(&prepared.operation.outputs, &self.operation.outputs);
+            if !original {
+                return Err(LoanError::WrongLoan);
+            }
+            prepared.validate(&self.source, destination)?;
+        }
         let exclusion = Rc::ptr_eq(&self.excluded_inputs, &self.operation.inputs)
             && Rc::ptr_eq(&self.excluded_outputs, &self.operation.outputs);
         let source_layout = self.demand.layout == self.source_identity.layout;

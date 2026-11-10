@@ -13,9 +13,9 @@ const DESTROYED: [usize; 30] = [
     0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
     22, 23,
 ];
-/// Literal deltas: 3 group rows at 888, 9 debit rows at 264, one weak row at 40,
+/// Literal deltas: 3 group rows at 1032, 9 debit rows at 264, one weak row at 40,
 /// then 3 descriptor rows at 256 and one native row at 32 for each native table.
-const DELTAS: [usize; 10] = [0, 2664, 5040, 5080, 5080, 5848, 5848, 5880, 5880, 5912];
+const DELTAS: [usize; 10] = [0, 3096, 5472, 5512, 5512, 6280, 6280, 6312, 6312, 6344];
 
 /// Assert physical table capacity and unchanged occupations independently of the prefix guard.
 pub(super) fn check(heap: &crate::Heap, prefix: usize, before: usize) -> TestResult {

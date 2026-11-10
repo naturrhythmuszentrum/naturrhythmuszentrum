@@ -5,7 +5,7 @@ mod attachments;
 pub(in crate::loan) mod bytes;
 mod constructor_work;
 mod fixture;
-mod memos;
+pub(in crate::loan) mod memos;
 mod public_boundary;
 mod refusal;
 mod resources;
@@ -58,6 +58,13 @@ pub(in crate::loan) fn prepare(
 ) -> TestResult<RetainedExpm1> {
     fixture::prepare(heap, account)
 }
+/// Original free-parameter request for checked application correspondence controls.
+pub(in crate::loan) fn request() -> TestResult<(
+    nrz_bindings::readings::algebra::Cas,
+    nrz_bindings::readings::algebra::enclosure::prepared_expm1::Request,
+)> {
+    fixture::request()
+}
 /// Keep immutable original limits equal across the ownership fixture.
 pub(in crate::loan) fn limits() -> nrz_bindings::Limits {
     fixture::limits()
@@ -79,6 +86,11 @@ pub(in crate::loan) fn check_attachment(attachment: &Attachment, identity: u64) 
         .law
         .evaluate(fixture::point(-0.5), &ArithmeticContext::new()?)?;
     Ok(())
+}
+/// Private environment substitution supplies no new owner or numerical program.
+pub(in crate::loan) fn substituted_environment(mut binding: Binding) -> Binding {
+    binding.seal.revisions[3] = 2;
+    binding
 }
 /// Independent uses survive heap destruction and release the exact authority once.
 #[test]

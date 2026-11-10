@@ -3,7 +3,7 @@
 
 use super::{TestResult, fixture, granted};
 use crate::heap::{descriptors::DescriptorRecord, identity::Key};
-use crate::loan::registry::{BundleOwner, Debit, Group, Liveness, PinIndex, PinRecord};
+use crate::loan::registry::{Debit, Liveness, PinIndex, PinRecord};
 use crate::loan::{CancelOutcome, LoanError, LoanRequest};
 use crate::mask::storage::{LayoutRecord, MaskRecord, Native, Store};
 use nrz_bindings::Limits;
@@ -34,15 +34,15 @@ fn bytes<P: Scalar>(cells: usize, components: usize, channels: usize) -> [usize;
     let flags = 8 * (entries.div_ceil(64) + cells.div_ceil(64));
     let debits = 3 * channels + 5;
     let retained = channels * (payload + flags)
-        + size_of::<crate::loan::lifecycle::HostCore>()
+        + crate::loan::abi::host_header()
         + size_of::<SharedMirror<LayoutRecord>>()
         + size_of::<SharedMirror<Liveness>>()
-        + size_of::<SharedMirror<BundleOwner>>()
+        + crate::loan::abi::bundle_header()
         + size_of::<SharedMirror<PinRecord>>()
         + channels * size_of::<SlotMirror<DescriptorRecord>>()
         + size_of::<SlotMirror<Native<LayoutRecord>>>()
         + size_of::<SlotMirror<Native<MaskRecord>>>()
-        + channels * size_of::<Option<Group>>()
+        + channels * crate::loan::abi::group_row()
         + debits * size_of::<Option<Debit>>()
         + size_of::<Option<PinIndex>>();
     let private = debits * size_of::<Debit>()

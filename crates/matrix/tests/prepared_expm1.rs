@@ -134,6 +134,8 @@ fn expression(f: &mut Fixture, argument: Handle, bits: u32) -> TestResult<Reques
 
 use nrz_matrix::{PreparedExpm1, PreparedExpm1Error};
 use nrz_scalar::{ArithmeticContext, Expm1Failure, Expm1Input};
+#[path = "prepared_expm1/application.rs"]
+mod application;
 #[path = "prepared_expm1/exp.rs"]
 mod exp;
 #[expect(

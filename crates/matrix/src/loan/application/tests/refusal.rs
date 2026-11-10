@@ -14,7 +14,9 @@ pub(super) fn replace_source<P: Scalar + 'static>(
     fixture: &mut Fixture<P>,
     values: impl Fn(usize, usize) -> (P, P),
 ) -> TestResult {
-    let source = crate::loan::application::contract::source(&fixture.request)?;
+    let source = crate::loan::application::contract::source(
+        &super::super::prepared::Request::from(&fixture.request),
+    )?;
     let symbols = source.declaration.symbols.clone();
     let axis = source.declaration.axis;
     let cells = source.declaration.extent.rows();

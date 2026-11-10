@@ -25,3 +25,12 @@ const fn point(x: f64) -> Expm1Input {
         bits: 40,
     }
 }
+
+#[path = "prepared_observation/application.rs"]
+mod application;
+#[path = "../examples/prepared_exponential/trace.rs"]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared bounded observer remains private to this integration target"
+)]
+mod trace;

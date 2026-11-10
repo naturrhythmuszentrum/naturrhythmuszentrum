@@ -33,6 +33,8 @@ pub enum KernelKind {
     ScalarQuantitySquareRoot,
     /// A direct native image of a complete deterministic box.
     Elementwise(super::Elementwise),
+    /// Retained prepared expm1, executable only through its checked masked adapter.
+    PreparedExpm1,
 }
 
 /// A private construction contract for one output and its complete ordered operands.
@@ -70,6 +72,8 @@ pub(crate) enum Recipe {
     Quantity(crate::quantity::nonlinear::ScalarQuantityRecipe),
     /// A direct native image of a complete deterministic box.
     Elementwise(super::Elementwise),
+    /// Retained prepared expm1, executable only through its checked masked adapter.
+    PreparedExpm1,
 }
 
 impl KernelContract {
@@ -86,6 +90,7 @@ impl KernelContract {
             Recipe::Product => KernelKind::Product,
             Recipe::Quantity(recipe) => recipe.kind(),
             Recipe::Elementwise(function) => KernelKind::Elementwise(*function),
+            Recipe::PreparedExpm1 => KernelKind::PreparedExpm1,
         }
     }
 

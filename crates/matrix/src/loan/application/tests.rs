@@ -3,6 +3,7 @@
 
 mod authority;
 mod bytes;
+pub(in crate::loan::application) mod expm1;
 mod invariants;
 mod laws;
 mod lifecycle;

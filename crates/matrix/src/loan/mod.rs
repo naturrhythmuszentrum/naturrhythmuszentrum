@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Owned host input follows the matrix loans design without a heap-wide execution borrow.
 
+#[cfg(test)]
+mod abi;
 mod account;
 mod application;
 mod declaration;
@@ -19,7 +21,8 @@ mod scans;
 pub use account::ExecutionAccount;
 pub use application::{
     ApplicationCancellation, ApplicationError, ApplicationEvaluation, ApplicationPublication,
-    ApplicationRequest, CellOutcome, OwnedApplication, PointwiseRequest,
+    ApplicationRequest, CellOutcome, Expm1ApplicationRequest, OwnedApplication,
+    PointwiseExpm1Request, PointwiseRequest, PreparedExpm1Operation,
 };
 pub use declaration::{HostChannel, HostTileDeclaration};
 pub use error::LoanError;

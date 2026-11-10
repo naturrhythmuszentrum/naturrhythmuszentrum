@@ -75,7 +75,10 @@ pub(crate) fn map<P: Scalar + 'static>(
                 }
             }
             Recipe::Linear(map) => fixed(map, &mut result, context)?,
-            Recipe::Product | Recipe::Elementwise(_) | Recipe::PositiveReciprocal(_) => {
+            Recipe::Product
+            | Recipe::Elementwise(_)
+            | Recipe::PositiveReciprocal(_)
+            | Recipe::PreparedExpm1 => {
                 return Err(StatisticsError::Unsupported.into());
             }
         },
