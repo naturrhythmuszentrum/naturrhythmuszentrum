@@ -20,7 +20,7 @@ struct Package {
 }
 
 /// New workspace owners or direct edges require deliberate architecture review.
-const PACKAGES: [Package; 6] = [
+const PACKAGES: [Package; 7] = [
     Package {
         name: "nrz-cas",
         manifest: "crates/cas/Cargo.toml",
@@ -83,6 +83,13 @@ const PACKAGES: [Package; 6] = [
             "thiserror",
         ],
         development: &["tempfile"],
+    },
+    Package {
+        // rule:nrz:criterion-benchmark-boundary reserves the harness for this owner.
+        name: "nrz-bench",
+        manifest: "crates/bench/Cargo.toml",
+        normal: &[],
+        development: &["criterion", "nrz-matrix", "nrz-bindings", "nrz-scalar"],
     },
 ];
 

@@ -8,6 +8,7 @@
 
 |Test|Area|Claim|
 |----|----|-----|
+|(`test:integration:criterion-is-exclusive-to-benchmark-development`)|docgen|Only the unpublished benchmark host can resolve Criterion, through its pinned development dependency.|
 |(`test:integration:binary-fixed-point-and-exit-classes`)|docgen|Rendering is idempotent, drift classes are distinct, and check is read-only. TODO ´todo:test:verify-migrated-binding-tables-preserve-point´: verify migrated binding tables preserve point order and shared source references under conv:nrz:batch-order-and-replay.|
 |(`test:integration:orders-problem-dataset-entries`)|docgen|Data writes problems before fixtures, with bytewise slug order in each group.|
 |(`test:integration:detects-changed-problem-value`)|docgen|A changed input value makes check report the derived dataset as changed.|

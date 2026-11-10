@@ -1,0 +1,14 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Workspace benchmarks · `guide:bench:overview`
+
+`nrz-bench` is an unpublished benchmark host with an empty library. Its development dependencies provide Criterion 0.8.2 and the existing matrix, bindings and scalar operations. Run `cargo bench -p nrz-bench`; a short observation uses `cargo bench -p nrz-bench -- --warm-up-time 1 --measurement-time 1`.
+
+The `host_sampling` binary prepares the existing matrix exponential fixture once, outside both timers, and measures native `PreparedExpm1::evaluate` at −¼ on the admitted interval [−2, 0], with a 40-bit target. Its independent mathematical value is exp(−¼) − 1. Preparation and exact authority are retained by borrow; native evaluation allocates no exact graph and charges zero exact Work. The benchmark owns its fixture construction, adapted from the matrix example. A black-box integer identity supplies a separate timer/call-overhead observation.
+
+The same binary samples each operation before and after Criterion, with seed 901, 100 linear rows, 2,000 bootstrap resamples, 95% confidence and a two-second admission budget. One-nanosecond warm-up and measurement targets deliberately select one warm-up iteration and the minimum complete schedule of 1 through 100 iterations; these are schedule controls, not useful-duration promises. Each callback and sampler checkpoint has a declared one-second execution allowance under ordinary allocator and CPU availability; additional scheduling delay remains separate. The checks compare row counts, seeds, every zero-Work receipt and fixed-row seeded analysis, never live timing values. The host explicitly exports the returned report and phase markers; the sampler itself has no output. Criterion measures grouped iterations, whereas nrz times each invocation, so overhead is observable and is not subtracted.
+
+Criterion's only enabled feature is `cargo_bench_support`, which permits the harness to run directly under `cargo bench`. The benchmark selects linear sampling, 20 rows and 2,000 resamples; command-line options can override its defaults. Criterion owns console reports and files under its ordinary benchmark output directory. Its private JSON is not an nrz interface. Docgen's dependency-boundary integration test checks Cargo's resolved graph and declarations, including aliases and transitive edges, so only this package can depend on Criterion and no package can depend on this benchmark host.
+
+Code is AGPL-3.0-only under `LICENSE-CODE`. This crate adds no production sampling API or mathematical authority; the matrix and scalar contracts define the measured operation.

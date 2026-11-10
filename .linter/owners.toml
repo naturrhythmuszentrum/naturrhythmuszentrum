@@ -13,6 +13,7 @@ owners = [
   "MATRIX",
   "BINDINGS",
   "CAS",
+  "BENCH",
   "ORCHESTRATION",
 ]
 
@@ -27,6 +28,7 @@ partitions = [
   { name = "accuracy", owner = "ACCURACY", pattern = '[ %s"templates/" ] %s"crates/accuracy" [ "/" *VCHAR ]' },
   { name = "matrix", owner = "MATRIX", pattern = '[ %s"templates/" ] %s"crates/matrix" [ "/" *VCHAR ]' },
   { name = "bindings", owner = "BINDINGS", pattern = '[ %s"templates/" ] %s"crates/bindings" [ "/" *VCHAR ]' },
+  { name = "bench", owner = "BENCH", pattern = '[ %s"templates/" ] %s"crates/bench" [ "/" *VCHAR ]' },
   { name = "cas", owner = "CAS", pattern = '[ %s"templates/" ] %s"crates/cas" [ "/" *VCHAR ]' },
 ]
 
@@ -35,6 +37,12 @@ imports = [
 ]
 
 may_cite = [
+  { owner = "DOCS", target = "BENCH" },
+  { owner = "NRZ", target = "BENCH" },
+  { owner = "BENCH", target = "ORCHESTRATION" },
+  { owner = "BENCH", target = "MATRIX" },
+  { owner = "BENCH", target = "BINDINGS" },
+  { owner = "BENCH", target = "SCALAR" },
   { owner = "DOCS", target = "ORCHESTRATION" },
   { owner = "DOCS", target = "NRZ" },
   { owner = "DOCS", target = "DOCGEN" },

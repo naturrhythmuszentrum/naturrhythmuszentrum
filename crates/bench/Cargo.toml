@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-bench"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+authors.workspace = true
+repository.workspace = true
+description = "Workspace Criterion benchmarks and host sampling comparisons"
+readme = "README.md"
+keywords = ["benchmark", "numerics", "sampling"]
+categories = ["development-tools::profiling", "science"]
+
+[lib]
+bench = false
+
+[dev-dependencies]
+criterion = { version = "=0.8.2", default-features = false, features = ["cargo_bench_support"] }
+nrz-matrix = { path = "../matrix" }
+nrz-bindings = { path = "../bindings" }
+nrz-scalar.workspace = true
+
+[[bench]]
+name = "host_sampling"
+harness = false
+
+[lints]
+workspace = true

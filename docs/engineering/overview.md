@@ -16,6 +16,7 @@ This set records the adopted scalar, accuracy and documentation-generator surfac
 |`nrz-matrix`|Typed descriptor heap with owned numerical regions and bound companions|faer, nrz-accuracy, nrz-bindings, nrz-scalar, oorandom, thiserror, tracing|nrz-docgen||
 |`nrz-bindings`|Data-time quantity descriptors and checks over original symbolic expressions|nrz-cas, thiserror, tracing|||
 |`nrz-cas`|Exact graph construction and checked symbolic derivations|num-bigint, num-complex, num-integer, num-rational, num-traits, petgraph, tracing|||
+|`nrz-bench`|Workspace Criterion benchmarks and host sampling comparisons||criterion, nrz-bindings, nrz-matrix, nrz-scalar||
 
 **Argument (Graph currency)** · `arg:nrz:engineering-graph-currency`
 

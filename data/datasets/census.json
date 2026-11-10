@@ -14,7 +14,8 @@
     "crates/accuracy/Cargo.toml",
     "crates/matrix/Cargo.toml",
     "crates/bindings/Cargo.toml",
-    "crates/cas/Cargo.toml"
+    "crates/cas/Cargo.toml",
+    "crates/bench/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -121,6 +122,20 @@
         "tracing"
       ],
       "path": "crates/cas"
+    },
+    {
+      "build_dependencies": [],
+      "description": "Workspace Criterion benchmarks and host sampling comparisons",
+      "development_dependencies": [
+        "criterion",
+        "nrz-bindings",
+        "nrz-matrix",
+        "nrz-scalar"
+      ],
+      "has_readme_template": true,
+      "name": "nrz-bench",
+      "normal_dependencies": [],
+      "path": "crates/bench"
     }
   ]
 }

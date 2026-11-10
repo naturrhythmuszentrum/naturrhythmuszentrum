@@ -4,6 +4,13 @@ namespace = "org.naturrhythmuszentrum.linter.policies"
 version = [1, 0, 0]
 
 policies = [
+  { owner = "BENCH", policy = "labels.mints-well-formed" },
+  { owner = "BENCH", policy = "labels.mints-kind-conform" },
+  { owner = "BENCH", policy = "labels.mints-unique" },
+  { owner = "BENCH", policy = "labels.heads-conform" },
+  { owner = "BENCH", policy = "labels.citations-local-resolve" },
+  { owner = "BENCH", policy = "owners.reach-conform" },
+
   { owner = "NRZ", policy = "labels.mints-well-formed" },
   { owner = "NRZ", policy = "labels.mints-kind-conform" },
   { owner = "NRZ", policy = "labels.mints-unique" },

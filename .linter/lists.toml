@@ -203,3 +203,21 @@ allowances = []
 
 [DOCGEN."projection.constant-pins-current"]
 allowances = []
+
+[BENCH."labels.mints-well-formed"]
+allowances = []
+
+[BENCH."labels.mints-kind-conform"]
+allowances = []
+
+[BENCH."labels.mints-unique"]
+allowances = []
+
+[BENCH."labels.heads-conform"]
+allowances = []
+
+[BENCH."labels.citations-local-resolve"]
+allowances = []
+
+[BENCH."owners.reach-conform"]
+allowances = []
