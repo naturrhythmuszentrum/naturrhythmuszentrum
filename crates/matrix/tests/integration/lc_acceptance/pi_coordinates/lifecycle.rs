@@ -247,7 +247,7 @@ fn pi_live_coordinate_unsupported_constants_are_atomic() -> TestResult {
         exact.mul(&exact, &mut setup)?,
     ]
     .into_iter()
-    .zip([209_353, 233_007])
+    .zip([209_581, 233_235])
     {
         let plan = fixture::with_scale(Scale::Expression(value))?;
         unsupported::<f32>(&plan, spent)?;

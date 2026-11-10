@@ -57,6 +57,8 @@ enum FrameHeader {
     Complex,
     /// A conservative child of the original Real header.
     Extended,
+    /// Consistently renamed declarations for independent source portability.
+    Renamed,
 }
 
 /// Shared public frame with an explicit coefficient product and a distinct dependent.
@@ -412,6 +414,11 @@ impl Fixture {
         Self::with_complex(values, centre, reversed, empty, false)
     }
 
+    /// Rename all three declarations without changing their mathematical roles.
+    pub(crate) fn renamed(values: &[&str], reversed: bool) -> TestResult<Self> {
+        Self::framed(values, "0", reversed, false, FrameHeader::Renamed)
+    }
+
     /// A matching complex declaration distinguishes scalar derivative admission from this grammar.
     pub(crate) fn with_complex(
         values: &[&str],
@@ -450,6 +457,11 @@ impl Fixture {
         empty: bool,
         frame: FrameHeader,
     ) -> TestResult<Self> {
+        let names = if matches!(frame, FrameHeader::Renamed) {
+            ["u", "v", "w"]
+        } else {
+            ["x", "y", "z"]
+        };
         let mut cas = Cas::new(Limits {
             work: 20_000_000,
             replay_work: 20_000_000,
@@ -460,7 +472,7 @@ impl Fixture {
             Draft::Header(HeaderDraft::Core(Environment {
                 field: Field::Real,
                 branch: Branch::StrictReal,
-                declarations: ["x", "y", "z"]
+                declarations: names
                     .into_iter()
                     .map(|key| Declaration {
                         key: key.into(),
@@ -499,7 +511,7 @@ impl Fixture {
                 header: Reference::Existing(header.clone()),
                 scalar_spaces: Vec::new(),
                 coordinates: vec![Coordinate {
-                    key: "x".into(),
+                    key: names[0].into(),
                     field: Field::Real,
                     role: CoordinateRole::Coefficient,
                 }],
@@ -566,7 +578,11 @@ impl Fixture {
             }),
         )?;
         let mut declarations = Vec::new();
-        for key in if reversed { ["y", "x"] } else { ["x", "y"] } {
+        for key in if reversed {
+            [names[1], names[0]]
+        } else {
+            [names[0], names[1]]
+        } {
             declarations.push(admit(
                 &mut cas,
                 Draft::Expression(ExpressionDraft {

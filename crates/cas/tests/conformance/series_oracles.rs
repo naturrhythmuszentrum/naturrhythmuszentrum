@@ -81,7 +81,8 @@ fn series_every_output_position_refused() -> TestResult {
             };
             let target = match value.as_ref() {
                 S::Source(_) | S::EvaluatedResidual { .. } => return Err("object fixture".into()),
-                S::Truncate { output, .. }
+                S::Reciprocal { output, .. }
+                | S::Truncate { output, .. }
                 | S::Add { output, .. }
                 | S::Scale { output, .. }
                 | S::Derive { output, .. }
@@ -138,7 +139,8 @@ fn series_every_output_position_refused() -> TestResult {
             };
             match value.as_mut() {
                 S::Source(_) | S::EvaluatedResidual { .. } => return Err("object fixture".into()),
-                S::Truncate { output, .. }
+                S::Reciprocal { output, .. }
+                | S::Truncate { output, .. }
                 | S::Add { output, .. }
                 | S::Scale { output, .. }
                 | S::Derive { output, .. }

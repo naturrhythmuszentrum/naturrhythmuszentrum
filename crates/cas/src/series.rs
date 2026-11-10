@@ -15,6 +15,7 @@ pub(crate) mod codec;
 mod compose;
 mod model;
 mod produce;
+mod reciprocal;
 mod residual;
 #[expect(
     clippy::redundant_pub_crate,
@@ -22,7 +23,7 @@ mod residual;
 )]
 pub(crate) mod residual_adapter;
 pub use residual_adapter::{ResidualReference, ResidualSolve};
-mod source;
+pub(crate) mod source;
 pub use produce::SeriesOperation;
 pub use source::{SourceCertificate, SourceClause, SourceRequest, SourceStatement, SourceUnitRow};
 #[expect(

@@ -38,6 +38,10 @@ pub enum SourceClause {
     Neg,
     /// Ordered original product.
     Mul,
+    /// Original reciprocal with a checked object unit and retained domain evidence.
+    Reciprocal,
+    /// Original quotient assembled from the exact guarded reciprocal and product.
+    Quotient,
 }
 
 impl SourceClause {
@@ -51,7 +55,8 @@ impl SourceClause {
             Self::PolynomialSeed | Self::Truncate => Primitive::SeriesTruncate,
             Self::Add | Self::Sub => Primitive::SeriesAdd,
             Self::ScaleLeft | Self::ScaleRight | Self::Neg => Primitive::SeriesScale,
-            Self::Mul => Primitive::SeriesMul,
+            Self::Mul | Self::Quotient => Primitive::SeriesMul,
+            Self::Reciprocal => Primitive::SeriesReciprocal,
         }
     }
 
@@ -63,7 +68,8 @@ impl SourceClause {
             Self::PolynomialSeed | Self::Truncate => 0,
             Self::Add | Self::Sub => 1,
             Self::ScaleLeft | Self::ScaleRight | Self::Neg => 2,
-            Self::Mul => 3,
+            Self::Mul | Self::Quotient => 3,
+            Self::Reciprocal => 7,
         }
     }
 
@@ -83,7 +89,7 @@ impl SourceClause {
             Self::SineOrigin => 3,
             Self::CosineOrigin => 4,
             Self::ArctangentOrigin => 5,
-            Self::Sub | Self::ScaleRight => 1,
+            Self::Sub | Self::ScaleRight | Self::Quotient => 1,
             Self::Neg => 2,
             _ => 0,
         }
@@ -99,7 +105,8 @@ impl SourceClause {
             | Self::PolynomialSeed => 1,
             Self::Truncate => 2,
             Self::ScaleLeft | Self::ScaleRight | Self::Neg => 3,
-            Self::Add | Self::Mul => 4,
+            Self::Add | Self::Mul | Self::Reciprocal => 4,
+            Self::Quotient => 6,
             Self::Sub => 5,
         }
     }
@@ -118,6 +125,8 @@ impl SourceClause {
             (2, 1, 1) => Self::ScaleRight,
             (2, 1, 2) => Self::Neg,
             (3, 1, 0) => Self::Mul,
+            (3, 1, 1) => Self::Quotient,
+            (7, 1, 0) => Self::Reciprocal,
             _ => return Err(unsupported()),
         })
     }
@@ -234,6 +243,7 @@ impl Cas {
                 if proofs.len() != statement.clause.arity() {
                     return Err(invalid());
                 }
+                preflight_slots(cas, statement.clause, proofs, budget)?;
                 let workspace = evidence_bytes(certificate, budget)?;
                 let bytes = workspace
                     .checked_add(premise_bytes(cas, proofs, budget)?)
@@ -273,6 +283,7 @@ impl Cas {
                 if proofs.len() != request.clause.arity() {
                     return Err(invalid());
                 }
+                preflight_slots(cas, request.clause, proofs, budget)?;
                 crate::validation::scope_limit(&request.scope, budget)?;
                 let scope_bytes = if request.scope.is_empty() {
                     0
@@ -342,6 +353,12 @@ fn publish(
         .try_reserve_exact(proofs.len())
         .map_err(|_| Fault::allocation(AT))?;
     for proof in proofs {
+        #[cfg(test)]
+        if let Statement::Series(statement) = &draft.conclusion
+            && let SeriesStatement::Source(source) = statement.as_ref()
+        {
+            observe_slot_copy(source.clause);
+        }
         premises.push(crate::proof_view::application(
             cas,
             cas.checked(proof)?,
@@ -402,13 +419,14 @@ fn candidate(
     };
     let output = if request.clause.form() == 1 {
         let slot = match request.clause {
-            SourceClause::Sub => 3,
+            SourceClause::Sub | SourceClause::Quotient => 3,
             SourceClause::Add | SourceClause::Mul => 2,
             _ => 1,
         };
         let application = crate::proof_view::application(cas, cas.checked(&proofs[slot])?, budget)?;
         match object(&application)? {
-            SeriesStatement::Truncate { output, .. }
+            SeriesStatement::Reciprocal { output, .. }
+            | SeriesStatement::Truncate { output, .. }
             | SeriesStatement::Add { output, .. }
             | SeriesStatement::Scale { output, .. }
             | SeriesStatement::Mul { output, .. } => output.clone(),
@@ -778,6 +796,248 @@ fn object(premise: &CheckedApplication) -> Result<&SeriesStatement, Fault> {
     Ok(statement)
 }
 
+#[cfg(test)]
+thread_local! {
+    static SLOT_VISITS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    static SLOT_COPIES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+/// Count actual application copies only in the two new source clauses.
+#[cfg(test)]
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "The supplied-proof dispatcher shares the phase-local observation"
+)]
+pub(crate) fn observe_slot_copy(clause: SourceClause) {
+    if matches!(clause, SourceClause::Reciprocal | SourceClause::Quotient) {
+        SLOT_COPIES.with(|n| n.set(n.get() + 1));
+    }
+}
+
+/// Borrow authenticated graph evidence without copying an application payload.
+fn borrowed<'a>(
+    cas: &'a Cas,
+    proof: &Handle,
+    budget: &mut Budget,
+) -> Result<&'a CheckedApplication, Fault> {
+    use crate::graph::Vertex;
+    budget.work(1, AT)?;
+    #[cfg(test)]
+    SLOT_VISITS.with(|n| n.set(n.get() + 1));
+    let Vertex::Proof(id) = cas.state.node(cas.checked(proof)?)? else {
+        return Err(invalid());
+    };
+    match cas.state.node(*id)? {
+        Vertex::ScopedApplication(value) => Ok(value),
+        Vertex::AnonymousLemma(_) => cas.series_application(*id),
+        _ => Err(invalid()),
+    }
+}
+
+/// New routes reject every wrong typed slot before any application payload is copied.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "Sibling proof import paths share the borrowed preflight"
+)]
+pub(crate) fn preflight_slots(
+    cas: &Cas,
+    clause: SourceClause,
+    proofs: &[Handle],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    use SourceClause as L;
+    if !matches!(clause, L::Reciprocal | L::Quotient) {
+        return Ok(());
+    }
+    if proofs.len() != clause.arity() {
+        return Err(invalid());
+    }
+    for (slot, proof) in proofs.iter().enumerate() {
+        let application = borrowed(cas, proof, budget)?;
+        let statement = &application.judgment.statement;
+        let valid = match (clause, slot, statement) {
+            (L::Reciprocal, 0, Statement::Series(s))
+            | (L::Quotient, 0 | 1, Statement::Series(s)) => {
+                matches!(s.as_ref(), SeriesStatement::Source(_))
+            }
+            (L::Reciprocal, 1, Statement::Series(s)) => {
+                matches!(s.as_ref(), SeriesStatement::Reciprocal { .. })
+            }
+            (L::Quotient, 2, Statement::Series(s)) => {
+                matches!(s.as_ref(), SeriesStatement::Source(v) if v.clause == L::Reciprocal)
+            }
+            (L::Quotient, 3, Statement::Series(s)) => {
+                matches!(s.as_ref(), SeriesStatement::Mul { .. })
+            }
+            (L::Reciprocal, 2 | 3, Statement::PredicateFact { .. })
+            | (L::Quotient, 4 | 5, Statement::PredicateFact { .. }) => true,
+            _ => false,
+        };
+        if !valid {
+            return Err(invalid());
+        }
+        if let Statement::PredicateFact { predicate, .. } = statement {
+            let crate::graph::Vertex::Condition(condition) =
+                cas.state.node(cas.checked(predicate)?)?
+            else {
+                return Err(invalid());
+            };
+            let nonzero_slot = if clause == L::Reciprocal { 2 } else { 4 };
+            let kind = if slot == nonzero_slot {
+                crate::model::PredicateKind::NonZero
+            } else {
+                crate::model::PredicateKind::Defined
+            };
+            if condition.kind != kind || condition.arguments.len() != 1 {
+                return Err(invalid());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Require the complete canonical Real-literal frame, then check the exact unit value.
+fn literal_one(
+    cas: &Cas,
+    id: crate::graph::LogicalId,
+    expected: &crate::graph::Expression,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let literal = cas.state.expression(id)?;
+    if literal.header != expected.header
+        || literal.scope != expected.scope
+        || literal.space != expected.space
+        || literal.binding != expected.binding
+        || literal.sort != expected.sort
+        || literal.ambient != expected.ambient
+        || literal.attachment.is_some()
+        || literal.layer != expected.layer
+        || literal.domain != expected.domain
+        || literal.arms != expected.arms
+        || !literal.operands.is_empty()
+    {
+        return Err(invalid());
+    }
+    let Operator::Rational(value) = &literal.operator else {
+        return Err(invalid());
+    };
+    equal(value, &Rational::one(), budget)
+}
+
+/// Exact ordinary denominator guard; a rational constant unit never implies this fact.
+fn nonzero(
+    cas: &Cas,
+    factor: &Handle,
+    basis: &SeriesObject<Handle>,
+    premise: &CheckedApplication,
+) -> Result<(), Fault> {
+    let Statement::PredicateFact { region, predicate } = &premise.judgment.statement else {
+        return Err(invalid());
+    };
+    let context = cas.state.context(cas.checked(&basis.context)?)?;
+    let crate::graph::Vertex::Condition(condition) = cas.state.node(cas.checked(predicate)?)?
+    else {
+        return Err(invalid());
+    };
+    if region.logical_id() != context.admissible
+        || condition.kind != crate::model::PredicateKind::NonZero
+        || condition.arguments.as_slice() != [cas.checked(factor)?]
+        || condition.header != context.header_id
+        || condition.scope != basis.scope
+    {
+        return Err(invalid());
+    }
+    Ok(())
+}
+
+/// Authenticate the original division and its direct finite object joins.
+fn quotient(
+    cas: &Cas,
+    value: &SourceStatement,
+    premises: &[CheckedApplication],
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    use SeriesStatement as S;
+    let basis = cas.series_object(&value.output)?;
+    let expression = cas.state.expression(cas.checked(&value.source)?)?;
+    budget.work(2, AT)?;
+    let [numerator, denominator] = expression.operands.as_slice() else {
+        return Err(invalid());
+    };
+    if expression.operator != Operator::Div {
+        return Err(invalid());
+    }
+    let left = source(cas, value, &premises[0], budget)?;
+    if cas.series_object(&left.output)?.order != basis.order {
+        return Err(invalid());
+    }
+    defined(cas, &value.source, basis, &premises[premises.len() - 1..])?;
+    if value.clause == SourceClause::Reciprocal {
+        literal_one(cas, *numerator, expression, budget)?;
+        if *denominator != cas.checked(&left.source)? {
+            return Err(invalid());
+        }
+        let S::Reciprocal { input, output } = object(&premises[1])? else {
+            return Err(invalid());
+        };
+        if input != &left.output || output != &value.output {
+            return Err(invalid());
+        }
+        nonzero(cas, &left.source, basis, &premises[2])?;
+    } else {
+        let right = source(cas, value, &premises[1], budget)?;
+        let reciprocal = source(cas, value, &premises[2], budget)?;
+        if reciprocal.clause != SourceClause::Reciprocal
+            || *numerator != cas.checked(&left.source)?
+            || *denominator != cas.checked(&right.source)?
+            || cas.series_object(&right.output)?.order != basis.order
+            || cas.series_object(&reciprocal.output)?.order != basis.order
+        {
+            return Err(invalid());
+        }
+        let original = cas.state.expression(cas.checked(&reciprocal.source)?)?;
+        let [one, original_denominator] = original.operands.as_slice() else {
+            return Err(invalid());
+        };
+        if original.operator != Operator::Div || original_denominator != denominator {
+            return Err(invalid());
+        }
+        literal_one(cas, *one, expression, budget)?;
+        let direct = &premises[2].premises;
+        if direct.len() != 4 {
+            return Err(invalid());
+        }
+        let denominator_source = borrowed(cas, &cas.handle(direct[0]), budget)?;
+        let inverse_object = borrowed(cas, &cas.handle(direct[1]), budget)?;
+        let original_source = source(cas, value, denominator_source, budget)?;
+        let S::Reciprocal { input, output } = object(inverse_object)? else {
+            return Err(invalid());
+        };
+        if original_source != right || input != &right.output || output != &reciprocal.output {
+            return Err(invalid());
+        }
+        let S::Mul {
+            left: a,
+            right: q,
+            output: t,
+            order,
+            ..
+        } = object(&premises[3])?
+        else {
+            return Err(invalid());
+        };
+        if a != &left.output
+            || q != &reciprocal.output
+            || t != &value.output
+            || *order != basis.order
+        {
+            return Err(invalid());
+        }
+        nonzero(cas, &right.source, basis, &premises[4])?;
+    }
+    Ok(())
+}
+
 /// Reconstruct ordered original syntax and the complete finite object inference.
 #[expect(
     clippy::too_many_lines,
@@ -791,6 +1051,9 @@ fn lifted(
 ) -> Result<(), Fault> {
     use SeriesStatement as S;
     use SourceClause as L;
+    if matches!(value.clause, L::Reciprocal | L::Quotient) {
+        return quotient(cas, value, premises, budget);
+    }
     let basis = cas.series_object(&value.output)?;
     let left = source(cas, value, &premises[0], budget)?;
     if value.clause == L::Truncate {
@@ -1037,5 +1300,186 @@ fn polynomial(
             Ok(result)
         }
         _ => Err(unsupported()),
+    }
+}
+
+#[cfg(test)]
+mod reciprocal_slots {
+    use super::*;
+    use crate::budget::Limits;
+    use crate::error::{Exhaustion, FaultKind, InvalidCode};
+    use crate::testing::common::{TestResult, default_budget};
+    use crate::testing::series_residual::Fixture;
+
+    /// The main supplied DAG route refuses a wrong typed slot without copying its payload.
+    /// ´test:unit:series-reciprocal-supplied-slot-copies´
+    #[test]
+    fn reciprocal_supplied_slot_copies() -> TestResult {
+        for clause in [SourceClause::Reciprocal, SourceClause::Quotient] {
+            let mut f = Fixture::new(&["1"], "0", false, false)?;
+            let output = f.object(&f.candidate.clone())?;
+            // The valid first step is newly published inside the failed public transaction.
+            // Its object theorem has the wrong kind for every Source clause's first slot.
+            let mut steps = vec![ApplicationDraft {
+                rule: Primitive::SeriesTruncate,
+                context: f.context.clone(),
+                conclusion: Statement::Series(Box::new(SeriesStatement::Truncate {
+                    input: output.clone(),
+                    output: output.clone(),
+                })),
+                premises: Vec::new(),
+                substitutions: Vec::new(),
+                certificate: Certificate::Series(Box::new(SeriesCertificate::Truncate {
+                    form: 0,
+                    coefficients: vec![Rational::one()],
+                })),
+            }];
+            steps.push(ApplicationDraft {
+                rule: clause.primitive(),
+                context: f.context.clone(),
+                conclusion: Statement::Series(Box::new(SeriesStatement::Source(SourceStatement {
+                    clause,
+                    source: f.x.clone(),
+                    domain: f.region.clone(),
+                    output,
+                }))),
+                premises: vec![0; clause.arity()],
+                substitutions: Vec::new(),
+                certificate: Certificate::Series(Box::new(SeriesCertificate::Source(
+                    SourceCertificate {
+                        clause,
+                        coefficients: Vec::new(),
+                        companion: Vec::new(),
+                        units: Vec::new(),
+                    },
+                ))),
+            });
+            let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
+            SLOT_VISITS.with(|n| n.set(0));
+            SLOT_COPIES.with(|n| n.set(0));
+            let fault = f
+                .cas
+                .check_proof(&f.context, &steps, &mut default_budget()?)
+                .expect_err("wrong supplied source slot");
+            assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
+            assert_eq!(SLOT_COPIES.with(std::cell::Cell::get), 0);
+            assert_eq!(SLOT_VISITS.with(std::cell::Cell::get), 1);
+            assert_eq!(f.cas.canonical_snapshot(&mut default_budget()?)?, before);
+        }
+        Ok(())
+    }
+
+    /// An ancestor-header one is admissible syntax but not the exact derived literal.
+    /// ´test:unit:series-reciprocal-literal-one-frame´
+    #[test]
+    fn reciprocal_literal_one_frame() -> TestResult {
+        use crate::graph::{Draft, ExpressionDraft, Reference};
+        use crate::testing::series_residual::admit;
+        let mut f = Fixture::with_extension(&["1"])?;
+        let parent = f
+            .cas
+            .state
+            .header(f.header.logical_id())?
+            .parent
+            .ok_or("parent header")?;
+        let ancestor = f.cas.handle(parent);
+        let ancestor_one = admit(
+            &mut f.cas,
+            Draft::Expression(ExpressionDraft {
+                header: Reference::Existing(ancestor),
+                space: None,
+                operator: Operator::Rational(Rational::one()),
+                sort: crate::testing::common::real(),
+                scope: Vec::new(),
+                binding: None,
+                operands: Vec::new(),
+            }),
+        )?;
+        let one = f.node(Operator::Rational(Rational::one()), &[])?;
+        // Admission fixes a Real rational's sort, ambient, layer, empty operands,
+        // absent attachment/space/binding/domain and empty arms. These cannot be
+        // forged independently in this closed frame; the shared check stays defensive.
+        // Header ancestry does admit a distinct literal and a composite using it.
+        for numerator in [one, ancestor_one] {
+            let source = f.node(Operator::Div, &[numerator.clone(), f.x.clone()])?;
+            let expected = f.cas.state.expression(source.logical_id())?;
+            let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
+            let result = literal_one(
+                &f.cas,
+                numerator.logical_id(),
+                expected,
+                &mut default_budget()?,
+            );
+            if f.cas.state.expression(numerator.logical_id())?.header == expected.header {
+                result?;
+            } else {
+                assert_eq!(
+                    result.expect_err("ancestor literal one").kind,
+                    FaultKind::Invalid(InvalidCode::Rule)
+                );
+            }
+            assert_eq!(f.cas.canonical_snapshot(&mut default_budget()?)?, before);
+        }
+        Ok(())
+    }
+
+    /// Actual borrowed visits require their charge and wrong kinds never reach payload copies.
+    /// ´test:unit:series-reciprocal-ordered-slot-visits´
+    #[test]
+    fn reciprocal_ordered_slot_visits() -> TestResult {
+        let mut f = Fixture::new(&["1"], "0", false, false)?;
+        let proof = f.compose()?;
+        let slots = vec![proof.proof().clone(); 4];
+        for work in [0, 1] {
+            SLOT_VISITS.with(|n| n.set(0));
+            SLOT_COPIES.with(|n| n.set(0));
+            let mut budget = Budget::new(Limits {
+                work,
+                ..Limits::default()
+            })?;
+            let fault = preflight_slots(&f.cas, SourceClause::Reciprocal, &slots, &mut budget)
+                .expect_err("typed slot");
+            assert_eq!(
+                fault.kind,
+                if work == 0 {
+                    FaultKind::Exhausted {
+                        reason: Exhaustion::Limit,
+                        budget: BudgetKind::Work,
+                        limit: 0,
+                        needed: 1,
+                    }
+                } else {
+                    FaultKind::Invalid(InvalidCode::Rule)
+                }
+            );
+            assert_eq!(SLOT_VISITS.with(std::cell::Cell::get), work);
+            assert_eq!(SLOT_COPIES.with(std::cell::Cell::get), 0);
+        }
+        let output = f.object(&f.candidate.clone())?;
+        let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
+        SLOT_COPIES.with(|n| n.set(0));
+        let fault = f
+            .cas
+            .check_series_source(
+                &SourceStatement {
+                    clause: SourceClause::Reciprocal,
+                    source: f.x.clone(),
+                    domain: f.region.clone(),
+                    output,
+                },
+                &SourceCertificate {
+                    clause: SourceClause::Reciprocal,
+                    coefficients: Vec::new(),
+                    companion: Vec::new(),
+                    units: Vec::new(),
+                },
+                &slots,
+                &mut default_budget()?,
+            )
+            .expect_err("wrong first typed slot");
+        assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Rule));
+        assert_eq!(SLOT_COPIES.with(std::cell::Cell::get), 0);
+        assert_eq!(f.cas.canonical_snapshot(&mut default_budget()?)?, before);
+        Ok(())
     }
 }

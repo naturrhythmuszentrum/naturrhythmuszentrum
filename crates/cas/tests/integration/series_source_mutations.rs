@@ -96,7 +96,8 @@ fn series_source_wire_mutations() -> TestResult {
     super::series_residual_wire::payload_control()?;
     // The mode-eleven reinterpretation of this source payload is malformed, not unavailable.
     mutations.push((byte(&bytes, cursor, 10, 11), InvalidCode::SeriesUnsupported));
-    for mode in [6, 7, 255] {
+    mutations.push((byte(&bytes, cursor, 10, 7), InvalidCode::Encoding));
+    for mode in [6, 255] {
         mutations.push((
             byte(&bytes, cursor, 10, mode),
             InvalidCode::SeriesUnsupported,
@@ -481,12 +482,8 @@ fn series_source_quotient_wire_refused() -> TestResult {
     super::series_residual_wire::payload_control()?;
     // A nonzero source form is still not a residual form.
     mutations.push((byte(&bytes, cursor, 1, 11), InvalidCode::SeriesUnsupported));
-    for mode in [6, 7] {
-        mutations.push((
-            byte(&bytes, cursor, 1, mode),
-            InvalidCode::SeriesUnsupported,
-        ));
-    }
+    mutations.push((byte(&bytes, cursor, 1, 7), InvalidCode::Rule));
+    mutations.push((byte(&bytes, cursor, 1, 6), InvalidCode::SeriesUnsupported));
     for reordered in [false, true] {
         let mut f = crate::testing::series_source::lifted(1, reordered)?;
         let expected = f.expected.as_ref().ok_or("expected")?;

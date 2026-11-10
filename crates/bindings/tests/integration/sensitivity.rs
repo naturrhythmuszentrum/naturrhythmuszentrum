@@ -155,7 +155,7 @@ fn quantity_product_sensitivity_refusal_twins() -> TestResult {
 fn quantity_product_sensitivity_work_boundary() -> TestResult {
     for accepted in [false, true] {
         let mut budget = Budget::new(Limits {
-            work: if accepted { 877_880 } else { 877_879 },
+            work: if accepted { 878_016 } else { 878_015 },
             ..Limits::default()
         })?;
         let ratio = Descriptor::ratio();
@@ -166,12 +166,12 @@ fn quantity_product_sensitivity_work_boundary() -> TestResult {
         );
         if accepted {
             let proof = result?;
-            assert_eq!(budget.usage().work, 818_499);
+            assert_eq!(budget.usage().work, 818_705);
             assert_eq!(
                 proof.jacobian().work(),
                 nrz_bindings::SensitivityWork {
                     construction: 24_965,
-                    generation: 73_085,
+                    generation: 73_186,
                     replay: 218_157,
                     requests: 4,
                 }
@@ -192,7 +192,7 @@ fn quantity_product_sensitivity_work_boundary() -> TestResult {
                 *outcome,
                 nrz_cas::request::Outcome::Exhausted { .. }
             ));
-            assert_eq!(budget.usage().work, 721_681);
+            assert_eq!(budget.usage().work, 721_819);
         }
     }
     Ok(())

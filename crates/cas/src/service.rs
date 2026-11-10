@@ -489,6 +489,7 @@ fn outcome(
                 InvalidCode::DistributionPointValue
                 | InvalidCode::DistributionProductUndefined
                 | InvalidCode::TestSpaceMismatch
+                | InvalidCode::SeriesNonunitConstant
                 | InvalidCode::SeriesNonzeroConstant
                 | InvalidCode::RefutedDomain
                 | InvalidCode::EmptyDomain
@@ -628,6 +629,50 @@ mod compose_outcomes {
     use crate::task::Task;
     use crate::testing::common::TestResult;
     use crate::testing::native::{Fixture, admit, budget};
+
+    /// Actual nonunit evidence remains owned when classified as a mathematical refusal.
+    /// ´test:unit:reciprocal-public-outcome-evidence´
+    #[test]
+    fn reciprocal_public_outcome_evidence() -> TestResult {
+        let mut f = crate::testing::series_residual::Fixture::new(&["0", "1"], "0", false, false)?;
+        let input = f.object(&[crate::Rational::zero(), crate::Rational::one()])?;
+        let fault = f
+            .cas
+            .compute_series(&O::Reciprocal { input }, &[], &mut budget()?)
+            .expect_err("nonunit");
+        assert_eq!(
+            fault.kind,
+            FaultKind::Invalid(InvalidCode::SeriesNonunitConstant)
+        );
+        assert_eq!(
+            fault.series_constant().ok_or("owned zero")?.value,
+            crate::Rational::zero()
+        );
+        let record = f.context.clone();
+        let classified = outcome(
+            record,
+            Execution {
+                result: None,
+                fault: Some(fault.clone()),
+            },
+            &BudgetUsage::default(),
+            &BudgetUsage::default(),
+        );
+        let Outcome::Refused {
+            reason,
+            fault: retained,
+            ..
+        } = classified
+        else {
+            return Err("refusal classification".into());
+        };
+        assert_eq!(
+            reason,
+            crate::request_model::RefusalReason::SeriesNonunitConstant
+        );
+        assert_eq!(retained, fault);
+        Ok(())
+    }
 
     /// Actual producer and supplied-candidate faults preserve the public mathematical split.
     /// ´test:unit:compose-public-outcome-evidence´

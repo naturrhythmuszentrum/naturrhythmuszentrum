@@ -39,7 +39,8 @@ fn preflight(cas: &Cas, steps: &[ApplicationDraft], budget: &mut Budget) -> Resu
             if let Statement::Series(value) = &step.conclusion
                 && matches!(
                     value.as_ref(),
-                    crate::series::SeriesStatement::Source(_)
+                    crate::series::SeriesStatement::Reciprocal { .. }
+                        | crate::series::SeriesStatement::Source(_)
                         | crate::series::SeriesStatement::EvaluatedResidual { .. }
                 )
                 && step.premises.len() != crate::series::check::premise_count(cas, value)?
@@ -91,6 +92,12 @@ pub(crate) fn check_supplied(
             .get(usize::try_from(*index).map_err(|_| invalid())?)
             .ok_or_else(invalid)?;
         ids.push(cas.checked(proof)?);
+    }
+    if let Statement::Series(value) = &step.conclusion
+        && let crate::series::SeriesStatement::Source(value) = value.as_ref()
+    {
+        let proofs: Vec<_> = ids.iter().map(|id| cas.handle(*id)).collect();
+        crate::series::source::preflight_slots(cas, value.clause, &proofs, budget)?;
     }
     let bytes = crate::proof_view::premises_bytes(cas, &ids, budget, AT)?;
     budget.with_retained_payload(bytes, AT, |budget| {
@@ -173,6 +180,7 @@ fn rule_conditions(
         | Primitive::SeriesDerive
         | Primitive::SeriesSource
         | Primitive::SeriesIntegrate
+        | Primitive::SeriesReciprocal
         | Primitive::SeriesMul
         | Primitive::SeriesResidual
         | Primitive::SeriesCompose
@@ -601,6 +609,25 @@ fn check_source_step(
     if step.premises.len() != crate::series::check::premise_count(cas, statement)? {
         return Err(invalid());
     }
+    let crate::series::SeriesStatement::Source(source) = statement.as_ref() else {
+        return Err(invalid());
+    };
+    if matches!(
+        source.clause,
+        crate::series::SourceClause::Reciprocal | crate::series::SourceClause::Quotient
+    ) {
+        let slots = step
+            .premises
+            .iter()
+            .map(|index| {
+                proofs
+                    .get(usize::try_from(*index).map_err(|_| invalid())?)
+                    .cloned()
+                    .ok_or_else(invalid)
+            })
+            .collect::<Result<Vec<_>, Fault>>()?;
+        crate::series::source::preflight_slots(cas, source.clause, &slots, budget)?;
+    }
     let mut bytes = crate::series::codec::source_workspace(&step.certificate, budget)?;
     for index in &step.premises {
         let proof = proofs
@@ -627,6 +654,8 @@ fn check_source_step(
                 .get(usize::try_from(*index).map_err(|_| invalid())?)
                 .ok_or_else(invalid)?;
             ids.push(cas.checked(proof)?);
+            #[cfg(test)]
+            crate::series::source::observe_slot_copy(source.clause);
             premises.push(crate::proof_view::application(
                 cas,
                 cas.checked(proof)?,

@@ -367,7 +367,9 @@ fn decode_certificate(
     };
     let count = if matches!(
         statement.as_ref(),
-        super::SeriesStatement::Source(_) | super::SeriesStatement::EvaluatedResidual { .. }
+        super::SeriesStatement::Reciprocal { .. }
+            | super::SeriesStatement::Source(_)
+            | super::SeriesStatement::EvaluatedResidual { .. }
     ) {
         let count = usize::try_from(reader.index()?).map_err(|_| invalid())?;
         if count != super::check::premise_count(cas, statement)? {
@@ -408,6 +410,14 @@ fn decode_certificate(
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
         ids.push(id);
         slots.push(u32::try_from(index).map_err(|_| invalid())?);
+    }
+    if let super::SeriesStatement::Source(value) = statement.as_ref() {
+        let proofs: Vec<_> = ids.iter().map(|id| cas.handle(*id)).collect();
+        super::source::preflight_slots(cas, value.clause, &proofs, reader.budget)?;
+    }
+    if let super::SeriesStatement::Reciprocal { input, .. } = statement.as_ref() {
+        // A proved nonunit precedes decoding a claimed inverse or allocating its rows.
+        super::reciprocal::nonunit(cas, input, reader.budget)?;
     }
     let certificate = super::codec::read_certificate(reader)?;
     if mode != certificate.mode() {

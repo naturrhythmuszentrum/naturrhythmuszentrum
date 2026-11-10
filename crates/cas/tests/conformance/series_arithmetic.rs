@@ -21,7 +21,8 @@ fn series_arithmetic_hand_fixtures() -> TestResult {
                         nrz_cas::series::SeriesStatement::Source(_)
                         | nrz_cas::series::SeriesStatement::EvaluatedResidual { .. } =>
                             return Err("object fixture".into()),
-                        nrz_cas::series::SeriesStatement::Truncate { input, .. }
+                        nrz_cas::series::SeriesStatement::Reciprocal { input, .. }
+                        | nrz_cas::series::SeriesStatement::Truncate { input, .. }
                         | nrz_cas::series::SeriesStatement::Scale { input, .. }
                         | nrz_cas::series::SeriesStatement::Derive { input, .. }
                         | nrz_cas::series::SeriesStatement::Integrate { input, .. }
@@ -71,7 +72,7 @@ fn series_arithmetic_row_mutations() -> TestResult {
             C::Truncate { coefficients, .. } => coefficients[0] = rational("9")?,
             C::Add { rows, .. } | C::Scale { rows, .. } => rows[0].result = rational("9")?,
             C::Compose { sums, .. } => sums[0].product = rational("9")?,
-            C::Mul { rows, .. } => {
+            C::Reciprocal { rows, .. } | C::Mul { rows, .. } => {
                 rows.pop();
             }
             C::Derive { rows, .. } => rows[0].result = rational("9")?,
@@ -123,7 +124,8 @@ fn series_arithmetic_deferred_forms() -> TestResult {
             };
             match value.as_mut() {
                 C::Source(_) | C::EvaluatedResidual { .. } => return Err("object fixture".into()),
-                C::Truncate { form: slot, .. }
+                C::Reciprocal { form: slot, .. }
+                | C::Truncate { form: slot, .. }
                 | C::Add { form: slot, .. }
                 | C::Scale { form: slot, .. }
                 | C::Derive { form: slot, .. }
@@ -160,7 +162,12 @@ fn series_arithmetic_deferred_forms() -> TestResult {
             .any(|rule| rule.specification().key == "series.residual"
                 && rule.specification().available)
     );
-    for key in ["series.reciprocal", "series.divide", "series.invert"] {
+    assert!(
+        nrz_cas::proof::Primitive::SeriesReciprocal
+            .specification()
+            .available
+    );
+    for key in ["series.divide", "series.invert"] {
         assert!(
             !nrz_cas::proof::PRIMITIVES
                 .iter()

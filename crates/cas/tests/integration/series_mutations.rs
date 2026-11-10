@@ -205,6 +205,10 @@ fn series_portable_mutation_controls() -> TestResult {
         ),
     ];
     for mode in 6..=11 {
+        if mode == 7 {
+            super::series_reciprocal_golden::payload_control()?;
+            continue;
+        }
         if mode == 10 {
             let mut source = crate::testing::series_source::setup(0, 4, false, false)?;
             let checked = source.base.cas.expand_series_source(
@@ -458,7 +462,8 @@ fn series_independent_wrong_expectation() -> TestResult {
                 | nrz_cas::series::SeriesStatement::EvaluatedResidual { .. } => {
                     return Err("object fixture".into());
                 }
-                nrz_cas::series::SeriesStatement::Truncate { input, output }
+                nrz_cas::series::SeriesStatement::Reciprocal { input, output }
+                | nrz_cas::series::SeriesStatement::Truncate { input, output }
                 | nrz_cas::series::SeriesStatement::Scale { input, output, .. }
                 | nrz_cas::series::SeriesStatement::Derive { input, output }
                 | nrz_cas::series::SeriesStatement::Integrate { input, output, .. } => {

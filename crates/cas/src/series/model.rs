@@ -8,6 +8,13 @@ use crate::rule::Primitive;
 /// Finite object computations and registered correspondence with an exact original source.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SeriesStatement {
+    /// Same-order finite inverse in the identical admitted rational frame.
+    Reciprocal {
+        /// Original admitted object.
+        input: Handle,
+        /// Proposed inverse at exactly the input order.
+        output: Handle,
+    },
     /// Polynomial interpretation of the complete original syntax at one checked finite subject.
     EvaluatedResidual {
         /// Exact original checked source or composition.
@@ -181,6 +188,17 @@ pub struct SeriesIntegralRow {
 /// Untrusted finite evidence; only a registered checker can establish a judgment.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SeriesCertificate {
+    /// Mode seven: checked rational unit and complete identity convolution.
+    Reciprocal {
+        /// Only object form zero executes.
+        form: u8,
+        /// Exact original constant.
+        constant: Rational,
+        /// Proposed multiplicative inverse of the constant.
+        inverse: Rational,
+        /// Every product, including zeros, in degree and first-index order.
+        rows: Vec<SeriesProductRow>,
+    },
     /// Mode eleven, evaluated stage zero with a complete postorder occurrence trace.
     EvaluatedResidual {
         /// Only object form zero is supported.
@@ -277,6 +295,7 @@ impl SeriesStatement {
         match self {
             Self::EvaluatedResidual { .. } => Primitive::SeriesResidual,
             Self::Source(value) => value.clause.primitive(),
+            Self::Reciprocal { .. } => Primitive::SeriesReciprocal,
             Self::Derive { .. } => Primitive::SeriesDerive,
             Self::Integrate { .. } => Primitive::SeriesIntegrate,
             Self::Truncate { .. } => Primitive::SeriesTruncate,
@@ -304,7 +323,9 @@ impl SeriesStatement {
                 objects
             }
             Self::Source(value) => vec![&value.source, &value.domain, &value.output],
-            Self::Truncate { input, output } | Self::Derive { input, output } => {
+            Self::Reciprocal { input, output }
+            | Self::Truncate { input, output }
+            | Self::Derive { input, output } => {
                 vec![input, output]
             }
             Self::Integrate {
@@ -344,7 +365,8 @@ impl SeriesStatement {
         match self {
             Self::EvaluatedResidual { subject, .. } => subject.output(),
             Self::Source(value) => &value.source,
-            Self::Truncate { input, .. }
+            Self::Reciprocal { input, .. }
+            | Self::Truncate { input, .. }
             | Self::Derive { input, .. }
             | Self::Integrate { input, .. }
             | Self::Scale { input, .. }
@@ -361,6 +383,7 @@ impl SeriesCertificate {
         match self {
             Self::EvaluatedResidual { .. } => 11,
             Self::Source(value) => value.clause.mode(),
+            Self::Reciprocal { .. } => 7,
             Self::Derive { .. } => 8,
             Self::Integrate { .. } => 9,
             Self::Truncate { .. } => 0,
@@ -378,6 +401,7 @@ impl SeriesCertificate {
         match self {
             Self::Source(value) => value.clause.form(),
             Self::EvaluatedResidual { form, .. }
+            | Self::Reciprocal { form, .. }
             | Self::Truncate { form, .. }
             | Self::Derive { form, .. }
             | Self::Integrate { form, .. }

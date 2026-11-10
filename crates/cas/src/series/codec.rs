@@ -76,13 +76,16 @@ pub(crate) fn statement(
         S::Mul { .. } => 3,
         S::Compose { .. } => 5,
         S::Coefficient { .. } => 4,
+        S::Reciprocal { .. } => 7,
         S::Derive { .. } => 8,
         S::Integrate { .. } => 9,
     })?;
     out.byte(0)?; // Object form, never a source congruence.
     match value {
         S::Source(_) | S::EvaluatedResidual { .. } => return Err(invalid()),
-        S::Truncate { input, output } | S::Derive { input, output } => {
+        S::Reciprocal { input, output }
+        | S::Truncate { input, output }
+        | S::Derive { input, output } => {
             write(input, out)?;
             out.byte(0)?;
             write(output, out)?;
@@ -214,7 +217,7 @@ pub(crate) fn read_statement(
             output,
         }));
     }
-    if !matches!(mode, 0..=5 | 8 | 9) {
+    if !matches!(mode, 0..=5 | 7 | 8 | 9) {
         return Err(unsupported());
     }
     let input = object(reader, records)?;
@@ -273,6 +276,7 @@ pub(crate) fn read_statement(
             index: reader.index()?,
             value: output,
         },
+        7 => SeriesStatement::Reciprocal { input, output },
         8 => SeriesStatement::Derive { input, output },
         9 => SeriesStatement::Integrate {
             input,
@@ -309,6 +313,19 @@ pub(crate) fn certificate(value: &SeriesCertificate, out: &mut Encoder<'_>) -> R
                 crate::wire::index(row.index, out)?;
                 out.number(&row.integer)?;
                 out.number(&row.inverse)?;
+            }
+        }
+        SeriesCertificate::Reciprocal {
+            constant,
+            inverse,
+            rows,
+            ..
+        } => {
+            out.number(constant)?;
+            out.number(inverse)?;
+            out.count(rows.len())?;
+            for row in rows {
+                product_row(row, out)?;
             }
         }
         SeriesCertificate::Derive { rows, .. } => {
@@ -467,7 +484,7 @@ pub(crate) fn read_certificate(reader: &mut Reader<'_, '_>) -> Result<SeriesCert
             units,
         }));
     }
-    if !matches!(mode, 0..=5 | 8 | 9) || form != 0 {
+    if !matches!(mode, 0..=5 | 7 | 8 | 9) || form != 0 {
         return Err(unsupported());
     }
     Ok(match mode {
@@ -552,6 +569,23 @@ pub(crate) fn read_certificate(reader: &mut Reader<'_, '_>) -> Result<SeriesCert
                 sums,
             }
         }
+        7 => {
+            let constant = reader.rational()?;
+            let inverse = reader.rational()?;
+            let count = reader.count(BudgetKind::JetEntries, 48, 256)?;
+            let mut rows = Vec::new();
+            rows.try_reserve_exact(count)
+                .map_err(|_| Fault::allocation(AT))?;
+            for _ in 0..count {
+                rows.push(read_product(reader)?);
+            }
+            SeriesCertificate::Reciprocal {
+                form,
+                constant,
+                inverse,
+                rows,
+            }
+        }
         8 => {
             let count = reader.count(BudgetKind::JetEntries, 31, 192)?;
             let mut rows = Vec::new();
@@ -625,6 +659,9 @@ pub(crate) fn measure(value: &SeriesCertificate, budget: &mut Budget) -> Result<
         SeriesCertificate::Truncate { coefficients, .. } => coefficients.len(),
         SeriesCertificate::Add { rows, .. } | SeriesCertificate::Scale { rows, .. } => rows.len(),
         SeriesCertificate::Mul { rows, .. } => rows.len(),
+        SeriesCertificate::Reciprocal { rows, .. } => {
+            rows.len().checked_add(2).ok_or_else(invalid)?
+        }
         SeriesCertificate::Compose {
             seed, powers, sums, ..
         } => seed

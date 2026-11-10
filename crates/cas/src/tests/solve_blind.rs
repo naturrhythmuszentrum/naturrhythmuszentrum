@@ -430,7 +430,7 @@ fn blind_symbolic_acceptance_audit() -> TestResult {
     let revision = "blind-cubic-audit-fixture-revision";
     let record = crate::testing::solve_blind::symbolic_audit(revision)?;
     assert!(record.starts_with(&format!("source_revision={revision}\n")));
-    assert!(record.contains("policy=logical-v19"));
+    assert!(record.contains("policy=logical-v20"));
     assert_eq!(record.matches("result=Solved(Radicals)").count(), 7);
     assert_eq!(record.matches("fresh_coverage=true").count(), 8);
     assert_eq!(record.matches("fresh_presentation=true").count(), 8);

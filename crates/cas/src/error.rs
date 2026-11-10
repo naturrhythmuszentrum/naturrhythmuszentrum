@@ -52,6 +52,8 @@ pub enum InvalidCode {
     SeriesUnsupported,
     /// Formal composition has an exactly nonzero inner constant.
     SeriesNonzeroConstant,
+    /// The admitted rational input has zero constant and is not a finite unit.
+    SeriesNonunitConstant,
     /// No admitted exact certificate checker supports this predicate or arithmetic origin.
     UnsupportedCertificate,
     /// The proposed option is not an association of the exact native case.
@@ -289,7 +291,7 @@ impl Eq for SeriesDiagnosticIdentity {}
 /// Owned finite refusal evidence, independent of graph transaction lifetime.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SeriesConstantEvidence {
-    /// Original inner object identity; descriptive even after its transaction rolls back.
+    /// Original input object identity; descriptive even after its transaction rolls back.
     pub input: SeriesDiagnosticIdentity,
     /// Exact original coefficient identity.
     pub coefficient: SeriesDiagnosticIdentity,
@@ -299,7 +301,7 @@ pub struct SeriesConstantEvidence {
     pub value: crate::number::Rational,
 }
 
-/// Exact independently owned composition refusal data.
+/// Exact independently owned finite-series refusal data.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SeriesRefusalEvidence {
     /// The offending coefficient and its descriptive original identities.
@@ -320,7 +322,7 @@ pub struct Fault {
 }
 
 impl Fault {
-    /// Borrow the owned nonzero coefficient without any graph lookup.
+    /// Borrow the owned offending constant coefficient without any graph lookup.
     #[must_use]
     pub fn series_constant(&self) -> Option<&SeriesConstantEvidence> {
         match self.series_evidence.as_deref() {

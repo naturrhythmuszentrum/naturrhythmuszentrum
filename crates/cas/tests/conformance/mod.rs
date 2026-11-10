@@ -16,6 +16,11 @@ mod series_joins;
 mod series_object;
 mod series_object_work;
 mod series_oracles;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "Independent integration oracles share internal conformance fixtures"
+)]
+pub(crate) mod series_reciprocal;
 mod series_residual;
 mod series_scalar;
 mod series_source;

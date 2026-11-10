@@ -53,6 +53,8 @@ pub enum UnsupportedReason {
 pub enum RefusalReason {
     /// An exact inner constant forbids finite formal composition.
     SeriesNonzeroConstant,
+    /// The admitted rational input has zero constant and is not a finite unit.
+    SeriesNonunitConstant,
     /// A query is proved outside every represented placement piece.
     NoApplicablePiece,
     /// Complex roots have no admitted ordering.

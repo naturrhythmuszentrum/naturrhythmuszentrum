@@ -95,7 +95,7 @@ fn claim(
 }
 
 /// Common Real header, coefficient x product, empty unknown product and exact constant equation.
-fn frame(source: bool, nonzero: bool) -> Vec<Record> {
+pub(super) fn frame(source: bool, nonzero: bool) -> Vec<Record> {
     let mut values = records();
     values.retain(|r| {
         matches!(r.name, "real" | "complex" | "Q" | "x" | "zero") || (!source && r.name == "one")

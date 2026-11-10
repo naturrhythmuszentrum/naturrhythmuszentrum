@@ -15,6 +15,11 @@ use crate::proof_model::{ApplicationDraft, Certificate, VerifiedWitness};
 /// A finite object operation; no variant denotes a source expansion or a centre change.
 #[derive(Clone, Debug)]
 pub enum SeriesOperation {
+    /// Same-order rational finite inverse with no ordinary proof slots.
+    Reciprocal {
+        /// Original admitted object.
+        input: Handle,
+    },
     /// Formal derivative at exactly one fewer known coefficient; no ordinary proof slots.
     Derive {
         /// Original object of order at least two.
@@ -81,7 +86,8 @@ impl SeriesOperation {
     /// Original object fixes the retained semantic axes.
     const fn input(&self) -> &Handle {
         match self {
-            Self::Truncate { input, .. }
+            Self::Reciprocal { input, .. }
+            | Self::Truncate { input, .. }
             | Self::Derive { input, .. }
             | Self::Integrate { input, .. }
             | Self::Scale { input, .. }
@@ -134,7 +140,7 @@ impl SeriesOperation {
                 }
                 available
             }
-            Self::Scale { .. } => available,
+            Self::Reciprocal { .. } | Self::Scale { .. } => available,
         };
         if order == 0 || order > available {
             if let Self::Compose { right, .. } = self {
@@ -157,7 +163,7 @@ fn workspace(
     operation: &SeriesOperation,
     order: u32,
     budget: &mut Budget,
-) -> Result<u64, Fault> {
+) -> Result<(u64, u64), Fault> {
     let mut bits = 1_u64;
     let mut metadata = 0_u64;
     for handle in std::iter::once(operation.input()).chain(operation.right()) {
@@ -173,6 +179,19 @@ fn workspace(
             let (a, b) = number(cas, coefficient)?.component_bits();
             bits = bits.max(a).max(b);
         }
+    }
+    if matches!(operation, SeriesOperation::Reciprocal { .. }) {
+        let scope_work = metadata
+            .checked_mul(u64::from(order) + 1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
+        let bytes = super::reciprocal::workspace(order, budget)?
+            .checked_add(
+                metadata
+                    .checked_mul(4)
+                    .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?,
+            )
+            .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+        return Ok((bytes, scope_work));
     }
     if let SeriesOperation::Scale { scalar, .. } = operation {
         budget.work(1, AT)?;
@@ -224,7 +243,7 @@ fn workspace(
             .ok_or_else(invalid)?,
         AT,
     )?;
-    Ok(bytes)
+    Ok((bytes, 0))
 }
 
 /// Copy a rational only after charging its exact retained component extent.
@@ -251,6 +270,8 @@ pub(super) fn literal(
 ) -> Result<Handle, Fault> {
     let object = cas.series_object(input)?;
     let header = cas.state.context(cas.checked(&object.context)?)?.header_id;
+    #[cfg(test)]
+    SCOPE_COPIES.with(|copies| copies.set(copies.get() + 1));
     let scope = object.scope.clone();
     cas.admit(
         &[Draft::Expression(ExpressionDraft {
@@ -276,6 +297,8 @@ pub(super) fn output(
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
     let basis = cas.series_object(input)?;
+    #[cfg(test)]
+    SCOPE_COPIES.with(|copies| copies.set(copies.get() + 1));
     let value = SeriesObject {
         field: Reference::Existing(basis.field.clone()),
         centre: Reference::Existing(basis.centre.clone()),
@@ -299,9 +322,13 @@ fn candidate(
     cas: &mut Cas,
     operation: &SeriesOperation,
     order: u32,
+    scope_work: u64,
     budget: &mut Budget,
 ) -> Result<(S, C), Fault> {
     match operation {
+        SeriesOperation::Reciprocal { input } => {
+            return super::reciprocal::produce(cas, input, scope_work, budget);
+        }
         SeriesOperation::Compose {
             left,
             right,
@@ -413,7 +440,8 @@ fn candidate(
                 rows: products,
             },
         ),
-        SeriesOperation::Coefficient { .. }
+        SeriesOperation::Reciprocal { .. }
+        | SeriesOperation::Coefficient { .. }
         | SeriesOperation::Compose { .. }
         | SeriesOperation::Derive { .. }
         | SeriesOperation::Integrate { .. } => return Err(invalid()),
@@ -509,7 +537,8 @@ fn row(
             }
             Ok(sum)
         }
-        SeriesOperation::Coefficient { .. }
+        SeriesOperation::Reciprocal { .. }
+        | SeriesOperation::Coefficient { .. }
         | SeriesOperation::Compose { .. }
         | SeriesOperation::Derive { .. }
         | SeriesOperation::Integrate { .. } => Err(invalid()),
@@ -536,7 +565,8 @@ impl Cas {
                 budget.work(1, AT)?;
                 let order = operation.order(cas, budget)?;
                 let count = match operation {
-                    SeriesOperation::Truncate { .. }
+                    SeriesOperation::Reciprocal { .. }
+                    | SeriesOperation::Truncate { .. }
                     | SeriesOperation::Coefficient { .. }
                     | SeriesOperation::Derive { .. } => 0,
                     SeriesOperation::Scale { .. } | SeriesOperation::Integrate { .. } => 1,
@@ -560,7 +590,10 @@ impl Cas {
                 if let SeriesOperation::Integrate { input, constant } = operation {
                     super::check::constant(cas, cas.series_object(input)?, constant, budget)?;
                 }
-                let mut bytes = workspace(cas, operation, order, budget)?;
+                if let SeriesOperation::Reciprocal { input } = operation {
+                    super::reciprocal::nonunit(cas, input, budget)?;
+                }
+                let (mut bytes, scope_work) = workspace(cas, operation, order, budget)?;
                 for proof in proofs {
                     bytes = bytes
                         .checked_add(crate::proof_view::application_bytes(
@@ -585,7 +618,7 @@ impl Cas {
                         cas.judgment_reservation(cas.retained_judgment_bytes(), budget, AT)?;
                     let (statement, certificate) =
                         budget.with_retained_payload(retained, AT, |budget| {
-                            candidate(cas, operation, order, budget)
+                            candidate(cas, operation, order, scope_work, budget)
                         })?;
                     let draft = ApplicationDraft {
                         rule: statement.primitive(),
@@ -603,5 +636,108 @@ impl Cas {
                 })
             })
         })
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    static SCOPE_COPIES: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+mod reciprocal_scope_tests {
+    use super::*;
+    use crate::budget::Limits;
+    use crate::error::{Exhaustion, FaultKind};
+    use crate::testing::common::{TestResult, default_budget};
+    use crate::testing::series_residual::{Fixture, admit};
+
+    /// Scope copies are observed at the actual literal/object clone sites.
+    /// ´test:unit:series-reciprocal-scope-copy-prepayment´
+    #[test]
+    fn reciprocal_scope_copy_prepayment() -> TestResult {
+        use crate::test_api::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
+        for width in [1, 1024] {
+            let mut f = Fixture::new(&["1"], "0", false, false)?;
+            let scope = vec![vec![AtomicSort::Scalar(Field::Real); width]];
+            let region = admit(
+                &mut f.cas,
+                Draft::Region(RegionDraft {
+                    header: Reference::Existing(f.header.clone()),
+                    scope: scope.clone(),
+                    ambient: AmbientDomain::Real("x".into()),
+                    expression: RegionExpr::Ambient,
+                }),
+            )?;
+            let context = admit(
+                &mut f.cas,
+                Draft::Context(ContextDraft::Root {
+                    header: Reference::Existing(f.header.clone()),
+                    admissible: Reference::Existing(region),
+                    assumptions: Vec::new(),
+                }),
+            )?;
+            let mut nodes = Vec::new();
+            for operator in [
+                Operator::Free("x".into()),
+                Operator::Rational(Rational::zero()),
+                Operator::Rational(Rational::one()),
+            ] {
+                nodes.push(admit(
+                    &mut f.cas,
+                    Draft::Expression(ExpressionDraft {
+                        header: Reference::Existing(f.header.clone()),
+                        space: None,
+                        operator,
+                        sort: Sort::Value(AtomicSort::Scalar(Field::Real)),
+                        scope: scope.clone(),
+                        binding: None,
+                        operands: Vec::new(),
+                    }),
+                )?);
+            }
+            let input = admit(
+                &mut f.cas,
+                Draft::SeriesObject(SeriesObject {
+                    field: Reference::Existing(f.field.clone()),
+                    centre: Reference::Existing(nodes[1].clone()),
+                    variable: Reference::Existing(nodes[0].clone()),
+                    scope,
+                    context: Reference::Existing(context),
+                    order: 1,
+                    coefficients: vec![Reference::Existing(nodes[2].clone())],
+                }),
+            )?;
+            let operation = SeriesOperation::Reciprocal { input };
+            let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
+            // Measured at the actual output-construction boundary on the frozen compiler.
+            let limit = if width == 1 { 1614 } else { 9798 };
+            let mut budget = Budget::new(Limits {
+                work: limit,
+                ..Limits::default()
+            })?;
+            SCOPE_COPIES.with(|copies| copies.set(0));
+            let fault = f
+                .cas
+                .compute_series(&operation, &[], &mut budget)
+                .expect_err("scope prepayment");
+            assert_eq!(SCOPE_COPIES.with(std::cell::Cell::get), 0);
+            assert_eq!(budget.usage().work, if width == 1 { 1595 } else { 5687 });
+            assert_eq!(
+                fault.kind,
+                FaultKind::Exhausted {
+                    reason: Exhaustion::Limit,
+                    budget: BudgetKind::Work,
+                    limit,
+                    needed: limit + 1
+                }
+            );
+            assert_eq!(fault.location, AT);
+            assert_eq!(f.cas.canonical_snapshot(&mut default_budget()?)?, before);
+            f.cas
+                .compute_series(&operation, &[], &mut default_budget()?)?;
+            assert_eq!(SCOPE_COPIES.with(std::cell::Cell::get), 2);
+        }
+        Ok(())
     }
 }

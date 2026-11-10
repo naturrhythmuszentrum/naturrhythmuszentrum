@@ -15,7 +15,7 @@ fn lc_angular_frequency_cold_warm_work_boundaries() -> TestResult {
 }
 
 fn pipeline_boundaries<P: Scalar + 'static>(prepared: &Prepared) -> TestResult {
-    for (cold, required) in [(true, 5_954_612), (false, 142_363)] {
+    for (cold, required) in [(true, 5_955_004), (false, 142_502)] {
         for (available, prior, success, consumed) in [
             (required, 0, true, required),
             (required - 1, 0, false, required - 1),
@@ -45,8 +45,8 @@ fn pipeline_boundaries<P: Scalar + 'static>(prepared: &Prepared) -> TestResult {
 #[test]
 fn lc_angular_frequency_atomic_publication_boundaries() -> TestResult {
     let prepared = prepared()?;
-    publication_boundaries::<f32>(&prepared, [286_550, 132_220])?;
-    publication_boundaries::<f64>(&prepared, [286_822, 132_320])
+    publication_boundaries::<f32>(&prepared, [286_675, 132_220])?;
+    publication_boundaries::<f64>(&prepared, [286_947, 132_320])
 }
 
 fn publication_boundaries<P: Scalar + 'static>(prepared: &Prepared, bytes: [u64; 2]) -> TestResult {

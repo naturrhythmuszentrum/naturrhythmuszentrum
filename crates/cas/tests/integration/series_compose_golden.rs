@@ -295,7 +295,16 @@ fn compose_wire_reader_boundaries() -> TestResult {
                 .expect_err("closed composition reader");
             assert_eq!(
                 fault.kind,
-                FaultKind::Invalid(InvalidCode::SeriesUnsupported),
+                if offset == certificate && value == 7 {
+                    FaultKind::Exhausted {
+                        reason: nrz_cas::Exhaustion::Limit,
+                        budget: nrz_cas::limits::BudgetKind::WitnessBytes,
+                        limit: 1_048_576,
+                        needed: 16_777_216,
+                    }
+                } else {
+                    FaultKind::Invalid(InvalidCode::SeriesUnsupported)
+                },
                 "offset {offset} value {value}"
             );
             assert!(budget.usage().work > 37);

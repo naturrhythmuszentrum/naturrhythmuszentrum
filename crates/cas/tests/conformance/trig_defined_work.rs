@@ -295,7 +295,7 @@ fn coverage_attempt(work: u64) -> TestResult<(bool, u64)> {
 /// ´test:integration:trig-defined-coverage-request-boundary´
 #[test]
 fn trig_defined_coverage_request_boundary() -> TestResult {
-    assert_eq!(coverage_attempt(203_022)?, (true, 203_022));
-    assert_eq!(coverage_attempt(203_021)?, (false, 202_430));
+    assert_eq!(coverage_attempt(203_090)?, (true, 203_090));
+    assert_eq!(coverage_attempt(203_089)?, (false, 202_498));
     Ok(())
 }

@@ -18,6 +18,8 @@ pub enum Primitive {
     SeriesScale,
     /// Complete truncated convolution.
     SeriesMul,
+    /// Same-order rational inverse and explicitly guarded source reciprocal.
+    SeriesReciprocal,
     /// Exact zero-constant object composition.
     SeriesCompose,
     /// Evaluate an original differential polynomial at a checked finite subject.
@@ -290,6 +292,7 @@ impl Primitive {
                 | Self::SeriesDerive
                 | Self::SeriesSource
                 | Self::SeriesIntegrate
+                | Self::SeriesReciprocal
                 | Self::SeriesMul
                 | Self::SeriesResidual
                 | Self::SeriesCompose
@@ -346,6 +349,7 @@ impl Primitive {
             Self::SeriesIntegrate => ("series.integrate", 4),
             Self::SeriesSource => ("series.source", 8),
             Self::SeriesMul => ("series.mul", 8),
+            Self::SeriesReciprocal => ("series.reciprocal", 8),
             Self::SeriesCompose => ("series.compose", 8),
             Self::SeriesResidual => ("series.residual", 8),
             Self::SeriesCoefficient => ("series.coefficient", 2),
@@ -447,6 +451,7 @@ impl Primitive {
             | Self::SeriesDerive
             | Self::SeriesSource
             | Self::SeriesIntegrate
+            | Self::SeriesReciprocal
             | Self::SeriesMul
             | Self::SeriesResidual
             | Self::SeriesCompose
@@ -499,6 +504,7 @@ impl Primitive {
             | Self::SeriesDerive
             | Self::SeriesSource
             | Self::SeriesIntegrate
+            | Self::SeriesReciprocal
             | Self::SeriesMul
             | Self::SeriesCompose
             | Self::SeriesCoefficient => PremiseShape::SeriesEvidence,
@@ -561,6 +567,7 @@ impl Primitive {
             | Self::SeriesDerive
             | Self::SeriesSource
             | Self::SeriesIntegrate
+            | Self::SeriesReciprocal
             | Self::SeriesMul
             | Self::SeriesResidual
             | Self::SeriesCompose
@@ -598,7 +605,7 @@ impl Primitive {
 }
 
 /// Every registered primitive, in ASCII key order; availability is separate metadata.
-pub const PRIMITIVES: [Primitive; 99] = [
+pub const PRIMITIVES: [Primitive; 100] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -677,6 +684,7 @@ pub const PRIMITIVES: [Primitive; 99] = [
     Primitive::SeriesDerive,
     Primitive::SeriesIntegrate,
     Primitive::SeriesMul,
+    Primitive::SeriesReciprocal,
     Primitive::SeriesResidual,
     Primitive::SeriesScale,
     Primitive::SeriesSource,

@@ -27,6 +27,9 @@ pub(crate) const fn unsupported() -> Fault {
 
 /// Precision is checked before arity or workspace sizing can misclassify an unavailable request.
 pub(crate) fn precision(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(), Fault> {
+    if let S::Reciprocal { input, .. } = value {
+        super::reciprocal::nonunit(cas, input, budget)?;
+    }
     if let S::EvaluatedResidual {
         subject,
         expression,
@@ -65,7 +68,9 @@ pub(crate) fn number<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a Rational, 
 pub(crate) fn premise_count(cas: &Cas, value: &S) -> Result<usize, Fault> {
     match value {
         S::Source(value) => Ok(value.clause.arity()),
-        S::Truncate { .. } | S::Coefficient { .. } | S::Derive { .. } => Ok(0),
+        S::Reciprocal { .. } | S::Truncate { .. } | S::Coefficient { .. } | S::Derive { .. } => {
+            Ok(0)
+        }
         S::EvaluatedResidual { .. } | S::Scale { .. } | S::Integrate { .. } => Ok(1),
         S::Add {
             left, right, order, ..
@@ -151,7 +156,7 @@ pub(crate) fn roles(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(), Fau
     input.preflight(budget)?;
     match value {
         S::Source(_) | S::EvaluatedResidual { .. } => return Err(invalid()),
-        S::Truncate { output, .. } | S::Derive { output, .. } => {
+        S::Reciprocal { output, .. } | S::Truncate { output, .. } | S::Derive { output, .. } => {
             compatible(input, cas.series_object(output)?, budget)?;
         }
         S::Integrate {
@@ -307,9 +312,11 @@ pub(crate) fn check(
     let bytes = encoded
         .checked_mul(3)
         .and_then(|bytes| bytes.checked_add(workspace))
-        .ok_or_else(invalid)?;
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
     let retained = cas.judgment_reservation(cas.retained_judgment_bytes(), budget, AT)?;
-    let bytes = bytes.checked_add(retained).ok_or_else(invalid)?;
+    let bytes = bytes
+        .checked_add(retained)
+        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
     budget.with_retained_payload(bytes, AT, |budget| {
         arithmetic(cas, value, certificate, premises, budget)
     })?;
@@ -323,6 +330,9 @@ pub(crate) fn check(
 /// Bound unreduced products and partial sums from actual admitted coefficient extents.
 fn arithmetic_workspace(cas: &Cas, value: &S, budget: &mut Budget) -> Result<u64, Fault> {
     let input = cas.series_object(value.input())?;
+    if matches!(value, S::Reciprocal { .. }) {
+        return super::reciprocal::workspace(input.order, budget);
+    }
     let mut bits = 1_u64;
     let other = match value {
         S::Compose { right, .. } | S::Add { right, .. } | S::Mul { right, .. } => Some(right),
@@ -367,6 +377,9 @@ fn arithmetic(
 ) -> Result<(), Fault> {
     let input = cas.series_object(value.input())?;
     match (value, certificate) {
+        (S::Reciprocal { .. }, _) => {
+            return super::reciprocal::check(cas, value, certificate, premises, budget);
+        }
         (S::Compose { .. }, _) => {
             return super::compose::check(cas, value, certificate, premises, budget);
         }

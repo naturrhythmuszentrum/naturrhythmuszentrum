@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Explicit admission boundary for the only proof route supporting bound context predicates.
+//! Explicit admission boundary for bound predicates and same-scope rational object identities.
 
 use super::storage::{AT, invalid};
 use crate::budget::Budget;
@@ -126,6 +126,12 @@ pub(crate) fn check(
             return Ok(());
         }
         match draft.rule {
+            Primitive::SeriesReciprocal if matches!(&draft.conclusion, Statement::Series(value) if matches!(value.as_ref(), crate::series::SeriesStatement::Reciprocal { .. })) =>
+            {
+                // The same-scope rational object identity has no scalar or source conclusion.
+                // Its checker independently validates both complete objects and every row.
+                Ok(())
+            }
             Primitive::ContextHypothesis | Primitive::RegionConstruct | Primitive::ContextClose => {
                 Ok(())
             }

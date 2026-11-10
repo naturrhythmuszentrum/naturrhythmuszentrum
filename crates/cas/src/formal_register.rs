@@ -42,7 +42,7 @@ const fn named(
 /// Every native and solving primitive in the same ASCII key order as `PRIMITIVES`.
 ///
 /// Unavailable schemas remain represented assumptions and cannot certify an application.
-pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 99] = [
+pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 100] = [
     named(
         Primitive::CaseCongruence,
         "thm:cas:primitive-case-congruence",
@@ -508,8 +508,14 @@ pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 99] = [
     named(
         Primitive::SeriesMul,
         "thm:cas:primitive-series-mul",
-        "Truncated multiplication checks every convolution pair and partial sum at the recorded common order. Lifted form 1 checks the original ordered product on an identical domain.",
-        "Object form: ordered checked truncations for precisely the higher-order inputs. Lifted form: ordered source inputs, matching object computation and original-composite definedness.",
+        "Truncated multiplication checks every convolution pair and partial sum at the recorded common order. Lifted form 1 checks the original ordered product or quotient on an identical domain.",
+        "Object form: ordered checked truncations for precisely the higher-order inputs. Lifted product: ordered source inputs, matching object computation and original-composite definedness. Quotient: numerator source, denominator source, exact reciprocal source, matching same-order product, denominator `NonZero` and original-quotient Defined; all six ordered slots and their conditions survive.",
+    ),
+    named(
+        Primitive::SeriesReciprocal,
+        "thm:cas:primitive-series-reciprocal",
+        "Same-order rational inversion checks the constant unit and every identity-convolution row. Lifted form 1 retains the exact original reciprocal and denominator domain.",
+        "Object form has zero proof slots. Source form has four ordered slots: denominator source, matching object reciprocal, `NonZero` denominator and Defined original reciprocal; all conditions survive.",
     ),
     named(
         Primitive::SeriesResidual,
@@ -526,7 +532,7 @@ pub static PRIMITIVE_SCHEMAS: [PrimitiveSchema; 99] = [
     named(
         Primitive::SeriesSource,
         "thm:cas:primitive-series-source",
-        "Registered `SineOrigin`, `CosineOrigin` and `ArctangentOrigin` laws establish exact rational `SourceCongruence` at centre zero. Tangent-quotient replay, other source laws and source-lifted composition remain outstanding obligations of the source-correspondence row.",
+        "Registered `SineOrigin`, `CosineOrigin` and `ArctangentOrigin` laws establish exact rational `SourceCongruence` at centre zero. Other source laws and source-lifted composition remain outstanding obligations of the source-correspondence row.",
         "One exact ordinary PredicateFact(Defined(source)) on the identical context admissible region; complete paired trigonometric vectors or arctangent coefficients and independently checked integer units.",
     ),
     named(
@@ -649,21 +655,22 @@ impl Primitive {
             Self::SeriesCoefficient => &PRIMITIVE_SCHEMAS[73],
             Self::SeriesDerive => &PRIMITIVE_SCHEMAS[75],
             Self::SeriesIntegrate => &PRIMITIVE_SCHEMAS[76],
+            Self::SeriesReciprocal => &PRIMITIVE_SCHEMAS[78],
             Self::SeriesMul => &PRIMITIVE_SCHEMAS[77],
-            Self::SeriesResidual => &PRIMITIVE_SCHEMAS[78],
-            Self::SeriesScale => &PRIMITIVE_SCHEMAS[79],
-            Self::SeriesSource => &PRIMITIVE_SCHEMAS[80],
-            Self::SeriesTruncate => &PRIMITIVE_SCHEMAS[81],
+            Self::SeriesResidual => &PRIMITIVE_SCHEMAS[79],
+            Self::SeriesScale => &PRIMITIVE_SCHEMAS[80],
+            Self::SeriesSource => &PRIMITIVE_SCHEMAS[81],
+            Self::SeriesTruncate => &PRIMITIVE_SCHEMAS[82],
 
-            Self::AtanOdd => &PRIMITIVE_SCHEMAS[90],
-            Self::AtanOne => &PRIMITIVE_SCHEMAS[91],
-            Self::AtanZero => &PRIMITIVE_SCHEMAS[92],
-            Self::CosEven => &PRIMITIVE_SCHEMAS[93],
-            Self::CosHalfPi => &PRIMITIVE_SCHEMAS[94],
-            Self::TrigDefined => &PRIMITIVE_SCHEMAS[95],
-            Self::HalfPiWitness => &PRIMITIVE_SCHEMAS[96],
-            Self::SinHalfPi => &PRIMITIVE_SCHEMAS[97],
-            Self::SinOdd => &PRIMITIVE_SCHEMAS[98],
+            Self::AtanOdd => &PRIMITIVE_SCHEMAS[91],
+            Self::AtanOne => &PRIMITIVE_SCHEMAS[92],
+            Self::AtanZero => &PRIMITIVE_SCHEMAS[93],
+            Self::CosEven => &PRIMITIVE_SCHEMAS[94],
+            Self::CosHalfPi => &PRIMITIVE_SCHEMAS[95],
+            Self::TrigDefined => &PRIMITIVE_SCHEMAS[96],
+            Self::HalfPiWitness => &PRIMITIVE_SCHEMAS[97],
+            Self::SinHalfPi => &PRIMITIVE_SCHEMAS[98],
+            Self::SinOdd => &PRIMITIVE_SCHEMAS[99],
             Self::Solve(schema) => solving(schema),
             Self::CaseCongruence => &PRIMITIVE_SCHEMAS[0],
             Self::CaseDomain => &PRIMITIVE_SCHEMAS[1],
@@ -723,7 +730,7 @@ impl Primitive {
             Self::RegionConstruct => &PRIMITIVE_SCHEMAS[66],
             Self::RegionDecide => &PRIMITIVE_SCHEMAS[67],
             Self::SeriesCaseRestrict => &PRIMITIVE_SCHEMAS[72],
-            Self::SumCaseSplit => &PRIMITIVE_SCHEMAS[89],
+            Self::SumCaseSplit => &PRIMITIVE_SCHEMAS[90],
         }
     }
 }
@@ -745,13 +752,13 @@ const fn solving(schema: SolveSchema) -> &'static PrimitiveSchema {
         SolveSchema::BinomialCoverage => &PRIMITIVE_SCHEMAS[68],
         SolveSchema::RealIsolationAndOrder => &PRIMITIVE_SCHEMAS[69],
         SolveSchema::RootSelectionRefinement => &PRIMITIVE_SCHEMAS[70],
-        SolveSchema::ParameterImageCoverage => &PRIMITIVE_SCHEMAS[82],
-        SolveSchema::ImplicitFunctionBranch => &PRIMITIVE_SCHEMAS[83],
-        SolveSchema::Membership => &PRIMITIVE_SCHEMAS[84],
-        SolveSchema::MultiplicityTransfer => &PRIMITIVE_SCHEMAS[85],
-        SolveSchema::ProductCompleteness => &PRIMITIVE_SCHEMAS[86],
-        SolveSchema::TotalPredicateSplit => &PRIMITIVE_SCHEMAS[87],
-        SolveSchema::SolutionTransport => &PRIMITIVE_SCHEMAS[88],
+        SolveSchema::ParameterImageCoverage => &PRIMITIVE_SCHEMAS[83],
+        SolveSchema::ImplicitFunctionBranch => &PRIMITIVE_SCHEMAS[84],
+        SolveSchema::Membership => &PRIMITIVE_SCHEMAS[85],
+        SolveSchema::MultiplicityTransfer => &PRIMITIVE_SCHEMAS[86],
+        SolveSchema::ProductCompleteness => &PRIMITIVE_SCHEMAS[87],
+        SolveSchema::TotalPredicateSplit => &PRIMITIVE_SCHEMAS[88],
+        SolveSchema::SolutionTransport => &PRIMITIVE_SCHEMAS[89],
     }
 }
 

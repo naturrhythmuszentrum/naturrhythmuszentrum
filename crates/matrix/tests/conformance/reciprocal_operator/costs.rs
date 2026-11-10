@@ -15,8 +15,8 @@ use nrz_scalar::LiteralLimits;
 #[test]
 fn reciprocal_operator_resource_boundaries() -> TestResult {
     for (operation, profile) in [
-        (0, [812_262, 134_652, 46_179]),
-        (1, [109_933, 72_875, 52_628]),
+        (0, [812_351, 134_652, 46_204]),
+        (1, [110_047, 72_900, 52_653]),
     ] {
         boundaries(operation, profile)?;
     }
