@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Deterministic sampling of the exact shared block adapters.
 use super::*;
+#[path = "sampling_lifecycle.rs"]
+mod lifecycle;
 use nrz_matrix::sampling::{ReceiptStatus, SamplingClock, SamplingStop, sample_with_clock};
 use sampling::{Adapter, Block, Phase, Prepared, Work};
 use std::{
@@ -158,6 +160,8 @@ fn registration_scan() -> TestResult<u64> {
 }
 
 /// Each item is the full unsorted block; fresh execution owns exactly one ledger.
+/// Reset returns empty, fully reserved scratch before timing; run supplies complete results.
+/// One retained adapter handles four points, a changed four-point block, then eight points.
 /// Ordinary snapshots and Work agree for all six phases and every invocation.
 /// The observed exact-work total also rejects rebuilding a plan during reset.
 /// # Errors
@@ -169,9 +173,6 @@ fn registration_scan() -> TestResult<u64> {
 #[test]
 fn prepared_exponential_sampling_blocks() -> TestResult {
     let _guard = DISPATCHERS.lock().map_err(|_| "dispatcher guard")?;
-    let values = inputs(4)?;
-    let ordinary = measure(&values)?;
-    let block = Block::new(values);
     let arithmetic = ArithmeticContext::new()?;
     let mut left = Fixture::new()?;
     let request = broad(&mut left, 40)?;
@@ -202,7 +203,15 @@ fn prepared_exponential_sampling_blocks() -> TestResult {
         arithmetic: &arithmetic,
     };
     let scan = registration_scan()?;
-    let shape = [4];
+    let mut changed = inputs(4)?;
+    changed.rotate_left(1);
+    changed[0] = -0.75;
+    let mut cases = Vec::new();
+    for values in [inputs(4)?, changed, inputs(8)?] {
+        let shape = [values.len()];
+        let ordinary = measure(&values)?;
+        cases.push((Block::new(values), ordinary, shape));
+    }
     for phase in [
         Phase::NativeExpm1,
         Phase::NativeExp,
@@ -211,35 +220,14 @@ fn prepared_exponential_sampling_blocks() -> TestResult {
         Phase::PlatformExpm1,
         Phase::PlatformExp,
     ] {
-        let row = ordinary
-            .iter()
-            .find(|r| r.phase == phase.name())
-            .ok_or("ordinary phase")?;
-        let fresh = fresh_work(&prepared, &block.values, phase)?;
-        let difference = if matches!(phase, Phase::BatchExpm1 | Phase::BatchExp) {
-            scan
-        } else {
-            0
+        let mut adapter = Adapter {
+            phase,
+            allowances: sampling::allowances(),
+            inspect: Some(inspect),
         };
-        assert_eq!(row.work, fresh.map(|work| work + difference));
-        let expected: Vec<_> = row
-            .results
-            .iter()
-            .map(|r| match r {
-                Snapshot::Exp(v) => Snapshot::Exp(*v),
-                Snapshot::Expm1(v) => Snapshot::Expm1(*v),
-            })
-            .collect();
-        let platform: Vec<_> = match phase {
-            Phase::PlatformExp => block.values.iter().map(|x| x.exp().to_bits()).collect(),
-            Phase::PlatformExpm1 => block.values.iter().map(|x| x.exp_m1().to_bits()).collect(),
-            _ => Vec::new(),
-        };
-        if !platform.is_empty() {
-            assert_eq!(platform.iter().fold(0, |a, b| a ^ b), row.checksum);
+        for (block, ordinary, shape) in &cases {
+            exercise(&prepared, block, ordinary, *shape, scan, &mut adapter)?;
         }
-        EXPECTED.with_borrow_mut(|state| *state = (expected, platform, 0));
-        sample_phase(&prepared, &block, phase, shape, fresh)?;
     }
     Ok(())
 }
@@ -248,15 +236,12 @@ fn prepared_exponential_sampling_blocks() -> TestResult {
 fn sample_phase(
     prepared: &Prepared<'_, '_>,
     block: &Block,
-    phase: Phase,
+    adapter: &mut Adapter,
     shape: [usize; 1],
     fresh: Option<u64>,
 ) -> TestResult {
-    let mut adapter = Adapter {
-        phase,
-        allowances: sampling::allowances(),
-        inspect: Some(inspect),
-    };
+    let phase = adapter.phase;
+    let mut checked = lifecycle::Checked { inner: adapter };
     let mut settings = sampling::settings()?;
     settings.warm_up = Duration::from_micros(1);
     settings.measurement = Duration::from_micros(55);
@@ -268,18 +253,18 @@ fn sample_phase(
         sample_with_clock(
             prepared,
             &sampling::representative(block, phase, &shape),
-            &mut adapter,
+            &mut checked,
             settings,
             &clock,
         )
     });
     let report = report?;
     assert_eq!(*report.stop(), SamplingStop::Complete, "{phase:?}");
-    assert_eq!(report.elements_per_item(), Some(4));
-    assert_eq!(report.identity().shape, &[4]);
+    assert_eq!(report.elements_per_item(), Some(shape[0] as u64));
+    assert_eq!(report.identity().shape, &shape);
     assert_eq!(
         report.analysis().ok_or("analysis")?.elements_per_item(),
-        Some(4)
+        Some(shape[0] as u64)
     );
     let mut work = 0;
     for iteration in report.iterations() {
@@ -304,5 +289,47 @@ fn sample_phase(
         .sum();
     assert_eq!(observed_work, work);
     EXPECTED.with_borrow(|state| assert_eq!(state.2, report.iterations().len()));
+    Ok(())
+}
+
+/// Change representatives without replacing the adapter or its immutable preparation.
+fn exercise(
+    prepared: &Prepared<'_, '_>,
+    block: &Block,
+    ordinary: &[Observation],
+    shape: [usize; 1],
+    scan: u64,
+    adapter: &mut Adapter,
+) -> TestResult {
+    let phase = adapter.phase;
+    let row = ordinary
+        .iter()
+        .find(|r| r.phase == phase.name())
+        .ok_or("ordinary phase")?;
+    let fresh = fresh_work(prepared, &block.values, phase)?;
+    let difference = if matches!(phase, Phase::BatchExpm1 | Phase::BatchExp) {
+        scan
+    } else {
+        0
+    };
+    assert_eq!(row.work, fresh.map(|work| work + difference));
+    let expected: Vec<_> = row
+        .results
+        .iter()
+        .map(|r| match r {
+            Snapshot::Exp(v) => Snapshot::Exp(*v),
+            Snapshot::Expm1(v) => Snapshot::Expm1(*v),
+        })
+        .collect();
+    let platform: Vec<_> = match phase {
+        Phase::PlatformExp => block.values.iter().map(|x| x.exp().to_bits()).collect(),
+        Phase::PlatformExpm1 => block.values.iter().map(|x| x.exp_m1().to_bits()).collect(),
+        _ => Vec::new(),
+    };
+    if !platform.is_empty() {
+        assert_eq!(platform.iter().fold(0, |a, b| a ^ b), row.checksum);
+    }
+    EXPECTED.with_borrow_mut(|state| *state = (expected, platform, 0));
+    sample_phase(prepared, block, adapter, shape, fresh)?;
     Ok(())
 }

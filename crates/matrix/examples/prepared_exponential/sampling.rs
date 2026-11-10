@@ -125,6 +125,17 @@ pub(super) struct Context {
     baseline: Vec<u64>,
 }
 
+#[cfg(test)]
+impl Context {
+    /// Read actual scratch lengths and capacities at the callback boundary.
+    pub(super) const fn scratch_layout(&self) -> [(usize, usize); 2] {
+        [
+            (self.snapshots.len(), self.snapshots.capacity()),
+            (self.baseline.len(), self.baseline.capacity()),
+        ]
+    }
+}
+
 /// Ordinary batch owners survive receipt preservation and are released by dispose.
 #[derive(Debug)]
 enum Batch<'a> {
@@ -345,7 +356,18 @@ pub(super) const fn representative<'a>(
             shape,
             operation_revision: "prepared-block-v1",
             workload: "unsorted-prepared-binary64-40-bit",
-            scope: "whole block, consumed complete readings; batch includes allocation and reading",
+            scope: if phase.platform() {
+                concat!(
+                    "whole block, consumed platform results; no engine ledger; ",
+                    "not an allocation-equivalent baseline for batch evaluation"
+                )
+            } else {
+                concat!(
+                    "whole block, consumed complete readings; ",
+                    "fresh execution ledger; empty registration inventory; ",
+                    "batch includes allocation and reading"
+                )
+            },
             trace_configuration: "disabled",
         },
     }
