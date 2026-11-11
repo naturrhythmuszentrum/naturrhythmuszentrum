@@ -240,7 +240,7 @@ fn reciprocal_literal_abi_byte_totals() {
     ];
     // Optional endpoints add 2*LoanChannel to the core and 2*PublishedChannel to the bundle.
     // Captured correspondence, endpoint identities and completed-mask identity add 272 to both evidence copies.
-    // H = core 3296 + layout 120 + witness 256 + bundle 3216 + pin 184 + extent 40 = 7112.
+    // H = core 3296 + layout 248 + witness 240 + bundle 3216 + pin 72 + extent 40 = 7112.
     // Outcomes grow 24 -> 32 for the lossless prepared refusal; every group row grows 888 -> 1032.
     // Temporary backings remain 17*264 + 5*16 + 3*248 + 2*24 = 5360.
     // Table delta: 3*(256+1032) + 2*32 + 40 + (15-2*h)*264.

@@ -233,10 +233,14 @@ impl Heap {
                 return Err(LoanError::WrongLoan);
             }
         }
-        if let Some(evidence) = &bundle.origin.evidence
-            && !self.loans.authentic_token(&evidence.token, bundle.identity)
-        {
-            return Err(LoanError::WrongLoan);
+        if let Some(evidence) = &bundle.origin.evidence {
+            for token in std::iter::once(&evidence.token)
+                .chain(evidence.endpoint_tokens.binary().map(|side| &side.token))
+            {
+                if !self.loans.authentic_token(token, bundle.identity) {
+                    return Err(LoanError::WrongLoan);
+                }
+            }
         }
         let layout = self
             .masks
@@ -449,6 +453,13 @@ impl Heap {
                     + 2 * usize::from(bundle.endpoints.is_some())
                     + 5
                     + usize::from(bundle.origin.evidence.is_some())
+                    + usize::from(
+                        bundle
+                            .origin
+                            .evidence
+                            .as_ref()
+                            .is_some_and(|evidence| evidence.endpoint_tokens.binary().is_some()),
+                    )
                     + super::retained_expm1::Attachment::WORK
                         * usize::from(bundle.retained_law.is_some()),
             )?;

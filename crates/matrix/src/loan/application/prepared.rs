@@ -184,10 +184,26 @@ pub(super) struct Request<'a, P: nrz_scalar::Scalar> {
     pub(super) limits: ExecutionLimits,
     /// Expected entry point, checked before the member profile is used.
     pub(super) expected: crate::KernelKind,
+    /// Optional ordered binary correspondence and borrowed right edge.
+    pub(super) binary: Option<(&'a super::PointwiseBinaryOperation, &'a BundlePin<f64>)>,
     /// Optional retained correspondence for the prepared member.
     pub(super) prepared: Option<&'a PreparedExpm1Operation>,
 }
 impl<P: nrz_scalar::Scalar> Request<'_, P> {
+    /// Both role inventories participate in initialization and symbolic cleanup.
+    pub(super) fn input_channels(&self) -> Result<usize, LoanError> {
+        let left = super::contract::source(self)?
+            .channels
+            .iter()
+            .flatten()
+            .count();
+        let right = self
+            .binary
+            .map(|(_, pin)| super::binary::bundle(pin))
+            .transpose()?
+            .map_or(0, |bundle| bundle.channels.iter().flatten().count());
+        Ok(left + right)
+    }
     /// Borrow a complete closed profile only after authenticating the requested entry point.
     pub(super) fn member(&self) -> Result<super::member::Member<'_>, LoanError> {
         super::member::Member::check(self.operation, self.expected, self.prepared)
@@ -201,6 +217,7 @@ impl<'a, P: nrz_scalar::Scalar> From<&'a PointwiseRequest<P>> for Request<'a, P>
             destination: &request.destination,
             demand: request.demand,
             limits: request.limits,
+            binary: None,
             prepared: None,
             expected: crate::KernelKind::Elementwise(crate::Elementwise::Square),
         }
@@ -214,6 +231,7 @@ impl<'a> From<&'a PointwiseExpm1Request> for Request<'a, f64> {
             destination: &request.destination,
             demand: request.demand,
             limits: request.limits,
+            binary: None,
             prepared: Some(&request.operation),
             expected: crate::KernelKind::PreparedExpm1,
         }
@@ -340,4 +358,19 @@ pub(super) fn authenticate(
         return Err(LoanError::WrongLoan);
     }
     Ok(())
+}
+
+impl<'a> From<&'a super::PointwiseBinaryRequest> for Request<'a, f64> {
+    fn from(request: &'a super::PointwiseBinaryRequest) -> Self {
+        Self {
+            operation: &request.operation.operation,
+            input: &request.left,
+            destination: &request.destination,
+            demand: request.demand,
+            limits: request.limits,
+            expected: crate::KernelKind::BinaryElementwise(crate::BinaryElementwise::Product),
+            prepared: None,
+            binary: Some((&request.operation, &request.right)),
+        }
+    }
 }

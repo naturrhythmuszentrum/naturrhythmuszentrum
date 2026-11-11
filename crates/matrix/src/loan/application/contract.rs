@@ -28,6 +28,9 @@ pub(super) fn check<P: Scalar + 'static>(
     account: u64,
     budget: &mut Budget,
 ) -> Result<(), ApplicationError> {
+    if request.binary.is_some() {
+        return super::binary::check_request(heap, request, account, budget);
+    }
     charge(budget, 1)?;
     let pin = request
         .input
@@ -84,7 +87,12 @@ pub(super) fn check<P: Scalar + 'static>(
     if destination.coverage != bundle.declaration.coverage {
         return Err(LoanError::CoverageMismatch.into());
     }
-    declarations(&bundle.declaration, &destination.symbols, request.operation)?;
+    declarations(
+        &bundle.declaration,
+        &destination.symbols,
+        request.operation.inputs()[0].descriptor(),
+        request.operation.outputs()[0].descriptor(),
+    )?;
     member.representation::<P>(
         &bundle.declaration,
         &destination.symbols,
@@ -115,10 +123,11 @@ pub(super) fn check<P: Scalar + 'static>(
     Ok(())
 }
 /// Match the independently declared result convention, including exact fresh channel identities.
-fn declarations(
+pub(super) fn declarations(
     source: &Declaration,
     output: &nrz_bindings::BindingSymbols,
-    operation: &crate::CheckedOperation,
+    input: &nrz_bindings::Descriptor,
+    result: &nrz_bindings::Descriptor,
 ) -> Result<(), LoanError> {
     source
         .symbols
@@ -127,9 +136,7 @@ fn declarations(
     output
         .check_import()
         .map_err(|_| LoanError::StaleDependency)?;
-    if source.symbols.value().descriptor() != operation.inputs()[0].descriptor()
-        || output.value().descriptor() != operation.outputs()[0].descriptor()
-    {
+    if source.symbols.value().descriptor() != input || output.value().descriptor() != result {
         return Err(LoanError::UnsupportedContract);
     }
     if output.value().shape() != source.symbols.value().shape()
@@ -161,7 +168,7 @@ fn declarations(
     Ok(())
 }
 /// Every filled role is authenticated even when all roles share one word owner.
-fn attachments(bundle: &Bundle) -> Result<(), LoanError> {
+pub(super) fn attachments(bundle: &Bundle) -> Result<(), LoanError> {
     for (channel, owner) in HostChannel::ALL.into_iter().zip(&bundle.channels) {
         match (owner, bundle.qualified[channel.index()]) {
             (Some(_), Some(attachment))
@@ -191,6 +198,13 @@ impl Evidence {
         let member =
             super::member::Member::check(&self.operation, self.law.kind(), self.prepared.as_ref())?;
         let law = member.law();
+        if member.is_binary() != self.endpoint_tokens.binary().is_some() {
+            return Err(LoanError::WrongLoan);
+        }
+        if let Some(side) = self.endpoint_tokens.binary() {
+            side.validate(self, destination)?;
+        }
+
         if let Some(prepared) = &self.prepared {
             let original = Rc::ptr_eq(&prepared.operation.inputs, &self.operation.inputs)
                 && Rc::ptr_eq(&prepared.operation.outputs, &self.operation.outputs);
@@ -218,7 +232,12 @@ impl Evidence {
         {
             return Err(LoanError::LayoutMismatch);
         }
-        declarations(&self.source, &destination.symbols, &self.operation)?;
+        declarations(
+            &self.source,
+            &destination.symbols,
+            self.operation.inputs()[0].descriptor(),
+            self.operation.outputs()[0].descriptor(),
+        )?;
         member.representation_format(
             identity.format,
             &self.source,

@@ -235,6 +235,12 @@ fn extras<P: Scalar + 'static>(
         for _ in source.channels.iter().flatten() {
             *word &= source.mask.words[index];
         }
+        if let Some((_, pin)) = request.binary {
+            let right = super::super::binary::bundle(pin)?;
+            for _ in right.channels.iter().flatten() {
+                *word &= right.mask.words[index];
+            }
+        }
     }
     let population = filled.iter().try_fold(0_usize, |population, word| {
         population
@@ -275,9 +281,10 @@ fn extras<P: Scalar + 'static>(
         &plan.debit_slots,
         &plan.identities,
     )?;
+    let auxiliary = auxiliary(request, plan, identity, debits, guard, endpoint_tokens)?;
     let evidence = Evidence {
         prepared: request.prepared.cloned(),
-        endpoint_tokens,
+        endpoint_tokens: auxiliary,
         completed_mask: None,
         operation: request.operation.clone(),
         excluded_inputs: Rc::clone(&request.operation.inputs),
@@ -306,6 +313,51 @@ fn extras<P: Scalar + 'static>(
         population,
     })
 }
+/// Mutually exclusive prepared endpoints or the single inventoried binary side box.
+fn auxiliary<P: Scalar>(
+    request: &super::super::prepared::Request<'_, P>,
+    plan: &Plan,
+    identity: Identity,
+    debits: &mut Vec<Debit>,
+    guard: &mut Preparation,
+    endpoints: Option<[(usize, u64, u64); 2]>,
+) -> Result<super::super::binary::Auxiliary, LoanError> {
+    use super::super::binary::{Auxiliary, Side};
+    let Some((original, pin)) = request.binary else {
+        return Ok(endpoints.map_or(Auxiliary::Absent, Auxiliary::Endpoints));
+    };
+    if endpoints.is_some() || request.prepared.is_some() {
+        return Err(LoanError::WrongLoan);
+    }
+    let source = super::super::binary::bundle(pin)?;
+    let token = token(
+        identity,
+        AllocationKind::Owner,
+        0,
+        plan.side_bytes,
+        debits,
+        &plan.debit_slots,
+        &plan.identities,
+    )?;
+    #[cfg(test)]
+    crate::loan::fault::before()?;
+    let side = Box::new(Side {
+        original: original.clone(),
+        source: Declaration {
+            symbols: source.declaration.symbols.clone(),
+            axis: source.declaration.axis,
+            extent: source.declaration.extent,
+            coverage: source.declaration.coverage,
+        },
+        identity: source.identity,
+        attachments: source.qualified,
+        input: None,
+        token,
+    });
+    guard.acquired(false)?;
+    Ok(Auxiliary::Binary(side))
+}
+
 /// The one-cell extent and closed allowance use the same separately owned numerical contract.
 fn cell_contract<P: Scalar>(
     request: &super::super::prepared::Request<'_, P>,
@@ -314,7 +366,11 @@ fn cell_contract<P: Scalar>(
     let extent = crate::Extent::new(1, request.destination.components())?;
     #[cfg(test)]
     crate::loan::fault::before()?;
-    let inputs: Rc<[crate::Extent]> = Rc::new([extent]);
+    let inputs: Rc<[crate::Extent]> = if request.binary.is_some() {
+        Rc::new([extent; 2])
+    } else {
+        Rc::new([extent])
+    };
     guard.acquired(false)?;
     Ok(crate::kernels::KernelContract {
         inputs,

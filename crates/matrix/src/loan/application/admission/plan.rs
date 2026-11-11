@@ -39,6 +39,8 @@ pub(super) struct Plan {
     pub(super) permit: ResourcePermit,
     /// Extra filled-word, outcome and per-cell-extent allocations.
     pub(super) extras: [usize; 3],
+    /// Additional boxed right correspondence, absent for every unary member.
+    pub(super) side_bytes: usize,
     /// Present native channels.
     pub(super) present: [bool; 3],
     /// Present channel count.
@@ -122,17 +124,8 @@ impl Plan {
         let pin_slot = heap.loans.vacant_pin();
         let pin_capacity = add(pin_slot, 1)?.max(heap.loans.pins.capacity());
         let headers = header_bytes::<P>();
-        let identities = if debit_count == 23 {
-            crate::heap::identity::identity_block::<26>()?
-        } else {
-            let source = crate::heap::identity::identity_block::<20>()?;
-            std::array::from_fn(|index| source.get(index).copied().unwrap_or(0))
-        };
-        let input_channels = super::super::contract::source(request)?
-            .channels
-            .iter()
-            .flatten()
-            .count();
+        let identities = identities(debit_count, member.is_binary())?;
+        let input_channels = request.input_channels()?;
         let cleanup = CleanupReceipt {
             identity: identities[0],
             allocations: (channels + 2 * usize::from(member.is_prepared()))
@@ -140,6 +133,7 @@ impl Plan {
                     + usize::from(geometry.component_words != 0)
                     + usize::from(geometry.cell_words != 0))
                 + 13
+                + usize::from(member.is_binary())
                 + usize::from(geometry.cell_words != 0)
                 + usize::from(declaration.capacity() != 0)
                 + geometry.replacements(heap, group_capacity, debit_capacity, pin_capacity)?,
@@ -147,9 +141,17 @@ impl Plan {
             // Destination symbol handles and common owners; input declaration handles,
             // three operation handles, three exclusion witnesses and the one-cell extent.
             // The transferred numerical pin's drop was already prepaid by its creator.
-            edges: channels + 3 + input_channels + 7 + 7 * usize::from(member.is_prepared()),
+            edges: channels
+                + 3
+                + input_channels
+                + 7
+                + 7 * usize::from(member.is_prepared())
+                + (input_channels + 6) * usize::from(member.is_binary()),
         };
-        let extras = geometry.extra_bytes(declaration.capacity())?;
+        let mut extras = geometry.extra_bytes(declaration.capacity())?;
+        if member.is_binary() {
+            extras[2] = rc_bytes::<[crate::Extent; 2]>();
+        }
         let mut plan = Self {
             identities,
             permit: ResourcePermit {
@@ -160,6 +162,11 @@ impl Plan {
                 peak: 0,
             },
             extras,
+            side_bytes: if member.is_binary() {
+                size_of::<super::super::binary::Side>()
+            } else {
+                0
+            },
             present: geometry.present,
             channels: geometry.channels,
             roles: member.roles(),
@@ -192,7 +199,10 @@ impl Plan {
         self.permit.account = Some(request.destination.account);
         let cleanup_work = add(
             add(self.cleanup.allocations, self.cleanup.records)?,
-            add(self.cleanup.edges, 15 + 4 * self.channels)?,
+            add(
+                self.cleanup.edges,
+                15 + 4 * self.channels + usize::from(self.side_bytes != 0),
+            )?,
         )?;
         let initialization = self
             .roles
@@ -201,11 +211,7 @@ impl Plan {
                 add(self.component_words, self.cell_words)?,
             )?)
             .ok_or(LoanError::CountOverflow)?;
-        let input_channels = super::super::contract::source(request)?
-            .channels
-            .iter()
-            .flatten()
-            .count();
+        let input_channels = request.input_channels()?;
         let initialization = add(
             initialization,
             add(
@@ -246,6 +252,7 @@ impl Plan {
             self.headers.into_iter().try_fold(0_usize, add)?,
         )?;
         retained = add(retained, self.extras.into_iter().try_fold(0_usize, add)?)?;
+        retained = add(retained, self.side_bytes)?;
         let mut scratch = 0;
         for (growth, old) in [
             heap.descriptors
@@ -307,6 +314,24 @@ impl Plan {
             )?;
         }
         Ok(heap.preflight_resources(resources, ResourcePolicy::from_budget(budget))?)
+    }
+}
+
+/// Reserve only the selected closed member's contiguous identity block.
+fn identities(debits: usize, binary: bool) -> Result<[u64; 26], LoanError> {
+    if debits == 23 {
+        return Ok(crate::heap::identity::identity_block::<26>()?);
+    }
+    if binary {
+        let source = crate::heap::identity::identity_block::<21>()?;
+        Ok(std::array::from_fn(|index| {
+            source.get(index).copied().unwrap_or(0)
+        }))
+    } else {
+        let source = crate::heap::identity::identity_block::<20>()?;
+        Ok(std::array::from_fn(|index| {
+            source.get(index).copied().unwrap_or(0)
+        }))
     }
 }
 

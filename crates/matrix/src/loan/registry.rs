@@ -326,6 +326,8 @@ pub(super) enum DebitInventory {
     Application([Option<(usize, u64)>; 17]),
     /// Five-role prepared application, including both endpoint tracking inventories.
     PreparedApplication([Option<(usize, u64)>; 23]),
+    /// Two-input applications add one side-owner debit without widening the largest variant.
+    BinaryApplication([Option<(usize, u64)>; 18]),
 }
 impl DebitInventory {
     /// Exact active variant, without inventing extra host debit positions.
@@ -334,6 +336,7 @@ impl DebitInventory {
             Self::Host(entries) => entries,
             Self::Application(entries) => entries,
             Self::PreparedApplication(entries) => entries,
+            Self::BinaryApplication(entries) => entries,
         }
     }
     /// Mutate only the fixed inventory selected at admission.
@@ -342,6 +345,7 @@ impl DebitInventory {
             Self::Host(entries) => entries,
             Self::Application(entries) => entries,
             Self::PreparedApplication(entries) => entries,
+            Self::BinaryApplication(entries) => entries,
         }
     }
 }

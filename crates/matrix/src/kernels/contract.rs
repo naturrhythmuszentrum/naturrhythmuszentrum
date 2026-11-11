@@ -35,6 +35,8 @@ pub enum KernelKind {
     Elementwise(super::Elementwise),
     /// Retained prepared expm1, executable only through its checked masked adapter.
     PreparedExpm1,
+    /// Ordered native product or quotient of equally shaped represented boxes.
+    BinaryElementwise(super::BinaryElementwise),
 }
 
 /// A private construction contract for one output and its complete ordered operands.
@@ -74,6 +76,8 @@ pub(crate) enum Recipe {
     Elementwise(super::Elementwise),
     /// Retained prepared expm1, executable only through its checked masked adapter.
     PreparedExpm1,
+    /// Ordered native product or quotient of equally shaped represented boxes.
+    BinaryElementwise(super::BinaryElementwise),
 }
 
 impl KernelContract {
@@ -91,6 +95,7 @@ impl KernelContract {
             Recipe::Quantity(recipe) => recipe.kind(),
             Recipe::Elementwise(function) => KernelKind::Elementwise(*function),
             Recipe::PreparedExpm1 => KernelKind::PreparedExpm1,
+            Recipe::BinaryElementwise(function) => KernelKind::BinaryElementwise(*function),
         }
     }
 

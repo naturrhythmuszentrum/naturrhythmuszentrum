@@ -47,6 +47,9 @@ pub(super) fn evaluate<P: Scalar + 'static>(
                         .validate()?;
                     charge(budget, 1)?;
                 }
+                if owner.core.evidence.endpoint_tokens.binary().is_some() {
+                    charge(budget, 1)?;
+                }
                 let member = validate(&owner.core)?;
                 let context = ArithmeticContext::new()
                     .map_err(KernelError::from)
@@ -60,6 +63,15 @@ pub(super) fn evaluate<P: Scalar + 'static>(
                 } else {
                     1
                 };
+                let loads = loads
+                    + owner
+                        .core
+                        .evidence
+                        .endpoint_tokens
+                        .binary()
+                        .map_or(0, |side| {
+                            1 + usize::from(side.source.symbols.bound().is_some())
+                        });
                 let invocation = member.invocation(components)?;
                 let per_cell = (loads + member.roles())
                     .checked_mul(components)
@@ -121,6 +133,9 @@ fn validate<P: Scalar + 'static>(core: &ApplicationCore<P>) -> Result<Member<'_>
         return Err(LoanError::WrongLoan);
     }
     input.checked_reader()?;
+    if let Some(side) = core.evidence.endpoint_tokens.binary() {
+        side.validate_pin(core.host.identity.account)?;
+    }
     Ok(member)
 }
 /// Enumerate words, cells and components in stable original order, including refused suffixes.
@@ -139,6 +154,10 @@ fn run<P: Scalar + 'static>(
         .input
         .as_ref()
         .and_then(|pin| pin.checked_reader().ok());
+    let side = core.evidence.endpoint_tokens.binary();
+    let right = side
+        .and_then(|side| side.input.as_ref())
+        .and_then(|pin| pin.checked_reader().ok());
     for word_index in 0..core.filled.len() {
         let mut remaining = core.filled[word_index];
         while remaining != 0 {
@@ -149,6 +168,8 @@ fn run<P: Scalar + 'static>(
                 let entry = cell + cells * component;
                 let result = member.scalar(
                     reader.as_ref(),
+                    right.as_ref(),
+                    side.is_some_and(|side| side.source.symbols.bound().is_some()),
                     core.host.retained_law.as_ref(),
                     core.evidence.source.symbols.bound().is_some(),
                     cell,

@@ -21,6 +21,8 @@ pub(super) enum Member<'a> {
     Reciprocal(&'a Rc<KernelContract>),
     /// Binary64 exact enclosure of the nonnegative branch, including zero.
     SquareRoot(&'a Rc<KernelContract>),
+    /// Ordered product or quotient uses the common three-reading lifecycle.
+    Binary(&'a Rc<KernelContract>, crate::BinaryElementwise),
 }
 impl<'a> Member<'a> {
     /// Expected identity comes from the entry point or the persistent captured law.
@@ -29,7 +31,12 @@ impl<'a> Member<'a> {
         expected: KernelKind,
         prepared: Option<&'a PreparedExpm1Operation>,
     ) -> Result<Self, LoanError> {
-        if operation.inputs().len() != 1
+        if operation.inputs().len()
+            != if matches!(expected, KernelKind::BinaryElementwise(_)) {
+                2
+            } else {
+                1
+            }
             || operation.outputs().len() != 1
             || operation.revision() != 1
         {
@@ -45,6 +52,7 @@ impl<'a> Member<'a> {
             (Recipe::Elementwise(Elementwise::Square), None) => Ok(Self::Square(law)),
             (Recipe::Elementwise(Elementwise::Reciprocal), None) => Ok(Self::Reciprocal(law)),
             (Recipe::Elementwise(Elementwise::SquareRoot), None) => Ok(Self::SquareRoot(law)),
+            (Recipe::BinaryElementwise(function), None) => Ok(Self::Binary(law, *function)),
             (Recipe::PreparedExpm1, Some(operation)) if law.work == 0 => {
                 Ok(Self::PreparedExpm1(law, operation))
             }
@@ -57,13 +65,14 @@ impl<'a> Member<'a> {
             Self::Square(law)
             | Self::Reciprocal(law)
             | Self::SquareRoot(law)
-            | Self::PreparedExpm1(law, _) => law,
+            | Self::PreparedExpm1(law, _)
+            | Self::Binary(law, _) => law,
         }
     }
     /// Fixed output roles are inseparable from the law and its reading semantics.
     pub(super) const fn roles(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 3,
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => 3,
             Self::PreparedExpm1(..) => 5,
         }
     }
@@ -72,17 +81,27 @@ impl<'a> Member<'a> {
         match self {
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 17,
             Self::PreparedExpm1(..) => 23,
+            Self::Binary(..) => 18,
         }
     }
     /// Only the retained member has endpoint owners and ledger-aware staged admission.
     pub(super) const fn is_prepared(self) -> bool {
         matches!(self, Self::PreparedExpm1(..))
     }
+    /// Binary members require both original slots and the inventoried side owner.
+    pub(super) const fn is_binary(self) -> bool {
+        matches!(self, Self::Binary(..))
+    }
+    /// Closed arity is a member property, never inferred from a caller's input count.
+    pub(super) const fn arity(self) -> usize {
+        if self.is_binary() { 2 } else { 1 }
+    }
     /// The closed elementwise law retains its original conservative factor.
     pub(super) const fn invocation_factor(self) -> usize {
         match self {
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 12,
             Self::PreparedExpm1(..) => 0,
+            Self::Binary(..) => 21,
         }
     }
     /// Native reuse reports its exact ledger delta independently of prepaid wrapper visits.
@@ -92,6 +111,10 @@ impl<'a> Member<'a> {
             Self::PreparedExpm1(..) => Some("prepared native traversal"),
             Self::Reciprocal(_) => Some("reciprocal native traversal"),
             Self::SquareRoot(_) => Some("square root native traversal"),
+            Self::Binary(_, crate::BinaryElementwise::Product) => Some("product native traversal"),
+            Self::Binary(_, crate::BinaryElementwise::Quotient) => {
+                Some("quotient native traversal")
+            }
         }
     }
     /// Native invocation allowance is checked separately at the original and one-cell shapes.
@@ -100,13 +123,14 @@ impl<'a> Member<'a> {
             .checked_mul(self.invocation_factor())
             .ok_or(LoanError::CountOverflow)
     }
-    /// The only four legal one-cell recipes require no coefficient copying or construction.
+    /// The closed one-cell recipes require no coefficient copying or construction.
     pub(super) const fn recipe(self) -> Recipe {
         match self {
             Self::Square(_) => Recipe::Elementwise(Elementwise::Square),
             Self::Reciprocal(_) => Recipe::Elementwise(Elementwise::Reciprocal),
             Self::SquareRoot(_) => Recipe::Elementwise(Elementwise::SquareRoot),
             Self::PreparedExpm1(..) => Recipe::PreparedExpm1,
+            Self::Binary(_, function) => Recipe::BinaryElementwise(function),
         }
     }
     /// Original and one-cell identity must agree before numerical entry and publication.
@@ -117,7 +141,8 @@ impl<'a> Member<'a> {
     ) -> Result<(), LoanError> {
         let extent = crate::Extent::new(1, components)?;
         if law.kind() != self.law().kind()
-            || law.inputs.as_ref() != [extent]
+            || law.inputs.len() != self.arity()
+            || law.inputs.iter().any(|input| *input != extent)
             || law.output != extent
             || law.work != self.invocation(components)?
         {
@@ -152,7 +177,7 @@ impl<'a> Member<'a> {
     ) -> Result<(), LoanError> {
         match self {
             Self::Square(_) => Ok(()),
-            Self::Reciprocal(_) | Self::SquareRoot(_) => {
+            Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => {
                 if format != crate::storage::Format::Binary64 {
                     return Err(LoanError::UnsupportedContract);
                 }
@@ -177,7 +202,7 @@ impl<'a> Member<'a> {
     /// Storage failures preserve the member's lossless public outcome family.
     pub(super) const fn storage_failure(self, component: usize) -> CellOutcome {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => {
                 CellOutcome::CellRefused {
                     component,
                     reason: crate::KernelError::Contract,
@@ -204,6 +229,14 @@ impl<'a> Member<'a> {
             }
             CellOutcome::CellRefused { component, reason } => {
                 if self.is_prepared() || *component >= extent.columns() {
+                    return Err(LoanError::WrongLoan);
+                }
+                if let crate::KernelError::BinaryDomain {
+                    function, entry, ..
+                } = reason
+                    && (self.law().kind() != KernelKind::BinaryElementwise(*function)
+                        || *entry != cell + extent.rows() * component)
+                {
                     return Err(LoanError::WrongLoan);
                 }
                 if let crate::KernelError::Domain {

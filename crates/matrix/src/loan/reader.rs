@@ -89,7 +89,16 @@ impl<P: Scalar + 'static> BundlePin<P> {
                             .as_ref()
                             .is_some_and(|evidence| evidence.prepared.is_some())
                 });
-                charge(budget, 3 + usize::from(has_law) + 3 * usize::from(prepared))?;
+                let binary = pin
+                    .bundle
+                    .payload
+                    .as_ref()
+                    .and_then(|bundle| bundle.origin.evidence.as_ref())
+                    .is_some_and(|evidence| evidence.endpoint_tokens.binary().is_some());
+                charge(
+                    budget,
+                    3 + usize::from(has_law) + 3 * usize::from(prepared) + usize::from(binary),
+                )?;
                 let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
                 if let Some(law) = &bundle.retained_law {
                     law.validate()?;
@@ -232,7 +241,7 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
             .read(cell + self.capacity() * component)
     }
     /// Refuse holes and invalid attachment authority before touching numerical storage.
-    fn selected_owner(
+    pub(super) fn selected_owner(
         &self,
         channel: HostChannel,
         cell: usize,
@@ -331,6 +340,13 @@ impl Heap {
                 + 2 * usize::from(bundle.endpoints.is_some())
                 + 5
                 + usize::from(bundle.origin.evidence.is_some())
+                + usize::from(
+                    bundle
+                        .origin
+                        .evidence
+                        .as_ref()
+                        .is_some_and(|evidence| evidence.endpoint_tokens.binary().is_some()),
+                )
                 + super::retained_expm1::Attachment::WORK
                     * usize::from(bundle.retained_law.is_some()),
         )?;

@@ -46,7 +46,8 @@ pub(super) fn publish<P: Scalar + 'static>(
         |budget| {
             charge(
                 budget,
-                25 + 7 * usize::from(owner.core.evidence.prepared.is_some())
+                25 + usize::from(owner.core.evidence.endpoint_tokens.binary().is_some())
+                    + 7 * usize::from(owner.core.evidence.prepared.is_some())
                     + crate::loan::retained_expm1::Attachment::WORK
                         * usize::from(owner.core.host.retained_law.is_some()),
             )?;
@@ -97,12 +98,24 @@ fn authenticate<P: Scalar>(
         return Err(LoanError::DuplicateReturn);
     };
     let inventory_matches = matches!(
-        (core.evidence.prepared.is_some(), &group.debits),
-        (false, crate::loan::registry::DebitInventory::Application(_))
-            | (
-                true,
-                crate::loan::registry::DebitInventory::PreparedApplication(_)
-            )
+        (
+            core.evidence.prepared.is_some(),
+            core.evidence.endpoint_tokens.binary().is_some(),
+            &group.debits
+        ),
+        (
+            false,
+            false,
+            crate::loan::registry::DebitInventory::Application(_)
+        ) | (
+            false,
+            true,
+            crate::loan::registry::DebitInventory::BinaryApplication(_)
+        ) | (
+            true,
+            false,
+            crate::loan::registry::DebitInventory::PreparedApplication(_)
+        )
     );
     if !inventory_matches
         || !witness.ptr_eq(&Rc::downgrade(&core.host.witness))
@@ -129,6 +142,12 @@ fn authenticate<P: Scalar>(
                 .flat_map(|channel| channel.tokens.iter()),
         )
         .chain([&core.filled_token, &core.extent_token, &core.evidence.token])
+        .chain(
+            core.evidence
+                .endpoint_tokens
+                .binary()
+                .map(|side| &side.token),
+        )
     {
         if !heap.loans.authentic_token(token, core.host.identity) {
             return Err(LoanError::WrongLoan);
@@ -163,6 +182,11 @@ fn prepare<P: Scalar + 'static>(
         != core.evidence.source_identity
     {
         return Err(LoanError::WrongLoan);
+    }
+    if let Some(side) = core.evidence.endpoint_tokens.binary() {
+        heap.current_bundle(side.input.as_ref().ok_or(LoanError::WrongLoan)?, budget)?;
+        charge(budget, 1)?;
+        side.validate_pin(core.host.identity.account)?;
     }
     core.evidence.validate(&core.host.declaration, identity)?;
     super::member::Member::check(
@@ -339,6 +363,7 @@ fn finish<P: Scalar + 'static>(
     if let Some(mask) = Rc::get_mut(&mut prepared.mask) {
         mask.words = filled;
     }
+    let right = evidence.endpoint_tokens.take_pin();
     evidence.completed_mask = Some(std::ptr::NonNull::from(prepared.mask.as_ref()));
     host.cleanup.allocations += prepared.cleanup.allocations;
     host.cleanup.records += prepared.cleanup.records;
@@ -404,6 +429,7 @@ fn finish<P: Scalar + 'static>(
     );
     // The terminal producer exists before either the transferred edge or witness expires.
     drop(input);
+    drop(right);
     drop(contract);
     drop(host.witness);
     heap.loans.release(extent_token.slot, extent_token.key);

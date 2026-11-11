@@ -93,6 +93,41 @@ pub(super) fn request_expm1(
         Err(error) => super::Expm1ApplicationRequest::ApplicationRefused(error, request),
     }
 }
+/// Both pins move only after the same complete private preparation as unary members.
+pub(super) fn request_binary(
+    heap: &mut Heap,
+    request: super::PointwiseBinaryRequest,
+    expected: crate::BinaryElementwise,
+    account: &mut ExecutionAccount,
+) -> super::BinaryApplicationRequest {
+    let checked =
+        account
+            .ledger
+            .with_work_phase(super::FAMILY, "binary application admission", |budget| {
+                let mut borrowed = super::prepared::Request::from(&request);
+                borrowed.expected = crate::KernelKind::BinaryElementwise(expected);
+                super::contract::check(heap, &borrowed, account.identity, budget)?;
+                let plan = plan::Plan::new(heap, &borrowed, budget)?;
+                preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)
+            });
+    match checked {
+        Ok(mut prepared) => {
+            let super::binary::Auxiliary::Binary(side) =
+                &mut prepared.core.evidence.endpoint_tokens
+            else {
+                return super::BinaryApplicationRequest::ApplicationRefused(
+                    LoanError::WrongLoan.into(),
+                    request,
+                );
+            };
+            side.input = Some(request.right);
+            prepared.core.input = Some(request.left);
+            super::BinaryApplicationRequest::ApplicationReady(install(heap, prepared))
+        }
+        Err(error) => super::BinaryApplicationRequest::ApplicationRefused(error, request),
+    }
+}
+
 /// Install only complete private records; no fallible work or allocation follows the input move.
 fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared<P>) -> OwnedApplication<P> {
     use crate::loan::registry::{DebitInventory, Group, PinIndex, ProducerOutcome, State};
@@ -117,6 +152,8 @@ fn install<P: Scalar>(heap: &mut Heap, prepared: Prepared<P>) -> OwnedApplicatio
         pin: prepared.pin_slot,
         debits: if prepared.core.evidence.prepared.is_some() {
             DebitInventory::PreparedApplication(inventory)
+        } else if prepared.core.evidence.endpoint_tokens.binary().is_some() {
+            DebitInventory::BinaryApplication(std::array::from_fn(|index| inventory[index]))
         } else {
             DebitInventory::Application(std::array::from_fn(|index| inventory[index]))
         },

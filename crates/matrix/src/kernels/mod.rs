@@ -13,6 +13,7 @@
 
 pub(crate) mod arithmetic;
 mod backend_product;
+pub(crate) mod binary;
 pub(crate) mod contract;
 mod contributions;
 mod evaluate;
@@ -25,6 +26,7 @@ pub(crate) mod reciprocal;
 mod resources;
 
 pub use crate::binding::kernel::linear::{FixedCoefficient, LinearMap};
+pub use binary::BinaryElementwise;
 pub(crate) use contract::KernelContract;
 pub use contract::{KernelEvidence, KernelKind};
 pub use contributions::ProductTerm;
@@ -52,6 +54,16 @@ pub enum KernelError {
         /// Logical column-order coordinate of the failed premise.
         entry: usize,
         /// Specific checked domain obstruction.
+        reason: DomainReason,
+    },
+    /// The complete ordered rectangle does not admit a finite native image.
+    #[error("binary kernel {function:?} domain at entry {entry}: {reason:?}")]
+    BinaryDomain {
+        /// Original ordered function.
+        function: BinaryElementwise,
+        /// Original column-major entry.
+        entry: usize,
+        /// Failed whole-box premise.
         reason: DomainReason,
     },
     /// Finite outward arithmetic could not establish the requested enclosure.

@@ -16,9 +16,14 @@ const fn identity(token: &Token) -> (usize, u64, u64) {
 
 /// Detached and published boundaries compare the use against the operation, not itself.
 pub(super) fn validate_core<P: Scalar>(core: &ApplicationCore<P>) -> Result<(), LoanError> {
+    if core.evidence.endpoint_tokens.binary().is_some()
+        && (core.evidence.prepared.is_some() || core.host.retained_law.is_some())
+    {
+        return Err(LoanError::WrongLoan);
+    }
     let Some(operation) = &core.evidence.prepared else {
         return if core.endpoints.is_none()
-            && core.evidence.endpoint_tokens.is_none()
+            && core.evidence.endpoint_tokens.endpoints().is_none()
             && core.evidence.completed_mask.is_none()
         {
             Ok(())
@@ -61,12 +66,21 @@ pub(in crate::loan) fn validate_bundle(bundle: &Bundle) -> Result<(), LoanError>
     {
         return Err(LoanError::WrongLoan);
     }
+    if let Some(side) = bundle
+        .origin
+        .evidence
+        .as_ref()
+        .and_then(|evidence| evidence.endpoint_tokens.binary())
+        && (side.input.is_some() || prepared.is_some() || bundle.retained_law.is_some())
+    {
+        return Err(LoanError::WrongLoan);
+    }
     let Some(operation) = prepared else {
         let no_tokens = bundle
             .origin
             .evidence
             .as_ref()
-            .is_none_or(|evidence| evidence.endpoint_tokens.is_none());
+            .is_none_or(|evidence| evidence.endpoint_tokens.endpoints().is_none());
         return if bundle.endpoints.is_none() && no_tokens {
             Ok(())
         } else {
@@ -113,7 +127,7 @@ fn pairing(
     destination: crate::loan::registry::Identity,
     tokens: [(usize, u64, u64); 2],
 ) -> Result<(), LoanError> {
-    if evidence.endpoint_tokens != Some(tokens)
+    if evidence.endpoint_tokens.endpoints() != Some(tokens)
         || tokens[0].1 == tokens[1].1
         || tokens.iter().any(|token| token.2 != destination.receipt)
         || destination.format != crate::storage::Format::Binary64

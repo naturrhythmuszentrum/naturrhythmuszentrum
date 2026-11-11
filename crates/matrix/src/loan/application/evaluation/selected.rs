@@ -13,6 +13,8 @@ use nrz_scalar::{Expm1Failure, Expm1Input, Scalar};
 pub(in crate::loan::application) enum Values<P: Scalar> {
     /// Center, total and numerical error in the closed primitive format.
     Closed([P; 3]),
+    /// Binary members store exactly three binary64 readings.
+    Binary([f64; 3]),
     /// Three readings and Lower/Upper in the prepared binary64 format.
     Prepared([f64; 5]),
 }
@@ -23,6 +25,7 @@ impl Member<'_> {
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 Values::Closed([P::ZERO; 3])
             }
+            Self::Binary(..) => Values::Binary([0.0; 3]),
             Self::PreparedExpm1(..) => Values::Prepared([0.0; 5]),
         }
     }
@@ -34,6 +37,8 @@ impl Member<'_> {
     pub(in crate::loan::application) fn scalar<P: Scalar + 'static>(
         self,
         reader: Option<&crate::TileReader<'_, P>>,
+        right: Option<&crate::TileReader<'_, f64>>,
+        right_bounded: bool,
         law: Option<&crate::loan::retained_expm1::Attachment>,
         bounded: bool,
         cell: usize,
@@ -63,12 +68,24 @@ impl Member<'_> {
                         )
                         .entered(),
                     ),
-                    Self::Square(_) | Self::PreparedExpm1(..) => None,
+                    Self::Square(_) | Self::PreparedExpm1(..) | Self::Binary(..) => None,
                 };
                 closed(reader, bounded, cell, component, function, entry, permit)
                     .map(|value| Values::Closed([value.center, value.total, value.error]))
                     .map_err(|reason| CellOutcome::CellRefused { component, reason })
             }
+            Self::Binary(_, function) => binary(
+                reader,
+                right,
+                [bounded, right_bounded],
+                cell,
+                component,
+                function,
+                entry,
+                permit,
+            )
+            .map(|value| Values::Binary([value.center, value.total, value.error]))
+            .map_err(|reason| CellOutcome::CellRefused { component, reason }),
             Self::PreparedExpm1(_, operation) => {
                 let result = || {
                     let center = reader
@@ -145,6 +162,7 @@ impl<P: Scalar + 'static> Values<P> {
             .chain(endpoints.iter_mut().flatten());
         match self {
             Self::Closed(values) => store(owners, values, entry),
+            Self::Binary(values) => store(owners, values, entry),
             Self::Prepared(values) => store(owners, values, entry),
         }
     }
@@ -162,4 +180,63 @@ fn store<'a, P: Scalar + 'static>(
         set(&mut channel.components, entry, true);
     }
     failed
+}
+
+/// Authenticate both selected cells and declared totals before loading either operand.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "borrowed readers and original address avoid a per-cell owner"
+)]
+fn binary<P: Scalar + 'static>(
+    left: Option<&crate::TileReader<'_, P>>,
+    right: Option<&crate::TileReader<'_, f64>>,
+    bounded: [bool; 2],
+    cell: usize,
+    component: usize,
+    function: crate::BinaryElementwise,
+    entry: usize,
+    permit: &Traversal,
+) -> Result<crate::kernels::arithmetic::Entry<f64>, crate::KernelError> {
+    let left = left.ok_or(crate::KernelError::Contract)?;
+    let right = right.ok_or(crate::KernelError::Contract)?;
+    let authenticate = || -> Result<(), LoanError> {
+        left.selected_owner(HostChannel::Center, cell, component)?;
+        right.selected_owner(HostChannel::Center, cell, component)?;
+        if bounded[0] {
+            left.selected_owner(HostChannel::Total, cell, component)?;
+        }
+        if bounded[1] {
+            right.selected_owner(HostChannel::Total, cell, component)?;
+        }
+        Ok(())
+    };
+    authenticate().map_err(|_| crate::KernelError::Contract)?;
+    let values = || -> Result<_, LoanError> {
+        let centers = [
+            left.read_prepaid(HostChannel::Center, cell, component, permit)?
+                .to_f64(),
+            right.read_prepaid(HostChannel::Center, cell, component, permit)?,
+        ];
+        let radii = [
+            if bounded[0] {
+                left.read_prepaid(HostChannel::Total, cell, component, permit)?
+                    .to_f64()
+            } else {
+                0.0
+            },
+            if bounded[1] {
+                right.read_prepaid(HostChannel::Total, cell, component, permit)?
+            } else {
+                0.0
+            },
+        ];
+        Ok((centers, radii))
+    };
+    let (centers, radii) = values().map_err(|_| crate::KernelError::Contract)?;
+    let family = match function {
+        crate::BinaryElementwise::Product => "product",
+        crate::BinaryElementwise::Quotient => "quotient",
+    };
+    let _span = tracing::trace_span!("nrz.kernel", family, revision = 1_u64).entered();
+    crate::kernels::binary::evaluate_selected(centers, radii, function, entry, &permit.context)
 }

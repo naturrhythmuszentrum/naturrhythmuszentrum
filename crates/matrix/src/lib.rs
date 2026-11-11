@@ -257,8 +257,8 @@ mod conversion_twins;
 )]
 mod kernels;
 pub use kernels::{
-    DomainReason, Elementwise, FixedCoefficient, KernelError, KernelEvidence, KernelKind,
-    LinearMap, ProductTerm,
+    BinaryElementwise, DomainReason, Elementwise, FixedCoefficient, KernelError, KernelEvidence,
+    KernelKind, LinearMap, ProductTerm,
 };
 
 #[cfg(test)]

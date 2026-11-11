@@ -2,7 +2,11 @@
 //! One transferred source pin and one boxed core implement the closed pointwise laws.
 
 mod admission;
+pub(super) mod binary;
 mod contract;
+pub use binary::{
+    BinaryApplicationRequest, BinaryRegion, PointwiseBinaryOperation, PointwiseBinaryRequest,
+};
 mod endpoints;
 pub(super) mod evaluation;
 mod member;
@@ -31,6 +35,16 @@ pub enum ApplicationError {
     /// Existing checked operation or numerical environment refusal.
     #[error("application operation: {0}")]
     Operation(#[from] crate::OperationError),
+    /// Binary structure retains the original operand position and assertion scope.
+    #[error("unsupported binary structural zero on {position:?}, entry={entry}, scope={scope:?}")]
+    UnsupportedBinaryStructure {
+        /// Original region position.
+        position: BinaryRegion,
+        /// Original flat entry.
+        entry: usize,
+        /// Original assertion scope.
+        scope: StructureScope,
+    },
     /// Structural assertions require a later scope-sensitive numerical law.
     #[error("unsupported structural zero on output={output}, entry={entry}, scope={scope:?}")]
     UnsupportedStructure {
@@ -190,7 +204,7 @@ pub(super) struct Evidence {
     /// Closed prepared correspondence, absent for Square.
     pub(super) prepared: Option<PreparedExpm1Operation>,
     /// Fixed Lower/Upper payload identities sealed before evaluation.
-    pub(super) endpoint_tokens: Option<[(usize, u64, u64); 2]>,
+    pub(in crate::loan) endpoint_tokens: binary::Auxiliary,
     /// Non-owning identity of the immutable completed mask, installed only at publication.
     pub(super) completed_mask: Option<std::ptr::NonNull<crate::mask::storage::MaskRecord>>,
     /// Original checked operation, including frozen declarations.
@@ -263,12 +277,23 @@ impl Origin {
     }
     /// Borrow only the immutable inline outcome from the retaining pin.
     pub(super) fn outcome(&self, cell: usize) -> Result<&CellOutcome, LoanError> {
-        self.evidence
+        let evidence = self
+            .evidence
             .as_ref()
-            .ok_or(LoanError::UnsupportedContract)?
+            .ok_or(LoanError::UnsupportedContract)?;
+        let outcome = evidence
             .outcomes
             .get(cell)
-            .ok_or(LoanError::LayoutMismatch)
+            .ok_or(LoanError::LayoutMismatch)?;
+        if evidence.endpoint_tokens.binary().is_some() {
+            member::Member::check(
+                &evidence.operation,
+                evidence.law.kind(),
+                evidence.prepared.as_ref(),
+            )?
+            .validate_outcome(outcome, cell, evidence.source.extent)?;
+        }
+        Ok(outcome)
     }
 }
 impl<P: Scalar + 'static> OwnedApplication<P> {

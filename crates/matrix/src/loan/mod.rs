@@ -21,7 +21,8 @@ mod scans;
 pub use account::ExecutionAccount;
 pub use application::{
     ApplicationCancellation, ApplicationError, ApplicationEvaluation, ApplicationPublication,
-    ApplicationRequest, CellOutcome, Expm1ApplicationRequest, OwnedApplication,
+    ApplicationRequest, BinaryApplicationRequest, BinaryRegion, CellOutcome,
+    Expm1ApplicationRequest, OwnedApplication, PointwiseBinaryOperation, PointwiseBinaryRequest,
     PointwiseExpm1Request, PointwiseRequest, PreparedExpm1Operation,
 };
 pub use declaration::{HostChannel, HostTileDeclaration};
