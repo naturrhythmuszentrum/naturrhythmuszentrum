@@ -94,14 +94,20 @@ impl<P: Scalar + 'static> BundlePin<P> {
                 if let Some(law) = &bundle.retained_law {
                     law.validate()?;
                 }
-                if prepared {
-                    bundle.origin.validate_current(bundle)?;
-                }
                 self.checked_reader()
             })
     }
     /// Private layout checks borrow the complete owner after its charged law authentication.
     pub(super) fn checked_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
+        let pin = self.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+        let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+        if bundle.origin.evidence.is_some() || bundle.endpoints.is_some() {
+            bundle.origin.validate_current(bundle)?;
+        }
+        self.layout_reader()
+    }
+    /// Current occupation authentication already checked the immutable origin in its own visit.
+    fn layout_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
         let pin = self.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
         let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
         let layout_matches = bundle.layout.axis == bundle.declaration.axis
@@ -154,7 +160,7 @@ impl<P: Scalar + 'static> PublishedTile<P> {
             .with_work_phase(super::FAMILY, "current reader", |budget| {
                 heap.current_bundle(&self.pin, budget)?;
                 charge(budget, 3)?;
-                self.pin.checked_reader()
+                self.pin.layout_reader()
             })
     }
     /// Move the initial use edge into another owning facade without creating a new edge.
@@ -238,12 +244,7 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
         if !bit(&self.bundle.mask.words, cell) {
             return Err(LoanError::CoverageMismatch);
         }
-        if self
-            .bundle
-            .origin
-            .evidence
-            .as_ref()
-            .is_some_and(|evidence| evidence.prepared.is_some())
+        if self.bundle.origin.evidence.as_ref().is_some()
             && !matches!(
                 self.bundle.origin.outcome(cell)?,
                 super::application::CellOutcome::Completed

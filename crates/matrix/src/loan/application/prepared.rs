@@ -182,8 +182,16 @@ pub(super) struct Request<'a, P: nrz_scalar::Scalar> {
     pub(super) demand: MaskVersion,
     /// Complete payload ceilings.
     pub(super) limits: ExecutionLimits,
-    /// Closed prepared alternative; absence is Square.
+    /// Expected entry point, checked before the member profile is used.
+    pub(super) expected: crate::KernelKind,
+    /// Optional retained correspondence for the prepared member.
     pub(super) prepared: Option<&'a PreparedExpm1Operation>,
+}
+impl<P: nrz_scalar::Scalar> Request<'_, P> {
+    /// Borrow a complete closed profile only after authenticating the requested entry point.
+    pub(super) fn member(&self) -> Result<super::member::Member<'_>, LoanError> {
+        super::member::Member::check(self.operation, self.expected, self.prepared)
+    }
 }
 impl<'a, P: nrz_scalar::Scalar> From<&'a PointwiseRequest<P>> for Request<'a, P> {
     fn from(request: &'a PointwiseRequest<P>) -> Self {
@@ -194,6 +202,7 @@ impl<'a, P: nrz_scalar::Scalar> From<&'a PointwiseRequest<P>> for Request<'a, P>
             demand: request.demand,
             limits: request.limits,
             prepared: None,
+            expected: crate::KernelKind::Elementwise(crate::Elementwise::Square),
         }
     }
 }
@@ -206,6 +215,7 @@ impl<'a> From<&'a PointwiseExpm1Request> for Request<'a, f64> {
             demand: request.demand,
             limits: request.limits,
             prepared: Some(&request.operation),
+            expected: crate::KernelKind::PreparedExpm1,
         }
     }
 }

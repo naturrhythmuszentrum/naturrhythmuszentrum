@@ -107,7 +107,8 @@ impl Plan {
             cell_words: words(declaration.capacity()),
             rounded: slab_bytes::<P>(length)?,
         };
-        let debit_count = if request.prepared.is_some() { 23 } else { 17 };
+        let member = request.member()?;
+        let debit_count = member.debits();
         charge(budget, heap.loans.debits.len())?;
         let debit_slots = heap.loans.vacant_inventory::<23>(debit_count)?;
         let group_capacity = heap
@@ -134,7 +135,7 @@ impl Plan {
             .count();
         let cleanup = CleanupReceipt {
             identity: identities[0],
-            allocations: (channels + 2 * usize::from(request.prepared.is_some()))
+            allocations: (channels + 2 * usize::from(member.is_prepared()))
                 * (usize::from(length != 0)
                     + usize::from(geometry.component_words != 0)
                     + usize::from(geometry.cell_words != 0))
@@ -146,7 +147,7 @@ impl Plan {
             // Destination symbol handles and common owners; input declaration handles,
             // three operation handles, three exclusion witnesses and the one-cell extent.
             // The transferred numerical pin's drop was already prepaid by its creator.
-            edges: channels + 3 + input_channels + 7 + 7 * usize::from(request.prepared.is_some()),
+            edges: channels + 3 + input_channels + 7 + 7 * usize::from(member.is_prepared()),
         };
         let extras = geometry.extra_bytes(declaration.capacity())?;
         let mut plan = Self {
@@ -161,7 +162,7 @@ impl Plan {
             extras,
             present: geometry.present,
             channels: geometry.channels,
-            roles: channels + 2 * usize::from(request.prepared.is_some()),
+            roles: member.roles(),
             length: geometry.length,
             component_words: geometry.component_words,
             cell_words: geometry.cell_words,
@@ -187,7 +188,7 @@ impl Plan {
         budget: &mut nrz_bindings::Budget,
     ) -> Result<(), LoanError> {
         charge(budget, heap.resource_work()?)?;
-        self.permit = self.preflight::<P>(heap, request.prepared.is_some(), budget)?;
+        self.permit = self.preflight::<P>(heap, request.member()?.is_prepared(), budget)?;
         self.permit.account = Some(request.destination.account);
         let cleanup_work = add(
             add(self.cleanup.allocations, self.cleanup.records)?,

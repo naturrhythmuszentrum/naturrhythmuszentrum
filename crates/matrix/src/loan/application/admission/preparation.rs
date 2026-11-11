@@ -75,7 +75,7 @@ pub(super) fn prepare<P: Scalar + 'static>(
         channels::<P, 3>(&plan, plan.present, identity, &mut debits, &mut guard)?;
     let endpoints = endpoint_channels(
         &plan,
-        request.prepared.is_some(),
+        request.member()?.is_prepared(),
         identity,
         &mut debits,
         &mut guard,
@@ -282,10 +282,7 @@ fn extras<P: Scalar + 'static>(
         operation: request.operation.clone(),
         excluded_inputs: Rc::clone(&request.operation.inputs),
         excluded_outputs: Rc::clone(&request.operation.outputs),
-        law: Rc::clone(super::super::contract::kernel(
-            request.operation,
-            request.prepared.is_some(),
-        )?),
+        law: Rc::clone(request.member()?.law()),
         source: Declaration {
             symbols: source.declaration.symbols.clone(),
             axis: source.declaration.axis,
@@ -322,15 +319,8 @@ fn cell_contract<P: Scalar>(
     Ok(crate::kernels::KernelContract {
         inputs,
         output: extent,
-        recipe: if request.prepared.is_some() {
-            crate::kernels::contract::Recipe::PreparedExpm1
-        } else {
-            crate::kernels::contract::Recipe::Elementwise(crate::Elementwise::Square)
-        },
-        work: extent
-            .entries()
-            .checked_mul(if request.prepared.is_some() { 0 } else { 12 })
-            .ok_or(LoanError::CountOverflow)?,
+        recipe: request.member()?.recipe(),
+        work: request.member()?.invocation(extent.entries())?,
     })
 }
 /// The fixed outcome array preserves D and A independently of caller mask retirement.

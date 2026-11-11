@@ -5,6 +5,7 @@ mod admission;
 mod contract;
 mod endpoints;
 pub(super) mod evaluation;
+mod member;
 mod prepared;
 mod publication;
 pub use prepared::{Expm1ApplicationRequest, PointwiseExpm1Request, PreparedExpm1Operation};
@@ -45,7 +46,7 @@ pub enum ApplicationError {
 /// Complete request, including the one owning input edge returned on admission refusal.
 #[derive(Debug)]
 pub struct PointwiseRequest<P: Scalar> {
-    /// Original checked square operation and its meaning witnesses.
+    /// Original checked closed operation and its meaning witnesses.
     pub operation: CheckedOperation,
     /// Exact owned source edge transferred on successful admission.
     pub input: BundlePin<P>,
@@ -310,7 +311,16 @@ impl Heap {
         request: PointwiseRequest<P>,
         account: &mut ExecutionAccount,
     ) -> ApplicationRequest<P> {
-        admission::request(self, request, account)
+        admission::request(self, request, crate::Elementwise::Square, account)
+    }
+    /// Admit binary64 reciprocal over represented input boxes separated from zero.
+    /// Numerical domain refusals remain local to selected cells during evaluation.
+    pub fn request_pointwise_reciprocal(
+        &mut self,
+        request: PointwiseRequest<f64>,
+        account: &mut ExecutionAccount,
+    ) -> ApplicationRequest<f64> {
+        admission::request(self, request, crate::Elementwise::Reciprocal, account)
     }
     /// Publish complete sealed evidence or retain the same candidate for repair.
     pub fn publish_application<P: Scalar + 'static>(

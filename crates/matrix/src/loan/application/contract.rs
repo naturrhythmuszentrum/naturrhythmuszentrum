@@ -2,14 +2,10 @@
 //! Original meanings and full-shape exclusion precede every numerical allocation.
 
 use super::{ApplicationError, Evidence, prepared::Request};
+use crate::Heap;
 use crate::loan::{
     HostChannel, LoanError, charge,
     registry::{Bundle, Declaration, Identity},
-};
-use crate::{
-    Elementwise, Heap,
-    binding::NativeRecipe,
-    kernels::{KernelContract, contract::Recipe},
 };
 use nrz_bindings::Budget;
 use nrz_scalar::Scalar;
@@ -47,7 +43,8 @@ pub(super) fn check<P: Scalar + 'static>(
     if bundle.origin.evidence.is_some() {
         return Err(LoanError::UnsupportedContract.into());
     }
-    let law = kernel(request.operation, request.prepared.is_some())?;
+    let member = request.member()?;
+    let law = member.law();
     let destination = &request.destination;
     let extent = bundle.declaration.extent;
     if destination.extent != extent || extent.columns() == 0 {
@@ -88,20 +85,12 @@ pub(super) fn check<P: Scalar + 'static>(
         return Err(LoanError::CoverageMismatch.into());
     }
     declarations(&bundle.declaration, &destination.symbols, request.operation)?;
-    if let Some(prepared) = request.prepared {
-        if bundle.declaration.symbols.bound().is_some()
-            || bundle.declaration.symbols.error().is_some()
-            || crate::storage::Format::of::<P>() != crate::storage::Format::Binary64
-        {
-            return Err(LoanError::UnsupportedContract.into());
-        }
-        prepared.validate_destination(
-            &bundle.declaration,
-            &destination.symbols,
-            destination.axis,
-            destination.coverage,
-        )?;
-    }
+    member.representation::<P>(
+        &bundle.declaration,
+        &destination.symbols,
+        destination.axis,
+        destination.coverage,
+    )?;
     attachments(bundle)?;
     charge(budget, bundle.channels.iter().flatten().count() + 3)?;
     let mask = heap
@@ -117,14 +106,10 @@ pub(super) fn check<P: Scalar + 'static>(
     {
         return Err(LoanError::CoverageMismatch.into());
     }
-    let work = if request.prepared.is_some() {
-        0
-    } else {
-        crate::kernels::contract::work(extent.columns(), 12)?
-    };
+    let work = crate::kernels::contract::work(extent.columns(), member.invocation_factor())?;
     let payload = extent
         .entries()
-        .checked_mul(if request.prepared.is_some() { 5 } else { 3 })
+        .checked_mul(member.roles())
         .ok_or(LoanError::CountOverflow)?;
     request.limits.check(1, work.max(payload))?;
     Ok(())
@@ -187,28 +172,6 @@ fn attachments(bundle: &Bundle) -> Result<(), LoanError> {
     }
     Ok(())
 }
-/// Original closed recipe selection preserves its independently checked whole-shape allowance.
-pub(super) fn kernel(
-    operation: &crate::CheckedOperation,
-    prepared: bool,
-) -> Result<&Rc<KernelContract>, LoanError> {
-    if operation.inputs().len() != 1 || operation.outputs().len() != 1 || operation.revision() != 1
-    {
-        return Err(LoanError::UnsupportedContract);
-    }
-    let NativeRecipe::Kernel(law) = &operation.recipe else {
-        return Err(LoanError::UnsupportedContract);
-    };
-    let supported = if prepared {
-        matches!(law.recipe, Recipe::PreparedExpm1) && law.work == 0
-    } else {
-        matches!(law.recipe, Recipe::Elementwise(Elementwise::Square))
-    };
-    if !supported {
-        return Err(LoanError::UnsupportedContract);
-    }
-    Ok(law)
-}
 impl Evidence {
     /// Authenticate original exclusion, output authority and revision without a live source lookup.
     pub(in crate::loan) fn validate(
@@ -225,7 +188,9 @@ impl Evidence {
         identity: Identity,
         revision: u32,
     ) -> Result<(), LoanError> {
-        let law = kernel(&self.operation, self.prepared.is_some())?;
+        let member =
+            super::member::Member::check(&self.operation, self.law.kind(), self.prepared.as_ref())?;
+        let law = member.law();
         if let Some(prepared) = &self.prepared {
             let original = Rc::ptr_eq(&prepared.operation.inputs, &self.operation.inputs)
                 && Rc::ptr_eq(&prepared.operation.outputs, &self.operation.outputs);
@@ -254,6 +219,13 @@ impl Evidence {
             return Err(LoanError::LayoutMismatch);
         }
         declarations(&self.source, &destination.symbols, &self.operation)?;
+        member.representation_format(
+            identity.format,
+            &self.source,
+            &destination.symbols,
+            destination.axis,
+            destination.coverage,
+        )?;
         for (index, attachment) in self.attachments.iter().enumerate() {
             let present = self.source_identity.channels[index].is_some();
             if present != attachment.is_some()

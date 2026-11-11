@@ -165,6 +165,12 @@ fn prepare<P: Scalar + 'static>(
         return Err(LoanError::WrongLoan);
     }
     core.evidence.validate(&core.host.declaration, identity)?;
+    super::member::Member::check(
+        &core.evidence.operation,
+        core.evidence.law.kind(),
+        core.evidence.prepared.as_ref(),
+    )?
+    .validate_cell(&core.contract, core.host.declaration.extent.columns())?;
     derive(core, budget)?;
     crate::loan::lifecycle::publication::validate_shells(heap, &core.host, budget)?;
     charge(budget, 9)?;
@@ -239,6 +245,11 @@ fn derive<P: Scalar + 'static>(
 ) -> Result<(), LoanError> {
     crate::loan::lifecycle::complete(&mut core.host, budget)?;
     super::endpoints::complete(core, budget)?;
+    let member = super::member::Member::check(
+        &core.evidence.operation,
+        core.evidence.law.kind(),
+        core.evidence.prepared.as_ref(),
+    )?;
     for (index, word) in core.filled.iter().enumerate() {
         let mut intersection = u64::MAX;
         for channel in core
@@ -281,26 +292,7 @@ fn derive<P: Scalar + 'static>(
                 crate::loan::lifecycle::publication::validate_cell::<P>(&core.host, cell, budget)?;
             }
         }
-        if let CellOutcome::PreparedRefused { component, .. } = outcome
-            && (*component >= core.host.declaration.extent.columns()
-                || core.evidence.prepared.is_none())
-        {
-            return Err(LoanError::WrongLoan);
-        }
-        if let CellOutcome::CellRefused { component, reason } = outcome {
-            if core.evidence.prepared.is_some()
-                || *component >= core.host.declaration.extent.columns()
-            {
-                return Err(LoanError::WrongLoan);
-            }
-            if let crate::KernelError::Domain {
-                function, entry, ..
-            } = reason
-                && (*function != crate::Elementwise::Square || *entry != cell + cells * component)
-            {
-                return Err(LoanError::WrongLoan);
-            }
-        }
+        member.validate_outcome(outcome, cell, core.host.declaration.extent)?;
     }
     Ok(())
 }
@@ -347,9 +339,7 @@ fn finish<P: Scalar + 'static>(
     if let Some(mask) = Rc::get_mut(&mut prepared.mask) {
         mask.words = filled;
     }
-    if evidence.prepared.is_some() {
-        evidence.completed_mask = Some(std::ptr::NonNull::from(prepared.mask.as_ref()));
-    }
+    evidence.completed_mask = Some(std::ptr::NonNull::from(prepared.mask.as_ref()));
     host.cleanup.allocations += prepared.cleanup.allocations;
     host.cleanup.records += prepared.cleanup.records;
     host.cleanup.edges += prepared.cleanup.edges;

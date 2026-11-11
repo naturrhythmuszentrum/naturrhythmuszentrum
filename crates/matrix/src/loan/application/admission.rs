@@ -41,12 +41,14 @@ struct Prepared<P: Scalar> {
 pub(super) fn request<P: Scalar + 'static>(
     heap: &mut Heap,
     request: PointwiseRequest<P>,
+    function: crate::Elementwise,
     account: &mut ExecutionAccount,
 ) -> ApplicationRequest<P> {
     let checked = account
         .ledger
         .with_work_phase(super::FAMILY, "pointwise admission", |budget| {
-            let borrowed = super::prepared::Request::from(&request);
+            let mut borrowed = super::prepared::Request::from(&request);
+            borrowed.expected = crate::KernelKind::Elementwise(function);
             super::contract::check(heap, &borrowed, account.identity, budget)?;
             let plan = plan::Plan::new(heap, &borrowed, budget)?;
             preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)

@@ -17,7 +17,10 @@ const fn identity(token: &Token) -> (usize, u64, u64) {
 /// Detached and published boundaries compare the use against the operation, not itself.
 pub(super) fn validate_core<P: Scalar>(core: &ApplicationCore<P>) -> Result<(), LoanError> {
     let Some(operation) = &core.evidence.prepared else {
-        return if core.endpoints.is_none() {
+        return if core.endpoints.is_none()
+            && core.evidence.endpoint_tokens.is_none()
+            && core.evidence.completed_mask.is_none()
+        {
             Ok(())
         } else {
             Err(LoanError::WrongLoan)
@@ -53,8 +56,18 @@ pub(in crate::loan) fn validate_bundle(bundle: &Bundle) -> Result<(), LoanError>
         .evidence
         .as_ref()
         .and_then(|evidence| evidence.prepared.as_ref());
+    if let Some(evidence) = &bundle.origin.evidence
+        && evidence.completed_mask != Some(std::ptr::NonNull::from(bundle.mask.as_ref()))
+    {
+        return Err(LoanError::WrongLoan);
+    }
     let Some(operation) = prepared else {
-        return if bundle.endpoints.is_none() {
+        let no_tokens = bundle
+            .origin
+            .evidence
+            .as_ref()
+            .is_none_or(|evidence| evidence.endpoint_tokens.is_none());
+        return if bundle.endpoints.is_none() && no_tokens {
             Ok(())
         } else {
             Err(LoanError::WrongLoan)
