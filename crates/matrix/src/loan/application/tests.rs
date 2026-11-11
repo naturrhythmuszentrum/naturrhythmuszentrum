@@ -14,6 +14,7 @@ mod resources;
 mod retained;
 mod review;
 mod spare;
+mod square_root;
 mod work;
 
 use super::{

@@ -322,6 +322,15 @@ impl Heap {
     ) -> ApplicationRequest<f64> {
         admission::request(self, request, crate::Elementwise::Reciprocal, account)
     }
+    /// Admit binary64 positive square root over nonnegative represented input boxes.
+    /// Zero is supported; numerical domain refusals remain local to selected cells.
+    pub fn request_pointwise_square_root(
+        &mut self,
+        request: PointwiseRequest<f64>,
+        account: &mut ExecutionAccount,
+    ) -> ApplicationRequest<f64> {
+        admission::request(self, request, crate::Elementwise::SquareRoot, account)
+    }
     /// Publish complete sealed evidence or retain the same candidate for repair.
     pub fn publish_application<P: Scalar + 'static>(
         &mut self,

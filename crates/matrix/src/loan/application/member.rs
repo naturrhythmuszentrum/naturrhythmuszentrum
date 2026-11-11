@@ -19,6 +19,8 @@ pub(super) enum Member<'a> {
     PreparedExpm1(&'a Rc<KernelContract>, &'a PreparedExpm1Operation),
     /// Binary64 exact enclosure of either sign of a separated represented box.
     Reciprocal(&'a Rc<KernelContract>),
+    /// Binary64 exact enclosure of the nonnegative branch, including zero.
+    SquareRoot(&'a Rc<KernelContract>),
 }
 impl<'a> Member<'a> {
     /// Expected identity comes from the entry point or the persistent captured law.
@@ -42,6 +44,7 @@ impl<'a> Member<'a> {
         match (&law.recipe, prepared) {
             (Recipe::Elementwise(Elementwise::Square), None) => Ok(Self::Square(law)),
             (Recipe::Elementwise(Elementwise::Reciprocal), None) => Ok(Self::Reciprocal(law)),
+            (Recipe::Elementwise(Elementwise::SquareRoot), None) => Ok(Self::SquareRoot(law)),
             (Recipe::PreparedExpm1, Some(operation)) if law.work == 0 => {
                 Ok(Self::PreparedExpm1(law, operation))
             }
@@ -51,20 +54,23 @@ impl<'a> Member<'a> {
     /// Retain the original pointer seal, not merely a supported name.
     pub(super) const fn law(self) -> &'a Rc<KernelContract> {
         match self {
-            Self::Square(law) | Self::Reciprocal(law) | Self::PreparedExpm1(law, _) => law,
+            Self::Square(law)
+            | Self::Reciprocal(law)
+            | Self::SquareRoot(law)
+            | Self::PreparedExpm1(law, _) => law,
         }
     }
     /// Fixed output roles are inseparable from the law and its reading semantics.
     pub(super) const fn roles(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) => 3,
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 3,
             Self::PreparedExpm1(..) => 5,
         }
     }
     /// Original cancellation inventory; the shared records never grow for dispatch.
     pub(super) const fn debits(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) => 17,
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 17,
             Self::PreparedExpm1(..) => 23,
         }
     }
@@ -75,7 +81,7 @@ impl<'a> Member<'a> {
     /// The closed elementwise law retains its original conservative factor.
     pub(super) const fn invocation_factor(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) => 12,
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 12,
             Self::PreparedExpm1(..) => 0,
         }
     }
@@ -85,6 +91,7 @@ impl<'a> Member<'a> {
             Self::Square(_) => None,
             Self::PreparedExpm1(..) => Some("prepared native traversal"),
             Self::Reciprocal(_) => Some("reciprocal native traversal"),
+            Self::SquareRoot(_) => Some("square root native traversal"),
         }
     }
     /// Native invocation allowance is checked separately at the original and one-cell shapes.
@@ -93,11 +100,12 @@ impl<'a> Member<'a> {
             .checked_mul(self.invocation_factor())
             .ok_or(LoanError::CountOverflow)
     }
-    /// The only three legal one-cell recipes require no coefficient copying or construction.
+    /// The only four legal one-cell recipes require no coefficient copying or construction.
     pub(super) const fn recipe(self) -> Recipe {
         match self {
             Self::Square(_) => Recipe::Elementwise(Elementwise::Square),
             Self::Reciprocal(_) => Recipe::Elementwise(Elementwise::Reciprocal),
+            Self::SquareRoot(_) => Recipe::Elementwise(Elementwise::SquareRoot),
             Self::PreparedExpm1(..) => Recipe::PreparedExpm1,
         }
     }
@@ -144,7 +152,7 @@ impl<'a> Member<'a> {
     ) -> Result<(), LoanError> {
         match self {
             Self::Square(_) => Ok(()),
-            Self::Reciprocal(_) => {
+            Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 if format != crate::storage::Format::Binary64 {
                     return Err(LoanError::UnsupportedContract);
                 }
@@ -169,10 +177,12 @@ impl<'a> Member<'a> {
     /// Storage failures preserve the member's lossless public outcome family.
     pub(super) const fn storage_failure(self, component: usize) -> CellOutcome {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) => CellOutcome::CellRefused {
-                component,
-                reason: crate::KernelError::Contract,
-            },
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
+                CellOutcome::CellRefused {
+                    component,
+                    reason: crate::KernelError::Contract,
+                }
+            }
             Self::PreparedExpm1(..) => CellOutcome::PreparedRefused {
                 component,
                 reason: nrz_scalar::Expm1Failure::MalformedPlan,

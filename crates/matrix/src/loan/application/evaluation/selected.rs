@@ -20,7 +20,9 @@ impl Member<'_> {
     /// A refused component still initializes every role with safe placeholders.
     pub(in crate::loan::application) const fn zeros<P: Scalar>(self) -> Values<P> {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) => Values::Closed([P::ZERO; 3]),
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
+                Values::Closed([P::ZERO; 3])
+            }
             Self::PreparedExpm1(..) => Values::Prepared([0.0; 5]),
         }
     }
@@ -40,16 +42,29 @@ impl Member<'_> {
         permit: &Traversal,
     ) -> Result<Values<P>, CellOutcome> {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) => {
+            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 let function = if matches!(self, Self::Square(_)) {
                     crate::Elementwise::Square
-                } else {
+                } else if matches!(self, Self::Reciprocal(_)) {
                     crate::Elementwise::Reciprocal
+                } else {
+                    crate::Elementwise::SquareRoot
                 };
-                let _span = matches!(self, Self::Reciprocal(_)).then(|| {
-                    tracing::trace_span!("nrz.kernel", family = "reciprocal", revision = 1_u64)
-                        .entered()
-                });
+                let _span = match self {
+                    Self::Reciprocal(_) => Some(
+                        tracing::trace_span!("nrz.kernel", family = "reciprocal", revision = 1_u64)
+                            .entered(),
+                    ),
+                    Self::SquareRoot(_) => Some(
+                        tracing::trace_span!(
+                            "nrz.kernel",
+                            family = "square root",
+                            revision = 1_u64
+                        )
+                        .entered(),
+                    ),
+                    Self::Square(_) | Self::PreparedExpm1(..) => None,
+                };
                 closed(reader, bounded, cell, component, function, entry, permit)
                     .map(|value| Values::Closed([value.center, value.total, value.error]))
                     .map_err(|reason| CellOutcome::CellRefused { component, reason })
