@@ -1045,3 +1045,6 @@ fn prepared_expm1_ledger_ownership() -> TestResult {
     }
     Ok(())
 }
+
+#[path = "prepared_expm1/sigmoid.rs"]
+mod sigmoid;
