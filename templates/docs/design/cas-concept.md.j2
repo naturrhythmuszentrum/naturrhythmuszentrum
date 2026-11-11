@@ -39,6 +39,10 @@ Thus x/x can reach one under x nonzero, while the original quotient and the rest
 
 The witness names the graph-independent mathematical endpoints, source links where applicable, context, rule identifiers and versions, ordered steps, substitutions, positions and the DAG of supporting proofs. A checker validates scope, sorts, premises, intermediate expressions and conclusion composition under its own bounds. It neither repeats heuristic search nor accepts the searcher's cost estimate as mathematical evidence. Primitive mathematical rules form an explicit trusted vocabulary; a derived shortcut must expand to previously checked rules and hypotheses, with acyclic dependency order. External declarations remain hypotheses unless supported by such a proof. Successful replay proves that conditional mathematical statement, not its physical relevance, completeness, numerical accuracy or global optimality.
 
+**Rule (Structural totality)** · `rule:nrz:cas-structural-totality`
+
+An expression built from total value leaves and operations that are defined for every tuple of admitted operand values is defined by structural induction, provided every operand satisfies the same rule. This fact depends on its declared sorts and operation semantics, not on the region or its ambient. It therefore supports a checked Defined(f) on any admissible region, including a Product region, without coordinate partitioning or an assumption of definedness. Original operands remain obligations of the induction even beneath cancellation or a zero factor; partial operations require separate evidence. The bounded closed operation set belongs to (`def:nrz:cas-piecewise-design-structural-totality`).
+
 ## Search and cost · `sec:nrz:cas-concept-search`
 
 **Decision (Path cost and goal ranking)** · `dec:nrz:cas-path-cost`
