@@ -19,6 +19,12 @@ use std::cmp::Ordering;
 mod exp;
 pub use exp::{ExpEvaluation, ExpPreparationPolicy, PreparedExp, PreparedExpError};
 
+#[path = "prepared_sigmoid.rs"]
+mod sigmoid;
+pub use sigmoid::{
+    PreparedSigmoid, PreparedSigmoidError, SigmoidEvaluation, SigmoidPreparationPolicy,
+};
+
 /// Shared preparation and admission accounting location.
 const AT: Location = Location::new("prepared expm1 lowering");
 

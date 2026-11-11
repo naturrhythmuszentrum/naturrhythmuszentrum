@@ -57,6 +57,9 @@ mod lc_relation;
 mod prepared_expm1;
 pub use prepared_expm1::{ExpEvaluation, ExpPreparationPolicy, PreparedExp, PreparedExpError};
 pub use prepared_expm1::{Expm1Evaluation, PreparedExpm1, PreparedExpm1Error};
+pub use prepared_expm1::{
+    PreparedSigmoid, PreparedSigmoidError, SigmoidEvaluation, SigmoidPreparationPolicy,
+};
 mod quantity;
 pub use lc_relation::{
     LcAliasProjection, LcCapacitanceProjection, LcClockProjection, LcForwardProjection,
