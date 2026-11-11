@@ -198,6 +198,10 @@ Paths in the table are relative to crates/cas/src. The optional scalar root cert
 
 Expose bounds on target encoding, exact exponent bits, root count, integer-power operations, polynomial degree, reduction candidates, refinement attempts, proof/checking Work, key/proof bytes, coefficient/scratch/output storage and retained ownership. Admission records concrete ceilings before preparation or execution; this design does not choose universal numerical ceilings or a Work tariff. Size and step excess report resource outcomes without redefining the mathematical domain. Retain cumulative spent Work and reserve checking/publication capacity separately, charging actual owner boundaries under (`rule:nrz:tiles-streams-cache-charge`). The baseline schedule, endpoint export and proof-scope decisions above resolve the joint-review choices; implementation must provide the closed checkers and complete fixtures before admitting a schedule.
 
+## Native sigmoid composition · `sec:nrz:transcendental-sigmoid-native`
+
+Revision one of (`[SCALAR-alg:scalar:prepared-sigmoid-native]`) supplies the conditional native argument for sigmoid values on [0,2], using the checked expm1 schedule and exp addition. Its endpoint target, nominal numerical error and whole-image radius remain separate. This adds no enclosure schema, retained owner or masked family member. The authority bridge must establish the original operation and exact transformed-request correspondence under (`dec:nrz:transcendental-proof-support`) and (`dec:nrz:transcendental-scalar-owner`); the scalar constructor admits numerical domain and policy correspondence only. Exact rational schedule reconstruction and represented golden values exercise the composition (`[MATRIX-test:integration:scalar-sigmoid-independent-rounding]`), (`[MATRIX-test:integration:scalar-sigmoid-golden-values]`).
+
 ## Scalar completion admission · `sec:nrz:transcendental-scalar-admission`
 
 **Decision (Prepare and freeze for scalar completion)** · `dec:nrz:transcendental-scalar-owner`

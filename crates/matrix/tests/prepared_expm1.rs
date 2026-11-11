@@ -146,6 +146,8 @@ mod exp;
 mod oracles;
 #[path = "prepared_expm1/retained.rs"]
 mod retained;
+#[path = "prepared_expm1/sigmoid_owner.rs"]
+mod sigmoid_owner;
 
 /// Read the validated payload structurally, retaining each row's associations.
 /// # Errors
@@ -1045,3 +1047,6 @@ fn prepared_expm1_ledger_ownership() -> TestResult {
     }
     Ok(())
 }
+
+#[path = "prepared_expm1/sigmoid.rs"]
+mod sigmoid;

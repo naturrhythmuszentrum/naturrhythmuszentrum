@@ -99,6 +99,10 @@ struct Observer {
     expm1_programs: Arc<AtomicU64>,
     /// All exact/other events, catching hidden nested receipt traffic.
     events: Arc<AtomicU64>,
+    /// Exact ledger lifecycle, phase and construction events only.
+    exact_events: Arc<AtomicU64>,
+    /// Formatted supplied operands, coordinates and recursive owners.
+    formatted: Arc<Mutex<[usize; 3]>>,
 }
 
 impl Subscriber for Observer {
@@ -106,15 +110,22 @@ impl Subscriber for Observer {
         true
     }
     fn new_span(&self, span: &Attributes<'_>) -> Id {
+        span.record(&mut FormattingVisitor(self.formatted.clone()));
         if span.metadata().name() == "nrz.kernel" {
             self.kernels.fetch_add(1, Ordering::Relaxed);
         }
         Id::from_u64(self.spans.fetch_add(1, Ordering::Relaxed) + 1)
     }
-    fn record(&self, _: &Id, _: &Record<'_>) {}
+    fn record(&self, _: &Id, record: &Record<'_>) {
+        record.record(&mut FormattingVisitor(self.formatted.clone()));
+    }
     fn record_follows_from(&self, _: &Id, _: &Id) {}
     fn event(&self, event: &Event<'_>) {
+        event.record(&mut FormattingVisitor(self.formatted.clone()));
         self.events.fetch_add(1, Ordering::Relaxed);
+        if event.metadata().target() == "nrz::work" {
+            self.exact_events.fetch_add(1, Ordering::Relaxed);
+        }
         if event.metadata().name() == "nrz.construct" {
             self.constructions.fetch_add(1, Ordering::Relaxed);
             let mut fields = Expm1Construction::default();
@@ -126,6 +137,113 @@ impl Subscriber for Observer {
     }
     fn enter(&self, _: &Id) {}
     fn exit(&self, _: &Id) {}
+}
+
+/// A field-formatting subscriber sees no supplied records on count or Work refusal, no recursive owner, and no exact event in native reuse.
+/// # Panics
+/// Panics if native reuse touches an exact ledger or unpaid batch traversal reaches a kernel.
+/// ´claim:matrix:owner-sigmoid-observed-reuse´
+/// ´test:integration:owner-sigmoid-observed-reuse´
+#[test]
+fn owner_sigmoid_observed_reuse() -> TestResult {
+    use nrz_matrix::{PreparedSigmoid, SigmoidPreparationPolicy};
+    use nrz_scalar::SigmoidInput;
+    let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
+    let observer = Observer::default();
+    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+        let mut f = Fixture::new()?;
+        let r = sigmoid_request(&mut f)?;
+        let context = ArithmeticContext::new()?;
+        let mut budget = ledger()?;
+        let mut counts = Counts::default();
+        reject_coordinates(&mut f, &r, &observer, &context)?;
+        let owner = PreparedSigmoid::new(
+            &mut f.cas,
+            &r,
+            [0.0, 2.0],
+            40,
+            SigmoidPreparationPolicy {
+                bits: 40,
+                requested_bits: 44,
+                revision: 1,
+            },
+            Policy::default(),
+            &context,
+            &mut budget,
+            &mut counts,
+        )?;
+        let admitted_fields = *observer.formatted.lock().map_err(|_| "format counters")?;
+        let events = observer.exact_events.load(Ordering::Relaxed);
+        let before = budget.usage();
+        for x in [1.0, 0.0, 2.0] {
+            owner.evaluate(
+                SigmoidInput {
+                    endpoints: [x, x],
+                    center: x,
+                    bits: 40,
+                },
+                &context,
+            )?;
+        }
+        assert_eq!(
+            observer.exact_events.load(Ordering::Relaxed),
+            events,
+            "no exact lifecycle in native reuse"
+        );
+        assert_eq!(budget.usage(), before);
+        assert_eq!(
+            observer.formatted.lock().map_err(|_| "format counters")?[0] - admitted_fields[0],
+            3,
+            "each admitted input is formatted once"
+        );
+        assert_eq!(
+            observer.formatted.lock().map_err(|_| "format counters")?[2],
+            admitted_fields[2],
+            "native spans must not format recursive owner authority"
+        );
+        for limits in [
+            Limits {
+                matrix_entries: 0,
+                ..Limits::default()
+            },
+            Limits {
+                work: 0,
+                ..Limits::default()
+            },
+        ] {
+            let mut refused = Budget::new(limits)?;
+            let before_fields = *observer.formatted.lock().map_err(|_| "format counters")?;
+            let kernels = observer.kernels.load(Ordering::Relaxed);
+            let allocations = observer.constructions.load(Ordering::Relaxed);
+            owner
+                .evaluate_batch(
+                    &[SigmoidInput {
+                        endpoints: [1.0, 1.0],
+                        center: 1.0,
+                        bits: 40,
+                    }; 3],
+                    &context,
+                    &mut refused,
+                )
+                .expect_err("preflight refusal");
+            assert_eq!(observer.kernels.load(Ordering::Relaxed), kernels);
+            assert_eq!(
+                observer.constructions.load(Ordering::Relaxed),
+                allocations,
+                "no allocation before admission"
+            );
+            assert_eq!(
+                *observer.formatted.lock().map_err(|_| "format counters")?,
+                before_fields,
+                "count and Work preflight must not enumerate supplied records"
+            );
+        }
+        assert!(
+            observer.formatted.lock().map_err(|_| "format counters")?[0] > 0,
+            "admitted operands are actually formatted"
+        );
+        Ok(())
+    })
 }
 
 /// Select the existing native-lowering event independently of CAS construction.
@@ -301,5 +419,107 @@ fn retained_expm1_observed_preparation_and_reuse() -> TestResult {
             Ok(())
         })?;
     }
+    Ok(())
+}
+
+/// Visit Debug fields as a formatting subscriber does, without retaining events.
+struct FormattingVisitor(Arc<Mutex<[usize; 3]>>);
+impl tracing::field::Visit for FormattingVisitor {
+    fn record_debug(&mut self, _: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        use std::fmt::Write as _;
+        let mut text = String::new();
+        write!(&mut text, "{value:?}").expect("String formatting");
+        // Preserve the original test failure if ledger-drop events arrive during unwinding.
+        let mut counts = self
+            .0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        for (count, name) in
+            counts
+                .iter_mut()
+                .zip(["SigmoidInput {", "CoordinateBound {", "PreparedSigmoid {"])
+        {
+            *count += text.matches(name).count();
+        }
+        counts[2] += text.matches("SigmoidProgram {").count()
+            + text.matches("Expm1Program {").count()
+            + text.matches("Budget {").count();
+    }
+}
+
+/// Build the admitted original sigmoid box without any observer-specific shortcut.
+fn sigmoid_request(
+    f: &mut Fixture,
+) -> Result<nrz_bindings::readings::algebra::enclosure::EnclosureRequest, Box<dyn std::error::Error>>
+{
+    use nrz_bindings::readings::algebra::{
+        Rational, Reference,
+        enclosure::Interval,
+        syntax::{Draft, ExpressionDraft, Operator},
+    };
+    let mut r = broad(f, 40)?.original;
+    let argument = r.coordinates[0].coordinate.clone();
+    let header = f.cas.expression_header(&argument)?;
+    let sort = f.cas.expression(&argument)?.1.clone();
+    let draft = Draft::Expression(ExpressionDraft {
+        space: None,
+        operator: Operator::Sigmoid,
+        sort,
+        header: Reference::Existing(header),
+        scope: Vec::new(),
+        binding: None,
+        operands: vec![Reference::Existing(argument)],
+    });
+    r.target = f
+        .cas
+        .admit(&[draft], &mut ledger()?)?
+        .into_iter()
+        .next()
+        .ok_or("sigmoid")?;
+    r.coordinates[0].interval = Interval::new(
+        Rational::zero(),
+        Rational::from_ratio(2, 1, &mut ledger()?)?,
+        &mut ledger()?,
+    )?;
+    Ok(r)
+}
+
+/// Excess coordinates are refused without formatting their records.
+fn reject_coordinates(
+    f: &mut Fixture,
+    r: &nrz_bindings::readings::algebra::enclosure::EnclosureRequest,
+    observer: &Observer,
+    context: &ArithmeticContext,
+) -> TestResult {
+    use nrz_matrix::{PreparedSigmoid, SigmoidPreparationPolicy};
+    let mut budget = ledger()?;
+    let mut counts = Counts::default();
+    let mut excessive = r.clone();
+    excessive.coordinates.push(excessive.coordinates[0].clone());
+    let before_fields = *observer.formatted.lock().map_err(|_| "format counters")?;
+    let rejected = PreparedSigmoid::new(
+        &mut f.cas,
+        &excessive,
+        [0.0, 2.0],
+        40,
+        SigmoidPreparationPolicy {
+            bits: 40,
+            requested_bits: 44,
+            revision: 1,
+        },
+        Policy::default(),
+        context,
+        &mut budget,
+        &mut counts,
+    );
+    assert!(matches!(
+        rejected,
+        Err(nrz_matrix::PreparedSigmoidError::Domain)
+    ));
+    assert_eq!(
+        *observer.formatted.lock().map_err(|_| "format counters")?,
+        before_fields,
+        "coordinate admission must precede formatting supplied records"
+    );
     Ok(())
 }

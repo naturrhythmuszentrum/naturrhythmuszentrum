@@ -4,6 +4,10 @@
 use super::{Expm1Failure, Expm1Input, Expm1Program, PointReading};
 use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite};
 
+#[path = "prepared_sigmoid.rs"]
+mod sigmoid;
+pub use sigmoid::{SigmoidFailure, SigmoidInput, SigmoidOutput, SigmoidProgram};
+
 /// Native exp application outcomes, independent of basis preparation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ExpFailure {

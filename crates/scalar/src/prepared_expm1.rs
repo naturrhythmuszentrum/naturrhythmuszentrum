@@ -12,6 +12,7 @@ use crate::{ArithmeticContext, ArithmeticFailure, Enclosure, Finite};
 #[path = "prepared_exp.rs"]
 mod exp;
 pub use exp::{ExpFailure, ExpInput, ExpOutput, ExpProgram};
+pub use exp::{SigmoidFailure, SigmoidInput, SigmoidOutput, SigmoidProgram};
 
 /// One rounded schedule's endpoints, nominal value and numerical radius.
 type PointReading = ([f64; 2], f64, f64);
