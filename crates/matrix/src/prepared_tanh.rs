@@ -158,28 +158,48 @@ impl<'a> PreparedTanh<'a> {
             ?counts
         )
         .entered();
-        let result = Self::prepare(
-            cas, original, domain, bits, policy, search, context, budget, counts,
+        let result = Self::with_basis(
+            cas,
+            original,
+            domain,
+            bits,
+            policy,
+            search,
+            budget,
+            |cas, auxiliary, budget| {
+                PreparedExpm1::new(
+                    cas,
+                    auxiliary,
+                    [-2.0 * domain[1], -2.0 * domain[0]],
+                    search,
+                    context,
+                    budget,
+                    counts,
+                )
+            },
         );
         tracing::trace!(bytes = result.as_ref().ok().map(|owner| owner.bytes), error = ?result.as_ref().err());
         result
     }
 
-    /// Complete fixed inventory admission precedes request traversal and graph construction.
+    /// Preserve the constructor's full admission path while substituting only basis preparation.
     #[expect(
         clippy::too_many_arguments,
         reason = "private implementation preserves the complete public admission inputs"
     )]
-    fn prepare(
+    fn with_basis(
         cas: &'a mut Cas,
         original: &'a EnclosureRequest,
         domain: [f64; 2],
         bits: u32,
         policy: TanhPreparationPolicy,
         search: Policy,
-        context: &ArithmeticContext,
         budget: &mut Budget,
-        counts: &mut Counts,
+        prepare: impl FnOnce(
+            &'a mut Cas,
+            &Request,
+            &mut Budget,
+        ) -> Result<PreparedExpm1<'a>, PreparedExpm1Error>,
     ) -> Result<Self, PreparedTanhError> {
         if bits != policy.bits {
             return Err(PreparedTanhError::Target);
@@ -211,26 +231,21 @@ impl<'a> PreparedTanh<'a> {
             tracing::trace!(target = ?original.target, context = ?original.context, goal = ?original.goal);
             transform(cas, original, domain, policy, budget)
         })?;
-        let result = budget.with_retained_payload(extra + 8192, AT, |budget| {
-            PreparedExpm1::new(
-                cas,
-                &auxiliary,
-                [-2.0 * domain[1], -2.0 * domain[0]],
-                search,
-                context,
-                budget,
-                counts,
-            )
-        });
+        let result = budget
+            .with_retained_payload(extra + 8192, AT, |budget| prepare(cas, &auxiliary, budget));
         match result {
             Ok(basis) => {
                 let bytes = basis.bytes.saturating_add(extra);
-                finalize_owner(bytes, budget, AT, || Self {
-                    original,
-                    basis,
-                    domain,
-                    policy,
-                    bytes,
+                finalize_owner(bytes, budget, AT, || {
+                    #[cfg(test)]
+                    constructor_tests::ASSEMBLED.set(true);
+                    Self {
+                        original,
+                        basis,
+                        domain,
+                        policy,
+                        bytes,
+                    }
                 })
                 .map_err(Into::into)
             }
@@ -537,3 +552,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "prepared_tanh_constructor_tests.rs"]
+mod constructor_tests;
