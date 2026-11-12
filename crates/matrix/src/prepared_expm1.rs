@@ -25,6 +25,10 @@ pub use sigmoid::{
     PreparedSigmoid, PreparedSigmoidError, SigmoidEvaluation, SigmoidPreparationPolicy,
 };
 
+#[path = "prepared_tanh.rs"]
+mod tanh;
+pub use tanh::{PreparedTanh, PreparedTanhError, TanhEvaluation, TanhPreparationPolicy};
+
 /// Admit returned inventory before assembling a standalone composition owner.
 /// Construction and isolated boundary controls share this complete finalization path.
 fn finalize_owner<T>(

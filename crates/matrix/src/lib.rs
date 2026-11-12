@@ -60,6 +60,7 @@ pub use prepared_expm1::{Expm1Evaluation, PreparedExpm1, PreparedExpm1Error};
 pub use prepared_expm1::{
     PreparedSigmoid, PreparedSigmoidError, SigmoidEvaluation, SigmoidPreparationPolicy,
 };
+pub use prepared_expm1::{PreparedTanh, PreparedTanhError, TanhEvaluation, TanhPreparationPolicy};
 mod quantity;
 pub use lc_relation::{
     LcAliasProjection, LcCapacitanceProjection, LcClockProjection, LcForwardProjection,

@@ -1053,3 +1053,6 @@ mod sigmoid;
 
 #[path = "prepared_expm1/tanh.rs"]
 mod tanh;
+
+#[path = "prepared_expm1/tanh_owner.rs"]
+mod tanh_owner;
