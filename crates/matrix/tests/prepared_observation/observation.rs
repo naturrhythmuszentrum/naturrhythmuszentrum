@@ -101,8 +101,8 @@ struct Observer {
     events: Arc<AtomicU64>,
     /// Exact ledger lifecycle, phase and construction events only.
     exact_events: Arc<AtomicU64>,
-    /// Formatted supplied operands, coordinates and recursive owners.
-    formatted: Arc<Mutex<[usize; 3]>>,
+    /// Formatted supplied operands, coordinates, recursive owners and tanh outputs.
+    formatted: Arc<Mutex<[usize; 4]>>,
 }
 
 impl Subscriber for Observer {
@@ -423,7 +423,7 @@ fn retained_expm1_observed_preparation_and_reuse() -> TestResult {
 }
 
 /// Visit Debug fields as a formatting subscriber does, without retaining events.
-struct FormattingVisitor(Arc<Mutex<[usize; 3]>>);
+struct FormattingVisitor(Arc<Mutex<[usize; 4]>>);
 impl tracing::field::Visit for FormattingVisitor {
     fn record_debug(&mut self, _: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         use std::fmt::Write as _;
@@ -441,7 +441,11 @@ impl tracing::field::Visit for FormattingVisitor {
         {
             *count += text.matches(name).count();
         }
-        counts[2] += text.matches("SigmoidProgram {").count()
+        counts[0] += text.matches("TanhInput {").count();
+        counts[3] += text.matches("TanhOutput {").count();
+        counts[2] += text.matches("PreparedTanh {").count()
+            + text.matches("TanhProgram {").count()
+            + text.matches("SigmoidProgram {").count()
             + text.matches("Expm1Program {").count()
             + text.matches("Budget {").count();
     }
@@ -515,6 +519,240 @@ fn reject_coordinates(
     assert!(matches!(
         rejected,
         Err(nrz_matrix::PreparedSigmoidError::Domain)
+    ));
+    assert_eq!(
+        *observer.formatted.lock().map_err(|_| "format counters")?,
+        before_fields,
+        "coordinate admission must precede formatting supplied records"
+    );
+    Ok(())
+}
+
+/// Scalar tanh formats each public input once without recursive basis or owner fields and emits no exact Work event.
+/// # Panics
+/// Panics if field visitation walks the basis, duplicates an input or reaches exact accounting.
+/// ´claim:matrix:scalar-tanh-observation´
+/// ´test:integration:scalar-tanh-observation´
+#[test]
+fn scalar_tanh_observation() -> TestResult {
+    use nrz_scalar::{Expm1Parameters, Expm1Program, TanhInput, TanhProgram};
+    let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
+    let context = ArithmeticContext::new()?;
+    let basis = Expm1Program::new(
+        &[1.0],
+        Expm1Parameters {
+            domain: [-2.0, 0.0],
+            bits: 44,
+            radius_bits: 44,
+            absolute_error: 2.0_f64.powi(-44),
+            environment: 1,
+        },
+        &context,
+    )?;
+    let observer = Observer::default();
+    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+        let program = TanhProgram::new(&basis, [0.0, 1.0], 40)?;
+        for x in [0.0, 2.0_f64.powi(-60), f64::from_bits(1)] {
+            let _result = program.evaluate(
+                TanhInput {
+                    endpoints: [x, x],
+                    center: x,
+                    bits: 40,
+                },
+                &context,
+            );
+        }
+        let fields = *observer.formatted.lock().map_err(|_| "field counters")?;
+        assert_eq!(fields[0], 3, "one public input per scalar invocation");
+        assert_eq!(
+            fields[3], 2,
+            "one complete output per successful invocation"
+        );
+        assert_eq!(fields[2], 0, "no recursive authority or program formatting");
+        assert_eq!(
+            observer.exact_events.load(Ordering::Relaxed),
+            0,
+            "native arithmetic has no exact Work"
+        );
+        Ok(())
+    })
+}
+
+/// A field-formatting subscriber sees no supplied records on count or Work refusal, no recursive owner, and no exact event in native reuse.
+/// # Panics
+/// Panics if native reuse touches an exact ledger or unpaid batch traversal reaches a kernel.
+/// ´claim:matrix:owner-tanh-observed-reuse´
+/// ´test:integration:owner-tanh-observed-reuse´
+#[test]
+fn owner_tanh_observed_reuse() -> TestResult {
+    use nrz_matrix::{PreparedTanh, TanhPreparationPolicy};
+    use nrz_scalar::TanhInput;
+    let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
+    let observer = Observer::default();
+    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+        let mut f = Fixture::new()?;
+        let r = tanh_request(&mut f)?;
+        let context = ArithmeticContext::new()?;
+        let mut budget = ledger()?;
+        let mut counts = Counts::default();
+        reject_tanh_coordinates(&mut f, &r, &observer, &context)?;
+        let owner = PreparedTanh::new(
+            &mut f.cas,
+            &r,
+            [0.0, 1.0],
+            40,
+            TanhPreparationPolicy {
+                bits: 40,
+                requested_bits: 44,
+                revision: 1,
+            },
+            Policy::default(),
+            &context,
+            &mut budget,
+            &mut counts,
+        )?;
+        let admitted_fields = *observer.formatted.lock().map_err(|_| "format counters")?;
+        let events = observer.exact_events.load(Ordering::Relaxed);
+        let before = budget.usage();
+        for x in [0.5, 0.0, 1.0] {
+            owner.evaluate(
+                TanhInput {
+                    endpoints: [x, x],
+                    center: x,
+                    bits: 40,
+                },
+                &context,
+            )?;
+        }
+        assert_eq!(
+            observer.exact_events.load(Ordering::Relaxed),
+            events,
+            "no exact lifecycle in native reuse"
+        );
+        assert_eq!(budget.usage(), before);
+        assert_eq!(
+            observer.formatted.lock().map_err(|_| "format counters")?[0] - admitted_fields[0],
+            3,
+            "each admitted input is formatted once"
+        );
+        assert_eq!(
+            observer.formatted.lock().map_err(|_| "format counters")?[2],
+            admitted_fields[2],
+            "native spans must not format recursive owner authority"
+        );
+        for limits in [
+            Limits {
+                matrix_entries: 0,
+                ..Limits::default()
+            },
+            Limits {
+                work: 0,
+                ..Limits::default()
+            },
+        ] {
+            let mut refused = Budget::new(limits)?;
+            let before_fields = *observer.formatted.lock().map_err(|_| "format counters")?;
+            let kernels = observer.kernels.load(Ordering::Relaxed);
+            let allocations = observer.constructions.load(Ordering::Relaxed);
+            owner
+                .evaluate_batch(
+                    &[TanhInput {
+                        endpoints: [1.0, 1.0],
+                        center: 1.0,
+                        bits: 40,
+                    }; 3],
+                    &context,
+                    &mut refused,
+                )
+                .expect_err("preflight refusal");
+            assert_eq!(observer.kernels.load(Ordering::Relaxed), kernels);
+            assert_eq!(
+                observer.constructions.load(Ordering::Relaxed),
+                allocations,
+                "no allocation before admission"
+            );
+            assert_eq!(
+                *observer.formatted.lock().map_err(|_| "format counters")?,
+                before_fields,
+                "count and Work preflight must not enumerate supplied records"
+            );
+        }
+        assert!(
+            observer.formatted.lock().map_err(|_| "format counters")?[0] > 0,
+            "admitted operands are actually formatted"
+        );
+        Ok(())
+    })
+}
+
+/// Build the admitted original tanh box without any observer-specific shortcut.
+fn tanh_request(
+    f: &mut Fixture,
+) -> Result<nrz_bindings::readings::algebra::enclosure::EnclosureRequest, Box<dyn std::error::Error>>
+{
+    use nrz_bindings::readings::algebra::{
+        Rational, Reference,
+        enclosure::Interval,
+        syntax::{Draft, ExpressionDraft, Operator},
+    };
+    let mut r = broad(f, 40)?.original;
+    let argument = r.coordinates[0].coordinate.clone();
+    let header = f.cas.expression_header(&argument)?;
+    let sort = f.cas.expression(&argument)?.1.clone();
+    let draft = Draft::Expression(ExpressionDraft {
+        space: None,
+        operator: Operator::Tanh,
+        sort,
+        header: Reference::Existing(header),
+        scope: Vec::new(),
+        binding: None,
+        operands: vec![Reference::Existing(argument)],
+    });
+    r.target = f
+        .cas
+        .admit(&[draft], &mut ledger()?)?
+        .into_iter()
+        .next()
+        .ok_or("tanh")?;
+    r.coordinates[0].interval = Interval::new(
+        Rational::zero(),
+        Rational::from_ratio(1, 1, &mut ledger()?)?,
+        &mut ledger()?,
+    )?;
+    Ok(r)
+}
+
+/// Excess coordinates are refused without formatting their records.
+fn reject_tanh_coordinates(
+    f: &mut Fixture,
+    r: &nrz_bindings::readings::algebra::enclosure::EnclosureRequest,
+    observer: &Observer,
+    context: &ArithmeticContext,
+) -> TestResult {
+    use nrz_matrix::{PreparedTanh, TanhPreparationPolicy};
+    let mut budget = ledger()?;
+    let mut counts = Counts::default();
+    let mut excessive = r.clone();
+    excessive.coordinates.push(excessive.coordinates[0].clone());
+    let before_fields = *observer.formatted.lock().map_err(|_| "format counters")?;
+    let rejected = PreparedTanh::new(
+        &mut f.cas,
+        &excessive,
+        [0.0, 1.0],
+        40,
+        TanhPreparationPolicy {
+            bits: 40,
+            requested_bits: 44,
+            revision: 1,
+        },
+        Policy::default(),
+        context,
+        &mut budget,
+        &mut counts,
+    );
+    assert!(matches!(
+        rejected,
+        Err(nrz_matrix::PreparedTanhError::Domain)
     ));
     assert_eq!(
         *observer.formatted.lock().map_err(|_| "format counters")?,

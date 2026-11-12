@@ -202,6 +202,10 @@ Expose bounds on target encoding, exact exponent bits, root count, integer-power
 
 Revision one of (`[SCALAR-alg:scalar:prepared-sigmoid-native]`) supplies the conditional native argument for sigmoid values on [0,2], using the checked expm1 schedule and exp addition. Its endpoint target, nominal numerical error and whole-image radius remain separate. This adds no enclosure schema, retained owner or masked family member. The authority bridge must establish the original operation and exact transformed-request correspondence under (`dec:nrz:transcendental-proof-support`) and (`dec:nrz:transcendental-scalar-owner`); the scalar constructor admits numerical domain and policy correspondence only. Exact rational schedule reconstruction and represented golden values exercise the composition (`[MATRIX-test:integration:scalar-sigmoid-independent-rounding]`), (`[MATRIX-test:integration:scalar-sigmoid-golden-values]`).
 
+## Native tanh composition · `sec:nrz:transcendental-tanh-native`
+
+Revision one of (`[SCALAR-alg:scalar:prepared-tanh-native]`) supplies the conditional native argument for tanh values on [0,1]. The consistent quotient extremes of (`[SCALAR-rule:scalar:prepared-tanh-quotient]`) give the same real image as independent interval division on the proved negative basis range, up to arithmetic rounding. A positive composed magnitude bound supports final relative endpoint evidence without dividing a uniform absolute error by a vanishing input. The scalar leaf uses checked expm1 authority and leaves the original operation's ownership correspondence to the matrix owner PreparedTanh::new (`[MATRIX-rule:matrix:prepared-tanh-correspondence]`); it adds no enclosure schema, retained owner or masked member. Exact rational reconstruction and the represented golden rows exercise this boundary (`[MATRIX-test:integration:scalar-tanh-independent-rounding]`), (`[MATRIX-test:integration:scalar-tanh-golden-values]`).
+
 ## Scalar completion admission · `sec:nrz:transcendental-scalar-admission`
 
 **Decision (Prepare and freeze for scalar completion)** · `dec:nrz:transcendental-scalar-owner`

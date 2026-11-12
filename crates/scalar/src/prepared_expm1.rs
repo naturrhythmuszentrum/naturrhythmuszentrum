@@ -343,3 +343,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[path = "prepared_tanh.rs"]
+mod tanh;
+pub use tanh::{TanhFailure, TanhInput, TanhOutput, TanhProgram};

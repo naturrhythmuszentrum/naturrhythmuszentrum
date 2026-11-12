@@ -1050,3 +1050,9 @@ fn prepared_expm1_ledger_ownership() -> TestResult {
 
 #[path = "prepared_expm1/sigmoid.rs"]
 mod sigmoid;
+
+#[path = "prepared_expm1/tanh.rs"]
+mod tanh;
+
+#[path = "prepared_expm1/tanh_owner.rs"]
+mod tanh_owner;
