@@ -17,7 +17,7 @@
 //! | [`refuses_legacy_formulas_and_forged_evidence`] | docgen | Reject legacy envelopes, invalid original formulas and forged committed evidence. |
 //! | [`tracked_ordinal_refusal_is_read_only`] | docgen | The check reads tracked working bytes and names the exact refusal location. |
 //! | [`tracked_ordinal_path_refuses`] | docgen | Tracked filenames are checked even when their contents contain no prose. |
-//! | [`golden_check_precedes_tracked_read`] | docgen | Exercise the real command: a bounded golden refusal precedes a tracked-text sentinel. # Errors Returns filesystem or subprocess failures. # Panics Panics only if the command reaches the tracked scan before bounded golden admission. |
+//! | [`golden_check_precedes_tracked_read`] | docgen | Exercise the real command: a bounded golden refusal precedes a tracked-text sentinel. |
 
 //! Binary-level checks of the documentation fixed point and exit classes.
 
