@@ -101,8 +101,8 @@ struct Observer {
     events: Arc<AtomicU64>,
     /// Exact ledger lifecycle, phase and construction events only.
     exact_events: Arc<AtomicU64>,
-    /// Formatted supplied operands, coordinates and recursive owners.
-    formatted: Arc<Mutex<[usize; 3]>>,
+    /// Formatted supplied operands, coordinates, recursive owners and tanh outputs.
+    formatted: Arc<Mutex<[usize; 4]>>,
 }
 
 impl Subscriber for Observer {
@@ -423,7 +423,7 @@ fn retained_expm1_observed_preparation_and_reuse() -> TestResult {
 }
 
 /// Visit Debug fields as a formatting subscriber does, without retaining events.
-struct FormattingVisitor(Arc<Mutex<[usize; 3]>>);
+struct FormattingVisitor(Arc<Mutex<[usize; 4]>>);
 impl tracing::field::Visit for FormattingVisitor {
     fn record_debug(&mut self, _: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         use std::fmt::Write as _;
@@ -441,7 +441,10 @@ impl tracing::field::Visit for FormattingVisitor {
         {
             *count += text.matches(name).count();
         }
-        counts[2] += text.matches("SigmoidProgram {").count()
+        counts[0] += text.matches("TanhInput {").count();
+        counts[3] += text.matches("TanhOutput {").count();
+        counts[2] += text.matches("TanhProgram {").count()
+            + text.matches("SigmoidProgram {").count()
             + text.matches("Expm1Program {").count()
             + text.matches("Budget {").count();
     }
@@ -522,4 +525,54 @@ fn reject_coordinates(
         "coordinate admission must precede formatting supplied records"
     );
     Ok(())
+}
+
+/// Scalar tanh formats each public input once without recursive basis or owner fields and emits no exact Work event.
+/// # Panics
+/// Panics if field visitation walks the basis, duplicates an input or reaches exact accounting.
+/// ´claim:matrix:scalar-tanh-observation´
+/// ´test:integration:scalar-tanh-observation´
+#[test]
+fn scalar_tanh_observation() -> TestResult {
+    use nrz_scalar::{Expm1Parameters, Expm1Program, TanhInput, TanhProgram};
+    let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
+    let context = ArithmeticContext::new()?;
+    let basis = Expm1Program::new(
+        &[1.0],
+        Expm1Parameters {
+            domain: [-2.0, 0.0],
+            bits: 44,
+            radius_bits: 44,
+            absolute_error: 2.0_f64.powi(-44),
+            environment: 1,
+        },
+        &context,
+    )?;
+    let observer = Observer::default();
+    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+        let program = TanhProgram::new(&basis, [0.0, 1.0], 40)?;
+        for x in [0.0, 2.0_f64.powi(-60), f64::from_bits(1)] {
+            let _result = program.evaluate(
+                TanhInput {
+                    endpoints: [x, x],
+                    center: x,
+                    bits: 40,
+                },
+                &context,
+            );
+        }
+        let fields = *observer.formatted.lock().map_err(|_| "field counters")?;
+        assert_eq!(fields[0], 3, "one public input per scalar invocation");
+        assert_eq!(
+            fields[3], 2,
+            "one complete output per successful invocation"
+        );
+        assert_eq!(fields[2], 0, "no recursive authority or program formatting");
+        assert_eq!(
+            observer.exact_events.load(Ordering::Relaxed),
+            0,
+            "native arithmetic has no exact Work"
+        );
+        Ok(())
+    })
 }

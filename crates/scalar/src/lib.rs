@@ -43,3 +43,5 @@ pub use reduction::{dot, norm_upper, sum};
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/type_twins.rs"]
 mod type_twins;
+
+pub use prepared_expm1::{TanhFailure, TanhInput, TanhOutput, TanhProgram};

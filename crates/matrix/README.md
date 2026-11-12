@@ -1164,3 +1164,11 @@ Deterministic clock fixtures exercise geometric groups, linear ceilings and caps
 **Rule (Owned additions and attributed statistics)** · `rule:matrix:license-inventory`
 
 Matrix additions remain AGPL-3.0-only under the unchanged root [LICENSE-CODE](../../LICENSE-CODE). The private Criterion 0.8.2 statistics extraction elects its MIT option and retains the complete [Criterion license](LICENSE-CRITERION), including Jorge Aparicio's copyright. Its [extraction notice](src/sampling/criterion/NOTICE) records selected upstream items, source revision, original SHA-256 hashes and safety adaptations. The separately linked `oorandom =11.1.5` dependency retains its [MIT notice](LICENSE-OORANDOM), including Simon Heath's copyright. Documentation and templates are CC0-1.0 under the root [LICENSE-DOCS](../../LICENSE-DOCS). Upstream changes require explicit source comparison, adaptation review and independent statistical evidence.
+
+## Scalar tanh evidence · `sec:matrix:scalar-tanh-evidence`
+
+The existing test dependencies lower a checked expm1 basis to the scalar composition of (`[SCALAR-alg:scalar:prepared-tanh-native]`), without a tanh matrix owner. Every represented tanh golden row is read structurally and checked for whole-interval containment, exact relative endpoint slack and point width; refusal rows retain their named cause (`test:integration:scalar-tanh-golden-values`). Independent exact rational reconstruction checks rounding, quotient endpoint association, nominal error and the maximum complete radius on unsorted points and boxes, including subnormal nominal interiors and underflowing intermediates (`test:integration:scalar-tanh-independent-rounding`). This evidence adds no retained or masked family membership.
+
+The shared dispatcher guard isolates a field-visiting subscriber that formats every span and event, counts each scalar input once and detects recursive basis metadata or exact Work during tanh evaluation (`test:integration:scalar-tanh-observation`).
+
+The independent truth oracle uses alternating expm1 sums away from zero. For 0<=x<=2^(-80), tanh(x)<=x and tanh'(x)=1-tanh(x)^2>=1-x^2 imply x-x^3/3<=tanh(x); hence x*(1-2^(-160))<=tanh(x)<=x. This test-side value bound avoids constructing extremely small powers beyond the existing exact component ceiling; it grants no native shortcut or derivative surface.
