@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original sigmoid authority paired with a checked negative-domain exponential basis.
 
-use super::{PreparedExpm1, PreparedExpm1Error, represented};
+use super::{PreparedExpm1, PreparedExpm1Error, finalize_owner, represented};
 use nrz_bindings::{
     Budget,
     readings::algebra::{
@@ -227,14 +227,14 @@ impl<'a> PreparedSigmoid<'a> {
         match result {
             Ok(basis) => {
                 let bytes = basis.bytes.saturating_add(extra);
-                admit_output(bytes, budget)?;
-                Ok(Self {
+                finalize_owner(bytes, budget, AT, || Self {
                     original,
                     basis,
                     domain,
                     policy,
                     bytes,
                 })
+                .map_err(Into::into)
             }
             Err(PreparedExpm1Error::TargetNotCertifiable) => {
                 budget.check(BudgetKind::OutputBytes, extra + 8192, AT)?;
@@ -492,16 +492,11 @@ fn term(
         .ok_or_else(|| Fault::allocation(AT))
 }
 
-/// Final returned-owner admission, independent of the earlier CAS output guard.
-const fn admit_output(bytes: u64, budget: &Budget) -> Result<(), Fault> {
-    budget.check(BudgetKind::OutputBytes, bytes, AT)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     /// A 4,096-byte basis and 1,600-byte original inventory require 5,696 bytes.
-    /// The final guard admits N, refuses N−1 and preserves seven prior Work.
+    /// The construction finalizer admits N, refuses N−1 before assembly and preserves seven prior Work.
     /// # Panics
     /// Panics if the independent returned-owner output guard or refusal changes.
     /// ´claim:matrix:owner-sigmoid-output-boundary´
@@ -515,10 +510,16 @@ mod tests {
                 ..Limits::default()
             })?;
             budget.work(7, AT)?;
-            let result = admit_output(5696, &budget);
+            let assembled = std::cell::Cell::new(false);
+            let result = finalize_owner(4096 + 1600, &budget, AT, || {
+                assembled.set(true);
+                5696_u64
+            });
             if limit == 5696 {
-                result?;
+                assert_eq!(result?, 5696);
+                assert!(assembled.get());
             } else {
+                assert!(!assembled.get(), "output admission precedes assembly");
                 assert_eq!(
                     result.expect_err("final owner output").kind,
                     FaultKind::Exhausted {

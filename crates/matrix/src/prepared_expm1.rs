@@ -25,6 +25,18 @@ pub use sigmoid::{
     PreparedSigmoid, PreparedSigmoidError, SigmoidEvaluation, SigmoidPreparationPolicy,
 };
 
+/// Admit returned inventory before assembling a standalone composition owner.
+/// Construction and isolated boundary controls share this complete finalization path.
+fn finalize_owner<T>(
+    bytes: u64,
+    budget: &Budget,
+    at: Location,
+    assemble: impl FnOnce() -> T,
+) -> Result<T, Fault> {
+    budget.check(BudgetKind::OutputBytes, bytes, at)?;
+    Ok(assemble())
+}
+
 /// Shared preparation and admission accounting location.
 const AT: Location = Location::new("prepared expm1 lowering");
 
