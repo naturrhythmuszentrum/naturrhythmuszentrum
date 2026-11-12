@@ -26,6 +26,7 @@ pub(super) fn check<P: Scalar + 'static>(
     heap: &Heap,
     request: &Request<'_, P>,
     account: u64,
+    origin: super::chain::Input,
     budget: &mut Budget,
 ) -> Result<(), ApplicationError> {
     if request.binary.is_some() {
@@ -41,11 +42,8 @@ pub(super) fn check<P: Scalar + 'static>(
     if pin.account != account || request.destination.account != account {
         return Err(LoanError::ForeignAccount.into());
     }
-    heap.current_bundle(request.input, budget)?;
+    super::chain::authenticate(heap, request.input, origin, budget)?;
     let bundle = source(request)?;
-    if bundle.origin.evidence.is_some() {
-        return Err(LoanError::UnsupportedContract.into());
-    }
     let member = request.member()?;
     let law = member.law();
     let destination = &request.destination;

@@ -37,11 +37,21 @@ struct Prepared<P: Scalar> {
     /// Admission revision with terminal headroom.
     revision: u64,
 }
-/// Retain the complete request until every fallible preparation has succeeded.
+/// Existing host routes retain their exact admission policy and charged prefix.
 pub(super) fn request<P: Scalar + 'static>(
     heap: &mut Heap,
     request: PointwiseRequest<P>,
     function: crate::Elementwise,
+    account: &mut ExecutionAccount,
+) -> ApplicationRequest<P> {
+    request_with_origin(heap, request, function, super::chain::Input::Host, account)
+}
+/// Retain the complete request until every fallible preparation has succeeded.
+pub(super) fn request_with_origin<P: Scalar + 'static>(
+    heap: &mut Heap,
+    request: PointwiseRequest<P>,
+    function: crate::Elementwise,
+    origin: super::chain::Input,
     account: &mut ExecutionAccount,
 ) -> ApplicationRequest<P> {
     let checked = account
@@ -49,7 +59,7 @@ pub(super) fn request<P: Scalar + 'static>(
         .with_work_phase(super::FAMILY, "pointwise admission", |budget| {
             let mut borrowed = super::prepared::Request::from(&request);
             borrowed.expected = crate::KernelKind::Elementwise(function);
-            super::contract::check(heap, &borrowed, account.identity, budget)?;
+            super::contract::check(heap, &borrowed, account.identity, origin, budget)?;
             let plan = plan::Plan::new(heap, &borrowed, budget)?;
             preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)
         });
@@ -72,7 +82,13 @@ pub(super) fn request_expm1(
             .with_work_phase(super::FAMILY, "prepared application admission", |budget| {
                 super::prepared::authenticate(&request, heap, account.identity, budget)?;
                 let borrowed = super::prepared::Request::from(&request);
-                super::contract::check(heap, &borrowed, account.identity, budget)?;
+                super::contract::check(
+                    heap,
+                    &borrowed,
+                    account.identity,
+                    super::chain::Input::Host,
+                    budget,
+                )?;
                 let plan = plan::Plan::new(heap, &borrowed, budget)?;
                 crate::loan::retained_expm1::Attachment::prepare_validation(
                     &request.law,
@@ -106,7 +122,13 @@ pub(super) fn request_binary(
             .with_work_phase(super::FAMILY, "binary application admission", |budget| {
                 let mut borrowed = super::prepared::Request::from(&request);
                 borrowed.expected = crate::KernelKind::BinaryElementwise(expected);
-                super::contract::check(heap, &borrowed, account.identity, budget)?;
+                super::contract::check(
+                    heap,
+                    &borrowed,
+                    account.identity,
+                    super::chain::Input::Host,
+                    budget,
+                )?;
                 let plan = plan::Plan::new(heap, &borrowed, budget)?;
                 preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)
             });

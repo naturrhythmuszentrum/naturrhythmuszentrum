@@ -50,48 +50,18 @@ pub(super) fn evaluate<P: Scalar + 'static>(
                 if owner.core.evidence.endpoint_tokens.binary().is_some() {
                     charge(budget, 1)?;
                 }
-                let member = validate(&owner.core)?;
+                let (member, seals) = validate(&owner.core, budget)?;
                 let context = ArithmeticContext::new()
                     .map_err(KernelError::from)
                     .map_err(crate::OperationError::from)?;
                 if context.revision() != 1 {
                     return Err(ApplicationError::Operation(KernelError::Contract.into()));
                 }
-                let components = owner.core.host.declaration.extent.columns();
-                let loads = if owner.core.evidence.source.symbols.bound().is_some() {
-                    2
-                } else {
-                    1
-                };
-                let loads = loads
-                    + owner
-                        .core
-                        .evidence
-                        .endpoint_tokens
-                        .binary()
-                        .map_or(0, |side| {
-                            1 + usize::from(side.source.symbols.bound().is_some())
-                        });
-                let invocation = member.invocation(components)?;
-                let per_cell = (loads + member.roles())
-                    .checked_mul(components)
-                    .and_then(|steps| steps.checked_add(invocation))
-                    .and_then(|steps| steps.checked_add(2))
-                    .ok_or(LoanError::CountOverflow)?;
-                let work = owner
-                    .core
-                    .population
-                    .checked_mul(per_cell)
-                    .and_then(|steps| {
-                        owner
-                            .core
-                            .filled
-                            .len()
-                            .checked_mul(2)
-                            .and_then(|words| steps.checked_add(words))
-                    })
-                    .ok_or(LoanError::CountOverflow)?;
-                charge(budget, work)?;
+                let work = traversal_work(&owner.core, member)?;
+                charge(
+                    budget,
+                    work.checked_add(seals).ok_or(LoanError::CountOverflow)?,
+                )?;
                 Ok::<_, ApplicationError>(Traversal {
                     context,
                     native_phase: member.native_phase(),
@@ -115,8 +85,38 @@ pub(super) fn evaluate<P: Scalar + 'static>(
     owner.core.candidate = true;
     ApplicationEvaluation::ApplicationCandidate(owner)
 }
+/// Complete selected traversal prepayment uses the unchanged member and per-role tariffs.
+fn traversal_work<P: Scalar>(
+    core: &ApplicationCore<P>,
+    member: Member<'_>,
+) -> Result<usize, LoanError> {
+    let components = core.host.declaration.extent.columns();
+    let loads = 1
+        + usize::from(core.evidence.source.symbols.bound().is_some())
+        + core.evidence.endpoint_tokens.binary().map_or(0, |side| {
+            1 + usize::from(side.source.symbols.bound().is_some())
+        });
+    let invocation = member.invocation(components)?;
+    let per_cell = (loads + member.roles())
+        .checked_mul(components)
+        .and_then(|steps| steps.checked_add(invocation))
+        .and_then(|steps| steps.checked_add(2))
+        .ok_or(LoanError::CountOverflow)?;
+    core.population
+        .checked_mul(per_cell)
+        .and_then(|steps| {
+            core.filled
+                .len()
+                .checked_mul(2)
+                .and_then(|words| steps.checked_add(words))
+        })
+        .ok_or(LoanError::CountOverflow)
+}
 /// Constant-size sealed law and owner checks require no selected numerical access.
-fn validate<P: Scalar + 'static>(core: &ApplicationCore<P>) -> Result<Member<'_>, LoanError> {
+fn validate<'a, P: Scalar + 'static>(
+    core: &'a ApplicationCore<P>,
+    budget: &mut nrz_bindings::Budget,
+) -> Result<(Member<'a>, usize), LoanError> {
     core.evidence
         .validate_revision(&core.host.declaration, core.host.identity, 0)?;
     super::endpoints::validate_core(core)?;
@@ -127,16 +127,17 @@ fn validate<P: Scalar + 'static>(core: &ApplicationCore<P>) -> Result<Member<'_>
     )?;
     member.validate_cell(&core.contract, core.host.declaration.extent.columns())?;
     let input = core.input.as_ref().ok_or(LoanError::WrongLoan)?;
-    if input.ticket()?.identity != core.evidence.source_identity
-        || core.filled.len() != crate::loan::words(core.host.declaration.extent.rows())
-    {
+    if core.filled.len() != crate::loan::words(core.host.declaration.extent.rows()) {
         return Err(LoanError::WrongLoan);
     }
+    super::chain::captured(input, &core.evidence, core.host.identity.account)?;
+    let seals = super::chain::seal_work(input)?;
+    charge(budget, seals)?;
     input.checked_reader()?;
     if let Some(side) = core.evidence.endpoint_tokens.binary() {
         side.validate_pin(core.host.identity.account)?;
     }
-    Ok(member)
+    Ok((member, seals))
 }
 /// Enumerate words, cells and components in stable original order, including refused suffixes.
 fn run<P: Scalar + 'static>(

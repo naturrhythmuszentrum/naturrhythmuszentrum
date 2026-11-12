@@ -171,18 +171,10 @@ fn prepare<P: Scalar + 'static>(
         records: 1,
         edges: 3,
     });
-    heap.current_bundle(core.input.as_ref().ok_or(LoanError::WrongLoan)?, budget)?;
+    let input = core.input.as_ref().ok_or(LoanError::WrongLoan)?;
+    super::chain::authenticate(heap, input, super::chain::origin(input)?, budget)?;
     charge(budget, 1)?;
-    if core
-        .input
-        .as_ref()
-        .ok_or(LoanError::WrongLoan)?
-        .ticket()?
-        .identity
-        != core.evidence.source_identity
-    {
-        return Err(LoanError::WrongLoan);
-    }
+    super::chain::captured(input, &core.evidence, core.host.identity.account)?;
     if let Some(side) = core.evidence.endpoint_tokens.binary() {
         heap.current_bundle(side.input.as_ref().ok_or(LoanError::WrongLoan)?, budget)?;
         charge(budget, 1)?;

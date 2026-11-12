@@ -3,6 +3,7 @@
 
 mod admission;
 pub(super) mod binary;
+mod chain;
 mod contract;
 pub use binary::{
     BinaryApplicationRequest, BinaryRegion, PointwiseBinaryOperation, PointwiseBinaryRequest,

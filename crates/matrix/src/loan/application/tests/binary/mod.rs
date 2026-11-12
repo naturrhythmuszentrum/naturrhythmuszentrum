@@ -2,6 +2,7 @@
 //! Independent ordered binary values, correspondence, resources and both retaining edges.
 
 mod bytes;
+mod chain;
 mod constructor_bytes;
 mod correspondence;
 mod fixture;

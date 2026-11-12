@@ -8,14 +8,14 @@ use std::cmp::Ordering;
 
 /// Exact unreduced signed fraction, kept separate from production scalar and CAS code.
 #[derive(Clone)]
-struct Rational {
+pub(super) struct Rational {
     negative: bool,
     numerator: Natural,
     denominator: Natural,
 }
 impl Rational {
     /// Decode sign, significand and exponent from binary64 bits.
-    fn binary(value: f64) -> TestResult<Self> {
+    pub(super) fn binary(value: f64) -> TestResult<Self> {
         let (negative, significand, exponent) = decode(value)?;
         let mut numerator = Natural::new(significand);
         let mut denominator = Natural::new(1);
@@ -31,7 +31,7 @@ impl Rational {
         })
     }
     /// Signed addition uses exact cross products; no reduction or budget is needed.
-    fn add(&self, other: &Self) -> Self {
+    pub(super) fn add(&self, other: &Self) -> Self {
         let left = self.numerator.mul(&other.denominator);
         let right = other.numerator.mul(&self.denominator);
         let (negative, numerator) = if self.negative == other.negative {
@@ -48,13 +48,13 @@ impl Rational {
         }
     }
     /// Exact subtraction retains canonical sign for zero.
-    fn sub(&self, other: &Self) -> Self {
+    pub(super) fn sub(&self, other: &Self) -> Self {
         let mut opposite = other.clone();
         opposite.negative = !opposite.negative && !opposite.numerator.is_zero();
         self.add(&opposite)
     }
     /// Ordered rational images directly multiply or divide the two exact operands.
-    fn image(&self, other: &Self, function: BinaryElementwise) -> TestResult<Self> {
+    pub(super) fn image(&self, other: &Self, function: BinaryElementwise) -> TestResult<Self> {
         let (numerator, denominator) = match function {
             BinaryElementwise::Product => (
                 self.numerator.mul(&other.numerator),
@@ -77,7 +77,7 @@ impl Rational {
         })
     }
     /// Cross-multiplied numerators prove containment without rounded endpoint arithmetic.
-    fn compare(&self, other: &Self) -> Ordering {
+    pub(super) fn compare(&self, other: &Self) -> Ordering {
         if self.negative != other.negative {
             return other.negative.cmp(&self.negative);
         }

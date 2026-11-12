@@ -328,7 +328,7 @@ impl Heap {
         self.current_owner(bundle, budget)
     }
     /// Bare tickets and retained pins share the same declaration, attachment and native checks.
-    fn current_owner(
+    pub(in crate::loan) fn current_owner(
         &self,
         bundle: &Bundle,
         budget: &mut nrz_bindings::Budget,
