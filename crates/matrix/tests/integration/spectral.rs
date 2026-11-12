@@ -44,7 +44,7 @@ fn lc_spectral_reference_enclosures() -> TestResult {
             fixture.input_construction_work,
             storage.usage().work
         ),
-        (133_549, 358, 776, 184_301, 1481)
+        (133_655, 358, 776, 184_301, 1481)
     );
     Ok(())
 }

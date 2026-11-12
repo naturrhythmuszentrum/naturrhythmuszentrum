@@ -107,3 +107,10 @@ mod trig_defined_work;
 mod trig_minus_one;
 mod trig_minus_one_work;
 mod trig_parity_work;
+
+mod defined_total;
+mod defined_total_resources;
+
+mod defined_total_mutations;
+
+mod defined_total_golden;

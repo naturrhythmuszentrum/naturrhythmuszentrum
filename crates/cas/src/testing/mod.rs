@@ -154,3 +154,22 @@ pub(crate) mod half_pi;
     reason = "shared half-Pi resource fixtures"
 )]
 pub(crate) mod half_pi_limits;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared structural totality fixtures"
+)]
+#[expect(
+    dead_code,
+    reason = "the public suite exercises the other totality cases"
+)]
+pub(crate) mod defined_total;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared independent resource inventory"
+)]
+#[expect(
+    dead_code,
+    reason = "the public suite exercises production and replay inventories"
+)]
+pub(crate) mod defined_total_minimal;

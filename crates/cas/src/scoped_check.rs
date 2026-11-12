@@ -190,6 +190,7 @@ fn rule_conditions(
         Primitive::SinOdd | Primitive::CosEven | Primitive::AtanOdd => {
             crate::trig::parity::check(cas, draft, premises, budget)?
         }
+        Primitive::DefinedTotal => crate::defined_total::check(cas, draft, premises, budget)?,
         Primitive::TrigDefined => crate::trig::defined::check(cas, draft, premises, budget)?,
         Primitive::HalfPiWitness => crate::trig::check(cas, draft, premises, budget)?,
         Primitive::SinHalfPi | Primitive::CosHalfPi | Primitive::AtanZero | Primitive::AtanOne => {

@@ -392,6 +392,11 @@ mod region;
 
 #[expect(
     clippy::redundant_pub_crate,
+    reason = "the scoped dispatcher shares the structural checker"
+)]
+mod defined_total;
+#[expect(
+    clippy::redundant_pub_crate,
     reason = "scoped key helpers remain private implementation"
 )]
 mod statement;

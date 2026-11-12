@@ -62,7 +62,7 @@ fn lc_original_root_factor_theorem_replays() -> TestResult {
     super::replay::fresh(&source.cas, &answer.set, &bytes, &mut checking)?;
     assert_eq!(
         (usage, checking.usage(), bytes.len()),
-        (generation(810_450, 3_350, 4), replay(), 6_140)
+        (generation(810_510, 3_350, 4), replay(), 6_140)
     );
     Ok(())
 }

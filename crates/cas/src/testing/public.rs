@@ -397,3 +397,17 @@ pub(crate) mod scalar_transport;
 #[path = "scalar_transport_work.rs"]
 #[expect(clippy::redundant_pub_crate, reason = "shared public test fixtures")]
 pub(crate) mod scalar_transport_work;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "shared structural totality fixtures"
+)]
+#[path = "defined_total.rs"]
+pub(crate) mod defined_total;
+
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "independent public resource inventory"
+)]
+#[path = "defined_total_minimal.rs"]
+pub(crate) mod defined_total_minimal;

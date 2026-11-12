@@ -32,6 +32,8 @@ pub enum Primitive {
     CosEven,
     /// Oddness of arctangent on its original defined Real operand.
     AtanOdd,
+    /// Premise-free structural definedness of the closed numeric fragment.
+    DefinedTotal,
     /// Totality of closed Real trigonometric nodes from original definedness.
     TrigDefined,
     /// Exact sine from the checked original half-Pi witness.
@@ -300,6 +302,7 @@ impl Primitive {
                 | Self::SinOdd
                 | Self::CosEven
                 | Self::AtanOdd
+                | Self::DefinedTotal
                 | Self::TrigDefined
                 | Self::HalfPiWitness
                 | Self::SinHalfPi
@@ -356,6 +359,7 @@ impl Primitive {
             Self::SinOdd => ("trig.sin-odd", 2),
             Self::CosEven => ("trig.cos-even", 2),
             Self::AtanOdd => ("trig.atan-odd", 2),
+            Self::DefinedTotal => ("defined.total", 1),
             Self::TrigDefined => ("trig.defined", 2),
             Self::HalfPiWitness => ("trig.half-pi-witness", 2),
             Self::SinHalfPi => ("trig.sin-half-pi", 2),
@@ -442,7 +446,7 @@ impl Primitive {
     /// Identify the exact proposition family without inspecting untrusted payloads.
     const fn conclusion_kind(self) -> ConclusionKind {
         match self {
-            Self::TrigDefined => ConclusionKind::Predicate,
+            Self::DefinedTotal | Self::TrigDefined => ConclusionKind::Predicate,
             Self::HalfPiWitness => ConclusionKind::HalfPiWitness,
             Self::Solve(_) => ConclusionKind::Solve,
             Self::SeriesTruncate
@@ -605,7 +609,7 @@ impl Primitive {
 }
 
 /// Every registered primitive, in ASCII key order; availability is separate metadata.
-pub const PRIMITIVES: [Primitive; 100] = [
+pub const PRIMITIVES: [Primitive; 101] = [
     Primitive::CaseCongruence,
     Primitive::CaseDomain,
     Primitive::CaseEliminate,
@@ -617,6 +621,7 @@ pub const PRIMITIVES: [Primitive; 100] = [
     Primitive::ContextClose,
     Primitive::ContextHypothesis,
     Primitive::ContextWeaken,
+    Primitive::DefinedTotal,
     Primitive::DifferentiateAdd,
     Primitive::CaseBoundary,
     Primitive::CaseInterior,

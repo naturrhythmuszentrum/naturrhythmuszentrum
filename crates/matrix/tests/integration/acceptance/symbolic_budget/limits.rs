@@ -18,7 +18,7 @@ use nrz_bindings::{
 #[test]
 fn full_ladder_symbolic_work_has_explicit_boundary() -> ResultOf {
     let baseline = lower(16_000_000, 16_000_000)?.jacobian().work();
-    let needed = 4_916_625;
+    let needed = 4_916_627;
     assert_eq!(
         lower(needed, 16_000_000)?.jacobian().work().requests,
         baseline.requests
@@ -46,7 +46,7 @@ fn full_ladder_symbolic_work_has_explicit_boundary() -> ResultOf {
             baseline.generation,
             baseline.replay
         ),
-        (4_916_625, 1_703_795, 4_922_279, 2_174_460)
+        (4_916_627, 1_703_795, 4_922_310, 2_174_460)
     );
     Ok(())
 }

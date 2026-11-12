@@ -126,6 +126,8 @@ pub(crate) fn check(
             return Ok(());
         }
         match draft.rule {
+            // Structural totality checks the exact retained frame and every bound value.
+            Primitive::DefinedTotal => Ok(()),
             Primitive::SeriesReciprocal if matches!(&draft.conclusion, Statement::Series(value) if matches!(value.as_ref(), crate::series::SeriesStatement::Reciprocal { .. })) =>
             {
                 // The same-scope rational object identity has no scalar or source conclusion.

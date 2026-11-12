@@ -16,7 +16,7 @@ use std::rc::Rc;
 /// ´test:integration:lc-root-preparation-cumulative-work-boundary´
 #[test]
 fn lc_root_preparation_cumulative_work_boundary() -> TestResult {
-    const REQUIRED: u64 = 5_618_993;
+    const REQUIRED: u64 = 5_619_289;
     for (available, prior, success) in [
         (REQUIRED, 0, true),
         (REQUIRED - 1, 0, false),
@@ -40,7 +40,7 @@ fn preparation(budget: &mut Budget) -> TestResult {
     let mut fixture = Fixture::with_store_limits(["5", "1/10", "1/2000"], budget.limits().clone())?;
     let graph = Rc::get_mut(&mut fixture.graph).ok_or("original graph")?;
     let key = ReciprocalJacobianKey::new(graph, fixture.law.operator(), &[], budget)?;
-    assert_eq!(key.usage().after.work - key.usage().before.work, 416_297);
+    assert_eq!(key.usage().after.work - key.usage().before.work, 416_530);
     let mut cache = ReciprocalJacobianCache::new();
     let exact = cache.get_or_derive(graph, &key, budget)?;
     assert_eq!(
@@ -49,7 +49,7 @@ fn preparation(budget: &mut Budget) -> TestResult {
     );
     let before = budget.usage().work;
     let cached = cache.get_or_derive(graph, &key, budget)?;
-    assert_eq!(budget.usage().work - before, 9_969);
+    assert_eq!(budget.usage().work - before, 10_011);
     assert!(std::ptr::eq(exact.native(), cached.native()));
     let contract =
         ReciprocalDerivativeContract::new(graph, exact, LiteralLimits::default(), budget)?;
@@ -61,9 +61,9 @@ fn preparation(budget: &mut Budget) -> TestResult {
     let result = LcRootJacobian::new(fixture.law, contract.exact().clone(), budget);
     assert_eq!(cache.len(), 1);
     assert_eq!(cache.retained_payload_bytes(), retained);
-    assert_eq!(retained, 144_253);
+    assert_eq!(retained, 144_358);
     let root = result?;
-    assert_eq!(root.usage().after.work - root.usage().before.work, 5_239);
+    assert_eq!(root.usage().after.work - root.usage().before.work, 5_260);
     assert!(std::ptr::eq(
         root.operator().native(),
         contract.exact().native()
@@ -78,7 +78,7 @@ fn lc_root_adapter_resource_boundaries() -> TestResult {
     let mut budget = shared::policy()?;
     let mut fixture = Fixture::with_store_limits(["5", "1/10", "1/2000"], budget.limits().clone())?;
     let contract = shared::derivative(&mut fixture, &mut budget)?;
-    for (kind, required) in [(0, 5_239), (1, 632), (2, 632)] {
+    for (kind, required) in [(0, 5_260), (1, 632), (2, 632)] {
         for (available, success) in [(required, true), (required - 1, false)] {
             let result = LcRootJacobian::new(
                 fixture.law.clone(),
@@ -108,7 +108,7 @@ fn lc_root_numerical_work_boundaries() -> TestResult {
     )?;
     let deterministic = fixture.plan(case.original.clone(), &mut budget)?;
     let context = ArithmeticContext::new()?;
-    for (available, prior, success) in [(5_247, 0, true), (5_246, 0, false), (5_247, 1, false)] {
+    for (available, prior, success) in [(5_268, 0, true), (5_267, 0, false), (5_268, 1, false)] {
         let before = case.heap.provenance_usage();
         let result = deterministic.clone().with_reciprocal_statistics(
             &case.heap,
@@ -148,7 +148,7 @@ pub(super) fn policy(kind: usize, available: u64, prior: u64) -> TestResult<Budg
 /// ´test:integration:lc-root-publication-cumulative-work-boundary´
 #[test]
 fn lc_root_publication_cumulative_work_boundary() -> TestResult {
-    const REQUIRED: u64 = 5_749_648;
+    const REQUIRED: u64 = 5_750_008;
     for (available, prior, success) in [
         (REQUIRED, 0, true),
         (REQUIRED - 1, 0, false),

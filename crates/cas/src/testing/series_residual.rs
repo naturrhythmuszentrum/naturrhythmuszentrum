@@ -53,6 +53,8 @@ pub(crate) fn rational(value: &str) -> TestResult<Rational> {
 enum FrameHeader {
     /// Original Real declarations.
     Core,
+    /// Structural totality uses production defaults throughout.
+    Totality,
     /// An additional Complex declaration.
     Complex,
     /// A conservative child of the original Real header.
@@ -404,6 +406,41 @@ impl Fixture {
             premises: Vec::new(),
         })
     }
+    /// Premise-free Product source fixture retains all production ceilings.
+    pub(crate) fn totality(reversed: bool) -> TestResult<Self> {
+        Self::framed(
+            &["0", "1/3", "0", "-1/45", "0"],
+            "0",
+            reversed,
+            false,
+            FrameHeader::Totality,
+        )
+    }
+
+    /// Add structural definedness beside the assumption-retention source controls.
+    pub(crate) fn total_source(&mut self, source: &Term) -> TestResult<VerifiedWitness> {
+        let (expression, _) = self.term(source, self.candidate.len())?;
+        let defined = self
+            .cas
+            .defined_total(&expression, &self.context, &mut default_budget()?)?;
+        assert!(defined.is_unconditional());
+        Ok(self.cas.expand_series_source(
+            &SourceRequest {
+                clause: SourceClause::PolynomialSeed,
+                source: expression,
+                domain: self.region.clone(),
+                field: self.field.clone(),
+                centre: self.centre.clone(),
+                variable: self.x.clone(),
+                scope: Vec::new(),
+                context: self.context.clone(),
+                order: u32::try_from(self.candidate.len())?,
+            },
+            std::slice::from_ref(defined.proof()),
+            &mut default_budget()?,
+        )?)
+    }
+
     /// Both allocation orders preserve exactly the same mathematical frame.
     pub(crate) fn new(
         values: &[&str],
@@ -462,10 +499,14 @@ impl Fixture {
         } else {
             ["x", "y", "z"]
         };
-        let mut cas = Cas::new(Limits {
-            work: 20_000_000,
-            replay_work: 20_000_000,
-            ..Limits::default()
+        let mut cas = Cas::new(if matches!(frame, FrameHeader::Totality) {
+            Limits::default()
+        } else {
+            Limits {
+                work: 20_000_000,
+                replay_work: 20_000_000,
+                ..Limits::default()
+            }
         })?;
         let header = admit(
             &mut cas,

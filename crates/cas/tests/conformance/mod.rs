@@ -159,3 +159,9 @@ mod series_transform;
 mod trig_minus_one;
 mod trig_minus_one_work;
 mod trig_parity_work;
+
+mod defined_total;
+
+mod defined_total_frames;
+
+mod defined_total_walk;
