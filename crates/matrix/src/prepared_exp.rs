@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Frozen expm1 authority composed with a separately checked exp target.
 
-use super::{PreparedExpm1, PreparedExpm1Error};
+use super::{PreparedExpm1, PreparedExpm1Error, finalize_owner};
 use nrz_bindings::{
     Budget,
     readings::algebra::{
@@ -112,6 +112,19 @@ impl<'a> PreparedExp<'a> {
         budget: &mut Budget,
         counts: &mut Counts,
     ) -> Result<Self, PreparedExpError<'r>> {
+        Self::with_basis(request, domain, budget, |budget| {
+            // Domain widening must update the bound, submitted auxiliary request and failure's carried request together.
+            PreparedExpm1::new(cas, request, domain, search, context, budget, counts)
+        })
+    }
+
+    /// Keep the constructor's admission path intact when a control supplies a prepared basis.
+    fn with_basis<'r>(
+        request: &'r Request,
+        domain: [f64; 2],
+        budget: &mut Budget,
+        prepare: impl FnOnce(&mut Budget) -> Result<PreparedExpm1<'a>, PreparedExpm1Error>,
+    ) -> Result<Self, PreparedExpError<'r>> {
         let valid = domain.iter().all(|x| x.is_finite())
             && domain[0] >= -2.0
             && domain[1] <= 0.0
@@ -122,20 +135,20 @@ impl<'a> PreparedExp<'a> {
         let policy = auxiliary_policy(request.bits, [1, 1], budget)?;
         // Composition storage is live alongside the basis throughout construction.
         let extra = (size_of::<Self>() - size_of::<PreparedExpm1<'_>>()) as u64;
-        let basis = budget.with_retained_payload(extra, AT, |budget| {
-            // Domain widening must update the bound, submitted auxiliary request and failure's carried request together.
-            PreparedExpm1::new(cas, request, domain, search, context, budget, counts)
-        });
+        let basis = budget.with_retained_payload(extra, AT, prepare);
         match basis {
-            Ok(basis) => {
-                admit_output(basis.bytes.saturating_add(extra), budget)
-                    .map_err(PreparedExpm1Error::from)?;
-                Ok(Self {
-                    basis,
-                    policy,
-                    bits: request.bits,
+            Ok(basis) => Ok(
+                finalize_owner(basis.bytes.saturating_add(extra), budget, AT, || {
+                    #[cfg(test)]
+                    constructor_tests::ASSEMBLED.set(true);
+                    Self {
+                        basis,
+                        policy,
+                        bits: request.bits,
+                    }
                 })
-            }
+                .map_err(PreparedExpm1Error::from)?,
+            ),
             Err(PreparedExpm1Error::TargetNotCertifiable) => {
                 Err(PreparedExpError::BasisPreparation {
                     auxiliary: request,
@@ -219,11 +232,6 @@ impl<'a> PreparedExp<'a> {
     }
 }
 
-/// Final returned ownership; a larger CAS registration can dominate the public route's limit.
-const fn admit_output(bytes: u64, budget: &Budget) -> Result<(), Fault> {
-    budget.check(BudgetKind::OutputBytes, bytes, AT)
-}
-
 /// Exact constant-size rational comparison; shifting a u64 by at most 63 fits u128.
 fn auxiliary_policy(
     bits: u32,
@@ -262,8 +270,9 @@ mod tests {
     use super::*;
     /// Isolate the returned-output boundary from the earlier, potentially larger CAS registration.
     /// A 4,096-byte basis plus 32 fixed bytes requires 4,128, with prior Work retained.
+    /// The construction finalizer admits N and refuses N−1 before assembly.
     /// # Panics
-    /// Panics if the output guard admits one below or changes the typed cause.
+    /// Panics if output admission, assembly order or the typed cause changes.
     /// ´claim:matrix:prepared-exp-output-boundary´
     /// ´test:unit:prepared-exp-output-boundary´
     #[test]
@@ -275,10 +284,16 @@ mod tests {
                 ..Limits::default()
             })?;
             budget.work(7, AT)?;
-            let result = admit_output(4128, &budget);
+            let assembled = std::cell::Cell::new(false);
+            let result = finalize_owner(4096 + 32, &budget, AT, || {
+                assembled.set(true);
+                4128_u64
+            });
             if limit == 4128 {
-                result?;
+                assert_eq!(result?, 4128);
+                assert!(assembled.get());
             } else {
+                assert!(!assembled.get(), "output admission precedes assembly");
                 assert_eq!(
                     result.expect_err("output boundary").kind,
                     FaultKind::Exhausted {
@@ -354,3 +369,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "prepared_exp_constructor_tests.rs"]
+mod constructor_tests;
