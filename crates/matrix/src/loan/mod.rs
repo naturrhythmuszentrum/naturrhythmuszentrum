@@ -11,6 +11,7 @@ mod error;
 pub(crate) mod fault;
 mod inventory;
 mod lifecycle;
+mod masked_reader;
 mod payload;
 pub(crate) mod preparation;
 mod reader;
@@ -29,6 +30,7 @@ pub use declaration::{HostChannel, HostTileDeclaration};
 pub use error::LoanError;
 pub use inventory::LoanInventory;
 pub use lifecycle::{CancelOutcome, HandbackOutcome, LoanRequest, OwnedLoan};
+pub use masked_reader::MaskedTileReader;
 pub use reader::{BundlePin, PublishedTile, TileReader};
 pub use registry::{
     AbsenceReason, CancellationReceipt, LoanTicket, ProducerOutcome, PublicationReceipt,

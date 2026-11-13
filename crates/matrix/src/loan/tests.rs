@@ -4,6 +4,7 @@
 mod affine;
 mod boundaries;
 mod invariants;
+mod masked_reader;
 mod products;
 mod recipes;
 mod review;
