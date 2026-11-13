@@ -71,6 +71,10 @@ output = "docs/design/reuse-concept.md"
 requires = []
 
 [[document]]
+output = "docs/design/compute-benchmarks-concept.md"
+requires = []
+
+[[document]]
 output = "docs/design/units-design.md"
 requires = []
 
