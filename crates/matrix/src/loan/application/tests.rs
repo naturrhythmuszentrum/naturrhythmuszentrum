@@ -4,6 +4,7 @@
 mod authority;
 mod binary;
 mod bytes;
+mod chain_format;
 pub(in crate::loan::application) mod expm1;
 mod invariants;
 mod laws;

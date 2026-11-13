@@ -18,17 +18,17 @@ use nrz_scalar::Scalar;
 pub(super) enum Input {
     /// Existing entry points accept only host origins with their unchanged tariff.
     Host,
-    /// The three opt-in binary64 entry points require current native application lineage.
+    /// Native continuations require current application lineage.
     Application,
 }
 
 impl Heap {
-    /// Apply square to a published binary64 result with current numerical lineage.
-    pub fn request_chained_pointwise_square(
+    /// Apply square to a published result in either native format with current numerical lineage.
+    pub fn request_chained_pointwise_square<P: Scalar + 'static>(
         &mut self,
-        request: PointwiseRequest<f64>,
+        request: PointwiseRequest<P>,
         account: &mut ExecutionAccount,
-    ) -> ApplicationRequest<f64> {
+    ) -> ApplicationRequest<P> {
         super::admission::request_with_origin(
             self,
             request,
@@ -124,7 +124,7 @@ pub(super) fn authenticate<P: Scalar + 'static>(
         }
         Input::Application => charge(budget, 1)?,
     }
-    if crate::storage::Format::of::<P>() != crate::storage::Format::Binary64
+    if crate::storage::Format::of::<P>() != immediate.identity.format
         || immediate.origin.evidence.is_none()
     {
         return Err(LoanError::UnsupportedContract);
@@ -181,6 +181,7 @@ fn parent<'a>(
     if identity.scope != child.scope
         || identity.scope != heap.scope
         || identity.request >= child.request
+        || identity.format != child.format
     {
         return Err(LoanError::WrongLoan);
     }
@@ -225,10 +226,7 @@ fn matches_capture(
 
 /// Reject unsupported representations while preserving specific layout and coverage faults.
 fn eligible(source: &Bundle) -> Result<(), LoanError> {
-    if source.identity.format != crate::storage::Format::Binary64
-        || source.endpoints.is_some()
-        || source.retained_law.is_some()
-    {
+    if source.endpoints.is_some() || source.retained_law.is_some() {
         return Err(LoanError::UnsupportedContract);
     }
     if source.declaration.coverage != crate::Coverage::RepresentedInputs {
@@ -249,10 +247,12 @@ fn eligible(source: &Bundle) -> Result<(), LoanError> {
             return Err(LoanError::UnsupportedContract);
         }
         match Member::check(&evidence.operation, evidence.law.kind(), None)? {
-            Member::Square(_)
-            | Member::SquareRoot(_)
-            | Member::Reciprocal(_)
-            | Member::Binary(..) => {}
+            Member::Square(_) => {}
+            Member::SquareRoot(_) | Member::Reciprocal(_) | Member::Binary(..) => {
+                if source.identity.format != crate::storage::Format::Binary64 {
+                    return Err(LoanError::UnsupportedContract);
+                }
+            }
             Member::PreparedExpm1(..) => return Err(LoanError::UnsupportedContract),
         }
     }
