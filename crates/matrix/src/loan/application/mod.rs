@@ -202,11 +202,14 @@ impl<P: Scalar> std::fmt::Debug for ApplicationCore<P> {
     }
 }
 /// Meaning of the numerical error companion at this tile's publication boundary.
+///
+/// A copy retains the scope of the arithmetic that last produced its companion,
+/// or `HostInput` when the companion came directly from a host.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NumericalErrorScope {
     /// The host supplied the companion under its declared input contract.
     HostInput,
-    /// Only the current arithmetic operation's numerical error is reported.
+    /// Reports only the numerical error of the arithmetic that last produced the companion.
     /// Inherited uncertainty is included in Total; Error is not a whole-chain bound.
     LocalOperation,
 }

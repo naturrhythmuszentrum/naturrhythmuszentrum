@@ -239,7 +239,9 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
             })
     }
     /// Report the immutable publication boundary of this tile's numerical error channel.
-    /// This metadata is available even when the historical input has retired.
+    ///
+    /// A copy reports the scope of the arithmetic that last produced its companion,
+    /// or `HostInput` for a host companion. The metadata survives input retirement.
     #[must_use]
     pub fn numerical_error_scope(&self) -> super::NumericalErrorScope {
         self.bundle
