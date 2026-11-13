@@ -30,6 +30,8 @@ pub(super) enum Member<'a> {
     Transform(&'a Rc<KernelContract>),
     /// Exact enclosure of the represented box in either existing scalar format.
     Square(&'a Rc<KernelContract>),
+    /// Native projected Square reads its source directly through a tile-bound map.
+    ProjectedSquare(&'a Rc<KernelContract>),
     /// Relative endpoint target with its exact retained original correspondence.
     PreparedExpm1(&'a Rc<KernelContract>, &'a PreparedExpm1Operation),
     /// Binary64 exact enclosure of either sign of a separated represented box.
@@ -64,6 +66,7 @@ impl<'a> Member<'a> {
             return Err(LoanError::UnsupportedContract);
         }
         match (&law.recipe, prepared) {
+            (Recipe::ProjectedSquare(_), None) => Ok(Self::ProjectedSquare(law)),
             (Recipe::Transform(_), None) => Ok(Self::Transform(law)),
             (Recipe::Elementwise(Elementwise::Square), None) => Ok(Self::Square(law)),
             (Recipe::Elementwise(Elementwise::Reciprocal), None) => Ok(Self::Reciprocal(law)),
@@ -79,6 +82,7 @@ impl<'a> Member<'a> {
     pub(super) const fn law(self) -> &'a Rc<KernelContract> {
         match self {
             Self::Transform(law)
+            | Self::ProjectedSquare(law)
             | Self::Square(law)
             | Self::Reciprocal(law)
             | Self::SquareRoot(law)
@@ -90,6 +94,7 @@ impl<'a> Member<'a> {
     pub(super) const fn roles(self) -> usize {
         match self {
             Self::Transform(_)
+            | Self::ProjectedSquare(_)
             | Self::Square(_)
             | Self::Reciprocal(_)
             | Self::SquareRoot(_)
@@ -100,7 +105,11 @@ impl<'a> Member<'a> {
     /// Original cancellation inventory; the shared records never grow for dispatch.
     pub(super) const fn debits(self) -> usize {
         match self {
-            Self::Transform(_) | Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 17,
+            Self::Transform(_)
+            | Self::ProjectedSquare(_)
+            | Self::Square(_)
+            | Self::Reciprocal(_)
+            | Self::SquareRoot(_) => 17,
             Self::PreparedExpm1(..) => 23,
             Self::Binary(..) => 18,
         }
@@ -117,6 +126,10 @@ impl<'a> Member<'a> {
     pub(super) const fn is_transform(self) -> bool {
         matches!(self, Self::Transform(_))
     }
+    /// Native maps change cell incidence for either movement or direct arithmetic.
+    pub(super) const fn is_projected(self) -> bool {
+        matches!(self, Self::Transform(_) | Self::ProjectedSquare(_))
+    }
     /// Publication records whether this member preserves input error or reports local arithmetic.
     pub(super) const fn error_scope(self) -> super::NumericalErrorScope {
         if self.is_transform() {
@@ -127,13 +140,11 @@ impl<'a> Member<'a> {
     }
     /// The checked full map remains shared with the original operation throughout execution.
     pub(super) fn map(self) -> Result<&'a crate::EntryMap, LoanError> {
-        let Self::Transform(law) = self else {
-            return Err(LoanError::UnsupportedContract);
-        };
-        let Recipe::Transform(map) = &law.recipe else {
-            return Err(LoanError::UnsupportedContract);
-        };
-        Ok(map)
+        let law = self.law();
+        match &law.recipe {
+            Recipe::Transform(map) | Recipe::ProjectedSquare(map) => Ok(map),
+            _ => Err(LoanError::UnsupportedContract),
+        }
     }
     /// Closed arity is a member property, never inferred from a caller's input count.
     pub(super) const fn arity(self) -> usize {
@@ -142,7 +153,10 @@ impl<'a> Member<'a> {
     /// The closed elementwise law retains its original conservative factor.
     pub(super) const fn invocation_factor(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 12,
+            Self::ProjectedSquare(_)
+            | Self::Square(_)
+            | Self::Reciprocal(_)
+            | Self::SquareRoot(_) => 12,
             Self::Transform(_) => 6,
             Self::PreparedExpm1(..) => 0,
             Self::Binary(..) => 21,
@@ -152,6 +166,7 @@ impl<'a> Member<'a> {
     pub(super) const fn native_phase(self) -> Option<&'static str> {
         match self {
             Self::Square(_) => None,
+            Self::ProjectedSquare(_) => Some("projected square traversal"),
             Self::Transform(_) => Some("mapped companion movement"),
             Self::PreparedExpm1(..) => Some("prepared native traversal"),
             Self::Reciprocal(_) => Some("reciprocal native traversal"),
@@ -211,7 +226,7 @@ impl<'a> Member<'a> {
         coverage: crate::Coverage,
     ) -> Result<(), LoanError> {
         match self {
-            Self::Transform(_) | Self::Square(_) => Ok(()),
+            Self::Transform(_) | Self::ProjectedSquare(_) | Self::Square(_) => Ok(()),
             Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => {
                 if format != crate::storage::Format::Binary64 {
                     return Err(LoanError::UnsupportedContract);
@@ -238,6 +253,7 @@ impl<'a> Member<'a> {
     pub(super) const fn storage_failure(self, component: usize) -> CellOutcome {
         match self {
             Self::Transform(_)
+            | Self::ProjectedSquare(_)
             | Self::Square(_)
             | Self::Reciprocal(_)
             | Self::SquareRoot(_)

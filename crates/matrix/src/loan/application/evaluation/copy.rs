@@ -47,6 +47,49 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
         })
     }
 
+    /// Native projected Square uses the same bound owners without materializing a copied tile.
+    pub(super) fn evaluate(
+        &self,
+        member: super::Member<'_>,
+        cell: usize,
+        component: usize,
+        entry: usize,
+        permit: &super::Traversal,
+    ) -> Result<super::selected::Values<P>, super::CellOutcome> {
+        if member.is_transform() {
+            return self
+                .component(cell, component, permit)
+                .map(super::selected::Values::Closed)
+                .map_err(|_| member.storage_failure(component));
+        }
+        let load = || -> Result<_, LoanError> {
+            let address = self.address(cell, component)?;
+            #[cfg(test)]
+            for _ in 0..2 {
+                crate::loan::fault::loaded();
+            }
+            Ok((
+                self.channels[0][(address, 0)],
+                self.channels[1][(address, 0)],
+            ))
+        };
+        let (center, total) = load().map_err(|_| member.storage_failure(component))?;
+        let result = nrz_accuracy::Nonnegative::new(total)
+            .map_err(crate::KernelError::from)
+            .and_then(|total| {
+                crate::kernels::nonlinear::evaluate_selected(
+                    center,
+                    total,
+                    crate::Elementwise::Square,
+                    entry,
+                    &permit.context,
+                )
+            });
+        result
+            .map(|value| super::selected::Values::Closed([value.center, value.total, value.error]))
+            .map_err(|reason| super::CellOutcome::CellRefused { component, reason })
+    }
+
     /// One checked address serves all equal-length immutable component planes.
     fn address(&self, cell: usize, component: usize) -> Result<usize, LoanError> {
         let entry = self.layout.index(cell, component)?;

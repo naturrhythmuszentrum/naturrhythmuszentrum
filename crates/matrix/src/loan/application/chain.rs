@@ -247,7 +247,7 @@ fn eligible(source: &Bundle) -> Result<(), LoanError> {
             return Err(LoanError::UnsupportedContract);
         }
         match Member::check(&evidence.operation, evidence.law.kind(), None)? {
-            Member::Transform(_) | Member::Square(_) => {}
+            Member::Transform(_) | Member::ProjectedSquare(_) | Member::Square(_) => {}
             Member::SquareRoot(_) | Member::Reciprocal(_) | Member::Binary(..) => {
                 if source.identity.format != crate::storage::Format::Binary64 {
                     return Err(LoanError::UnsupportedContract);

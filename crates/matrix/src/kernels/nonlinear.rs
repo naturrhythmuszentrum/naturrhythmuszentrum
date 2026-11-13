@@ -53,6 +53,26 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
     Ok(result)
 }
 
+/// Dense execution shares the exact native projection and whole-box Square law.
+pub(crate) fn evaluate_projected<P: Scalar + 'static>(
+    input: &NormalizedView<'_, P>,
+    map: &crate::EntryMap,
+    context: &ArithmeticContext,
+) -> Result<Vec<Entry<P>>, OperationError> {
+    let mut result = buffer(map.target().entries())?;
+    for (entry, original) in map.indices().enumerate() {
+        let (center, radius) = operand(input, original)?;
+        result.push(evaluate_selected(
+            center,
+            radius,
+            Elementwise::Square,
+            entry,
+            context,
+        )?);
+    }
+    Ok(result)
+}
+
 /// Preserve the dense wrapper's original-entry overflow mapping for selected access.
 pub(crate) fn evaluate_selected<P: Scalar>(
     center: P,

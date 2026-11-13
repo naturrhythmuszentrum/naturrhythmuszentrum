@@ -22,9 +22,11 @@ impl Member<'_> {
     /// A refused component still initializes every role with safe placeholders.
     pub(in crate::loan::application) const fn zeros<P: Scalar>(self) -> Values<P> {
         match self {
-            Self::Transform(_) | Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
-                Values::Closed([P::ZERO; 3])
-            }
+            Self::Transform(_)
+            | Self::ProjectedSquare(_)
+            | Self::Square(_)
+            | Self::Reciprocal(_)
+            | Self::SquareRoot(_) => Values::Closed([P::ZERO; 3]),
             Self::Binary(..) => Values::Binary([0.0; 3]),
             Self::PreparedExpm1(..) => Values::Prepared([0.0; 5]),
         }
@@ -47,7 +49,7 @@ impl Member<'_> {
         permit: &Traversal,
     ) -> Result<Values<P>, CellOutcome> {
         match self {
-            Self::Transform(_) => Err(self.storage_failure(component)),
+            Self::Transform(_) | Self::ProjectedSquare(_) => Err(self.storage_failure(component)),
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 let function = if matches!(self, Self::Square(_)) {
                     crate::Elementwise::Square
@@ -70,6 +72,7 @@ impl Member<'_> {
                         .entered(),
                     ),
                     Self::Transform(_)
+                    | Self::ProjectedSquare(_)
                     | Self::Square(_)
                     | Self::PreparedExpm1(..)
                     | Self::Binary(..) => None,

@@ -271,6 +271,7 @@ impl CheckedOperation {
                 | Recipe::Transform(_)
                 | Recipe::Product
                 | Recipe::Elementwise(_)
+                | Recipe::ProjectedSquare(_)
                 | Recipe::PositiveReciprocal(_) => true,
             },
             NativeRecipe::Copy

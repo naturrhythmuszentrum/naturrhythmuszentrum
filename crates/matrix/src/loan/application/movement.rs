@@ -31,6 +31,25 @@ impl Heap {
         })
     }
 
+    /// Evaluate Square directly over native product or gather incidence in either format.
+    pub fn request_projected_square<P: Scalar + 'static>(
+        &mut self,
+        request: PointwiseRequest<P>,
+        account: &mut ExecutionAccount,
+    ) -> ApplicationRequest<P> {
+        let origin = match super::chain::origin(&request.input) {
+            Ok(origin) => origin,
+            Err(error) => return ApplicationRequest::ApplicationRefused(error.into(), request),
+        };
+        super::admission::request_kind(
+            self,
+            request,
+            KernelKind::Elementwise(crate::Elementwise::Square),
+            origin,
+            account,
+        )
+    }
+
     /// Copy selected original values and both companions into disjoint dense owners.
     ///
     /// The checked entry transform preserves component order within each copied cell.

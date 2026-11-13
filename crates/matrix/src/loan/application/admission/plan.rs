@@ -212,7 +212,7 @@ impl Plan {
             )?)
             .ok_or(LoanError::CountOverflow)?;
         let input_channels = request.input_channels()?;
-        let mask_work = if request.member()?.is_transform() {
+        let mask_work = if request.member()?.is_projected() {
             super::super::movement::availability_work(
                 request.destination.capacity(),
                 self.cell_words,

@@ -107,7 +107,7 @@ fn traversal_work<P: Scalar>(
         .ok_or(LoanError::CountOverflow)?;
     core.population
         .checked_mul(per_cell)
-        .and_then(|steps| steps.checked_add(if member.is_transform() { 3 } else { 0 }))
+        .and_then(|steps| steps.checked_add(if member.is_projected() { 3 } else { 0 }))
         .and_then(|steps| {
             core.filled
                 .len()
@@ -159,14 +159,14 @@ fn run<P: Scalar + 'static>(
         .input
         .as_ref()
         .and_then(|pin| pin.checked_reader().ok());
-    let copy = if member.is_transform() {
+    let copy = if member.is_projected() {
         Some(copy::BoundCopy::bind(
             reader.as_ref().ok_or(LoanError::WrongLoan)?,
         )?)
     } else {
         None
     };
-    let projection = if member.is_transform() {
+    let projection = if member.is_projected() {
         Some(member.map()?)
     } else {
         None
@@ -188,9 +188,7 @@ fn run<P: Scalar + 'static>(
             for component in 0..components {
                 let entry = cell + cells * component;
                 let result = if let Some(copy) = &copy {
-                    copy.component(original, component, permit)
-                        .map(selected::Values::Closed)
-                        .map_err(|_| member.storage_failure(component))
+                    copy.evaluate(member, original, component, entry, permit)
                 } else {
                     member.scalar(
                         reader.as_ref(),

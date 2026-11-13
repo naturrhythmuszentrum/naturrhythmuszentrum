@@ -32,7 +32,9 @@ pub(super) fn check<P: Scalar + 'static>(
     if request.binary.is_some() {
         return super::binary::check_request(heap, request, account, budget);
     }
-    if request.expected == crate::KernelKind::TransformEntries {
+    let projected = matches!(&request.operation.recipe, crate::binding::NativeRecipe::Kernel(law)
+        if matches!(law.recipe, crate::kernels::contract::Recipe::ProjectedSquare(_)));
+    if request.expected == crate::KernelKind::TransformEntries || projected {
         return super::movement::check(heap, request, account, origin, budget);
     }
     charge(budget, 1)?;
@@ -249,7 +251,7 @@ impl Evidence {
         let law = member.law();
         let exclusion = Rc::ptr_eq(&self.excluded_inputs, &self.operation.inputs)
             && Rc::ptr_eq(&self.excluded_outputs, &self.operation.outputs);
-        let (source_layout, same_axis) = if member.is_transform() {
+        let (source_layout, same_axis) = if member.is_projected() {
             let (layout, axis) = self
                 .endpoint_tokens
                 .movement()
@@ -261,7 +263,7 @@ impl Evidence {
                 destination.axis == self.source.axis,
             )
         };
-        if member.is_transform() != self.endpoint_tokens.movement().is_some() {
+        if member.is_projected() != self.endpoint_tokens.movement().is_some() {
             return Err(LoanError::WrongLoan);
         }
         if !exclusion
@@ -273,7 +275,7 @@ impl Evidence {
         {
             return Err(LoanError::WrongLoan);
         }
-        let expected_extent = if member.is_transform() {
+        let expected_extent = if member.is_projected() {
             member.map()?.target()
         } else {
             self.source.extent
@@ -289,9 +291,9 @@ impl Evidence {
             &destination.symbols,
             self.operation.inputs()[0].descriptor(),
             self.operation.outputs()[0].descriptor(),
-            !member.is_transform(),
+            !member.is_projected(),
         )?;
-        if member.is_transform() && member.map()?.source() != self.source.extent {
+        if member.is_projected() && member.map()?.source() != self.source.extent {
             return Err(LoanError::WrongLoan);
         }
         member.representation_format(

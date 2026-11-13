@@ -13,6 +13,7 @@ use nrz_scalar::Scalar;
 mod arithmetic;
 mod combined;
 mod gathered_product;
+mod projected;
 
 /// One independently described source and branch, with an intentional original input hole.
 struct Setup<P: Scalar> {

@@ -225,7 +225,7 @@ fn extras<P: Scalar + 'static>(
 ) -> Result<Extras, LoanError> {
     let source = super::super::contract::source(request)?;
     let member = request.member()?;
-    let demand_layout = if member.is_transform() {
+    let demand_layout = if member.is_projected() {
         request.demand.layout()
     } else {
         source.identity.layout
@@ -317,7 +317,7 @@ fn fill_availability<P: Scalar>(
     demand: &crate::MaskView<'_>,
     filled: &mut [u64],
 ) -> Result<(), LoanError> {
-    if member.is_transform() {
+    if member.is_projected() {
         super::super::movement::filled(member.map()?, source, demand, filled)?;
     } else {
         for (index, word) in filled.iter_mut().enumerate() {
@@ -346,7 +346,7 @@ fn auxiliary<P: Scalar>(
     endpoints: Option<[(usize, u64, u64); 2]>,
 ) -> Result<super::super::binary::Auxiliary, LoanError> {
     use super::super::binary::{Auxiliary, Side};
-    if request.member()?.is_transform() {
+    if request.member()?.is_projected() {
         return Ok(Auxiliary::Movement {
             layout: request.demand.layout(),
             axis: request.destination.axis,

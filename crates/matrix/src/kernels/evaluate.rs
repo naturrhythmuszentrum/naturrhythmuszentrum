@@ -35,6 +35,10 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
             return Err(KernelError::Contract.into());
         }
         Recipe::Sum { subtract, right } => (sum(views, *subtract, right, &context)?, None),
+        Recipe::ProjectedSquare(map) => (
+            super::nonlinear::evaluate_projected(first(views)?, map, &context)?,
+            None,
+        ),
         Recipe::Transform(map) => (
             transform(views, map)?,
             transformed_contributions(views, map)?,

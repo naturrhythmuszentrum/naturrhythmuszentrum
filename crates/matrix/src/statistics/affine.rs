@@ -77,6 +77,7 @@ pub(crate) fn map<P: Scalar + 'static>(
             Recipe::Linear(map) => fixed(map, &mut result, context)?,
             Recipe::Product
             | Recipe::Elementwise(_)
+            | Recipe::ProjectedSquare(_)
             | Recipe::PositiveReciprocal(_)
             | Recipe::PreparedExpm1
             | Recipe::BinaryElementwise(_) => {
