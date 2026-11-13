@@ -33,7 +33,6 @@ mod support;
     reason = "the existing bounded observer remains executable-private"
 )]
 mod trace;
-use nrz_scalar::{SigmoidFailure, TanhFailure};
 use std::{
     cell::Cell,
     io::{self, Write},
@@ -41,17 +40,8 @@ use std::{
     time::Instant,
 };
 use support::TestResult;
+use support::{Snapshot, inputs};
 
-/// Complete bits or the unchanged typed numerical refusal.
-#[derive(Debug, PartialEq, Eq)]
-enum Snapshot {
-    /// Sigmoid's five public fields.
-    Sigmoid(Result<[u64; 5], SigmoidFailure>),
-    /// Tanh's five public fields.
-    Tanh(Result<[u64; 5], TanhFailure>),
-    /// Uncertified platform result, never a golden value.
-    Platform(u64),
-}
 /// One private live observation, rendered without extending the recorded schema.
 #[derive(Debug, PartialEq)]
 struct Observation {
@@ -168,19 +158,6 @@ fn timed<T>(phase: &'static str, run: impl FnOnce() -> TestResult<T>) -> TestRes
     }?;
     Ok((result, clock.stop()))
 }
-/// A finite permutation reaches both owners without sorting or duplicate points.
-fn inputs(count: u32) -> TestResult<Vec<f64>> {
-    if !(4..=4096).contains(&count) || !count.is_power_of_two() {
-        return Err("power-of-two population 4 through 4096 required".into());
-    }
-    let mut values = (0..count)
-        .map(|i| f64::from((i * 13) % count) / f64::from(count))
-        .collect::<Vec<_>>();
-    let n = values.len();
-    values[n - 2] = 2.0_f64.powi(-40);
-    values[n - 1] = 2.0_f64.powi(-10) / f64::from(count);
-    Ok(values)
-}
 /// Collection loss is an explicit failure; it cannot change a numerical result.
 fn run(
     count: u32,
@@ -273,7 +250,7 @@ fn write_run(p: &protocol::Protocol, capacity: usize, mut out: impl Write) -> Te
                     "discarded warm-up process",
                     "1",
                     "process",
-                    &p.source(),
+                    &p.source(None),
                 )?;
                 out.flush()?;
                 return Ok(());
@@ -282,7 +259,7 @@ fn write_run(p: &protocol::Protocol, capacity: usize, mut out: impl Write) -> Te
                 let id = format!("{}-{}", row.family, row.phase);
                 let source = format!(
                     "{}; boundary={}; work={:?}; resources={}; complete_results={:?}; observer={receipt:?}",
-                    p.source(),
+                    p.source(None),
                     row.phase,
                     row.work,
                     row.evidence,
@@ -307,7 +284,7 @@ fn write_run(p: &protocol::Protocol, capacity: usize, mut out: impl Write) -> Te
                 "collection failed",
                 "1",
                 "failure",
-                &format!("{}; error={error}", p.source()),
+                &format!("{}; error={error}", p.source(None)),
             )?;
             out.flush()?;
             return Err(error);
@@ -327,3 +304,13 @@ fn main() -> TestResult {
 #[cfg(test)]
 #[path = "../tests/prepared_sigmoid_tanh_measurements/controls.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "prepared_sigmoid_tanh/sampling.rs"]
+mod sampling;
+#[cfg(test)]
+#[path = "../tests/prepared_sigmoid_tanh_measurements/sampling_controls.rs"]
+mod sampling_controls;
+#[cfg(test)]
+#[path = "prepared_sigmoid_tanh/setup.rs"]
+mod setup;

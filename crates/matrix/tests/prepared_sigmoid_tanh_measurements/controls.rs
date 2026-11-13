@@ -3,7 +3,7 @@
 use super::*;
 use std::sync::Mutex;
 /// Serialize dispatch replacement within this executable.
-static DISPATCHERS: Mutex<()> = Mutex::new(());
+pub(super) static DISPATCHERS: Mutex<()> = Mutex::new(());
 /// Complete process declarations; a distinct prior process is supplied as provenance.
 fn arguments() -> Vec<String> {
     [
@@ -228,9 +228,9 @@ fn prepared_sigmoid_tanh_measurement_protocol() -> TestResult {
             }
         );
         assert!(
-            p.source().contains("processes=5")
-                && p.source().contains("cpu=1")
-                && p.source().contains("warm_up_pid=1")
+            p.source(None).contains("processes=5")
+                && p.source(None).contains("cpu=1")
+                && p.source(None).contains("warm_up_pid=1")
         );
     }
     let mut args = arguments();

@@ -13,6 +13,7 @@ use nrz_bindings::readings::algebra::syntax::{
 };
 use nrz_bindings::readings::algebra::syntax::{Draft, ExpressionDraft};
 use nrz_bindings::readings::algebra::{Cas, Fault, Handle, Rational, Reference};
+use nrz_scalar::{SigmoidFailure, TanhFailure};
 /// Fallible fixture operations preserve their original diagnostics.
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 /// Finite fixture allowances, independent of observation storage.
@@ -149,4 +150,52 @@ pub(super) fn broad(f: &mut Fixture, bits: u32) -> TestResult<Request> {
         interval: Interval::new(number(-2, 1)?, Rational::zero(), &mut ledger()?)?,
     });
     Ok(r)
+}
+
+/// Complete bits or the unchanged typed numerical refusal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Snapshot {
+    /// Sigmoid's five public fields.
+    Sigmoid(Result<[u64; 5], SigmoidFailure>),
+    /// Tanh's five public fields.
+    Tanh(Result<[u64; 5], TanhFailure>),
+    /// Uncertified platform result, never a golden value.
+    Platform(u64),
+}
+
+/// A finite permutation reaches both owners without sorting or duplicate points.
+pub(super) fn inputs(count: u32) -> TestResult<Vec<f64>> {
+    if !(4..=4096).contains(&count) || !count.is_power_of_two() {
+        return Err("power-of-two population 4 through 4096 required".into());
+    }
+    let mut values = (0..count)
+        .map(|i| f64::from((i * 13) % count) / f64::from(count))
+        .collect::<Vec<_>>();
+    let n = values.len();
+    values[n - 2] = 2.0_f64.powi(-40);
+    values[n - 1] = 2.0_f64.powi(-10) / f64::from(count);
+    Ok(values)
+}
+
+/// Original operations are built outside preparation clocks.
+pub(super) fn original(f: &mut Fixture, tanh: bool) -> TestResult<EnclosureRequest> {
+    let x = f.term(Operator::Free("x".into()), &[])?;
+    let target = f.term(
+        if tanh {
+            Operator::Tanh
+        } else {
+            Operator::Sigmoid
+        },
+        std::slice::from_ref(&x),
+    )?;
+    let mut request = f.request(target);
+    request.coordinates.push(CoordinateBound {
+        coordinate: x,
+        interval: Interval::new(
+            Rational::zero(),
+            Rational::from_ratio(if tanh { 1 } else { 2 }, 1, &mut ledger()?)?,
+            &mut ledger()?,
+        )?,
+    });
+    Ok(request)
 }
