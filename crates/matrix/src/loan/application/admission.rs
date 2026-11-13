@@ -54,11 +54,27 @@ pub(super) fn request_with_origin<P: Scalar + 'static>(
     origin: super::chain::Input,
     account: &mut ExecutionAccount,
 ) -> ApplicationRequest<P> {
+    request_kind(
+        heap,
+        request,
+        crate::KernelKind::Elementwise(function),
+        origin,
+        account,
+    )
+}
+/// Closed mapped movement shares preparation without changing the original unary tariffs.
+pub(super) fn request_kind<P: Scalar + 'static>(
+    heap: &mut Heap,
+    request: PointwiseRequest<P>,
+    expected: crate::KernelKind,
+    origin: super::chain::Input,
+    account: &mut ExecutionAccount,
+) -> ApplicationRequest<P> {
     let checked = account
         .ledger
         .with_work_phase(super::FAMILY, "pointwise admission", |budget| {
             let mut borrowed = super::prepared::Request::from(&request);
-            borrowed.expected = crate::KernelKind::Elementwise(function);
+            borrowed.expected = expected;
             super::contract::check(heap, &borrowed, account.identity, origin, budget)?;
             let plan = plan::Plan::new(heap, &borrowed, budget)?;
             preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)

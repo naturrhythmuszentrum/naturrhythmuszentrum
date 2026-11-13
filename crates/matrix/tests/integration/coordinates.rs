@@ -157,8 +157,7 @@ fn shape_entry_map_agrees_with_strided_layout() -> ResultOf<()> {
         .first()
         .ok_or("entry map")?
         .indices()
-        .iter()
-        .map(|index| original.get(*index).copied().ok_or("source index"))
+        .map(|index| original.get(index).copied().ok_or("source index"))
         .collect::<Result<Vec<_>, _>>()?;
     let actual = view.region().export()?;
     assert_eq!(

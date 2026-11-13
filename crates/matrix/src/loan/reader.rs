@@ -238,6 +238,18 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
                     .read(self.bundle.layout.components.index(cell, component)?)
             })
     }
+    /// Report the immutable publication boundary of this tile's numerical error channel.
+    /// This metadata is available even when the historical input has retired.
+    #[must_use]
+    pub fn numerical_error_scope(&self) -> super::NumericalErrorScope {
+        self.bundle
+            .origin
+            .evidence
+            .as_ref()
+            .map_or(super::NumericalErrorScope::HostInput, |evidence| {
+                evidence.error_scope
+            })
+    }
     /// The prepaid application reader shares every address and attachment check.
     pub(super) fn read_prepaid(
         &self,

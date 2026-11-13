@@ -240,11 +240,11 @@ fn square_root_literal_abi_byte_totals() {
     ];
     // Optional endpoints add 2*LoanChannel to the core and 2*PublishedChannel to the bundle.
     // Captured correspondence, endpoint identities and completed-mask identity add 272 to both evidence copies.
-    // H = core 3296 + layout 248 + witness 240 + bundle 3216 + pin 72 + extent 40 = 7112.
+    // H = core 3224 + layout 248 + witness 240 + bundle 3216 + pin 72 + extent 40 = 7040.
     // Outcomes grow 24 -> 32 for the lossless prepared refusal; every group row grows 888 -> 1032.
     // Temporary backings remain 17*264 + 5*16 + 3*248 + 2*24 = 5360.
     // Table delta: 3*(256+1032) + 2*32 + 40 + (15-2*h)*264.
-    // Empty B: 7112 + 7928 - 528*h. Replaced old backings:
+    // Empty B: 7040 + 7928 - 528*h. Replaced old backings:
     // h*(256+1032) + 3*32 + (3*h+6)*264 + 40.
     // C=1 adds 280; C=3 adds 344; binary64 C=9 adds 728.
     // Vacant tables: 48 + 6*256 + 6*1032 + 5*32 + 24*264 + 2*40 = 14352.
@@ -261,13 +261,13 @@ fn square_root_literal_abi_byte_totals() {
     assert_eq!(
         independently_laid_out,
         [
-            [14_512, 27_472],
-            [14_792, 27_752],
-            [14_856, 27_816],
-            [14_264, 31_384],
-            [13_736, 35_016],
-            [15_240, 28_200],
-            [7_112, 14_352],
+            [14_440, 27_400],
+            [14_720, 27_680],
+            [14_784, 27_744],
+            [14_192, 31_312],
+            [13_664, 34_944],
+            [15_168, 28_128],
+            [7_040, 14_352],
             [32, 64],
         ]
     );

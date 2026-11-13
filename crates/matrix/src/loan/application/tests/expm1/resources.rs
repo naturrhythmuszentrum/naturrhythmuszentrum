@@ -97,7 +97,14 @@ fn prepared_dense_recipe_refuses() -> TestResult {
     } = fixture(1, 1, [-2.0, 0.0], 2, false)?;
     let owner = ready(heap.request_pointwise_expm1(request, &mut account))?;
     let injection = crate::loan::fault::Injection::after(0);
-    assert!(owner.core.contract.physical_scratch::<f64, f64>(0).is_err());
+    assert!(
+        owner
+            .core
+            .evidence
+            .law
+            .physical_scratch::<f64, f64>(0)
+            .is_err()
+    );
     assert_eq!(crate::loan::fault::Injection::attempts(), 0);
     drop(injection);
     Ok(())

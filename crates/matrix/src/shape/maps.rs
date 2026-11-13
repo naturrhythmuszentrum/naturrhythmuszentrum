@@ -6,7 +6,7 @@ use crate::Extent;
 use nrz_bindings::Conversion;
 
 /// A checked logical selection, independent of physical storage addresses.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct EntryMap {
     /// Original logical extent.
     source: Extent,
@@ -14,7 +14,27 @@ pub struct EntryMap {
     target: Extent,
     /// Source indices in target column order; repetitions retain identity.
     indices: Vec<usize>,
+    /// Native repeated-cell projection needs no entry-sized descriptor.
+    product: Option<(crate::CellProduct, crate::CellFactor)>,
+    /// Shared native selection metadata keeps its original occupation protected.
+    selection: Option<std::rc::Rc<crate::mask::storage::LayoutRecord>>,
 }
+
+impl PartialEq for EntryMap {
+    fn eq(&self, other: &Self) -> bool {
+        let selection = match (&self.selection, &other.selection) {
+            (Some(left), Some(right)) => std::rc::Rc::ptr_eq(left, right),
+            (None, None) => true,
+            _ => false,
+        };
+        self.source == other.source
+            && self.target == other.target
+            && self.indices == other.indices
+            && self.product == other.product
+            && selection
+    }
+}
+impl Eq for EntryMap {}
 
 impl EntryMap {
     /// Check every selected entry; repeated inputs are permitted.
@@ -39,6 +59,8 @@ impl EntryMap {
             source,
             target,
             indices,
+            product: None,
+            selection: None,
         })
     }
 
@@ -70,10 +92,108 @@ impl EntryMap {
         self.target
     }
 
-    /// Complete source-index selection.
+    /// Construct a component-preserving native product projection.
+    /// # Errors
+    /// Refuses an invalid extent or exceeded shape limits.
+    pub fn product_cells(
+        product: crate::CellProduct,
+        factor: crate::CellFactor,
+        components: usize,
+        limits: ShapeLimits,
+    ) -> Result<Self, ShapeError> {
+        let source = limits.extent(product.factors()[factor.index()].capacity(), components)?;
+        let target = limits.extent(product.axis().capacity(), components)?;
+        Ok(Self {
+            source,
+            target,
+            indices: Vec::new(),
+            selection: None,
+            product: Some((product, factor)),
+        })
+    }
+
+    /// Native product association, when the descriptor preserves complete cells.
+    pub(crate) const fn product(&self) -> Option<(crate::CellProduct, crate::CellFactor)> {
+        self.product
+    }
+
+    /// Source index at one checked target entry without enumerating preceding entries.
     #[must_use]
-    pub fn indices(&self) -> &[usize] {
-        &self.indices
+    pub fn source_index(&self, entry: usize) -> Option<usize> {
+        if entry >= self.target.entries() {
+            return None;
+        }
+        if self.product.is_none() && self.selection.is_none() {
+            return self.indices.get(entry).copied();
+        }
+        let original = self.source_cell(entry % self.target.rows()).unwrap_or(0);
+        self.source.index(original, entry / self.target.rows()).ok()
+    }
+
+    /// Native cell projection composes original-index gathering before product coordinates.
+    pub(crate) fn source_cell(&self, cell: usize) -> Option<usize> {
+        if cell >= self.target.rows() {
+            return None;
+        }
+        let cell = self
+            .selection
+            .as_ref()
+            .and_then(|layout| layout.gather.as_ref())
+            .map_or(Some(cell), |gather| gather.indices().get(cell).copied())?;
+        match self.product {
+            Some((product, factor)) => Some(product.coordinates(cell).ok()?[factor.index()]),
+            None => Some(cell),
+        }
+    }
+
+    /// Borrow the shared native selection for constant-size authentication.
+    pub(crate) fn selection(&self) -> Option<&crate::mask::storage::LayoutRecord> {
+        self.selection.as_deref()
+    }
+
+    /// Retain already checked native metadata without copying its original-index inventory.
+    pub(crate) fn selected_cells(
+        source: Extent,
+        selection: std::rc::Rc<crate::mask::storage::LayoutRecord>,
+        product: Option<(crate::CellProduct, crate::CellFactor)>,
+    ) -> Result<Self, ShapeError> {
+        let target = Extent::new(selection.axis.capacity(), source.columns())?;
+        let original = selection
+            .gather
+            .as_ref()
+            .map_or(selection.axis, crate::CellGather::original_axis);
+        let source_rows = product.map_or_else(
+            || original.capacity(),
+            |(product, factor)| product.factors()[factor.index()].capacity(),
+        );
+        let empty_source_padding = source.rows() == 0 && target.entries() != 0;
+        if empty_source_padding
+            || source.rows() != source_rows
+            || selection.components.extent().columns() != source.columns()
+            || product.is_some_and(|(product, _)| product.axis() != original)
+        {
+            return Err(ShapeError::LengthMismatch);
+        }
+        Ok(Self {
+            source,
+            target,
+            indices: Vec::new(),
+            product,
+            selection: Some(selection),
+        })
+    }
+
+    /// Unmapped native padding requires a mask-aware consumer rather than dense evaluation.
+    pub(crate) fn has_padding(&self) -> bool {
+        self.selection
+            .as_ref()
+            .and_then(|layout| layout.gather.as_ref())
+            .is_some_and(|gather| gather.indices().len() != self.target.rows())
+    }
+
+    /// Enumerate source indices without allocating a descriptor for native products.
+    pub fn indices(&self) -> impl Iterator<Item = usize> + '_ {
+        (0..self.target.entries()).filter_map(|entry| self.source_index(entry))
     }
 
     /// Compose a selection of this map's result back to the original logical entries.
@@ -84,16 +204,10 @@ impl EntryMap {
         if self.target != next.source {
             return Err(ShapeError::LengthMismatch);
         }
-        limits.check_work(next.indices.len())?;
+        limits.check_work(next.target.entries())?;
         let indices = next
-            .indices
-            .iter()
-            .map(|index| {
-                self.indices
-                    .get(*index)
-                    .copied()
-                    .ok_or(ShapeError::EntryIndex)
-            })
+            .indices()
+            .map(|index| self.source_index(index).ok_or(ShapeError::EntryIndex))
             .collect::<Result<_, _>>()?;
         Self::new(self.source, next.target, indices, limits)
     }

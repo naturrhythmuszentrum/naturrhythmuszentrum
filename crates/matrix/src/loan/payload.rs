@@ -61,6 +61,16 @@ impl Numerical {
         };
         Ok(owner)
     }
+    /// Resolve the primitive storage type once for an authenticated selected traversal.
+    pub(super) fn typed<P: Scalar + 'static>(&self) -> Result<&Mat<P>, LoanError> {
+        let matrix: &dyn Any = match self {
+            Self::Single(matrix) => matrix,
+            Self::Double(matrix) => matrix,
+        };
+        matrix
+            .downcast_ref::<Mat<P>>()
+            .ok_or(LoanError::LayoutMismatch)
+    }
     /// Read only after the caller checks initialized selected coverage.
     pub(super) fn read<P: Scalar + 'static>(&self, index: usize) -> Result<P, LoanError> {
         let value: &dyn Any = match self {

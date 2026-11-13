@@ -77,13 +77,13 @@ fn prepared() -> TestResult<(
     ))
 }
 
-/// Delta=O=0: B=7112+240+8+32=7392 and S=B+5360=12752 on a separately funded account.
+/// Delta=O=0: B=7040+240+8+32=7320 and S=B+5360=12680 on a separately funded account.
 #[test]
 fn chain_spare_capacity_public_byte_neighbours() -> TestResult {
     for staged in [false, true] {
         for short in [false, true] {
             let (mut heap, old, _ancestors) = prepared()?;
-            let required = if staged { 12_752 } else { 7_392 };
+            let required = if staged { 12_680 } else { 7_320 };
             let mut limits = Limits::default();
             if staged {
                 limits.staged_payload_bytes = required - u64::from(short);
@@ -110,7 +110,7 @@ fn chain_spare_capacity_public_byte_neighbours() -> TestResult {
             match admit(&mut heap, request, Elementwise::SquareRoot, &mut account) {
                 ApplicationRequest::ApplicationReady(owner) => {
                     assert!(!short);
-                    assert_eq!(heap.resource_bytes()? - before, 7392);
+                    assert_eq!(heap.resource_bytes()? - before, 7320);
                     assert!(matches!(
                         heap.cancel_application(owner, &mut account),
                         ApplicationCancellation::ApplicationCancelled(_)

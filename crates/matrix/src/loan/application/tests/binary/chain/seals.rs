@@ -180,10 +180,10 @@ fn substitute(
         2 => owner.core.evidence.attachments[0] = None,
         3 => owner.core.evidence.source.symbols = owner.core.host.declaration.symbols.clone(),
         4 => {
-            owner.core.contract = crate::kernels::KernelContract {
+            owner.core.contract = crate::loan::application::member::CellContract {
                 inputs: Rc::clone(&owner.core.contract.inputs),
                 output: owner.core.contract.output,
-                recipe: crate::kernels::contract::Recipe::Elementwise(Elementwise::Reciprocal),
+                kind: crate::KernelKind::Elementwise(Elementwise::Reciprocal),
                 work: 12,
             }
         }

@@ -8,6 +8,7 @@ use super::{
 use crate::KernelError;
 use crate::loan::{ExecutionAccount, LoanError, charge, payload::set};
 use nrz_scalar::{ArithmeticContext, Scalar};
+mod copy;
 mod selected;
 
 /// Single-use private traversal authority; only whole-phase prepayment constructs it.
@@ -91,7 +92,9 @@ fn traversal_work<P: Scalar>(
     member: Member<'_>,
 ) -> Result<usize, LoanError> {
     let components = core.host.declaration.extent.columns();
+    let inherited_error = member.is_transform() && core.evidence.source.symbols.error().is_some();
     let loads = 1
+        + usize::from(inherited_error)
         + usize::from(core.evidence.source.symbols.bound().is_some())
         + core.evidence.endpoint_tokens.binary().map_or(0, |side| {
             1 + usize::from(side.source.symbols.bound().is_some())
@@ -104,6 +107,7 @@ fn traversal_work<P: Scalar>(
         .ok_or(LoanError::CountOverflow)?;
     core.population
         .checked_mul(per_cell)
+        .and_then(|steps| steps.checked_add(if member.is_transform() { 3 } else { 0 }))
         .and_then(|steps| {
             core.filled
                 .len()
@@ -155,6 +159,18 @@ fn run<P: Scalar + 'static>(
         .input
         .as_ref()
         .and_then(|pin| pin.checked_reader().ok());
+    let copy = if member.is_transform() {
+        Some(copy::BoundCopy::bind(
+            reader.as_ref().ok_or(LoanError::WrongLoan)?,
+        )?)
+    } else {
+        None
+    };
+    let projection = if member.is_transform() {
+        Some(member.map()?)
+    } else {
+        None
+    };
     let side = core.evidence.endpoint_tokens.binary();
     let right = side
         .and_then(|side| side.input.as_ref())
@@ -164,20 +180,30 @@ fn run<P: Scalar + 'static>(
         while remaining != 0 {
             let cell = word_index * 64 + remaining.trailing_zeros() as usize;
             remaining &= remaining - 1;
+            let original = match projection {
+                Some(map) => super::movement::source_cell(map, cell)?,
+                None => cell,
+            };
             let mut first = None;
             for component in 0..components {
                 let entry = cell + cells * component;
-                let result = member.scalar(
-                    reader.as_ref(),
-                    right.as_ref(),
-                    side.is_some_and(|side| side.source.symbols.bound().is_some()),
-                    core.host.retained_law.as_ref(),
-                    core.evidence.source.symbols.bound().is_some(),
-                    cell,
-                    component,
-                    entry,
-                    permit,
-                );
+                let result = if let Some(copy) = &copy {
+                    copy.component(original, component, permit)
+                        .map(selected::Values::Closed)
+                        .map_err(|_| member.storage_failure(component))
+                } else {
+                    member.scalar(
+                        reader.as_ref(),
+                        right.as_ref(),
+                        side.is_some_and(|side| side.source.symbols.bound().is_some()),
+                        core.host.retained_law.as_ref(),
+                        core.evidence.source.symbols.bound().is_some(),
+                        original,
+                        component,
+                        entry,
+                        permit,
+                    )
+                };
                 let values = match result {
                     Ok(values) => values,
                     Err(refused) => {

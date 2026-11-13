@@ -29,7 +29,7 @@ pub enum CellFactor {
 }
 impl CellFactor {
     /// Ordered factor slot.
-    const fn index(self) -> usize {
+    pub(crate) const fn index(self) -> usize {
         match self {
             Self::Outer => 0,
             Self::Inner => 1,

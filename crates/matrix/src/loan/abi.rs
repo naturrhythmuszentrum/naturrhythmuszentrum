@@ -117,6 +117,8 @@ struct Evidence {
     destination: Identity,
     /// Arithmetic completion revision.
     revision: u32,
+    /// The one-byte scope shares the existing revision alignment slot.
+    error_scope: super::NumericalErrorScope,
     /// Separately allocated fixed-size outcomes.
     outcomes: Vec<Outcome>,
     /// Outcome allocation token.
@@ -186,6 +188,14 @@ struct Host {
     /// Final liveness witness.
     witness: Rc<Liveness>,
 }
+/// One-cell invocation seal owns extents but no full numerical recipe.
+#[repr(C)]
+struct CellContract {
+    inputs: Rc<[crate::Extent]>,
+    output: crate::Extent,
+    kind: crate::KernelKind,
+    work: usize,
+}
 /// No additional box is introduced for either endpoints or the original correspondence.
 #[repr(C)]
 struct Core<P: Scalar> {
@@ -194,7 +204,7 @@ struct Core<P: Scalar> {
     /// Transferred source pin.
     input: Option<crate::BundlePin<P>>,
     /// One-cell extent owner and closed recipe.
-    contract: crate::kernels::KernelContract,
+    contract: CellContract,
     /// Per-cell extent debit.
     extent_token: Token,
     /// Prospective completed words.
@@ -284,6 +294,9 @@ fn prepared_application_independent_abi_layouts() {
     assert_eq!(host_header(), size_of::<super::lifecycle::HostCore>());
     assert_eq!(outcome_width(), size_of::<crate::CellOutcome>());
     assert_eq!(group_row(), size_of::<Option<super::registry::Group>>());
+    // The local seal has 16-byte inputs, a 24-byte extent, a two-byte kind,
+    // six alignment bytes and eight Work bytes: 56 instead of the former 128.
+    assert_eq!(size_of::<CellContract>(), 56);
     assert_eq!(
         [
             size_of::<Operation>(),
@@ -295,6 +308,6 @@ fn prepared_application_independent_abi_layouts() {
             bundle_header(),
             application_headers::<f64>()
         ],
-        [208, 1664, 3200, 3296, 32, 1032, 3216, 7112]
+        [208, 1664, 3200, 3224, 32, 1032, 3216, 7040]
     );
 }

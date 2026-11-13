@@ -39,7 +39,11 @@ fn ordered_axis_identity_refusals() -> ResultOf<()> {
         AxisAlignment::check(&coordinates, &reversed, vec![1, 0], ShapeLimits::default())?;
     let sum = operator.sum(&reordered, &alignment, &alignment, ShapeLimits::default())?;
     assert_eq!(
-        sum.entry_maps().first().ok_or("sum map")?.indices(),
+        sum.entry_maps()
+            .first()
+            .ok_or("sum map")?
+            .indices()
+            .collect::<Vec<_>>(),
         [3, 2, 1, 0]
     );
     assert!(
@@ -261,7 +265,8 @@ fn logical_shape_maps_preserve_order() -> ResultOf<()> {
             .entry_maps()
             .first()
             .ok_or("transpose map")?
-            .indices(),
+            .indices()
+            .collect::<Vec<_>>(),
         [0, 2, 4, 1, 3, 5]
     );
     let restored = transposed.dual_transpose(limits)?;
@@ -272,7 +277,12 @@ fn logical_shape_maps_preserve_order() -> ResultOf<()> {
     let selected = shape.select(column, codomain, map, limits)?;
     assert_eq!(selected.recipe(), ShapeRecipe::Selection);
     assert_eq!(
-        selected.entry_maps().first().ok_or("selection")?.indices(),
+        selected
+            .entry_maps()
+            .first()
+            .ok_or("selection")?
+            .indices()
+            .collect::<Vec<_>>(),
         [4, 4]
     );
     assert!(EntryMap::new(shape.extent(), Extent::new(1, 1)?, vec![6], limits).is_err());

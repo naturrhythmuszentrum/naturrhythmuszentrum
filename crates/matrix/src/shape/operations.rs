@@ -151,10 +151,9 @@ impl CheckedShape {
         let map = EntryMap::transpose(self.extent, limits)?;
         let entries = map
             .indices()
-            .iter()
             .map(|index| {
                 self.entries
-                    .get(*index)
+                    .get(index)
                     .cloned()
                     .ok_or(ShapeError::EntryIndex)
             })
@@ -215,10 +214,10 @@ impl CheckedShape {
             return Err(ShapeError::LengthMismatch);
         }
         let mut entries = Vec::with_capacity(extent.entries());
-        for (position, index) in map.indices().iter().enumerate() {
+        for (position, index) in map.indices().enumerate() {
             let mut entry = self
                 .entries
-                .get(*index)
+                .get(index)
                 .cloned()
                 .ok_or(ShapeError::EntryIndex)?;
             let output = codomain

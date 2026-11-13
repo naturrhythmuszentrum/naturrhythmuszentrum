@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Tile-bound complete companion owners avoid repeating authority checks at each load.
+
+use crate::loan::{HostChannel, LoanError, TileReader};
+use nrz_scalar::Scalar;
+
+/// Borrowed immutable owners are valid for the complete prepaid selected traversal.
+pub(super) struct BoundCopy<'a, P: Scalar> {
+    /// Original component addressing, shared by the three numerical planes.
+    layout: &'a crate::Layout,
+    /// Fixed complete center, total and error owners.
+    channels: [&'a faer::Mat<P>; 3],
+}
+impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
+    /// Validate all companion attachments once, after the source pin and capture were checked.
+    pub(super) fn bind(reader: &TileReader<'a, P>) -> Result<Self, LoanError> {
+        let bundle = reader.bundle;
+        let owner = |channel: HostChannel| {
+            let qualified = bundle.qualified[channel.index()].ok_or(LoanError::CoverageMismatch)?;
+            if qualified.identity != bundle.identity || qualified.channel != channel {
+                return Err(LoanError::CoverageMismatch);
+            }
+            let matrix = bundle.channels[channel.index()]
+                .as_ref()
+                .ok_or(LoanError::UnsupportedContract)?
+                .matrix
+                .typed::<P>()?;
+            if matrix.ncols() != 1 {
+                return Err(LoanError::LayoutMismatch);
+            }
+            Ok(matrix)
+        };
+        let channels = [
+            owner(HostChannel::Center)?,
+            owner(HostChannel::Total)?,
+            owner(HostChannel::Error)?,
+        ];
+        if channels
+            .iter()
+            .any(|matrix| matrix.nrows() != channels[0].nrows())
+        {
+            return Err(LoanError::LayoutMismatch);
+        }
+        Ok(Self {
+            layout: &bundle.layout.components,
+            channels,
+        })
+    }
+
+    /// One checked address serves all equal-length immutable component planes.
+    fn address(&self, cell: usize, component: usize) -> Result<usize, LoanError> {
+        let entry = self.layout.index(cell, component)?;
+        if entry >= self.channels[0].nrows() {
+            return Err(LoanError::LayoutMismatch);
+        }
+        Ok(entry)
+    }
+
+    /// The sealed filled words already authenticate this cell's complete bundle coverage.
+    pub(super) fn component(
+        &self,
+        cell: usize,
+        component: usize,
+        _permit: &super::Traversal,
+    ) -> Result<[P; 3], LoanError> {
+        let entry = self.address(cell, component)?;
+        #[cfg(test)]
+        for _ in 0..3 {
+            crate::loan::fault::loaded();
+        }
+        Ok([
+            self.channels[0][(entry, 0)],
+            self.channels[1][(entry, 0)],
+            self.channels[2][(entry, 0)],
+        ])
+    }
+}

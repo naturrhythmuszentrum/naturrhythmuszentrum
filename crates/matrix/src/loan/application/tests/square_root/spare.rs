@@ -5,12 +5,12 @@ use super::{Fixture, TestResult, fixture, ready};
 use crate::{ApplicationCancellation, ApplicationError, ApplicationRequest, LoanError};
 use nrz_bindings::{Budget, Limits};
 
-/// Spare-capacity B=7112 headers + 240 channels + 8 filled words + 96 outcomes = 7456.
+/// Spare-capacity B=7040 headers + 240 channels + 8 filled words + 96 outcomes = 7384.
 /// No table is replaced, so the peak adds only the 5360 temporary backing inventory.
 /// ´test:unit:square_root-spare-capacity-both-byte-ceiling-neighbours´
 #[test]
 fn square_root_spare_capacity_both_byte_ceiling_neighbours() -> TestResult {
-    for (cells, retained_literal, staged_literal) in [(1, 7_392, 12_752), (3, 7_456, 12_816)] {
+    for (cells, retained_literal, staged_literal) in [(1, 7_320, 12_680), (3, 7_384, 12_744)] {
         for staged in [false, true] {
             for succeeds in [false, true] {
                 let Fixture {

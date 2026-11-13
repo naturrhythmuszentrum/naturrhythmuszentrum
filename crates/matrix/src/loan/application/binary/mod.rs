@@ -157,31 +157,47 @@ impl Heap {
 pub(in crate::loan) enum Auxiliary {
     /// Ordinary unary application has no additional owner.
     Absent,
+    /// Immutable target correspondence for mapped movement, with no additional owner.
+    Movement {
+        /// Original demand-layout occupation checked at admission.
+        layout: crate::CellLayoutVersion,
+        /// Exact destination cell axis captured before allocation.
+        axis: CellAxis,
+    },
     /// Prepared member's original ordered endpoint tokens.
     Endpoints([(usize, u64, u64); 2]),
     /// Binary correspondence and the right source edge.
     Binary(Box<Side>),
 }
 impl Auxiliary {
+    /// Constant-size seal authenticates demand metadata after its native owner retires.
+    pub(in crate::loan::application) const fn movement(
+        &self,
+    ) -> Option<(crate::CellLayoutVersion, CellAxis)> {
+        match self {
+            Self::Movement { layout, axis } => Some((*layout, *axis)),
+            Self::Absent | Self::Endpoints(_) | Self::Binary(_) => None,
+        }
+    }
     /// Borrow the binary owner without creating another edge or authority.
     pub(in crate::loan) const fn binary(&self) -> Option<&Side> {
         match self {
             Self::Binary(side) => Some(side),
-            Self::Absent | Self::Endpoints(_) => None,
+            Self::Absent | Self::Movement { .. } | Self::Endpoints(_) => None,
         }
     }
     /// Prepared endpoint authentication excludes the mutually exclusive binary owner.
     pub(super) const fn endpoints(&self) -> Option<[(usize, u64, u64); 2]> {
         match self {
             Self::Endpoints(tokens) => Some(*tokens),
-            Self::Absent | Self::Binary(_) => None,
+            Self::Absent | Self::Movement { .. } | Self::Binary(_) => None,
         }
     }
     /// Extract the transferred right edge only at the final no-fail publication boundary.
     pub(super) fn take_pin(&mut self) -> Option<BundlePin<f64>> {
         match self {
             Self::Binary(side) => side.input.take(),
-            Self::Absent | Self::Endpoints(_) => None,
+            Self::Absent | Self::Movement { .. } | Self::Endpoints(_) => None,
         }
     }
 }

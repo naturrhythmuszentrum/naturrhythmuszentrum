@@ -22,7 +22,7 @@ impl Member<'_> {
     /// A refused component still initializes every role with safe placeholders.
     pub(in crate::loan::application) const fn zeros<P: Scalar>(self) -> Values<P> {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
+            Self::Transform(_) | Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 Values::Closed([P::ZERO; 3])
             }
             Self::Binary(..) => Values::Binary([0.0; 3]),
@@ -47,6 +47,7 @@ impl Member<'_> {
         permit: &Traversal,
     ) -> Result<Values<P>, CellOutcome> {
         match self {
+            Self::Transform(_) => Err(self.storage_failure(component)),
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 let function = if matches!(self, Self::Square(_)) {
                     crate::Elementwise::Square
@@ -68,7 +69,10 @@ impl Member<'_> {
                         )
                         .entered(),
                     ),
-                    Self::Square(_) | Self::PreparedExpm1(..) | Self::Binary(..) => None,
+                    Self::Transform(_)
+                    | Self::Square(_)
+                    | Self::PreparedExpm1(..)
+                    | Self::Binary(..) => None,
                 };
                 closed(reader, bounded, cell, component, function, entry, permit)
                     .map(|value| Values::Closed([value.center, value.total, value.error]))
@@ -87,38 +91,50 @@ impl Member<'_> {
             .map(|value| Values::Binary([value.center, value.total, value.error]))
             .map_err(|reason| CellOutcome::CellRefused { component, reason }),
             Self::PreparedExpm1(_, operation) => {
-                let result = || {
-                    let center = reader
-                        .ok_or(Expm1Failure::MalformedPlan)?
-                        .read_prepaid(HostChannel::Center, cell, component, permit)
-                        .map_err(|_| Expm1Failure::MalformedPlan)?
-                        .to_f64();
-                    let law = law.ok_or(Expm1Failure::MalformedPlan)?;
-                    #[cfg(test)]
-                    crate::loan::fault::entered_scalar();
-                    let value = law
-                        .evaluate(
-                            Expm1Input {
-                                endpoints: [center; 2],
-                                center,
-                                bits: operation.bits,
-                            },
-                            &permit.context,
-                        )?
-                        .reading();
-                    Ok(Values::Prepared([
-                        value.center,
-                        value.total_radius,
-                        value.numerical_error,
-                        value.endpoints[0],
-                        value.endpoints[1],
-                    ]))
-                };
-                result().map_err(|reason| CellOutcome::PreparedRefused { component, reason })
+                prepared(reader, law, operation, cell, component, permit)
             }
         }
     }
 }
+/// The prepared member keeps its original funded use and unchanged result construction.
+fn prepared<P: Scalar + 'static>(
+    reader: Option<&crate::TileReader<'_, P>>,
+    law: Option<&crate::loan::retained_expm1::Attachment>,
+    operation: &crate::loan::application::PreparedExpm1Operation,
+    cell: usize,
+    component: usize,
+    permit: &Traversal,
+) -> Result<Values<P>, CellOutcome> {
+    let result = || {
+        let center = reader
+            .ok_or(Expm1Failure::MalformedPlan)?
+            .read_prepaid(HostChannel::Center, cell, component, permit)
+            .map_err(|_| Expm1Failure::MalformedPlan)?
+            .to_f64();
+        let law = law.ok_or(Expm1Failure::MalformedPlan)?;
+        #[cfg(test)]
+        crate::loan::fault::entered_scalar();
+        let value = law
+            .evaluate(
+                Expm1Input {
+                    endpoints: [center; 2],
+                    center,
+                    bits: operation.bits,
+                },
+                &permit.context,
+            )?
+            .reading();
+        Ok(Values::Prepared([
+            value.center,
+            value.total_radius,
+            value.numerical_error,
+            value.endpoints[0],
+            value.endpoints[1],
+        ]))
+    };
+    result().map_err(|reason| CellOutcome::PreparedRefused { component, reason })
+}
+
 /// Closed primitives retain their exact input-radius and original-location overflow contract.
 fn closed<P: Scalar + 'static>(
     reader: Option<&crate::TileReader<'_, P>>,

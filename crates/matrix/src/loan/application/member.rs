@@ -10,9 +10,24 @@ use crate::{
 use nrz_scalar::Scalar;
 use std::rc::Rc;
 
+/// Tile-local invocation inventory; no loan-only case enters the crate-wide recipe enum.
+#[derive(Clone)]
+pub(in crate::loan) struct CellContract {
+    /// Independently reserved one-cell input extents.
+    pub(super) inputs: Rc<[crate::Extent]>,
+    /// Complete one-cell result extent.
+    pub(super) output: crate::Extent,
+    /// Closed member identity, authenticated against the captured original law.
+    pub(super) kind: KernelKind,
+    /// Prepaid native invocation allowance.
+    pub(super) work: usize,
+}
+
 /// No member owns an allocation, authority, receipt or retaining edge.
 #[derive(Clone, Copy)]
 pub(super) enum Member<'a> {
+    /// Exact mapped movement of all existing value and error channels.
+    Transform(&'a Rc<KernelContract>),
     /// Exact enclosure of the represented box in either existing scalar format.
     Square(&'a Rc<KernelContract>),
     /// Relative endpoint target with its exact retained original correspondence.
@@ -49,6 +64,7 @@ impl<'a> Member<'a> {
             return Err(LoanError::UnsupportedContract);
         }
         match (&law.recipe, prepared) {
+            (Recipe::Transform(_), None) => Ok(Self::Transform(law)),
             (Recipe::Elementwise(Elementwise::Square), None) => Ok(Self::Square(law)),
             (Recipe::Elementwise(Elementwise::Reciprocal), None) => Ok(Self::Reciprocal(law)),
             (Recipe::Elementwise(Elementwise::SquareRoot), None) => Ok(Self::SquareRoot(law)),
@@ -62,7 +78,8 @@ impl<'a> Member<'a> {
     /// Retain the original pointer seal, not merely a supported name.
     pub(super) const fn law(self) -> &'a Rc<KernelContract> {
         match self {
-            Self::Square(law)
+            Self::Transform(law)
+            | Self::Square(law)
             | Self::Reciprocal(law)
             | Self::SquareRoot(law)
             | Self::PreparedExpm1(law, _)
@@ -72,14 +89,18 @@ impl<'a> Member<'a> {
     /// Fixed output roles are inseparable from the law and its reading semantics.
     pub(super) const fn roles(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => 3,
+            Self::Transform(_)
+            | Self::Square(_)
+            | Self::Reciprocal(_)
+            | Self::SquareRoot(_)
+            | Self::Binary(..) => 3,
             Self::PreparedExpm1(..) => 5,
         }
     }
     /// Original cancellation inventory; the shared records never grow for dispatch.
     pub(super) const fn debits(self) -> usize {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 17,
+            Self::Transform(_) | Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 17,
             Self::PreparedExpm1(..) => 23,
             Self::Binary(..) => 18,
         }
@@ -92,6 +113,28 @@ impl<'a> Member<'a> {
     pub(super) const fn is_binary(self) -> bool {
         matches!(self, Self::Binary(..))
     }
+    /// Mapped movement has no arithmetic and preserves the original error channel.
+    pub(super) const fn is_transform(self) -> bool {
+        matches!(self, Self::Transform(_))
+    }
+    /// Publication records whether this member preserves input error or reports local arithmetic.
+    pub(super) const fn error_scope(self) -> super::NumericalErrorScope {
+        if self.is_transform() {
+            super::NumericalErrorScope::PreservedInput
+        } else {
+            super::NumericalErrorScope::LocalOperation
+        }
+    }
+    /// The checked full map remains shared with the original operation throughout execution.
+    pub(super) fn map(self) -> Result<&'a crate::EntryMap, LoanError> {
+        let Self::Transform(law) = self else {
+            return Err(LoanError::UnsupportedContract);
+        };
+        let Recipe::Transform(map) = &law.recipe else {
+            return Err(LoanError::UnsupportedContract);
+        };
+        Ok(map)
+    }
     /// Closed arity is a member property, never inferred from a caller's input count.
     pub(super) const fn arity(self) -> usize {
         if self.is_binary() { 2 } else { 1 }
@@ -100,6 +143,7 @@ impl<'a> Member<'a> {
     pub(super) const fn invocation_factor(self) -> usize {
         match self {
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => 12,
+            Self::Transform(_) => 6,
             Self::PreparedExpm1(..) => 0,
             Self::Binary(..) => 21,
         }
@@ -108,6 +152,7 @@ impl<'a> Member<'a> {
     pub(super) const fn native_phase(self) -> Option<&'static str> {
         match self {
             Self::Square(_) => None,
+            Self::Transform(_) => Some("mapped companion movement"),
             Self::PreparedExpm1(..) => Some("prepared native traversal"),
             Self::Reciprocal(_) => Some("reciprocal native traversal"),
             Self::SquareRoot(_) => Some("square root native traversal"),
@@ -123,24 +168,14 @@ impl<'a> Member<'a> {
             .checked_mul(self.invocation_factor())
             .ok_or(LoanError::CountOverflow)
     }
-    /// The closed one-cell recipes require no coefficient copying or construction.
-    pub(super) const fn recipe(self) -> Recipe {
-        match self {
-            Self::Square(_) => Recipe::Elementwise(Elementwise::Square),
-            Self::Reciprocal(_) => Recipe::Elementwise(Elementwise::Reciprocal),
-            Self::SquareRoot(_) => Recipe::Elementwise(Elementwise::SquareRoot),
-            Self::PreparedExpm1(..) => Recipe::PreparedExpm1,
-            Self::Binary(_, function) => Recipe::BinaryElementwise(function),
-        }
-    }
     /// Original and one-cell identity must agree before numerical entry and publication.
     pub(super) fn validate_cell(
         self,
-        law: &KernelContract,
+        law: &CellContract,
         components: usize,
     ) -> Result<(), LoanError> {
         let extent = crate::Extent::new(1, components)?;
-        if law.kind() != self.law().kind()
+        if law.kind != self.law().kind()
             || law.inputs.len() != self.arity()
             || law.inputs.iter().any(|input| *input != extent)
             || law.output != extent
@@ -176,7 +211,7 @@ impl<'a> Member<'a> {
         coverage: crate::Coverage,
     ) -> Result<(), LoanError> {
         match self {
-            Self::Square(_) => Ok(()),
+            Self::Transform(_) | Self::Square(_) => Ok(()),
             Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => {
                 if format != crate::storage::Format::Binary64 {
                     return Err(LoanError::UnsupportedContract);
@@ -202,12 +237,14 @@ impl<'a> Member<'a> {
     /// Storage failures preserve the member's lossless public outcome family.
     pub(super) const fn storage_failure(self, component: usize) -> CellOutcome {
         match self {
-            Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => {
-                CellOutcome::CellRefused {
-                    component,
-                    reason: crate::KernelError::Contract,
-                }
-            }
+            Self::Transform(_)
+            | Self::Square(_)
+            | Self::Reciprocal(_)
+            | Self::SquareRoot(_)
+            | Self::Binary(..) => CellOutcome::CellRefused {
+                component,
+                reason: crate::KernelError::Contract,
+            },
             Self::PreparedExpm1(..) => CellOutcome::PreparedRefused {
                 component,
                 reason: nrz_scalar::Expm1Failure::MalformedPlan,

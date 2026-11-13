@@ -32,7 +32,14 @@ fn substitute(
     };
     match choice {
         0 => owner.core.evidence.operation = other.clone(),
-        1 => owner.core.contract = law.as_ref().clone(),
+        1 => {
+            owner.core.contract = crate::loan::application::member::CellContract {
+                inputs: Rc::clone(&law.inputs),
+                output: law.output,
+                kind: law.kind(),
+                work: law.work,
+            }
+        }
         2 => owner.core.evidence.law = Rc::clone(law),
         _ => return Err("substitution".into()),
     }

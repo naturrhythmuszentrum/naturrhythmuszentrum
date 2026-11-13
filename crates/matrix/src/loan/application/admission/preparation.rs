@@ -205,7 +205,7 @@ struct Extras {
     /// Complete immutable metadata and outcome backing.
     evidence: Evidence,
     /// Checked one-cell numerical law.
-    contract: crate::kernels::KernelContract,
+    contract: super::super::member::CellContract,
     /// Unique prospective filled backing token.
     filled_token: Token,
     /// Unique per-cell extent owner token.
@@ -224,24 +224,19 @@ fn extras<P: Scalar + 'static>(
     endpoint_tokens: Option<[(usize, u64, u64); 2]>,
 ) -> Result<Extras, LoanError> {
     let source = super::super::contract::source(request)?;
-    let demand = heap.mask(request.demand, source.identity.layout)?;
+    let member = request.member()?;
+    let demand_layout = if member.is_transform() {
+        request.demand.layout()
+    } else {
+        source.identity.layout
+    };
+    let demand = heap.mask(request.demand, demand_layout)?;
     let mut filled = vector(plan.cell_words)?;
     if plan.cell_words != 0 {
         guard.acquired(false)?;
     }
     filled.resize(plan.cell_words, 0);
-    for (index, word) in filled.iter_mut().enumerate() {
-        *word = demand.words()[index];
-        for _ in source.channels.iter().flatten() {
-            *word &= source.mask.words[index];
-        }
-        if let Some((_, pin)) = request.binary {
-            let right = super::super::binary::bundle(pin)?;
-            for _ in right.channels.iter().flatten() {
-                *word &= right.mask.words[index];
-            }
-        }
-    }
+    fill_availability(member, request, source, &demand, &mut filled)?;
     let population = filled.iter().try_fold(0_usize, |population, word| {
         population
             .checked_add(word.count_ones() as usize)
@@ -283,6 +278,7 @@ fn extras<P: Scalar + 'static>(
     )?;
     let auxiliary = auxiliary(request, plan, identity, debits, guard, endpoint_tokens)?;
     let evidence = Evidence {
+        error_scope: request.member()?.error_scope(),
         prepared: request.prepared.cloned(),
         endpoint_tokens: auxiliary,
         completed_mask: None,
@@ -313,6 +309,33 @@ fn extras<P: Scalar + 'static>(
         population,
     })
 }
+/// The original word intersection and mapped cell incidence share the same prepaid owner.
+fn fill_availability<P: Scalar>(
+    member: super::super::member::Member<'_>,
+    request: &super::super::prepared::Request<'_, P>,
+    source: &crate::loan::registry::Bundle,
+    demand: &crate::MaskView<'_>,
+    filled: &mut [u64],
+) -> Result<(), LoanError> {
+    if member.is_transform() {
+        super::super::movement::filled(member.map()?, source, demand, filled)?;
+    } else {
+        for (index, word) in filled.iter_mut().enumerate() {
+            *word = demand.words()[index];
+            for _ in source.channels.iter().flatten() {
+                *word &= source.mask.words[index];
+            }
+            if let Some((_, pin)) = request.binary {
+                let right = super::super::binary::bundle(pin)?;
+                for _ in right.channels.iter().flatten() {
+                    *word &= right.mask.words[index];
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Mutually exclusive prepared endpoints or the single inventoried binary side box.
 fn auxiliary<P: Scalar>(
     request: &super::super::prepared::Request<'_, P>,
@@ -323,6 +346,12 @@ fn auxiliary<P: Scalar>(
     endpoints: Option<[(usize, u64, u64); 2]>,
 ) -> Result<super::super::binary::Auxiliary, LoanError> {
     use super::super::binary::{Auxiliary, Side};
+    if request.member()?.is_transform() {
+        return Ok(Auxiliary::Movement {
+            layout: request.demand.layout(),
+            axis: request.destination.axis,
+        });
+    }
     let Some((original, pin)) = request.binary else {
         return Ok(endpoints.map_or(Auxiliary::Absent, Auxiliary::Endpoints));
     };
@@ -362,7 +391,7 @@ fn auxiliary<P: Scalar>(
 fn cell_contract<P: Scalar>(
     request: &super::super::prepared::Request<'_, P>,
     guard: &mut Preparation,
-) -> Result<crate::kernels::KernelContract, LoanError> {
+) -> Result<super::super::member::CellContract, LoanError> {
     let extent = crate::Extent::new(1, request.destination.components())?;
     #[cfg(test)]
     crate::loan::fault::before()?;
@@ -372,10 +401,10 @@ fn cell_contract<P: Scalar>(
         Rc::new([extent])
     };
     guard.acquired(false)?;
-    Ok(crate::kernels::KernelContract {
+    Ok(super::super::member::CellContract {
         inputs,
         output: extent,
-        recipe: request.member()?.recipe(),
+        kind: request.member()?.law().kind(),
         work: request.member()?.invocation(extent.entries())?,
     })
 }

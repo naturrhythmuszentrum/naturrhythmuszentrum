@@ -18,18 +18,10 @@ impl Projection {
     fn original(self, cell: usize) -> Result<usize, LoanError> {
         match self {
             Self::Original => Ok(cell),
-            Self::Product(product, factor) => Ok(product.coordinates(cell)?[factor_index(factor)]),
+            Self::Product(product, factor) => Ok(product.coordinates(cell)?[factor.index()]),
         }
     }
 }
-/// Ordered native product coordinates use the same fixed outer/inner convention.
-const fn factor_index(factor: CellFactor) -> usize {
-    match factor {
-        CellFactor::Outer => 0,
-        CellFactor::Inner => 1,
-    }
-}
-
 /// A checked cell selection borrowing a pinned value and its complete companion bundle.
 ///
 /// Components retain their original source meaning. The mask supplies selection and
@@ -110,8 +102,7 @@ impl<'a, P: Scalar + 'static> MaskedTileReader<'a, P> {
                             .gather()
                             .map_or_else(|| selection.axis(), crate::CellGather::original_axis);
                         if axis != product.axis()
-                            || source.bundle.declaration.axis
-                                != product.factors()[factor_index(factor)]
+                            || source.bundle.declaration.axis != product.factors()[factor.index()]
                         {
                             return Err(LoanError::LayoutMismatch);
                         }

@@ -7,6 +7,7 @@ mod invariants;
 mod mapped;
 mod mapped_kernels;
 mod masked_reader;
+mod movement;
 mod owned_product;
 mod owned_selection;
 mod products;

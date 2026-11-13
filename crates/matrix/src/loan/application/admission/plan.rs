@@ -212,14 +212,19 @@ impl Plan {
             )?)
             .ok_or(LoanError::CountOverflow)?;
         let input_channels = request.input_channels()?;
+        let mask_work = if request.member()?.is_transform() {
+            super::super::movement::availability_work(
+                request.destination.capacity(),
+                self.cell_words,
+            )?
+        } else {
+            (input_channels + 4)
+                .checked_mul(self.cell_words)
+                .ok_or(LoanError::CountOverflow)?
+        };
         let initialization = add(
             initialization,
-            add(
-                (input_channels + 4)
-                    .checked_mul(self.cell_words)
-                    .ok_or(LoanError::CountOverflow)?,
-                request.destination.capacity(),
-            )?,
+            add(mask_work, request.destination.capacity())?,
         )?;
         let slots = add(
             heap.descriptors.slots.scan_work(),

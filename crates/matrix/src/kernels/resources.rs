@@ -12,6 +12,7 @@ impl KernelContract {
         scalar_scratch: usize,
     ) -> Result<usize, OperationError> {
         match &self.recipe {
+            Recipe::Transform(map) if map.has_padding() => Err(super::KernelError::Contract.into()),
             Recipe::Product => self.product_scratch::<P, Q>(),
             Recipe::PreparedExpm1 | Recipe::BinaryElementwise(_) => {
                 Err(super::KernelError::Contract.into())

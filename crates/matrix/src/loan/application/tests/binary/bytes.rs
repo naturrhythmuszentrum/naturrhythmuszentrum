@@ -48,7 +48,7 @@ fn bytes(cells: usize, components: usize, roles: [usize; 2]) -> [usize; 2] {
     let old_debits = roles[0] + 3 * roles[1] + 10;
     let delta = 3 * (256 + 1032) + 2 * 32 + (16 - 2 * roles[1]) * 264 + 40;
     let old = total_roles * (256 + 1032) + 5 * 32 + old_debits * 264 + 2 * 40;
-    let retained = 3 * (rounded + 8 * tracking + 8 * words) + 8 * words + 32 * cells + 8728 + delta;
+    let retained = 3 * (rounded + 8 * tracking + 8 * words) + 8 * words + 32 * cells + 8656 + delta;
     [retained, retained + 2 * old + 5624]
 }
 /// Mirrored fields establish X before comparing any production owner size or byte report.
@@ -93,16 +93,16 @@ fn binary_independent_abi_and_literal_inventory() {
             abi::outcome_width(),
             abi::group_row()
         ],
-        [7112, 32, 1032]
+        [7040, 32, 1032]
     );
-    assert_eq!(7112 + 24 + size_of::<Side>(), 8728);
+    assert_eq!(7040 + 24 + size_of::<Side>(), 8656);
     assert_eq!(
         [
             bytes(0, 1, [1; 2]),
             bytes(1, 1, [1; 2]),
             bytes(3, 1, [1; 2])
         ],
-        [[16_392, 35_040], [16_672, 35_320], [16_736, 35_384]]
+        [[16_320, 34_968], [16_600, 35_248], [16_664, 35_312]]
     );
     assert_eq!(18 * 264 + 5 * 16 + 3 * 248 + 2 * 24, 5624);
 }
@@ -236,9 +236,9 @@ fn binary_spare_capacity_inventory_and_retained_side() -> TestResult {
         function,
         &mut setup.account,
     ))?;
-    let expected = 3 * (64 + 8 + 8) + 8 + 32 + 8728;
-    assert_eq!(expected, 9008);
-    assert_eq!(expected + 5624, 14_632);
+    let expected = 3 * (64 + 8 + 8) + 8 + 32 + 8656;
+    assert_eq!(expected, 8936);
+    assert_eq!(expected + 5624, 14_560);
     assert_eq!(setup.heap.resource_bytes()? - before, expected);
     let side_key = owner
         .core

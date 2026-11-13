@@ -39,12 +39,12 @@ fn prepared_application_literal_complete_bytes() {
             inventory(65, 3)
         ],
         [
-            [16_624, 31_168],
-            [17_064, 31_608],
-            [17_256, 31_800],
-            [17_288, 31_832],
-            [17_640, 32_184],
-            [26_960, 41_504]
+            [16_552, 31_096],
+            [16_992, 31_536],
+            [17_184, 31_728],
+            [17_216, 31_760],
+            [17_568, 32_112],
+            [26_888, 41_432]
         ]
     );
 }
@@ -228,7 +228,7 @@ fn prepared_application_spare_capacity_bytes_and_scoped_neighbours() -> TestResu
     ));
     let retained = abi::application_headers::<f64>() + 5 * (64 + 8 + 8) + 8 + abi::outcome_width();
     let staged = retained + 23 * 264 + 5 * 16 + 3 * 248 + 2 * 24;
-    assert_eq!([retained, staged], [7552, 14_496]);
+    assert_eq!([retained, staged], [7480, 14_424]);
     for staging in [false, true] {
         for short in [0, 1] {
             let required = u64::try_from(if staging { staged } else { retained })?;

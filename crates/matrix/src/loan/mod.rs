@@ -24,8 +24,8 @@ pub use account::ExecutionAccount;
 pub use application::{
     ApplicationCancellation, ApplicationError, ApplicationEvaluation, ApplicationPublication,
     ApplicationRequest, BinaryApplicationRequest, BinaryRegion, CellOutcome,
-    Expm1ApplicationRequest, OwnedApplication, PointwiseBinaryOperation, PointwiseBinaryRequest,
-    PointwiseExpm1Request, PointwiseRequest, PreparedExpm1Operation,
+    Expm1ApplicationRequest, NumericalErrorScope, OwnedApplication, PointwiseBinaryOperation,
+    PointwiseBinaryRequest, PointwiseExpm1Request, PointwiseRequest, PreparedExpm1Operation,
 };
 pub use declaration::{HostChannel, HostTileDeclaration};
 pub use error::LoanError;

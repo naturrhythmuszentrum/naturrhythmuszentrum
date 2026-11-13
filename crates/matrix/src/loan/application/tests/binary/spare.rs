@@ -67,10 +67,10 @@ fn prepared(cells: usize) -> TestResult<(crate::Heap, crate::PointwiseBinaryRequ
         },
     ))
 }
-/// No replacement backing: B=8728+240+8+32C and S=B+5624, with real N/N-1 limits.
+/// No replacement backing: B=8656+240+8+32C and S=B+5624, with real N/N-1 limits.
 #[test]
 fn binary_spare_capacity_both_byte_ceiling_neighbours() -> TestResult {
-    for (cells, retained, staged) in [(1, 9008, 14_632), (3, 9072, 14_696)] {
+    for (cells, retained, staged) in [(1, 8936, 14_560), (3, 9000, 14_624)] {
         for staging in [false, true] {
             for short in [false, true] {
                 let (mut heap, old) = prepared(cells)?;

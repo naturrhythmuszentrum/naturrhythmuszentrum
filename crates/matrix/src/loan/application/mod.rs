@@ -5,6 +5,7 @@ mod admission;
 pub(super) mod binary;
 mod chain;
 mod contract;
+mod movement;
 pub use binary::{
     BinaryApplicationRequest, BinaryRegion, PointwiseBinaryOperation, PointwiseBinaryRequest,
 };
@@ -151,7 +152,7 @@ pub(super) struct ApplicationCore<P: Scalar> {
     /// Exact transferred use edge, released before witness expiration.
     pub(super) input: Option<BundlePin<P>>,
     /// Private checked one-cell numerical law; its extent allocation ends at publication.
-    pub(super) contract: crate::kernels::KernelContract,
+    pub(super) contract: member::CellContract,
     /// Exact allocation token for the one-element extent owner.
     pub(super) extent_token: Token,
     /// Original A, reduced only by numerical refusals to completed coverage.
@@ -200,8 +201,22 @@ impl<P: Scalar> std::fmt::Debug for ApplicationCore<P> {
             .finish_non_exhaustive()
     }
 }
+/// Meaning of the numerical error companion at this tile's publication boundary.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NumericalErrorScope {
+    /// The host supplied the companion under its declared input contract.
+    HostInput,
+    /// Exact movement preserves the immediate input companion bit for bit.
+    PreservedInput,
+    /// Only the current arithmetic operation's numerical error is reported.
+    /// Inherited uncertainty is included in Total; Error is not a whole-chain bound.
+    LocalOperation,
+}
+
 /// Immutable application evidence owns outcomes and symbolic metadata, never a source pin.
 pub(super) struct Evidence {
+    /// Explicit error-channel semantics authenticated against the captured member.
+    pub(in crate::loan) error_scope: NumericalErrorScope,
     /// Closed prepared correspondence, absent for Square.
     pub(super) prepared: Option<PreparedExpm1Operation>,
     /// Fixed Lower/Upper payload identities sealed before evaluation.

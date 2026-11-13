@@ -5,7 +5,7 @@ use super::{Fixture, TestResult, fixture, ready};
 use crate::{ApplicationCancellation, ApplicationError, ApplicationRequest, LoanError};
 use nrz_bindings::{Budget, Limits};
 
-/// Spare-capacity B=7112 headers + 240 channels + 8 filled words + 96 outcomes = 7456.
+/// Spare-capacity B=7040 headers + 240 channels + 8 filled words + 96 outcomes = 7384.
 /// No table is replaced, so the peak adds only the 5360 temporary backing inventory.
 /// ´test:unit:pointwise-spare-capacity-both-byte-ceiling-neighbours´
 #[test]
@@ -41,7 +41,7 @@ fn pointwise_spare_capacity_both_byte_ceiling_neighbours() -> TestResult {
                 + 3 * (64 + 8 + 8)
                 + 8
                 + 3 * crate::loan::abi::outcome_width();
-            assert_eq!(retained, 7456);
+            assert_eq!(retained, 7384);
             let required = u64::try_from(retained + usize::from(staged) * 5360)?;
             if staged {
                 limits.staged_payload_bytes = required - u64::from(!succeeds);

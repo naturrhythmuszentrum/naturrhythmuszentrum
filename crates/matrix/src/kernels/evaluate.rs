@@ -86,13 +86,13 @@ fn sum<P: Scalar + 'static>(
     let left = first(views)?;
     let right = views.get(1).ok_or(OperationError::InputCount)?;
     let mut result = buffer(map.target().entries())?;
-    for (index, source) in map.indices().iter().enumerate() {
+    for (index, source) in map.indices().enumerate() {
         result.push(super::arithmetic::sum(
             operand(left, index)?,
-            operand(right, *source)?,
+            operand(right, source)?,
             [
                 super::arithmetic::operand_error(left, index)?,
-                super::arithmetic::operand_error(right, *source)?,
+                super::arithmetic::operand_error(right, source)?,
             ],
             subtract,
             context,
@@ -109,7 +109,7 @@ fn transform<P: Scalar + 'static>(
     let input = first(views)?;
     let mut result = buffer(map.target().entries())?;
     for source in map.indices() {
-        let (center, radius) = operand(input, *source)?;
+        let (center, radius) = operand(input, source)?;
         result.push(Entry {
             center,
             total: radius.get(),

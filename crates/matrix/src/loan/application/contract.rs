@@ -32,6 +32,9 @@ pub(super) fn check<P: Scalar + 'static>(
     if request.binary.is_some() {
         return super::binary::check_request(heap, request, account, budget);
     }
+    if request.expected == crate::KernelKind::TransformEntries {
+        return super::movement::check(heap, request, account, origin, budget);
+    }
     charge(budget, 1)?;
     let pin = request
         .input
@@ -127,6 +130,16 @@ pub(super) fn declarations(
     input: &nrz_bindings::Descriptor,
     result: &nrz_bindings::Descriptor,
 ) -> Result<(), LoanError> {
+    declarations_with_shape(source, output, input, result, true)
+}
+/// Movement preserves descriptors and original targets while its checked map changes shape.
+pub(super) fn declarations_with_shape(
+    source: &Declaration,
+    output: &nrz_bindings::BindingSymbols,
+    input: &nrz_bindings::Descriptor,
+    result: &nrz_bindings::Descriptor,
+    same_shape: bool,
+) -> Result<(), LoanError> {
     source
         .symbols
         .check_import()
@@ -137,10 +150,8 @@ pub(super) fn declarations(
     if source.symbols.value().descriptor() != input || output.value().descriptor() != result {
         return Err(LoanError::UnsupportedContract);
     }
-    if output.value().shape() != source.symbols.value().shape()
-        || output.bound().is_none()
-        || output.error().is_none()
-    {
+    let shape_mismatch = same_shape && output.value().shape() != source.symbols.value().shape();
+    if shape_mismatch || output.bound().is_none() || output.error().is_none() {
         return Err(LoanError::UnsupportedContract);
     }
     let inputs = [
@@ -195,7 +206,6 @@ impl Evidence {
     ) -> Result<(), LoanError> {
         let member =
             super::member::Member::check(&self.operation, self.law.kind(), self.prepared.as_ref())?;
-        let law = member.law();
         if member.is_binary() != self.endpoint_tokens.binary().is_some() {
             return Err(LoanError::WrongLoan);
         }
@@ -211,38 +221,10 @@ impl Evidence {
             }
             prepared.validate(&self.source, destination)?;
         }
-        let exclusion = Rc::ptr_eq(&self.excluded_inputs, &self.operation.inputs)
-            && Rc::ptr_eq(&self.excluded_outputs, &self.operation.outputs);
-        let source_layout = self.demand.layout == self.source_identity.layout;
-        let same_axis = destination.axis == self.source.axis;
-        if !exclusion
-            || !Rc::ptr_eq(law, &self.law)
-            || self.destination != identity
-            || self.revision != revision
-            || !source_layout
-            || !same_axis
-        {
+        if self.error_scope != member.error_scope() {
             return Err(LoanError::WrongLoan);
         }
-        if destination.extent != self.source.extent
-            || destination.coverage != self.source.coverage
-            || self.outcomes.len() != destination.extent.rows()
-        {
-            return Err(LoanError::LayoutMismatch);
-        }
-        declarations(
-            &self.source,
-            &destination.symbols,
-            self.operation.inputs()[0].descriptor(),
-            self.operation.outputs()[0].descriptor(),
-        )?;
-        member.representation_format(
-            identity.format,
-            &self.source,
-            &destination.symbols,
-            destination.axis,
-            destination.coverage,
-        )?;
+        self.validate_mapping(member, destination, identity, revision)?;
         for (index, attachment) in self.attachments.iter().enumerate() {
             let present = self.source_identity.channels[index].is_some();
             if present != attachment.is_some()
@@ -254,6 +236,71 @@ impl Evidence {
                 return Err(LoanError::CoverageMismatch);
             }
         }
+        Ok(())
+    }
+    /// Constant-size immutable map and target seals survive retirement of native demand storage.
+    fn validate_mapping(
+        &self,
+        member: super::member::Member<'_>,
+        destination: &Declaration,
+        identity: Identity,
+        revision: u32,
+    ) -> Result<(), LoanError> {
+        let law = member.law();
+        let exclusion = Rc::ptr_eq(&self.excluded_inputs, &self.operation.inputs)
+            && Rc::ptr_eq(&self.excluded_outputs, &self.operation.outputs);
+        let (source_layout, same_axis) = if member.is_transform() {
+            let (layout, axis) = self
+                .endpoint_tokens
+                .movement()
+                .ok_or(LoanError::WrongLoan)?;
+            (self.demand.layout == layout, destination.axis == axis)
+        } else {
+            (
+                self.demand.layout == self.source_identity.layout,
+                destination.axis == self.source.axis,
+            )
+        };
+        if member.is_transform() != self.endpoint_tokens.movement().is_some() {
+            return Err(LoanError::WrongLoan);
+        }
+        if !exclusion
+            || !Rc::ptr_eq(law, &self.law)
+            || self.destination != identity
+            || self.revision != revision
+            || !source_layout
+            || !same_axis
+        {
+            return Err(LoanError::WrongLoan);
+        }
+        let expected_extent = if member.is_transform() {
+            member.map()?.target()
+        } else {
+            self.source.extent
+        };
+        if destination.extent != expected_extent
+            || destination.coverage != self.source.coverage
+            || self.outcomes.len() != destination.extent.rows()
+        {
+            return Err(LoanError::LayoutMismatch);
+        }
+        declarations_with_shape(
+            &self.source,
+            &destination.symbols,
+            self.operation.inputs()[0].descriptor(),
+            self.operation.outputs()[0].descriptor(),
+            !member.is_transform(),
+        )?;
+        if member.is_transform() && member.map()?.source() != self.source.extent {
+            return Err(LoanError::WrongLoan);
+        }
+        member.representation_format(
+            identity.format,
+            &self.source,
+            &destination.symbols,
+            destination.axis,
+            destination.coverage,
+        )?;
         Ok(())
     }
 }
