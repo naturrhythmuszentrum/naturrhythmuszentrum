@@ -104,6 +104,7 @@ fn token(
 pub(super) fn request<P: Scalar + 'static>(
     heap: &mut Heap,
     declaration: HostTileDeclaration<P>,
+    layout: Layout,
     account: &mut ExecutionAccount,
 ) -> Result<OwnedLoan<P>, LoanError> {
     account.authenticate(declaration.account)?;
@@ -113,8 +114,8 @@ pub(super) fn request<P: Scalar + 'static>(
     account
         .ledger
         .with_work_phase(crate::loan::FAMILY, "loan admission", |budget| {
-            let plan = Plan::new(heap, &declaration, budget)?;
-            let prepared = prepare(heap, declaration, plan)?;
+            let plan = Plan::new(heap, &declaration, &layout, budget)?;
+            let prepared = prepare(heap, declaration, layout, plan)?;
             Ok(install(heap, prepared))
         })
 }
@@ -122,6 +123,7 @@ pub(super) fn request<P: Scalar + 'static>(
 fn prepare<P: Scalar + 'static>(
     heap: &mut Heap,
     declaration: HostTileDeclaration<P>,
+    layout: Layout,
     mut plan: Plan,
 ) -> Result<Prepared, LoanError> {
     let receipt_identity = plan.cleanup.identity;
@@ -163,7 +165,7 @@ fn prepare<P: Scalar + 'static>(
         bundle,
         pin,
         witness,
-    } = shells(&declaration, identity, &mut guard)?;
+    } = shells(&declaration, layout, identity, &mut guard)?;
     let mut records = vector(plan.channels)?;
     guard.acquired(true)?;
     for (channel, present) in HostChannel::ALL.into_iter().zip(plan.present) {
@@ -376,6 +378,7 @@ struct Shells {
 /// use the workspace's stable allocation boundary; a real allocator abort is out of scope.
 fn shells<P: Scalar>(
     declaration: &HostTileDeclaration<P>,
+    layout: Layout,
     identity: Identity,
     guard: &mut Preparation,
 ) -> Result<Shells, LoanError> {
@@ -383,7 +386,7 @@ fn shells<P: Scalar>(
     crate::loan::fault::before()?;
     let layout = Rc::new(LayoutRecord {
         axis: declaration.axis,
-        components: Layout::contiguous(declaration.extent)?,
+        components: layout,
         gather: None,
     });
     guard.acquired(false)?;

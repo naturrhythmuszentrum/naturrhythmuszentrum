@@ -69,9 +69,13 @@ impl Plan {
     pub(super) fn new<P: Scalar + 'static>(
         heap: &Heap,
         declaration: &HostTileDeclaration<P>,
+        layout: &crate::Layout,
         budget: &mut nrz_bindings::Budget,
     ) -> Result<Self, LoanError> {
         charge(budget, 1)?;
+        if layout.extent() != declaration.extent || layout.dense_range()?.is_none() {
+            return Err(LoanError::LayoutMismatch);
+        }
         // Planning inspects descriptor vacancies three times and native vacancies twice;
         // the final occupation scans are prepaid with preparation below.
         charge(
@@ -89,12 +93,12 @@ impl Plan {
         )?;
         let present = declaration.present();
         let channels = present.into_iter().filter(|present| *present).count();
-        let length = declaration.extent.entries();
+        let length = layout.region_entries();
         let geometry = Geometry {
             present,
             channels,
             length,
-            component_words: words(length),
+            component_words: words(declaration.extent.entries()),
             cell_words: words(declaration.capacity()),
             rounded: slab_bytes::<P>(length)?,
         };

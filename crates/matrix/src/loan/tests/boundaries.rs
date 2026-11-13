@@ -483,3 +483,87 @@ fn loan_clear_stride_word_tariff_precedes_mutation() -> TestResult {
     }
     Ok(())
 }
+
+/// The design reserves physical L=161 scalars but logical 130 component flags per channel.
+/// The original literal header inventory stays fixed; only three rounded payloads change.
+/// ´test:unit:loan-dense-layout-literal-byte-boundaries´
+#[test]
+fn loan_dense_layout_literal_byte_boundaries() -> TestResult {
+    mapped_bytes::<f32>()?;
+    mapped_bytes::<f64>()
+}
+
+/// The one-byte-short twins derive their ceilings from the public slab inventory.
+fn mapped_bytes<P: Scalar + 'static>() -> TestResult {
+    let original = bytes::<P>(65, 2, 3);
+    let added = 3
+        * 64
+        * (161_usize.div_ceil(64 / size_of::<P>()) - 130_usize.div_ceil(64 / size_of::<P>()));
+    for staging in [false, true] {
+        let required = original[usize::from(staging)] + added;
+        for (limit, success) in [(required, true), (required - 1, false)] {
+            let mut limits = Limits::default();
+            if staging {
+                limits.staged_payload_bytes = u64::try_from(limit)?;
+            } else {
+                limits.output_bytes = u64::try_from(limit)?;
+            }
+            let (mut heap, mut account, declaration) = fixture::<P>(65, 2, [true, true], limits)?;
+            let layout = crate::Layout::strided(crate::Extent::new(65, 2)?, 161, 132, -2, -1)?;
+            let request = heap.request_loan_with_layout(declaration, layout, &mut account);
+            if success {
+                let loan = granted(request)?;
+                assert_eq!(
+                    heap.resource_bytes()?,
+                    original[0] + added + size_of::<Store>()
+                );
+                assert!(matches!(
+                    heap.cancel_loan(loan, &mut account),
+                    CancelOutcome::Cancelled(_)
+                ));
+            } else {
+                assert!(
+                    matches!(request, LoanRequest::Refused(LoanError::Heap(crate::HeapError::ResourceBytes { staged: actual, .. })) if actual == staging)
+                );
+                assert_eq!(heap.loans.elements()?, [0, 0]);
+                assert_eq!(heap.descriptors.slots.iter().count(), 0);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Three channels initialize 161 physical scalars, three logical-flag words and two cell words.
+/// Fixed host preparation is 58+15h+3h, hence 610 Work units, including fixture preparation.
+/// ´test:unit:loan-dense-layout-literal-work-boundary´
+#[test]
+fn loan_dense_layout_literal_work_boundary() -> TestResult {
+    for (work, success) in [(610, true), (609, false)] {
+        let (mut heap, mut account, declaration) = fixture::<f64>(
+            65,
+            2,
+            [true, true],
+            Limits {
+                work,
+                ..Limits::default()
+            },
+        )?;
+        let layout = crate::Layout::strided(crate::Extent::new(65, 2)?, 161, 132, -2, -1)?;
+        let request = heap.request_loan_with_layout(declaration, layout, &mut account);
+        if success {
+            let loan = granted(request)?;
+            assert_eq!(account.usage().work, 610);
+            assert!(matches!(
+                heap.cancel_loan(loan, &mut account),
+                CancelOutcome::Cancelled(_)
+            ));
+        } else {
+            assert!(matches!(
+                request,
+                LoanRequest::Refused(LoanError::Budget(_))
+            ));
+            assert_eq!(heap.loans.elements()?, [0, 0]);
+        }
+    }
+    Ok(())
+}

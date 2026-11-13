@@ -225,7 +225,9 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
             .ledger
             .with_work_phase(super::FAMILY, "selected load", |budget| {
                 charge(budget, 1)?;
-                owner.matrix.read(cell + self.capacity() * component)
+                owner
+                    .matrix
+                    .read(self.bundle.layout.components.index(cell, component)?)
             })
     }
     /// The prepaid application reader shares every address and attachment check.
@@ -238,7 +240,7 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
     ) -> Result<P, LoanError> {
         self.selected_owner(channel, cell, component)?
             .matrix
-            .read(cell + self.capacity() * component)
+            .read(self.bundle.layout.components.index(cell, component)?)
     }
     /// Refuse holes and invalid attachment authority before touching numerical storage.
     pub(super) fn selected_owner(

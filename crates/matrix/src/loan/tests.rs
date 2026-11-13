@@ -4,6 +4,8 @@
 mod affine;
 mod boundaries;
 mod invariants;
+mod mapped;
+mod mapped_kernels;
 mod masked_reader;
 mod products;
 mod recipes;

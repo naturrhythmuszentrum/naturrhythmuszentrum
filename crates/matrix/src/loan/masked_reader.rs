@@ -93,9 +93,13 @@ impl<P: Scalar + 'static> MaskedTileReader<'_, P> {
                 };
                 let owner = self.source.selected_owner(channel, original, component)?;
                 charge(budget, 1)?;
-                owner
-                    .matrix
-                    .read(original + self.source.capacity() * component)
+                owner.matrix.read(
+                    self.source
+                        .bundle
+                        .layout
+                        .components
+                        .index(original, component)?,
+                )
             })
     }
 }

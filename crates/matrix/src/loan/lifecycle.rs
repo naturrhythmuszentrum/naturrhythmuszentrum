@@ -62,7 +62,7 @@ pub(super) struct HostCore {
     pub(super) declaration: Declaration,
     /// Fixed channels with separate native allocations and initialization maps.
     pub(super) channels: [Option<LoanChannel>; 3],
-    /// Native identity layout is retained independently of heap table movement.
+    /// Native component layout is retained independently of heap table movement.
     pub(super) layout: Rc<crate::mask::storage::LayoutRecord>,
     /// Private empty immutable publication shell.
     pub(super) bundle: Rc<BundleOwner>,
@@ -93,7 +93,7 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
     pub const fn components(&self) -> usize {
         self.core.declaration.extent.columns()
     }
-    /// Actual native identity layout selected at admission.
+    /// Actual native component layout selected at admission.
     #[must_use]
     pub const fn layout(&self) -> crate::CellLayoutVersion {
         self.core.identity.layout
@@ -119,7 +119,11 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
                     .as_mut()
                     .ok_or(LoanError::UnsupportedContract)?;
                 owner.matrix.write(address, value)?;
-                set(&mut owner.components, address, true);
+                set(
+                    &mut owner.components,
+                    cell + self.core.declaration.extent.rows() * component,
+                    true,
+                );
                 Ok(())
             })
     }
@@ -146,6 +150,7 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
                 .ok_or(LoanError::LayoutMismatch)?,
         )?;
         let capacity = self.capacity();
+        let layout = &self.core.layout.components;
         account
             .ledger
             .with_work_phase(super::FAMILY, "write cell", |budget| {
@@ -154,9 +159,9 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
                     .as_mut()
                     .ok_or(LoanError::UnsupportedContract)?;
                 for (component, &value) in values.iter().enumerate() {
-                    let address = cell + capacity * component;
+                    let address = layout.index(cell, component)?;
                     owner.matrix.write(address, value)?;
-                    set(&mut owner.components, address, true);
+                    set(&mut owner.components, cell + capacity * component, true);
                 }
                 Ok(())
             })
@@ -174,7 +179,7 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
         self.address(channel, cell, 0)?;
         let capacity = self.capacity();
         let components = self.components();
-        let last = self.address(channel, cell, components - 1)?;
+        let last = cell + capacity * (components - 1);
         // A stride below one word visits every intervening word; larger strides visit
         // one distinct word per component ``rule:nrz:matrix-loans-owner-tariffs``.
         let touched = (last / 64)
@@ -199,7 +204,7 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
                 Ok(())
             })
     }
-    /// Checked column-major identity incidence precedes every write.
+    /// Checked physical incidence precedes every write; initialization remains logical.
     fn address(
         &self,
         channel: HostChannel,
@@ -212,10 +217,7 @@ impl<P: Scalar + 'static> OwnedLoan<P> {
         {
             return Err(LoanError::LayoutMismatch);
         }
-        component
-            .checked_mul(self.capacity())
-            .and_then(|offset| offset.checked_add(cell))
-            .ok_or(LoanError::CountOverflow)
+        Ok(self.core.layout.components.index(cell, component)?)
     }
 }
 impl Heap {
@@ -225,7 +227,24 @@ impl Heap {
         declaration: HostTileDeclaration<P>,
         account: &mut ExecutionAccount,
     ) -> LoanRequest<P> {
-        match admission::request(self, declaration, account) {
+        let layout = match crate::Layout::contiguous(declaration.extent) {
+            Ok(layout) => layout,
+            Err(error) => return LoanRequest::Refused(error.into()),
+        };
+        self.request_loan_with_layout(declaration, layout, account)
+    }
+    /// Admit a dense component permutation, including reversed and interleaved storage.
+    ///
+    /// The map preserves the declaration's logical cells and components. All channels
+    /// share its checked injective map; physical prefix and suffix padding is reserved.
+    /// Explicit gathers and non-dense strides are outside this admission contract.
+    pub fn request_loan_with_layout<P: Scalar + 'static>(
+        &mut self,
+        declaration: HostTileDeclaration<P>,
+        layout: crate::Layout,
+        account: &mut ExecutionAccount,
+    ) -> LoanRequest<P> {
+        match admission::request(self, declaration, layout, account) {
             Ok(loan) => LoanRequest::Granted(loan),
             Err(error) => LoanRequest::Refused(error),
         }

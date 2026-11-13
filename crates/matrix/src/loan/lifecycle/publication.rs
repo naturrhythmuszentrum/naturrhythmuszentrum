@@ -324,9 +324,8 @@ pub(in crate::loan) fn validate_cell<P: Scalar + 'static>(
     cell: usize,
     budget: &mut nrz_bindings::Budget,
 ) -> Result<(), LoanError> {
-    let cells = core.declaration.extent.rows();
     for component in 0..core.declaration.extent.columns() {
-        let address = cell + cells * component;
+        let address = core.layout.components.index(cell, component)?;
         let mut total = None;
         for (channel, owner) in HostChannel::ALL.into_iter().zip(&core.channels) {
             if let Some(owner) = owner {
