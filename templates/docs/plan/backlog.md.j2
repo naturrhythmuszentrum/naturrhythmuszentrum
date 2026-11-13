@@ -7,7 +7,7 @@
 
 **Convention (The register decides completion; the backlog orders work)** · `conv:nrz:backlog-standing`
 
-The completion authority is (`sec:nrz:lc-closing-register`), under (`rule:nrz:lc-closing-completion`). Each implementation item below corresponds to one open or partial closing claim at (`obs:nrz:lc-closing-baseline`), cites its governing design and states the evidence needed to meet it. Status changes are recorded in the register and the corresponding backlog item is removed or revised in the same change, so this ordering cannot imply a different standing. Met claims, follow-ons and work outside LC are excluded. The final review item enforces (`rule:nrz:lc-closing-independent-review`) after all claims are met; labelled blocking review findings become or update backlog items with consistent register standing. This document orders implementation and review dependencies; it does not declare another completion authority.
+The completion authority is (`sec:nrz:lc-closing-register`), under (`rule:nrz:lc-closing-completion`). Each implementation item in (`sec:nrz:backlog-lc-closing`) corresponds to one open or partial closing claim at (`obs:nrz:lc-closing-baseline`), cites its governing design and states the evidence needed to meet it. Status changes are recorded in the register and the corresponding backlog item is removed or revised in the same change, so this ordering cannot imply a different standing. Met claims, follow-ons and work outside LC are excluded from that section. Sections outside LC carry their own standing and do not imply an LC completion claim. The final review item enforces (`rule:nrz:lc-closing-independent-review`) after all claims are met; labelled blocking review findings become or update backlog items with consistent register standing. This document orders implementation and review dependencies; it does not declare another completion authority.
 
 **Rule (LC dependency order)** · `rule:nrz:backlog-lc-order`
 
@@ -168,3 +168,9 @@ Closes (`claim:nrz:lc-closing-scale-measurement`) only with its full evidence. G
 **Step (Independent LC closing review)** · `step:nrz:backlog-lc-independent-review`
 
 Enforces (`rule:nrz:lc-closing-independent-review`) after every closing claim is met, including the actual scale measurement and all four explained-overhead claims (`sec:nrz:lc-closing-certification-cost`). Review the whole repository at candidate main on a model other than the producers', reading the register, backlog, plan, LC designs and cited code/tests. Closing evidence: a recorded candidate commit and explicit `LC DONE` verdict. The alternative is labelled blocking findings that become or update backlog items and affected register standing; resolve them and repeat the independent review before closure. This is the final LC backlog item, not a substitute for any implementation or measurement evidence.
+
+## Number design outside LC closing · `sec:nrz:backlog-number-design`
+
+**Step (Design number storage, identity and display contracts)** · `step:nrz:backlog-number-design`
+
+After (`spec:nrz:number-concept`), specify the number design and its acceptance evidence, resolving (`open:nrz:number-contract-owner`), (`open:nrz:number-docgen-check`), (`open:nrz:number-error-grid`), (`open:nrz:number-polar-certification`). Define owner boundaries, exact representations, quantity links, rounding and notation checks, equality authority and bounded refusals for docgen, compute and LC consumers. This design work is outside (`rule:nrz:backlog-lc-order`) and neither blocks nor closes an LC register claim; it changes no limits, defaults or pins.

@@ -297,3 +297,7 @@ requires = []
 [[document]]
 output = "docs/design/compute-benchmarks.md"
 requires = []
+
+[[document]]
+output = "docs/design/number-concept.md"
+requires = []
