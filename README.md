@@ -8,6 +8,10 @@ Naturrhythmuszentrum is a physics calculation engine for results whose meaning, 
 
 The first reusable physical target is LC resonance: one small circuit exercises mixed voltage/current coordinates, a Complex spectrum, phasor response, frequency kinds and explicit undefined outcomes. The implemented foundations already support exact CAS proofs, physical descriptor checks, outward arithmetic and certified homogeneous matrix operations. The complete LC engine remains an implementation route, not an available end-to-end product.
 
+**Statement (Supported platform)** · `stmt:nrz:overview-supported-platform`
+
+Support and verified evidence are limited to x86_64 Linux. Code portability is a design goal; support for another target requires build, test and gate evidence on that target first, as specified by the supported-platform decision in `docs/design/architecture.md` (`dec:vision:supported-platform`). Bug reports and patches from other platforms are welcome through the contribution rule in `CONTRIBUTING.md` (`rule:nrz:other-platform-contributions`).
+
 ## Two graphs joined by bindings · `sec:nrz:overview-architecture`
 
 The descriptor graph is exact CAS structure: symbols, sorts, kinds, units, axes and checked relations. Its definitions and judgments have the same meaning on every machine. The computational graph consists of float-region versions and the kernel applications that produced them, with tracked error and dependencies. Bindings joins a symbol's exact meaning to its selected numerical representation, or eventually to an exact value requiring no numerical region. See `docs/design/descriptor-binding.md` for the architecture and its implementation boundary.

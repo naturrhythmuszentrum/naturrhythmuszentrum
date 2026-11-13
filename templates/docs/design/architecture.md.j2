@@ -39,6 +39,12 @@ Packages, computational stages, and commits have explicit responsibilities becau
 
 ## Numerical model · `sec:vision:numerical-model`
 
+**Decision (Supported platform)** · `dec:vision:supported-platform`
+
+The supported platform is x86_64 Linux. All repository builds, tests and gates run on that platform, so their evidence supports only that platform: test results, enclosure checks, measurements and the machine model used for the LC overhead bound. Numerical admission remains subject to the narrower target and compiler/profile arithmetic checks in (`rule:nrz:matrix-core-rounding`); the platform name alone does not admit every build or floating environment.
+
+Safe Rust with `unsafe_code = "forbid"` and portable vector forms preserve code portability as a design goal, not evidence of support. Other platforms can differ in fused multiply-add lowering, any reliance on a platform math library, toolchain behaviour and machine performance. Widening the support claim requires adding build, test and gate runs on the new target first, validating its enclosure assumptions and recording target-specific measurement and machine-model evidence for any performance claim. Bug reports and patches that improve robustness across platforms are welcome under (`rule:nrz:other-platform-contributions`); landing such a fix does not widen official support. This support scope adds no target-environment, latency or memory-envelope gate to the delivery contract (`dec:nrz:lc-resonance-delivery-contract`).
+
 **Decision (Precision selection)** · `dec:vision:precision-selection`
 
 Precision is a scalar type parameter inside the numerical engine, initially supporting `f32` and `f64`, with `f64` as the default. Applications may select between complete typed computations through runtime dispatch at a problem boundary. This combines specialization of hot kernels with configurable execution without allowing a setting change to reinterpret existing storage. Extended precision is an admission path, not an initial capability: it requires compatible safe faer integration, validated arithmetic, and evidence that the additional accuracy justifies its cost. Exemplars: (`ex:exemplars:arb`), (`ex:exemplars:drake`).
@@ -394,7 +400,7 @@ Package-local tests exercise the package contract; integration tests live under 
 
 **Rule (Independent numerical evidence)** · `rule:vision:independent-numerical-evidence`
 
-Tests combine small exact or independently bounded references, adversarial conditioning cases, structural identities, and whole worked problems because no single oracle covers both arithmetic correctness and model assembly. Higher precision is useful reference evidence but is not automatically truth. Fixtures include scale imbalance, cancellation, near-singularity, repeated spectra, correlated inputs, and budget boundaries. Benchmark reports pair speed with achieved assurance and accuracy; a faster failing computation is not recorded as an improvement. Exemplars: (`ex:exemplars:herbie`), (`ex:exemplars:interval-arithmetic-jl`), (`ex:exemplars:hilbert-matrices`), (`ex:exemplars:kahan-and-wilkinson-matrices`), (`cex:exemplars:rump-polynomial`).
+Tests combine small exact or independently bounded references, adversarial conditioning cases, structural identities, and whole worked problems because no single oracle covers both arithmetic correctness and model assembly. Higher precision is useful reference evidence but is not automatically truth. Fixtures include scale imbalance, cancellation, near-singularity, repeated spectra, correlated inputs, and budget boundaries. Benchmark reports pair speed with achieved assurance and accuracy; a faster failing computation is not recorded as an improvement. Exemplars: (`ex:exemplars:herbie`), (`ex:exemplars:interval-arithmetic-jl`), (`ex:exemplars:hilbert-matrices`), (`ex:exemplars:kahan-and-wilkinson-matrices`), (`cex:exemplars:rump-polynomial`). All such executed evidence has the platform scope of (`dec:vision:supported-platform`).
 
 **Decision (Documentation layout)** · `dec:vision:documentation-layout`
 
@@ -402,7 +408,7 @@ Each Markdown render has its minijinja template at `templates/{output}.j2`, mirr
 
 **Rule (Documentation envelope and derivation)** · `rule:vision:documentation-envelope-and-derivation`
 
-Each input envelope identifies its document or dataset, labels, ownership reference, license classification, and source relationships because rendering must preserve estate metadata as well as prose. Exact keys follow the orchestration linter’s actual schema once available. Derived JSON is reproducible from committed inputs, metadata, and fixtures; live clocks, network responses, unordered traversal, and live benchmark timing are excluded because they would prevent reproducible renders. Recorded measurements include their environment and provenance before entering documentation. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`).
+Each input envelope identifies its document or dataset, labels, ownership reference, license classification, and source relationships because rendering must preserve estate metadata as well as prose. Exact keys follow the orchestration linter’s actual schema once available. Derived JSON is reproducible from committed inputs, metadata, and fixtures; live clocks, network responses, unordered traversal, and live benchmark timing are excluded because they would prevent reproducible renders. Recorded measurements include their environment and provenance before entering documentation. Exemplars: (`ex:exemplars:estate-tools-and-templated-documentation`). Measurement provenance retains the platform scope of (`dec:vision:supported-platform`).
 
 **Rule (Fixed-point gate and bootstrap)** · `rule:vision:fixed-point-gate-and-bootstrap`
 
@@ -432,7 +438,7 @@ No particular faer version, decomposition API, threading behavior, or extended-s
 
 **Caveat (Validated arithmetic assumptions)** · `cav:vision:validated-arithmetic-assumptions`
 
-Certified envelopes depend on correctly handling primitive rounding, subnormals, overflow, and norms. The feasibility bite tests a small validated arithmetic implementation against exact small-case references and targeted floating-point boundaries on supported environments. Failure narrows the supported platform contract or blocks certification; it does not downgrade a guarantee invisibly.
+Certified envelopes depend on correctly handling primitive rounding, subnormals, overflow, and norms. The feasibility bite tests a small validated arithmetic implementation against exact small-case references and targeted floating-point boundaries on admitted x86_64 Linux environments (`dec:vision:supported-platform`). Failure narrows the supported platform contract or blocks certification; it does not downgrade a guarantee invisibly.
 
 **Caveat (Certificate cost and looseness)** · `cav:vision:certificate-cost-and-looseness`
 

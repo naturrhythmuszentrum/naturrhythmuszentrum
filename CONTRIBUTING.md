@@ -8,6 +8,10 @@
 
 A commit on main is one meaningful unit of work: one coherent change that is reviewable alone and green alone. It is neither a fragment, a mixture of unrelated work, nor a repair needed to make the preceding commit acceptable. Tests accompany the behavior they validate. An indivisible change across packages remains together when splitting it would make intermediate commits incoherent. This preserves a history whose boundaries explain and verify the change independently (`rule:vision:meaningful-commit-series`), (`prin:vision:reviewable-boundaries`).
 
+**Rule (Contributions from other platforms)** · `rule:nrz:other-platform-contributions`
+
+Bug reports and patches from other platforms, such as WebAssembly or aarch64, are welcome when they make the code more robust across platforms. Submit them through the repository's usual contribution route, with their own tests and the same review and verification requirements (`rule:nrz:coherent-main-commits`), (`rule:nrz:required-verification`). The accompanying tests run and pass under the gate of record on x86_64 Linux; behaviour only observable on the reporting platform is recorded as unverified. Landing such a fix improves portability without widening official support: the claim remains x86_64 Linux only, and widening it requires test runs on the new target first under (`dec:vision:supported-platform`).
+
 **Rule (Commit subject and body)** · `rule:nrz:commit-subject-and-body`
 
 Each commit has one Conventional Commits subject of at most 72 characters in total and a non-empty body stating why the change is needed. The subject names the coherent change; the body supplies its justification so the reviewer can assess purpose as well as implementation. The gate checks subject syntax and body presence over every commit past the base (`gate:nrz:verification-of-candidate`).

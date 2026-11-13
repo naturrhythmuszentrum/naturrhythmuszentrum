@@ -24,7 +24,7 @@ The standard library's `mul_add` is assumed to perform one correctly rounded fus
 
 **Assumption (Supported gate targets)** · `assum:nrz:gate-targets`
 
-The first gate ran on `x86_64-unknown-linux-gnu` with rustc 1.101.0-nightly (21b707e3f, 2026-09-30), LLVM 23.1.1 and an AMD EPYC 7C13 that reports FMA; tests used the former unoptimized default dev profile with full debug information. These historical timings do not describe the current optimized workspace dev profile (`opt-level = 2`). This is the measured target, and no other target is implied (`cav:vision:validated-arithmetic-assumptions`).
+The first gate ran on `x86_64-unknown-linux-gnu` with rustc 1.101.0-nightly (21b707e3f, 2026-09-30), LLVM 23.1.1 and an AMD EPYC 7C13 that reports FMA; tests used the former unoptimized default dev profile with full debug information. These historical timings do not describe the current optimized workspace dev profile (`opt-level = 2`). This is the measured target, and no other target is implied (`cav:vision:validated-arithmetic-assumptions`), (`dec:vision:supported-platform`).
 
 **Result (Primitive enclosures)** · `result:nrz:primitive-enclosures`
 
