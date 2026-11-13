@@ -9,6 +9,7 @@ mod recipes;
 mod review;
 mod solves;
 mod statistics;
+mod transport;
 
 use super::{
     AbsenceReason, CancelOutcome, ExecutionAccount, HandbackOutcome, HostChannel,

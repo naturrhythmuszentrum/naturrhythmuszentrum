@@ -6,6 +6,7 @@ mod compaction;
 mod layout;
 pub(crate) mod memory;
 pub(crate) mod storage;
+mod transport;
 mod types;
 
 pub use algebra::MaskPartition;

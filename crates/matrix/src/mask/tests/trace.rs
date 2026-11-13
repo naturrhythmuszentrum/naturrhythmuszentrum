@@ -328,3 +328,48 @@ fn loan_phases(
     ));
     Ok(account.usage().work - before)
 }
+
+/// Transport records its allocation child on the same ledger without changing literal Work.
+/// ´test:unit:mask-transport-ledger-receipts´
+#[test]
+fn mask_transport_ledger_receipts() -> TestResult {
+    let guard = DISPATCHERS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let (mut heap, layout, _, mut preparation) = fixture(65)?;
+    let source = heap.create_mask(layout, &[1, 64], &mut preparation)?;
+    let axis = heap.mask(source, layout)?.axis();
+    let target = heap.create_cell_layout(
+        axis,
+        crate::Layout::contiguous(crate::Extent::new(65, 1)?)?,
+        &mut preparation,
+    )?;
+    let state = Arc::new(Mutex::new(State::default()));
+    let subscriber = Observer(Arc::clone(&state));
+    tracing::subscriber::with_default(subscriber, || -> TestResult {
+        let mut budget = Budget::new(Limits::default())?;
+        heap.transport_mask(source, target, &mut budget)?;
+        // Two authenticators, three occupied slots, two zeroes, two copies, one scan.
+        assert_eq!(budget.usage().work, 10);
+        Ok(())
+    })?;
+    drop(guard);
+    let mut state = state
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    assert!(!state.lost);
+    assert_eq!(state.active, []);
+    let receipts = std::mem::take(&mut state.receipts);
+    drop(state);
+    assert_eq!(receipts.len(), 2);
+    let root = receipts.first().ok_or("transport receipt")?;
+    let allocation = receipts.get(1).ok_or("allocation receipt")?;
+    assert_eq!(root.fields.operation, "mask cell transport");
+    assert_eq!(allocation.fields.operation, "mask allocation");
+    assert_eq!(allocation.parent, Some(0));
+    assert_eq!(root.fields.ledger, allocation.fields.ledger);
+    assert_ne!(root.fields.ledger, 0);
+    assert_eq!(root.after - root.before, 10);
+    assert_eq!(allocation.after - allocation.before, 2);
+    Ok(())
+}
