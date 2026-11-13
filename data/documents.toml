@@ -289,3 +289,7 @@ requires = []
 [[document]]
 output = "crates/bench/README.md"
 requires = []
+
+[[document]]
+output = "docs/design/compute-benchmarks.md"
+requires = []
