@@ -3,6 +3,7 @@
 
 mod algebra;
 mod compaction;
+mod product;
 mod resources;
 mod trace;
 mod transport;

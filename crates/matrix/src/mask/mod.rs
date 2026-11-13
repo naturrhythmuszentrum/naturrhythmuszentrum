@@ -5,11 +5,13 @@ mod algebra;
 mod compaction;
 mod layout;
 pub(crate) mod memory;
+mod product;
 pub(crate) mod storage;
 mod transport;
 mod types;
 
 pub use algebra::MaskPartition;
+pub use product::{CellFactor, CellProduct};
 pub(crate) use storage::Store;
 pub use types::{
     CellAxis, CellCorrespondence, CellGather, CellLayoutVersion, MaskError, MaskVersion, MaskView,

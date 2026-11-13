@@ -419,6 +419,6 @@ pub use publication::{
 )]
 mod mask;
 pub use mask::{
-    CellAxis, CellCorrespondence, CellGather, CellLayoutVersion, MaskError, MaskPartition,
-    MaskVersion, MaskView,
+    CellAxis, CellCorrespondence, CellFactor, CellGather, CellLayoutVersion, CellProduct,
+    MaskError, MaskPartition, MaskVersion, MaskView,
 };
