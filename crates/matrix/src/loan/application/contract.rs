@@ -223,7 +223,10 @@ impl Evidence {
             }
             prepared.validate(&self.source, destination)?;
         }
-        if self.error_scope != member.error_scope(self.error_scope) {
+        // Copies inherit their source scope, authenticated by the capture seal in chain.
+        let arithmetic = !member.is_transform();
+        let wrong_scope = self.error_scope != member.error_scope(self.error_scope);
+        if arithmetic && wrong_scope {
             return Err(LoanError::WrongLoan);
         }
         self.validate_mapping(member, destination, identity, revision)?;
