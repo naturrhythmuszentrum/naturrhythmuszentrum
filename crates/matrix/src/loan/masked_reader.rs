@@ -2,8 +2,33 @@
 //! Borrowed selected views retain the original numerical pin and immutable native map.
 
 use super::{ExecutionAccount, HostChannel, LoanError, TileReader, charge};
-use crate::MaskView;
+use crate::{CellFactor, CellProduct, MaskView};
 use nrz_scalar::Scalar;
+
+/// Native cell projection retains original source dependence without new descriptors.
+#[derive(Clone, Copy, Debug)]
+pub(super) enum Projection {
+    /// Dense or original-index gathered selection.
+    Original,
+    /// One checked factor of an original or gathered Cartesian selection.
+    Product(CellProduct, CellFactor),
+}
+impl Projection {
+    /// Project one already selected product cell to its original factor coordinate.
+    fn original(self, cell: usize) -> Result<usize, LoanError> {
+        match self {
+            Self::Original => Ok(cell),
+            Self::Product(product, factor) => Ok(product.coordinates(cell)?[factor_index(factor)]),
+        }
+    }
+}
+/// Ordered native product coordinates use the same fixed outer/inner convention.
+const fn factor_index(factor: CellFactor) -> usize {
+    match factor {
+        CellFactor::Outer => 0,
+        CellFactor::Inner => 1,
+    }
+}
 
 /// A checked cell selection borrowing a pinned value and its complete companion bundle.
 ///
@@ -12,9 +37,11 @@ use nrz_scalar::Scalar;
 /// The view allocates nothing and cannot outlive either its source reader or mask.
 pub struct MaskedTileReader<'a, P: Scalar> {
     /// Existing reader borrow keeps its complete bundle pin alive.
-    source: &'a TileReader<'a, P>,
+    source: TileReader<'a, P>,
     /// Immutable selected words and any retained original-index map.
     selection: MaskView<'a>,
+    /// Checked original-source projection, fixed at binding.
+    projection: Projection,
 }
 impl<P: Scalar> std::fmt::Debug for MaskedTileReader<'_, P> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -22,6 +49,7 @@ impl<P: Scalar> std::fmt::Debug for MaskedTileReader<'_, P> {
             .debug_struct("MaskedTileReader")
             .field("source", &self.source)
             .field("selection", &self.selection)
+            .field("projection", &self.projection)
             .finish()
     }
 }
@@ -38,29 +66,66 @@ impl<P: Scalar + 'static> TileReader<'_, P> {
         selection: MaskView<'a>,
         account: &mut ExecutionAccount,
     ) -> Result<MaskedTileReader<'a, P>, LoanError> {
-        account.authenticate(self.account)?;
+        MaskedTileReader::bind(self.reborrow(), selection, account)
+    }
+}
+impl<'a, P: Scalar + 'static> MaskedTileReader<'a, P> {
+    /// Shared association check for borrowed and independently retained selections.
+    pub(super) fn bind(
+        source: TileReader<'a, P>,
+        selection: MaskView<'a>,
+        account: &mut ExecutionAccount,
+    ) -> Result<Self, LoanError> {
+        Self::bind_projected(source, selection, Projection::Original, account)
+    }
+    /// Validate the complete source association once for an owned mapped selection.
+    pub(super) fn bind_projected(
+        source: TileReader<'a, P>,
+        selection: MaskView<'a>,
+        projection: Projection,
+        account: &mut ExecutionAccount,
+    ) -> Result<Self, LoanError> {
+        account.authenticate(source.account)?;
         account
             .ledger
             .with_work_phase(super::FAMILY, "masked reader binding", |budget| {
                 charge(budget, 2)?;
-                let axis = if let Some(map) = selection.gather() {
-                    if map.source().layout() != self.bundle.identity.layout {
-                        return Err(LoanError::LayoutMismatch);
+                match projection {
+                    Projection::Original => {
+                        let axis = if let Some(map) = selection.gather() {
+                            if map.source().layout() != source.bundle.identity.layout {
+                                return Err(LoanError::LayoutMismatch);
+                            }
+                            map.original_axis()
+                        } else {
+                            selection.axis()
+                        };
+                        if axis != source.bundle.declaration.axis {
+                            return Err(LoanError::LayoutMismatch);
+                        }
                     }
-                    map.original_axis()
-                } else {
-                    selection.axis()
-                };
-                if axis != self.bundle.declaration.axis {
-                    return Err(LoanError::LayoutMismatch);
+                    Projection::Product(product, factor) => {
+                        charge(budget, 1)?;
+                        let axis = selection
+                            .gather()
+                            .map_or_else(|| selection.axis(), crate::CellGather::original_axis);
+                        if axis != product.axis()
+                            || source.bundle.declaration.axis
+                                != product.factors()[factor_index(factor)]
+                        {
+                            return Err(LoanError::LayoutMismatch);
+                        }
+                    }
                 }
-                Ok(MaskedTileReader {
-                    source: self,
+                Ok(Self {
+                    source,
                     selection,
+                    projection,
                 })
             })
     }
 }
+
 impl<P: Scalar + 'static> MaskedTileReader<'_, P> {
     /// Logical selected-layout capacity, including its unfilled cells.
     #[must_use]
@@ -91,6 +156,10 @@ impl<P: Scalar + 'static> MaskedTileReader<'_, P> {
                     Some(map) => *map.indices().get(cell).ok_or(LoanError::LayoutMismatch)?,
                     None => cell,
                 };
+                if matches!(self.projection, Projection::Product(..)) {
+                    charge(budget, 1)?;
+                }
+                let original = self.projection.original(original)?;
                 let owner = self.source.selected_owner(channel, original, component)?;
                 charge(budget, 1)?;
                 owner.matrix.read(

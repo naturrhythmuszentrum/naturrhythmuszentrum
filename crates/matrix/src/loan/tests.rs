@@ -7,6 +7,8 @@ mod invariants;
 mod mapped;
 mod mapped_kernels;
 mod masked_reader;
+mod owned_product;
+mod owned_selection;
 mod products;
 mod recipes;
 mod review;

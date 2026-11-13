@@ -184,6 +184,14 @@ impl<P: Scalar + 'static> PublishedTile<P> {
     }
 }
 impl<P: Scalar + 'static> TileReader<'_, P> {
+    /// Reborrow the immutable bundle without adding a pin or extending its lifetime.
+    pub(super) const fn reborrow(&self) -> TileReader<'_, P> {
+        TileReader {
+            bundle: self.bundle,
+            account: self.account,
+            marker: PhantomData,
+        }
+    }
     /// Declared capacity includes holes, which remain forbidden numerical reads.
     #[must_use]
     pub const fn capacity(&self) -> usize {
