@@ -13,12 +13,24 @@ use nrz_bindings::{BindingSymbols, Budget, Descriptor, Limits};
 /// ´test:unit:loan-dense-layout-binary-and-chained-kernels´
 #[test]
 fn loan_dense_layout_binary_and_chained_kernels() -> TestResult {
+    kernels(false)
+}
+
+/// Gapped operands preserve the same independent enclosure and lineage laws.
+/// ´test:unit:loan-affine-layout-binary-and-chained-kernels´
+#[test]
+fn loan_affine_layout_binary_and_chained_kernels() -> TestResult {
+    kernels(true)
+}
+
+/// Run the same original mathematical problem through independently chosen physical maps.
+fn kernels(gapped: bool) -> TestResult {
     for function in [BinaryElementwise::Product, BinaryElementwise::Quotient] {
         let super::super::Fixture {
             mut heap,
             mut account,
             request: binary,
-        } = fixture(function)?;
+        } = fixture(function, gapped)?;
         let owner = match function {
             BinaryElementwise::Product => heap.request_pointwise_product(binary, &mut account),
             BinaryElementwise::Quotient => heap.request_pointwise_quotient(binary, &mut account),
@@ -84,7 +96,7 @@ fn check_binary(
 }
 
 /// The original axis and symbols are independent of the two physical permutations.
-fn fixture(function: BinaryElementwise) -> TestResult<super::super::Fixture> {
+fn fixture(function: BinaryElementwise, gapped: bool) -> TestResult<super::super::Fixture> {
     let mut heap = Heap::new(HeapLimits::default())?;
     let mut account = ExecutionAccount::new(Budget::new(Limits::default())?)?;
     let axis = heap.create_cell_axis(3, &mut account.ledger)?;
@@ -96,8 +108,8 @@ fn fixture(function: BinaryElementwise) -> TestResult<super::super::Fixture> {
         Coverage::RepresentedInputs,
         &mut account,
     )?;
-    let left = source(&mut heap, &mut account, axis, 0)?;
-    let right = source(&mut heap, &mut account, axis, 1)?;
+    let left = source(&mut heap, &mut account, axis, 0, gapped)?;
+    let right = source(&mut heap, &mut account, axis, 1, gapped)?;
     let demand = heap.create_mask(
         left.ticket()?.identity.layout,
         &[0, 1, 2],
@@ -137,16 +149,18 @@ fn source(
     account: &mut ExecutionAccount,
     axis: crate::CellAxis,
     operand: usize,
+    gapped: bool,
 ) -> TestResult<BundlePin<f64>> {
     let symbols =
         BindingSymbols::declare(&Descriptor::ratio(), [3, 2], [true; 2], &mut account.ledger)?;
     let declaration =
         HostTileDeclaration::check(symbols, axis, Coverage::RepresentedInputs, account)?;
     let extent = crate::Extent::new(3, 2)?;
-    let map = if operand == 0 {
-        Layout::strided(extent, 9, 1, 2, 1)?
-    } else {
-        Layout::strided(extent, 11, 8, -1, -3)?
+    let map = match (operand, gapped) {
+        (0, false) => Layout::strided(extent, 9, 1, 2, 1)?,
+        (0, true) => Layout::strided(extent, 12, 1, 3, 1)?,
+        (_, false) => Layout::strided(extent, 11, 8, -1, -3)?,
+        (_, true) => Layout::strided(extent, 9, 0, 2, 3)?,
     };
     let mut loan = match heap.request_loan_with_layout(declaration, map, account) {
         LoanRequest::Granted(loan) => loan,

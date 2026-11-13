@@ -237,7 +237,7 @@ fn eligible(source: &Bundle) -> Result<(), LoanError> {
     if source.layout.gather.is_some()
         || source.layout.axis != source.declaration.axis
         || source.layout.components.extent() != source.declaration.extent
-        || source.layout.components.dense_range()?.is_none()
+        || !source.layout.components.writable_affine()?
     {
         return Err(LoanError::LayoutMismatch);
     }

@@ -32,7 +32,7 @@ pub(super) fn source(
         || bundle.layout.gather.is_some()
         || bundle.layout.axis != axis
         || bundle.layout.components.extent() != extent
-        || bundle.layout.components.dense_range()?.is_none()
+        || !bundle.layout.components.writable_affine()?
     {
         return Err(LoanError::LayoutMismatch);
     }

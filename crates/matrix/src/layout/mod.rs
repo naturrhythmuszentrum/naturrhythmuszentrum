@@ -241,6 +241,19 @@ impl Layout {
         }
     }
 
+    /// Prove writable affine incidence without allocating or enumerating logical entries.
+    /// Explicit gathers require their separately bounded validation and are not admitted here.
+    pub(crate) fn writable_affine(&self) -> Result<bool, HeapError> {
+        if self.dense_range()?.is_some() {
+            return Ok(true);
+        }
+        Ok(match &self.map {
+            Map::Affine(affine) => affine.injective(self.extent),
+            Map::Empty => true,
+            Map::Gather(_) => false,
+        })
+    }
+
     /// Copy a checked selection fallibly, bounding explicit-map allocation and scanning.
     fn copy_checked(&self, region_entries: usize, work_limit: usize) -> Result<Self, HeapError> {
         self.validate(region_entries, work_limit)?;
@@ -269,3 +282,6 @@ pub(crate) const fn check_work(entries: usize, limit: usize) -> Result<(), HeapE
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

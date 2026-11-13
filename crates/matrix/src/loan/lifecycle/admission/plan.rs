@@ -73,7 +73,7 @@ impl Plan {
         budget: &mut nrz_bindings::Budget,
     ) -> Result<Self, LoanError> {
         charge(budget, 1)?;
-        if layout.extent() != declaration.extent || layout.dense_range()?.is_none() {
+        if layout.extent() != declaration.extent || !layout.writable_affine()? {
             return Err(LoanError::LayoutMismatch);
         }
         // Planning inspects descriptor vacancies three times and native vacancies twice;

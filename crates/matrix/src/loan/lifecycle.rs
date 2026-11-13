@@ -233,11 +233,11 @@ impl Heap {
         };
         self.request_loan_with_layout(declaration, layout, account)
     }
-    /// Admit a dense component permutation, including reversed and interleaved storage.
+    /// Admit an injective affine component map, including gapped and reversed storage.
     ///
     /// The map preserves the declaration's logical cells and components. All channels
     /// share its checked injective map; physical prefix and suffix padding is reserved.
-    /// Explicit gathers and non-dense strides are outside this admission contract.
+    /// Explicit gather maps are outside this admission contract.
     pub fn request_loan_with_layout<P: Scalar + 'static>(
         &mut self,
         declaration: HostTileDeclaration<P>,

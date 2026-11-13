@@ -110,6 +110,34 @@ impl Affine {
         Ok(Some((start, end)))
     }
 
+    /// Distinct rectangular coordinates collide exactly when the primitive stride relation fits.
+    /// For nonzero strides a,b, the least nonzero differences have magnitudes b/g and a/g,
+    /// where g=gcd(a,b). Signs only choose the direction of those differences.
+    pub(crate) const fn injective(self, extent: Extent) -> bool {
+        let rows = extent.rows();
+        let columns = extent.columns();
+        let row = self.row_stride.unsigned_abs();
+        let column = self.column_stride.unsigned_abs();
+        if rows <= 1 {
+            return columns <= 1 || column != 0;
+        }
+        if columns <= 1 {
+            return row != 0;
+        }
+        if row == 0 || column == 0 {
+            return false;
+        }
+        let mut divisor = row;
+        let mut remainder = column;
+        // Euclid has a fixed machine-word bound, independent of cell population.
+        while remainder != 0 {
+            let next = divisor % remainder;
+            divisor = remainder;
+            remainder = next;
+        }
+        rows <= column / divisor || columns <= row / divisor
+    }
+
     /// Constant-time proof that vectorization itself is the map.
     pub(crate) fn is_identity(self, extent: Extent) -> bool {
         self.offset == 0

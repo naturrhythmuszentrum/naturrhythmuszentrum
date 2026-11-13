@@ -6,13 +6,15 @@ use crate::{HandbackOutcome, HostChannel, Layout, LoanError, LoanRequest};
 use nrz_bindings::Limits;
 use nrz_scalar::Scalar;
 
-/// Three independently specified permutations occupy addresses 3 through 132.
+/// Independently specified dense and gapped permutations have distinct physical footprints.
 fn layout(kind: usize) -> TestResult<Layout> {
     let extent = crate::Extent::new(65, 2)?;
     Ok(match kind {
         0 => Layout::strided(extent, 137, 3, 1, 65)?,
         1 => Layout::strided(extent, 137, 3, 2, 1)?,
         2 => Layout::strided(extent, 137, 132, -2, -1)?,
+        3 => Layout::strided(extent, 400, 3, 3, 201)?,
+        4 => Layout::strided(extent, 134, 0, 2, 3)?,
         _ => return Err("unknown test layout".into()),
     })
 }
@@ -55,13 +57,13 @@ fn fill<P: Scalar + 'static>(
 /// ´test:unit:loan-dense-layout-independent-addresses-and-coverage´
 #[test]
 fn loan_dense_layout_independent_addresses_and_coverage() -> TestResult {
-    coverage::<f32>()?;
-    coverage::<f64>()
+    coverage::<f32>(0..3)?;
+    coverage::<f64>(0..3)
 }
 
 /// Explicit address arithmetic, logical set membership and pinned reads are separate oracles.
-fn coverage<P: Scalar + 'static>() -> TestResult {
-    for kind in 0..3 {
+fn coverage<P: Scalar + 'static>(kinds: std::ops::Range<usize>) -> TestResult {
+    for kind in kinds {
         for mode in 0..4 {
             let (mut heap, mut account, declaration) =
                 fixture::<P>(65, 2, [true, true], Limits::default())?;
@@ -126,13 +128,13 @@ fn repair<P: Scalar + 'static>() -> TestResult {
     empty(&mut heap, &mut account)
 }
 
-/// Alias and non-dense maps refuse before numerical owners or native occupations exist.
+/// Alias and wrong-extent maps refuse before numerical owners or native occupations exist.
 /// ´test:unit:loan-dense-layout-refusals´
 #[test]
 fn loan_dense_layout_refusals() -> TestResult {
     for map in [
         Layout::strided(crate::Extent::new(65, 2)?, 137, 0, 0, 1)?,
-        Layout::strided(crate::Extent::new(65, 2)?, 300, 0, 2, 140)?,
+        Layout::strided(crate::Extent::new(65, 2)?, 300, 0, 2, 4)?,
         Layout::contiguous(crate::Extent::new(64, 2)?)?,
     ] {
         let (mut heap, mut account, declaration) =
@@ -160,6 +162,8 @@ fn check_physical<P: Scalar + 'static>(
                 0 => 3 + cell + 65 * component,
                 1 => 3 + 2 * cell + component,
                 2 => 132 - 2 * cell - component,
+                3 => 3 + 3 * cell + 201 * component,
+                4 => 2 * cell + 3 * component,
                 _ => return Err("unknown test layout".into()),
             };
             let expected = if component == 0 {
@@ -216,4 +220,12 @@ fn check_reader<P: Scalar + 'static>(
         }
     }
     Ok(())
+}
+
+/// Gapped planes and interwoven coprime strides preserve cells, companions and physical padding.
+/// ´test:unit:loan-affine-layout-independent-addresses-and-coverage´
+#[test]
+fn loan_affine_layout_independent_addresses_and_coverage() -> TestResult {
+    coverage::<f32>(3..5)?;
+    coverage::<f64>(3..5)
 }
