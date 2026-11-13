@@ -10,7 +10,7 @@ fn quoted(out: &mut impl Write, value: &impl std::fmt::Debug) -> io::Result<()> 
     string(out, &text)
 }
 /// Escape JSON text without depending on a serialization framework.
-fn string(out: &mut impl Write, text: &str) -> io::Result<()> {
+pub(super) fn string(out: &mut impl Write, text: &str) -> io::Result<()> {
     write!(out, "\"")?;
     for c in text.chars() {
         match c {

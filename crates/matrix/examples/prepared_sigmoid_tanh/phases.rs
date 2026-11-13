@@ -1,41 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete owner phases, with independent clocks and retained result identities.
 use super::{Clock, Observation, Snapshot, Tracked, checkpoint, support, timed};
-use nrz_bindings::readings::algebra::{
-    Rational,
-    enclosure::{
-        CoordinateBound, EnclosureRequest, Interval,
-        prepared_expm1::{Counts, Outcome, Policy},
-    },
-    syntax::Operator,
-};
+use nrz_bindings::readings::algebra::enclosure::prepared_expm1::{Counts, Outcome, Policy};
 use nrz_matrix::{PreparedSigmoid, PreparedTanh, SigmoidPreparationPolicy, TanhPreparationPolicy};
 use nrz_scalar::{ArithmeticContext, SigmoidInput, TanhInput};
 use std::{cell::Cell, hint::black_box, rc::Rc};
-use support::{Fixture, TestResult, broad, ledger};
-
-/// Original operations are built outside preparation clocks.
-fn original(f: &mut Fixture, tanh: bool) -> TestResult<EnclosureRequest> {
-    let x = f.term(Operator::Free("x".into()), &[])?;
-    let target = f.term(
-        if tanh {
-            Operator::Tanh
-        } else {
-            Operator::Sigmoid
-        },
-        std::slice::from_ref(&x),
-    )?;
-    let mut request = f.request(target);
-    request.coordinates.push(CoordinateBound {
-        coordinate: x,
-        interval: Interval::new(
-            Rational::zero(),
-            Rational::from_ratio(if tanh { 1 } else { 2 }, 1, &mut ledger()?)?,
-            &mut ledger()?,
-        )?,
-    });
-    Ok(request)
-}
+use support::{Fixture, TestResult, broad, ledger, original};
 
 /// Each cold and warm phase ends at checked basis authority, not owner import.
 fn prepare(f: &mut Fixture, rows: &mut Vec<Observation>, family: &'static str) -> TestResult {

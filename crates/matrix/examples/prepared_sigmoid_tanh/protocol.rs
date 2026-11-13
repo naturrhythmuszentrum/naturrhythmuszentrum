@@ -114,9 +114,13 @@ impl Protocol {
         order
     }
     /// Complete protocol travels with each row through the existing provenance field.
-    pub(super) fn source(&self) -> String {
+    pub(super) fn source(&self, bootstrap: Option<(u128, u32)>) -> String {
+        let intervals = bootstrap.map_or_else(
+            || "not-collected; seed=none; resamples=0".to_owned(),
+            |(seed, resamples)| format!("bootstrap; seed={seed}; resamples={resamples}"),
+        );
         format!(
-            "count={}; pid={}; cpu={}; ordinal={}; processes=5; warm_up_pid={}; measured={}; builds={:?}; round_order={:?}; build={}; tracing={}; comparable={}; within_process_intervals=not-collected; seed=none; resamples=0; environment={}",
+            "count={}; pid={}; cpu={}; ordinal={}; processes=5; warm_up_pid={}; measured={}; builds={:?}; round_order={:?}; build={}; tracing={}; comparable={}; within_process_intervals={intervals}; environment={}",
             self.count,
             std::process::id(),
             self.cpu,
