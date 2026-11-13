@@ -268,9 +268,9 @@ impl CheckedOperation {
                         | crate::KernelKind::ScalarQuantityIntegerPower
                         | crate::KernelKind::ScalarQuantitySquareRoot
                 ),
+                Recipe::Transform(map) => !map.has_padding(),
                 Recipe::Sum { .. }
                 | Recipe::Linear(_)
-                | Recipe::Transform(_)
                 | Recipe::Product
                 | Recipe::Elementwise(_)
                 | Recipe::PositiveReciprocal(_) => true,

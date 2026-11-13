@@ -307,6 +307,7 @@ fn loan_native_padding_map_refusal() -> TestResult {
         request,
         demand,
     } = super::setup::<f64>()?;
+    assert!(!request.operation.carries_statistics());
     let map = heap.cell_entry_map(crate::Extent::new(5, 2)?, demand, None, &mut account.ledger)?;
     assert_eq!(map.source_index(0), Some(1));
     assert_eq!(map.source_index(2), Some(4));
