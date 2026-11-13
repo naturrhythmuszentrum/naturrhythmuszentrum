@@ -519,7 +519,7 @@ Recorded observations stay attached to their historical tree when the current wo
 
 **Definition (Delivery acceptance)** · `def:nrz:engineering-measurement-acceptance`
 
-The delivery contract requires recorded provenance without an extra target-environment or performance-envelope gate; numerical acceptance and fresh-process comparison retain their stated correctness and tracked-error obligations (`dec:nrz:lc-resonance-delivery-contract`), (`step:nrz:lc-resonance-numerical-acceptance`), (`step:nrz:lc-resonance-record-bite`).
+The delivery contract requires recorded provenance without an extra target-environment, absolute-latency or absolute-memory-envelope gate; the explained relative-cost bound remains required under (`rule:nrz:lc-grid-ratio-information`), (`claim:nrz:lc-closing-overhead-bound`); numerical acceptance and fresh-process comparison retain their stated correctness and tracked-error obligations (`dec:nrz:lc-resonance-delivery-contract`), (`step:nrz:lc-resonance-numerical-acceptance`), (`step:nrz:lc-resonance-record-bite`).
 
 ## Open intents · `sec:nrz:engineering-measurement-intents`
 

@@ -27,6 +27,10 @@ output = "docs/plan/plan.md"
 requires = []
 
 [[document]]
+output = "docs/plan/backlog.md"
+requires = []
+
+[[document]]
 output = "tools/docgen/README.md"
 requires = ["census", "project"]
 

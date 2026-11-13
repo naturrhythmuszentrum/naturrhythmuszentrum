@@ -55,7 +55,7 @@ For `L=25 mH` and `C=10 µF`, the independent reference answers include `ω₀=2
 - LC plans (`step:nrz:lc-resonance-physics-bite`): reusable LC plans and shared-source frequency batches.
 - LC reproducibility (`step:nrz:lc-resonance-record-bite`): within-error reproducibility and environment provenance after the first physics slice.
 
-The design route retains the separate earlier symbolic proof-cost work and does not imply a general eigensolver, Complex numerical library or time integrator. The broader engine plan remains in `docs/plan/plan.md`; the LC design refines the relevant implementation sequence.
+The design route retains the separate earlier symbolic proof-cost work and does not imply a general eigensolver, Complex numerical library or time integrator. The engine plan places LC closing before the coupled 2L2C target and advanced matrix domains (`sec:nrz:plan-order-and-dependencies`); the remaining LC work is ordered in (`sec:nrz:backlog-lc-closing`), with completion decided by (`sec:nrz:lc-closing-register`).
 
 ## Documentation · `sec:nrz:overview-documentation`
 
@@ -72,7 +72,7 @@ Repository Markdown is committed output from minijinja templates. Edit `template
 |`docs/design/cas-design.md`, `docs/design/cas-solving-design.md`|Exact graph, proof, replay and solving contracts.|
 |`docs/design/units-design.md`, `docs/design/problem-data-schema.md`|Physical checking and the versioned data boundary.|
 |`docs/reference/`, `data/problems/`|Reference systems, fixtures and their generated problem documentation.|
-|`docs/records/`, `docs/plan/plan.md`|Recorded evidence, admission limits and the broader implementation plan.|
+|`docs/records/`, `docs/plan/plan.md`, `docs/plan/backlog.md`|Recorded evidence, admission limits, implementation order (`plan:nrz:engine-plan`) and remaining LC work (`plan:nrz:backlog`); LC completion is decided by (`sec:nrz:lc-closing-register`).|
 |`CONTRIBUTING.md`, `tools/docgen/README.md`|Contribution rules and documentation commands.|
 
 ## Licensing · `sec:nrz:overview-licensing`
