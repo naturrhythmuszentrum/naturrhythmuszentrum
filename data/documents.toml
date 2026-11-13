@@ -251,6 +251,10 @@ output = "docs/design/lattice-decisions.md"
 requires = []
 
 [[document]]
+output = "docs/design/lc-compute-concept.md"
+requires = []
+
+[[document]]
 output = "docs/design/lc-grid-tiles.md"
 requires = []
 
