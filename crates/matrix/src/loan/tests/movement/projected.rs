@@ -347,3 +347,87 @@ fn loan_native_padding_map_refusal() -> TestResult {
     super::retire_copy_layout(&mut heap, &mut account, demand.layout())?;
     empty(&mut heap, &mut account)
 }
+
+/// Constructor refusals precede every companion read, even for a valid native selection.
+/// ´test:unit:loan-native-copy-constructor-refusals´
+#[test]
+fn loan_native_copy_constructor_refusals() -> TestResult {
+    let Setup {
+        mut heap,
+        mut account,
+        request,
+        demand,
+    } = super::setup::<f64>()?;
+    let owner = crate::kernel_testing::owner()?;
+    let ratio = nrz_bindings::Descriptor::ratio();
+    let input = copy_shape(&owner, &ratio, 5)?;
+    let output = copy_shape(&owner, &ratio, 4)?;
+    let map = heap.cell_entry_map(crate::Extent::new(5, 2)?, demand, None, &mut account.ledger)?;
+    let explicit = crate::EntryMap::new(
+        input.extent(),
+        output.extent(),
+        vec![1, 3, 4, 0, 6, 8, 9, 5],
+        crate::ShapeLimits::default(),
+    )?;
+    let wrong_extent = copy_shape(&owner, &ratio, 3)?;
+    let quantity = nrz_bindings::Descriptor::new(
+        nrz_bindings::Kind::Named(
+            "length".into(),
+            Box::new(nrz_bindings::Dimension::integers([1, 0, 0, 0, 0, 0, 0])?),
+        ),
+        nrz_bindings::Measure::coherent(),
+        nrz_bindings::Role::Difference,
+    )?;
+    let wrong_descriptor = copy_shape(&owner, &quantity, 4)?;
+    let foreign = copy_shape(&crate::kernel_testing::owner()?, &ratio, 4)?;
+    for (target, candidate, snapshot) in [
+        (output, explicit, false),
+        (wrong_extent, map.clone(), false),
+        (wrong_descriptor, map.clone(), false),
+        (foreign, map.clone(), true),
+    ] {
+        super::super::super::fault::reset_reads();
+        let result = crate::OperationDraft::map_cell_copy(input.clone(), target, candidate);
+        if snapshot {
+            assert!(matches!(
+                result,
+                Err(crate::OperationError::Shape(
+                    crate::ShapeError::SnapshotMismatch
+                ))
+            ));
+        } else {
+            assert!(matches!(
+                result,
+                Err(crate::OperationError::Kernel(crate::KernelError::Contract))
+            ));
+        }
+        assert_eq!(super::super::super::fault::reads(), 0);
+    }
+    drop(map);
+    drop(request);
+    heap.retire_mask(demand, &mut account.ledger)?;
+    super::retire_copy_layout(&mut heap, &mut account, demand.layout())?;
+    empty(&mut heap, &mut account)
+}
+
+/// Duplicate a homogeneous column so the fixture matches the native two-component layout.
+fn copy_shape(
+    owner: &std::rc::Rc<nrz_bindings::CheckedDeclarations>,
+    quantity: &nrz_bindings::Descriptor,
+    rows: usize,
+) -> TestResult<crate::CheckedShape> {
+    let input = crate::conversion_testing::shape(owner, quantity, rows)?;
+    let limits = crate::ShapeLimits::default();
+    let map = crate::EntryMap::new(
+        input.extent(),
+        crate::Extent::new(rows, 2)?,
+        (0..rows).chain(0..rows).collect(),
+        limits,
+    )?;
+    Ok(input.select(
+        crate::kernel_testing::axis(2)?,
+        input.codomain().clone(),
+        map,
+        limits,
+    )?)
+}
