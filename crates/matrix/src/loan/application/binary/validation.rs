@@ -30,7 +30,9 @@ pub(super) fn source(
     if bundle.declaration.axis != axis
         || bundle.declaration.extent != extent
         || bundle.layout.gather.is_some()
-        || bundle.layout.components != crate::Layout::contiguous(extent)?
+        || bundle.layout.axis != axis
+        || bundle.layout.components.extent() != extent
+        || bundle.layout.components.dense_range()?.is_none()
     {
         return Err(LoanError::LayoutMismatch);
     }

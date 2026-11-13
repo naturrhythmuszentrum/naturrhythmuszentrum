@@ -137,7 +137,17 @@ impl Layout {
     /// # Errors
     /// Refuses out-of-range logical indices or checked address arithmetic failure.
     pub fn index(&self, row: usize, column: usize) -> Result<usize, HeapError> {
-        self.flat_index(self.extent.index(row, column)?)
+        let logical = self.extent.index(row, column)?;
+        // Keep checked coordinates for affine loads instead of flattening and dividing them back.
+        let index = match &self.map {
+            Map::Empty => return Err(HeapError::InvalidLayout),
+            Map::Affine(affine) => affine.index(row, column)?,
+            Map::Gather(indices) => *indices.get(logical).ok_or(HeapError::InvalidLayout)?,
+        };
+        if index >= self.region_entries {
+            return Err(HeapError::InvalidLayout);
+        }
+        Ok(index)
     }
 
     /// Compose a selection of this view's logical entries, retaining base-region offsets.

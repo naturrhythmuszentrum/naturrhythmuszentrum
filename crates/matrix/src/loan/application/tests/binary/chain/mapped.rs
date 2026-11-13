@@ -1,0 +1,190 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Independently permuted physical operands retain logical correspondence through native chains.
+
+use super::{TestResult, candidate, published, request};
+use crate::{
+    BinaryElementwise, BundlePin, Coverage, Elementwise, ExecutionAccount, ExecutionLimits,
+    HandbackOutcome, Heap, HeapLimits, HostChannel, HostTileDeclaration, Layout, LoanRequest,
+    PointwiseBinaryOperation, PointwiseBinaryRequest, RegionContract,
+};
+use nrz_bindings::{BindingSymbols, Budget, Descriptor, Limits};
+
+/// Different dense maps preserve sparse operand intersection, four-corner bounds and lineage.
+/// ´test:unit:loan-dense-layout-binary-and-chained-kernels´
+#[test]
+fn loan_dense_layout_binary_and_chained_kernels() -> TestResult {
+    for function in [BinaryElementwise::Product, BinaryElementwise::Quotient] {
+        let super::super::Fixture {
+            mut heap,
+            mut account,
+            request: binary,
+        } = fixture(function)?;
+        let owner = match function {
+            BinaryElementwise::Product => heap.request_pointwise_product(binary, &mut account),
+            BinaryElementwise::Quotient => heap.request_pointwise_quotient(binary, &mut account),
+        };
+        let owner = candidate(super::super::ready(owner)?, &mut account)?;
+        let (tile, _) = published(heap.publish_application(owner, &mut account))?;
+        check_binary(&tile, &heap, &mut account, function)?;
+        let next = request(
+            &mut heap,
+            tile.into_pin(),
+            Elementwise::SquareRoot,
+            2,
+            &mut account,
+        )?;
+        let owner = super::super::super::ready(
+            heap.request_chained_pointwise_square_root(next, &mut account),
+        )?;
+        let owner = candidate(owner, &mut account)?;
+        let (tile, _) = published(heap.publish_application(owner, &mut account))?;
+        let reader = tile.reader(&heap, &mut account)?;
+        assert!(!reader.contains(1, &mut account)?);
+        for cell in [0, 2] {
+            for component in 0..2 {
+                let expected = match function {
+                    BinaryElementwise::Product => [[2.0, 8.0], [12.0, 3.0]][cell / 2][component],
+                    BinaryElementwise::Quotient => [2.0, 3.0][cell / 2],
+                };
+                assert_eq!(
+                    reader.read_component(HostChannel::Center, cell, component, &mut account)?,
+                    expected
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The exact rational oracle receives literal original inputs, never recovered production addresses.
+fn check_binary(
+    tile: &crate::PublishedTile<f64>,
+    heap: &Heap,
+    account: &mut ExecutionAccount,
+    function: BinaryElementwise,
+) -> TestResult {
+    let reader = tile.reader(heap, account)?;
+    assert!(!reader.contains(1, account)?);
+    for cell in [0, 2] {
+        for component in 0..2 {
+            let readings = [
+                reader.read_component(HostChannel::Center, cell, component, account)?,
+                reader.read_component(HostChannel::Total, cell, component, account)?,
+                reader.read_component(HostChannel::Error, cell, component, account)?,
+            ];
+            super::super::oracle::check(
+                [values(0, cell)[component], values(1, cell)[component]],
+                [bounds(0, cell)[component], bounds(1, cell)[component]],
+                function,
+                readings,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+/// The original axis and symbols are independent of the two physical permutations.
+fn fixture(function: BinaryElementwise) -> TestResult<super::super::Fixture> {
+    let mut heap = Heap::new(HeapLimits::default())?;
+    let mut account = ExecutionAccount::new(Budget::new(Limits::default())?)?;
+    let axis = heap.create_cell_axis(3, &mut account.ledger)?;
+    let output =
+        BindingSymbols::declare(&Descriptor::ratio(), [3, 2], [true; 2], &mut account.ledger)?;
+    let destination = HostTileDeclaration::check(
+        output.clone(),
+        axis,
+        Coverage::RepresentedInputs,
+        &mut account,
+    )?;
+    let left = source(&mut heap, &mut account, axis, 0)?;
+    let right = source(&mut heap, &mut account, axis, 1)?;
+    let demand = heap.create_mask(
+        left.ticket()?.identity.layout,
+        &[0, 1, 2],
+        &mut account.ledger,
+    )?;
+    let owner = crate::kernel_testing::owner()?;
+    let domain = crate::kernel_testing::axis(2)?;
+    let codomain = crate::kernel_testing::axis(3)?;
+    let region = RegionContract::check(crate::kernel_testing::shape(&owner, &domain, &codomain)?)?;
+    let operation = PointwiseBinaryOperation::check(
+        [region.clone(), region.clone()],
+        region,
+        [&left, &right],
+        output,
+        axis,
+        function,
+        ExecutionLimits::default(),
+        &mut account,
+    )?;
+    Ok(super::super::Fixture {
+        heap,
+        account,
+        request: PointwiseBinaryRequest {
+            operation,
+            left,
+            right,
+            destination,
+            demand,
+            limits: ExecutionLimits::default(),
+        },
+    })
+}
+
+/// The left map interleaves components; the right reverses separate planes with different padding.
+fn source(
+    heap: &mut Heap,
+    account: &mut ExecutionAccount,
+    axis: crate::CellAxis,
+    operand: usize,
+) -> TestResult<BundlePin<f64>> {
+    let symbols =
+        BindingSymbols::declare(&Descriptor::ratio(), [3, 2], [true; 2], &mut account.ledger)?;
+    let declaration =
+        HostTileDeclaration::check(symbols, axis, Coverage::RepresentedInputs, account)?;
+    let extent = crate::Extent::new(3, 2)?;
+    let map = if operand == 0 {
+        Layout::strided(extent, 9, 1, 2, 1)?
+    } else {
+        Layout::strided(extent, 11, 8, -1, -3)?
+    };
+    let mut loan = match heap.request_loan_with_layout(declaration, map, account) {
+        LoanRequest::Granted(loan) => loan,
+        other @ LoanRequest::Refused(_) => return Err(format!("{other:?}").into()),
+    };
+    for cell in 0..3 {
+        loan.write_cell(HostChannel::Center, cell, &values(operand, cell), account)?;
+        let total = bounds(operand, cell);
+        loan.write_cell(HostChannel::Total, cell, &total, account)?;
+        if operand == 0 || cell != 1 {
+            loan.write_cell(
+                HostChannel::Error,
+                cell,
+                &[total[0] / 2.0, total[1] / 2.0],
+                account,
+            )?;
+        }
+    }
+    match heap.handback(loan, account) {
+        HandbackOutcome::Published(tile, _) => Ok(tile.into_pin()),
+        other => Err(format!("{other:?}").into()),
+    }
+}
+
+/// Literal positive controls give exact nominal products, quotients and subsequent roots.
+const fn values(operand: usize, cell: usize) -> [f64; 2] {
+    if operand == 0 {
+        [[4.0, 16.0], [25.0, 100.0], [36.0, 9.0]][cell]
+    } else {
+        [[1.0, 4.0], [4.0, 1.0], [4.0, 1.0]][cell]
+    }
+}
+
+/// Distinct companion magnitudes expose wrong component and cell addressing on either operand.
+const fn bounds(operand: usize, cell: usize) -> [f64; 2] {
+    if operand == 0 {
+        [[0.25, 0.5], [0.5, 0.25], [0.5, 0.25]][cell]
+    } else {
+        [[0.125, 0.25], [0.25, 0.125], [0.25, 0.125]][cell]
+    }
+}

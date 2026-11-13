@@ -5,6 +5,7 @@ mod boundaries;
 mod bytes;
 mod holes;
 mod lifetime;
+mod mapped;
 mod oracle;
 mod prefixes;
 mod refusals;

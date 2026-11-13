@@ -235,7 +235,9 @@ fn eligible(source: &Bundle) -> Result<(), LoanError> {
         return Err(LoanError::CoverageMismatch);
     }
     if source.layout.gather.is_some()
-        || source.layout.components != crate::Layout::contiguous(source.declaration.extent)?
+        || source.layout.axis != source.declaration.axis
+        || source.layout.components.extent() != source.declaration.extent
+        || source.layout.components.dense_range()?.is_none()
     {
         return Err(LoanError::LayoutMismatch);
     }
