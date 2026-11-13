@@ -3,6 +3,7 @@
 
 mod algebra;
 mod compaction;
+mod gather_transport;
 mod layout;
 pub(crate) mod memory;
 mod product;

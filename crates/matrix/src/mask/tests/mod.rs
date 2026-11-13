@@ -3,6 +3,7 @@
 
 mod algebra;
 mod compaction;
+mod gather_transport;
 mod product;
 mod resources;
 mod trace;
