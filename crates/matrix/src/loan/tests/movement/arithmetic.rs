@@ -116,7 +116,7 @@ fn product<P: Scalar + 'static>() -> TestResult {
 }
 
 /// Fresh targets share only the exact original axis; the source's immutable occupation stays captured.
-fn square_request<P: Scalar + 'static>(
+pub(super) fn square_request<P: Scalar + 'static>(
     heap: &mut Heap,
     account: &mut ExecutionAccount,
     input: BundlePin<P>,

@@ -5,6 +5,10 @@ use super::{Setup, TestResult, candidate, empty, publish};
 use crate::{ApplicationEvaluation, ApplicationRequest, HostChannel, PointwiseRequest};
 use nrz_scalar::Scalar;
 
+mod boundaries;
+mod observation;
+mod unary;
+
 /// Both formats directly consume gathered and repeated-product source cells.
 /// ´test:unit:loan-projected-square-native-consumers´
 #[test]
@@ -23,10 +27,11 @@ fn square<P: Scalar>(request: &mut PointwiseRequest<P>) -> TestResult {
     let crate::kernels::contract::Recipe::Transform(map) = &law.recipe else {
         return Err("map".into());
     };
-    request.operation = crate::OperationDraft::map_projected_square(
+    request.operation = crate::OperationDraft::map_projected_elementwise(
         request.operation.inputs()[0].shape().clone(),
         request.operation.outputs()[0].shape().clone(),
         map.clone(),
+        crate::Elementwise::Square,
     )?
     .check(crate::ExecutionLimits::default())?;
     assert!(!request.operation.carries_statistics());
@@ -48,7 +53,7 @@ fn direct<P: Scalar + 'static>(product: bool) -> TestResult {
         demand,
     } = setup;
     square(&mut request)?;
-    let owner = match heap.request_projected_square(request, &mut account) {
+    let owner = match heap.request_projected_elementwise(request, &mut account) {
         ApplicationRequest::ApplicationReady(owner) => owner,
         other @ ApplicationRequest::ApplicationRefused(..) => {
             return Err(format!("{other:?}").into());
@@ -128,7 +133,7 @@ fn loan_projected_square_literal_work_boundary() -> TestResult {
             ..
         } = super::setup::<f64>()?;
         square(&mut request)?;
-        let owner = match heap.request_projected_square(request, &mut account) {
+        let owner = match heap.request_projected_elementwise(request, &mut account) {
             ApplicationRequest::ApplicationReady(owner) => owner,
             other @ ApplicationRequest::ApplicationRefused(..) => {
                 return Err(format!("{other:?}").into());
@@ -170,6 +175,11 @@ fn loan_projected_square_full_and_empty() -> TestResult {
 
 /// Three original cells are filled; an empty demand performs no arithmetic or numerical loads.
 fn coverage<P: Scalar + 'static>() -> TestResult {
+    coverage_function::<P>(crate::Elementwise::Square)
+}
+
+/// Coverage depends on the selected original cells, independently of the unary law.
+fn coverage_function<P: Scalar + 'static>(function: crate::Elementwise) -> TestResult {
     for populated in [false, true] {
         let Setup {
             mut heap,
@@ -183,8 +193,8 @@ fn coverage<P: Scalar + 'static>() -> TestResult {
             heap.create_mask(demand.layout(), &[], &mut account.ledger)?
         };
         request.demand = selected;
-        square(&mut request)?;
-        let owner = match heap.request_projected_square(request, &mut account) {
+        unary::operation(&mut request, function)?;
+        let owner = match heap.request_projected_elementwise(request, &mut account) {
             ApplicationRequest::ApplicationReady(owner) => owner,
             other @ ApplicationRequest::ApplicationRefused(..) => {
                 return Err(format!("{other:?}").into());
@@ -227,7 +237,7 @@ fn loan_projected_square_axis_refusal() -> TestResult {
     request.destination.axis = heap.create_cell_axis(4, &mut account.ledger)?;
     super::super::super::fault::reset_reads();
     let injection = super::super::super::fault::Injection::after(0);
-    let mut request = match heap.request_projected_square(request, &mut account) {
+    let mut request = match heap.request_projected_elementwise(request, &mut account) {
         ApplicationRequest::ApplicationRefused(
             crate::ApplicationError::Loan(crate::LoanError::LayoutMismatch),
             request,
@@ -243,7 +253,7 @@ fn loan_projected_square_axis_refusal() -> TestResult {
     );
     drop(injection);
     request.destination.axis = axis;
-    let owner = match heap.request_projected_square(request, &mut account) {
+    let owner = match heap.request_projected_elementwise(request, &mut account) {
         ApplicationRequest::ApplicationReady(owner) => owner,
         other @ ApplicationRequest::ApplicationRefused(..) => {
             return Err(format!("{other:?}").into());

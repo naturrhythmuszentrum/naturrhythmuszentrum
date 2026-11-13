@@ -12,7 +12,7 @@ impl KernelContract {
         scalar_scratch: usize,
     ) -> Result<usize, OperationError> {
         match &self.recipe {
-            Recipe::Transform(map) | Recipe::ProjectedSquare(map) if map.has_padding() => {
+            Recipe::Transform(map) | Recipe::ProjectedElementwise(map, _) if map.has_padding() => {
                 Err(super::KernelError::Contract.into())
             }
             Recipe::Product => self.product_scratch::<P, Q>(),
@@ -57,7 +57,7 @@ impl KernelContract {
             }
             Recipe::Sum { .. }
             | Recipe::Transform(_)
-            | Recipe::ProjectedSquare(_)
+            | Recipe::ProjectedElementwise(..)
             | Recipe::Elementwise(_) => {
                 // Entry results coexist with candidate channels; transform's optional three
                 // contribution channels are also already counted by Reservations.

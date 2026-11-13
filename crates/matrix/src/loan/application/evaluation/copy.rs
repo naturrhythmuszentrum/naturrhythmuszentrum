@@ -47,7 +47,7 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
         })
     }
 
-    /// Native projected Square uses the same bound owners without materializing a copied tile.
+    /// Projected unary laws share bound owners without materializing a copied tile.
     pub(super) fn evaluate(
         &self,
         member: super::Member<'_>,
@@ -62,6 +62,9 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
                 .map(super::selected::Values::Closed)
                 .map_err(|_| member.storage_failure(component));
         }
+        let super::Member::ProjectedElementwise(_, function) = member else {
+            return Err(member.storage_failure(component));
+        };
         let load = || -> Result<_, LoanError> {
             let address = self.address(cell, component)?;
             #[cfg(test)]
@@ -80,7 +83,7 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
                 crate::kernels::nonlinear::evaluate_selected(
                     center,
                     total,
-                    crate::Elementwise::Square,
+                    function,
                     entry,
                     &permit.context,
                 )

@@ -53,23 +53,18 @@ pub(crate) fn evaluate<P: Scalar + 'static>(
     Ok(result)
 }
 
-/// Dense execution shares the exact native projection and whole-box Square law.
+/// Dense execution shares the exact native projection and whole-box unary law.
 pub(crate) fn evaluate_projected<P: Scalar + 'static>(
     input: &NormalizedView<'_, P>,
     map: &crate::EntryMap,
+    function: Elementwise,
     context: &ArithmeticContext,
 ) -> Result<Vec<Entry<P>>, OperationError> {
     let mut result = buffer(map.target().entries())?;
     for (entry, original) in map.indices()?.enumerate() {
         let original = original?;
         let (center, radius) = operand(input, original)?;
-        result.push(evaluate_selected(
-            center,
-            radius,
-            Elementwise::Square,
-            entry,
-            context,
-        )?);
+        result.push(evaluate_selected(center, radius, function, entry, context)?);
     }
     Ok(result)
 }

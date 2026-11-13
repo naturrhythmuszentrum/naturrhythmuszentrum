@@ -33,8 +33,8 @@ impl Heap {
         })
     }
 
-    /// Evaluate Square directly over native product or gather incidence in either format.
-    pub fn request_projected_square<P: Scalar + 'static>(
+    /// Evaluate a unary law directly over native product or gather incidence in either format.
+    pub fn request_projected_elementwise<P: Scalar + 'static>(
         &mut self,
         request: PointwiseRequest<P>,
         account: &mut ExecutionAccount,
@@ -43,13 +43,23 @@ impl Heap {
             Ok(origin) => origin,
             Err(error) => return ApplicationRequest::ApplicationRefused(error.into(), request),
         };
-        super::admission::request_kind(
-            self,
-            request,
-            KernelKind::Elementwise(crate::Elementwise::Square),
-            origin,
-            account,
-        )
+        let kind = match &request.operation.recipe {
+            crate::binding::NativeRecipe::Kernel(law)
+                if matches!(
+                    law.recipe,
+                    crate::kernels::contract::Recipe::ProjectedElementwise(..)
+                ) =>
+            {
+                law.kind()
+            }
+            _ => {
+                return ApplicationRequest::ApplicationRefused(
+                    LoanError::UnsupportedContract.into(),
+                    request,
+                );
+            }
+        };
+        super::admission::request_kind(self, request, kind, true, origin, account)
     }
 
     /// Copy selected original values and both companions into disjoint dense owners.
@@ -67,7 +77,14 @@ impl Heap {
             Ok(origin) => origin,
             Err(error) => return ApplicationRequest::ApplicationRefused(error.into(), request),
         };
-        super::admission::request_kind(self, request, KernelKind::TransformEntries, origin, account)
+        super::admission::request_kind(
+            self,
+            request,
+            KernelKind::TransformEntries,
+            false,
+            origin,
+            account,
+        )
     }
 }
 

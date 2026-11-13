@@ -58,6 +58,7 @@ pub(super) fn request_with_origin<P: Scalar + 'static>(
         heap,
         request,
         crate::KernelKind::Elementwise(function),
+        false,
         origin,
         account,
     )
@@ -67,6 +68,7 @@ pub(super) fn request_kind<P: Scalar + 'static>(
     heap: &mut Heap,
     request: PointwiseRequest<P>,
     expected: crate::KernelKind,
+    projected_entry: bool,
     origin: super::chain::Input,
     account: &mut ExecutionAccount,
 ) -> ApplicationRequest<P> {
@@ -75,6 +77,7 @@ pub(super) fn request_kind<P: Scalar + 'static>(
         .with_work_phase(super::FAMILY, "pointwise admission", |budget| {
             let mut borrowed = super::prepared::Request::from(&request);
             borrowed.expected = expected;
+            borrowed.projected_entry = projected_entry;
             super::contract::check(heap, &borrowed, account.identity, origin, budget)?;
             let plan = plan::Plan::new(heap, &borrowed, budget)?;
             preparation::prepare(heap, &borrowed, plan).map_err(ApplicationError::from)

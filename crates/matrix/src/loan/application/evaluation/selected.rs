@@ -23,7 +23,7 @@ impl Member<'_> {
     pub(in crate::loan::application) const fn zeros<P: Scalar>(self) -> Values<P> {
         match self {
             Self::Transform(_)
-            | Self::ProjectedSquare(_)
+            | Self::ProjectedElementwise(..)
             | Self::Square(_)
             | Self::Reciprocal(_)
             | Self::SquareRoot(_) => Values::Closed([P::ZERO; 3]),
@@ -49,7 +49,9 @@ impl Member<'_> {
         permit: &Traversal,
     ) -> Result<Values<P>, CellOutcome> {
         match self {
-            Self::Transform(_) | Self::ProjectedSquare(_) => Err(self.storage_failure(component)),
+            Self::Transform(_) | Self::ProjectedElementwise(..) => {
+                Err(self.storage_failure(component))
+            }
             Self::Square(_) | Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 let function = if matches!(self, Self::Square(_)) {
                     crate::Elementwise::Square
@@ -72,7 +74,7 @@ impl Member<'_> {
                         .entered(),
                     ),
                     Self::Transform(_)
-                    | Self::ProjectedSquare(_)
+                    | Self::ProjectedElementwise(..)
                     | Self::Square(_)
                     | Self::PreparedExpm1(..)
                     | Self::Binary(..) => None,

@@ -33,7 +33,10 @@ pub(super) fn check<P: Scalar + 'static>(
         return super::binary::check_request(heap, request, account, budget);
     }
     let projected = matches!(&request.operation.recipe, crate::binding::NativeRecipe::Kernel(law)
-        if matches!(law.recipe, crate::kernels::contract::Recipe::ProjectedSquare(_)));
+        if matches!(law.recipe, crate::kernels::contract::Recipe::ProjectedElementwise(..)));
+    if projected != request.projected_entry {
+        return Err(LoanError::UnsupportedContract.into());
+    }
     if request.expected == crate::KernelKind::TransformEntries || projected {
         return super::movement::check(heap, request, account, origin, budget);
     }

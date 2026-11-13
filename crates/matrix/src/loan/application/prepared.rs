@@ -184,6 +184,8 @@ pub(super) struct Request<'a, P: nrz_scalar::Scalar> {
     pub(super) limits: ExecutionLimits,
     /// Expected entry point, checked before the member profile is used.
     pub(super) expected: crate::KernelKind,
+    /// Only the projected entry point admits a projected unary recipe.
+    pub(super) projected_entry: bool,
     /// Optional ordered binary correspondence and borrowed right edge.
     pub(super) binary: Option<(&'a super::PointwiseBinaryOperation, &'a BundlePin<f64>)>,
     /// Optional retained correspondence for the prepared member.
@@ -217,6 +219,7 @@ impl<'a, P: nrz_scalar::Scalar> From<&'a PointwiseRequest<P>> for Request<'a, P>
             destination: &request.destination,
             demand: request.demand,
             limits: request.limits,
+            projected_entry: false,
             binary: None,
             prepared: None,
             expected: crate::KernelKind::Elementwise(crate::Elementwise::Square),
@@ -231,6 +234,7 @@ impl<'a> From<&'a PointwiseExpm1Request> for Request<'a, f64> {
             destination: &request.destination,
             demand: request.demand,
             limits: request.limits,
+            projected_entry: false,
             binary: None,
             prepared: Some(&request.operation),
             expected: crate::KernelKind::PreparedExpm1,
@@ -368,6 +372,7 @@ impl<'a> From<&'a super::PointwiseBinaryRequest> for Request<'a, f64> {
             destination: &request.destination,
             demand: request.demand,
             limits: request.limits,
+            projected_entry: false,
             expected: crate::KernelKind::BinaryElementwise(crate::BinaryElementwise::Product),
             prepared: None,
             binary: Some((&request.operation, &request.right)),

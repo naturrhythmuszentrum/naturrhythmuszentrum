@@ -68,8 +68,8 @@ pub(crate) enum Recipe {
     Linear(Box<LinearSchedule>),
     /// Bit-preserving logical entry transformation.
     Transform(EntryMap),
-    /// Native whole-cell projection followed by a square enclosure.
-    ProjectedSquare(EntryMap),
+    /// Native whole-cell projection followed by a closed unary enclosure.
+    ProjectedElementwise(EntryMap, super::Elementwise),
     /// Backend product with an independent outward contraction.
     Product,
     /// A closed scalar-quantity schedule with an explicit per-attempt Work allowance.
@@ -95,8 +95,9 @@ impl KernelContract {
             Recipe::Transform(_) => KernelKind::TransformEntries,
             Recipe::Product => KernelKind::Product,
             Recipe::Quantity(recipe) => recipe.kind(),
-            Recipe::ProjectedSquare(_) => KernelKind::Elementwise(super::Elementwise::Square),
-            Recipe::Elementwise(function) => KernelKind::Elementwise(*function),
+            Recipe::ProjectedElementwise(_, function) | Recipe::Elementwise(function) => {
+                KernelKind::Elementwise(*function)
+            }
             Recipe::PreparedExpm1 => KernelKind::PreparedExpm1,
             Recipe::BinaryElementwise(function) => KernelKind::BinaryElementwise(*function),
         }

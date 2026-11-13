@@ -9,20 +9,21 @@ use crate::{
 use nrz_bindings::{Conversion, Descriptor, Measure, Role, Scale};
 
 impl OperationDraft {
-    /// Propose Square over a native cell projection and an independently declared result.
+    /// Propose an enclosed unary law over a native projection and declared result.
     /// # Errors
     /// Refuses unlike snapshots, mismatched extents, explicit entry maps or wrong result units.
-    pub fn map_projected_square(
+    pub fn map_projected_elementwise(
         input: CheckedShape,
         output: CheckedShape,
         map: crate::EntryMap,
+        function: Elementwise,
     ) -> Result<Self, OperationError> {
         input.same_snapshot(&output)?;
         let native = map.product().is_some() || map.selection().is_some();
         if !native || input.extent() != map.source() || output.extent() != map.target() {
             return Err(KernelError::Contract.into());
         }
-        let expected = descriptor(&input, Elementwise::Square)?;
+        let expected = descriptor(&input, function)?;
         let output = RegionContract::check(output)?;
         if output.descriptor() != &expected {
             return Err(KernelError::Contract.into());
@@ -32,7 +33,7 @@ impl OperationDraft {
             work: work(output.shape().extent().entries(), 12)?,
             inputs: regions(vec![input])?,
             output,
-            recipe: Recipe::ProjectedSquare(map),
+            recipe: Recipe::ProjectedElementwise(map, function),
         }))
     }
 
