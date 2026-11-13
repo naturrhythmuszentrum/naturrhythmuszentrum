@@ -109,7 +109,7 @@ fn binary32_mapped_packing_is_an_owned_copy() -> TestResult {
         );
     }
     let empty = heap.alias(transpose, &Layout::gather(Extent::new(0, 2)?, 6, &[], 0)?)?;
-    assert_eq!(heap.value(empty)?.region().export()?, []);
+    assert_eq!(heap.value(empty)?.region().export()?, [] as [f32; 0]);
     assert!(heap.selected_bound(empty)?.is_none());
     assert!(matches!(
         heap.value(empty)?.region().pack()?.get(0, 0),

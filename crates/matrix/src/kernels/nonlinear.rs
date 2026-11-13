@@ -60,7 +60,8 @@ pub(crate) fn evaluate_projected<P: Scalar + 'static>(
     context: &ArithmeticContext,
 ) -> Result<Vec<Entry<P>>, OperationError> {
     let mut result = buffer(map.target().entries())?;
-    for (entry, original) in map.indices().enumerate() {
+    for (entry, original) in map.indices()?.enumerate() {
+        let original = original?;
         let (center, radius) = operand(input, original)?;
         result.push(evaluate_selected(
             center,

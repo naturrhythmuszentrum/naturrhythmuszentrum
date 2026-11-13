@@ -206,8 +206,6 @@ impl<P: Scalar> std::fmt::Debug for ApplicationCore<P> {
 pub enum NumericalErrorScope {
     /// The host supplied the companion under its declared input contract.
     HostInput,
-    /// Exact movement preserves the immediate input companion bit for bit.
-    PreservedInput,
     /// Only the current arithmetic operation's numerical error is reported.
     /// Inherited uncertainty is included in Total; Error is not a whole-chain bound.
     LocalOperation,
@@ -267,6 +265,15 @@ pub(super) struct Origin {
     pub(super) evidence: Option<Evidence>,
 }
 impl Origin {
+    /// Copies inherit this immutable scope, including after the source retires.
+    pub(super) fn error_scope(&self) -> NumericalErrorScope {
+        self.evidence
+            .as_ref()
+            .map_or(NumericalErrorScope::HostInput, |evidence| {
+                evidence.error_scope
+            })
+    }
+
     /// Host publication carries no numerical completion evidence.
     pub(super) const fn host() -> Self {
         Self { evidence: None }

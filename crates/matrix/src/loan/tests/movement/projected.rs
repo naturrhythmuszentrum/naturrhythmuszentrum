@@ -29,6 +29,7 @@ fn square<P: Scalar>(request: &mut PointwiseRequest<P>) -> TestResult {
         map.clone(),
     )?
     .check(crate::ExecutionLimits::default())?;
+    assert!(!request.operation.carries_statistics());
     Ok(())
 }
 
@@ -294,4 +295,54 @@ fn loan_native_padding_dense_refusal() -> TestResult {
         empty(&mut heap, &mut account)?;
     }
     Ok(())
+}
+
+/// Padding remains absent in every component and cannot escape through dense composition.
+/// ´test:unit:loan-native-padding-map-refusal´
+#[test]
+fn loan_native_padding_map_refusal() -> TestResult {
+    let Setup {
+        mut heap,
+        mut account,
+        request,
+        demand,
+    } = super::setup::<f64>()?;
+    let map = heap.cell_entry_map(crate::Extent::new(5, 2)?, demand, None, &mut account.ledger)?;
+    assert_eq!(map.source_index(0), Some(1));
+    assert_eq!(map.source_index(2), Some(4));
+    assert_eq!(map.source_index(3), None);
+    assert_eq!(map.source_index(4), Some(6));
+    assert_eq!(map.source_index(7), None);
+    assert!(matches!(
+        map.indices(),
+        Err(crate::ShapeError::UnmappedEntries)
+    ));
+    let limits = crate::ShapeLimits::default();
+    let identity = crate::EntryMap::reshape(map.target(), map.target(), limits)?;
+    assert_eq!(
+        map.compose(&identity, limits),
+        Err(crate::ShapeError::UnmappedEntries)
+    );
+    let source_identity = crate::EntryMap::reshape(map.source(), map.source(), limits)?;
+    assert_eq!(
+        source_identity.compose(&map, limits),
+        Err(crate::ShapeError::UnmappedEntries)
+    );
+    let output = request.operation.outputs()[0].shape();
+    assert!(matches!(
+        crate::OperationDraft::transform_entries(
+            request.operation.inputs()[0].shape().clone(),
+            output.domain().clone(),
+            output.codomain().clone(),
+            map,
+            limits,
+        ),
+        Err(crate::OperationError::Shape(
+            crate::ShapeError::UnmappedEntries
+        ))
+    ));
+    drop(request);
+    heap.retire_mask(demand, &mut account.ledger)?;
+    super::retire_copy_layout(&mut heap, &mut account, demand.layout())?;
+    empty(&mut heap, &mut account)
 }

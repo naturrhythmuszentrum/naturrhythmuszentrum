@@ -90,7 +90,8 @@ fn sum<P: Scalar + 'static>(
     let left = first(views)?;
     let right = views.get(1).ok_or(OperationError::InputCount)?;
     let mut result = buffer(map.target().entries())?;
-    for (index, source) in map.indices().enumerate() {
+    for (index, source) in map.indices()?.enumerate() {
+        let source = source?;
         result.push(super::arithmetic::sum(
             operand(left, index)?,
             operand(right, source)?,
@@ -112,7 +113,8 @@ fn transform<P: Scalar + 'static>(
 ) -> Result<Vec<Entry<P>>, OperationError> {
     let input = first(views)?;
     let mut result = buffer(map.target().entries())?;
-    for source in map.indices() {
+    for source in map.indices()? {
+        let source = source?;
         let (center, radius) = operand(input, source)?;
         result.push(Entry {
             center,
@@ -237,7 +239,8 @@ fn transformed_contributions<P: Scalar + 'static, Q: Scalar + 'static>(
     }
     let length = map.target().entries();
     let mut result = [buffer(length)?, buffer(length)?, buffer(length)?];
-    for index in map.indices() {
+    for index in map.indices()? {
+        let index = index?;
         for (values, term) in result.iter_mut().zip(super::ProductTerm::ALL) {
             let value = input
                 .contribution(

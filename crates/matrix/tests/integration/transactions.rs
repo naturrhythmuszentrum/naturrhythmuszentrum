@@ -195,12 +195,15 @@ fn empty_copy_bundle_publishes_completely() -> TestResult {
     let candidate = bound.evaluate(bound.normalized_inputs()?)?;
     let published = bound.publish(candidate)?;
     for output in published.output() {
-        assert_eq!(heap.value(output.value())?.region().export()?, []);
+        assert_eq!(
+            heap.value(output.value())?.region().export()?,
+            [] as [f64; 0]
+        );
         assert_eq!(
             heap.companion(output.bound().ok_or("missing bound")?)?
                 .region()
                 .export()?,
-            []
+            [] as [f64; 0]
         );
     }
     assert_eq!(

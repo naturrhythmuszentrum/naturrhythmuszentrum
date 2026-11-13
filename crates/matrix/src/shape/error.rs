@@ -28,6 +28,9 @@ pub enum ShapeError {
     /// A logical index is out of range.
     #[error("logical entry index is out of range")]
     EntryIndex,
+    /// A dense entry consumer cannot represent native padding.
+    #[error("native padding has no source entry")]
+    UnmappedEntries,
     /// A pairing refuses this column-ordered original entry.
     #[error("entry {index} does not map its column to its row: {cause}")]
     EntryMeaning {

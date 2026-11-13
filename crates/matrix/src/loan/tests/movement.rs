@@ -45,6 +45,10 @@ fn setup_layout<P: Scalar + 'static>(
 ) -> TestResult<Setup<P>> {
     let (mut heap, mut account, input) = fixture::<P>(5, 2, [true, true], Limits::default())?;
     let (tile, source) = publish_source_layout(&mut heap, &mut account, input, layout)?;
+    assert_eq!(
+        tile.reader(&heap, &mut account)?.numerical_error_scope(),
+        crate::NumericalErrorScope::HostInput
+    );
     let branch = heap.create_mask(source.layout(), cells, &mut account.ledger)?;
     let identity =
         heap.mask_correspondence(source.layout(), source.layout(), &mut account.ledger)?;
@@ -158,6 +162,11 @@ fn operation_map(map: crate::EntryMap) -> TestResult<crate::CheckedOperation> {
     let codomain = crate::kernel_testing::axis(map.source().rows())?;
     let input = crate::kernel_testing::shape(&owner, &domain, &codomain)?;
     let output_axis = crate::kernel_testing::axis(map.target().rows())?;
+    if map.product().is_some() || map.selection().is_some() {
+        let output = crate::kernel_testing::shape(&owner, &domain, &output_axis)?;
+        return Ok(crate::OperationDraft::map_cell_copy(input, output, map)?
+            .check(ExecutionLimits::default())?);
+    }
     Ok(crate::OperationDraft::transform_entries(
         input,
         domain,
@@ -233,7 +242,7 @@ fn check_values<P: Scalar + 'static>(
     let reader = tile.reader(heap, account)?;
     assert_eq!(
         reader.numerical_error_scope(),
-        crate::NumericalErrorScope::PreservedInput
+        crate::NumericalErrorScope::HostInput
     );
     for (cell, values) in [(0, [11, 21]), (2, [14, 24])] {
         for (channel, expected) in [
@@ -349,7 +358,7 @@ fn loan_mapped_movement_product_and_outside_reader() -> TestResult {
     product::<f64>()
 }
 
-/// Explicit repeated row indices provide a product oracle without using product projection code.
+/// Native product maps are checked against independent literal source-cell oracles.
 fn product<P: Scalar + 'static>() -> TestResult {
     let (
         Setup {

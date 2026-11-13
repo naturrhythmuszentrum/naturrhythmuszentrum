@@ -42,8 +42,8 @@ fn ordered_axis_identity_refusals() -> ResultOf<()> {
         sum.entry_maps()
             .first()
             .ok_or("sum map")?
-            .indices()
-            .collect::<Vec<_>>(),
+            .indices()?
+            .collect::<Result<Vec<_>, _>>()?,
         [3, 2, 1, 0]
     );
     assert!(
@@ -265,8 +265,8 @@ fn logical_shape_maps_preserve_order() -> ResultOf<()> {
             .entry_maps()
             .first()
             .ok_or("transpose map")?
-            .indices()
-            .collect::<Vec<_>>(),
+            .indices()?
+            .collect::<Result<Vec<_>, _>>()?,
         [0, 2, 4, 1, 3, 5]
     );
     let restored = transposed.dual_transpose(limits)?;
@@ -281,8 +281,8 @@ fn logical_shape_maps_preserve_order() -> ResultOf<()> {
             .entry_maps()
             .first()
             .ok_or("selection")?
-            .indices()
-            .collect::<Vec<_>>(),
+            .indices()?
+            .collect::<Result<Vec<_>, _>>()?,
         [4, 4]
     );
     assert!(EntryMap::new(shape.extent(), Extent::new(1, 1)?, vec![6], limits).is_err());

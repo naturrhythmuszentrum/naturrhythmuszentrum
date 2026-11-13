@@ -124,13 +124,13 @@ fn empty_compaction_preserves_no_address_contract() -> TestResult {
     heap.compact()?;
     assert_eq!(heap.value(empty)?.stamp(), stamp);
     assert_eq!(heap.value(empty)?.region().layout_epoch(), 3);
-    assert_eq!(heap.value(empty)?.region().export()?, []);
+    assert_eq!(heap.value(empty)?.region().export()?, [] as [f64; 0]);
     assert_eq!(
         heap.selected_bound(empty)?
             .ok_or(HeapError::StaleEvidence)?
             .region()
             .export()?,
-        []
+        [] as [f64; 0]
     );
     assert!(matches!(
         heap.value(empty)?.region().get(0, 0),

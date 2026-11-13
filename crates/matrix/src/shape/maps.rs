@@ -126,7 +126,7 @@ impl EntryMap {
         if self.product.is_none() && self.selection.is_none() {
             return self.indices.get(entry).copied();
         }
-        let original = self.source_cell(entry % self.target.rows()).unwrap_or(0);
+        let original = self.source_cell(entry % self.target.rows())?;
         self.source.index(original, entry / self.target.rows()).ok()
     }
 
@@ -192,22 +192,33 @@ impl EntryMap {
     }
 
     /// Enumerate source indices without allocating a descriptor for native products.
-    pub fn indices(&self) -> impl Iterator<Item = usize> + '_ {
-        (0..self.target.entries()).filter_map(|entry| self.source_index(entry))
+    /// # Errors
+    /// Refuses native padding; each yielded position retains any source-index refusal.
+    pub fn indices(
+        &self,
+    ) -> Result<impl Iterator<Item = Result<usize, ShapeError>> + '_, ShapeError> {
+        if self.has_padding() {
+            return Err(ShapeError::UnmappedEntries);
+        }
+        Ok((0..self.target.entries())
+            .map(|entry| self.source_index(entry).ok_or(ShapeError::EntryIndex)))
     }
 
     /// Compose a selection of this map's result back to the original logical entries.
     ///
     /// # Errors
-    /// Refuses incompatible extents or exceeded limits.
+    /// Refuses native padding, incompatible extents or exceeded limits.
     pub fn compose(&self, next: &Self, limits: ShapeLimits) -> Result<Self, ShapeError> {
+        if self.has_padding() || next.has_padding() {
+            return Err(ShapeError::UnmappedEntries);
+        }
         if self.target != next.source {
             return Err(ShapeError::LengthMismatch);
         }
         limits.check_work(next.target.entries())?;
         let indices = next
-            .indices()
-            .map(|index| self.source_index(index).ok_or(ShapeError::EntryIndex))
+            .indices()?
+            .map(|index| self.source_index(index?).ok_or(ShapeError::EntryIndex))
             .collect::<Result<_, _>>()?;
         Self::new(self.source, next.target, indices, limits)
     }

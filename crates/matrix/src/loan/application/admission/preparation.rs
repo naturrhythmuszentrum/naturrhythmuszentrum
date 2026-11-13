@@ -278,7 +278,7 @@ fn extras<P: Scalar + 'static>(
     )?;
     let auxiliary = auxiliary(request, plan, identity, debits, guard, endpoint_tokens)?;
     let evidence = Evidence {
-        error_scope: request.member()?.error_scope(),
+        error_scope: request.member()?.error_scope(source.origin.error_scope()),
         prepared: request.prepared.cloned(),
         endpoint_tokens: auxiliary,
         completed_mask: None,

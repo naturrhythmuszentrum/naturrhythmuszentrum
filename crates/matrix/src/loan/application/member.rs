@@ -131,9 +131,12 @@ impl<'a> Member<'a> {
         matches!(self, Self::Transform(_) | Self::ProjectedSquare(_))
     }
     /// Publication records whether this member preserves input error or reports local arithmetic.
-    pub(super) const fn error_scope(self) -> super::NumericalErrorScope {
+    pub(super) const fn error_scope(
+        self,
+        input: super::NumericalErrorScope,
+    ) -> super::NumericalErrorScope {
         if self.is_transform() {
-            super::NumericalErrorScope::PreservedInput
+            input
         } else {
             super::NumericalErrorScope::LocalOperation
         }

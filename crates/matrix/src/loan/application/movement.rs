@@ -9,6 +9,8 @@ use nrz_scalar::Scalar;
 
 impl Heap {
     /// Retain a native original, gathered or product selection without an entry-sized map.
+    /// Every retained map clone pins its layout record until dropped, including maps
+    /// retained by checked operations; layout retirement then returns `PinnedUses`.
     /// # Errors
     /// Refuses foreign or stale masks, incompatible component extents and exhausted Work.
     pub fn cell_entry_map(

@@ -258,7 +258,9 @@ impl CheckedOperation {
         match &self.recipe {
             NativeRecipe::Reciprocal { .. } => false,
             NativeRecipe::Kernel(contract) => match &contract.recipe {
-                Recipe::PreparedExpm1 | Recipe::BinaryElementwise(_) => false,
+                Recipe::PreparedExpm1
+                | Recipe::BinaryElementwise(_)
+                | Recipe::ProjectedSquare(_) => false,
                 Recipe::Quantity(_) => matches!(
                     contract.kind(),
                     crate::KernelKind::ScalarQuantityProduct
@@ -271,7 +273,6 @@ impl CheckedOperation {
                 | Recipe::Transform(_)
                 | Recipe::Product
                 | Recipe::Elementwise(_)
-                | Recipe::ProjectedSquare(_)
                 | Recipe::PositiveReciprocal(_) => true,
             },
             NativeRecipe::Copy

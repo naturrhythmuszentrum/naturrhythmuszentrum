@@ -88,6 +88,28 @@ impl OperationDraft {
         transform(input, output, map)
     }
 
+    /// Propose native cell movement with independently declared output axes.
+    /// Padding remains unmapped and requires a mask-aware loan consumer.
+    /// # Errors
+    /// Refuses explicit maps, mismatched extents, snapshots or homogeneous meanings.
+    pub fn map_cell_copy(
+        input: CheckedShape,
+        output: CheckedShape,
+        map: EntryMap,
+    ) -> Result<Self, OperationError> {
+        input.same_snapshot(&output)?;
+        let native = map.product().is_some() || map.selection().is_some();
+        if !native || input.extent() != map.source() || output.extent() != map.target() {
+            return Err(crate::KernelError::Contract.into());
+        }
+        let source = RegionContract::check(input.clone())?;
+        let target = RegionContract::check(output.clone())?;
+        if source.descriptor() != target.descriptor() {
+            return Err(crate::KernelError::Contract.into());
+        }
+        transform(input, output, map)
+    }
+
     /// Propose the algebraic transpose with reciprocal dual axes and unchanged entry units.
     /// # Errors
     /// Refuses unsupported coordinate references, shapes or exhausted limits.

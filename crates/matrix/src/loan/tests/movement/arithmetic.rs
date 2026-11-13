@@ -230,3 +230,64 @@ pub(super) fn local_error<P: Scalar>(square: f64) -> f64 {
         }),
     }
 }
+
+/// A copied Square error remains local after the numerical source occupation retires.
+/// ´test:unit:loan-copy-square-error-scope´
+#[test]
+fn loan_copy_square_error_scope() -> TestResult {
+    copy_square::<f32>()?;
+    copy_square::<f64>()
+}
+
+/// Literal Square centres and neighbour-rule errors survive bit-preserving native movement.
+fn copy_square<P: Scalar + 'static>() -> TestResult {
+    let super::Setup {
+        mut heap,
+        mut account,
+        request,
+        demand,
+    } = super::setup::<P>()?;
+    let owner = ready(&mut heap, &mut account, request)?;
+    let owner = candidate(owner, &mut account)?;
+    let copied = publish(&mut heap, &mut account, owner)?;
+    let request = square_request(&mut heap, &mut account, copied.into_pin())?;
+    let squared = apply(&mut heap, &mut account, request)?;
+    let squared = squared.into_pin();
+    let source_identity = squared.ticket()?.identity;
+    let mut request = square_request(&mut heap, &mut account, squared)?;
+    let copy_demand = request.demand;
+    let input = request.operation.inputs()[0].shape().clone();
+    let map = heap.cell_entry_map(input.extent(), copy_demand, None, &mut account.ledger)?;
+    request.operation = crate::OperationDraft::map_cell_copy(input.clone(), input, map)?
+        .check(ExecutionLimits::default())?;
+    let owner = ready(&mut heap, &mut account, request)?;
+    heap.retire_mask(copy_demand, &mut account.ledger)?;
+    let owner = candidate(owner, &mut account)?;
+    let result = publish(&mut heap, &mut account, owner)?;
+    assert!(matches!(
+        heap.residence(&mut account, 100_000)?,
+        crate::Residence::Pending { .. }
+    ));
+    assert!(heap.loans.group(source_identity).is_err());
+    let reader = result.reader(&heap, &mut account)?;
+    assert_eq!(
+        reader.numerical_error_scope(),
+        crate::NumericalErrorScope::LocalOperation
+    );
+    assert_eq!(
+        reader
+            .read_component(HostChannel::Center, 0, 0, &mut account)?
+            .to_f64(),
+        121.0
+    );
+    assert_eq!(
+        reader
+            .read_component(HostChannel::Error, 0, 0, &mut account)?
+            .to_f64(),
+        local_error::<P>(121.0)
+    );
+    drop(result);
+    heap.retire_mask(demand, &mut account.ledger)?;
+    super::retire_copy_layout(&mut heap, &mut account, demand.layout())?;
+    empty(&mut heap, &mut account)
+}

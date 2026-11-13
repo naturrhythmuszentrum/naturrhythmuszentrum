@@ -194,8 +194,11 @@ fn empty_regions_have_no_address() -> TestResult {
     let bundle =
         heap.import_declared_bounds(Extent::new(0, 3)?, &Descriptor::ratio(), &[] as &[f64], &[])?;
     let value = heap.value(bundle.value())?;
-    assert_eq!(value.region().export()?, []);
-    assert_eq!(heap.companion(bound(bundle)?)?.region().export()?, []);
+    assert_eq!(value.region().export()?, [] as [f64; 0]);
+    assert_eq!(
+        heap.companion(bound(bundle)?)?.region().export()?,
+        [] as [f64; 0]
+    );
     assert!(matches!(
         value.region().get(0, 0),
         Err(HeapError::InvalidLayout)

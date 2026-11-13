@@ -103,7 +103,9 @@ pub(super) fn captured<P: Scalar + 'static>(
     if payload.account != account || pin.ticket()?.identity != evidence.source_identity {
         return Err(LoanError::WrongLoan);
     }
-    matches_capture(bundle(pin)?, &evidence.source, &evidence.attachments)
+    let source = bundle(pin)?;
+    error_scope(evidence, source)?;
+    matches_capture(source, &evidence.source, &evidence.attachments)
 }
 
 /// Charge the ordinary current authentication before the additional origin visit and edges.
@@ -141,6 +143,7 @@ pub(super) fn authenticate<P: Scalar + 'static>(
             &evidence.attachments,
             budget,
         )?;
+        error_scope(evidence, left)?;
         if let Some(side) = evidence.endpoint_tokens.binary() {
             if left.origin.evidence.is_some() {
                 return Err(LoanError::UnsupportedContract);
@@ -277,6 +280,19 @@ fn inventory(group: &Group, bundle: &Bundle) -> Result<(), LoanError> {
         || receipt.ticket.identity != bundle.identity
         || receipt.present != bundle.channels.each_ref().map(Option::is_some)
     {
+        return Err(LoanError::WrongLoan);
+    }
+    Ok(())
+}
+
+/// Capture seals inherited copy semantics while the immediate source is still retained.
+fn error_scope(evidence: &Evidence, source: &Bundle) -> Result<(), LoanError> {
+    let member = Member::check(
+        &evidence.operation,
+        evidence.law.kind(),
+        evidence.prepared.as_ref(),
+    )?;
+    if evidence.error_scope != member.error_scope(source.origin.error_scope()) {
         return Err(LoanError::WrongLoan);
     }
     Ok(())

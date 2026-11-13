@@ -150,10 +150,10 @@ impl CheckedShape {
     pub fn dual_transpose(&self, limits: ShapeLimits) -> Result<Self, ShapeError> {
         let map = EntryMap::transpose(self.extent, limits)?;
         let entries = map
-            .indices()
+            .indices()?
             .map(|index| {
                 self.entries
-                    .get(index)
+                    .get(index?)
                     .cloned()
                     .ok_or(ShapeError::EntryIndex)
             })
@@ -214,7 +214,8 @@ impl CheckedShape {
             return Err(ShapeError::LengthMismatch);
         }
         let mut entries = Vec::with_capacity(extent.entries());
-        for (position, index) in map.indices().enumerate() {
+        for (position, index) in map.indices()?.enumerate() {
+            let index = index?;
             let mut entry = self
                 .entries
                 .get(index)

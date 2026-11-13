@@ -55,7 +55,8 @@ pub(crate) fn map<P: Scalar + 'static>(
         NativeRecipe::Kernel(contract) => match &contract.recipe {
             Recipe::Quantity(_) => return Err(StatisticsError::NonlinearStatistics.into()),
             Recipe::Sum { subtract, right } => {
-                for (row, source) in right.indices().enumerate() {
+                for (row, source) in right.indices()?.enumerate() {
+                    let source = source?;
                     result.jacobian.set(row, row, P::ONE, singleton(P::ONE)?)?;
                     let sign = if *subtract { -P::ONE } else { P::ONE };
                     result.jacobian.set(
@@ -68,7 +69,8 @@ pub(crate) fn map<P: Scalar + 'static>(
                 }
             }
             Recipe::Transform(map) => {
-                for (row, source) in map.indices().enumerate() {
+                for (row, source) in map.indices()?.enumerate() {
+                    let source = source?;
                     result
                         .jacobian
                         .set(row, source, P::ONE, singleton(P::ONE)?)?;

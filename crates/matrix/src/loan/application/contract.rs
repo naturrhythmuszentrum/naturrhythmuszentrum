@@ -223,7 +223,7 @@ impl Evidence {
             }
             prepared.validate(&self.source, destination)?;
         }
-        if self.error_scope != member.error_scope() {
+        if self.error_scope != member.error_scope(self.error_scope) {
             return Err(LoanError::WrongLoan);
         }
         self.validate_mapping(member, destination, identity, revision)?;
