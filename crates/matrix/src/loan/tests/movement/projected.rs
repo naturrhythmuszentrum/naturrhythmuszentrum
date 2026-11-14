@@ -6,6 +6,7 @@ use crate::{ApplicationEvaluation, ApplicationRequest, HostChannel, PointwiseReq
 use nrz_scalar::Scalar;
 
 mod boundaries;
+mod continuation;
 mod observation;
 mod unary;
 
