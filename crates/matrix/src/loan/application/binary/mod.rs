@@ -2,6 +2,8 @@
 //! Original ordered correspondence and the sole additional binary owner.
 
 mod correspondence;
+mod geometry;
+pub(super) use geometry::Geometry;
 mod validation;
 pub(super) use validation::check_request;
 
@@ -31,6 +33,9 @@ pub struct PointwiseBinaryOperation {
 impl PointwiseBinaryOperation {
     /// Demand belongs to the output-sized operand, preferring Left for equal extents.
     pub(super) fn demand_layout(&self) -> crate::CellLayoutVersion {
+        if let Geometry::Cartesian(_, layout) = self.geometry() {
+            return layout;
+        }
         let right_anchor = self.operation.inputs()[0].shape().extent()
             != self.operation.outputs()[0].shape().extent();
         self.identities[usize::from(right_anchor)].layout
@@ -56,9 +61,83 @@ impl PointwiseBinaryOperation {
         limits: ExecutionLimits,
         account: &mut ExecutionAccount,
     ) -> Result<Self, ApplicationError> {
+        Self::build(
+            inputs,
+            output,
+            sources,
+            destination,
+            Geometry::Aligned(axis),
+            function,
+            limits,
+            account,
+        )
+    }
+
+    /// Bind ordered factor hosts to an ordinary Cartesian product demand layout.
+    /// # Errors
+    /// Refuses wrong factor axes, unsupported component extents and exhausted original limits.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "ordered original regions, product and demand are checked together"
+    )]
+    pub fn check_cartesian(
+        inputs: [RegionContract; 2],
+        output: RegionContract,
+        sources: [&BundlePin<f64>; 2],
+        destination: BindingSymbols,
+        product: crate::CellProduct,
+        demand: crate::CellLayoutVersion,
+        function: BinaryElementwise,
+        limits: ExecutionLimits,
+        account: &mut ExecutionAccount,
+    ) -> Result<Self, ApplicationError> {
+        Self::build(
+            inputs,
+            output,
+            sources,
+            destination,
+            Geometry::Cartesian(product, demand),
+            function,
+            limits,
+            account,
+        )
+    }
+
+    /// Recover the sealed native incidence without allocating another descriptor owner.
+    pub(super) fn geometry(&self) -> Geometry {
+        match &self.operation.recipe {
+            crate::binding::NativeRecipe::Kernel(law) => match &law.recipe {
+                crate::kernels::contract::Recipe::CartesianBinary(product, layout, _) => {
+                    Geometry::Cartesian(*product, *layout)
+                }
+                _ => Geometry::Aligned(self.axis),
+            },
+            _ => Geometry::Aligned(self.axis),
+        }
+    }
+
+    /// Shared construction retains the same four allocated original owners for both incidences.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the original ordered correspondence is checked together"
+    )]
+    fn build(
+        inputs: [RegionContract; 2],
+        output: RegionContract,
+        sources: [&BundlePin<f64>; 2],
+        destination: BindingSymbols,
+        geometry: Geometry,
+        function: BinaryElementwise,
+        limits: ExecutionLimits,
+        account: &mut ExecutionAccount,
+    ) -> Result<Self, ApplicationError> {
+        let phase = match geometry {
+            Geometry::Aligned(_) => "binary correspondence",
+            Geometry::Cartesian(..) => "Cartesian binary correspondence",
+        };
         account
             .ledger
-            .with_work_phase(super::FAMILY, "binary correspondence", |budget| {
+            .with_work_phase(super::FAMILY, phase, |budget| {
                 crate::loan::charge(budget, 1)?;
                 let bundles = [bundle(sources[0])?, bundle(sources[1])?];
                 for (source, pin) in bundles.into_iter().zip(sources) {
@@ -76,12 +155,15 @@ impl PointwiseBinaryOperation {
                         return Err(LoanError::UnsupportedContract.into());
                     }
                 }
+                if matches!(geometry, Geometry::Cartesian(..)) {
+                    crate::loan::charge(budget, 4)?;
+                }
                 correspondence::check(
                     &inputs,
                     &output,
                     bundles,
                     &destination,
-                    axis,
+                    geometry,
                     function,
                     budget,
                 )?;
@@ -92,7 +174,7 @@ impl PointwiseBinaryOperation {
                 let law = crate::kernels::KernelContract {
                     inputs: Rc::new(inputs.each_ref().map(|region| region.shape().extent())),
                     output: extent,
-                    recipe: crate::kernels::contract::Recipe::BinaryElementwise(function),
+                    recipe: geometry.recipe(function),
                     work,
                 };
                 Ok(Self {
@@ -105,7 +187,7 @@ impl PointwiseBinaryOperation {
                     sources: bundles.map(|source| source.declaration.symbols.clone()),
                     identities: bundles.map(|source| source.identity),
                     destination,
-                    axis,
+                    axis: geometry.axis(),
                 })
             })
     }
@@ -120,7 +202,7 @@ pub struct PointwiseBinaryRequest {
     pub left: BundlePin<f64>,
     /// Right source pin, matching the second original operand.
     pub right: BundlePin<f64>,
-    /// Fresh three-reading destination on the original cell axis.
+    /// Fresh three-reading destination on the checked result axis.
     pub destination: HostTileDeclaration<f64>,
     /// Ordinary demand on the output-sized operand's layout; Left when both extents match.
     pub demand: MaskVersion,
@@ -292,4 +374,24 @@ pub(in crate::loan::application) fn coverage_word(
             .copied()
             .ok_or(LoanError::CoverageMismatch)
     }
+}
+
+/// Prepaid factor incidence intersects every declared role at the original factor cell.
+pub(super) fn filled(
+    product: crate::CellProduct,
+    sources: [&crate::loan::registry::Bundle; 2],
+    demand: &crate::MaskView<'_>,
+    words: &mut [u64],
+) -> Result<(), LoanError> {
+    for cell in 0..product.axis().capacity() {
+        let mut available = demand.contains(cell)?;
+        let coordinates = product.coordinates(cell)?;
+        for (source, original) in sources.into_iter().zip(coordinates) {
+            for _ in source.channels.iter().flatten() {
+                available &= crate::loan::payload::bit(&source.mask.words, original);
+            }
+        }
+        crate::loan::payload::set(words, cell, available);
+    }
+    Ok(())
 }

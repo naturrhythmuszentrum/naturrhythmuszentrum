@@ -16,7 +16,7 @@ impl KernelContract {
                 Err(super::KernelError::Contract.into())
             }
             Recipe::Product => self.product_scratch::<P, Q>(),
-            Recipe::PreparedExpm1 | Recipe::BinaryElementwise(_) => {
+            Recipe::PreparedExpm1 | Recipe::BinaryElementwise(_) | Recipe::CartesianBinary(..) => {
                 Err(super::KernelError::Contract.into())
             }
             Recipe::Linear(map) => {

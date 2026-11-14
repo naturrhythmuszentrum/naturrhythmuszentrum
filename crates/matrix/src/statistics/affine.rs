@@ -82,7 +82,8 @@ pub(crate) fn map<P: Scalar + 'static>(
             | Recipe::ProjectedElementwise(..)
             | Recipe::PositiveReciprocal(_)
             | Recipe::PreparedExpm1
-            | Recipe::BinaryElementwise(_) => {
+            | Recipe::BinaryElementwise(_)
+            | Recipe::CartesianBinary(..) => {
                 return Err(StatisticsError::Unsupported.into());
             }
         },

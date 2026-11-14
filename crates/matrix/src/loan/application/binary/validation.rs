@@ -65,7 +65,7 @@ pub(in crate::loan::application) fn check_request<P: Scalar + 'static>(
     let extent = request.destination.extent;
     let law = member.law();
     let inputs = [left.declaration.extent, right_bundle.declaration.extent];
-    super::extents(inputs, extent)?;
+    original.geometry().extents(inputs, extent)?;
     if law.inputs.as_ref() != inputs
         || law.output != extent
         || law.work != member.invocation(extent.entries())?
@@ -75,13 +75,12 @@ pub(in crate::loan::application) fn check_request<P: Scalar + 'static>(
     }
     regions(request.operation, inputs, extent, budget)?;
     charge(budget, 8)?;
-    for bundle in [left, right_bundle] {
+    for (index, bundle) in [left, right_bundle].into_iter().enumerate() {
         let source_extent = bundle.declaration.extent;
-        let axis = if source_extent == extent {
-            request.destination.axis
-        } else {
-            bundle.declaration.axis
-        };
+        let axis =
+            original
+                .geometry()
+                .source_axis(index, bundle.declaration.axis, source_extent, extent);
         source(bundle, axis, source_extent)?;
         super::super::contract::attachments(bundle)?;
     }
@@ -98,25 +97,7 @@ pub(in crate::loan::application) fn check_request<P: Scalar + 'static>(
     }
     let channels =
         left.channels.iter().flatten().count() + right_bundle.channels.iter().flatten().count();
-    charge(budget, channels + 6)?;
-    let demand = heap
-        .mask(request.demand, original.demand_layout())
-        .map_err(|cause| match cause {
-            crate::MaskError::LayoutMismatch => LoanError::LayoutMismatch,
-            other => LoanError::Mask(other),
-        })?;
-    if demand.words().len() != crate::loan::words(extent.rows()) {
-        return Err(LoanError::CoverageMismatch.into());
-    }
-    let partial = extent.rows() % 64;
-    if partial != 0
-        && demand
-            .words()
-            .last()
-            .is_some_and(|word| *word >> partial != 0)
-    {
-        return Err(LoanError::CoverageMismatch.into());
-    }
+    check_demand(heap, request, original, channels, budget)?;
     let payload = extent
         .entries()
         .checked_mul(3)
@@ -155,8 +136,13 @@ impl PointwiseBinaryOperation {
             if self.identities[index] != identity
                 || !same_symbols(&self.sources[index], &source.symbols)
                 || source.extent != self.operation.inputs()[index].shape().extent()
-                || (source.extent == self.operation.outputs()[0].shape().extent()
-                    && source.axis != axis)
+                || source.axis
+                    != self.geometry().source_axis(
+                        index,
+                        source.axis,
+                        source.extent,
+                        self.operation.outputs()[0].shape().extent(),
+                    )
             {
                 return Err(LoanError::WrongLoan);
             }
@@ -204,7 +190,7 @@ impl Side {
             &destination.symbols,
             destination.axis,
         )?;
-        super::extents(
+        self.original.geometry().extents(
             [evidence.source.extent, self.source.extent],
             destination.extent,
         )?;
@@ -274,6 +260,46 @@ fn regions(
                 });
             }
         }
+    }
+    Ok(())
+}
+
+/// Demand authenticates the exact captured layout before any factor-coordinate enumeration.
+fn check_demand<P: Scalar>(
+    heap: &crate::Heap,
+    request: &super::super::prepared::Request<'_, P>,
+    original: &PointwiseBinaryOperation,
+    channels: usize,
+    budget: &mut Budget,
+) -> Result<(), ApplicationError> {
+    let extent = request.destination.extent;
+    charge(budget, channels + 6)?;
+    let demand = heap
+        .mask(request.demand, original.demand_layout())
+        .map_err(|cause| match cause {
+            crate::MaskError::LayoutMismatch => LoanError::LayoutMismatch,
+            other => LoanError::Mask(other),
+        })?;
+    if matches!(original.geometry(), super::Geometry::Cartesian(..)) {
+        charge(budget, 4)?;
+        if demand.gather().is_some() {
+            return Err(LoanError::UnsupportedBinaryProjection.into());
+        }
+        if demand.axis() != original.axis || demand.components().extent() != extent {
+            return Err(LoanError::LayoutMismatch.into());
+        }
+    }
+    if demand.words().len() != crate::loan::words(extent.rows()) {
+        return Err(LoanError::CoverageMismatch.into());
+    }
+    let partial = extent.rows() % 64;
+    if partial != 0
+        && demand
+            .words()
+            .last()
+            .is_some_and(|word| *word >> partial != 0)
+    {
+        return Err(LoanError::CoverageMismatch.into());
     }
     Ok(())
 }

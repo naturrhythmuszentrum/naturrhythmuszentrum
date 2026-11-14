@@ -47,6 +47,24 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
         })
     }
 
+    /// Two complete bound planes share one checked address and prepaid numerical observation.
+    pub(super) fn pair(
+        &self,
+        cell: usize,
+        component: usize,
+        _permit: &super::Traversal,
+    ) -> Result<[P; 2], LoanError> {
+        let address = self.address(cell, component)?;
+        #[cfg(test)]
+        for _ in 0..2 {
+            crate::loan::fault::loaded();
+        }
+        Ok([
+            self.channels[0][(address, 0)],
+            self.channels[1][(address, 0)],
+        ])
+    }
+
     /// Projected unary laws share bound owners without materializing a copied tile.
     pub(super) fn evaluate(
         &self,
@@ -119,5 +137,47 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
             self.channels[1][(entry, 0)],
             self.channels[2][(entry, 0)],
         ])
+    }
+}
+
+/// Cartesian binary arithmetic uses both immutable companion bundles bound once per tile.
+pub(super) fn binary<P: Scalar + 'static>(
+    member: super::Member<'_>,
+    left: &BoundCopy<'_, P>,
+    right: &BoundCopy<'_, f64>,
+    cells: [usize; 2],
+    component: usize,
+    entry: usize,
+    permit: &super::Traversal,
+) -> Result<super::selected::Values<P>, super::CellOutcome> {
+    let super::Member::Binary(_, function) = member else {
+        return Err(member.storage_failure(component));
+    };
+    let left = left
+        .pair(cells[0], component, permit)
+        .map_err(|_| member.storage_failure(component))?;
+    let right = right
+        .pair(cells[1], component, permit)
+        .map_err(|_| member.storage_failure(component))?;
+    crate::kernels::binary::evaluate_selected(
+        [left[0].to_f64(), right[0]],
+        [left[1].to_f64(), right[1]],
+        function,
+        entry,
+        &permit.context,
+    )
+    .map(|value| super::selected::Values::Binary([value.center, value.total, value.error]))
+    .map_err(|reason| super::CellOutcome::CellRefused { component, reason })
+}
+
+/// Nonprojected members keep their existing reader path without binding unused owners.
+pub(super) fn bind<'a, P: Scalar + 'static>(
+    reader: Option<&TileReader<'a, P>>,
+    enabled: bool,
+) -> Result<Option<BoundCopy<'a, P>>, LoanError> {
+    if enabled {
+        BoundCopy::bind(reader.ok_or(LoanError::WrongLoan)?).map(Some)
+    } else {
+        Ok(None)
     }
 }

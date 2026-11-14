@@ -103,17 +103,29 @@ fn traversal_work<P: Scalar>(
     let projections = core.evidence.endpoint_tokens.binary().map_or(0, |side| {
         let left = core.evidence.source.extent != core.host.declaration.extent;
         let right = side.source.extent != core.host.declaration.extent;
-        if left || right { 2 } else { 0 }
+        if member.cartesian().is_none() && (left || right) {
+            2
+        } else {
+            0
+        }
     });
     let invocation = member.invocation(components)?;
     let per_cell = (loads + member.roles() + projections)
         .checked_mul(components)
         .and_then(|steps| steps.checked_add(invocation))
-        .and_then(|steps| steps.checked_add(2))
+        .and_then(|steps| steps.checked_add(2 + 2 * usize::from(member.cartesian().is_some())))
         .ok_or(LoanError::CountOverflow)?;
     core.population
         .checked_mul(per_cell)
-        .and_then(|steps| steps.checked_add(if member.is_projected() { 3 } else { 0 }))
+        .and_then(|steps| {
+            steps.checked_add(if member.is_projected() {
+                3
+            } else if member.cartesian().is_some() {
+                6
+            } else {
+                0
+            })
+        })
         .and_then(|steps| {
             core.filled
                 .len()
@@ -165,13 +177,10 @@ fn run<P: Scalar + 'static>(
         .input
         .as_ref()
         .and_then(|pin| pin.checked_reader().ok());
-    let copy = if member.is_projected() {
-        Some(copy::BoundCopy::bind(
-            reader.as_ref().ok_or(LoanError::WrongLoan)?,
-        )?)
-    } else {
-        None
-    };
+    let copy = copy::bind(
+        reader.as_ref(),
+        member.is_projected() || member.cartesian().is_some(),
+    )?;
     let projection = if member.is_projected() {
         Some(member.map()?)
     } else {
@@ -181,6 +190,8 @@ fn run<P: Scalar + 'static>(
     let right = side
         .and_then(|side| side.input.as_ref())
         .and_then(|pin| pin.checked_reader().ok());
+    let right_copy = copy::bind(right.as_ref(), member.cartesian().is_some())?;
+    let product = member.cartesian();
     for word_index in 0..core.filled.len() {
         let mut remaining = core.filled[word_index];
         while remaining != 0 {
@@ -190,10 +201,16 @@ fn run<P: Scalar + 'static>(
                 Some(map) => super::movement::source_cell(map, cell)?,
                 None => cell,
             };
+            let source_cells = match product {
+                Some(product) => product.coordinates(cell)?,
+                None => [original; 2],
+            };
             let mut first = None;
             for component in 0..components {
                 let entry = cell + cells * component;
-                let result = if let Some(copy) = &copy {
+                let result = if let (Some(left), Some(right)) = (&copy, &right_copy) {
+                    copy::binary(member, left, right, source_cells, component, entry, permit)
+                } else if let Some(copy) = &copy {
                     copy.evaluate(member, original, component, entry, permit)
                 } else {
                     member.scalar(
@@ -202,26 +219,21 @@ fn run<P: Scalar + 'static>(
                         side.is_some_and(|side| side.source.symbols.bound().is_some()),
                         core.host.retained_law.as_ref(),
                         core.evidence.source.symbols.bound().is_some(),
-                        original,
+                        source_cells,
                         component,
                         entry,
                         permit,
                     )
                 };
-                let values = match result {
-                    Ok(values) => values,
-                    Err(refused) => {
-                        if first.is_none() {
-                            first = Some(refused);
-                        }
-                        member.zeros()
-                    }
-                };
-                if values.store(&mut core.host.channels, &mut core.endpoints, entry)
-                    && first.is_none()
-                {
-                    first = Some(member.storage_failure(component));
-                }
+                store_result(
+                    result,
+                    member,
+                    component,
+                    entry,
+                    &mut first,
+                    &mut core.host.channels,
+                    &mut core.endpoints,
+                );
             }
             if let Some(refused) = first {
                 core.evidence.outcomes[cell] = refused;
@@ -232,4 +244,28 @@ fn run<P: Scalar + 'static>(
         }
     }
     Ok(())
+}
+
+/// Store all admitted roles even after a refusal, preserving the first failing component.
+fn store_result<P: Scalar + 'static>(
+    result: Result<selected::Values<P>, CellOutcome>,
+    member: Member<'_>,
+    component: usize,
+    entry: usize,
+    first: &mut Option<CellOutcome>,
+    channels: &mut [Option<crate::loan::payload::LoanChannel>; 3],
+    endpoints: &mut Option<[crate::loan::payload::LoanChannel; 2]>,
+) {
+    let values = match result {
+        Ok(values) => values,
+        Err(refused) => {
+            if first.is_none() {
+                *first = Some(refused);
+            }
+            member.zeros()
+        }
+    };
+    if values.store(channels, endpoints, entry) && first.is_none() {
+        *first = Some(member.storage_failure(component));
+    }
 }

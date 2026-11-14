@@ -260,6 +260,7 @@ impl CheckedOperation {
             NativeRecipe::Kernel(contract) => match &contract.recipe {
                 Recipe::PreparedExpm1
                 | Recipe::BinaryElementwise(_)
+                | Recipe::CartesianBinary(..)
                 | Recipe::ProjectedElementwise(..) => false,
                 Recipe::Quantity(_) => matches!(
                     contract.kind(),

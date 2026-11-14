@@ -31,7 +31,8 @@ pub(crate) fn evaluate<P: Scalar + 'static, Q: Scalar + 'static>(
         Recipe::PositiveReciprocal(_)
         | Recipe::Quantity(_)
         | Recipe::PreparedExpm1
-        | Recipe::BinaryElementwise(_) => {
+        | Recipe::BinaryElementwise(_)
+        | Recipe::CartesianBinary(..) => {
             return Err(KernelError::Contract.into());
         }
         Recipe::Sum { subtract, right } => (sum(views, *subtract, right, &context)?, None),

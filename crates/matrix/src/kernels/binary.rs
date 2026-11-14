@@ -7,7 +7,7 @@ use super::{
 };
 use nrz_scalar::{ArithmeticContext, Enclosure, Finite};
 
-/// Closed equal-shape binary functions supported by the masked application adapter.
+/// Closed native binary functions supported by the masked application adapter.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BinaryElementwise {
     /// Cartesian product of two represented boxes.

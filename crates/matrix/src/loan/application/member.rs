@@ -73,7 +73,10 @@ impl<'a> Member<'a> {
             (Recipe::Elementwise(Elementwise::Square), None) => Ok(Self::Square(law)),
             (Recipe::Elementwise(Elementwise::Reciprocal), None) => Ok(Self::Reciprocal(law)),
             (Recipe::Elementwise(Elementwise::SquareRoot), None) => Ok(Self::SquareRoot(law)),
-            (Recipe::BinaryElementwise(function), None) => Ok(Self::Binary(law, *function)),
+            (
+                Recipe::BinaryElementwise(function) | Recipe::CartesianBinary(_, _, function),
+                None,
+            ) => Ok(Self::Binary(law, *function)),
             (Recipe::PreparedExpm1, Some(operation)) if law.work == 0 => {
                 Ok(Self::PreparedExpm1(law, operation))
             }
@@ -167,8 +170,18 @@ impl<'a> Member<'a> {
             Self::Binary(..) => 21,
         }
     }
+    /// Cartesian geometry retains both ordered factor axes inside the original law.
+    pub(super) fn cartesian(self) -> Option<crate::CellProduct> {
+        match &self.law().recipe {
+            Recipe::CartesianBinary(product, _, _) => Some(*product),
+            _ => None,
+        }
+    }
     /// Native reuse reports its exact ledger delta independently of prepaid wrapper visits.
     pub(super) fn native_phase(self) -> Option<&'static str> {
+        if self.cartesian().is_some() {
+            return Some("Cartesian binary traversal");
+        }
         match self {
             Self::Square(_) => None,
             Self::ProjectedElementwise(_, crate::Elementwise::Square) => {

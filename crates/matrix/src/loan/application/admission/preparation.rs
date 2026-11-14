@@ -319,7 +319,15 @@ fn fill_availability<P: Scalar>(
     demand: &crate::MaskView<'_>,
     filled: &mut [u64],
 ) -> Result<(), LoanError> {
-    if member.is_projected() {
+    if let Some(product) = member.cartesian() {
+        let (_, right) = request.binary.ok_or(LoanError::WrongLoan)?;
+        super::super::binary::filled(
+            product,
+            [source, super::super::binary::bundle(right)?],
+            demand,
+            filled,
+        )?;
+    } else if member.is_projected() {
         super::super::movement::filled(member.map()?, source, demand, filled)?;
     } else {
         for (index, word) in filled.iter_mut().enumerate() {

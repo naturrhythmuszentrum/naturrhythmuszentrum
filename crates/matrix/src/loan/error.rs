@@ -28,6 +28,9 @@ pub enum LoanError {
     /// Binary incidence admits equal extents or one tile scalar only.
     #[error("unsupported binary operand extent")]
     UnsupportedBinaryExtent,
+    /// Cartesian binary demand currently requires an ordinary product layout.
+    #[error("unsupported binary demand projection")]
+    UnsupportedBinaryProjection,
     /// A selected cell lacks initialized complete coverage.
     #[error("unfilled selected cell")]
     CoverageMismatch,

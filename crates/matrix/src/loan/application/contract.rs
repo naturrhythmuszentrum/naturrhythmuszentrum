@@ -264,14 +264,9 @@ impl Evidence {
                 .ok_or(LoanError::WrongLoan)?;
             (self.demand.layout == layout, destination.axis == axis)
         } else if let Some(side) = self.endpoint_tokens.binary() {
-            let axis = if self.source.extent == law.output {
-                self.source.axis
-            } else {
-                side.source.axis
-            };
             (
                 self.demand.layout == side.original.demand_layout(),
-                destination.axis == axis,
+                destination.axis == side.original.geometry().axis(),
             )
         } else {
             (

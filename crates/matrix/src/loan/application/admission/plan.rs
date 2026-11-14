@@ -212,7 +212,18 @@ impl Plan {
             )?)
             .ok_or(LoanError::CountOverflow)?;
         let input_channels = request.input_channels()?;
-        let mask_work = if request.member()?.is_projected() {
+        let mask_work = if request.member()?.cartesian().is_some() {
+            request
+                .destination
+                .capacity()
+                .checked_mul(input_channels + 4)
+                .and_then(|work| {
+                    self.cell_words
+                        .checked_mul(4)
+                        .and_then(|words| work.checked_add(words))
+                })
+                .ok_or(LoanError::CountOverflow)?
+        } else if request.member()?.is_projected() {
             super::super::movement::availability_work(
                 request.destination.capacity(),
                 self.cell_words,

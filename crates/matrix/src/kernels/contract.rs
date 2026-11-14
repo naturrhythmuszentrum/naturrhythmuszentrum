@@ -35,7 +35,7 @@ pub enum KernelKind {
     Elementwise(super::Elementwise),
     /// Retained prepared expm1, executable only through its checked masked adapter.
     PreparedExpm1,
-    /// Ordered native product or quotient of equally shaped represented boxes.
+    /// Ordered native product or quotient of represented boxes with checked native incidence.
     BinaryElementwise(super::BinaryElementwise),
 }
 
@@ -78,8 +78,14 @@ pub(crate) enum Recipe {
     Elementwise(super::Elementwise),
     /// Retained prepared expm1, executable only through its checked masked adapter.
     PreparedExpm1,
-    /// Ordered native product or quotient of equally shaped represented boxes.
+    /// Ordered native product or quotient of represented boxes with checked native incidence.
     BinaryElementwise(super::BinaryElementwise),
+    /// Ordered outer/inner factor incidence on an ordinary product demand layout.
+    CartesianBinary(
+        crate::CellProduct,
+        crate::CellLayoutVersion,
+        super::BinaryElementwise,
+    ),
 }
 
 impl KernelContract {
@@ -99,7 +105,9 @@ impl KernelContract {
                 KernelKind::Elementwise(*function)
             }
             Recipe::PreparedExpm1 => KernelKind::PreparedExpm1,
-            Recipe::BinaryElementwise(function) => KernelKind::BinaryElementwise(*function),
+            Recipe::BinaryElementwise(function) | Recipe::CartesianBinary(_, _, function) => {
+                KernelKind::BinaryElementwise(*function)
+            }
         }
     }
 

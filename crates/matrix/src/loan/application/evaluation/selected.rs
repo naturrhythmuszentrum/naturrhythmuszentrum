@@ -43,11 +43,12 @@ impl Member<'_> {
         right_bounded: bool,
         law: Option<&crate::loan::retained_expm1::Attachment>,
         bounded: bool,
-        cell: usize,
+        cells: [usize; 2],
         component: usize,
         entry: usize,
         permit: &Traversal,
     ) -> Result<Values<P>, CellOutcome> {
+        let cell = cells[0];
         match self {
             Self::Transform(_) | Self::ProjectedElementwise(..) => {
                 Err(self.storage_failure(component))
@@ -87,7 +88,7 @@ impl Member<'_> {
                 reader,
                 right,
                 [bounded, right_bounded],
-                cell,
+                cells,
                 component,
                 function,
                 entry,
@@ -212,7 +213,7 @@ fn binary<P: Scalar + 'static>(
     left: Option<&crate::TileReader<'_, P>>,
     right: Option<&crate::TileReader<'_, f64>>,
     bounded: [bool; 2],
-    cell: usize,
+    cells: [usize; 2],
     component: usize,
     function: crate::BinaryElementwise,
     entry: usize,
@@ -224,13 +225,13 @@ fn binary<P: Scalar + 'static>(
         if crate::loan::application::binary::tile_scalar(left.bundle.declaration.extent) {
             (0, 0)
         } else {
-            (cell, component)
+            (cells[0], component)
         };
     let (right_cell, right_component) =
         if crate::loan::application::binary::tile_scalar(right.bundle.declaration.extent) {
             (0, 0)
         } else {
-            (cell, component)
+            (cells[1], component)
         };
     let authenticate = || -> Result<(), LoanError> {
         left.selected_owner(HostChannel::Center, left_cell, left_component)?;

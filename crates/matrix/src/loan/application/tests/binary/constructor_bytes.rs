@@ -52,6 +52,11 @@ enum Recipe {
     Elementwise(crate::Elementwise),
     PreparedExpm1,
     Binary(BinaryElementwise),
+    Cartesian(
+        crate::CellProduct,
+        crate::CellLayoutVersion,
+        BinaryElementwise,
+    ),
 }
 /// The checked kernel owns one shared extent array and no additional binary program.
 #[repr(C)]
