@@ -62,7 +62,7 @@ impl<'a> Member<'a> {
         let crate::binding::NativeRecipe::Kernel(law) = &operation.recipe else {
             return Err(LoanError::UnsupportedContract);
         };
-        if law.kind() != expected {
+        if law.kind() != expected || law.inputs.len() != operation.inputs().len() {
             return Err(LoanError::UnsupportedContract);
         }
         match (&law.recipe, prepared) {
@@ -168,7 +168,7 @@ impl<'a> Member<'a> {
         }
     }
     /// Native reuse reports its exact ledger delta independently of prepaid wrapper visits.
-    pub(super) const fn native_phase(self) -> Option<&'static str> {
+    pub(super) fn native_phase(self) -> Option<&'static str> {
         match self {
             Self::Square(_) => None,
             Self::ProjectedElementwise(_, crate::Elementwise::Square) => {
@@ -184,9 +184,19 @@ impl<'a> Member<'a> {
             Self::PreparedExpm1(..) => Some("prepared native traversal"),
             Self::Reciprocal(_) => Some("reciprocal native traversal"),
             Self::SquareRoot(_) => Some("square root native traversal"),
-            Self::Binary(_, crate::BinaryElementwise::Product) => Some("product native traversal"),
-            Self::Binary(_, crate::BinaryElementwise::Quotient) => {
-                Some("quotient native traversal")
+            Self::Binary(law, crate::BinaryElementwise::Product) => {
+                Some(if law.inputs[1] == law.output {
+                    "product native traversal"
+                } else {
+                    "product right scalar traversal"
+                })
+            }
+            Self::Binary(law, crate::BinaryElementwise::Quotient) => {
+                Some(if law.inputs[1] == law.output {
+                    "quotient native traversal"
+                } else {
+                    "quotient right scalar traversal"
+                })
             }
         }
     }
@@ -205,7 +215,14 @@ impl<'a> Member<'a> {
         let extent = crate::Extent::new(1, components)?;
         if law.kind != self.law().kind()
             || law.inputs.len() != self.arity()
-            || law.inputs.iter().any(|input| *input != extent)
+            || law.inputs.iter().enumerate().any(|(index, input)| {
+                let components = if self.is_binary() {
+                    self.law().inputs[index].columns()
+                } else {
+                    components
+                };
+                input.rows() != 1 || input.columns() != components
+            })
             || law.output != extent
             || law.work != self.invocation(components)?
         {

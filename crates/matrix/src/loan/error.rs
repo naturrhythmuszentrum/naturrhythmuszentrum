@@ -25,6 +25,9 @@ pub enum LoanError {
     /// Component layout or axis association differs.
     #[error("layout mismatch")]
     LayoutMismatch,
+    /// Binary incidence admits equal extents or a right tile scalar only.
+    #[error("unsupported binary operand extent")]
+    UnsupportedBinaryExtent,
     /// A selected cell lacks initialized complete coverage.
     #[error("unfilled selected cell")]
     CoverageMismatch,

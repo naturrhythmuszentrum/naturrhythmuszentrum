@@ -328,7 +328,15 @@ fn fill_availability<P: Scalar>(
             if let Some((_, pin)) = request.binary {
                 let right = super::super::binary::bundle(pin)?;
                 for _ in right.channels.iter().flatten() {
-                    *word &= right.mask.words[index];
+                    *word &= if super::super::binary::tile_scalar(right.declaration.extent) {
+                        if crate::loan::payload::bit(&right.mask.words, 0) {
+                            u64::MAX
+                        } else {
+                            0
+                        }
+                    } else {
+                        right.mask.words[index]
+                    };
                 }
             }
         }
@@ -395,8 +403,12 @@ fn cell_contract<P: Scalar>(
     let extent = crate::Extent::new(1, request.destination.components())?;
     #[cfg(test)]
     crate::loan::fault::before()?;
-    let inputs: Rc<[crate::Extent]> = if request.binary.is_some() {
-        Rc::new([extent; 2])
+    let inputs: Rc<[crate::Extent]> = if let Some((_, right)) = request.binary {
+        let components = super::super::binary::bundle(right)?
+            .declaration
+            .extent
+            .columns();
+        Rc::new([extent, crate::Extent::new(1, components)?])
     } else {
         Rc::new([extent])
     };

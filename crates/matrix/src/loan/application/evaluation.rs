@@ -99,8 +99,16 @@ fn traversal_work<P: Scalar>(
         + core.evidence.endpoint_tokens.binary().map_or(0, |side| {
             1 + usize::from(side.source.symbols.bound().is_some())
         });
+    // Two right-coordinate projections per output component are prepaid for tile broadcast.
+    let projections = core.evidence.endpoint_tokens.binary().map_or(0, |side| {
+        if side.source.extent == core.host.declaration.extent {
+            0
+        } else {
+            2
+        }
+    });
     let invocation = member.invocation(components)?;
-    let per_cell = (loads + member.roles())
+    let per_cell = (loads + member.roles() + projections)
         .checked_mul(components)
         .and_then(|steps| steps.checked_add(invocation))
         .and_then(|steps| steps.checked_add(2))

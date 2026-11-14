@@ -64,43 +64,25 @@ pub(in crate::loan::application) fn check_request<P: Scalar + 'static>(
     }
     let extent = request.destination.extent;
     let law = member.law();
-    if law.inputs.as_ref() != [extent; 2]
+    let inputs = [left.declaration.extent, right_bundle.declaration.extent];
+    super::extents(inputs, extent)?;
+    if law.inputs.as_ref() != inputs
         || law.output != extent
         || law.work != member.invocation(extent.entries())?
         || extent.columns() == 0
     {
         return Err(LoanError::UnsupportedContract.into());
     }
-    for (position, region) in [
-        BinaryRegion::Left,
-        BinaryRegion::Right,
-        BinaryRegion::Output,
-    ]
-    .into_iter()
-    .zip(
-        request
-            .operation
-            .inputs()
-            .iter()
-            .chain(request.operation.outputs()),
-    ) {
-        if region.shape().extent() != extent {
-            return Err(LoanError::LayoutMismatch.into());
-        }
-        for (entry, contract) in region.shape().entries().iter().enumerate() {
-            charge(budget, 1)?;
-            if contract.is_zero() {
-                return Err(ApplicationError::UnsupportedBinaryStructure {
-                    position,
-                    entry,
-                    scope: region.shape().structure_scope(),
-                });
-            }
-        }
-    }
+    regions(request.operation, inputs, extent, budget)?;
     charge(budget, 8)?;
     for bundle in [left, right_bundle] {
-        source(bundle, request.destination.axis, extent)?;
+        let source_extent = bundle.declaration.extent;
+        let axis = if source_extent == extent {
+            request.destination.axis
+        } else {
+            bundle.declaration.axis
+        };
+        source(bundle, axis, source_extent)?;
         super::super::contract::attachments(bundle)?;
     }
     original.validate(
@@ -163,21 +145,27 @@ impl PointwiseBinaryOperation {
         destination: &nrz_bindings::BindingSymbols,
         axis: crate::CellAxis,
     ) -> Result<(), LoanError> {
-        if self.axis != axis || !same_symbols(&self.destination, destination) {
+        if self.axis != axis {
+            return Err(LoanError::LayoutMismatch);
+        }
+        if !same_symbols(&self.destination, destination) {
             return Err(LoanError::WrongLoan);
         }
         for (index, (source, identity)) in sources.iter().copied().enumerate() {
             if self.identities[index] != identity
                 || !same_symbols(&self.sources[index], &source.symbols)
-                || source.axis != axis
+                || source.extent != self.operation.inputs()[index].shape().extent()
+                || (source.extent == self.operation.outputs()[0].shape().extent()
+                    && source.axis != axis)
             {
                 return Err(LoanError::WrongLoan);
             }
-            super::super::contract::declarations(
+            super::super::contract::declarations_with_shape(
                 source,
                 destination,
                 self.operation.inputs()[index].descriptor(),
                 self.operation.outputs()[0].descriptor(),
+                index == 0,
             )?;
         }
         Ok(())
@@ -216,8 +204,11 @@ impl Side {
             &destination.symbols,
             destination.axis,
         )?;
-        if self.source.extent != destination.extent || self.source.coverage != destination.coverage
-        {
+        super::extents(
+            [evidence.source.extent, self.source.extent],
+            destination.extent,
+        )?;
+        if self.source.coverage != destination.coverage {
             return Err(LoanError::LayoutMismatch);
         }
         for (index, attachment) in self.attachments.iter().enumerate() {
@@ -248,4 +239,41 @@ impl Side {
         input.checked_reader()?;
         Ok(())
     }
+}
+
+/// Original operand rectangles are inspected independently of the destination rectangle.
+fn regions(
+    operation: &crate::CheckedOperation,
+    inputs: [crate::Extent; 2],
+    extent: crate::Extent,
+    budget: &mut Budget,
+) -> Result<(), ApplicationError> {
+    for (position, region) in [
+        BinaryRegion::Left,
+        BinaryRegion::Right,
+        BinaryRegion::Output,
+    ]
+    .into_iter()
+    .zip(operation.inputs().iter().chain(operation.outputs()))
+    {
+        let expected = match position {
+            BinaryRegion::Left => inputs[0],
+            BinaryRegion::Right => inputs[1],
+            BinaryRegion::Output => extent,
+        };
+        if region.shape().extent() != expected {
+            return Err(LoanError::LayoutMismatch.into());
+        }
+        for (entry, contract) in region.shape().entries().iter().enumerate() {
+            charge(budget, 1)?;
+            if contract.is_zero() {
+                return Err(ApplicationError::UnsupportedBinaryStructure {
+                    position,
+                    entry,
+                    scope: region.shape().structure_scope(),
+                });
+            }
+        }
+    }
+    Ok(())
 }

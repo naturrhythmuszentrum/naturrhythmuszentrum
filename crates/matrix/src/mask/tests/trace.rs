@@ -180,7 +180,7 @@ fn mask_shared_ledger_boundary_receipts() -> TestResult {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     assert!(!state.lost);
-    assert_eq!(state.active, []);
+    assert_eq!(state.active, [] as [usize; 0]);
     assert_eq!(state.receipts.len(), 3);
     let root = state.receipts.first().ok_or("missing enclosing receipt")?;
     assert_eq!(root.fields.family, "cas");
@@ -240,7 +240,7 @@ fn loan_original_ledger_observation_does_not_change_work() -> TestResult {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     assert!(!state.lost);
-    assert_eq!(state.active, []);
+    assert_eq!(state.active, [] as [usize; 0]);
     assert_eq!(state.receipts.len(), 5);
     let ledger = state
         .receipts
@@ -358,7 +358,7 @@ fn mask_transport_ledger_receipts() -> TestResult {
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     assert!(!state.lost);
-    assert_eq!(state.active, []);
+    assert_eq!(state.active, [] as [usize; 0]);
     let receipts = std::mem::take(&mut state.receipts);
     drop(state);
     assert_eq!(receipts.len(), 2);

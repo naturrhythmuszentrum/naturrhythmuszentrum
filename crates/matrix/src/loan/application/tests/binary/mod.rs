@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independent ordered binary values, correspondence, resources and both retaining edges.
 
+mod broadcast;
 mod bytes;
 mod chain;
 mod constructor_bytes;

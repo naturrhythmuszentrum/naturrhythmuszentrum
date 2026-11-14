@@ -83,7 +83,7 @@ impl PointwiseBinaryOperation {
                 limits.check(2, work)?;
                 correspondence::preflight(budget)?;
                 let law = crate::kernels::KernelContract {
-                    inputs: Rc::new([extent; 2]),
+                    inputs: Rc::new(inputs.each_ref().map(|region| region.shape().extent())),
                     output: extent,
                     recipe: crate::kernels::contract::Recipe::BinaryElementwise(function),
                     work,
@@ -245,4 +245,19 @@ fn same_symbols(left: &BindingSymbols, right: &BindingSymbols) -> bool {
     let total = left.bound() == right.bound();
     let error = left.error() == right.error();
     value && total && error
+}
+
+/// Ordered right tile scalars repeat their single original component over the output rectangle.
+pub(super) fn extents(inputs: [crate::Extent; 2], output: crate::Extent) -> Result<(), LoanError> {
+    if inputs[0] != output || (inputs[1] != output && !tile_scalar(inputs[1])) {
+        return Err(LoanError::UnsupportedBinaryExtent);
+    }
+    Ok(())
+}
+
+/// A scalar has one cell and one component, independent of the output cell-axis occupation.
+pub(in crate::loan::application) const fn tile_scalar(extent: crate::Extent) -> bool {
+    let one_cell = extent.rows() == 1;
+    let one_component = extent.columns() == 1;
+    one_cell && one_component
 }

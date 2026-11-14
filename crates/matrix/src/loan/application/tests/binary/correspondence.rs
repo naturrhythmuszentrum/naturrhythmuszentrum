@@ -271,13 +271,21 @@ fn binary_public_request_order_identity_demand_and_family_refusals() -> TestResu
             BinaryElementwise::Product
         };
         match admit(&mut setup.heap, setup.request, function, &mut setup.account) {
-            BinaryApplicationRequest::ApplicationRefused(_, request) => assert_eq!(
-                [
-                    Rc::as_ptr(&request.left.record),
-                    Rc::as_ptr(&request.right.record)
-                ],
-                pins
-            ),
+            BinaryApplicationRequest::ApplicationRefused(error, request) => {
+                if choice == 4 {
+                    assert!(matches!(
+                        error,
+                        ApplicationError::Loan(LoanError::LayoutMismatch)
+                    ));
+                }
+                assert_eq!(
+                    [
+                        Rc::as_ptr(&request.left.record),
+                        Rc::as_ptr(&request.right.record)
+                    ],
+                    pins
+                );
+            }
             other @ BinaryApplicationRequest::ApplicationReady(_) => {
                 return Err(format!("{other:?}").into());
             }

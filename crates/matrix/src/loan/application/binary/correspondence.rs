@@ -25,6 +25,15 @@ pub(super) fn check(
     {
         return Err(LoanError::TargetMismatch.into());
     }
+    let extents = inputs.each_ref().map(|region| region.shape().extent());
+    if sources
+        .iter()
+        .zip(extents)
+        .any(|(source, extent)| source.declaration.extent != extent)
+    {
+        return Err(LoanError::LayoutMismatch.into());
+    }
+    super::extents(extents, extent)?;
     for (position, region) in [
         BinaryRegion::Left,
         BinaryRegion::Right,
@@ -34,9 +43,7 @@ pub(super) fn check(
     .zip([&inputs[0], &inputs[1], output])
     {
         charge(budget, 1)?;
-        if region.shape().extent() != extent
-            || region.shape().declarations().id() != output.shape().declarations().id()
-        {
+        if region.shape().declarations().id() != output.shape().declarations().id() {
             return Err(LoanError::LayoutMismatch.into());
         }
         for (entry, original) in region.shape().entries().iter().enumerate() {
@@ -61,15 +68,22 @@ pub(super) fn check(
     }
     for (source, region) in sources.into_iter().zip(inputs) {
         charge(budget, 4)?;
-        super::validation::source(source, axis, extent)?;
+        let source_extent = region.shape().extent();
+        let source_axis = if source_extent == extent {
+            axis
+        } else {
+            source.declaration.axis
+        };
+        super::validation::source(source, source_axis, source_extent)?;
         if source.declaration.symbols.value().descriptor() != region.descriptor() {
             return Err(LoanError::UnsupportedContract.into());
         }
-        super::super::contract::declarations(
+        super::super::contract::declarations_with_shape(
             &source.declaration,
             destination,
             region.descriptor(),
             output.descriptor(),
+            source_extent == extent,
         )?;
     }
     charge(budget, 1)?;

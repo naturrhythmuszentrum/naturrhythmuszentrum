@@ -200,6 +200,39 @@ pub(super) fn check(
     );
     containment(centers, radii, function, readings)
 }
+/// Small fixture boxes permit a fixed dyadic excess below any cell/component radius increment.
+/// Exact extremal displacement bounds Total from above as well as below, exposing oversized
+/// enclosures caused by reading a different original cell's larger radius.
+pub(super) fn tight(
+    centers: [f64; 2],
+    radii: [f64; 2],
+    function: BinaryElementwise,
+    readings: [f64; 3],
+) -> TestResult {
+    check(centers, radii, function, readings)?;
+    let left = Rational::binary(centers[0])?;
+    let right = Rational::binary(centers[1])?;
+    let left_radius = Rational::binary(radii[0])?;
+    let right_radius = Rational::binary(radii[1])?;
+    let output = Rational::binary(readings[0])?;
+    let mut maximum = Rational::binary(0.0)?;
+    for first in [left.sub(&left_radius), left.add(&left_radius)] {
+        for second in [right.sub(&right_radius), right.add(&right_radius)] {
+            let mut distance = first.image(&second, function)?.sub(&output);
+            distance.negative = false;
+            if distance.compare(&maximum) == Ordering::Greater {
+                maximum = distance;
+            }
+        }
+    }
+    let ceiling = maximum.add(&Rational::binary(1.0 / 1_048_576.0)?);
+    assert_ne!(
+        Rational::binary(readings[1])?.compare(&ceiling),
+        Ordering::Greater
+    );
+    Ok(())
+}
+
 /// Exact nominal and four-corner checks remain valid even for a deliberately wrong nearby center.
 pub(super) fn containment(
     centers: [f64; 2],

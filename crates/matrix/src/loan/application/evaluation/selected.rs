@@ -220,14 +220,20 @@ fn binary<P: Scalar + 'static>(
 ) -> Result<crate::kernels::arithmetic::Entry<f64>, crate::KernelError> {
     let left = left.ok_or(crate::KernelError::Contract)?;
     let right = right.ok_or(crate::KernelError::Contract)?;
+    let (right_cell, right_component) =
+        if crate::loan::application::binary::tile_scalar(right.bundle.declaration.extent) {
+            (0, 0)
+        } else {
+            (cell, component)
+        };
     let authenticate = || -> Result<(), LoanError> {
         left.selected_owner(HostChannel::Center, cell, component)?;
-        right.selected_owner(HostChannel::Center, cell, component)?;
+        right.selected_owner(HostChannel::Center, right_cell, right_component)?;
         if bounded[0] {
             left.selected_owner(HostChannel::Total, cell, component)?;
         }
         if bounded[1] {
-            right.selected_owner(HostChannel::Total, cell, component)?;
+            right.selected_owner(HostChannel::Total, right_cell, right_component)?;
         }
         Ok(())
     };
@@ -236,7 +242,7 @@ fn binary<P: Scalar + 'static>(
         let centers = [
             left.read_prepaid(HostChannel::Center, cell, component, permit)?
                 .to_f64(),
-            right.read_prepaid(HostChannel::Center, cell, component, permit)?,
+            right.read_prepaid(HostChannel::Center, right_cell, right_component, permit)?,
         ];
         let radii = [
             if bounded[0] {
@@ -246,7 +252,7 @@ fn binary<P: Scalar + 'static>(
                 0.0
             },
             if bounded[1] {
-                right.read_prepaid(HostChannel::Total, cell, component, permit)?
+                right.read_prepaid(HostChannel::Total, right_cell, right_component, permit)?
             } else {
                 0.0
             },
