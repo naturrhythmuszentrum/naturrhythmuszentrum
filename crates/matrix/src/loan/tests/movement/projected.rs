@@ -7,6 +7,7 @@ use nrz_scalar::Scalar;
 
 mod boundaries;
 mod continuation;
+mod coverage;
 mod observation;
 mod unary;
 
