@@ -227,6 +227,8 @@ fn extras<P: Scalar + 'static>(
     let member = request.member()?;
     let demand_layout = if member.is_projected() {
         request.demand.layout()
+    } else if let Some((original, _)) = request.binary {
+        original.demand_layout()
     } else {
         source.identity.layout
     };
@@ -323,20 +325,16 @@ fn fill_availability<P: Scalar>(
         for (index, word) in filled.iter_mut().enumerate() {
             *word = demand.words()[index];
             for _ in source.channels.iter().flatten() {
-                *word &= source.mask.words[index];
+                *word &= if request.binary.is_some() {
+                    super::super::binary::coverage_word(source, index)?
+                } else {
+                    source.mask.words[index]
+                };
             }
             if let Some((_, pin)) = request.binary {
                 let right = super::super::binary::bundle(pin)?;
                 for _ in right.channels.iter().flatten() {
-                    *word &= if super::super::binary::tile_scalar(right.declaration.extent) {
-                        if crate::loan::payload::bit(&right.mask.words, 0) {
-                            u64::MAX
-                        } else {
-                            0
-                        }
-                    } else {
-                        right.mask.words[index]
-                    };
+                    *word &= super::super::binary::coverage_word(right, index)?;
                 }
             }
         }
@@ -408,7 +406,14 @@ fn cell_contract<P: Scalar>(
             .declaration
             .extent
             .columns();
-        Rc::new([extent, crate::Extent::new(1, components)?])
+        let left = super::super::contract::source(request)?
+            .declaration
+            .extent
+            .columns();
+        Rc::new([
+            crate::Extent::new(1, left)?,
+            crate::Extent::new(1, components)?,
+        ])
     } else {
         Rc::new([extent])
     };

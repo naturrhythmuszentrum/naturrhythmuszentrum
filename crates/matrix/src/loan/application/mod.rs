@@ -317,7 +317,7 @@ impl Origin {
                 evidence.law.kind(),
                 evidence.prepared.as_ref(),
             )?
-            .validate_outcome(outcome, cell, evidence.source.extent)?;
+            .validate_outcome(outcome, cell, evidence.law.output)?;
         }
         Ok(outcome)
     }

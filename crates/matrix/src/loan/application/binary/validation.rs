@@ -100,7 +100,7 @@ pub(in crate::loan::application) fn check_request<P: Scalar + 'static>(
         left.channels.iter().flatten().count() + right_bundle.channels.iter().flatten().count();
     charge(budget, channels + 6)?;
     let demand = heap
-        .mask(request.demand, left.identity.layout)
+        .mask(request.demand, original.demand_layout())
         .map_err(|cause| match cause {
             crate::MaskError::LayoutMismatch => LoanError::LayoutMismatch,
             other => LoanError::Mask(other),
@@ -165,7 +165,7 @@ impl PointwiseBinaryOperation {
                 destination,
                 self.operation.inputs()[index].descriptor(),
                 self.operation.outputs()[0].descriptor(),
-                index == 0,
+                source.extent == self.operation.outputs()[0].shape().extent(),
             )?;
         }
         Ok(())

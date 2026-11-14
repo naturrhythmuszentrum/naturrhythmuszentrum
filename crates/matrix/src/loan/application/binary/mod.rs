@@ -29,6 +29,13 @@ pub struct PointwiseBinaryOperation {
     axis: CellAxis,
 }
 impl PointwiseBinaryOperation {
+    /// Demand belongs to the output-sized operand, preferring Left for equal extents.
+    pub(super) fn demand_layout(&self) -> crate::CellLayoutVersion {
+        let right_anchor = self.operation.inputs()[0].shape().extent()
+            != self.operation.outputs()[0].shape().extent();
+        self.identities[usize::from(right_anchor)].layout
+    }
+
     /// Check original regions against the two borrowed host pins and a fresh destination.
     ///
     /// Each source's exact symbols and occupation are captured from its borrowed pin.
@@ -115,7 +122,7 @@ pub struct PointwiseBinaryRequest {
     pub right: BundlePin<f64>,
     /// Fresh three-reading destination on the original cell axis.
     pub destination: HostTileDeclaration<f64>,
-    /// Ordinary demand on the exact left layout occupation.
+    /// Ordinary demand on the output-sized operand's layout; Left when both extents match.
     pub demand: MaskVersion,
     /// Two-slot original application invocation and payload ceilings.
     pub limits: ExecutionLimits,
@@ -247,9 +254,13 @@ fn same_symbols(left: &BindingSymbols, right: &BindingSymbols) -> bool {
     value && total && error
 }
 
-/// Ordered right tile scalars repeat their single original component over the output rectangle.
+/// One ordered tile scalar may repeat over the other operand's output rectangle.
 pub(super) fn extents(inputs: [crate::Extent; 2], output: crate::Extent) -> Result<(), LoanError> {
-    if inputs[0] != output || (inputs[1] != output && !tile_scalar(inputs[1])) {
+    let anchored = inputs.contains(&output);
+    let supported = inputs
+        .into_iter()
+        .all(|input| input == output || tile_scalar(input));
+    if !anchored || !supported {
         return Err(LoanError::UnsupportedBinaryExtent);
     }
     Ok(())
@@ -260,4 +271,25 @@ pub(in crate::loan::application) const fn tile_scalar(extent: crate::Extent) -> 
     let one_cell = extent.rows() == 1;
     let one_component = extent.columns() == 1;
     one_cell && one_component
+}
+
+/// Pull back the scalar's complete role coverage without inventing independent copies.
+pub(in crate::loan::application) fn coverage_word(
+    source: &crate::loan::registry::Bundle,
+    index: usize,
+) -> Result<u64, LoanError> {
+    if tile_scalar(source.declaration.extent) {
+        Ok(if crate::loan::payload::bit(&source.mask.words, 0) {
+            u64::MAX
+        } else {
+            0
+        })
+    } else {
+        source
+            .mask
+            .words
+            .get(index)
+            .copied()
+            .ok_or(LoanError::CoverageMismatch)
+    }
 }

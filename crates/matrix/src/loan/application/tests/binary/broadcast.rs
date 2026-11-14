@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! A distinct one-cell right operand is a shared uncertain scalar, not copied independent inputs.
 
+mod left;
+
 use super::{
     BinaryElementwise, Fixture, Limits, TestResult, admit, candidate, oracle, published, ready,
 };
@@ -87,16 +89,17 @@ fn operation(
     function: BinaryElementwise,
 ) -> TestResult<PointwiseBinaryOperation> {
     let original = &setup.request.operation.operation;
-    let left = original.inputs()[0].clone();
     let output = original.outputs()[0].clone();
-    let extent = super::super::super::binary::bundle(&setup.request.right)?
-        .declaration
-        .extent;
-    let right = RegionContract::check(crate::kernel_testing::shape(
-        &output.shape().declarations,
-        &crate::kernel_testing::axis(extent.columns())?,
-        &crate::kernel_testing::axis(extent.rows())?,
-    )?)?;
+    let region = |pin: &crate::BundlePin<f64>| -> TestResult<RegionContract> {
+        let extent = super::super::super::binary::bundle(pin)?.declaration.extent;
+        Ok(RegionContract::check(crate::kernel_testing::shape(
+            &output.shape().declarations,
+            &crate::kernel_testing::axis(extent.columns())?,
+            &crate::kernel_testing::axis(extent.rows())?,
+        )?)?)
+    };
+    let left = region(&setup.request.left)?;
+    let right = region(&setup.request.right)?;
     Ok(PointwiseBinaryOperation::check(
         [left, right],
         output,

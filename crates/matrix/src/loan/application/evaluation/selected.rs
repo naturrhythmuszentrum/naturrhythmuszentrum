@@ -220,6 +220,12 @@ fn binary<P: Scalar + 'static>(
 ) -> Result<crate::kernels::arithmetic::Entry<f64>, crate::KernelError> {
     let left = left.ok_or(crate::KernelError::Contract)?;
     let right = right.ok_or(crate::KernelError::Contract)?;
+    let (left_cell, left_component) =
+        if crate::loan::application::binary::tile_scalar(left.bundle.declaration.extent) {
+            (0, 0)
+        } else {
+            (cell, component)
+        };
     let (right_cell, right_component) =
         if crate::loan::application::binary::tile_scalar(right.bundle.declaration.extent) {
             (0, 0)
@@ -227,10 +233,10 @@ fn binary<P: Scalar + 'static>(
             (cell, component)
         };
     let authenticate = || -> Result<(), LoanError> {
-        left.selected_owner(HostChannel::Center, cell, component)?;
+        left.selected_owner(HostChannel::Center, left_cell, left_component)?;
         right.selected_owner(HostChannel::Center, right_cell, right_component)?;
         if bounded[0] {
-            left.selected_owner(HostChannel::Total, cell, component)?;
+            left.selected_owner(HostChannel::Total, left_cell, left_component)?;
         }
         if bounded[1] {
             right.selected_owner(HostChannel::Total, right_cell, right_component)?;
@@ -240,13 +246,13 @@ fn binary<P: Scalar + 'static>(
     authenticate().map_err(|_| crate::KernelError::Contract)?;
     let values = || -> Result<_, LoanError> {
         let centers = [
-            left.read_prepaid(HostChannel::Center, cell, component, permit)?
+            left.read_prepaid(HostChannel::Center, left_cell, left_component, permit)?
                 .to_f64(),
             right.read_prepaid(HostChannel::Center, right_cell, right_component, permit)?,
         ];
         let radii = [
             if bounded[0] {
-                left.read_prepaid(HostChannel::Total, cell, component, permit)?
+                left.read_prepaid(HostChannel::Total, left_cell, left_component, permit)?
                     .to_f64()
             } else {
                 0.0

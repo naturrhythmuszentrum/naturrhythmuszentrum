@@ -263,6 +263,16 @@ impl Evidence {
                 .movement()
                 .ok_or(LoanError::WrongLoan)?;
             (self.demand.layout == layout, destination.axis == axis)
+        } else if let Some(side) = self.endpoint_tokens.binary() {
+            let axis = if self.source.extent == law.output {
+                self.source.axis
+            } else {
+                side.source.axis
+            };
+            (
+                self.demand.layout == side.original.demand_layout(),
+                destination.axis == axis,
+            )
         } else {
             (
                 self.demand.layout == self.source_identity.layout,
@@ -283,6 +293,8 @@ impl Evidence {
         }
         let expected_extent = if member.is_projected() {
             member.map()?.target()
+        } else if member.is_binary() {
+            law.output
         } else {
             self.source.extent
         };
@@ -297,7 +309,7 @@ impl Evidence {
             &destination.symbols,
             self.operation.inputs()[0].descriptor(),
             self.operation.outputs()[0].descriptor(),
-            !member.is_projected(),
+            !member.is_projected() && !member.is_binary(),
         )?;
         if member.is_projected() && member.map()?.source() != self.source.extent {
             return Err(LoanError::WrongLoan);

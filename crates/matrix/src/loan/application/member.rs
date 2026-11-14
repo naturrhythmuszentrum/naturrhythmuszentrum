@@ -185,17 +185,17 @@ impl<'a> Member<'a> {
             Self::Reciprocal(_) => Some("reciprocal native traversal"),
             Self::SquareRoot(_) => Some("square root native traversal"),
             Self::Binary(law, crate::BinaryElementwise::Product) => {
-                Some(if law.inputs[1] == law.output {
+                Some(if law.inputs.iter().all(|input| *input == law.output) {
                     "product native traversal"
                 } else {
-                    "product right scalar traversal"
+                    "product tile scalar traversal"
                 })
             }
             Self::Binary(law, crate::BinaryElementwise::Quotient) => {
-                Some(if law.inputs[1] == law.output {
+                Some(if law.inputs.iter().all(|input| *input == law.output) {
                     "quotient native traversal"
                 } else {
-                    "quotient right scalar traversal"
+                    "quotient tile scalar traversal"
                 })
             }
         }
