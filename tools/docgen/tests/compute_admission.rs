@@ -7,7 +7,7 @@
 //! | [`compute_receipts_bind_bytes_revisions_and_raw_identity`] | docgen | Admission receipts bind summary bytes, raw identity and every declared revision. |
 //! | [`compute_templates_preserve_separate_observations`] | docgen | Strict compute templates retain separate run identities, intervals and escaped provenance. |
 //! | [`compute_source_attachments_bind_reviewed_repository_bytes`] | docgen | Source attachments bind exact repository patch bytes and refuse changed content. |
-//! | [`compute_open_policy_refuses_data_activation`] | docgen | An index edit cannot adopt the repository's still-open policy. |
+//! | [`compute_open_policy_refuses_data_activation`] | docgen | Open or unimplemented design policy, or missing index policy, refuses data activation. |
 
 use std::{
     fs,
@@ -292,7 +292,7 @@ fn compute_source_attachments_bind_reviewed_repository_bytes()
     Ok(())
 }
 
-/// An index edit cannot adopt the repository's still-open policy.
+/// Open or unimplemented design policy, or missing index policy, refuses data activation.
 /// ´claim:docgen:compute-open-policy-refuses-data-activation´
 /// ´test:integration:compute-open-policy-refuses-data-activation´
 #[test]
@@ -306,12 +306,40 @@ fn compute_open_policy_refuses_data_activation() -> Result<(), Box<dyn std::erro
     fs::write(
         root.0
             .join("templates/docs/design/compute-benchmarks.md.j2"),
-        include_bytes!("../../../templates/docs/design/compute-benchmarks.md.j2"),
+        "**Open Question (Synthetic fixture policy)** · `open:nrz:compute-admission-size-policy`\n",
     )?;
     let error = nrz_docgen::compute::validate_inputs(&root.0)
         .err()
         .ok_or("open policy accepted")?;
     assert!(error.contains("policy is undecided"));
+    fs::write(
+        root.0
+            .join("templates/docs/design/compute-benchmarks.md.j2"),
+        include_bytes!("../../../templates/docs/design/compute-benchmarks.md.j2"),
+    )?;
+    let error = nrz_docgen::compute::validate_inputs(&root.0)
+        .err()
+        .ok_or("unimplemented design accepted admission")?;
+    assert!(error.contains("policy is undecided"));
+    let committed: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../../../data/inputs/compute/index.json"))?;
+    assert!(committed["payload"]["policy"].is_null());
+    assert_eq!(committed["payload"]["runs"], serde_json::json!([]));
+    let mut disabled = index.clone();
+    disabled["payload"]["policy"] = committed["payload"]["policy"].clone();
+    fs::write(
+        root.0.join("data/inputs/compute/index.json"),
+        serde_json::to_vec(&disabled)?,
+    )?;
+    let error = nrz_docgen::compute::validate_inputs(&root.0)
+        .err()
+        .ok_or("null policy accepted admission")?;
+    assert!(error.contains("policy is undecided"));
+    fs::write(
+        root.0
+            .join("templates/docs/design/compute-benchmarks.md.j2"),
+        "**Open Question (Synthetic fixture policy)** · `open:nrz:compute-admission-size-policy`\n",
+    )?;
     fs::remove_dir_all(root.0.join("data/inputs/compute/runs"))?;
     let mut empty = index;
     empty["payload"]["runs"] = serde_json::json!([]);
@@ -323,5 +351,15 @@ fn compute_open_policy_refuses_data_activation() -> Result<(), Box<dyn std::erro
         .err()
         .ok_or("data-only policy accepted")?;
     assert!(error.contains("policy is undecided"));
+    fs::write(
+        root.0
+            .join("templates/docs/design/compute-benchmarks.md.j2"),
+        include_bytes!("../../../templates/docs/design/compute-benchmarks.md.j2"),
+    )?;
+    fs::write(
+        root.0.join("data/inputs/compute/index.json"),
+        serde_json::to_vec(&committed)?,
+    )?;
+    nrz_docgen::compute::validate_inputs(&root.0)?;
     Ok(())
 }

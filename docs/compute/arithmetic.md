@@ -8,6 +8,6 @@ These records describe a machine under its recorded load. Sampling intervals exp
 
 No admitted compute observations are available.
 
-Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).
+Repository summary admission remains disabled until the adopted design policy is implemented (`req:nrz:compute-admission-activation`).
 
 Raw reports are retained externally. A summary-only reader cannot verify an unseen raw digest, reconstruct chronology or independently reanalyze omitted observations. The admission receipt states the actual verification scope (`rule:nrz:compute-design-admission`).

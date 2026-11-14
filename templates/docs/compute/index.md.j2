@@ -10,7 +10,7 @@ These records describe a machine under its recorded load. Sampling intervals exp
 
 {% if not compute.runs %}No admitted compute observations are available.
 {% if not compute.policy_adopted %}
-Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).{% endif %}{% else %}
+Repository summary admission remains disabled until the adopted design policy is implemented (`req:nrz:compute-admission-activation`).{% endif %}{% else %}
 |Run|Machine|Families|Summary|Raw content identity|Verification scope|
 |---|-------|--------|-------|--------------------|------------------|
 {% for run in compute.runs %}

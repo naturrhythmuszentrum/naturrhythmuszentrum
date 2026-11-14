@@ -8,7 +8,7 @@ These records describe a machine under its recorded load. Sampling intervals exp
 
 No admitted compute observations are available.
 
-Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).
+Repository summary admission remains disabled until the adopted design policy is implemented (`req:nrz:compute-admission-activation`).
 
 Matrix rates report aggregate items and output elements; each accepted item contains the recorded number of kernel traversals. No logical-traffic rate is assigned from output bytes alone; backend packing and repeated internal accesses are not inferred from shape.
 

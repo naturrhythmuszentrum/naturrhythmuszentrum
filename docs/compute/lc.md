@@ -8,7 +8,7 @@ These records describe a machine under its recorded load. Sampling intervals exp
 
 No admitted compute observations are available.
 
-Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).
+Repository summary admission remains disabled until the adopted design policy is implemented (`req:nrz:compute-admission-activation`).
 
 Logical traversal bytes count named source operand uses and output writes: 32 bytes per forward output, 24 per element query, and 40 per inverse branch including the integer cycle input. Preparation-inclusive counts additionally include root/input initialization and reads, prepared reciprocal writes, and zero-initialized output allocation. These are recipe counts; compiler hoisting and caches can change physical traffic.
 
