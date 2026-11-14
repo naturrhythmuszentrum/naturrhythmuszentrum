@@ -80,3 +80,61 @@ fn mismatch<P: Scalar + 'static>(coverage: Coverage) -> TestResult {
     }
     Ok(())
 }
+
+/// Published assumption-bound results retain readable coverage but cannot start a current lineage.
+/// ´test:unit:loan-projected-declared-bounds-terminal´
+#[test]
+fn loan_projected_declared_bounds_terminal() -> TestResult {
+    terminal::<f32>()?;
+    terminal::<f64>()
+}
+
+/// All projected unary producers encounter the same represented-input lineage requirement.
+fn terminal<P: Scalar + 'static>() -> TestResult {
+    for function in [
+        Elementwise::Square,
+        Elementwise::Reciprocal,
+        Elementwise::SquareRoot,
+    ] {
+        let Setup {
+            mut heap,
+            mut account,
+            mut request,
+            ..
+        } = super::unary::domain_setup(
+            [[P::from_u8(5); 2]; 3],
+            [[P::ONE; 2]; 3],
+            Coverage::DeclaredBounds,
+        )?;
+        super::unary::operation(&mut request, function)?;
+        let owner = match heap.request_projected_elementwise(request, &mut account) {
+            ApplicationRequest::ApplicationReady(owner) => owner,
+            other @ ApplicationRequest::ApplicationRefused(..) => {
+                return Err(format!("{other:?}").into());
+            }
+        };
+        let owner = candidate(owner, &mut account)?;
+        let tile = publish(&mut heap, &mut account, owner)?;
+        let mut request = super::super::next_copy(&mut heap, &mut account, tile.into_pin())?;
+        request.destination.coverage = Coverage::DeclaredBounds;
+        let ticket = request.input.ticket()?;
+        crate::loan::fault::reset_reads();
+        let injection = crate::loan::fault::Injection::after(0);
+        let request = match heap.request_mapped_copy(request, &mut account) {
+            ApplicationRequest::ApplicationRefused(
+                ApplicationError::Loan(LoanError::CoverageMismatch),
+                request,
+            ) => request,
+            other => return Err(format!("{other:?}").into()),
+        };
+        assert_eq!(request.input.ticket()?, ticket);
+        assert_eq!(crate::loan::fault::reads(), 0);
+        assert_eq!(crate::loan::fault::Injection::attempts(), 0);
+        drop(injection);
+        assert_eq!(
+            request.input.historical_reader(&mut account)?.coverage(),
+            Coverage::DeclaredBounds
+        );
+    }
+    Ok(())
+}
