@@ -309,3 +309,27 @@ requires = []
 [[document]]
 output = "crates/compute/README.md"
 requires = []
+
+[[document]]
+output = "docs/compute/index.md"
+requires = ["compute"]
+
+[[document]]
+output = "docs/compute/arithmetic.md"
+requires = ["compute"]
+
+[[document]]
+output = "docs/compute/memory.md"
+requires = ["compute"]
+
+[[document]]
+output = "docs/compute/matrix.md"
+requires = ["compute"]
+
+[[document]]
+output = "docs/compute/lc.md"
+requires = ["compute"]
+
+[[document]]
+output = "docs/compute/provenance.md"
+requires = ["compute"]

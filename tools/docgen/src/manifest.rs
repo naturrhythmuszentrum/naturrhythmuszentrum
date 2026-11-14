@@ -108,7 +108,7 @@ pub(crate) fn read(root: &Path, owners: &BTreeSet<String>) -> Result<Vec<Documen
         for name in &document.requires {
             if !matches!(
                 name.as_str(),
-                "project" | "census" | "problems" | "engineering"
+                "project" | "census" | "problems" | "engineering" | "compute"
             ) {
                 return Err(invalid(
                     &document.output,

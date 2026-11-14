@@ -1,0 +1,66 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+{# requires compute v1 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Compute provenance · `spec:compute:provenance-observations`
+
+## Recorded evidence · `sec:compute:provenance-evidence`
+
+These records describe a machine under its recorded load. Sampling intervals express conditional sampling uncertainty, not numerical error or a hardware peak. They neither supply a correctness oracle nor calibrate the theoretical LC overhead reference (`rule:nrz:compute-design-authority`).
+
+{% if not compute.runs %}No admitted compute observations are available.
+{% if not compute.policy_adopted %}
+Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).{% endif %}{% else %}
+|Run|Machine|Summary|Raw content identity|Verification scope|
+|---|-------|-------|--------------------|------------------|
+{% for run in compute.runs %}
+|{{ run.entry.run_id }}|{{ run.entry.machine_alias }}|[JSON](../../{{ run.entry.path }})|{{ run.entry.receipt.raw_blob }}|{{ run.entry.receipt.verification }}|
+{% endfor %}
+{% for run in compute.runs %}
+**{{ run.entry.run_id }}: public build and environment**
+
+|Field|Evidence state|Public value|
+|-----|--------------|------------|
+|Compiler|{{ run.summary.payload.build.compiler.state }}|{{ run.summary.payload.build.compiler.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Source commit|{{ run.summary.payload.build.source_commit.state }}|{{ run.summary.payload.build.source_commit.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Dirty source|{{ run.summary.payload.build.dirty.state }}|{{ run.summary.payload.build.dirty.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Lockfile|{{ run.summary.payload.build.lockfile.state }}|{{ run.summary.payload.build.lockfile.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Target|{{ run.summary.payload.build.target.state }}|{{ run.summary.payload.build.target.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Profile|{{ run.summary.payload.build.profile.state }}|{{ run.summary.payload.build.profile.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Flags|{{ run.summary.payload.build.flags.state }}|{{ run.summary.payload.build.flags.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Build intent|{{ run.summary.payload.build.intent.state }}|{{ run.summary.payload.build.intent.value }}|
+|Backend|{{ run.summary.payload.build.backend.state }}|{{ run.summary.payload.build.backend.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|CPU model|{{ run.summary.payload.environment.cpu_model.state }}|{{ run.summary.payload.environment.cpu_model.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Cache inventory|{{ run.summary.payload.environment.caches.observed.state }}|{{ run.summary.payload.environment.caches.observed.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Memory capacity|{{ run.summary.payload.environment.memory.observed.state }}|{{ run.summary.payload.environment.memory.observed.value | string | replace("\n", " ") | replace("|", "&#124;") }}|
+|Reviewed source attachment|{{ run.summary.payload.identity.source_attachment.state }}|{% if run.summary.payload.identity.source_attachment.state == "Known" %}[Reviewed patch](../../{{ run.summary.payload.identity.source_attachment.value.path }}) · {{ run.summary.payload.identity.source_attachment.value.blob.algorithm }}:{{ run.summary.payload.identity.source_attachment.value.blob.digest }}{% else %}{{ run.summary.payload.identity.source_attachment.value | string | replace("\n", " ") | replace("|", "&#124;") }}{% endif %}|
+
+Compile ISA: {{ run.summary.payload.environment.compile_isa | join(", ") }}. Runtime ISA: {{ run.summary.payload.environment.runtime_isa | join(", ") }}. Comparison eligibility: {{ run.entry.receipt.comparison_eligible }}. These fields remain separate for each run; unlike scopes and environments are not pooled.
+
+{% endfor %}
+{% endif %}
+
+Raw reports are retained externally. A summary-only reader cannot verify an unseen raw digest, reconstruct chronology or independently reanalyze omitted observations. The admission receipt states the actual verification scope (`rule:nrz:compute-design-admission`).
+
+## Changed build and environment evidence · `sec:compute:provenance-changes`
+
+Adjacent admitted records retain separate results. These tables identify metadata changes; equal unavailable values do not establish equal machines or builds. A changed field is not evidence of a performance cause. Eligibility is the review receipt's decision, and unlike case scopes remain separate (`rule:nrz:compute-comparison`).
+
+{% for run in compute.runs %}{% if not loop.first %}{% set previous = compute.runs[loop.index0 - 1] %}
+**{{ previous.entry.run_id }} → {{ run.entry.run_id }}**
+
+|Changed build field|Previous evidence|Current evidence|
+|-------------------|-----------------|----------------|
+{% for field in ["compiler", "source_commit", "dirty", "lockfile", "target", "profile", "flags", "intent", "features", "backend", "dependencies", "lowering"] %}{% if previous.summary.payload.build[field] != run.summary.payload.build[field] %}
+|{{ field }}|{{ previous.summary.payload.build[field] | string | replace("\n", " ") | replace("|", "&#124;") }}|{{ run.summary.payload.build[field] | string | replace("\n", " ") | replace("|", "&#124;") }}|
+{% endif %}{% endfor %}
+
+|Changed environment field|Previous evidence|Current evidence|
+|-------------------------|-----------------|----------------|
+{% for field in ["machine_alias", "cpu_model", "runtime_isa", "compile_isa", "topology", "caches", "memory", "smt", "placement", "numa", "kernel", "distribution", "resource_limits", "power", "turbo", "tracing", "concurrent_load", "core_classes", "coordinator_placement", "worker_placement", "numa_allowed_nodes", "process_limits", "cgroup_cpu_limit", "cgroup_memory_limit", "cgroup_cpuset", "virtual_machine", "frequency_min", "frequency_max"] %}{% if previous.summary.payload.environment[field] != run.summary.payload.environment[field] %}
+|{{ field }}|{{ previous.summary.payload.environment[field] | string | replace("\n", " ") | replace("|", "&#124;") }}|{{ run.summary.payload.environment[field] | string | replace("\n", " ") | replace("|", "&#124;") }}|
+{% endif %}{% endfor %}
+
+{% endif %}{% endfor -%}
+
+Known source attachments use reviewed repository-relative patch links and full blob identities. Admission checks the bytes and symlink policy, binds them through the summary receipt, and counts the attachment bytes against the aggregate cap. No raw observation file is an attachment (`rule:nrz:compute-design-admission`).

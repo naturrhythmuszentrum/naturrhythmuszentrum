@@ -1,0 +1,16 @@
+{
+  "namespace": "org.naturrhythmuszentrum.docs.dataset.compute",
+  "version": [
+    1,
+    0,
+    0
+  ],
+  "owner": "NRZ",
+  "license": "CC0-1.0",
+  "sources": [
+    "data/inputs/compute/index.json"
+  ],
+  "labels": [],
+  "policy_adopted": false,
+  "runs": []
+}

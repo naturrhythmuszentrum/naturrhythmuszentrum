@@ -1,0 +1,62 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+{# requires compute v1 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Arithmetic observations · `spec:compute:arithmetic-observations`
+
+## Recorded evidence · `sec:compute:arithmetic-evidence`
+
+These records describe a machine under its recorded load. Sampling intervals express conditional sampling uncertainty, not numerical error or a hardware peak. They neither supply a correctness oracle nor calibrate the theoretical LC overhead reference (`rule:nrz:compute-design-authority`).
+
+{% if not compute.runs %}No admitted compute observations are available.
+{% if not compute.policy_adopted %}
+Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).{% endif %}{% else %}
+{% for run in compute.runs %}
+{% for case in run.summary.payload.cases %}
+{% if case.recipe.operation in ['Add', 'Multiply', 'FmaAddend', 'FmaMultiplicand', 'MultiplyAdd', 'Divide', 'SquareRoot'] %}
+**{{ run.entry.run_id }} / case {{ case.case_index }} / repetition {{ case.repetition }}**
+
+Recipe: {{ case.recipe.operation }}, {{ case.recipe.width }}, {{ case.recipe.dependency }}, scope {{ case.recipe.scope }}; shape {{ case.recipe.shape | join(" × ") }}; {{ case.recipe.workers }} worker(s), {{ case.recipe.placement }}. Machine: {{ run.entry.machine_alias }}. Independent seed: `{{ case.seed }}`. Accepted item length: {{ case.accepted_length }}.
+
+{% if case.arithmetic %}
+The coefficient cycle has {{ case.arithmetic.cycle }} updates, {{ case.arithmetic.state_bytes }} active seed/state bytes and {{ case.arithmetic.coefficient_bytes }} active coefficient-pair bytes per worker. Exact input bits are retained at `{{ case.arithmetic.exact_inputs.pointer }}` in raw artifact `{{ case.arithmetic.exact_inputs.raw.algorithm }}:{{ case.arithmetic.exact_inputs.raw.digest }}`. Compiler spills and physical register residency remain unverified.
+
+{% endif %}
+|Outcome|Attempted|Measured|Discarded|Rows|Source|
+|-------|---------|--------|---------|----|------|
+|{{ case.outcome.status }}|{{ case.counts.attempted }}|{{ case.counts.measured }}|{{ case.counts.discarded }}|{{ case.counts.rows }}|[Summary JSON](../../{{ run.entry.path }})|
+
+{% if case.outcome.status == "Complete" %}
+{% set analysis = case.outcome.value %}
+|Quantity|Point|Conditional lower|Conditional upper|Unit and numerator|
+|--------|-----|-----------------|-----------------|------------------|
+|Slope|{{ analysis.estimates[4].point }}|{{ analysis.estimates[4].lower }}|{{ analysis.estimates[4].upper }}|seconds per item; decimal quantum 10^{{ analysis.estimates[4].grid_power }} (positive exponent denotes scaled seconds)|
+|Item rate|{{ analysis.items_per_second.point }}|{{ analysis.items_per_second.lower if analysis.items_per_second.lower is not none else "Unavailable: NonpositiveTimeEndpoint" }}|{{ analysis.items_per_second.upper if analysis.items_per_second.upper is not none else "Unavailable: NonpositiveTimeEndpoint" }}|items/s; N={{ analysis.items_per_second.numerator }}|
+|Element rate|{{ analysis.elements_per_second.point }}|{{ analysis.elements_per_second.lower if analysis.elements_per_second.lower is not none else "Unavailable: NonpositiveTimeEndpoint" }}|{{ analysis.elements_per_second.upper if analysis.elements_per_second.upper is not none else "Unavailable: NonpositiveTimeEndpoint" }}|elements/s; N={{ analysis.elements_per_second.numerator }}|
+{% if analysis.floating_operations_per_second %}
+|Arithmetic rate|{{ analysis.floating_operations_per_second.point }}|{{ analysis.floating_operations_per_second.lower if analysis.floating_operations_per_second.lower is not none else "Unavailable: NonpositiveTimeEndpoint" }}|{{ analysis.floating_operations_per_second.upper if analysis.floating_operations_per_second.upper is not none else "Unavailable: NonpositiveTimeEndpoint" }}|operations/s; N={{ analysis.floating_operations_per_second.numerator }}|
+{% endif %}
+{% if analysis.logical_bytes_per_second %}
+|Logical traffic|{{ analysis.logical_bytes_per_second.point }}|{{ analysis.logical_bytes_per_second.lower if analysis.logical_bytes_per_second.lower is not none else "Unavailable: NonpositiveTimeEndpoint" }}|{{ analysis.logical_bytes_per_second.upper if analysis.logical_bytes_per_second.upper is not none else "Unavailable: NonpositiveTimeEndpoint" }}|logical bytes/s; N={{ analysis.logical_bytes_per_second.numerator }}|
+{% endif %}
+{% else %}
+Reason: {{ case.outcome.value }}. No complete estimate is available.
+{% endif %}
+
+{% if case.pilot %}
+Pilot status: {{ case.pilot.stop }}. Observed tick: {{ case.pilot.observed_tick_ns }} ns; declared resolution: {{ case.pilot.declared_resolution_ns }} ns. Control median: {{ case.pilot.control_median_seconds }} s; accepted-item median: {{ case.pilot.accepted_median_seconds }} s; target: {{ case.pilot.target_ns }} ns. Missing values mean unavailable evidence.
+
+{% endif %}
+{% if case.load_before and case.load_after %}
+Load capture offsets: {{ case.load_before.offset_ns }} and {{ case.load_after.offset_ns }} ns; method: {{ case.load_before.method }}. Allowed CPU evidence: {{ case.load_before.allowed_cpus.state }} / {{ case.load_after.allowed_cpus.state }}. Runnable-task evidence: {{ case.load_before.runnable_tasks.state }} / {{ case.load_after.runnable_tasks.state }}.
+{% else %}
+No paired load capture is available.
+{% endif %}
+
+Each record stands separately. Compare only matching recipes, scopes, shapes and load conditions after inspecting build and environment differences in the linked summaries; no records are pooled.
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+Raw reports are retained externally. A summary-only reader cannot verify an unseen raw digest, reconstruct chronology or independently reanalyze omitted observations. The admission receipt states the actual verification scope (`rule:nrz:compute-design-admission`).

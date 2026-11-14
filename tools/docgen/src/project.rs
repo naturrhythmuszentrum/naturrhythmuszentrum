@@ -66,12 +66,13 @@ pub(crate) fn derive(root: &Path, owners: &BTreeSet<String>) -> Result<(Vec<u8>,
         let entry = entry.map_err(|source| error::io(directory, source))?;
         if !matches!(
             entry.file_name().to_str(),
-            Some("project.toml" | "engineering.toml")
+            Some("project.toml" | "engineering.toml" | "compute")
         ) {
             return Err(Error::Payload {
                 path: format!("{directory}/{}", entry.file_name().to_string_lossy()),
-                detail: "only project.toml and engineering.toml are accepted in data/inputs"
-                    .to_owned(),
+                detail:
+                    "only project.toml, engineering.toml and compute are accepted in data/inputs"
+                        .to_owned(),
             });
         }
     }

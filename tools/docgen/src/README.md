@@ -4,7 +4,7 @@
 
 **Rule (Declared input layout)** · `rule:docgen:input-layout`
 
-The root Cargo manifest declares workspace members, the document manifest under `data/` declares rendered outputs, and the project input under `data/inputs/` supplies authored project metadata; generation reads those canonical sources and refuses alternate layouts rather than searching for substitutes.
+The root Cargo manifest declares workspace members, the document manifest under `data/` declares rendered outputs, and the project input under `data/inputs/` supplies authored project metadata; `data/inputs/` admits `project.toml`, `engineering.toml` and the compute admission directory. Compute uses `data/inputs/compute/index.json` and only its explicitly admitted summaries under `runs/`; missing byte policy refuses nonempty admission, and raw reports stay external. Generation reads those canonical sources and refuses alternate layouts rather than searching for substitutes.
 
 **Rule (Distinct artifact identities)** · `rule:docgen:dataset-identities`
 

@@ -75,6 +75,11 @@ fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
             "# {{ project.name }}\n",
         ),
     )?;
+    fs::create_dir_all(root.join("data/inputs/compute"))?;
+    fs::write(
+        root.join("data/inputs/compute/index.json"),
+        include_bytes!("../../../data/inputs/compute/index.json"),
+    )?;
     fs::write(
         root.join("data/inputs/engineering.toml"),
         include_str!("support/engineering.toml"),

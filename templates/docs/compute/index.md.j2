@@ -1,0 +1,21 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+{# requires compute v1 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Machine compute observations · `spec:compute:index-observations`
+
+## Recorded evidence · `sec:compute:index-evidence`
+
+These records describe a machine under its recorded load. Sampling intervals express conditional sampling uncertainty, not numerical error or a hardware peak. They neither supply a correctness oracle nor calibrate the theoretical LC overhead reference (`rule:nrz:compute-design-authority`).
+
+{% if not compute.runs %}No admitted compute observations are available.
+{% if not compute.policy_adopted %}
+Repository summary admission is disabled because the metadata and storage byte policy has not been adopted (`open:nrz:compute-admission-size-policy`).{% endif %}{% else %}
+|Run|Machine|Families|Summary|Raw content identity|Verification scope|
+|---|-------|--------|-------|--------------------|------------------|
+{% for run in compute.runs %}
+|{{ run.entry.run_id }}|{{ run.entry.machine_alias }}|{{ run.entry.families | join(", ") }}|[JSON](../../{{ run.entry.path }})|{{ run.entry.receipt.raw_blob }}|{{ run.entry.receipt.verification }}|
+{% endfor %}
+{% endif %}
+
+Raw reports are retained externally. A summary-only reader cannot verify an unseen raw digest, reconstruct chronology or independently reanalyze omitted observations. The admission receipt states the actual verification scope (`rule:nrz:compute-design-admission`).

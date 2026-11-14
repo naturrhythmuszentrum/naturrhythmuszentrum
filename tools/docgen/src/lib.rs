@@ -70,6 +70,8 @@ mod problem_schema;
 
 pub mod golden;
 
+pub mod compute;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
@@ -150,17 +152,20 @@ fn datasets(root: &Path, owners: &BTreeSet<String>) -> Result<DatasetGeneration,
     let (census_bytes, census_value) = census::derive(root)?;
     let (problems_bytes, problems_value) = problems::derive(root, owners)?;
     let (engineering_bytes, engineering_value) = engineering::derive(root, owners)?;
+    let (compute_bytes, compute_value) = compute::derive(root)?;
     let files = BTreeMap::from([
         (project::DATASET.to_owned(), project_bytes),
         (census::DATASET.to_owned(), census_bytes),
         (problems::DATASET.to_owned(), problems_bytes),
         (engineering::DATASET.to_owned(), engineering_bytes),
+        ("data/datasets/compute.json".to_owned(), compute_bytes),
     ]);
     let values = BTreeMap::from([
         ("project".to_owned(), project_value),
         ("census".to_owned(), census_value),
         ("problems".to_owned(), problems_value),
         ("engineering".to_owned(), engineering_value),
+        ("compute".to_owned(), compute_value),
     ]);
     Ok((files, values))
 }
@@ -183,6 +188,7 @@ fn dataset_path(name: &str) -> Option<&'static str> {
         "census" => Some(census::DATASET),
         "problems" => Some(problems::DATASET),
         "engineering" => Some(engineering::DATASET),
+        "compute" => Some("data/datasets/compute.json"),
         _ => None,
     }
 }
@@ -199,6 +205,7 @@ fn validate_dataset(
         "census" => census::validate_dataset(value, owners),
         "problems" => problems::validate_dataset(value, owners),
         "engineering" => engineering::validate_dataset(root, value, owners),
+        "compute" => compute::validate_dataset(root, value),
         _ => Err(Error::DatasetCompatibility {
             document: String::new(),
             dataset: name.to_owned(),

@@ -25,7 +25,7 @@ The table “Current LC capabilities by supported route” in `docs/design/lc-re
 
 The library functions `data`, `render` and `check` take a repository root. `Finding` and `Class` identify drift, while `Error` retains a path-bearing failure. The executable exposes the same three stages:
 
-- Inputs: edit `data/inputs/project.toml`, the files under `data/problems/`, and the workspace manifests that describe packages.
+- Inputs: edit `data/inputs/project.toml`, `data/inputs/engineering.toml`, the reviewed compute admission index and summaries under `data/inputs/compute/`, the files under `data/problems/`, and the workspace manifests that describe packages.
 - Data: derive `data/datasets/project.json`, `data/datasets/census.json`, and `data/datasets/problems.json` in stable order.
 - Render: evaluate `data/documents.toml` using `templates/{output}.j2` sources over their declared datasets.
 - Check: compare two in-memory generations with each other and with committed output.
