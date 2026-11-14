@@ -1220,3 +1220,7 @@ The existing test dependencies lower a checked expm1 basis to the scalar composi
 The shared dispatcher guard isolates a field-visiting subscriber that formats every span and event, counts each scalar input once and detects recursive basis metadata or exact Work during tanh evaluation (`test:integration:scalar-tanh-observation`).
 
 The independent truth oracle uses alternating expm1 sums away from zero. For 0<=x<=2^(-80), tanh(x)<=x and tanh'(x)=1-tanh(x)^2>=1-x^2 imply x-x^3/3<=tanh(x); hence x*(1-2^(-160))<=tanh(x)<=x. This test-side value bound avoids constructing extremely small powers beyond the existing exact component ceiling; it grants no native shortcut or derivative surface.
+
+## Raw benchmark boundary · `sec:matrix:raw-benchmark-boundary`
+
+The non-default `benchmark` feature exposes opaque owned binary64 kernels for explicit machine observations. Raw buffers are detached from engine descriptors, companions and certification; no certified region can be passed to these handles. The serial backend and consumed raw outputs do not create a Work ledger or numerical guarantee. Feature unification makes the surface available in a shared matrix build without changing certified execution paths.

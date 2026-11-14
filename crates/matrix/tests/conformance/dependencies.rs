@@ -13,7 +13,7 @@ struct Package {
     name: &'static str,
     /// Manifest path relative to the workspace root.
     manifest: &'static str,
-    /// Permitted normal edges; no package currently has a build edge.
+    /// Permitted normal edges.
     normal: &'static [&'static str],
     /// Permitted development edges, including independent oracle libraries.
     development: &'static [&'static str],
@@ -93,7 +93,7 @@ const PACKAGES: [Package; 7] = [
     },
 ];
 
-/// No workspace feature switches are currently admitted; all three public Cargo modes must agree.
+/// The opt-in raw matrix surface preserves the same direct edges in all three Cargo modes.
 const CONFIGURATIONS: [&[&str]; 3] = [&[], &["--no-default-features"], &["--all-features"]];
 
 /// No feature or test-only route may reverse the public engine dependency graph.
@@ -117,7 +117,10 @@ fn supported_feature_dependencies_match_the_public_graph() -> CheckResult {
 
 /// Check each edge kind separately, across every target and supported feature configuration.
 fn inspect(root: &Path, package: &Package) -> CheckResult {
-    manifest_policy(&std::fs::read_to_string(root.join(package.manifest))?)?;
+    manifest_policy(
+        &std::fs::read_to_string(root.join(package.manifest))?,
+        package.name == "nrz-matrix",
+    )?;
     for features in CONFIGURATIONS {
         for (kind, expected) in [
             ("normal", package.normal),
@@ -200,8 +203,8 @@ fn edges(output: &str, owner: &str, allowed: &[&str]) -> CheckResult {
     Ok(())
 }
 
-/// The current manifests admit no feature switches, optional edges or target-specific declarations.
-fn manifest_policy(manifest: &str) -> CheckResult {
+/// Only the named empty matrix feature is admitted; optional and target-specific edges remain forbidden.
+fn manifest_policy(manifest: &str, matrix_benchmark: bool) -> CheckResult {
     let mut section = String::new();
     for line in manifest.lines() {
         let content = line.split('#').next().ok_or("manifest line")?.trim();
@@ -216,8 +219,10 @@ fn manifest_policy(manifest: &str) -> CheckResult {
             section.contains("dependencies") && compact.contains("optional=true");
         let target_key = section.is_empty() && compact.starts_with("target=");
         let feature_key = section.is_empty() && compact.starts_with("features=");
-        let unsupported_features =
-            section == "features" || (feature_key && compact != "features={}");
+        let named_matrix_feature =
+            matrix_benchmark && matches!(compact.as_str(), "default=[]" | "benchmark=[]");
+        let unsupported_features = (section == "features" && !named_matrix_feature)
+            || (feature_key && compact != "features={}");
         if compact.starts_with('[') {
             section = compact.trim_matches(['[', ']']).replace(['\'', '"'], "");
             if section.starts_with("target.") || section == "target" {
@@ -239,7 +244,7 @@ fn negative_twins() -> CheckResult {
         "[dependencies]\nnrz-bindings = { path = '../bindings', optional = true }\n",
         "[target.'cfg(windows)'.dependencies]\nnrz-matrix = { path = '../matrix' }\n",
     ] {
-        if manifest_policy(manifest).is_ok() {
+        if manifest_policy(manifest, false).is_ok() {
             return Err("manifest policy accepted its negative twin".into());
         }
     }
@@ -253,7 +258,10 @@ fn negative_twins() -> CheckResult {
             return Err("edge policy accepted a forbidden resolved target".into());
         }
     }
-    manifest_policy("[features]\n# no feature switches\n[dependencies]\nthiserror = '2'\n")?;
+    manifest_policy(
+        "[features]\n# no feature switches\n[dependencies]\nthiserror = '2'\n",
+        false,
+    )?;
     edges(
         "nrz-scalar v0.1.0 (/workspace/scalar)\nthiserror v2.0.0 (*)\n",
         "nrz-scalar",

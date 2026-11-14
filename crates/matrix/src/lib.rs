@@ -49,6 +49,9 @@ pub use loan::*;
 
 pub mod sampling;
 
+#[cfg(feature = "benchmark")]
+pub mod benchmark;
+
 mod lc_relation;
 #[expect(
     clippy::redundant_pub_crate,

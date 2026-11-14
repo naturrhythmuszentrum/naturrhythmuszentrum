@@ -11,6 +11,10 @@ readme = "README.md"
 keywords = ["matrix", "numerics", "validation"]
 categories = ["mathematics", "science"]
 
+[features]
+default = []
+benchmark = []
+
 [dependencies]
 oorandom.workspace = true
 tracing.workspace = true
