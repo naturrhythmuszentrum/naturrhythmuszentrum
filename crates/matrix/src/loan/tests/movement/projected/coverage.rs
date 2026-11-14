@@ -135,6 +135,38 @@ fn terminal<P: Scalar + 'static>() -> TestResult {
             request.input.historical_reader(&mut account)?.coverage(),
             Coverage::DeclaredBounds
         );
+        terminal_square(&mut heap, &mut account, request.input)?;
     }
+    Ok(())
+}
+
+/// Chained arithmetic cannot turn caller assumptions into represented-input lineage.
+fn terminal_square<P: Scalar + 'static>(
+    heap: &mut crate::Heap,
+    account: &mut crate::ExecutionAccount,
+    input: crate::BundlePin<P>,
+) -> TestResult {
+    let mut request = super::super::arithmetic::square_request(heap, account, input)?;
+    request.destination.coverage = Coverage::DeclaredBounds;
+    let ticket = request.input.ticket()?;
+    let elements = heap.loans.elements()?;
+    crate::loan::fault::reset_reads();
+    let injection = crate::loan::fault::Injection::after(0);
+    let request = match heap.request_chained_pointwise_square(request, account) {
+        ApplicationRequest::ApplicationRefused(
+            ApplicationError::Loan(LoanError::CoverageMismatch),
+            request,
+        ) => request,
+        other => return Err(format!("{other:?}").into()),
+    };
+    assert_eq!(request.input.ticket()?, ticket);
+    assert_eq!(heap.loans.elements()?, elements);
+    assert_eq!(crate::loan::fault::reads(), 0);
+    assert_eq!(crate::loan::fault::Injection::attempts(), 0);
+    drop(injection);
+    assert_eq!(
+        request.input.historical_reader(account)?.coverage(),
+        Coverage::DeclaredBounds
+    );
     Ok(())
 }
