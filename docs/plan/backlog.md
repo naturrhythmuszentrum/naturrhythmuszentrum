@@ -173,3 +173,9 @@ Enforces (`rule:nrz:lc-closing-independent-review`) after every closing claim is
 **Step (Design number storage, identity and display contracts)** · `step:nrz:backlog-number-design`
 
 After (`spec:nrz:number-concept`), specify the number design and its acceptance evidence, resolving (`open:nrz:number-contract-owner`), (`open:nrz:number-docgen-check`), (`open:nrz:number-error-grid`), (`open:nrz:number-polar-certification`). Define owner boundaries, exact representations, quantity links, rounding and notation checks, equality authority and bounded refusals for docgen, compute and LC consumers. This design work is outside (`rule:nrz:backlog-lc-order`) and neither blocks nor closes an LC register claim; it changes no limits, defaults or pins.
+
+## Placement design outside LC closing · `sec:nrz:backlog-placement-design`
+
+**Step (Design heap placement and decision-node collection)** · `step:nrz:backlog-placement-design`
+
+After (`spec:nrz:placement-concept`), specify the placement model and acceptance evidence for logical/physical maps, padding ownership, original identities, companion coverage, version authentication and collection at decision nodes. Resolve the labelled questions in (`sec:nrz:placement-open`), especially ordinary publication, internal reductions and error/Work accumulation that currently lack a decision-node owner. Preserve existing contracts until their replacements are explicitly decided; no backward-compatibility requirement constrains the later design. This work is outside (`rule:nrz:backlog-lc-order`), neither closes nor adds a prerequisite to an LC claim, and changes no limits, defaults or pins.

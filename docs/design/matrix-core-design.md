@@ -523,3 +523,7 @@ Scalar identity readings of expanded families may enter native storage when ever
 **Decision (Raw benchmark surface)** · `dec:nrz:matrix-core-benchmark-surface`
 
 The matrix-owned `benchmark` Cargo feature is non-default and exposes opaque prepared binary64 GEMM, GEMV, partial-pivot LU factor and LU solve handles with checked shapes/strides, bounded scratch requirements, reset and execute operations. Cargo feature unification enables the surface wherever this matrix build is shared; it does not switch certified operations to raw execution. Handles accept owned raw buffers and return explicitly raw centers only, with no descriptor, companion, Work certificate or numerical guarantee. They neither alias certified regions nor accept certified handles; any conversion from certified storage must first detach guarantees through its owner's export boundary. This satisfies (`rule:vision:backend-boundaries`) without making faer public. The existing serial faer configuration is retained; expose a selected runtime backend path when available and otherwise report unknown. The compute consumer records this feature and the scope, restoration and serial-only contracts in (`dec:nrz:compute-design-matrix-boundary`) and (`def:nrz:compute-design-matrices`).
+
+**Argument (Placement concept relation)** · `arg:nrz:placement-from-matrix-core-design`
+
+Its slab, layout, relocation and multileg rules are placement cases inventoried by (`spec:nrz:placement-concept`). That concept records collection conflicts for a later design and does not replace the contracts here.

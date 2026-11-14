@@ -165,3 +165,7 @@ The graph walk runs leaves whose inputs are available. Barriers hold only their 
 **Decision (Observable cost and explained certification overhead)** · `dec:nrz:lc-stream-observable-evidence`
 
 The common pinned single-core release `f64` timing environment, both correctness formats, explicit claim scopes and all six route-scoped accounting proposals apply under (`req:nrz:lc-stream-acceptance-evidence`), (`dec:nrz:lc-grid-observable-evidence`). Host fill, dependency waits, barrier decisions, kernels and flush are measured separately so attribution explains latency and throughput. Certification cost must meet the theoretical-model, overhead-budget, tracking and measured-bound claims under (`rule:nrz:lc-grid-ratio-information`); their standing belongs to (`sec:nrz:lc-closing-certification-cost`). Coarse benchmark analysis directs further investigation under (`req:nrz:lc-stream-latency-evidence`), without an absolute latency gate or linear-scaling acceptance band.
+
+**Argument (Placement concept relation)** · `arg:nrz:placement-from-lc-streams`
+
+Its handback, windows, refinement and delivery rules supply the stream instances of (`spec:nrz:placement-concept`). That concept records collection conflicts for a later design and does not replace the contracts here.

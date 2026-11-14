@@ -301,3 +301,7 @@ requires = []
 [[document]]
 output = "docs/design/number-concept.md"
 requires = []
+
+[[document]]
+output = "docs/design/placement-concept.md"
+requires = []

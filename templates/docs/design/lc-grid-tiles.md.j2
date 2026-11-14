@@ -284,3 +284,7 @@ Execution walks runnable leaves without a scheduler. Each decision chooses any r
 **Decision (Observable costs and scoped evidence)** · `dec:nrz:lc-grid-observable-evidence`
 
 Acceptance uses one pinned single-core release `f64` timing environment, both supported formats for correctness, explicit capability/workload/claim scopes and all six route-scoped accounting requirements: coverage, exclusive receipts, construction/reuse events, claim scopes, joined decision attempts and reproducible fixtures (`req:nrz:lc-grid-accounting-coverage`), (`req:nrz:lc-grid-phase-receipts`), (`req:nrz:lc-grid-construction-events`), (`req:nrz:lc-grid-claim-scopes`), (`req:nrz:lc-grid-decision-attempts`), (`req:nrz:lc-grid-accounting-fixtures`). These expose where cost goes without confusing a cache hit with zero work. Certification overhead is modelled, predicted, tracked and bounded under (`rule:nrz:lc-grid-ratio-information`), with standing recorded in (`sec:nrz:lc-closing-certification-cost`). Coarse scaling analysis directs further study under (`req:nrz:lc-grid-fit`); no fitted exponent or linear-scaling band substitutes for actual billion-cell execution or explained component costs.
+
+**Argument (Placement concept relation)** · `arg:nrz:placement-from-lc-grid-tiles`
+
+Its heap passes and dependency-defined decision nodes supply the grid instances of (`spec:nrz:placement-concept`). That concept records collection conflicts for a later design and does not replace the contracts here.

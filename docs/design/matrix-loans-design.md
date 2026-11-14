@@ -945,3 +945,7 @@ Pi-dependent affine evaluation, sine and cosine retain their separate checked do
 **Rule (Later engine and numerical slices)** · `rule:nrz:matrix-loans-boundary`
 
 Lowered lambdas and their cache keys, numerical preludes and coefficient import, semantic barriers and membership decisions, the ready-leaf walk, graph-level flush, tile-size and branch-representation choice remain with (`spec:nrz:tiles-streams-design`). This design supplies their ownership, local absence, retention, application and residence interfaces without implementing their scheduling or changing their contracts. Transcendental schedules, their proof/rounding/target evidence and LC kernels remain separate consumers under (`spec:nrz:enclosed-transcendental-plans-design`). The first implementation subset does not admit arbitrary contraction/stencil incidence, statistical propagation, transport concurrency or a new endpoint conversion merely because the ownership mechanism can store their components. Those capabilities require their already specified checked laws and evidence; none is inferred from a mask, an allocation or successful handback.
+
+**Argument (Placement concept relation)** · `arg:nrz:placement-from-matrix-loans-design`
+
+Its mapped storage, padding refusals, complete movement and publication rules are placement cases inventoried by (`spec:nrz:placement-concept`). That concept records collection conflicts for a later design and does not replace the contracts here.

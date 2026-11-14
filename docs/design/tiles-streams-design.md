@@ -456,3 +456,7 @@ Owners must name their supported family origin/membership recipes and shape/layo
 **Criterion (A slice proves its named capability)** · `crit:nrz:tiles-streams-acceptance`
 
 Each implementation slice supplies the owner capability and acceptance evidence linked above, preserving existing limits/defaults/pins and all original semantic obligations. It states its supported questions, ordered quantifiers, recipes, workloads, lifecycle operations and claim scopes under (`rule:nrz:lc-grid-acceptance-scope`). A green cache microfixture does not prove arbitrary family membership, a valid mask does not prove its cut, and a steady kernel benchmark does not include unreported barrier or delivery work. Acceptance requires complete attributed costs, independent semantic/mutation controls, bounded residence, current live attachments and honest flush completion. An LC instantiation supplies the projection and decision laws required by these contracts. LC prerequisite and integrated delivery standing belong to (`sec:nrz:lc-closing-register`); the worked examples above specify required behavior and supply no execution or scale result.
+
+**Argument (Placement concept relation)** · `arg:nrz:placement-from-tiles-streams-design`
+
+Its tile, mask, ownership and dependency-defined decision rules are placement cases inventoried by (`spec:nrz:placement-concept`). That concept records collection conflicts for a later design and does not replace the contracts here.

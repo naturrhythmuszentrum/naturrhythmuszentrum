@@ -193,3 +193,7 @@ Which counters report A,M,F,D,S, comparisons, vector occupancy, floor/reduction 
 **Decision (Formal design disposition)** · `dec:nrz:lc-compute-design-disposition`
 
 The accounting resolutions are (`dec:nrz:lc-overhead-concept-resolution`), the measurement and acceptance contract is (`sec:nrz:lc-overhead-acceptance`), and retained source and fused-time decisions are (`open:nrz:lc-overhead-machine-decision`), (`open:nrz:lc-overhead-fused-attribution`). These dispositions preserve the questions above as the provenance of their obligations, not additional unresolved copies.
+
+**Argument (Placement concept relation)** · `arg:nrz:placement-from-lc-compute-concept`
+
+Its useful-cell, mask and companion byte counts acquire explicit physical-capacity terms in (`spec:nrz:placement-concept`). That concept records collection conflicts for a later design and does not replace the contracts here.
