@@ -51,10 +51,10 @@ impl PointwiseBinaryOperation {
         clippy::too_many_arguments,
         reason = "the original ordered correspondence is checked together"
     )]
-    pub fn check(
+    pub fn check<P: nrz_scalar::Scalar + 'static>(
         inputs: [RegionContract; 2],
         output: RegionContract,
-        sources: [&BundlePin<f64>; 2],
+        sources: [&BundlePin<P>; 2],
         destination: BindingSymbols,
         axis: CellAxis,
         function: BinaryElementwise,
@@ -80,10 +80,10 @@ impl PointwiseBinaryOperation {
         clippy::too_many_arguments,
         reason = "ordered original regions, product and demand are checked together"
     )]
-    pub fn check_cartesian(
+    pub fn check_cartesian<P: nrz_scalar::Scalar + 'static>(
         inputs: [RegionContract; 2],
         output: RegionContract,
-        sources: [&BundlePin<f64>; 2],
+        sources: [&BundlePin<P>; 2],
         destination: BindingSymbols,
         product: crate::CellProduct,
         demand: crate::CellLayoutVersion,
@@ -121,10 +121,10 @@ impl PointwiseBinaryOperation {
         clippy::too_many_arguments,
         reason = "the original ordered correspondence is checked together"
     )]
-    fn build(
+    fn build<P: nrz_scalar::Scalar + 'static>(
         inputs: [RegionContract; 2],
         output: RegionContract,
-        sources: [&BundlePin<f64>; 2],
+        sources: [&BundlePin<P>; 2],
         destination: BindingSymbols,
         geometry: Geometry,
         function: BinaryElementwise,
@@ -195,15 +195,15 @@ impl PointwiseBinaryOperation {
 
 /// Both owning pins return unchanged if admission refuses.
 #[derive(Debug)]
-pub struct PointwiseBinaryRequest {
+pub struct PointwiseBinaryRequest<P: nrz_scalar::Scalar> {
     /// Checked original operation and exact ordered captures.
     pub operation: PointwiseBinaryOperation,
     /// Left source pin, matching the first original operand.
-    pub left: BundlePin<f64>,
+    pub left: BundlePin<P>,
     /// Right source pin, matching the second original operand.
-    pub right: BundlePin<f64>,
+    pub right: BundlePin<P>,
     /// Fresh three-reading destination on the checked result axis.
-    pub destination: HostTileDeclaration<f64>,
+    pub destination: HostTileDeclaration<P>,
     /// Ordinary demand on the output-sized operand's layout; Left when both extents match.
     pub demand: MaskVersion,
     /// Two-slot original application invocation and payload ceilings.
@@ -216,27 +216,27 @@ pub struct PointwiseBinaryRequest {
     clippy::large_enum_variant,
     reason = "refusal preserves both original pins without another allocation"
 )]
-pub enum BinaryApplicationRequest {
+pub enum BinaryApplicationRequest<P: nrz_scalar::Scalar> {
     /// Common detached evaluation and publication capability.
-    ApplicationReady(super::OwnedApplication<f64>),
+    ApplicationReady(super::OwnedApplication<P>),
     /// Original request and both still-owning pins.
-    ApplicationRefused(ApplicationError, PointwiseBinaryRequest),
+    ApplicationRefused(ApplicationError, PointwiseBinaryRequest<P>),
 }
 impl Heap {
     /// Apply cartesian product through the common masked application mechanism.
-    pub fn request_pointwise_product(
+    pub fn request_pointwise_product<P: nrz_scalar::Scalar + 'static>(
         &mut self,
-        request: PointwiseBinaryRequest,
+        request: PointwiseBinaryRequest<P>,
         account: &mut ExecutionAccount,
-    ) -> BinaryApplicationRequest {
+    ) -> BinaryApplicationRequest<P> {
         super::admission::request_binary(self, request, BinaryElementwise::Product, account)
     }
     /// Apply direct ordered quotient through the common masked application mechanism.
-    pub fn request_pointwise_quotient(
+    pub fn request_pointwise_quotient<P: nrz_scalar::Scalar + 'static>(
         &mut self,
-        request: PointwiseBinaryRequest,
+        request: PointwiseBinaryRequest<P>,
         account: &mut ExecutionAccount,
-    ) -> BinaryApplicationRequest {
+    ) -> BinaryApplicationRequest<P> {
         super::admission::request_binary(self, request, BinaryElementwise::Quotient, account)
     }
 }
@@ -283,7 +283,7 @@ impl Auxiliary {
         }
     }
     /// Extract the transferred right edge only at the final no-fail publication boundary.
-    pub(super) fn take_pin(&mut self) -> Option<BundlePin<f64>> {
+    pub(super) fn take_pin(&mut self) -> Option<crate::loan::reader::RecordPin> {
         match self {
             Self::Binary(side) => side.input.take(),
             Self::Absent | Self::Movement { .. } | Self::Endpoints(_) => None,
@@ -303,13 +303,15 @@ pub(in crate::loan) struct Side {
     /// Independently authenticated right filled roles.
     pub(super) attachments: [Option<QualifiedMaskVersion>; 3],
     /// Transferred right edge, empty in every immutable published seal.
-    pub(super) input: Option<BundlePin<f64>>,
+    pub(super) input: Option<crate::loan::reader::RecordPin>,
     /// Sole allocation debit for this box.
     pub(in crate::loan) token: Token,
 }
 
 /// Borrowing a source cannot manufacture another pin.
-pub(super) fn bundle(pin: &BundlePin<f64>) -> Result<&crate::loan::registry::Bundle, LoanError> {
+pub(super) fn bundle<P: nrz_scalar::Scalar>(
+    pin: &BundlePin<P>,
+) -> Result<&crate::loan::registry::Bundle, LoanError> {
     pin.record
         .payload
         .as_ref()

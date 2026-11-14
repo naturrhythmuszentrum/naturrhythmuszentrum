@@ -9,7 +9,7 @@ use crate::{
 use nrz_bindings::Budget;
 
 /// Prepopulate spare tables through a cancelled real application while retaining both source owners.
-fn prepared(cells: usize) -> TestResult<(crate::Heap, crate::PointwiseBinaryRequest)> {
+fn prepared(cells: usize) -> TestResult<(crate::Heap, crate::PointwiseBinaryRequest<f64>)> {
     let mut setup = fixture(
         cells,
         1,

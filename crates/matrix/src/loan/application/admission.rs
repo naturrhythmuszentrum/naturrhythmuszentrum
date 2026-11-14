@@ -129,12 +129,12 @@ pub(super) fn request_expm1(
     }
 }
 /// Both pins move only after the same complete private preparation as unary members.
-pub(super) fn request_binary(
+pub(super) fn request_binary<P: Scalar + 'static>(
     heap: &mut Heap,
-    request: super::PointwiseBinaryRequest,
+    request: super::PointwiseBinaryRequest<P>,
     expected: crate::BinaryElementwise,
     account: &mut ExecutionAccount,
-) -> super::BinaryApplicationRequest {
+) -> super::BinaryApplicationRequest<P> {
     let checked =
         account
             .ledger
@@ -161,7 +161,7 @@ pub(super) fn request_binary(
                     request,
                 );
             };
-            side.input = Some(request.right);
+            side.input = Some(crate::loan::reader::RecordPin::from_typed(request.right));
             prepared.core.input = Some(request.left);
             super::BinaryApplicationRequest::ApplicationReady(install(heap, prepared))
         }

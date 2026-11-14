@@ -181,7 +181,7 @@ fn numerical_case(centers: [f64; 2], radii: [f64; 2]) -> TestResult<bool> {
         mut heap,
         mut account,
         request,
-    } = binary::custom(
+    } = binary::custom::<f64>(
         1,
         1,
         [3; 2],

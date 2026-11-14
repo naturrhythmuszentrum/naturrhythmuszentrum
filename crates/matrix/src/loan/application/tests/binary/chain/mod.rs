@@ -39,7 +39,7 @@ fn product(
         mut heap,
         mut account,
         request,
-    } = super::custom(
+    } = super::custom::<f64>(
         cells,
         components,
         [1; 2],
@@ -57,13 +57,13 @@ fn product(
 }
 
 /// Fresh independent symbols and the existing original operation bind the immediate operand.
-fn request(
+fn request<P: nrz_scalar::Scalar + 'static>(
     heap: &mut Heap,
-    input: BundlePin<f64>,
+    input: BundlePin<P>,
     function: Elementwise,
     selection: usize,
     account: &mut ExecutionAccount,
-) -> TestResult<PointwiseRequest<f64>> {
+) -> TestResult<PointwiseRequest<P>> {
     let bundle = input
         .record
         .payload

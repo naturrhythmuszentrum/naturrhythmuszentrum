@@ -208,7 +208,7 @@ fn chain_same_valued_same_shaped_operand_substitution_refuses() -> TestResult {
         mut heap,
         mut account,
         request: original,
-    } = super::super::custom(
+    } = super::super::custom::<f64>(
         1,
         1,
         [1; 2],
@@ -285,5 +285,63 @@ fn chain_unrelated_legacy_relocation_keeps_current_lineage() -> TestResult {
     assert_eq!(owner.core.input.as_ref().ok_or("input")?.ticket()?, ticket);
     let owner = super::candidate(owner, &mut account)?;
     let _tile = super::published(heap.publish_application(owner, &mut account))?;
+    Ok(())
+}
+
+/// A native binary32 binary result remains readable but cannot supply a chained Square.
+/// ´test:unit:loan-binary32-binary-chain-refusal´
+#[test]
+fn loan_binary32_binary_chain_refusal() -> TestResult {
+    use crate::loan::fault;
+    use std::rc::Rc;
+    let mut setup = super::super::custom::<f32>(
+        1,
+        1,
+        [2; 2],
+        2,
+        false,
+        crate::BinaryElementwise::Product,
+        Limits::default(),
+        |operand, _, _| (if operand == 0 { 2.0 } else { 3.0 }, 0.0),
+    )?;
+    let owner = super::super::ready(
+        setup
+            .heap
+            .request_pointwise_product(setup.request, &mut setup.account),
+    )?;
+    let owner = super::candidate(owner, &mut setup.account)?;
+    let (tile, _) = super::published(setup.heap.publish_application(owner, &mut setup.account))?;
+    let request = make_request(
+        &mut setup.heap,
+        tile.into_pin(),
+        Elementwise::Square,
+        2,
+        &mut setup.account,
+    )?;
+    let pointer = Rc::as_ptr(&request.input.record);
+    let ticket = request.input.ticket()?;
+    fault::reset_reads();
+    let injection = fault::Injection::after(0);
+    let request = match setup
+        .heap
+        .request_chained_pointwise_square(request, &mut setup.account)
+    {
+        ApplicationRequest::ApplicationRefused(
+            ApplicationError::Loan(LoanError::UnsupportedContract),
+            request,
+        ) => request,
+        other => return Err(format!("{other:?}").into()),
+    };
+    assert_eq!(Rc::as_ptr(&request.input.record), pointer);
+    assert_eq!(request.input.ticket()?, ticket);
+    assert_eq!([fault::reads(), fault::Injection::attempts()], [0; 2]);
+    drop(injection);
+    assert_eq!(
+        request
+            .input
+            .historical_reader(&mut setup.account)?
+            .read_component(crate::HostChannel::Center, 0, 0, &mut setup.account,)?,
+        6.0
+    );
     Ok(())
 }

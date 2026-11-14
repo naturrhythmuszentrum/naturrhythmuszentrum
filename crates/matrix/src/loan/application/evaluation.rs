@@ -157,7 +157,7 @@ fn validate<'a, P: Scalar + 'static>(
     charge(budget, seals)?;
     input.checked_reader()?;
     if let Some(side) = core.evidence.endpoint_tokens.binary() {
-        side.validate_pin(core.host.identity.account)?;
+        side.validate_pin::<P>(core.host.identity.account)?;
     }
     Ok((member, seals))
 }
@@ -189,7 +189,7 @@ fn run<P: Scalar + 'static>(
     let side = core.evidence.endpoint_tokens.binary();
     let right = side
         .and_then(|side| side.input.as_ref())
-        .and_then(|pin| pin.checked_reader().ok());
+        .and_then(|pin| pin.checked_reader::<P>().ok());
     let right_copy = copy::bind(right.as_ref(), member.cartesian().is_some())?;
     let product = member.cartesian();
     for word_index in 0..core.filled.len() {

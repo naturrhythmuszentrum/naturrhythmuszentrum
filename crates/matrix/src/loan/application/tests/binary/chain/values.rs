@@ -39,7 +39,7 @@ fn quotient_reciprocal_quarter() -> TestResult {
         mut heap,
         mut account,
         request,
-    } = binary::custom(
+    } = binary::custom::<f64>(
         1,
         1,
         [2; 2],
@@ -84,7 +84,7 @@ fn edge(
         mut heap,
         mut account,
         request,
-    } = binary::custom(
+    } = binary::custom::<f64>(
         cells,
         components,
         [1; 2],

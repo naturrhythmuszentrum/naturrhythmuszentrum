@@ -17,7 +17,7 @@ fn binary_aggregate_elements_real_neighbours_and_zero_capacity() -> TestResult {
             }
             let required = 5 * cells;
             let heap = Heap::new(HeapLimits::new(4096, required - usize::from(short), 4096))?;
-            let mut setup = super::fixture::with_heap(
+            let mut setup = super::fixture::with_heap::<f64>(
                 cells,
                 1,
                 [1; 2],
@@ -184,7 +184,7 @@ fn binary_descriptor_and_native_slot_neighbours() -> TestResult {
         for short in [false, true] {
             let required = if table == 0 { 5 } else { 8 };
             let heap = Heap::new(HeapLimits::new(required - usize::from(short), 4096, 4096))?;
-            let mut setup = super::fixture::with_heap(
+            let mut setup = super::fixture::with_heap::<f64>(
                 1,
                 1,
                 [1; 2],
@@ -254,7 +254,7 @@ fn binary_descriptor_and_native_slot_neighbours() -> TestResult {
 fn binary_managed_pins_survive_legacy_relocation_with_aggregate_ceiling() -> TestResult {
     for short in [false, true] {
         let heap = Heap::new(HeapLimits::new(4096, 7 - usize::from(short), 4096))?;
-        let mut setup = super::fixture::with_heap(
+        let mut setup = super::fixture::with_heap::<f64>(
             1,
             1,
             [1; 2],

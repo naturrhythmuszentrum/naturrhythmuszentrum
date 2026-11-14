@@ -144,7 +144,7 @@ impl<'a, P: Scalar + 'static> BoundCopy<'a, P> {
 pub(super) fn binary<P: Scalar + 'static>(
     member: super::Member<'_>,
     left: &BoundCopy<'_, P>,
-    right: &BoundCopy<'_, f64>,
+    right: &BoundCopy<'_, P>,
     cells: [usize; 2],
     component: usize,
     entry: usize,
@@ -160,13 +160,13 @@ pub(super) fn binary<P: Scalar + 'static>(
         .pair(cells[1], component, permit)
         .map_err(|_| member.storage_failure(component))?;
     crate::kernels::binary::evaluate_selected(
-        [left[0].to_f64(), right[0]],
-        [left[1].to_f64(), right[1]],
+        [left[0], right[0]],
+        [left[1], right[1]],
         function,
         entry,
         &permit.context,
     )
-    .map(|value| super::selected::Values::Binary([value.center, value.total, value.error]))
+    .map(|value| super::selected::Values::Closed([value.center, value.total, value.error]))
     .map_err(|reason| super::CellOutcome::CellRefused { component, reason })
 }
 

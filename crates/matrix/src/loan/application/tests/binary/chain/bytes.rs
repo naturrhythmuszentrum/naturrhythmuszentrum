@@ -158,7 +158,7 @@ fn canonical_staged(cells: usize, reciprocal: bool, required: u64, short: bool) 
         mut heap,
         mut account,
         request: original,
-    } = super::super::custom(
+    } = super::super::custom::<f64>(
         cells,
         1,
         [1; 2],

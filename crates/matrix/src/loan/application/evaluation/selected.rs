@@ -13,8 +13,6 @@ use nrz_scalar::{Expm1Failure, Expm1Input, Scalar};
 pub(in crate::loan::application) enum Values<P: Scalar> {
     /// Center, total and numerical error in the closed primitive format.
     Closed([P; 3]),
-    /// Binary members store exactly three binary64 readings.
-    Binary([f64; 3]),
     /// Three readings and Lower/Upper in the prepared binary64 format.
     Prepared([f64; 5]),
 }
@@ -26,8 +24,8 @@ impl Member<'_> {
             | Self::ProjectedElementwise(..)
             | Self::Square(_)
             | Self::Reciprocal(_)
-            | Self::SquareRoot(_) => Values::Closed([P::ZERO; 3]),
-            Self::Binary(..) => Values::Binary([0.0; 3]),
+            | Self::SquareRoot(_)
+            | Self::Binary(..) => Values::Closed([P::ZERO; 3]),
             Self::PreparedExpm1(..) => Values::Prepared([0.0; 5]),
         }
     }
@@ -39,7 +37,7 @@ impl Member<'_> {
     pub(in crate::loan::application) fn scalar<P: Scalar + 'static>(
         self,
         reader: Option<&crate::TileReader<'_, P>>,
-        right: Option<&crate::TileReader<'_, f64>>,
+        right: Option<&crate::TileReader<'_, P>>,
         right_bounded: bool,
         law: Option<&crate::loan::retained_expm1::Attachment>,
         bounded: bool,
@@ -94,7 +92,7 @@ impl Member<'_> {
                 entry,
                 permit,
             )
-            .map(|value| Values::Binary([value.center, value.total, value.error]))
+            .map(|value| Values::Closed([value.center, value.total, value.error]))
             .map_err(|reason| CellOutcome::CellRefused { component, reason }),
             Self::PreparedExpm1(_, operation) => {
                 prepared(reader, law, operation, cell, component, permit)
@@ -184,7 +182,6 @@ impl<P: Scalar + 'static> Values<P> {
             .chain(endpoints.iter_mut().flatten());
         match self {
             Self::Closed(values) => store(owners, values, entry),
-            Self::Binary(values) => store(owners, values, entry),
             Self::Prepared(values) => store(owners, values, entry),
         }
     }
@@ -211,14 +208,14 @@ fn store<'a, P: Scalar + 'static>(
 )]
 fn binary<P: Scalar + 'static>(
     left: Option<&crate::TileReader<'_, P>>,
-    right: Option<&crate::TileReader<'_, f64>>,
+    right: Option<&crate::TileReader<'_, P>>,
     bounded: [bool; 2],
     cells: [usize; 2],
     component: usize,
     function: crate::BinaryElementwise,
     entry: usize,
     permit: &Traversal,
-) -> Result<crate::kernels::arithmetic::Entry<f64>, crate::KernelError> {
+) -> Result<crate::kernels::arithmetic::Entry<P>, crate::KernelError> {
     let left = left.ok_or(crate::KernelError::Contract)?;
     let right = right.ok_or(crate::KernelError::Contract)?;
     let (left_cell, left_component) =
@@ -247,21 +244,19 @@ fn binary<P: Scalar + 'static>(
     authenticate().map_err(|_| crate::KernelError::Contract)?;
     let values = || -> Result<_, LoanError> {
         let centers = [
-            left.read_prepaid(HostChannel::Center, left_cell, left_component, permit)?
-                .to_f64(),
+            left.read_prepaid(HostChannel::Center, left_cell, left_component, permit)?,
             right.read_prepaid(HostChannel::Center, right_cell, right_component, permit)?,
         ];
         let radii = [
             if bounded[0] {
                 left.read_prepaid(HostChannel::Total, left_cell, left_component, permit)?
-                    .to_f64()
             } else {
-                0.0
+                P::ZERO
             },
             if bounded[1] {
                 right.read_prepaid(HostChannel::Total, right_cell, right_component, permit)?
             } else {
-                0.0
+                P::ZERO
             },
         ];
         Ok((centers, radii))

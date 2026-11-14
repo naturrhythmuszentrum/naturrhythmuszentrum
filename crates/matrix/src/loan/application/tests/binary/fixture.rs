@@ -42,7 +42,7 @@ pub(super) fn fixture(
     clippy::too_many_arguments,
     reason = "the exact fixture controls geometry, limits and payload independently"
 )]
-pub(super) fn custom(
+pub(super) fn custom<P: nrz_scalar::Scalar + 'static>(
     cells: usize,
     components: usize,
     roles: [usize; 2],
@@ -51,7 +51,7 @@ pub(super) fn custom(
     function: BinaryElementwise,
     limits: Limits,
     values: impl Fn(usize, usize, usize) -> (f64, f64),
-) -> TestResult<Fixture> {
+) -> TestResult<Fixture<P>> {
     with_heap(
         cells,
         components,
@@ -70,7 +70,7 @@ pub(super) fn custom(
     clippy::too_many_arguments,
     reason = "fixture geometry and permanent resource policy are independent"
 )]
-pub(super) fn with_heap(
+pub(super) fn with_heap<P: nrz_scalar::Scalar + 'static>(
     cells: usize,
     components: usize,
     roles: [usize; 2],
@@ -80,7 +80,7 @@ pub(super) fn with_heap(
     limits: Limits,
     mut heap: Heap,
     values: impl Fn(usize, usize, usize) -> (f64, f64),
-) -> TestResult<Fixture> {
+) -> TestResult<Fixture<P>> {
     let mut account = ExecutionAccount::new(Budget::new(limits)?)?;
     account.ledger.work(3, crate::loan::AT)?;
     let shape = [u32::try_from(cells)?, u32::try_from(components)?];
@@ -126,7 +126,7 @@ pub(super) fn with_heap(
                             HostChannel::ALL[role],
                             cell,
                             component,
-                            value,
+                            super::native::<P>(value),
                             &mut account,
                         )?;
                     }

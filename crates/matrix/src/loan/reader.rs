@@ -63,6 +63,70 @@ impl<P: Scalar> std::fmt::Debug for TileReader<'_, P> {
             .finish_non_exhaustive()
     }
 }
+/// One format-erased right use edge; typed reading rechecks the captured native format.
+#[derive(Debug)]
+pub(super) struct RecordPin {
+    /// The same prepaid pin record, moved without cloning or acquiring another edge.
+    pub(super) record: Rc<PinRecord>,
+}
+impl RecordPin {
+    /// Erase only the zero-sized marker after complete request admission.
+    pub(super) fn from_typed<P: Scalar>(pin: BundlePin<P>) -> Self {
+        Self { record: pin.record }
+    }
+    /// Retained right reads require the requested native scalar format.
+    pub(super) fn checked_reader<P: Scalar + 'static>(
+        &self,
+    ) -> Result<TileReader<'_, P>, LoanError> {
+        checked_record_reader(&self.record)
+    }
+    /// Original occupation remains independently authenticated after type erasure.
+    pub(super) fn ticket(&self) -> Result<LoanTicket, LoanError> {
+        record_ticket(&self.record)
+    }
+}
+/// Typed and erased pins derive the same locator from their retained bundle.
+fn record_ticket(record: &PinRecord) -> Result<LoanTicket, LoanError> {
+    Ok(LoanTicket {
+        identity: record
+            .payload
+            .as_ref()
+            .and_then(|pin| pin.bundle.payload.as_ref())
+            .ok_or(LoanError::WrongLoan)?
+            .identity,
+    })
+}
+/// Check the immutable origin before borrowing its native component map.
+fn checked_record_reader<P: Scalar + 'static>(
+    record: &Rc<PinRecord>,
+) -> Result<TileReader<'_, P>, LoanError> {
+    let pin = record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+    let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+    if bundle.origin.evidence.is_some() || bundle.endpoints.is_some() {
+        bundle.origin.validate_current(bundle)?;
+    }
+    layout_record_reader(record)
+}
+/// Current occupation authentication already checked the immutable origin in its own visit.
+fn layout_record_reader<P: Scalar + 'static>(
+    record: &Rc<PinRecord>,
+) -> Result<TileReader<'_, P>, LoanError> {
+    let pin = record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+    let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+    let layout_matches = bundle.layout.axis == bundle.declaration.axis
+        && bundle.layout.components.extent() == bundle.declaration.extent;
+    if !layout_matches || bundle.mask.layout != bundle.identity.layout {
+        return Err(LoanError::LayoutMismatch);
+    }
+    if bundle.identity.format != crate::storage::Format::of::<P>() {
+        return Err(LoanError::LayoutMismatch);
+    }
+    Ok(TileReader {
+        bundle,
+        account: pin.account,
+        marker: PhantomData,
+    })
+}
 impl<P: Scalar + 'static> BundlePin<P> {
     /// Exact historical selected access, independent of current semantic availability.
     /// # Errors
@@ -108,44 +172,17 @@ impl<P: Scalar + 'static> BundlePin<P> {
     }
     /// Private layout checks borrow the complete owner after its charged law authentication.
     pub(super) fn checked_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
-        let pin = self.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
-        let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
-        if bundle.origin.evidence.is_some() || bundle.endpoints.is_some() {
-            bundle.origin.validate_current(bundle)?;
-        }
-        self.layout_reader()
+        checked_record_reader(&self.record)
     }
-    /// Current occupation authentication already checked the immutable origin in its own visit.
+    /// Current occupation authentication already checked this immutable owner.
     fn layout_reader(&self) -> Result<TileReader<'_, P>, LoanError> {
-        let pin = self.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
-        let bundle = pin.bundle.payload.as_ref().ok_or(LoanError::WrongLoan)?;
-        let layout_matches = bundle.layout.axis == bundle.declaration.axis
-            && bundle.layout.components.extent() == bundle.declaration.extent;
-        if !layout_matches || bundle.mask.layout != bundle.identity.layout {
-            return Err(LoanError::LayoutMismatch);
-        }
-        if bundle.identity.format != crate::storage::Format::of::<P>() {
-            return Err(LoanError::LayoutMismatch);
-        }
-        Ok(TileReader {
-            bundle,
-            account: pin.account,
-            marker: PhantomData,
-        })
+        layout_record_reader(&self.record)
     }
     /// Diagnostic locator carries no additional numerical use edge.
     /// # Errors
     /// Refuses an incomplete internal publication shell.
     pub fn ticket(&self) -> Result<LoanTicket, LoanError> {
-        Ok(LoanTicket {
-            identity: self
-                .record
-                .payload
-                .as_ref()
-                .and_then(|pin| pin.bundle.payload.as_ref())
-                .ok_or(LoanError::WrongLoan)?
-                .identity,
-        })
+        record_ticket(&self.record)
     }
 }
 impl<P: Scalar + 'static> PublishedTile<P> {
@@ -318,8 +355,16 @@ impl Heap {
         pin: &BundlePin<P>,
         budget: &mut nrz_bindings::Budget,
     ) -> Result<(), LoanError> {
+        self.current_record(&pin.record, budget)
+    }
+    /// Typed and erased pins share the exact current-occupation and registry-index checks.
+    pub(super) fn current_record(
+        &self,
+        record: &Rc<PinRecord>,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<(), LoanError> {
         charge(budget, 1)?;
-        let ticket = pin.ticket()?;
+        let ticket = record_ticket(record)?;
         if ticket.identity.scope != self.scope {
             return Err(LoanError::ForeignOwner);
         }
@@ -328,7 +373,7 @@ impl Heap {
         let State::Published(owner) = &group.state else {
             return Err(LoanError::StaleDependency);
         };
-        let payload = pin.record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
+        let payload = record.payload.as_ref().ok_or(LoanError::WrongLoan)?;
         if !Rc::ptr_eq(owner, &payload.bundle) {
             return Err(LoanError::StaleDependency);
         }
@@ -343,7 +388,7 @@ impl Heap {
                     && entry
                         .witness
                         .as_ref()
-                        .is_some_and(|witness| witness.ptr_eq(&Rc::downgrade(&pin.record)))
+                        .is_some_and(|witness| witness.ptr_eq(&Rc::downgrade(record)))
             });
         if !indexed || payload.identity != payload.token.key {
             return Err(LoanError::WrongLoan);

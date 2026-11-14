@@ -19,9 +19,7 @@ pub(super) fn source(
     axis: crate::CellAxis,
     extent: crate::Extent,
 ) -> Result<(), LoanError> {
-    if bundle.origin.evidence.is_some()
-        || bundle.identity.format != crate::storage::Format::Binary64
-    {
+    if bundle.origin.evidence.is_some() {
         return Err(LoanError::UnsupportedContract);
     }
     if bundle.declaration.coverage != crate::Coverage::RepresentedInputs {
@@ -59,9 +57,6 @@ pub(in crate::loan::application) fn check_request<P: Scalar + 'static>(
     heap.current_bundle(request.input, budget)?;
     heap.current_bundle(right, budget)?;
     let member = request.member()?;
-    if crate::storage::Format::of::<P>() != crate::storage::Format::Binary64 {
-        return Err(LoanError::UnsupportedContract.into());
-    }
     let extent = request.destination.extent;
     let law = member.law();
     let inputs = [left.declaration.extent, right_bundle.declaration.extent];
@@ -209,7 +204,10 @@ impl Side {
         Ok(())
     }
     /// Both live pin identity and selected-reader authentication precede any numerical load.
-    pub(in crate::loan::application) fn validate_pin(&self, account: u64) -> Result<(), LoanError> {
+    pub(in crate::loan::application) fn validate_pin<P: Scalar + 'static>(
+        &self,
+        account: u64,
+    ) -> Result<(), LoanError> {
         let input = self.input.as_ref().ok_or(LoanError::WrongLoan)?;
         if input.ticket()?.identity != self.identity
             || input
@@ -222,7 +220,7 @@ impl Side {
         {
             return Err(LoanError::WrongLoan);
         }
-        input.checked_reader()?;
+        input.checked_reader::<P>()?;
         Ok(())
     }
 }

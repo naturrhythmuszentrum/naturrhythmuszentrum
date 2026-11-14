@@ -12,15 +12,15 @@ use crate::{
 };
 
 /// Replace the ordinary right fixture with an independently declared scalar of configurable shape.
-fn setup(
+fn setup<P: nrz_scalar::Scalar + 'static>(
     cells: usize,
     selection: usize,
     right_shape: [usize; 2],
     missing: bool,
     function: BinaryElementwise,
     scalar: [f64; 2],
-) -> TestResult<Fixture> {
-    let mut setup = super::fixture::custom(
+) -> TestResult<Fixture<P>> {
+    let mut setup = super::fixture::custom::<P>(
         cells,
         2,
         [3; 2],
@@ -70,7 +70,13 @@ fn setup(
                 (HostChannel::Error, 0.0),
             ] {
                 if channel != HostChannel::Error || !missing {
-                    loan.write_component(channel, cell, component, value, &mut setup.account)?;
+                    loan.write_component(
+                        channel,
+                        cell,
+                        component,
+                        super::native::<P>(value),
+                        &mut setup.account,
+                    )?;
                 }
             }
         }
@@ -84,13 +90,13 @@ fn setup(
 }
 
 /// Both original regions retain one frozen declaration snapshot and their own extents.
-fn operation(
-    setup: &mut Fixture,
+fn operation<P: nrz_scalar::Scalar + 'static>(
+    setup: &mut Fixture<P>,
     function: BinaryElementwise,
 ) -> TestResult<PointwiseBinaryOperation> {
     let original = &setup.request.operation.operation;
     let output = original.outputs()[0].clone();
-    let region = |pin: &crate::BundlePin<f64>| -> TestResult<RegionContract> {
+    let region = |pin: &crate::BundlePin<P>| -> TestResult<RegionContract> {
         let extent = super::super::super::binary::bundle(pin)?.declaration.extent;
         Ok(RegionContract::check(crate::kernel_testing::shape(
             &output.shape().declarations,
@@ -116,11 +122,17 @@ fn operation(
 /// ´test:unit:loan-binary-right-tile-scalar´
 #[test]
 fn loan_binary_right_tile_scalar() -> TestResult {
+    loan_binary_right_tile_scalar_format::<f32>()?;
+    loan_binary_right_tile_scalar_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_right_tile_scalar_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for function in [BinaryElementwise::Product, BinaryElementwise::Quotient] {
         for cells in [0, 1, 65] {
             for selection in 0..3 {
                 for missing in [false, true] {
-                    values(cells, selection, missing, function)?;
+                    values::<P>(cells, selection, missing, function)?;
                 }
             }
         }
@@ -129,13 +141,13 @@ fn loan_binary_right_tile_scalar() -> TestResult {
 }
 
 /// The error-only hole on the scalar suppresses every output without observing either input.
-fn values(
+fn values<P: nrz_scalar::Scalar + 'static>(
     cells: usize,
     selection: usize,
     missing: bool,
     function: BinaryElementwise,
 ) -> TestResult {
-    let mut setup = setup(cells, selection, [1, 1], missing, function, [3.0, 0.5])?;
+    let mut setup = setup::<P>(cells, selection, [1, 1], missing, function, [3.0, 0.5])?;
     setup.request.operation = operation(&mut setup, function)?;
     let demand = setup.request.demand;
     let outside = setup
@@ -171,7 +183,12 @@ fn values(
                 let total = 0.25
                     + f64::from(u32::try_from(cell)?) / 1024.0
                     + f64::from(u32::try_from(component)?) / 256.0;
-                oracle::tight([left, 3.0], [total, 0.5], function, readings)?;
+                oracle::tight_native::<P>(
+                    [left, 3.0],
+                    [total, 0.5],
+                    function,
+                    readings.map(nrz_scalar::Scalar::to_f64),
+                )?;
             }
         }
     }
@@ -186,7 +203,7 @@ fn values(
     if !missing {
         assert_eq!(
             reader.read_component(HostChannel::Center, 0, 0, &mut setup.account)?,
-            3.0
+            P::from_u8(3)
         );
     }
     drop(outside);
@@ -203,8 +220,14 @@ fn values(
 /// ´test:unit:loan-binary-unsupported-extent´
 #[test]
 fn loan_binary_unsupported_extent() -> TestResult {
+    loan_binary_unsupported_extent_format::<f32>()?;
+    loan_binary_unsupported_extent_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_unsupported_extent_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for shape in [[1, 2], [3, 1], [2, 2]] {
-        let mut setup = setup(3, 2, shape, false, BinaryElementwise::Product, [3.0, 0.5])?;
+        let mut setup = setup::<P>(3, 2, shape, false, BinaryElementwise::Product, [3.0, 0.5])?;
         let tickets = [setup.request.left.ticket()?, setup.request.right.ticket()?];
         crate::loan::fault::reset_reads();
         let injection = crate::loan::fault::Injection::after(0);
@@ -231,9 +254,15 @@ fn loan_binary_unsupported_extent() -> TestResult {
 /// ´test:unit:loan-binary-right-scalar-work-boundary´
 #[test]
 fn loan_binary_right_scalar_work_boundary() -> TestResult {
+    loan_binary_right_scalar_work_boundary_format::<f32>()?;
+    loan_binary_right_scalar_work_boundary_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_right_scalar_work_boundary_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for available in [127, 128] {
         let function = BinaryElementwise::Product;
-        let mut setup = setup(3, 1, [1, 1], false, function, [3.0, 0.5])?;
+        let mut setup = setup::<P>(3, 1, [1, 1], false, function, [3.0, 0.5])?;
         setup.request.operation = operation(&mut setup, function)?;
         let owner = ready(admit(
             &mut setup.heap,
@@ -270,8 +299,14 @@ fn loan_binary_right_scalar_work_boundary() -> TestResult {
 /// ´test:unit:loan-binary-right-scalar-domain´
 #[test]
 fn loan_binary_right_scalar_domain() -> TestResult {
+    loan_binary_right_scalar_domain_format::<f32>()?;
+    loan_binary_right_scalar_domain_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_right_scalar_domain_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     let function = BinaryElementwise::Quotient;
-    let mut setup = setup(3, 1, [1, 1], false, function, [0.0, 1.0])?;
+    let mut setup = setup::<P>(3, 1, [1, 1], false, function, [0.0, 1.0])?;
     setup.request.operation = operation(&mut setup, function)?;
     let owner = ready(admit(
         &mut setup.heap,
@@ -304,9 +339,16 @@ fn loan_binary_right_scalar_domain() -> TestResult {
 /// ´test:unit:loan-binary-right-scalar-request-refusal´
 #[test]
 fn loan_binary_right_scalar_request_refusal() -> TestResult {
+    loan_binary_right_scalar_request_refusal_format::<f32>()?;
+    loan_binary_right_scalar_request_refusal_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_right_scalar_request_refusal_format<P: nrz_scalar::Scalar + 'static>() -> TestResult
+{
     for allocation in [false, true] {
         let function = BinaryElementwise::Product;
-        let mut setup = setup(3, 1, [1, 1], false, function, [3.0, 0.5])?;
+        let mut setup = setup::<P>(3, 1, [1, 1], false, function, [3.0, 0.5])?;
         setup.request.operation = operation(&mut setup, function)?;
         let original_axis = setup.request.destination.axis;
         let tickets = [setup.request.left.ticket()?, setup.request.right.ticket()?];

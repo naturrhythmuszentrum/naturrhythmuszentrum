@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original factor coordinates govern Cartesian binary masks, values and lifetime.
 
+mod binary32;
 mod boundaries;
 mod fixture;
 use super::{BinaryElementwise, TestResult, admit, candidate, oracle, published, ready};
@@ -9,11 +10,17 @@ use super::{BinaryElementwise, TestResult, admit, candidate, oracle, published, 
 /// ´test:unit:loan-cartesian-binary-factor-images´
 #[test]
 fn loan_cartesian_binary_factor_images() -> TestResult {
+    loan_cartesian_binary_factor_images_format::<f32>()?;
+    loan_cartesian_binary_factor_images_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_factor_images_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for function in [BinaryElementwise::Product, BinaryElementwise::Quotient] {
         for rows in [[0, 2], [3, 0], [3, 2], [35, 2]] {
             for selection in 0..3 {
                 for holes in [false, true] {
-                    values(rows, selection, holes, function)?;
+                    values::<P>(rows, selection, holes, function)?;
                 }
             }
         }
@@ -22,13 +29,13 @@ fn loan_cartesian_binary_factor_images() -> TestResult {
 }
 
 /// Literal input formulas and exact rational corners never consult production product coordinates.
-fn values(
+fn values<P: nrz_scalar::Scalar + 'static>(
     rows: [usize; 2],
     selection: usize,
     holes: bool,
     function: BinaryElementwise,
 ) -> TestResult {
-    let (mut setup, _) = fixture::setup(rows, selection, holes, function)?;
+    let (mut setup, _) = fixture::setup::<P>(rows, selection, holes, function)?;
     let demand = setup.request.demand;
     let outside = setup
         .heap
@@ -71,7 +78,12 @@ fn values(
                     0.5 + f64::from(u32::try_from(cell % rows[1])?) / 1024.0
                         + f64::from(u32::try_from(component)?) / 256.0,
                 ];
-                oracle::tight(centers, totals, function, readings)?;
+                oracle::tight_native::<P>(
+                    centers,
+                    totals,
+                    function,
+                    readings.map(nrz_scalar::Scalar::to_f64),
+                )?;
             }
         }
     }
@@ -105,9 +117,15 @@ fn values(
 /// ´test:unit:loan-cartesian-binary-work-boundary´
 #[test]
 fn loan_cartesian_binary_work_boundary() -> TestResult {
+    loan_cartesian_binary_work_boundary_format::<f32>()?;
+    loan_cartesian_binary_work_boundary_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_work_boundary_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for available in [249, 250] {
         let function = BinaryElementwise::Product;
-        let (mut setup, _) = fixture::setup([3, 2], 1, false, function)?;
+        let (mut setup, _) = fixture::setup::<P>([3, 2], 1, false, function)?;
         let owner = ready(admit(
             &mut setup.heap,
             setup.request,
@@ -141,11 +159,17 @@ fn loan_cartesian_binary_work_boundary() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-request-refusals´
 #[test]
 fn loan_cartesian_binary_request_refusals() -> TestResult {
+    loan_cartesian_binary_request_refusals_format::<f32>()?;
+    loan_cartesian_binary_request_refusals_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_request_refusals_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for choice in 0..3 {
         let swapped = choice == 1;
         let allocation = choice == 2;
         let function = BinaryElementwise::Quotient;
-        let (mut setup, _) = fixture::setup([3, 2], 1, false, function)?;
+        let (mut setup, _) = fixture::setup::<P>([3, 2], 1, false, function)?;
         let demand = setup.request.demand;
         if swapped {
             std::mem::swap(&mut setup.request.left, &mut setup.request.right);
@@ -207,8 +231,14 @@ fn loan_cartesian_binary_request_refusals() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-gather-refusal´
 #[test]
 fn loan_cartesian_binary_gather_refusal() -> TestResult {
+    loan_cartesian_binary_gather_refusal_format::<f32>()?;
+    loan_cartesian_binary_gather_refusal_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_gather_refusal_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     let function = BinaryElementwise::Product;
-    let (mut setup, product) = fixture::setup([3, 2], 1, false, function)?;
+    let (mut setup, product) = fixture::setup::<P>([3, 2], 1, false, function)?;
     let demand = setup.request.demand;
     let identity = setup.heap.mask_correspondence(
         demand.layout(),
@@ -250,8 +280,15 @@ fn loan_cartesian_binary_gather_refusal() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-axis-and-dense-refusals´
 #[test]
 fn loan_cartesian_binary_axis_and_dense_refusals() -> TestResult {
+    loan_cartesian_binary_axis_and_dense_refusals_format::<f32>()?;
+    loan_cartesian_binary_axis_and_dense_refusals_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_axis_and_dense_refusals_format<P: nrz_scalar::Scalar + 'static>()
+-> TestResult {
     let function = BinaryElementwise::Product;
-    let (mut setup, product) = fixture::setup([3, 2], 1, false, function)?;
+    let (mut setup, product) = fixture::setup::<P>([3, 2], 1, false, function)?;
     let original = &setup.request.operation.operation;
     assert!(!original.carries_statistics());
     let crate::binding::NativeRecipe::Kernel(law) = &original.recipe else {
@@ -299,8 +336,14 @@ fn loan_cartesian_binary_axis_and_dense_refusals() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-companion-refusal´
 #[test]
 fn loan_cartesian_binary_companion_refusal() -> TestResult {
+    loan_cartesian_binary_companion_refusal_format::<f32>()?;
+    loan_cartesian_binary_companion_refusal_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_companion_refusal_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for roles in [[1, 3], [2, 3], [3, 1], [3, 2]] {
-        let mut setup = super::fixture(
+        let mut setup = super::fixture::custom::<P>(
             3,
             2,
             roles,
@@ -308,6 +351,7 @@ fn loan_cartesian_binary_companion_refusal() -> TestResult {
             false,
             BinaryElementwise::Product,
             super::Limits::default(),
+            |_, _, _| (2.0, 0.25),
         )?;
         let axis = setup.request.destination.axis;
         let product = setup
@@ -360,18 +404,27 @@ fn loan_cartesian_binary_companion_refusal() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-capture-repair´
 #[test]
 fn loan_cartesian_binary_capture_repair() -> TestResult {
+    loan_cartesian_binary_capture_repair_format::<f32>()?;
+    loan_cartesian_binary_capture_repair_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_capture_repair_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for publication in [false, true] {
         for mutation in 0..3 {
-            capture_repair(publication, mutation)?;
+            capture_repair::<P>(publication, mutation)?;
         }
     }
     Ok(())
 }
 
 /// Restoring captured metadata repairs the same owner without replenishing its account.
-fn capture_repair(publication: bool, mutation: usize) -> TestResult {
+fn capture_repair<P: nrz_scalar::Scalar + 'static>(
+    publication: bool,
+    mutation: usize,
+) -> TestResult {
     let function = BinaryElementwise::Product;
-    let (mut setup, product) = fixture::setup([3, 2], 1, false, function)?;
+    let (mut setup, product) = fixture::setup::<P>([3, 2], 1, false, function)?;
     let mut owner = ready(admit(
         &mut setup.heap,
         setup.request,

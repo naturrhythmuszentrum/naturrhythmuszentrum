@@ -9,23 +9,17 @@ use crate::loan::fault;
 use crate::{CellOutcome, DomainReason, HostChannel, KernelError, LoanError};
 
 /// Read every output through the public selected reader and refuse prepared endpoints.
-pub(super) fn readings(
-    reader: &crate::TileReader<'_, f64>,
+pub(super) fn readings<P: nrz_scalar::Scalar + 'static>(
+    reader: &crate::TileReader<'_, P>,
     cell: usize,
     component: usize,
     account: &mut crate::ExecutionAccount,
-) -> TestResult<[f64; 3]> {
+) -> TestResult<[P; 3]> {
     let values = [
         reader.read_component(HostChannel::Center, cell, component, account)?,
         reader.read_component(HostChannel::Total, cell, component, account)?,
         reader.read_component(HostChannel::Error, cell, component, account)?,
     ];
-    let before = fault::reads();
-    assert!(matches!(
-        reader.expm1_endpoints(cell, component, account),
-        Err(LoanError::UnsupportedContract)
-    ));
-    assert_eq!(fault::reads(), before);
     Ok(values)
 }
 /// Nine ordered role combinations and shifted holes determine A independently of native words.
@@ -94,6 +88,12 @@ fn selection_case(
     drop(injection);
     let (tile, _) = published(setup.heap.publish_application(owner, &mut setup.account))?;
     let reader = tile.reader(&setup.heap, &mut setup.account)?;
+    let before = fault::reads();
+    assert!(matches!(
+        reader.expm1_endpoints(0, 0, &mut setup.account),
+        Err(LoanError::UnsupportedContract)
+    ));
+    assert_eq!(fault::reads(), before);
     for cell in 0..cells {
         assert_eq!(
             reader.contains(cell, &mut setup.account)?,
@@ -173,7 +173,7 @@ fn binary_published_exact_rational_images_and_nearest_centers() -> TestResult {
         (Quotient, [1e-300, 1e300], [0.0; 2]),
         (Quotient, [f64::from_bits(2), f64::from_bits(2)], [0.0; 2]),
     ] {
-        let mut setup = custom(
+        let mut setup = custom::<f64>(
             1,
             1,
             [2; 2],
@@ -305,7 +305,7 @@ fn binary_domain_refusal_retains_original_entry_and_continues() -> TestResult {
         ),
     ] {
         for first in [0, 1, 2] {
-            let mut setup = custom(
+            let mut setup = custom::<f64>(
                 3,
                 3,
                 [2; 2],
@@ -353,7 +353,7 @@ fn binary_domain_refusal_retains_original_entry_and_continues() -> TestResult {
 #[test]
 fn binary_center_only_subnormal_direct_division_and_all_refused_completion() -> TestResult {
     for divisor in [1, 2] {
-        let mut setup = custom(
+        let mut setup = custom::<f64>(
             65,
             2,
             [1; 2],

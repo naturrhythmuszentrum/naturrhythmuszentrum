@@ -187,7 +187,7 @@ pub(super) struct Request<'a, P: nrz_scalar::Scalar> {
     /// Only the projected entry point admits a projected unary recipe.
     pub(super) projected_entry: bool,
     /// Optional ordered binary correspondence and borrowed right edge.
-    pub(super) binary: Option<(&'a super::PointwiseBinaryOperation, &'a BundlePin<f64>)>,
+    pub(super) binary: Option<(&'a super::PointwiseBinaryOperation, &'a BundlePin<P>)>,
     /// Optional retained correspondence for the prepared member.
     pub(super) prepared: Option<&'a PreparedExpm1Operation>,
 }
@@ -364,8 +364,8 @@ pub(super) fn authenticate(
     Ok(())
 }
 
-impl<'a> From<&'a super::PointwiseBinaryRequest> for Request<'a, f64> {
-    fn from(request: &'a super::PointwiseBinaryRequest) -> Self {
+impl<'a, P: nrz_scalar::Scalar> From<&'a super::PointwiseBinaryRequest<P>> for Request<'a, P> {
+    fn from(request: &'a super::PointwiseBinaryRequest<P>) -> Self {
         Self {
             operation: &request.operation.operation,
             input: &request.left,

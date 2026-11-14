@@ -270,7 +270,15 @@ impl<'a> Member<'a> {
     ) -> Result<(), LoanError> {
         match self {
             Self::Transform(_) | Self::ProjectedElementwise(..) | Self::Square(_) => Ok(()),
-            Self::Reciprocal(_) | Self::SquareRoot(_) | Self::Binary(..) => {
+            Self::Binary(..) => {
+                if source.coverage != crate::Coverage::RepresentedInputs
+                    || coverage != crate::Coverage::RepresentedInputs
+                {
+                    return Err(LoanError::CoverageMismatch);
+                }
+                Ok(())
+            }
+            Self::Reciprocal(_) | Self::SquareRoot(_) => {
                 if format != crate::storage::Format::Binary64 {
                     return Err(LoanError::UnsupportedContract);
                 }

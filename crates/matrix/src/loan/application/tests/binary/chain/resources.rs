@@ -31,7 +31,7 @@ fn fixture(
         mut heap,
         mut account,
         request,
-    } = binary::fixture::with_heap(
+    } = binary::fixture::with_heap::<f64>(
         1,
         1,
         [1; 2],

@@ -111,6 +111,17 @@ fn decode(value: f64) -> TestResult<(bool, u64, i32)> {
 
 /// Exact center operands have at most 106 significand bits; integer quotient/remainder proves RN.
 pub(super) fn nearest(left: f64, right: f64, function: BinaryElementwise) -> TestResult<u64> {
+    nearest_format(left, right, function, 52, 1023)
+}
+
+/// Integer significands are rounded directly to the target format, without double rounding.
+fn nearest_format(
+    left: f64,
+    right: f64,
+    function: BinaryElementwise,
+    fraction: i32,
+    bias: i32,
+) -> TestResult<u64> {
     let (left_sign, left_magnitude, left_exponent) = decode(left)?;
     let (right_sign, right_magnitude, right_exponent) = decode(right)?;
     let (numerator, denominator, exponent) = match function {
@@ -139,10 +150,10 @@ pub(super) fn nearest(left: f64, right: f64, function: BinaryElementwise) -> Tes
         (numerator << u32::try_from(-difference)?) < denominator
     };
     let mut output_exponent = exponent + difference - i32::from(below);
-    if output_exponent > 1023 {
+    if output_exponent > bias {
         return Err("oracle overflow".into());
     }
-    let quantum = output_exponent.max(-1022) - 52;
+    let quantum = output_exponent.max(1 - bias) - fraction;
     let shift = exponent - quantum;
     let (scaled, divisor) = if shift >= 0 {
         (
@@ -152,8 +163,8 @@ pub(super) fn nearest(left: f64, right: f64, function: BinaryElementwise) -> Tes
             denominator,
         )
     } else {
-        let bits = i32::try_from(128 - denominator.leading_zeros())? - shift;
-        if bits > i32::try_from(128 - numerator.leading_zeros())? + 1 {
+        let width = i32::try_from(128 - denominator.leading_zeros())? - shift;
+        if width > i32::try_from(128 - numerator.leading_zeros())? + 1 {
             return Ok(0);
         }
         (
@@ -168,22 +179,25 @@ pub(super) fn nearest(left: f64, right: f64, function: BinaryElementwise) -> Tes
     if twice_remainder > divisor || (twice_remainder == divisor && quotient % 2 != 0) {
         quotient += 1;
     }
-    let magnitude = if output_exponent < -1022 {
+    let magnitude = if output_exponent < 1 - bias {
         u64::try_from(quotient)?
     } else {
-        if quotient == 1_u128 << 53 {
+        if quotient == 1_u128 << (fraction + 1) {
             quotient >>= 1;
             output_exponent += 1;
         }
-        if output_exponent > 1023 {
+        if output_exponent > bias {
             return Err("oracle rounded overflow".into());
         }
-        (u64::try_from(output_exponent + 1023)? << 52) | (u64::try_from(quotient)? - (1_u64 << 52))
+        (u64::try_from(output_exponent + bias)? << fraction)
+            | (u64::try_from(quotient)? - (1_u64 << fraction))
     };
     Ok(if magnitude == 0 {
         0
     } else {
-        magnitude | (u64::from(left_sign != right_sign) << 63)
+        magnitude
+            | (u64::from(left_sign != right_sign)
+                << (fraction + if fraction == 52 { 11 } else { 8 }))
     })
 }
 
@@ -200,16 +214,25 @@ pub(super) fn check(
     );
     containment(centers, radii, function, readings)
 }
-/// Small fixture boxes permit a fixed dyadic excess below any cell/component radius increment.
-/// Exact extremal displacement bounds Total from above as well as below, exposing oversized
-/// enclosures caused by reading a different original cell's larger radius.
-pub(super) fn tight(
+/// Native RN and both radius ceilings use exact rational differences. Binary32 permits
+/// eight relative epsilons for outward endpoint construction, image and displacement;
+/// binary64 small fixtures retain the fixed dyadic ceiling below radius increments.
+pub(super) fn tight_native<P: nrz_scalar::Scalar>(
     centers: [f64; 2],
     radii: [f64; 2],
     function: BinaryElementwise,
     readings: [f64; 3],
 ) -> TestResult {
-    check(centers, radii, function, readings)?;
+    let binary32 = P::PRECISION == nrz_scalar::Precision::F32;
+    let expected = if binary32 {
+        f64::from(f32::from_bits(u32::try_from(nearest_format(
+            centers[0], centers[1], function, 23, 127,
+        )?)?))
+    } else {
+        f64::from_bits(nearest(centers[0], centers[1], function)?)
+    };
+    assert_eq!(readings[0].to_bits(), expected.to_bits());
+    containment(centers, radii, function, readings)?;
     let left = Rational::binary(centers[0])?;
     let right = Rational::binary(centers[1])?;
     let left_radius = Rational::binary(radii[0])?;
@@ -225,7 +248,26 @@ pub(super) fn tight(
             }
         }
     }
-    let ceiling = maximum.add(&Rational::binary(1.0 / 1_048_576.0)?);
+    let mut nominal = left.image(&right, function)?.sub(&output);
+    nominal.negative = false;
+    let allowance = if binary32 {
+        let mut magnitude = output;
+        magnitude.negative = false;
+        magnitude
+            .add(&maximum)
+            .image(
+                &Rational::binary(1.0 / 1_048_576.0)?,
+                BinaryElementwise::Product,
+            )?
+            .add(&Rational::binary(f64::from(f32::from_bits(8)))?)
+    } else {
+        Rational::binary(1.0 / 1_048_576.0)?
+    };
+    assert_ne!(
+        Rational::binary(readings[2])?.compare(&nominal.add(&allowance)),
+        Ordering::Greater
+    );
+    let ceiling = maximum.add(&allowance);
     assert_ne!(
         Rational::binary(readings[1])?.compare(&ceiling),
         Ordering::Greater
@@ -306,5 +348,49 @@ fn binary_nearest_integer_goldens_and_wrong_adjacent_centers() -> TestResult {
         containment(centers, [0.0; 2], function, readings)?;
         assert!(std::panic::catch_unwind(|| check(centers, [0.0; 2], function, readings)).is_err());
     }
+    Ok(())
+}
+
+/// Independent binary32 encodings exercise midpoint parity, signs and its subnormal quantum.
+#[test]
+fn binary32_nearest_integer_goldens_and_wrong_adjacent_centers() -> TestResult {
+    use BinaryElementwise::{Product, Quotient};
+    for (left, right, function, expected) in [
+        (1.0_f32, 3.0_f32, Quotient, 0x3eaa_aaab),
+        (1.5, f32::from_bits(0x3f80_0001), Product, 0x3fc0_0002),
+        (1.5, f32::from_bits(0x3f80_0003), Product, 0x3fc0_0004),
+        (f32::from_bits(1), 0.5, Product, 0),
+        (f32::from_bits(3), 0.5, Product, 2),
+        (f32::from_bits(5), 0.5, Product, 2),
+        (f32::from_bits(7), 0.5, Product, 4),
+        (f32::from_bits(3), 2.0, Quotient, 2),
+        (f32::from_bits(5), 2.0, Quotient, 2),
+    ] {
+        assert_eq!(
+            nearest_format(f64::from(left), f64::from(right), function, 23, 127)?,
+            expected
+        );
+        assert_eq!(
+            nearest_format(-f64::from(left), f64::from(right), function, 23, 127)?,
+            if expected == 0 {
+                0
+            } else {
+                expected | (1_u64 << 31)
+            }
+        );
+    }
+    let centers = [1.0, 3.0];
+    let radii = [0.0; 2];
+    let wrong = [f64::from(f32::from_bits(0x3eaa_aaaa)), 1e-7, 1e-7];
+    containment(centers, radii, Quotient, wrong)?;
+    assert!(
+        std::panic::catch_unwind(|| tight_native::<f32>(centers, radii, Quotient, wrong)).is_err()
+    );
+    let oversized = [f64::from(f32::from_bits(0x3eaa_aaab)), 0.25, 0.25];
+    containment(centers, radii, Quotient, oversized)?;
+    assert!(
+        std::panic::catch_unwind(|| tight_native::<f32>(centers, radii, Quotient, oversized))
+            .is_err()
+    );
     Ok(())
 }

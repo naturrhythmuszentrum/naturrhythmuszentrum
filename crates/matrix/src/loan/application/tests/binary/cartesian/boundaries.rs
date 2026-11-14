@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independent domain, admission and representation boundaries for factor incidence.
 
+use super::super::alter;
 use super::{BinaryElementwise, TestResult, admit, candidate, fixture, oracle, published, ready};
 use crate::{ApplicationError, BinaryApplicationRequest, LoanError};
 
@@ -8,8 +9,14 @@ use crate::{ApplicationError, BinaryApplicationRequest, LoanError};
 /// ´test:unit:loan-cartesian-binary-domain´
 #[test]
 fn loan_cartesian_binary_domain() -> TestResult {
+    loan_cartesian_binary_domain_format::<f32>()?;
+    loan_cartesian_binary_domain_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_domain_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     let function = BinaryElementwise::Quotient;
-    let (mut setup, _) = fixture::setup_domain([3, 2], 2, false, function, true)?;
+    let (mut setup, _) = fixture::setup_domain::<P>([3, 2], 2, false, function, true)?;
     let owner = ready(admit(
         &mut setup.heap,
         setup.request,
@@ -46,7 +53,12 @@ fn loan_cartesian_binary_domain() -> TestResult {
                 ];
                 let readings =
                     super::super::values::readings(&reader, cell, component, &mut setup.account)?;
-                oracle::tight(centers, totals, function, readings)?;
+                oracle::tight_native::<P>(
+                    centers,
+                    totals,
+                    function,
+                    readings.map(nrz_scalar::Scalar::to_f64),
+                )?;
             }
         }
     }
@@ -59,9 +71,32 @@ fn loan_cartesian_binary_domain() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-admission-boundary´
 #[test]
 fn loan_cartesian_binary_admission_boundary() -> TestResult {
-    for available in [493, 494] {
+    loan_cartesian_binary_admission_boundary_format::<f32>()?;
+    loan_cartesian_binary_admission_boundary_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_admission_boundary_format<P: nrz_scalar::Scalar + 'static>() -> TestResult
+{
+    for (rows, required) in [([3, 2], 494), ([35, 2], 1787)] {
+        admission_boundary::<P>(rows, required)?;
+    }
+    Ok(())
+}
+
+/// For C=70,k=2,q=2,t=3,h=6 the ordinary inventory gives 1297.
+/// Original factor entries subtract 206; geometry/layout visits add 8;
+/// the 70 outcome initializations remain separate: replace only the ordinary
+/// 10*q=20 mask visits with (4+3+3)*70+4*2=708, giving 1787.
+/// Equivalently: 360 fixed + 214 original entries + 435 role initialization
+/// + 708 factor-mask visits + 70 outcome initializations = 1787.
+fn admission_boundary<P: nrz_scalar::Scalar + 'static>(
+    rows: [usize; 2],
+    required: u64,
+) -> TestResult {
+    for available in [required - 1, required] {
         let function = BinaryElementwise::Product;
-        let (mut setup, _) = fixture::setup([3, 2], 1, false, function)?;
+        let (mut setup, _) = fixture::setup::<P>(rows, 1, false, function)?;
         let tickets = [setup.request.left.ticket()?, setup.request.right.ticket()?];
         let demand = setup.request.demand;
         let symbols = setup.request.destination.symbols.clone();
@@ -73,12 +108,15 @@ fn loan_cartesian_binary_admission_boundary() -> TestResult {
         super::super::leave(&mut setup.account, available)?;
         let before = setup.account.usage().work;
         crate::loan::fault::reset_reads();
-        let injection =
-            crate::loan::fault::Injection::after(if available == 493 { 0 } else { usize::MAX });
+        let injection = crate::loan::fault::Injection::after(if available == required {
+            usize::MAX
+        } else {
+            0
+        });
         match admit(&mut setup.heap, setup.request, function, &mut setup.account) {
             BinaryApplicationRequest::ApplicationReady(owner) => {
-                assert_eq!(available, 494);
-                assert_eq!(setup.account.usage().work - before, 494);
+                assert_eq!(available, required);
+                assert_eq!(setup.account.usage().work - before, required);
                 assert!(matches!(
                     setup.heap.cancel_application(owner, &mut setup.account),
                     crate::ApplicationCancellation::ApplicationCancelled(_)
@@ -88,7 +126,7 @@ fn loan_cartesian_binary_admission_boundary() -> TestResult {
                 ApplicationError::Loan(LoanError::Budget(_)),
                 request,
             ) => {
-                assert_eq!(available, 493);
+                assert_eq!(available, required - 1);
                 assert_eq!(crate::loan::fault::Injection::attempts(), 0);
                 assert_eq!(setup.heap.resource_bytes()?, bytes);
                 assert_eq!([request.left.ticket()?, request.right.ticket()?], tickets);
@@ -118,9 +156,15 @@ fn loan_cartesian_binary_admission_boundary() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-component-refusal´
 #[test]
 fn loan_cartesian_binary_component_refusal() -> TestResult {
+    loan_cartesian_binary_component_refusal_format::<f32>()?;
+    loan_cartesian_binary_component_refusal_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_component_refusal_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for side in 0..2 {
         let function = BinaryElementwise::Product;
-        let (mut setup, product) = fixture::setup([3, 2], 2, false, function)?;
+        let (mut setup, product) = fixture::setup::<P>([3, 2], 2, false, function)?;
         let pin = fixture::host(
             &mut setup.heap,
             &mut setup.account,
@@ -166,9 +210,16 @@ fn loan_cartesian_binary_component_refusal() -> TestResult {
 /// ´test:unit:loan-cartesian-binary-gathered-factor-refusal´
 #[test]
 fn loan_cartesian_binary_gathered_factor_refusal() -> TestResult {
+    loan_cartesian_binary_gathered_factor_refusal_format::<f32>()?;
+    loan_cartesian_binary_gathered_factor_refusal_format::<f64>()
+}
+
+/// The identical boundary is required in both native formats.
+fn loan_cartesian_binary_gathered_factor_refusal_format<P: nrz_scalar::Scalar + 'static>()
+-> TestResult {
     for side in 0..2 {
         let function = BinaryElementwise::Product;
-        let (mut setup, product) = fixture::setup([3, 2], 2, false, function)?;
+        let (mut setup, product) = fixture::setup::<P>([3, 2], 2, false, function)?;
         let pin = if side == 0 {
             &mut setup.request.left
         } else {
@@ -226,9 +277,9 @@ fn loan_cartesian_binary_gathered_factor_refusal() -> TestResult {
 }
 
 /// Keep every earlier source predicate unchanged, isolating the gather exclusion itself.
-fn add_gather(
+fn add_gather<P: nrz_scalar::Scalar + 'static>(
     heap: &mut crate::Heap,
-    pin: &mut crate::BundlePin<f64>,
+    pin: &mut crate::BundlePin<P>,
 ) -> TestResult<std::rc::Rc<crate::mask::storage::LayoutRecord>> {
     let mut original = None;
     alter(heap, pin, |bundle| {
@@ -247,30 +298,4 @@ fn add_gather(
         Ok(())
     })?;
     original.ok_or_else(|| "original layout".into())
-}
-
-/// Withdraw registry aliases while substituting a test seal, then restore both aliases exactly.
-fn alter(
-    heap: &mut crate::Heap,
-    pin: &mut crate::BundlePin<f64>,
-    change: impl FnOnce(&mut crate::loan::registry::Bundle) -> TestResult,
-) -> TestResult {
-    use std::rc::Rc;
-    let root = pin.ticket()?.identity.root.slot;
-    let pin_slot = pin.record.payload.as_ref().ok_or("pin")?.index;
-    let mut index = heap.loans.pins[pin_slot].take().ok_or("pin index")?;
-    index.witness = None;
-    heap.loans.groups[root].as_mut().ok_or("group")?.state = crate::loan::registry::State::Reserved;
-    let payload = Rc::get_mut(&mut pin.record)
-        .and_then(|record| record.payload.as_mut())
-        .ok_or("unique pin")?;
-    let bundle = Rc::get_mut(&mut payload.bundle)
-        .and_then(|owner| owner.payload.as_mut())
-        .ok_or("unique bundle")?;
-    change(bundle)?;
-    heap.loans.groups[root].as_mut().ok_or("group")?.state =
-        crate::loan::registry::State::Published(Rc::clone(&payload.bundle));
-    index.witness = Some(Rc::downgrade(&pin.record));
-    heap.loans.pins[pin_slot] = Some(index);
-    Ok(())
 }

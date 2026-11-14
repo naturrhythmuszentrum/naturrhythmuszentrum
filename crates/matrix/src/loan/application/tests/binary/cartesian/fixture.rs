@@ -24,7 +24,7 @@ pub(super) fn total(operand: usize, cell: usize, component: usize) -> TestResult
 }
 
 /// Error-only holes close the entire original factor cell before product expansion.
-pub(super) fn host(
+pub(super) fn host<P: nrz_scalar::Scalar + 'static>(
     heap: &mut Heap,
     account: &mut ExecutionAccount,
     axis: crate::CellAxis,
@@ -32,7 +32,7 @@ pub(super) fn host(
     holes: bool,
     components: usize,
     domain: bool,
-) -> TestResult<BundlePin<f64>> {
+) -> TestResult<BundlePin<P>> {
     let symbols = nrz_bindings::BindingSymbols::declare(
         &nrz_bindings::Descriptor::ratio(),
         [u32::try_from(axis.capacity())?, u32::try_from(components)?],
@@ -69,9 +69,9 @@ pub(super) fn host(
                 cell,
                 component,
                 if crossing {
-                    0.0
+                    P::ZERO
                 } else {
-                    center(operand, cell, component)?
+                    super::super::native::<P>(center(operand, cell, component)?)
                 },
                 account,
             )?;
@@ -79,12 +79,12 @@ pub(super) fn host(
                 HostChannel::Total,
                 cell,
                 component,
-                total(operand, cell, component)?,
+                super::super::native::<P>(total(operand, cell, component)?),
                 account,
             )?;
             let missing = holes && cell == operand;
             if !missing {
-                loan.write_component(HostChannel::Error, cell, component, 0.0, account)?;
+                loan.write_component(HostChannel::Error, cell, component, P::ZERO, account)?;
             }
         }
     }
@@ -95,23 +95,23 @@ pub(super) fn host(
 }
 
 /// Original factor rows and their Cartesian output are frozen in one descriptor snapshot.
-pub(super) fn setup(
+pub(super) fn setup<P: nrz_scalar::Scalar + 'static>(
     rows: [usize; 2],
     selection: usize,
     holes: bool,
     function: BinaryElementwise,
-) -> TestResult<(Fixture, crate::CellProduct)> {
+) -> TestResult<(Fixture<P>, crate::CellProduct)> {
     setup_domain(rows, selection, holes, function, false)
 }
 
 /// Domain fixtures alter only one inner factor component, preserving every original coordinate.
-pub(super) fn setup_domain(
+pub(super) fn setup_domain<P: nrz_scalar::Scalar + 'static>(
     rows: [usize; 2],
     selection: usize,
     holes: bool,
     function: BinaryElementwise,
     domain: bool,
-) -> TestResult<(Fixture, crate::CellProduct)> {
+) -> TestResult<(Fixture<P>, crate::CellProduct)> {
     let mut heap = Heap::new(crate::HeapLimits::default())?;
     let mut account =
         ExecutionAccount::new(nrz_bindings::Budget::new(nrz_bindings::Limits::default())?)?;
@@ -171,9 +171,9 @@ pub(super) fn setup_domain(
 }
 
 /// Construct original regions once from independently retained factor extents.
-pub(super) fn operation(
-    sources: [&BundlePin<f64>; 2],
-    destination: &HostTileDeclaration<f64>,
+pub(super) fn operation<P: nrz_scalar::Scalar + 'static>(
+    sources: [&BundlePin<P>; 2],
+    destination: &HostTileDeclaration<P>,
     product: crate::CellProduct,
     layout: crate::CellLayoutVersion,
     function: BinaryElementwise,

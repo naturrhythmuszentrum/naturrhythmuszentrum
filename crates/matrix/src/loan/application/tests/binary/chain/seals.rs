@@ -3,40 +3,12 @@
 
 use super::super::super::ready;
 use super::{TestResult, admit, candidate, prefix, product, request};
-use crate::loan::{
-    fault,
-    registry::{Bundle, State},
-};
+use crate::loan::fault;
 use crate::{
     ApplicationError, ApplicationEvaluation, ApplicationPublication, ApplicationRequest,
     Elementwise, LoanError,
 };
 use std::rc::Rc;
-
-/// Withdraw only registry aliases while mutating test evidence, then restore their exact pairing.
-fn alter(
-    pin: &mut crate::BundlePin<f64>,
-    heap: &mut crate::Heap,
-    change: impl FnOnce(&mut Bundle) -> TestResult,
-) -> TestResult {
-    let root = pin.ticket()?.identity.root.slot;
-    let slot = pin.record.payload.as_ref().ok_or("pin")?.index;
-    let mut index = heap.loans.pins[slot].take().ok_or("index")?;
-    index.witness = None;
-    heap.loans.groups[root].as_mut().ok_or("group")?.state = State::Reserved;
-    let payload = Rc::get_mut(&mut pin.record)
-        .and_then(|record| record.payload.as_mut())
-        .ok_or("unique pin")?;
-    let bundle = Rc::get_mut(&mut payload.bundle)
-        .and_then(|owner| owner.payload.as_mut())
-        .ok_or("unique bundle")?;
-    change(bundle)?;
-    heap.loans.groups[root].as_mut().ok_or("group")?.state =
-        State::Published(Rc::clone(&payload.bundle));
-    index.witness = Some(Rc::downgrade(&pin.record));
-    heap.loans.pins[slot] = Some(index);
-    Ok(())
-}
 
 /// Completed masks, revisions, ordered original operands and exact side tokens cannot be substituted.
 #[test]
@@ -50,7 +22,7 @@ fn chain_producer_seals_refuse_admission_before_allocation() -> TestResult {
             2,
             &mut account,
         )?;
-        alter(&mut request.input, &mut heap, |bundle| {
+        super::super::alter(&mut heap, &mut request.input, |bundle| {
             let evidence = bundle.origin.evidence.as_mut().ok_or("origin")?;
             let crate::loan::application::binary::Auxiliary::Binary(side) =
                 &mut evidence.endpoint_tokens
@@ -98,7 +70,7 @@ fn chain_self_and_reversed_ancestry_refuse() -> TestResult {
             2,
             &mut account,
         )?;
-        alter(&mut request.input, &mut heap, |bundle| {
+        super::super::alter(&mut heap, &mut request.input, |bundle| {
             let evidence = bundle.origin.evidence.as_mut().ok_or("origin")?;
             evidence.source_identity.request = bundle.identity.request + u64::from(reversed);
             for attachment in evidence.attachments.iter_mut().flatten() {

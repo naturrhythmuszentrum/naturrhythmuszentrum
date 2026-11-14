@@ -18,7 +18,7 @@ fn chain_sparse_upstream_availability_and_selected_loads() -> TestResult {
                         mut heap,
                         mut account,
                         request: original,
-                    } = binary::custom(
+                    } = binary::custom::<f64>(
                         cells,
                         components,
                         [3; 2],
@@ -164,7 +164,7 @@ fn chain_completion_becomes_empty_midway() -> TestResult {
             mut heap,
             mut account,
             request: original,
-        } = binary::custom(
+        } = binary::custom::<f64>(
             3,
             1,
             [1; 2],
@@ -236,7 +236,7 @@ fn mixed_product() -> TestResult<(
         mut heap,
         mut account,
         request: original,
-    } = binary::custom(
+    } = binary::custom::<f64>(
         4,
         2,
         [3; 2],
@@ -333,7 +333,7 @@ fn chain_positive_product_with_negative_published_lower_refuses_root() -> TestRe
         mut heap,
         mut account,
         request,
-    } = binary::custom(
+    } = binary::custom::<f64>(
         1,
         1,
         [2; 2],

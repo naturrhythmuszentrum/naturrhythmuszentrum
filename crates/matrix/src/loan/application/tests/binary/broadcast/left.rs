@@ -7,13 +7,13 @@ use super::{
 use crate::{ApplicationError, BinaryApplicationRequest, HostChannel, LoanError};
 
 /// Swap the original host pins before correspondence construction, retaining table-qualified demand.
-fn setup(
+fn setup<P: nrz_scalar::Scalar + 'static>(
     cells: usize,
     selection: usize,
     missing: bool,
     function: BinaryElementwise,
-) -> TestResult<Fixture> {
-    let mut setup = super::setup(cells, selection, [1, 1], missing, function, [3.0, 0.5])?;
+) -> TestResult<Fixture<P>> {
+    let mut setup = super::setup::<P>(cells, selection, [1, 1], missing, function, [3.0, 0.5])?;
     std::mem::swap(&mut setup.request.left, &mut setup.request.right);
     setup.request.operation = operation(&mut setup, function)?;
     Ok(setup)
@@ -23,11 +23,17 @@ fn setup(
 /// ´test:unit:loan-binary-left-tile-scalar´
 #[test]
 fn loan_binary_left_tile_scalar() -> TestResult {
+    loan_binary_left_tile_scalar_format::<f32>()?;
+    loan_binary_left_tile_scalar_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_left_tile_scalar_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for function in [BinaryElementwise::Product, BinaryElementwise::Quotient] {
         for cells in [0, 1, 65] {
             for selection in 0..3 {
                 for missing in [false, true] {
-                    values(cells, selection, missing, function)?;
+                    values::<P>(cells, selection, missing, function)?;
                 }
             }
         }
@@ -36,13 +42,13 @@ fn loan_binary_left_tile_scalar() -> TestResult {
 }
 
 /// The shared scalar's error-only hole removes all targets while preserving outside readers.
-fn values(
+fn values<P: nrz_scalar::Scalar + 'static>(
     cells: usize,
     selection: usize,
     missing: bool,
     function: BinaryElementwise,
 ) -> TestResult {
-    let mut setup = setup(cells, selection, missing, function)?;
+    let mut setup = setup::<P>(cells, selection, missing, function)?;
     let demand = setup.request.demand;
     let outside = setup
         .heap
@@ -77,7 +83,12 @@ fn values(
                 let total = 0.25
                     + f64::from(u32::try_from(cell)?) / 1024.0
                     + f64::from(u32::try_from(component)?) / 256.0;
-                super::oracle::tight([3.0, right], [0.5, total], function, readings)?;
+                super::oracle::tight_native::<P>(
+                    [3.0, right],
+                    [0.5, total],
+                    function,
+                    readings.map(nrz_scalar::Scalar::to_f64),
+                )?;
             }
         }
     }
@@ -106,8 +117,14 @@ fn values(
 /// ´test:unit:loan-binary-left-scalar-demand-refusal´
 #[test]
 fn loan_binary_left_scalar_demand_refusal() -> TestResult {
+    loan_binary_left_scalar_demand_refusal_format::<f32>()?;
+    loan_binary_left_scalar_demand_refusal_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_left_scalar_demand_refusal_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     let function = BinaryElementwise::Quotient;
-    let mut setup = setup(3, 1, false, function)?;
+    let mut setup = setup::<P>(3, 1, false, function)?;
     let original = setup.request.demand;
     let wrong = setup.heap.create_mask(
         setup.request.left.ticket()?.identity.layout,
@@ -142,7 +159,7 @@ fn loan_binary_left_scalar_demand_refusal() -> TestResult {
     assert_eq!(
         tile.reader(&setup.heap, &mut setup.account)?
             .read_component(HostChannel::Center, 2, 0, &mut setup.account)?,
-        1.5
+        P::from_u8(3) / P::from_u8(2)
     );
     Ok(())
 }
@@ -151,8 +168,14 @@ fn loan_binary_left_scalar_demand_refusal() -> TestResult {
 /// ´test:unit:loan-binary-left-scalar-domain-entry´
 #[test]
 fn loan_binary_left_scalar_domain_entry() -> TestResult {
+    loan_binary_left_scalar_domain_entry_format::<f32>()?;
+    loan_binary_left_scalar_domain_entry_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_left_scalar_domain_entry_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     let function = BinaryElementwise::Quotient;
-    let mut setup = setup(3, 1, false, function)?;
+    let mut setup = setup::<P>(3, 1, false, function)?;
     let symbols = nrz_bindings::BindingSymbols::declare(
         &nrz_bindings::Descriptor::ratio(),
         [3, 2],
@@ -170,10 +193,19 @@ fn loan_binary_left_scalar_domain_entry() -> TestResult {
         crate::LoanRequest::Refused(error) => return Err(error.into()),
     };
     for cell in 0..3 {
-        let centers = if cell == 2 { [2.0, 0.0] } else { [2.0; 2] };
+        let centers = if cell == 2 {
+            [P::from_u8(2), P::ZERO]
+        } else {
+            [P::from_u8(2); 2]
+        };
         loan.write_cell(HostChannel::Center, cell, &centers, &mut setup.account)?;
-        loan.write_cell(HostChannel::Total, cell, &[0.5; 2], &mut setup.account)?;
-        loan.write_cell(HostChannel::Error, cell, &[0.0; 2], &mut setup.account)?;
+        loan.write_cell(
+            HostChannel::Total,
+            cell,
+            &[P::ONE / P::from_u8(2); 2],
+            &mut setup.account,
+        )?;
+        loan.write_cell(HostChannel::Error, cell, &[P::ZERO; 2], &mut setup.account)?;
     }
     let table = match setup.heap.handback(loan, &mut setup.account) {
         crate::HandbackOutcome::Published(tile, _) => tile,
@@ -215,9 +247,15 @@ fn loan_binary_left_scalar_domain_entry() -> TestResult {
 /// ´test:unit:loan-binary-left-scalar-work-boundary´
 #[test]
 fn loan_binary_left_scalar_work_boundary() -> TestResult {
+    loan_binary_left_scalar_work_boundary_format::<f32>()?;
+    loan_binary_left_scalar_work_boundary_format::<f64>()
+}
+
+/// The same ordered contract and literal budget hold in both formats.
+fn loan_binary_left_scalar_work_boundary_format<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     for available in [127, 128] {
         let function = BinaryElementwise::Quotient;
-        let mut setup = setup(3, 1, false, function)?;
+        let mut setup = setup::<P>(3, 1, false, function)?;
         let owner = ready(admit(
             &mut setup.heap,
             setup.request,

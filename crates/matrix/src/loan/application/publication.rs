@@ -176,9 +176,12 @@ fn prepare<P: Scalar + 'static>(
     charge(budget, 1)?;
     super::chain::captured(input, &core.evidence, core.host.identity.account)?;
     if let Some(side) = core.evidence.endpoint_tokens.binary() {
-        heap.current_bundle(side.input.as_ref().ok_or(LoanError::WrongLoan)?, budget)?;
+        heap.current_record(
+            &side.input.as_ref().ok_or(LoanError::WrongLoan)?.record,
+            budget,
+        )?;
         charge(budget, 1)?;
-        side.validate_pin(core.host.identity.account)?;
+        side.validate_pin::<P>(core.host.identity.account)?;
     }
     core.evidence.validate(&core.host.declaration, identity)?;
     super::member::Member::check(
