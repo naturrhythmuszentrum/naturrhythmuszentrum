@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: CC0-1.0
+[package]
+name = "nrz-compute"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+authors.workspace = true
+repository.workspace = true
+description = "Explicit machine compute measurements and exact deterministic summaries"
+readme = "README.md"
+keywords = ["benchmark", "numerics", "sampling"]
+categories = ["development-tools::profiling", "science"]
+
+[dependencies]
+nrz-matrix = { path = "../matrix", features = ["benchmark"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "nrz-compute"
+path = "src/bin_cli.rs"

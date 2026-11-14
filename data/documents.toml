@@ -305,3 +305,7 @@ requires = []
 [[document]]
 output = "docs/design/placement-concept.md"
 requires = []
+
+[[document]]
+output = "crates/compute/README.md"
+requires = []

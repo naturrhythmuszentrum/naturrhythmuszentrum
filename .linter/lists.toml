@@ -221,3 +221,21 @@ allowances = []
 
 [BENCH."owners.reach-conform"]
 allowances = []
+
+[COMPUTE."labels.mints-well-formed"]
+allowances = []
+
+[COMPUTE."labels.mints-kind-conform"]
+allowances = []
+
+[COMPUTE."labels.mints-unique"]
+allowances = []
+
+[COMPUTE."labels.heads-conform"]
+allowances = []
+
+[COMPUTE."labels.citations-local-resolve"]
+allowances = []
+
+[COMPUTE."owners.reach-conform"]
+allowances = []

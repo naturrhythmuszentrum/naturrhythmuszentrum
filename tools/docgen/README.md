@@ -50,6 +50,7 @@ The census lists current workspace members in manifest order; retired packages r
 |`nrz-bindings`|`crates/bindings`|Data-time quantity descriptors and checks over original symbolic expressions|
 |`nrz-cas`|`crates/cas`|Exact graph construction and checked symbolic derivations|
 |`nrz-bench`|`crates/bench`|Workspace Criterion benchmarks and host sampling comparisons|
+|`nrz-compute`|`crates/compute`|Explicit machine compute measurements and exact deterministic summaries|
 
 The project dataset records 9 entries in the broader engine plan. The LC implementation route is specified separately in `docs/design/lc-resonance.md`; a plan entry or generated description does not establish an implemented numerical domain.
 

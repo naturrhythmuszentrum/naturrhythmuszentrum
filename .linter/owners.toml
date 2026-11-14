@@ -14,10 +14,12 @@ owners = [
   "BINDINGS",
   "CAS",
   "BENCH",
+  "COMPUTE",
   "ORCHESTRATION",
 ]
 
 partitions = [
+  { name = "compute", owner = "COMPUTE", pattern = '[ %s"templates/" ] %s"crates/compute" [ "/" *VCHAR ]' },
   { name = "declared-surface", owner = "NRZ", pattern = '%s".linter" [ "/" *VCHAR ]' },
   { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"rust-toolchain.toml" )' },
   { name = "guides", owner = "DOCS", pattern = '( %s"CONTRIBUTING.md" / %s"templates/CONTRIBUTING.md.j2" / %s"README.md" / %s"templates/README.md.j2" )' },
@@ -37,6 +39,13 @@ imports = [
 ]
 
 may_cite = [
+  { owner = "COMPUTE", target = "NRZ" },
+  { owner = "COMPUTE", target = "DOCS" },
+  { owner = "COMPUTE", target = "MATRIX" },
+  { owner = "COMPUTE", target = "ORCHESTRATION" },
+  { owner = "NRZ", target = "COMPUTE" },
+  { owner = "DOCS", target = "COMPUTE" },
+
   { owner = "DOCS", target = "BENCH" },
   { owner = "NRZ", target = "BENCH" },
   { owner = "BENCH", target = "ORCHESTRATION" },

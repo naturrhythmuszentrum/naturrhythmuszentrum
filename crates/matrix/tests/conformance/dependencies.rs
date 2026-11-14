@@ -15,12 +15,14 @@ struct Package {
     manifest: &'static str,
     /// Permitted normal edges.
     normal: &'static [&'static str],
+    /// Permitted build-time edges.
+    build: &'static [&'static str],
     /// Permitted development edges, including independent oracle libraries.
     development: &'static [&'static str],
 }
 
 /// New workspace owners or direct edges require deliberate architecture review.
-const PACKAGES: [Package; 7] = [
+const PACKAGES: [Package; 8] = [
     Package {
         name: "nrz-cas",
         manifest: "crates/cas/Cargo.toml",
@@ -33,24 +35,28 @@ const PACKAGES: [Package; 7] = [
             "num-rational",
             "num-complex",
         ],
+        build: &[],
         development: &[],
     },
     Package {
         name: "nrz-scalar",
         manifest: "crates/scalar/Cargo.toml",
         normal: &["thiserror", "tracing"],
+        build: &[],
         development: &["num-bigint", "num-rational", "num-traits"],
     },
     Package {
         name: "nrz-accuracy",
         manifest: "crates/accuracy/Cargo.toml",
         normal: &["nrz-scalar", "tracing"],
+        build: &[],
         development: &["num-bigint", "num-rational", "num-traits"],
     },
     Package {
         name: "nrz-bindings",
         manifest: "crates/bindings/Cargo.toml",
         normal: &["nrz-cas", "thiserror", "tracing"],
+        build: &[],
         development: &[],
     },
     Package {
@@ -66,6 +72,7 @@ const PACKAGES: [Package; 7] = [
             "nrz-bindings",
             "thiserror",
         ],
+        build: &[],
         development: &["nrz-docgen"],
     },
     Package {
@@ -82,13 +89,22 @@ const PACKAGES: [Package; 7] = [
             "clap",
             "thiserror",
         ],
+        build: &[],
         development: &["tempfile"],
+    },
+    Package {
+        name: "nrz-compute",
+        manifest: "crates/compute/Cargo.toml",
+        normal: &["nrz-matrix", "serde", "serde_json", "thiserror"],
+        build: &["serde_json"],
+        development: &[],
     },
     Package {
         // rule:nrz:criterion-benchmark-boundary reserves the harness for this owner.
         name: "nrz-bench",
         manifest: "crates/bench/Cargo.toml",
         normal: &[],
+        build: &[],
         development: &["criterion", "nrz-matrix", "nrz-bindings", "nrz-scalar"],
     },
 ];
@@ -124,7 +140,7 @@ fn inspect(root: &Path, package: &Package) -> CheckResult {
     for features in CONFIGURATIONS {
         for (kind, expected) in [
             ("normal", package.normal),
-            ("build", &[]),
+            ("build", package.build),
             ("dev", package.development),
         ] {
             let mut arguments = vec!["-p", package.name, "-e", kind, "--depth", "1"];
