@@ -11,6 +11,7 @@ mod error;
 #[cfg(test)]
 pub(crate) mod fault;
 mod inventory;
+mod lc_origin;
 mod lc_shape;
 pub use lc_shape::{
     LcFrequencyPrelude, LcFrequencyTarget, LcInputCell, LcInputCells, LcInputInventory,

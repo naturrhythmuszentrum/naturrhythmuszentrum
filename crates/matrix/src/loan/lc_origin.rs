@@ -1,0 +1,227 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Private layout inventory; no constructors, registry dispatch or publication authority.
+//!
+//! C is the future checked correspondence owner, not an erased receipt or a stand-in
+//! proof. Only its sized Rc edge is native storage; its backend inventory is separate.
+#![expect(
+    dead_code,
+    reason = "layout definitions precede gated owner construction"
+)]
+
+use super::{
+    lc_shape::LcShapeAxes,
+    payload::Numerical,
+    registry::{CleanupReceipt, Identity, PinRecord, QualifiedMaskVersion, Token},
+};
+use crate::mask::storage::{LayoutRecord, MaskRecord};
+use crate::{CellLayoutVersion, CellProduct, Coverage, MaskVersion, NumericalErrorScope};
+use nrz_bindings::BindingSymbols;
+use std::rc::Rc;
+
+/// No implicit padding: status, target and explicit closed reason code.
+#[repr(C)]
+struct LcOutcome {
+    /// Explicit version-one outcome status byte.
+    status: u8,
+    /// Original operand or kernel target code.
+    target: u8,
+    /// Lossless closed cause code; never a Rust enum discriminant.
+    reason: u16,
+}
+
+/// Six symbol handles and one mapped-source pin retain each original position.
+#[repr(C)]
+struct LcSourceRow {
+    /// Original symbol ownership; the complete companions remain private.
+    symbols: [BindingSymbols; 2],
+    /// One mapped-source pin retains its entire immutable incoming closure.
+    pin: Rc<PinRecord>,
+    /// Original supplied-constraint position, including repeats.
+    position: usize,
+    /// Nonwrapping original input schema identity.
+    schema: u64,
+    /// Captured original host occupation.
+    source: Identity,
+    /// Captured mapped-copy occupation and receipt identity.
+    mapped: Identity,
+    /// Original ordered instance, sample and branch roles.
+    axes: LcShapeAxes,
+    /// Exact tuple-to-instance affine product map.
+    projection: CellProduct,
+    /// Captured source layout version.
+    layout: CellLayoutVersion,
+    /// Three complete qualified mapped companion locators.
+    companions: [QualifiedMaskVersion; 3],
+}
+
+/// Exact-capacity rows have their own allocation and debit.
+#[repr(C)]
+struct LcClosure {
+    /// Exact immutable owner or occupation identity.
+    identity: u64,
+    /// Exact-capacity original positional row backing.
+    rows: Vec<LcSourceRow>,
+}
+
+/// Closed schedule metadata contains no C-sized intermediate storage.
+#[repr(C)]
+struct LcSchedule {
+    /// Original ordered inductance and capacitance positions.
+    positions: [usize; 2],
+    /// Immutable requested-quantity specialization identity.
+    specialization: u64,
+    /// Correspondence, recipe, lowering and arithmetic revisions.
+    revisions: [u32; 4],
+    /// Closed native scalar precision.
+    format: crate::storage::Format,
+}
+
+/// The only certainty claim permitted by this layout slice.
+#[repr(u8)]
+enum LcCertainty {
+    /// Neither feasibility nor determinacy is asserted.
+    Undecided,
+}
+
+/// Inline locators bind the immutable storage; they do not replace checked evidence.
+#[repr(C)]
+struct LcSeal {
+    /// Exact immutable owner or occupation identity.
+    identity: Identity,
+    /// Checked matrix-to-correspondence join identity.
+    join: u64,
+    /// Sealed checked-correspondence allocation identity.
+    correspondence: u64,
+    /// Sealed captured-closure allocation identity.
+    closure: u64,
+    /// Fixed original operand and revision schedule.
+    schedule: LcSchedule,
+    /// Original immutable demand version.
+    demand: MaskVersion,
+    /// Sealed outcome-backing allocation identity.
+    outcomes: u64,
+    /// Sealed completed-mask version.
+    completed: MaskVersion,
+    /// Represented-input outer-cover interpretation.
+    coverage: Coverage,
+    /// Final reciprocal `LocalOperation` error interpretation.
+    error_scope: NumericalErrorScope,
+    /// Explicit undecided certainty, independent of numerical completion.
+    certainty: LcCertainty,
+}
+
+/// The numerical owner stays closed over binary32 and binary64, with both tracking maps.
+#[repr(C)]
+struct LcChannel {
+    /// Closed native numerical storage.
+    numerical: Numerical,
+    /// Per-component initialization word backing.
+    components: Vec<u64>,
+    /// Per-cell initialization word backing, retained after publication.
+    complete: Vec<u64>,
+}
+
+/// Expiration witness is the final retaining field of storage.
+#[repr(C)]
+struct LcLiveness {
+    /// Exact immutable owner or occupation identity.
+    identity: Identity,
+    /// Original prepaid cleanup receipt identity.
+    receipt: u64,
+}
+
+/// Nineteen named slots include zero-length backings; no slot is an allocation itself.
+#[repr(C)]
+struct LcDebits {
+    /// Three numerical-storage allocation debit tokens.
+    numerical: [Option<Token>; 3],
+    /// Six independent component/cell word allocation debits.
+    tracking: [Option<Token>; 6],
+    /// Boxed-storage allocation debit token.
+    storage: Option<Token>,
+    /// Liveness shared-header allocation debit token.
+    liveness: Option<Token>,
+    /// Output-layout allocation debit token.
+    layout: Option<Token>,
+    /// Outcome-backing allocation debit token.
+    outcomes: Option<Token>,
+    /// Completed-mask word backing debit.
+    completed_words: Option<Token>,
+    /// Completed-mask shared header debit.
+    completed_header: Option<Token>,
+    /// Captured-closure shared-header allocation debit token.
+    closure: Option<Token>,
+    /// Exact-capacity positional-row backing allocation debit token.
+    rows: Option<Token>,
+    /// Bundle shared-shell allocation debit token.
+    bundle: Option<Token>,
+    /// Initial specialized use shell debit, transferred on publication.
+    initial_use: Option<Token>,
+}
+
+/// Boxed payload survives publication without releasing its initialization backings.
+#[repr(C)]
+struct LcStorage<C> {
+    /// Exact immutable owner or occupation identity.
+    identity: Identity,
+    /// Fixed original operand and revision schedule.
+    schedule: LcSchedule,
+    /// Original symbol ownership; the complete companions remain private.
+    symbols: BindingSymbols,
+    /// Original immutable demand version.
+    demand: MaskVersion,
+    /// Existing demand-mask edge, moved on cancellation.
+    demand_mask: Rc<MaskRecord>,
+    /// Existing demand-layout edge, moved on cancellation.
+    demand_layout: Rc<LayoutRecord>,
+    /// Retained output-layout edge.
+    layout: Rc<LayoutRecord>,
+    /// Preallocated completed-mask edge.
+    completed: Rc<MaskRecord>,
+    /// Complete captured-closure edge.
+    closure: Rc<LcClosure>,
+    /// Checked-correspondence edge.
+    correspondence: Rc<C>,
+    /// Center, total radius and local error, retaining all six tracking maps.
+    channels: [LcChannel; 3],
+    /// Exact outcome backing.
+    outcomes: Vec<LcOutcome>,
+    /// Nineteen movable tokens; a transferred token leaves an empty slot.
+    debits: LcDebits,
+    /// Prepaid allocation, record and retaining-edge destruction.
+    cleanup: CleanupReceipt,
+    /// Final expiration edge.
+    liveness: Rc<LcLiveness>,
+}
+
+/// Private shell is completed before any owning edge escapes; seal is never boxed.
+#[repr(C)]
+struct LcBundleOwner<C> {
+    /// Boxed storage ownership, absent only while the private shell is empty.
+    storage: Option<Box<LcStorage<C>>>,
+    /// Inline complete seal, absent only while the private shell is empty.
+    seal: Option<LcSeal>,
+}
+
+/// Outside uses have their own debit, without an ordinary pin-index entry.
+#[repr(C)]
+struct LcUsePayload<C> {
+    /// Exact immutable owner or occupation identity.
+    identity: u64,
+    /// Original continuation account identity.
+    account: u64,
+    /// Immutable bundle edge.
+    bundle: Rc<LcBundleOwner<C>>,
+    /// Unique specialized-use allocation debit.
+    token: Token,
+}
+
+/// Empty initial shell is reserved beside storage, never inside its own bundle.
+#[repr(C)]
+struct LcUse<C> {
+    /// Complete use payload, absent only in the private initial shell.
+    payload: Option<LcUsePayload<C>>,
+}
+
+#[cfg(test)]
+mod tests;

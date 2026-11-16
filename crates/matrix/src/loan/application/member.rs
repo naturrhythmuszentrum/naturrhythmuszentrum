@@ -387,3 +387,11 @@ impl<'a> Member<'a> {
         Ok(())
     }
 }
+
+/// LC layout definitions must not widen the common borrowed member dispatch.
+/// ´test:unit:lc-origin-common-member-layout´
+#[test]
+fn lc_origin_common_member_layout() {
+    assert_eq!(size_of::<Member<'_>>(), 24);
+    assert_eq!(std::mem::align_of::<Member<'_>>(), 8);
+}
