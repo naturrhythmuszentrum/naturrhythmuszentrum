@@ -359,6 +359,7 @@ impl DyadicPowerProgram {
 mod tests {
     use super::*;
 
+    /// Capacities sufficient for every admission fixture in this module.
     const ENOUGH: DyadicPowerLimits = DyadicPowerLimits {
         exponent_bits: 63,
         root_steps: 63,

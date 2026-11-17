@@ -7,6 +7,7 @@ use nrz_scalar::{
 use std::cmp::Ordering;
 use std::io::Write as _;
 
+/// Capacities admitting every selected replay and observation schedule.
 const LIMITS: DyadicPowerLimits = DyadicPowerLimits {
     exponent_bits: 63,
     root_steps: 63,
@@ -298,10 +299,12 @@ fn rounded_root(value: f64, b: &mut Budget) -> TestResult<[f64; 2]> {
     ])
 }
 
+/// Replay the two outward root endpoints independently.
 fn oracle_root(image: [f64; 2], b: &mut Budget) -> TestResult<[f64; 2]> {
     Ok([rounded_root(image[0], b)?[0], rounded_root(image[1], b)?[1]])
 }
 
+/// Replay the square hull with a nonnegative lower endpoint.
 fn oracle_square(image: [f64; 2], b: &mut Budget) -> TestResult<Option<[f64; 2]>> {
     let magnitude = if image[0] >= 0.0 {
         image
@@ -319,6 +322,7 @@ fn oracle_square(image: [f64; 2], b: &mut Budget) -> TestResult<Option<[f64; 2]>
     Ok(Some([lower[0].max(0.0), upper[1]]))
 }
 
+/// Replay all four product corners and their nonnegative hull.
 fn oracle_mul(left: [f64; 2], right: [f64; 2], b: &mut Budget) -> TestResult<Option<[f64; 2]>> {
     let mut lower = f64::INFINITY;
     let mut upper = f64::NEG_INFINITY;
@@ -422,6 +426,7 @@ fn replay(
     Ok((Some(oracle_reading(image, &mut b)?), counts))
 }
 
+/// Require bitwise equality of every native and reconstructed output field.
 fn same_reading(native: DyadicPowerOutput, oracle: DyadicPowerOutput) {
     assert_eq!(
         native.endpoints.map(f64::to_bits),
@@ -441,8 +446,8 @@ fn same_reading(native: DyadicPowerOutput, oracle: DyadicPowerOutput) {
 /// Panics if a successful replay differs bit for bit from native execution,
 /// the underflow witness fails, the replay's first finite certification refusal
 /// leaves `[63, 58, 58]`, the native refusal changes its name, or a rounding-cell
-/// or end fixture fails. ´test:integration:scalar-dyadic-power-observation´
-/// pins the native stopping prefix.
+/// or end fixture fails. The observation test
+/// (´test:integration:scalar-dyadic-power-observation´) pins the native prefix.
 /// ´claim:matrix:scalar-dyadic-power-reconstruction´
 /// ´test:integration:scalar-dyadic-power-reconstruction´
 #[expect(
@@ -556,20 +561,29 @@ fn scalar_dyadic_power_reconstruction() -> TestResult {
     Ok(())
 }
 
+/// Collect span names, fields and exact Work events for numerical observation.
 #[derive(Clone, Default)]
 struct PowerObserver {
+    /// Next identifier assigned to a visited span.
     next: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    /// Span names keyed by their assigned identifiers.
     names: std::sync::Arc<std::sync::Mutex<std::collections::BTreeMap<u64, String>>>,
+    /// Recorded span fields with their identifiers and names.
     fields: std::sync::Arc<std::sync::Mutex<Vec<(u64, String, String)>>>,
+    /// Number of exact Work events seen by this subscriber.
     exact_events: std::sync::Arc<std::sync::atomic::AtomicU64>,
 }
 
+/// Record debug field values for one visited span.
 struct PowerFields {
+    /// Identifier of the span being visited.
     id: u64,
+    /// Shared ordered buffer of visited field values.
     fields: std::sync::Arc<std::sync::Mutex<Vec<(u64, String, String)>>>,
 }
 
 impl tracing::field::Visit for PowerFields {
+    /// Save a debug field value with its span identifier.
     fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
         self.fields.lock().expect("field visitor lock").push((
             self.id,
@@ -580,9 +594,11 @@ impl tracing::field::Visit for PowerFields {
 }
 
 impl tracing::Subscriber for PowerObserver {
+    /// Enable every span and event during this local observation.
     fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
         true
     }
+    /// Assign an identifier and record a new span's initial fields.
     fn new_span(&self, span: &tracing::span::Attributes<'_>) -> tracing::span::Id {
         use std::sync::atomic::Ordering as AtomicOrdering;
         let id = self.next.fetch_add(1, AtomicOrdering::Relaxed) + 1;
@@ -596,23 +612,29 @@ impl tracing::Subscriber for PowerObserver {
         });
         tracing::span::Id::from_u64(id)
     }
+    /// Record updated fields for an existing span.
     fn record(&self, span: &tracing::span::Id, values: &tracing::span::Record<'_>) {
         values.record(&mut PowerFields {
             id: span.into_u64(),
             fields: self.fields.clone(),
         });
     }
+    /// Ignore causal links because these assertions inspect span fields.
     fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+    /// Count events on the exact Work tracing target.
     fn event(&self, event: &tracing::Event<'_>) {
         use std::sync::atomic::Ordering as AtomicOrdering;
         if event.metadata().target() == "nrz::work" {
             self.exact_events.fetch_add(1, AtomicOrdering::Relaxed);
         }
     }
+    /// Ignore span entry because this test reads recorded fields.
     fn enter(&self, _: &tracing::span::Id) {}
+    /// Ignore span exit because this test reads recorded fields.
     fn exit(&self, _: &tracing::span::Id) {}
 }
 
+/// Return the latest recorded value of one field on one span.
 fn field<'a>(fields: &'a [(u64, String, String)], id: u64, name: &str) -> Option<&'a str> {
     fields
         .iter()
