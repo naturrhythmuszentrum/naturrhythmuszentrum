@@ -17,6 +17,8 @@ The scalar and finite wrappers preserve canonical positive zero as the additive 
 |Test|Area|Claim|
 |----|----|-----|
 |(`test:unit:environment-admission-refuses`)|scalar|Private admission cannot bypass either target or environment refusal.|
+|(`test:unit:dyadic-power-admission`)|scalar|Exact reduction and isolated refusals precede the validated one shortcut.|
+|(`test:unit:dyadic-power-inventory`)|scalar|Each independent inclusive inventory is enforced, even for exact one.|
 |(`test:unit:prepared-exp-validation-order`)|scalar|Operand checks keep their typed order, including zero and subnormal nominal interiors.|
 |(`test:unit:prepared-exp-basis-readings`)|scalar|Structural admission alone does not establish monotonicity or finite nominal exports.|
 |(`test:unit:prepared-exp-competing-failures`)|scalar|Basis inversion takes precedence over a competing nonfinite composition.|

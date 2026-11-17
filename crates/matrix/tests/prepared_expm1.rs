@@ -1056,3 +1056,6 @@ mod tanh;
 
 #[path = "prepared_expm1/tanh_owner.rs"]
 mod tanh_owner;
+
+#[path = "prepared_expm1/dyadic_power.rs"]
+mod dyadic_power;
