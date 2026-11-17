@@ -99,6 +99,10 @@ output = "docs/design/cas-trig-design.md"
 requires = []
 
 [[document]]
+output = "docs/design/cas-elementary-chain-design.md"
+requires = []
+
+[[document]]
 output = "docs/design/cas-series-design.md"
 requires = []
 
