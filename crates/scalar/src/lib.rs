@@ -15,6 +15,7 @@ mod kernel;
 )]
 mod literal;
 mod pi;
+mod prepared_dyadic_power;
 mod prepared_expm1;
 #[expect(
     clippy::redundant_pub_crate,
@@ -35,6 +36,9 @@ pub use kernel::{
 };
 pub use literal::{DecodedLiteral, LiteralLimits, NumericLiteral};
 pub use pi::{PiBounds, PiBudget, PiEnclosure, PiError, PiLimits, PiUsage};
+pub use prepared_dyadic_power::{
+    DyadicPowerFailure, DyadicPowerLimits, DyadicPowerOutput, DyadicPowerProgram,
+};
 pub use prepared_expm1::{ExpFailure, ExpInput, ExpOutput, ExpProgram};
 pub use prepared_expm1::{Expm1Failure, Expm1Input, Expm1Output, Expm1Parameters, Expm1Program};
 pub use prepared_expm1::{SigmoidFailure, SigmoidInput, SigmoidOutput, SigmoidProgram};
