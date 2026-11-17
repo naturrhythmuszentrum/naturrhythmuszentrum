@@ -61,7 +61,8 @@ enum Term {
     Endpoint(u8),
     /// Square of a root endpoint parameter.
     Square(u8),
-    /// Reciprocal of a strictly positive root endpoint parameter.
+    /// Reciprocal of a root endpoint parameter; positivity of the upper endpoint
+    /// follows from the preceding product and squared-root premises.
     Inverse(u8),
 }
 
@@ -93,7 +94,7 @@ enum Native {
     ReciprocalLocalOperation,
 }
 
-/// Ordered-field expansion of the conditional schema; no external callbacks.
+/// Fixed tags identifying the reviewed ordered-field argument of the closed schema.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Step {
     /// Positive factors give a positive product.

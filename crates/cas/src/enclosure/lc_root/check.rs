@@ -72,7 +72,7 @@ fn originals(
     }
     event(budget, events, Event::Compare)?;
     if expected.arithmetic != proposed.arithmetic {
-        return Err(invalid());
+        return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     Ok(())
 }
@@ -174,7 +174,8 @@ fn relations(proposed: &Candidate, budget: &mut Budget, events: &mut Events) -> 
     Ok(())
 }
 
-/// Check every step, rather than trusting a name or a ground result as the expansion.
+/// Match the five tags of the reviewed closed schema; its ordered-field argument
+/// supplies soundness, rather than a general inference checker or ground result.
 fn expansion(proposed: &Candidate, budget: &mut Budget, events: &mut Events) -> Result<(), Fault> {
     for (index, step) in proposed.expansion.iter().enumerate() {
         event(budget, events, Event::Expansion)?;

@@ -342,7 +342,19 @@ fn lc_root_family_mutations() -> TestResult {
     refused(&f, &f.request, &p)?;
     let mut p = original.clone();
     p.original.arithmetic = 2;
-    refused(&f, &f.request, &p)?;
+    let error = check::verify(
+        &f.cas,
+        &f.request,
+        &p,
+        &mut ledger()?,
+        &mut Events::default(),
+    )
+    .err()
+    .ok_or("accepted arithmetic revision")?;
+    assert_eq!(
+        error.kind,
+        crate::FaultKind::Invalid(InvalidCode::UnsupportedVersion)
+    );
     let mut p = original;
     p.version = 2;
     refused(&f, &f.request, &p)?;
