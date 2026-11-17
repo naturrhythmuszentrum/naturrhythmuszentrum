@@ -8,6 +8,7 @@ use super::{Cause, Error, Limits, read};
 
 mod bounds;
 mod constants;
+mod power;
 
 /// Read the small CC0 fixture, never a separately implemented validator.
 ///
