@@ -41,6 +41,7 @@ mod clamp;
 mod derivative;
 mod exp;
 mod interval;
+mod lc_root;
 mod log;
 mod model;
 mod planning;
