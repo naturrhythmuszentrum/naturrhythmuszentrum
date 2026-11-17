@@ -5,6 +5,16 @@
 //! |------|------|-------|
 //! | [`compact_golden_associations`] | docgen | Exact binary64 inputs, row identities, targets and relative golden widths remain associated. Each row passes the unchanged bounded reader before its stronger coverage assertions. Every positive operand with endpoint evidence has a sigmoid upper endpoint above 1/2 or a tanh lower endpoint below the operand, excluding nonzero identity singletons. |
 //! | [`compact_golden_cas_route`] | docgen | Every compact endpoint retains its independently replayed exact CAS interval. The generator's precision and schedule are provenance, not a native target promise. |
+//! | [`power_golden_associations`] | docgen | Stored rows correspond exactly to independent binary64 input reconstructions. |
+//! | [`power_golden_cas_route`] | docgen | Every endpoint reproduces through CAS and independent fresh-store certificate replay. |
+//! | [`power_golden_original_exponent`] | docgen | A changed original exponent cannot reuse the quarter-power certificate. |
+//! | [`power_golden_rounding_boundaries`] | docgen | Exact fourth and eighth powers and integer-decoded adjacent values pin rounding-boundary rows. |
+//! | [`power_golden_exact_inequalities`] | docgen | Exact integer powers independently bound every route and golden endpoint image. |
+//! | [`power_golden_capacity_search`] | docgen | Manual bisection separates ledger Work from size capacity requirements. |
+//! | [`power_golden_reproduction_resources`] | docgen | Exact and one-below limits pin reproduction policy on the limiting stored rows. |
+//! | [`power_golden_comparison_resources`] | docgen | Exact and one-below limits pin comparison policy on the limiting stored rows. |
+//!
+//! The dyadic-power controls use the implementations in [`power`].
 use nrz_cas::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use nrz_cas::enclosure::{EnclosureGoal, EnclosureRequest};
 use nrz_cas::limits::{Budget, Limits};
@@ -12,6 +22,9 @@ use nrz_cas::syntax::{
     AtomicSort, Declaration, Draft, Environment, ExpressionDraft, Field, Operator, Sort,
 };
 use nrz_cas::{Cas, Fault, Handle, Rational, Reference};
+#[path = "sigmoid_tanh/power.rs"]
+pub mod power;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 fn ledger() -> Result<Budget, Fault> {
     Budget::new(Limits {
@@ -112,8 +125,13 @@ const fn real() -> Sort {
 }
 
 fn payload() -> TestResult<serde_json::Value> {
+    read_payload("prepared-binary64.json")
+}
+
+fn read_payload(name: &str) -> TestResult<serde_json::Value> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../data/golden/prepared-binary64.json");
+        .join("../../data/golden")
+        .join(name);
     Ok(nrz_docgen::golden::read(
         std::fs::File::open(path)?,
         nrz_docgen::golden::Limits::default(),
@@ -137,7 +155,8 @@ fn binary64(bits: u64) -> TestResult<String> {
         i64::try_from(exponent)? - 1075
     };
     let mut b = ledger()?;
-    let value = Rational::from_ratio(i64::try_from(significand)?, 1, &mut b)?.mul(
+    let sign = if bits >> 63 == 0 { 1 } else { -1 };
+    let value = Rational::from_ratio(sign * i64::try_from(significand)?, 1, &mut b)?.mul(
         &Rational::from_ratio(2, 1, &mut b)?.pow(power, &mut b)?,
         &mut b,
     )?;
@@ -429,4 +448,91 @@ fn compact_golden_cas_route() -> TestResult {
     }
     assert_eq!(seen.len(), 16, "distinct compact endpoints");
     Ok(())
+}
+
+/// Stored rows correspond exactly to independent binary64 input reconstructions.
+/// # Panics
+/// Panics if a stored identity, exponent, target, outcome or declared route changes.
+/// ´claim:docgen:power-golden-associations´
+/// ´test:integration:power-golden-associations´
+#[test]
+fn power_golden_associations() -> TestResult {
+    power::power_golden_associations()
+}
+
+/// Every endpoint reproduces through CAS and independent fresh-store certificate replay.
+/// # Panics
+/// Panics if retained intervals, original scope or complete golden containment disagree.
+/// ´claim:docgen:power-golden-cas-route´
+/// ´test:integration:power-golden-cas-route´
+#[test]
+fn power_golden_cas_route() -> TestResult {
+    power::power_golden_cas_route()
+}
+
+/// A changed original exponent cannot reuse the quarter-power certificate.
+/// # Panics
+/// Panics if the stored quarter case drifts or another exponent authenticates its proof.
+/// ´claim:docgen:power-golden-original-exponent´
+/// ´test:integration:power-golden-original-exponent´
+#[test]
+fn power_golden_original_exponent() -> TestResult {
+    power::power_golden_original_exponent()
+}
+
+/// Exact fourth and eighth powers and integer-decoded adjacent values pin rounding-boundary rows.
+/// # Panics
+/// Panics if exact anchors or the whole neighbouring golden intervals cross their bounds.
+/// ´claim:docgen:power-golden-rounding-boundaries´
+/// ´test:integration:power-golden-rounding-boundaries´
+#[test]
+fn power_golden_rounding_boundaries() -> TestResult {
+    power::power_golden_rounding_boundaries()
+}
+
+/// Exact integer powers independently bound every route and golden endpoint image.
+/// # Panics
+/// Panics if an endpoint inequality, relative width or isolated comparison changes.
+/// ´claim:docgen:power-golden-exact-inequalities´
+/// ´test:integration:power-golden-exact-inequalities´
+#[test]
+fn power_golden_exact_inequalities() -> TestResult {
+    power::power_golden_exact_inequalities()
+}
+
+/// Manual bisection separates ledger Work from size capacity requirements.
+/// # Errors
+/// Returns fixture, arithmetic or unexpected service errors.
+/// # Panics
+/// Panics if capacities change a retained outcome or interval.
+/// ´claim:docgen:power-golden-capacity-search´
+/// ´test:integration:power-golden-capacity-search´
+#[test]
+#[ignore = "manual reproduction capacity search"]
+fn power_golden_capacity_search() -> TestResult {
+    power::profile::search()
+}
+
+/// Exact and one-below limits pin reproduction policy on the limiting stored rows.
+/// # Errors
+/// Returns fixture, arithmetic or service errors.
+/// # Panics
+/// Panics if a capacity boundary, retained reading or typed refusal changes.
+/// ´claim:docgen:power-golden-reproduction-resources´
+/// ´test:integration:power-golden-reproduction-resources´
+#[test]
+fn power_golden_reproduction_resources() -> TestResult {
+    power::profile::reproduction_boundaries()
+}
+
+/// Exact and one-below limits pin comparison policy on the limiting stored rows.
+/// # Errors
+/// Returns fixture, arithmetic or service errors.
+/// # Panics
+/// Panics if a capacity boundary, retained reading or typed refusal changes.
+/// ´claim:docgen:power-golden-comparison-resources´
+/// ´test:integration:power-golden-comparison-resources´
+#[test]
+fn power_golden_comparison_resources() -> TestResult {
+    power::profile::comparison_boundaries()
 }

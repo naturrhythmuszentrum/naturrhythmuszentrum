@@ -37,3 +37,11 @@
 |(`test:integration:preservation-rejects-missing-or-changed-originals`)|docgen|Neither removing an original source nor changing its documentary payload can pass preservation.|
 |(`test:integration:compact-golden-associations`)|docgen|Exact binary64 inputs, row identities, targets and relative golden widths remain associated. Each row passes the unchanged bounded reader before its stronger coverage assertions. Every positive operand with endpoint evidence has a sigmoid upper endpoint above 1/2 or a tanh lower endpoint below the operand, excluding nonzero identity singletons.|
 |(`test:integration:compact-golden-cas-route`)|docgen|Every compact endpoint retains its independently replayed exact CAS interval. The generator's precision and schedule are provenance, not a native target promise.|
+|(`test:integration:power-golden-associations`)|docgen|Stored rows correspond exactly to independent binary64 input reconstructions.|
+|(`test:integration:power-golden-cas-route`)|docgen|Every endpoint reproduces through CAS and independent fresh-store certificate replay.|
+|(`test:integration:power-golden-original-exponent`)|docgen|A changed original exponent cannot reuse the quarter-power certificate.|
+|(`test:integration:power-golden-rounding-boundaries`)|docgen|Exact fourth and eighth powers and integer-decoded adjacent values pin rounding-boundary rows.|
+|(`test:integration:power-golden-exact-inequalities`)|docgen|Exact integer powers independently bound every route and golden endpoint image.|
+|(`test:integration:power-golden-capacity-search`)|docgen|Manual bisection separates ledger Work from size capacity requirements.|
+|(`test:integration:power-golden-reproduction-resources`)|docgen|Exact and one-below limits pin reproduction policy on the limiting stored rows.|
+|(`test:integration:power-golden-comparison-resources`)|docgen|Exact and one-below limits pin comparison policy on the limiting stored rows.|
