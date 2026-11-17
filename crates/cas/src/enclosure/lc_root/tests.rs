@@ -4,6 +4,7 @@
 use super::*;
 
 mod adversarial;
+mod registered;
 use crate::budget::Limits;
 use crate::domain_model::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use crate::graph::{Draft, ExpressionDraft};

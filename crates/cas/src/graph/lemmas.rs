@@ -2,6 +2,7 @@
 //! Checked anonymous judgments use the graph's canonical index and evidence edges.
 
 mod enclosure;
+mod lc_root;
 mod prepared_expm1;
 pub(crate) use enclosure::EnclosureInventory;
 pub(crate) use prepared_expm1::Expm1Inventory;
@@ -37,6 +38,8 @@ pub(crate) enum AnonymousLemma {
     Enclosure(enclosure::EnclosureLemma),
     /// Checked native schedule under its original claim and arithmetic environment.
     PreparedExpm1(prepared_expm1::Expm1Lemma),
+    /// Complete conditional LC positive-root family and original dependency inventory.
+    LcRoot(lc_root::LcRootLemma),
 }
 
 impl AnonymousLemma {
@@ -48,6 +51,7 @@ impl AnonymousLemma {
             Self::Constant(node) => node.key.len(),
             Self::Enclosure(node) => node.inventory.key.len(),
             Self::PreparedExpm1(node) => node.inventory.key.len(),
+            Self::LcRoot(node) => node.key.len(),
             Self::Scalar(node) => node.inventory.key.len(),
             Self::Pi(node) => node
                 .inventory
@@ -67,6 +71,7 @@ impl AnonymousLemma {
             Self::Pi(node) => Ok(node.inventory.bytes),
             Self::Enclosure(node) => Ok(node.inventory.bytes),
             Self::PreparedExpm1(node) => Ok(node.inventory.bytes),
+            Self::LcRoot(node) => Ok(node.bytes),
         }
     }
 
@@ -77,6 +82,7 @@ impl AnonymousLemma {
             Self::Constant(node) => out.raw(&node.key[1..]),
             Self::Enclosure(node) => out.raw(&node.inventory.key[1..]),
             Self::PreparedExpm1(node) => out.raw(&node.inventory.key[1..]),
+            Self::LcRoot(node) => out.raw(&node.key[1..]),
             Self::Scalar(node) => {
                 out.byte(1)?;
                 out.unsigned(u64::from(crate::proof::RETAINED_SCHEMAS[1].version))?;

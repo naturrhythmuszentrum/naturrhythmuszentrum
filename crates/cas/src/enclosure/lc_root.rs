@@ -1,15 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Private conditional family checker, without public or graph-registered proof authority.
-#![cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "private checker precedes atomic graph registration and portable replay"
-    )
-)]
-
+//! Conditional positive-root family law with durable receipts and independent portable replay.
 mod check;
 mod claim;
+mod service;
+mod wire;
+pub use service::{Certificate, Receipt};
 #[cfg(test)]
 mod tests;
 
@@ -23,21 +18,21 @@ const RECIPE: &str = "lc-positive-root-composition";
 
 /// Complete unsimplified original request; all constraints remain conditional premises.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Request {
+pub struct Request {
     /// Original context, including its admissible region and conditional fibres.
-    context: Handle,
+    pub context: Handle,
     /// Original ordered inputs, including unused and repeated positions.
-    inputs: Vec<Handle>,
+    pub inputs: Vec<Handle>,
     /// Original ordered Boolean constraints, including repeats.
-    constraints: Vec<Handle>,
+    pub constraints: Vec<Handle>,
     /// Original L and C positions, without commutative normalization.
-    positions: [usize; 2],
+    pub positions: [usize; 2],
     /// `P_lower`, `P_upper`, `t_lower`, `t_upper`, `a_lower` and `a_upper`.
-    endpoints: [Handle; 6],
+    pub endpoints: [Handle; 6],
     /// Original ordered product, strict half-power, reciprocal and tau*tau-P.
-    targets: [Handle; 4],
+    pub targets: [Handle; 4],
     /// Exact arithmetic interpretation; only revision one is defined.
-    arithmetic: u32,
+    pub arithmetic: u32,
 }
 
 /// Formal terms of the closed implication, resolved only against its original request.
@@ -111,13 +106,13 @@ enum Step {
 
 /// An untrusted local proposal, deliberately distinct from every existing receipt.
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct Candidate {
+pub(crate) struct Candidate {
     /// Closed schema name, checked independently of all other fields.
     recipe: &'static str,
     /// Mathematical revision; unknown versions refuse.
     version: u32,
     /// Complete original graph references and ordered constraints.
-    original: Request,
+    pub(crate) original: Request,
     /// Universally quantified distinct original inputs followed by endpoint parameters.
     universal: Vec<Handle>,
     /// Exact ordered conditional mathematical premises.
@@ -126,11 +121,18 @@ struct Candidate {
     native: [Native; 4],
     /// Exact ordered conditional conclusions.
     conclusions: [Predicate; 7],
-    /// Full five-step expansion; no receipt key replaces it.
+    /// All five reviewed expansion tags; no receipt key replaces their inventory.
     expansion: [Step; 5],
 }
 
 /// Borrowed checked closure; neither its original owner nor proposal may change while retained.
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "local checker borrow is inspected by internal controls"
+    )
+)]
 struct Checked<'a> {
     /// Keeps all shared original graphs alive once, without copying their closure.
     owner: &'a Cas,
@@ -194,7 +196,7 @@ const fn request_bytes(request: &Request) -> u64 {
 }
 
 /// Supplied proposals may retain excess capacity; charge the actual buffers before checking.
-const fn candidate_bytes(proposed: &Candidate) -> u64 {
+pub(crate) const fn candidate_bytes(proposed: &Candidate) -> u64 {
     let handles = proposed
         .original
         .inputs
@@ -219,4 +221,25 @@ fn capacity(request: &Request, budget: &Budget) -> Result<(), Fault> {
 /// Structural or mathematical mismatch cannot be confused with an exhausted budget.
 const fn invalid() -> Fault {
     Fault::invalid(InvalidCode::UnsupportedCertificate, AT)
+}
+
+/// Closed conditional family schema; this is not a ground enclosure or feasibility claim.
+pub const SCHEMA: crate::proof::LemmaSchema = crate::proof::LemmaSchema {
+    name: RECIPE,
+    label: "thm:cas:lc-positive-root-composition",
+    version: 1,
+    standing: crate::proof::Standing::Lemma(crate::proof::LemmaProvenance::CasChecked),
+    statement: "Under the complete original context and conditional premises, the ordered positive product, its original strict-real square root and reciprocal satisfy the retained root and reciprocal brackets and reverse polynomial.",
+    premises: "Original `DomainGuard` and Boolean constraints; `StrictSign` for L, C, product lower and root lower endpoints; ordered square and inverse endpoint inequalities; three native total Enclosure obligations and reciprocal `LocalOperation` interpretation.",
+};
+
+impl Request {
+    /// Original positions in the retained graph dependency inventory, without deduplication.
+    pub(crate) fn handles(&self) -> impl Iterator<Item = &Handle> {
+        std::iter::once(&self.context)
+            .chain(&self.inputs)
+            .chain(&self.constraints)
+            .chain(&self.endpoints)
+            .chain(&self.targets)
+    }
 }

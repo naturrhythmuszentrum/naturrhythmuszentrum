@@ -96,7 +96,11 @@ fn handles(
 }
 
 /// Copy the complete original inventory without canonicalizing its positions or constraints.
-fn copy(request: &Request, budget: &mut Budget, events: &mut Events) -> Result<Request, Fault> {
+pub(super) fn copy(
+    request: &Request,
+    budget: &mut Budget,
+    events: &mut Events,
+) -> Result<Request, Fault> {
     let inputs = handles(&request.inputs, budget, events)?;
     let constraints = handles(&request.constraints, budget, events)?;
     for _ in 0..11 {

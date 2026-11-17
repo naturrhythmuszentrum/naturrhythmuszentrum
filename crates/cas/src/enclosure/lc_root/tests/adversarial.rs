@@ -152,6 +152,15 @@ fn lc_root_family_ground_receipt() -> TestResult {
     )?;
     let receipt = report.checked.ok_or("ground root receipt")?;
     assert_eq!(receipt.formal_schema().name, "enclosure.root-grid");
+    let wire = receipt.certificate().to_bytes(&mut ledger()?)?;
+    let wrong_category = Certificate::from_bytes(&wire, &mut ledger()?)?;
+    let retained = f.cas.retained_judgment_count();
+    assert!(
+        f.cas
+            .check_lc_root(&f.request, &wrong_category, &mut ledger()?)
+            .is_err()
+    );
+    assert_eq!(f.cas.retained_judgment_count(), retained);
     let mut substitution = proposed(&f)?;
     substitution.recipe = receipt.formal_schema().name;
     refused(&f, &f.request, &substitution)?;
