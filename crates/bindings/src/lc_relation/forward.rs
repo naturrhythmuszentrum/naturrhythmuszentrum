@@ -108,6 +108,12 @@ impl LcRelation {
 }
 
 impl LcForwardCover {
+    /// Exact immutable question identity, including query and branch cover.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.0, &other.0)
+    }
+
     /// Complete original relation; no constraint has been silently dropped.
     #[must_use]
     pub fn relation(&self) -> &LcRelation {

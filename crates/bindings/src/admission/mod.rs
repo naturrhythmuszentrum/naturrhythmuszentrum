@@ -40,8 +40,8 @@ pub enum AdmissionError {
     /// A companion has the wrong kind, target, shape or difference measure.
     #[error("companion symbol does not match its declared target")]
     CompanionMismatch,
-    /// The result does not derive from the specified source symbol.
-    #[error("planned result does not match the copy source")]
+    /// The planned result differs from the checked original recipe or copy source.
+    #[error("planned result does not match the checked recipe")]
     ResultMismatch,
     /// Required region associations are missing or extra.
     #[error("symbol binding region inventory is incomplete")]

@@ -48,7 +48,9 @@ mod evidence;
 )]
 mod exact;
 mod kind;
+mod lc_omega;
 mod lc_relation;
+pub use lc_omega::{LcOmegaOriginals, LcOmegaOriginalsRequest};
 mod measure;
 #[expect(
     clippy::redundant_pub_crate,
