@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The rational original-declaration subset; no registered correspondence is asserted.
 
+mod correspondence;
 mod owning;
 
 use super::*;
@@ -40,15 +41,26 @@ fn input(quantity: LcQuantity, endpoints: [&str; 2], budget: &mut Budget) -> Tes
 
 /// Named `lc_omega_rational_originals` fixture, with repeated L and zero-admitting Energy.
 fn fixture(budget: &mut Budget) -> TestResult<Fixture> {
+    fixture_with_intervals(
+        [["1", "9"], ["1", "1"], ["0", "0"], ["1", "4"], ["0", "1"]],
+        budget,
+    )
+}
+
+/// Independently supplied receiving intervals keep every original positional declaration.
+fn fixture_with_intervals(intervals: [[&str; 2]; 5], budget: &mut Budget) -> TestResult<Fixture> {
     let mut originals = Vec::new();
     let mut inputs = Vec::new();
     for (quantity, endpoints) in [
-        (LcQuantity::Inductance, ["1", "9"]),
-        (LcQuantity::Capacitance, ["1", "1"]),
-        (LcQuantity::InitialPhase, ["0", "0"]),
-        (LcQuantity::Inductance, ["1", "4"]),
-        (LcQuantity::Energy, ["0", "1"]),
-    ] {
+        LcQuantity::Inductance,
+        LcQuantity::Capacitance,
+        LcQuantity::InitialPhase,
+        LcQuantity::Inductance,
+        LcQuantity::Energy,
+    ]
+    .into_iter()
+    .zip(intervals)
+    {
         originals.push(input(quantity, endpoints, budget)?);
         inputs.push([
             BindingSymbols::declare(&quantity.descriptor()?, [1, 1], [true; 2], budget)?,

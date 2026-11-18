@@ -51,7 +51,8 @@ mod kind;
 mod lc_omega;
 mod lc_relation;
 pub use lc_omega::{
-    LcOmegaDeclarationRequest, LcOmegaDeclarationToken, LcOmegaOriginals, LcOmegaOriginalsRequest,
+    LcOmegaCorrespondence, LcOmegaDeclarationRequest, LcOmegaDeclarationToken, LcOmegaOriginals,
+    LcOmegaOriginalsRequest,
 };
 mod measure;
 #[expect(

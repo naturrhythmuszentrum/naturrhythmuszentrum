@@ -31,8 +31,12 @@ pub use symbols::{BindingSymbols, CompanionKind, QuantitySymbol, SymbolKind};
 /// A refused exact symbol relation, independent of any numerical heap.
 #[derive(Clone, Debug, Eq, PartialEq, thiserror::Error)]
 pub enum AdmissionError {
-    /// The recipe requires concrete homogeneous coherent differences.
-    #[error("recipe requires concrete homogeneous coherent differences")]
+    /// The request lies outside the recipe's supported declaration or translation fragment.
+    /// This includes non-coherent differences and LC coordinates, endpoints or observations
+    /// outside the finite rational forward-question fragment.
+    #[error(
+        "unsupported declaration or translation: expected coherent differences or the finite rational LC forward-question fragment"
+    )]
     UnsupportedRecipe,
     /// A declared value does not have the requested physical meaning.
     #[error("symbol meaning does not match the recipe")]

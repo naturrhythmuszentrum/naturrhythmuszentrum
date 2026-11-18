@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Borrowed physical originals, without root-law or numerical authority.
+//! Original physical declarations and sealed conditional LC correspondence.
 
+mod correspondence;
 mod owner;
+pub use correspondence::LcOmegaCorrespondence;
 pub use owner::{LcOmegaDeclarationRequest, LcOmegaDeclarationToken};
 
 use crate::readings::EntryMeaning;

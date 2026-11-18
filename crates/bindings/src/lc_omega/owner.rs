@@ -59,19 +59,19 @@ impl<F> fmt::Debug for LcOmegaDeclarationRequest<'_, F> {
 pub struct LcOmegaDeclarationToken(Rc<Originals>);
 
 /// One captured inventory; all existing physical and graph allocations stay shared.
-struct Originals {
+pub(super) struct Originals {
     /// Exact question keeps its relation, query and branch domain live.
-    question: LcForwardCover,
+    pub(super) question: LcForwardCover,
     /// One retained pair buffer, never returned to callers.
-    inputs: Vec<[BindingSymbols; 2]>,
+    pub(super) inputs: Vec<[BindingSymbols; 2]>,
     /// Ordered physical operands.
-    positions: [usize; 2],
+    pub(super) positions: [usize; 2],
     /// Fixed tuple specialization.
-    counts: [usize; 3],
+    pub(super) counts: [usize; 3],
     /// Private requested result and companions.
-    output: BindingSymbols,
+    pub(super) output: BindingSymbols,
     /// Exact angle definition, retaining its original reference.
-    radian: EntryMeaning,
+    pub(super) radian: EntryMeaning,
     /// Compact exact coherent descriptors validated against the supplied registry.
     quantities: [LcQuantity; 3],
     /// Ordered operation validated at admission, not a registry proof token.
@@ -88,6 +88,16 @@ impl fmt::Debug for LcOmegaDeclarationToken {
 }
 
 impl LcOmegaDeclarationToken {
+    /// Borrow the captured originals only inside this implementation module.
+    pub(super) fn originals(&self) -> &Originals {
+        &self.0
+    }
+
+    /// Reserve the exact same captured-capacity increment as sharing.
+    pub(super) fn retained_bytes(&self) -> Result<u64, AdmissionError> {
+        retained_bytes(self.0.inputs.capacity())
+    }
+
     /// Capture each indexed row once, validate originals, and publish one shared owner.
     /// Existing original residence must remain reserved by the caller on this ledger.
     /// # Errors
@@ -151,7 +161,7 @@ impl LcOmegaDeclarationToken {
     /// Refuses exhausted Work or incremental token capacity before cloning its edge.
     pub fn share(&self, budget: &mut Budget) -> Result<Self, AdmissionError> {
         budget.with_work_phase("LC omega declaration", "sharing", |budget| {
-            budget.with_retained_payload(retained_bytes(self.0.inputs.capacity())?, AT, |budget| {
+            budget.with_retained_payload(self.retained_bytes()?, AT, |budget| {
                 budget.check(BudgetKind::OutputBytes, size_of::<Self>() as u64, AT)?;
                 budget.check(BudgetKind::StagedPayloadBytes, size_of::<Self>() as u64, AT)?;
                 budget.work(2, AT)?;
@@ -187,7 +197,7 @@ impl LcOmegaDeclarationToken {
         F: Fn(usize) -> Option<&'a [BindingSymbols; 2]>,
     {
         budget.with_work_phase("LC omega declaration", "comparison", |budget| {
-            budget.with_retained_payload(retained_bytes(self.0.inputs.capacity())?, AT, |budget| {
+            budget.with_retained_payload(self.retained_bytes()?, AT, |budget| {
                 compare(&self.0, expected, budget)
             })
         })
