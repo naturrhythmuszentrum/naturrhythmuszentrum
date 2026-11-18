@@ -138,6 +138,33 @@ impl LcOmegaCorrespondence {
         })
     }
 
+    /// Authenticate the frozen receipt, exact declaration and expected arithmetic.
+    ///
+    /// The caller reserves original residence minus the captured owner increment,
+    /// excluding this correspondence's `retained_bytes()` for the call. This method
+    /// reserves both internally; other owners and extra tokens remain caller-reserved.
+    /// Three ordered prepaid visits allocate nothing and expose no graph capability.
+    /// # Errors
+    /// Preserves receipt faults, identity/arithmetic mismatches and resource refusals.
+    pub fn authenticate_join(
+        &self,
+        expected: &LcOmegaDeclarationToken,
+        expected_arithmetic: u32,
+        budget: &mut Budget,
+    ) -> Result<()> {
+        let live = self.declaration.retained_bytes()? + self.retained_bytes();
+        budget.with_retained_payload(live, AT, |budget| {
+            accounting::original(1, budget)?;
+            let request = self.receipt.request(&self.cas)?;
+            self.declaration.check_same(expected, budget)?;
+            accounting::original(1, budget)?;
+            if request.arithmetic != expected_arithmetic {
+                return Err(AdmissionError::ValueMismatch);
+            }
+            Ok(())
+        })
+    }
+
     /// New retained correspondence residence, excluding existing original owners.
     #[must_use]
     pub fn retained_bytes(&self) -> u64 {

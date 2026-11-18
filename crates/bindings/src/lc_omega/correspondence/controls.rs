@@ -91,3 +91,18 @@ pub(in crate::lc_omega) fn source_tariffs(
     assert_eq!(budget.usage().work - before, 32, "typed seal and freeze");
     Ok(())
 }
+
+/// Defensive internal injection: public callers cannot replace the sealed receipt.
+pub(in crate::lc_omega) fn foreign_join_receipt(
+    checked: &mut LcOmegaCorrespondence,
+    foreign: &mut LcOmegaCorrespondence,
+    expected: &LcOmegaDeclarationToken,
+    budget: &mut Budget,
+) -> Result<()> {
+    let owner = &raw const *checked.cas;
+    std::mem::swap(&mut checked.receipt, &mut foreign.receipt);
+    let result = checked.authenticate_join(expected, 1, budget);
+    std::mem::swap(&mut checked.receipt, &mut foreign.receipt);
+    assert_eq!(owner, &raw const *checked.cas);
+    result
+}

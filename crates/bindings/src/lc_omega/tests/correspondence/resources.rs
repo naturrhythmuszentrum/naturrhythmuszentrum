@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact source-derived boundaries with a caller-owned original baseline and nonzero prefixes.
 use super::*;
+mod authentication;
 mod inspection;
 
 /// A caller-supplied original-union allowance, not a bindings measurement of mixed owners.
@@ -51,6 +52,7 @@ fn lc_omega_correspondence_resource_boundaries() -> TestResult {
     let certificate = run(&token, None, &mut preparation)?.certificate(&mut preparation)?;
     for proposed in [None, Some(&certificate)] {
         inspection::boundaries(&token, proposed)?;
+        authentication::boundaries(&token, proposed)?;
         work(&token, proposed)?;
         bytes(&token, proposed, BudgetKind::OutputBytes)?;
         bytes(&token, proposed, BudgetKind::StagedPayloadBytes)?;
@@ -187,5 +189,7 @@ fn lc_omega_correspondence_failure_ownership() -> TestResult {
     )?;
     let retried = run(&token, None, &mut preparation)?;
     retried.check_declaration(&token, &mut preparation)?;
+    // Independent authentication cases do not consume the construction-failure setup ledger.
+    authentication::failures(&token, &mut Budget::new(Limits::default())?)?;
     Ok(())
 }
