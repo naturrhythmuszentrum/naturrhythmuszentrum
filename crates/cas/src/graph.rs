@@ -1203,6 +1203,14 @@ impl Cas {
         })
     }
 
+    /// Borrow the immutable policy of this store.
+    ///
+    /// Receiving stores can meet this policy with their caller's active limits.
+    #[must_use]
+    pub const fn limits(&self) -> &Limits {
+        &self.limits
+    }
+
     /// Read cumulative comparator diagnostics without charging or resetting any budget.
     /// Includes lookup, insertion and rollback removal; failed work is never refunded.
     pub(crate) fn interning_snapshot(&self) -> InterningSnapshot {

@@ -768,6 +768,17 @@ impl Limits {
         self.local_branches = overrides.local_branches.unwrap_or(self.local_branches);
     }
 
+    /// Return the componentwise meet without changing either policy.
+    ///
+    /// Includes every permanent, cumulative and solving ceiling. Consumers can
+    /// derive a receiving store policy without recovering default allowances.
+    #[must_use]
+    pub fn meet(&self, other: &Self) -> Self {
+        let mut result = self.clone();
+        result.intersect(other);
+        result
+    }
+
     /// Intersect every component with the permanent store ceiling.
     pub(crate) fn intersect(&mut self, store: &Self) {
         self.source_bytes = self.source_bytes.min(store.source_bytes);

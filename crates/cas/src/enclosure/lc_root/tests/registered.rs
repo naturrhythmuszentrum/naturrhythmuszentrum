@@ -208,7 +208,14 @@ fn lc_root_registered_boundaries() -> TestResult {
     // Append: retained8110 + (18*4+24) dependency buffer. Transfer is the larger peak.
     // Replay retains the supplied 7036+24 bytes and reserves one fewer binder handle (24).
     boundaries(&certificate, 0, 173_200, 41_675)?;
-    boundaries(&certificate, 1, 187_375, 48_711)?;
+    // The receiving service reserves this getter, not a separately copied buffer.
+    assert_eq!(certificate.retained_bytes(), 7036 + 24);
+    boundaries(
+        &certificate,
+        1,
+        187_375,
+        41_675 + certificate.retained_bytes() - 24,
+    )?;
     rollback()?;
     shared_ledger()?;
     Ok(())

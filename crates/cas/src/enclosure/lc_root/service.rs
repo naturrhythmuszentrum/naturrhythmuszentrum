@@ -13,6 +13,12 @@ use std::sync::Arc;
 pub struct Certificate(Vec<u8>);
 
 impl Certificate {
+    /// Actual retained input residence, available without copying untrusted bytes.
+    #[must_use]
+    pub const fn retained_bytes(&self) -> u64 {
+        size_of::<Self>() as u64 + self.0.capacity() as u64
+    }
+
     /// Copy a bounded untrusted transcript; semantic checking occurs only in `Cas::check_lc_root`.
     /// # Errors
     /// Refuses exhausted witness, staged-byte or Work limits before copying.
@@ -118,9 +124,7 @@ fn run(
         .counts()
         .payload_bytes
         .saturating_sub(cas.retained_judgment_bytes());
-    let external = certificate.map_or(0, |value| {
-        value.0.capacity() as u64 + size_of::<Certificate>() as u64
-    });
+    let external = certificate.map_or(0, Certificate::retained_bytes);
     let result =
         budget.with_retained_payload(original_graph.saturating_add(external), AT, |budget| {
             cas.transaction(budget, |cas, budget| {

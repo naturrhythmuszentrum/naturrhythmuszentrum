@@ -3,6 +3,7 @@
 
 mod frontier;
 mod frozen;
+mod limits;
 mod snapshot;
 
 mod cases;
