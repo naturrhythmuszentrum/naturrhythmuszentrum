@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The rational original-declaration subset; no registered correspondence is asserted.
 
+mod owning;
+
 use super::*;
 use crate::{
     ExponentPolicy, Kind, LcInput, LcInterval, LcRelation, Limits, ReferenceDefinition, Scale,
@@ -115,6 +117,7 @@ impl Fixture {
 /// ´test:unit:lc-omega-originals-identity-refusals´
 #[test]
 fn lc_omega_originals_identity_refusals() -> TestResult {
+    owning::identities()?;
     let mut budget = Budget::new(Limits::default())?;
     let f = fixture(&mut budget)?;
     let checked = LcOmegaOriginals::check(f.request(), &mut budget)?;
@@ -290,10 +293,108 @@ fn lc_omega_originals_kind_refusals() -> TestResult {
     Ok(())
 }
 
+/// Original kinds, exact radians, companion targets and tuple shapes cannot be substituted.
+/// ´test:unit:lc-omega-correspondence-kind-refusals´
+#[test]
+fn lc_omega_correspondence_kind_refusals() -> TestResult {
+    let mut budget = Budget::new(Limits::default())?;
+    let f = fixture(&mut budget)?;
+    let mut request = f.request();
+    request.positions = [1, 0];
+    assert!(matches!(
+        owning::admit(request, &mut budget),
+        Err(AdmissionError::ValueMismatch)
+    ));
+    for (quantity, magnitude) in [(LcQuantity::Rate, "1"), (LcQuantity::InitialPhase, "2")] {
+        let descriptor = quantity.descriptor()?;
+        let value = Rational::parse(magnitude, &mut budget)?;
+        let meaning = EntryMeaning::new(
+            descriptor.clone(),
+            ReferenceDefinition::new("wrong radian", &descriptor, Scale::Exact(value))?,
+            None,
+            &mut budget,
+        )?;
+        let mut request = f.request();
+        request.radian = &meaning;
+        assert!(matches!(
+            owning::admit(request, &mut budget),
+            Err(AdmissionError::ValueMismatch)
+        ));
+    }
+    let original = LcQuantity::Inductance.descriptor()?;
+    let foreign_kind = crate::Descriptor::new(
+        Kind::Named(
+            "equal-dimension foreign L".into(),
+            Box::new(original.kind().dimension()?),
+        ),
+        crate::Measure::coherent(),
+        crate::Role::Difference,
+    )?;
+    let scaled = crate::Descriptor::new(
+        original.kind().clone(),
+        crate::Measure::new(
+            "scaled L",
+            Scale::Exact(Rational::parse("2", &mut budget)?),
+            Rational::zero(),
+        )?,
+        crate::Role::Difference,
+    )?;
+    for descriptor in [foreign_kind, scaled] {
+        let mut substituted = f.inputs.clone();
+        substituted[0][0] = BindingSymbols::declare(&descriptor, [1, 1], [true; 2], &mut budget)?;
+        let mut request = f.request();
+        request.inputs = &substituted;
+        assert!(matches!(
+            owning::admit(request, &mut budget),
+            Err(AdmissionError::ValueMismatch)
+        ));
+    }
+    let missing = BindingSymbols::declare(
+        &LcQuantity::AngularFrequency.descriptor()?,
+        [1, 1],
+        [false; 2],
+        &mut budget,
+    )?;
+    let mut request = f.request();
+    request.output = &missing;
+    assert!(matches!(
+        owning::admit(request, &mut budget),
+        Err(AdmissionError::CompanionMismatch)
+    ));
+    let mut malformed = f.output.clone();
+    malformed.bound = f.inputs[0][0].bound.clone();
+    let mut request = f.request();
+    request.output = &malformed;
+    assert!(matches!(
+        owning::admit(request, &mut budget),
+        Err(AdmissionError::CompanionMismatch)
+    ));
+    let rate = BindingSymbols::declare(
+        &LcQuantity::Rate.descriptor()?,
+        [1, 1],
+        [true; 2],
+        &mut budget,
+    )?;
+    let mut request = f.request();
+    request.output = &rate;
+    assert!(matches!(
+        owning::admit(request, &mut budget),
+        Err(AdmissionError::ValueMismatch)
+    ));
+    let mut request = f.request();
+    request.counts = [1, 2, 1];
+    assert!(matches!(
+        owning::admit(request, &mut budget),
+        Err(AdmissionError::ValueMismatch)
+    ));
+    Ok(())
+}
+
 /// Early and late physical refusal preserves every borrowed owner and spent Work.
 /// ´test:unit:lc-omega-originals-failure-ownership´
 #[test]
 fn lc_omega_originals_failure_ownership() -> TestResult {
+    owning::failures()?;
     let mut budget = Budget::new(Limits::default())?;
     let f = fixture(&mut budget)?;
     let question = f.question.clone();
@@ -324,6 +425,7 @@ fn lc_omega_originals_failure_ownership() -> TestResult {
 /// ´test:unit:lc-omega-originals-resource-boundaries´
 #[test]
 fn lc_omega_originals_resource_boundaries() -> TestResult {
+    owning::boundaries()?;
     let mut preparation = Budget::new(Limits::default())?;
     let f = fixture(&mut preparation)?;
     // Preflight, branch visit, selected positions, ordered rows, symbols, radian,

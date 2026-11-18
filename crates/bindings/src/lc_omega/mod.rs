@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Borrowed physical originals, without root-law or numerical authority.
 
+mod owner;
+pub use owner::{LcOmegaDeclarationRequest, LcOmegaDeclarationToken};
+
 use crate::readings::EntryMeaning;
 use crate::{AdmissionError, BinaryOp, BindingSymbols, LcForwardCover, LcQuantity, Registry};
 use nrz_cas::{

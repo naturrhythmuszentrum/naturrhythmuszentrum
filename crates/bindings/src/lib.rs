@@ -50,7 +50,9 @@ mod exact;
 mod kind;
 mod lc_omega;
 mod lc_relation;
-pub use lc_omega::{LcOmegaOriginals, LcOmegaOriginalsRequest};
+pub use lc_omega::{
+    LcOmegaDeclarationRequest, LcOmegaDeclarationToken, LcOmegaOriginals, LcOmegaOriginalsRequest,
+};
 mod measure;
 #[expect(
     clippy::redundant_pub_crate,
