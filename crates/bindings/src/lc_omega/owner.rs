@@ -93,8 +93,13 @@ impl LcOmegaDeclarationToken {
         &self.0
     }
 
-    /// Reserve the exact same captured-capacity increment as sharing.
-    pub(super) fn retained_bytes(&self) -> Result<u64, AdmissionError> {
+    /// Retained owner, captured pair capacity and initial token-slot allowance.
+    ///
+    /// Callers reserve this increment between operations. Methods documenting an
+    /// internal owner reservation take it over for the duration of their call.
+    /// # Errors
+    /// Refuses an allocation inventory that cannot be represented as a byte count.
+    pub fn retained_bytes(&self) -> Result<u64, AdmissionError> {
         retained_bytes(self.0.inputs.capacity())
     }
 

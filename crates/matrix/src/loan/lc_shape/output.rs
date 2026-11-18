@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! A requested omega declaration precedes storage; pending storage grants no computation proof.
 
+pub(super) mod bridge;
 mod pending;
 use super::{LcInputInventory, LcQuantityDemand, LcShapeError};
 use crate::{ExecutionAccount, LoanError, NumericalErrorScope};
+pub use bridge::{LcOmegaPrepareFailure, LcOmegaPrepared};
 use nrz_bindings::{BindingSymbols, Descriptor, LcQuantity, Registry, readings::EntryMeaning};
 use nrz_scalar::Scalar;
 pub use pending::{LcOutputCellState, LcOutputPending, LcOutputPublicationError};

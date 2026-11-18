@@ -210,6 +210,21 @@ impl<P: Scalar + 'static> LcShapeTile<'_, P> {
         self.tile.reader(heap, account)
     }
 
+    /// Borrow the exact private pin; the bridge cannot synthesize a ticket or clone an edge.
+    pub(in crate::loan::lc_shape) const fn pin(&self) -> &crate::BundlePin<P> {
+        self.tile.pin()
+    }
+
+    /// Admission on an already reserved original ledger preserves the public reader tariff.
+    pub(in crate::loan::lc_shape) fn current_reader_on<'a>(
+        &'a self,
+        heap: &'a Heap,
+        account: u64,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<TileReader<'a, P>, LoanError> {
+        self.tile.reader_on(heap, account, budget)
+    }
+
     /// Original schema retained by this publication and every independent outside pin.
     #[must_use]
     pub const fn schema(&self) -> &LcInputShape<P> {

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Private layout inventory; no constructors, registry dispatch or publication authority.
+//! Funded preparation records and private future execution layouts; no publication authority.
 //!
 //! C is the future checked correspondence owner, not an erased receipt or a stand-in
 //! proof. Only its sized Rc edge is native storage; its backend inventory is separate.
 #![expect(
     dead_code,
-    reason = "layout definitions precede gated owner construction"
+    reason = "execution layouts precede gated numerical owner construction"
 )]
 
 use super::{
@@ -31,49 +31,49 @@ struct LcOutcome {
 
 /// Six symbol handles and one mapped-source pin retain each original position.
 #[repr(C)]
-struct LcSourceRow {
+pub(in crate::loan) struct LcSourceRow {
     /// Original symbol ownership; the complete companions remain private.
-    symbols: [BindingSymbols; 2],
+    pub(in crate::loan) symbols: [BindingSymbols; 2],
     /// One mapped-source pin retains its entire immutable incoming closure.
-    pin: Rc<PinRecord>,
+    pub(in crate::loan) pin: Rc<PinRecord>,
     /// Original supplied-constraint position, including repeats.
-    position: usize,
+    pub(in crate::loan) position: usize,
     /// Nonwrapping original input schema identity.
-    schema: u64,
+    pub(in crate::loan) schema: u64,
     /// Captured original host occupation.
-    source: Identity,
+    pub(in crate::loan) source: Identity,
     /// Captured mapped-copy occupation and receipt identity.
-    mapped: Identity,
+    pub(in crate::loan) mapped: Identity,
     /// Original ordered instance, sample and branch roles.
-    axes: LcShapeAxes,
+    pub(in crate::loan) axes: LcShapeAxes,
     /// Exact tuple-to-instance affine product map.
-    projection: CellProduct,
+    pub(in crate::loan) projection: CellProduct,
     /// Captured source layout version.
-    layout: CellLayoutVersion,
+    pub(in crate::loan) layout: CellLayoutVersion,
     /// Three complete qualified mapped companion locators.
-    companions: [QualifiedMaskVersion; 3],
+    pub(in crate::loan) companions: [QualifiedMaskVersion; 3],
 }
 
 /// Exact-capacity rows have their own allocation and debit.
 #[repr(C)]
-struct LcClosure {
+pub(in crate::loan) struct LcClosure {
     /// Exact immutable owner or occupation identity.
-    identity: u64,
+    pub(in crate::loan) identity: u64,
     /// Exact-capacity original positional row backing.
-    rows: Vec<LcSourceRow>,
+    pub(in crate::loan) rows: Vec<LcSourceRow>,
 }
 
 /// Closed schedule metadata contains no C-sized intermediate storage.
 #[repr(C)]
-struct LcSchedule {
+pub(in crate::loan) struct LcSchedule {
     /// Original ordered inductance and capacitance positions.
-    positions: [usize; 2],
+    pub(in crate::loan) positions: [usize; 2],
     /// Immutable requested-quantity specialization identity.
-    specialization: u64,
+    pub(in crate::loan) specialization: u64,
     /// Correspondence, recipe, lowering and arithmetic revisions.
-    revisions: [u32; 4],
+    pub(in crate::loan) revisions: [u32; 4],
     /// Closed native scalar precision.
-    format: crate::storage::Format,
+    pub(in crate::loan) format: crate::storage::Format,
 }
 
 /// The only certainty claim permitted by this layout slice.
@@ -225,3 +225,14 @@ struct LcUse<C> {
 
 #[cfg(test)]
 mod tests;
+
+/// Closed native join owner, distinct from any numerical bundle occupation.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(in crate::loan) struct LcJoinIdentity {
+    /// Original heap scope.
+    pub(in crate::loan) scope: u64,
+    /// Original execution account.
+    pub(in crate::loan) account: u64,
+    /// Nonwrapping identity shared by the closure and cleanup receipts.
+    pub(in crate::loan) join: u64,
+}

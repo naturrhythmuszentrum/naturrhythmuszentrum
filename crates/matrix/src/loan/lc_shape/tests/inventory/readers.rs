@@ -20,15 +20,23 @@ const SELECTED: [[usize; 5]; 5] = [
     [0, 1, 4, 6, 9],
     [2, 3, 5, 9, 11],
 ];
-struct Members<'a, P: Scalar> {
+pub(in crate::loan::lc_shape::tests) struct Members<'a, P: Scalar> {
     tiles: Vec<LcShapeTile<'a, P>>,
     layouts: Vec<crate::CellLayoutVersion>,
 }
-impl<P: Scalar> Members<'_, P> {
-    fn references(&self) -> Vec<&LcShapeTile<'_, P>> {
+impl<'i, P: Scalar> Members<'i, P> {
+    pub(in crate::loan::lc_shape::tests) fn detach(self) -> Vec<crate::CellLayoutVersion> {
+        drop(self.tiles);
+        self.layouts
+    }
+    pub(in crate::loan::lc_shape::tests) fn references(&self) -> Vec<&LcShapeTile<'i, P>> {
         self.tiles.iter().collect()
     }
-    fn finish(self, heap: &mut Heap, account: &mut ExecutionAccount) -> TestResult {
+    pub(in crate::loan::lc_shape::tests) fn finish(
+        self,
+        heap: &mut Heap,
+        account: &mut ExecutionAccount,
+    ) -> TestResult {
         drop(self.tiles);
         for layout in self.layouts {
             fixture::retire_layout(heap, account, layout)?;
@@ -37,7 +45,7 @@ impl<P: Scalar> Members<'_, P> {
     }
 }
 /// All original schema members exist before the first numerical publication.
-fn publish<'a, P: Scalar + 'static>(
+pub(in crate::loan::lc_shape::tests) fn publish<'a, P: Scalar + 'static>(
     inventory: &'a LcInputInventory<P, 5>,
     axes: &LcShapeAxes,
     heap: &mut Heap,

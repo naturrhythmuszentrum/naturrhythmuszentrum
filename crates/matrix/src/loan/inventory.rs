@@ -68,6 +68,8 @@ impl Heap {
                             AllocationKind::Filled => &mut result.filled_bytes,
                             AllocationKind::PreparedOwner { .. }
                             | AllocationKind::PreparedUse(_)
+                            | AllocationKind::LcClosure(_)
+                            | AllocationKind::LcRows(_)
                             | AllocationKind::Constant(_) => return Err(LoanError::WrongLoan),
                         };
                         *total = total

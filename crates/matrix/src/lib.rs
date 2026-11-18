@@ -427,3 +427,7 @@ pub use mask::{
     CellAxis, CellCorrespondence, CellFactor, CellGather, CellLayoutVersion, CellProduct,
     MaskError, MaskPartition, MaskVersion, MaskView,
 };
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/lc_origin_no_symbol_escape.rs"]
+mod lc_origin_no_symbol_escape;

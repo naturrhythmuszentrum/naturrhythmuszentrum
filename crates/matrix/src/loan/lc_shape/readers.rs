@@ -71,18 +71,47 @@ impl<P: Scalar + 'static, const N: usize> LcInputInventory<P, N> {
                 if tiles.len() != N {
                     return Err(LoanError::UnsupportedContract);
                 }
-                let axes = tiles.first().ok_or(LoanError::UnsupportedContract)?.axes();
-                for (index, tile) in tiles.iter().enumerate() {
-                    let expected = self.input(index).ok_or(LoanError::TargetMismatch)?;
-                    if !std::ptr::eq(expected, tile.schema()) {
-                        return Err(LoanError::TargetMismatch);
-                    }
-                    if tile.axes() != axes {
-                        return Err(LoanError::LayoutMismatch);
-                    }
-                }
-                Ok(axes)
+                self.membership_prepaid(tiles)
             })
+    }
+
+    /// Reuse the public metadata gate after the bridge has prepaid its row agreement.
+    pub(in crate::loan::lc_shape) fn membership_prepaid(
+        &self,
+        tiles: &[&LcShapeTile<'_, P>],
+    ) -> Result<LcShapeAxes, LoanError> {
+        let axes = tiles.first().ok_or(LoanError::UnsupportedContract)?.axes();
+        for (index, tile) in tiles.iter().enumerate() {
+            let expected = self.input(index).ok_or(LoanError::TargetMismatch)?;
+            if !std::ptr::eq(expected, tile.schema()) {
+                return Err(LoanError::TargetMismatch);
+            }
+            if tile.axes() != axes {
+                return Err(LoanError::LayoutMismatch);
+            }
+        }
+        Ok(axes)
+    }
+
+    /// Build readers after the bridge's count check and positional prepayment.
+    /// The original candidate residence remains reserved by the caller.
+    pub(in crate::loan::lc_shape) fn readers_prepaid<'a>(
+        &'a self,
+        heap: &'a Heap,
+        tiles: &[&'a LcShapeTile<'_, P>],
+        account: u64,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<LcInputReaders<'a, P, N>, LoanError> {
+        let axes = self.membership_prepaid(tiles)?;
+        let mut readers = std::array::from_fn(|_| None);
+        for (slot, tile) in readers.iter_mut().zip(tiles) {
+            *slot = Some(tile.current_reader_on(heap, account, budget)?);
+        }
+        Ok(LcInputReaders {
+            inventory: self,
+            axes,
+            readers,
+        })
     }
 }
 impl<P: Scalar, const N: usize> LcInputReaders<'_, P, N> {

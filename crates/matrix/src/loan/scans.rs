@@ -21,7 +21,7 @@ pub struct ScanCursor {
     next: usize,
     /// Stable endpoint of this pass.
     end: usize,
-    /// A root removal requires another oldest-first pass.
+    /// Root removal or a deferred expired LC header requires another pass.
     changed: bool,
 }
 /// Bounded traversal distinguishes completion from stopped or pending work.
@@ -294,8 +294,8 @@ impl Heap {
             |budget| {
                 for _ in 0..allowance {
                     if cursor.next == cursor.end {
-                        if reclaim && cursor.changed {
-                            cursor = self.cursor(true);
+                        if cursor.changed {
+                            cursor = self.cursor(reclaim);
                         } else {
                             return Ok(true);
                         }
@@ -304,7 +304,7 @@ impl Heap {
                     if reclaim {
                         self.reclaim_slot(cursor.next, budget, &mut cursor.changed)?;
                     } else {
-                        self.reconcile_slot(cursor.next, budget)?;
+                        self.reconcile_slot(cursor.next, budget, &mut cursor.changed)?;
                     }
                     cursor.next += 1;
                     cursor.revision = self.loans.revision;
@@ -324,10 +324,11 @@ impl Heap {
         &mut self,
         slot: usize,
         budget: &mut nrz_bindings::Budget,
+        changed: &mut bool,
     ) -> Result<(), LoanError> {
         let prepared_start = self.loans.groups.len() + self.loans.pins.len();
         if slot >= prepared_start {
-            return self.reconcile_prepared(slot - prepared_start, budget);
+            return self.reconcile_prepared(slot - prepared_start, budget, changed);
         }
         if slot >= self.loans.groups.len() {
             let index = slot - self.loans.groups.len();
@@ -375,11 +376,31 @@ impl Heap {
         self.loans.pending -= 1;
         Ok(())
     }
+    /// A rows witness keeps the header allocation alive regardless of scan order.
+    fn lc_rows_remain(
+        &self,
+        identity: super::lc_origin::LcJoinIdentity,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<bool, LoanError> {
+        use super::registry::{AllocationKind, DebitOwner};
+        for slot in &self.loans.debits {
+            charge(budget, 1)?;
+            if let Some(debit) = slot {
+                let matching_rows = debit.owner == DebitOwner::LcJoin(identity)
+                    && matches!(debit.kind, AllocationKind::LcRows(_));
+                if matching_rows {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
     /// A law owner and each expired use are distinct authenticated removal events.
     fn reconcile_prepared(
         &mut self,
         slot: usize,
         budget: &mut nrz_bindings::Budget,
+        changed: &mut bool,
     ) -> Result<(), LoanError> {
         use super::registry::{AllocationKind, DebitOwner};
         let Some(debit) = self.loans.debits.get(slot).and_then(Option::as_ref) else {
@@ -388,6 +409,32 @@ impl Heap {
         let expired = match &debit.kind {
             AllocationKind::PreparedOwner { witness, .. } => witness.strong_count() == 0,
             AllocationKind::PreparedUse(witness) => witness.strong_count() == 0,
+            AllocationKind::LcClosure(witness) | AllocationKind::LcRows(witness) => {
+                let DebitOwner::LcJoin(identity) = debit.owner else {
+                    return Err(LoanError::WrongLoan);
+                };
+                if identity.scope != self.scope
+                    || identity.account == 0
+                    || identity.join == 0
+                    || debit.key == 0
+                    || debit.elements != 0
+                {
+                    return Err(LoanError::WrongLoan);
+                }
+                if witness.strong_count() == 0 {
+                    let header = matches!(debit.kind, AllocationKind::LcClosure(_));
+                    if header && self.lc_rows_remain(identity, budget)? {
+                        *changed = true;
+                        return Ok(());
+                    }
+                    let revision = self.loans.next_revision()?;
+                    charge(budget, 1)?;
+                    let key = debit.key;
+                    self.loans.release(slot, key);
+                    self.loans.revision = revision;
+                }
+                return Ok(());
+            }
             AllocationKind::Constant(witness) => {
                 if debit.owner != DebitOwner::Constant(self.scope)
                     || debit.key == 0

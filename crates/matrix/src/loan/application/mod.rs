@@ -12,6 +12,7 @@ pub use binary::{
 };
 mod endpoints;
 pub(super) mod evaluation;
+pub(in crate::loan) mod lc_source;
 mod member;
 mod prepared;
 mod publication;

@@ -194,20 +194,29 @@ impl<P: Scalar + 'static> PublishedTile<P> {
         heap: &'a Heap,
         account: &mut ExecutionAccount,
     ) -> Result<TileReader<'a, P>, LoanError> {
+        self.reader_on(heap, account.identity, &mut account.ledger)
+    }
+    /// Internal callers retain their original ledger while reserving sibling owners.
+    pub(in crate::loan) fn reader_on<'a>(
+        &'a self,
+        heap: &'a Heap,
+        account: u64,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<TileReader<'a, P>, LoanError> {
         let pin = self
             .pin
             .record
             .payload
             .as_ref()
             .ok_or(LoanError::WrongLoan)?;
-        account.authenticate(pin.account)?;
-        account
-            .ledger
-            .with_work_phase(super::FAMILY, "current reader", |budget| {
-                heap.current_bundle(&self.pin, budget)?;
-                charge(budget, 3)?;
-                self.pin.layout_reader()
-            })
+        if account != pin.account {
+            return Err(LoanError::ForeignAccount);
+        }
+        budget.with_work_phase(super::FAMILY, "current reader", |budget| {
+            heap.current_bundle(&self.pin, budget)?;
+            charge(budget, 3)?;
+            self.pin.layout_reader()
+        })
     }
     /// Move the initial use edge into another owning facade without creating a new edge.
     #[must_use]

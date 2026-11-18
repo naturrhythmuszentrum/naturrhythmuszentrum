@@ -168,6 +168,10 @@ pub(super) enum AllocationKind {
     PreparedUse(Weak<super::retained_expm1::PreparedExpm1UseRecord>),
     /// Shared source-free numerical constant, observed only for expiration and pointer identity.
     Constant(Weak<dyn std::any::Any>),
+    /// Expiration witness for the shared LC closure header.
+    LcClosure(Weak<super::lc_origin::LcClosure>),
+    /// Separate allocation role for the exact positional row backing.
+    LcRows(Weak<super::lc_origin::LcClosure>),
 }
 /// Closed authority classes prevent a bundle occupation authenticating a law debit.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -178,6 +182,8 @@ pub(super) enum DebitOwner {
     Prepared(super::retained_expm1::LawIdentity),
     /// Heap scope for an adopted immutable numerical constant, without bundle authority.
     Constant(u64),
+    /// A funded LC join without a fictitious numerical occupation.
+    LcJoin(super::lc_origin::LcJoinIdentity),
 }
 /// The accounting record owns no payload and never duplicates its charge.
 #[derive(Debug)]

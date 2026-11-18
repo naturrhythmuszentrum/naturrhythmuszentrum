@@ -5,8 +5,8 @@ mod inventory;
 mod lifecycle;
 mod output;
 pub use output::{
-    LcOmegaOutput, LcOutputCellState, LcOutputDeclaration, LcOutputPending,
-    LcOutputPublicationError,
+    LcOmegaOutput, LcOmegaPrepareFailure, LcOmegaPrepared, LcOutputCellState, LcOutputDeclaration,
+    LcOutputPending, LcOutputPublicationError,
 };
 mod readers;
 use super::{ExecutionAccount, HostTileDeclaration, LoanError, charge};
@@ -238,3 +238,9 @@ impl<P: Scalar> LcInputShape<P> {
 
 #[cfg(test)]
 mod tests;
+
+/// Private bridge layout evidence is shared with the existing native inventory control.
+#[cfg(test)]
+pub(super) fn bridge_layout<P: nrz_scalar::Scalar>() {
+    output::bridge::layout::<P>();
+}

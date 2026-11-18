@@ -2,7 +2,7 @@
 //! Complete original inventories preserve each independent positional transport capability.
 
 mod boundaries;
-mod readers;
+pub(super) mod readers;
 mod refusals;
 use super::fixture::{self, TestResult};
 use crate::loan::application::tests::binary::oracle::Rational;

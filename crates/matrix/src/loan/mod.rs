@@ -15,10 +15,11 @@ mod lc_origin;
 mod lc_shape;
 pub use lc_shape::{
     LcFrequencyPrelude, LcFrequencyTarget, LcInputCell, LcInputCells, LcInputInventory,
-    LcInputProduct, LcInputReaders, LcInputReading, LcInputShape, LcOmegaOutput, LcOutputCellState,
-    LcOutputDeclaration, LcOutputPending, LcOutputPublicationError, LcProductCell, LcProductError,
-    LcQuantityDemand, LcRequestedCell, LcRequestedState, LcRequestedValues, LcShapeApplication,
-    LcShapeAxes, LcShapeError, LcShapeRequest, LcShapeTile,
+    LcInputProduct, LcInputReaders, LcInputReading, LcInputShape, LcOmegaOutput,
+    LcOmegaPrepareFailure, LcOmegaPrepared, LcOutputCellState, LcOutputDeclaration,
+    LcOutputPending, LcOutputPublicationError, LcProductCell, LcProductError, LcQuantityDemand,
+    LcRequestedCell, LcRequestedState, LcRequestedValues, LcShapeApplication, LcShapeAxes,
+    LcShapeError, LcShapeRequest, LcShapeTile,
 };
 mod lifecycle;
 mod masked_reader;
