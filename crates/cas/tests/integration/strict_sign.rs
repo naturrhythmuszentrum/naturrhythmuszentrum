@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact sign proposals are checked against an independent integer sign oracle and fresh replay.
 
+mod boundaries;
+
 use crate::testing::common::TestResult;
 use crate::testing::readings::ledger;
 use crate::testing::strict_sign::{expected, fixture};
@@ -55,24 +57,33 @@ fn strict_sign_oracle_and_fresh_replay() -> TestResult {
     assert_eq!(
         costs,
         vec![
-            (-1, -1, 0, 27_081, 58_330, 705),
-            (-1, -1, 1, 27_081, 58_330, 705),
-            (-1, -1, 2, 33_007, 71_159, 846),
-            (-1, -1, 3, 35_766, 77_266, 911),
-            (-1, 1, 0, 25_602, 54_618, 662),
-            (-1, 1, 1, 25_602, 54_618, 662),
-            (-1, 1, 2, 31_526, 67_314, 803),
-            (-1, 1, 3, 34_284, 73_360, 868),
-            (1, -1, 0, 25_602, 54_619, 662),
-            (1, -1, 1, 25_602, 54_619, 662),
-            (1, -1, 2, 31_526, 67_315, 803),
-            (1, -1, 3, 34_284, 73_361, 868),
-            (1, 1, 0, 24_124, 50_946, 619),
-            (1, 1, 1, 24_124, 50_946, 619),
-            (1, 1, 2, 30_046, 63_509, 760),
-            (1, 1, 3, 32_803, 69_494, 825),
+            (-1, -1, 0, 27_123, 58_372, 705),
+            (-1, -1, 1, 27_123, 58_372, 705),
+            (-1, -1, 2, 33_082, 71_234, 846),
+            (-1, -1, 3, 35_864, 77_364, 911),
+            (-1, 1, 0, 25_644, 54_660, 662),
+            (-1, 1, 1, 25_644, 54_660, 662),
+            (-1, 1, 2, 31_601, 67_389, 803),
+            (-1, 1, 3, 34_382, 73_458, 868),
+            (1, -1, 0, 25_644, 54_661, 662),
+            (1, -1, 1, 25_644, 54_661, 662),
+            (1, -1, 2, 31_601, 67_390, 803),
+            (1, -1, 3, 34_382, 73_459, 868),
+            (1, 1, 0, 24_166, 50_988, 619),
+            (1, 1, 1, 24_166, 50_988, 619),
+            (1, 1, 2, 30_121, 63_584, 760),
+            (1, 1, 3, 32_901, 69_592, 825),
         ]
     );
+    for (left, right, index, generation, replay, _) in costs {
+        let positive = (left == right) != (index == 3);
+        boundaries::check(
+            (left, right),
+            boundaries::Subject::Indexed(index),
+            positive,
+            (generation, replay),
+        )?;
+    }
     Ok(())
 }
 
@@ -123,11 +134,20 @@ fn strict_sign_power_oracle() -> TestResult {
     assert_eq!(
         costs,
         vec![
-            (-1, 2, 24_164, 52_232, 645),
-            (-1, 3, 24_164, 52_232, 645),
-            (1, 2, 22_686, 48_577, 602),
-            (1, 3, 22_686, 48_577, 602),
+            (-1, 2, 24_188, 52_256, 645),
+            (-1, 3, 24_188, 52_256, 645),
+            (1, 2, 22_710, 48_601, 602),
+            (1, 3, 22_710, 48_601, 602),
         ]
     );
+    for (sign, exponent, generation, replay, _) in costs {
+        let positive = sign > 0 || exponent % 2 == 0;
+        boundaries::check(
+            (i8::try_from(sign)?, 1),
+            boundaries::Subject::Power(exponent),
+            positive,
+            (generation, replay),
+        )?;
+    }
     Ok(())
 }

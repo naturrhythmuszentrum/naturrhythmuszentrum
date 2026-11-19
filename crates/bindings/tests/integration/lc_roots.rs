@@ -51,7 +51,7 @@ fn lc_original_root_coverage_replays() -> TestResult {
             admission.usage().work,
             coverage.retained_payload_bytes()
         ),
-        (1_415_961, 1_422_102, 1_413_948, 826_907, 4_468, 52_448)
+        (1_417_099, 1_423_240, 1_415_086, 826_907, 4_468, 52_448)
     );
     Ok(())
 }

@@ -21,7 +21,7 @@ owners = [
 partitions = [
   { name = "compute", owner = "COMPUTE", pattern = '[ %s"templates/" ] %s"crates/compute" [ "/" *VCHAR ]' },
   { name = "declared-surface", owner = "NRZ", pattern = '%s".linter" [ "/" *VCHAR ]' },
-  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"Cargo.lock" / %s"Cargo.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"rust-toolchain.toml" )' },
+  { name = "root-files", owner = "NRZ", pattern = '( %s".gitignore" / %s"Cargo.lock" / %s"Cargo.toml" / %s"clippy.toml" / %s"LICENSE-CODE" / %s"LICENSE-DOCS" / %s"rust-toolchain.toml" )' },
   { name = "guides", owner = "DOCS", pattern = '( %s"CONTRIBUTING.md" / %s"templates/CONTRIBUTING.md.j2" / %s"README.md" / %s"templates/README.md.j2" )' },
   { name = "documents", owner = "DOCS", pattern = '[ %s"templates/" ] %s"docs" [ "/" *VCHAR ]' },
   { name = "data", owner = "NRZ", pattern = '%s"data" [ "/" *VCHAR ]' },

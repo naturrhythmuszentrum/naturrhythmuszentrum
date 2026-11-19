@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: CC0-1.0
+# Workspace collection ordering gate.
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "std::collections::HashSet", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "std::hash::RandomState", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "std::hash::DefaultHasher", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "hashbrown::HashMap", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "hashbrown::HashSet", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "indexmap::IndexMap", reason = "rule:nrz:stable-collection-order: no admitted indexmap implementation; type gate covers random-state trait constructors" },
+  { path = "indexmap::IndexSet", reason = "rule:nrz:stable-collection-order: no admitted indexmap implementation; type gate covers random-state trait constructors" },
+]
+disallowed-methods = [
+  { path = "std::hash::RandomState::new", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "std::hash::DefaultHasher::new", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "indexmap::IndexMap::new", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "indexmap::IndexMap::with_capacity", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "indexmap::IndexSet::new", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "indexmap::IndexSet::with_capacity", reason = "rule:nrz:stable-collection-order: use key/index order or admitted deterministic insertion order" },
+  { path = "petgraph::algo::dijkstra", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "petgraph::algo::floyd_warshall", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "petgraph::algo::johnson", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "petgraph::algo::articulation_points::articulation_points", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "petgraph::algo::dsatur_coloring", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "petgraph::algo::maximal_cliques", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "minijinja::Environment::templates", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "minijinja::Template::undeclared_variables", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+  { path = "minijinja::Expression::undeclared_variables", reason = "rule:nrz:stable-collection-order: returned hash collection or hash-order iterator is not admitted" },
+]

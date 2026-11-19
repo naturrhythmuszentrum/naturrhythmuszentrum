@@ -58,7 +58,7 @@ fn lc_replay_default_agrees_with_full_oracle() -> TestResult {
         crate::testing::solve_blind::family_lc(&target.cas, &witness)?;
         costs.push(budget.usage().work);
     }
-    assert_eq!(costs, [1_415_961, 1_915_679]);
+    assert_eq!(costs, [1_417_099, 1_916_817]);
     Ok(())
 }
 
@@ -70,7 +70,7 @@ fn capped_replay(
     short: u64,
     prior: u64,
 ) -> TestResult {
-    let required = 1_415_961;
+    let required = 1_417_099;
     let cap = required - short;
     let (mut target, expected) = receiver(original, set)?;
     let before = target.cas.counts();
@@ -138,6 +138,43 @@ fn lc_empty_exclusion_agrees_with_search() -> TestResult {
         crate::testing::solve_blind::family_lc(&target.cas, &witness)?;
         costs.push(budget.usage().work);
     }
-    assert_eq!(costs, [1_415_961, 1_764_902]);
+    assert_eq!(costs, [1_417_099, 1_766_040]);
+    Ok(())
+}
+
+/// ´test:crate:stable-collection-lc-oracle-work-boundaries´
+#[test]
+fn oracle_work_boundaries() -> TestResult {
+    let (original, set, bytes) = source()?;
+    for (full, required) in [(true, 1_916_817), (false, 1_766_040)] {
+        for short in [0, 1] {
+            let (mut target, expected) = receiver(&original.cas, &set)?;
+            let mut limits = super::ledger()?.limits().clone();
+            limits.work = required - short;
+            let mut budget = Budget::new(limits)?;
+            let result = if full {
+                crate::testing::replay_answer::full_replay(
+                    &mut target.cas,
+                    &bytes,
+                    &expected,
+                    &mut budget,
+                )
+            } else {
+                crate::testing::exclusion_oracle::run(|| {
+                    target.cas.replay(&bytes, &expected, &mut budget)
+                })
+            };
+            if short == 0 {
+                result?;
+                assert_eq!(budget.usage().work, required);
+            } else {
+                let fault = result.err().ok_or("one-below LC oracle completed")?;
+                assert!(
+                    matches!(fault.kind, crate::FaultKind::Exhausted { budget: BudgetKind::Work, needed, .. } if needed == required),
+                    "{fault:?}"
+                );
+            }
+        }
+    }
     Ok(())
 }

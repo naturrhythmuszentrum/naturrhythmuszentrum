@@ -52,13 +52,14 @@ fn split(
     if *domain != node.region || members.len() != children.len() {
         return Err(invalid());
     }
-    let mut regions = std::collections::HashSet::new();
-    regions
-        .try_reserve(members.len())
-        .map_err(|_| Fault::allocation(AT))?;
+    let mut regions = crate::ordered_scratch::Map::new();
+    regions.reserve(members.len(), budget, AT)?;
     for member in members {
         budget.work(1, AT)?;
-        if !regions.insert(member.logical_id().serial) {
+        if regions
+            .insert(member.logical_id().serial, (), budget, AT)?
+            .is_some()
+        {
             return Err(invalid());
         }
     }
@@ -69,7 +70,10 @@ fn split(
             return Err(invalid());
         }
         let region = &dag.nodes.get(child).ok_or_else(invalid)?.region;
-        if !regions.remove(&region.logical_id().serial) {
+        if regions
+            .remove(&region.logical_id().serial, budget, AT)?
+            .is_none()
+        {
             return Err(invalid());
         }
     }

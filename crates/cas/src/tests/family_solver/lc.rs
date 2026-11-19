@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! The original determinant retains strict divisors through checked coefficient transport.
 
+mod boundaries;
 mod cache;
 mod citations;
 mod costs;
@@ -51,7 +52,7 @@ fn lc_original_coefficient_equality_replays() -> TestResult {
             replay.usage().work,
             bytes.len()
         ),
-        (101_354, 749_040, 375_148, 2_479)
+        (101_354, 749_125, 375_190, 2_479)
     );
     Ok(())
 }
@@ -93,7 +94,7 @@ fn lc_original_missing_domain_refuses() -> TestResult {
     }
     assert_eq!(
         (domain_work, sign_work),
-        (9_867, vec![([0, 1], 448_377), ([1, 0], 445_969)])
+        (9_867, vec![([0, 1], 458_420), ([1, 0], 456_008)])
     );
     Ok(())
 }

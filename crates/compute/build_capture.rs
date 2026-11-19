@@ -8,7 +8,7 @@
 
 use serde_json::{Value, json};
 use std::{
-    collections::HashSet,
+    collections::BTreeSet,
     env, fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -51,7 +51,7 @@ pub(crate) fn watch(path: &Path, excluded: &[PathBuf], output: &mut impl Write) 
 }
 
 /// List ignored root-relative paths once, before walking any source directory.
-fn ignored_paths(root: &Path) -> io::Result<HashSet<PathBuf>> {
+fn ignored_paths(root: &Path) -> io::Result<BTreeSet<PathBuf>> {
     let output = Command::new("git")
         .args([
             "ls-files",
@@ -80,7 +80,7 @@ fn watch_directory(
     path: &Path,
     root: &Path,
     excluded: &[PathBuf],
-    ignored: &HashSet<PathBuf>,
+    ignored: &BTreeSet<PathBuf>,
     output: &mut impl Write,
 ) -> io::Result<bool> {
     let mut children = Vec::new();

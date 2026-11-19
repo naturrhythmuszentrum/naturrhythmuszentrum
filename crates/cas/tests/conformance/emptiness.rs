@@ -590,7 +590,7 @@ fn emptiness_resource_measurements() -> TestResult {
             u64::try_from(bytes.len())?,
             fixture.cas.counts().payload_bytes - before
         ],
-        [5_002, 43_188, 72_670, 789, 789, 3_178]
+        [5_010, 43_200, 72_682, 789, 789, 3_178]
     );
     Ok(())
 }

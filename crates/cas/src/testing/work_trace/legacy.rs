@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Complete named receipts captured from the charge-hook observer on the dependency seed.
+//! Named receipts preserve observer scope across explicitly measured tariff revisions.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -153,7 +153,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1317
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -1069,7 +1069,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1319
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -1200,7 +1200,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1319
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -1344,7 +1344,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1292
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -1532,7 +1532,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1301
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -1720,7 +1720,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1292
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -1908,7 +1908,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1296
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7
@@ -2096,7 +2096,7 @@ real.sign	validation	rational comparison	2784
 real.sign	validation	rational constructor	256
 real.sign	validation	rational multiplication	320
 real.sign	validation	rational negation	64
-real.sign	validation	real solving certificates	179
+real.sign	validation	real solving certificates	1317
 real.sign	validation	scalar family admission	1
 real.sign	validation	scalar statement view	2382
 real.sign	validation	semantic header	7

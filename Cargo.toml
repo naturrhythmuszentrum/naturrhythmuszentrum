@@ -63,6 +63,8 @@ pedantic = { level = "deny", priority = -1 }
 perf = { level = "deny", priority = -1 }
 style = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
+disallowed_types = { level = "deny", priority = 0 }
+disallowed_methods = { level = "deny", priority = 0 }
 dbg_macro = { level = "deny", priority = 0 }
 exit = { level = "deny", priority = 0 }
 missing_docs_in_private_items = { level = "warn", priority = 0 }

@@ -54,6 +54,7 @@ fn at_cap(
     field: &Field,
     boundary: Boundary,
     cap: u64,
+    expected_work: u64,
 ) -> TestResult {
     let bytes = super::answer::exported(cas, answer.facts.last().ok_or("presentation")?)?;
     let (mut fixture, coverage, presentation) =
@@ -66,6 +67,7 @@ fn at_cap(
         .replay_answer(&bytes, &coverage, &presentation, &mut ledger);
     if cap == boundary.required {
         let (checked_coverage, checked_presentation) = result?;
+        assert_eq!(ledger.usage().work, expected_work);
         assert_eq!(usage(&ledger.usage(), boundary.kind)?, boundary.required);
         assert_eq!(
             super::answer::exported(&fixture.cas, &checked_presentation)?,
@@ -94,7 +96,7 @@ fn at_cap(
 pub(crate) fn check(field: &Field) -> TestResult {
     let (coefficient_ops, work) = match field {
         Field::Complex => (2_940_416, 381_017_101),
-        Field::Real => (2_008_224, 379_173_871),
+        Field::Real => (2_008_224, 382_249_082),
         _ => return Err("symbolic boundary field".into()),
     };
     let (cas, answer) = source(field)?;
@@ -109,7 +111,7 @@ pub(crate) fn check(field: &Field) -> TestResult {
         },
     ] {
         for cap in [boundary.required, boundary.required - 1] {
-            at_cap(&cas, &answer, field, boundary, cap)?;
+            at_cap(&cas, &answer, field, boundary, cap, work)?;
         }
     }
     Ok(())

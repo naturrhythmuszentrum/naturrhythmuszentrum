@@ -5,6 +5,7 @@ use crate::testing::lc_roots::{TestResult, changed, ledger, mutations, original,
 use nrz_bindings::readings::algebra::{
     FaultKind, Location,
     limits::{Budget, BudgetKind, Limits},
+    request::Outcome,
 };
 use nrz_bindings::readings::{ReadingError, RootCoverage, RootProblem};
 
@@ -76,9 +77,9 @@ fn lc_root_replay_exact_work_boundaries() -> TestResult {
     let theorem = proof()?;
     let bytes = &theorem.bytes;
     for (work, replay, accepted) in [
-        (1_415_962, 1_415_961, true),
-        (1_415_961, 1_415_961, false),
-        (1_415_962, 1_415_960, false),
+        (1_417_100, 1_417_099, true),
+        (1_417_099, 1_417_099, false),
+        (1_417_100, 1_417_098, false),
     ] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
@@ -105,13 +106,13 @@ fn lc_root_replay_exact_work_boundaries() -> TestResult {
 fn lc_root_replay_carries_requests_and_retries() -> TestResult {
     let theorem = proof()?;
     let bytes = &theorem.bytes;
-    for ceiling in [2_829_928, 2_829_927] {
+    for ceiling in [2_832_204, 2_832_203] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
         let problem = RootProblem::check(&mut fixture.cas, request, &mut ledger()?)?;
         let mut budget = Budget::new(Limits {
             work: ceiling,
-            replay_work: 1_415_961,
+            replay_work: 1_417_099,
             ..Limits::default()
         })?;
         budget.work(17, Location::new("earlier symbolic work"))?;
@@ -123,7 +124,7 @@ fn lc_root_replay_carries_requests_and_retries() -> TestResult {
             Location::new("retained earlier coverage"),
             |budget| RootCoverage::replay(&mut fixture.cas, &problem, set.clone(), bytes, budget),
         );
-        assert_eq!(second.is_ok(), ceiling == 2_829_928);
+        assert_eq!(second.is_ok(), ceiling == 2_832_204);
         if second.is_err() {
             exhausted(&second, &[BudgetKind::Work])?;
             let spent = budget.usage();
@@ -196,5 +197,27 @@ fn lc_root_coverage_refuses_missing_placement() -> TestResult {
     let before = fixture.cas.counts();
     assert!(RootCoverage::replay(&mut fixture.cas, &problem, set, bytes, &mut ledger()?).is_err());
     assert_eq!(fixture.cas.counts(), before);
+    Ok(())
+}
+
+/// ´test:integration:stable-collection-bindings-generation-work-boundary´
+#[test]
+fn stable_collection_bindings_generation_work_boundary() -> TestResult {
+    let required = 822_665;
+    for short in [0, 1] {
+        let (mut fixture, mut request) = original([1, 1], &mut ledger()?)?;
+        request.limits.work = Some(required - short);
+        let result = fixture.cas.run(&request);
+        if short == 0 {
+            let Outcome::Solved { usage, .. } = result else {
+                return Err(format!("exact bindings generation refused: {result:?}").into());
+            };
+            assert_eq!(usage.work, required);
+        } else {
+            assert!(
+                matches!(result, Outcome::Exhausted { fault, .. } if matches!(fault.kind, FaultKind::Exhausted { budget: BudgetKind::Work, needed, .. } if needed == required))
+            );
+        }
+    }
     Ok(())
 }

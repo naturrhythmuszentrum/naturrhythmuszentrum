@@ -33,9 +33,8 @@ fn trim(cas: &Cas, input: &EmptinessDag, budget: &mut Budget) -> Result<Emptines
     let mut mapped = crate::solving::coefficients::storage::vector(input.nodes.len(), budget)?;
     mapped.resize(input.nodes.len(), None);
     let mut nodes = crate::solving::coefficients::storage::vector(input.nodes.len(), budget)?;
-    let mut keys = std::collections::HashMap::new();
-    keys.try_reserve(input.nodes.len())
-        .map_err(|_| Fault::allocation(AT))?;
+    let mut keys = crate::ordered_scratch::Map::new();
+    keys.reserve(input.nodes.len(), budget, AT)?;
     for (index, node) in input.nodes.iter().enumerate() {
         budget.work(1, AT)?;
         if !reached.get(index).copied().ok_or_else(invalid)? {
@@ -43,7 +42,7 @@ fn trim(cas: &Cas, input: &EmptinessDag, budget: &mut Budget) -> Result<Emptines
         }
         let region = cas.checked(&node.region)?;
         cas.state.region(region)?;
-        let slot = if let Some(slot) = keys.get(&region.serial) {
+        let slot = if let Some(slot) = keys.get(&region.serial, budget, AT)? {
             *slot
         } else {
             let mut node = node.clone();
@@ -59,7 +58,7 @@ fn trim(cas: &Cas, input: &EmptinessDag, budget: &mut Budget) -> Result<Emptines
             }
             let slot = u32::try_from(nodes.len()).map_err(|_| invalid())?;
             nodes.push(node);
-            keys.insert(region.serial, slot);
+            keys.insert(region.serial, slot, budget, AT)?;
             slot
         };
         *mapped.get_mut(index).ok_or_else(invalid)? = Some(slot);

@@ -123,7 +123,10 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
         let oracle = crate::testing::exclusion_oracle::run(|| {
             receiver.cas.replay(&bytes, &expected, &mut oracle_budget)
         });
-        assert_eq!(oracle.err(), Some(fault));
+        assert_eq!(oracle.err(), Some(fault.clone()));
+        super::boundaries::refusal(budget.usage().work, &fault, |boundary| {
+            receiver.cas.replay(&bytes, &expected, boundary).map(|_| ())
+        })?;
         assert_eq!(receiver.cas.counts(), before);
     }
     assert_eq!(
@@ -132,32 +135,32 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
             (
                 [0, 1],
                 true,
-                1_634_924,
-                [221_241, 75_578, 74_839, 1_263_266]
+                1_636_037,
+                [221_241, 75_578, 75_952, 1_263_266]
             ),
             (
                 [1, 0],
                 true,
-                1_633_299,
-                [221_241, 75_578, 74_839, 1_261_641]
+                1_634_421,
+                [221_241, 75_578, 75_961, 1_261_641]
             ),
             (
                 [-1, 1],
                 true,
-                1_639_097,
-                [221_241, 75_578, 74_839, 1_267_439]
+                1_640_210,
+                [221_241, 75_578, 75_952, 1_267_439]
             ),
             (
                 [1, -1],
                 true,
-                1_637_469,
-                [221_241, 75_578, 74_839, 1_265_811]
+                1_638_586,
+                [221_241, 75_578, 75_956, 1_265_811]
             ),
             (
                 [1, 1],
                 false,
-                1_629_659,
-                [221_241, 75_578, 74_839, 1_258_001]
+                1_630_797,
+                [221_241, 75_578, 75_977, 1_258_001]
             ),
         ]
     );
@@ -257,14 +260,20 @@ fn lc_root_factor_coverage_rejects_omissions() -> TestResult {
                 .cas
                 .check_proof(&request.context, &steps, &mut oracle_budget)
         });
-        assert_eq!(oracle.err(), Some(fault));
+        assert_eq!(oracle.err(), Some(fault.clone()));
+        super::boundaries::refusal(budget.usage().work, &fault, |boundary| {
+            source
+                .cas
+                .check_proof(&request.context, &steps, boundary)
+                .map(|_| ())
+        })?;
         assert_eq!(source.cas.counts(), before);
     }
     assert_eq!(
         traces,
         [
-            (false, 398_691, [205_391, 36_228, 74_778, 82_294]),
-            (true, 456_997, [221_241, 78_735, 74_753, 82_268]),
+            (false, 399_831, [205_391, 36_228, 75_918, 82_294]),
+            (true, 458_137, [221_241, 78_735, 75_893, 82_268]),
         ]
     );
     Ok(())

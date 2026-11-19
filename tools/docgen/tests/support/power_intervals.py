@@ -53,12 +53,12 @@ def derive(text, exponent):
 
 def main():
     payload = json.loads(Path('data/golden/dyadic-power.json').read_text())
-    seen = set()
+    seen = {}
     for row in payload['entries']:
         for evidence in row['evidence']:
             pair = derive(evidence['input'], row['exponent'])
             assert evidence['routes'][1]['interval'] == pair, row['id']
-            seen.add((evidence['input'], row['exponent']))
+            seen[(evidence['input'], row['exponent'])] = None
     print(json.dumps({'directed_endpoints': len(seen), 'decimal_digits': 150}))
 
 

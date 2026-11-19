@@ -5,10 +5,10 @@ use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Edge, Expression, Handle, LogicalId, Vertex, size, vertex_key};
 use crate::model::{Field, Operator, Sort};
+use crate::ordered_scratch::Map;
 use crate::solving::SolveReason;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
-use std::collections::{HashMap, HashSet};
 
 /// Stable location of structural routing refusals.
 const AT: Location = Location::new("declared scalar sort preflight");
@@ -40,18 +40,18 @@ pub struct SortRouting {
 }
 
 /// One reached header's distinct original declaration uses.
-type Uses<'a> = HashMap<NodeIndex<u32>, HashMap<&'a str, &'a Sort>>;
+type Uses<'a> = Map<NodeIndex<u32>, Map<&'a str, &'a Sort>>;
 
 /// Prepaid per-request scratch, discarded when routing finishes.
 struct Scan<'a> {
     /// Distinct physical records already scheduled.
-    seen: HashSet<NodeIndex<u32>>,
+    seen: Map<NodeIndex<u32>, ()>,
     /// Pending records and their explicit path depth.
     pending: Vec<(NodeIndex<u32>, u64)>,
     /// Distinct declaration uses in each original semantic header.
     uses: Uses<'a>,
     /// Logical identities for exactly the used headers and their ancestors.
-    headers: HashMap<NodeIndex<u32>, LogicalId>,
+    headers: Map<NodeIndex<u32>, LogicalId>,
     /// Cumulative reached semantic edges.
     edges: u64,
 }
@@ -69,10 +69,10 @@ impl Cas {
     ) -> Result<SortRouting, Fault> {
         let original = crate::solving::graph::problem(&self.state, self.checked(problem)?)?;
         let mut scan = Scan {
-            seen: HashSet::new(),
+            seen: Map::new(),
             pending: Vec::new(),
-            uses: HashMap::new(),
-            headers: HashMap::new(),
+            uses: Map::new(),
+            headers: Map::new(),
             edges: 0,
         };
         scan.enqueue(self, problem.logical_id(), 1, budget)?;
@@ -118,7 +118,7 @@ impl<'a> Scan<'a> {
         self.push(index, depth, budget)
     }
 
-    /// Charge hash lookup and finite storage before scheduling an unseen node.
+    /// Charge ordered lookup and finite storage before scheduling an unseen node.
     fn push(
         &mut self,
         index: NodeIndex<u32>,
@@ -127,7 +127,7 @@ impl<'a> Scan<'a> {
     ) -> Result<(), Fault> {
         budget.work(256, AT)?;
         budget.check(BudgetKind::Depth, depth, AT)?;
-        if self.seen.contains(&index) {
+        if self.seen.get(&index, budget, AT)?.is_some() {
             return Ok(());
         }
         let count = size(self.seen.len().saturating_add(1), AT)?;
@@ -137,13 +137,11 @@ impl<'a> Scan<'a> {
             count.saturating_mul(1024),
             AT,
         )?;
-        self.seen
-            .try_reserve(1)
-            .map_err(|_| Fault::allocation(AT))?;
+        self.seen.reserve(1, budget, AT)?;
         self.pending
             .try_reserve(1)
             .map_err(|_| Fault::allocation(AT))?;
-        self.seen.insert(index);
+        self.seen.insert(index, (), budget, AT)?;
         self.pending.push((index, depth));
         Ok(())
     }
@@ -197,13 +195,12 @@ impl<'a> Scan<'a> {
                     .ok_or_else(invalid)?;
                 self.header(cas, expression.header, budget)?;
                 budget.work(size(key.len(), AT)?, AT)?;
-                self.uses
-                    .try_reserve(1)
-                    .map_err(|_| Fault::allocation(AT))?;
-                let uses = self.uses.entry(index).or_default();
-                uses.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
+                if self.uses.get(&index, budget, AT)?.is_none() {
+                    self.uses.insert(index, Map::new(), budget, AT)?;
+                }
+                let uses = self.uses.get_mut(&index, budget, AT)?.ok_or_else(invalid)?;
                 if uses
-                    .insert(key, &expression.sort)
+                    .insert(key.as_str(), &expression.sort, budget, AT)?
                     .is_some_and(|previous| previous != &expression.sort)
                 {
                     return Err(invalid());
@@ -220,13 +217,10 @@ impl<'a> Scan<'a> {
         loop {
             budget.work(256, AT)?;
             let index = *cas.state.indices.get(&id).ok_or_else(invalid)?;
-            if self.headers.contains_key(&index) {
+            if self.headers.get(&index, budget, AT)?.is_some() {
                 return Ok(());
             }
-            self.headers
-                .try_reserve(1)
-                .map_err(|_| Fault::allocation(AT))?;
-            self.headers.insert(index, id);
+            self.headers.insert(index, id, budget, AT)?;
             let Some(parent) = cas.state.header(id)?.parent else {
                 return Ok(());
             };

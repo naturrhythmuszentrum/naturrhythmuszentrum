@@ -6,9 +6,9 @@ use crate::budget::{Budget, BudgetKind};
 use crate::error::Fault;
 use crate::graph::{Cas, Edge, Handle, Vertex};
 use crate::model::{AtomicSort, Field, Sort};
+use crate::ordered_scratch::Map;
 use crate::solving::{MapTarget, SolveDraft};
 use petgraph::visit::EdgeRef;
-use std::collections::HashSet;
 
 /// Reject actual Complex values and relation frames, including those hidden in exact scalar maps.
 fn node(value: &Vertex) -> Result<(), Fault> {
@@ -52,7 +52,7 @@ pub(crate) fn check<'a>(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         let mut pending = crate::solving::coefficients::storage::vector(0, budget)?;
-        let mut seen = HashSet::new();
+        let mut seen = Map::new();
         for root in roots {
             cas.checked(root)?;
             crate::solving::coefficients::storage::reserve(&mut pending, 1, budget)?;
@@ -71,7 +71,7 @@ pub(crate) fn check<'a>(
             if Some(&index) == forbidden {
                 return Err(invalid());
             }
-            if seen.contains(&index) {
+            if seen.get(&index, budget, AT)?.is_some() {
                 continue;
             }
             budget.check(
@@ -79,8 +79,7 @@ pub(crate) fn check<'a>(
                 crate::graph::size(seen.len().saturating_add(1), AT)?,
                 AT,
             )?;
-            seen.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
-            seen.insert(index);
+            seen.insert(index, (), budget, AT)?;
             let value = cas.state.graph.node_weight(index).ok_or_else(invalid)?;
             node(value)?;
             if let Vertex::ScopedApplication(application) = value {
