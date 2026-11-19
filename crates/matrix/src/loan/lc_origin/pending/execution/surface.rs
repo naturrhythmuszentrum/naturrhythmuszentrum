@@ -1,0 +1,214 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+//! Separate terminal wrappers prohibit a second traversal without changing the pending layout.
+use super::super::LcApplicationPending;
+use crate::{CancellationReceipt, ExecutionAccount, Heap, LcProductError, LoanError, LoanTicket};
+use nrz_scalar::Scalar;
+use std::fmt;
+
+/// An evaluated private candidate has no numerical reader or publication route in this slice.
+///
+/// ```compile_fail,E0599
+/// use nrz_matrix::{LcApplicationEvaluated, ExecutionAccount};
+/// fn repeat(owner: LcApplicationEvaluated<'_, f32, 5>, account: &mut ExecutionAccount) {
+///     let _ = owner.evaluate(account);
+/// }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.symbols(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.symbols(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.value_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.bound_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.error_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.read(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.publish(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.symbols(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.value_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.bound_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.error_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.read(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationEvaluated;
+/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.publish(); }
+/// ```
+pub struct LcApplicationEvaluated<'i, P: Scalar, const N: usize> {
+    /// Same funded storage, captured closure and original inventory borrow.
+    pub(super) owner: LcApplicationPending<'i, P, N>,
+}
+/// An unexpected traversal failure retains cleanup authority but cannot evaluate again.
+///
+/// ```compile_fail,E0599
+/// use nrz_matrix::{LcApplicationFailed, ExecutionAccount};
+/// fn repeat(owner: LcApplicationFailed<'_, f64, 5>, account: &mut ExecutionAccount) {
+///     let _ = owner.evaluate(account);
+/// }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f32, 5>) { let _ = owner.symbols(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f32, 5>) { let _ = owner.value_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f32, 5>) { let _ = owner.bound_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f32, 5>) { let _ = owner.error_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f32, 5>) { let _ = owner.read(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f32, 5>) { let _ = owner.publish(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f64, 5>) { let _ = owner.symbols(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f64, 5>) { let _ = owner.value_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f64, 5>) { let _ = owner.bound_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f64, 5>) { let _ = owner.error_symbol(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f64, 5>) { let _ = owner.read(); }
+/// ```
+/// ```compile_fail,E0599
+/// use nrz_matrix::LcApplicationFailed;
+/// fn escape(owner: LcApplicationFailed<'_, f64, 5>) { let _ = owner.publish(); }
+/// ```
+pub struct LcApplicationFailed<'i, P: Scalar, const N: usize> {
+    /// Earlier private records grant no result authority.
+    owner: LcApplicationPending<'i, P, N>,
+}
+/// Readiness or prepayment refusal preserves retry; a started traversal failure permits cancellation.
+#[derive(Debug)]
+pub enum LcApplicationEvaluationFailure<'i, P: Scalar, const N: usize> {
+    /// No numerical traversal started and the identical pending owner can retry.
+    Pending {
+        /// Original owner with unchanged private buffers.
+        owner: LcApplicationPending<'i, P, N>,
+        /// Original structured error with completed Work retained.
+        error: LcProductError,
+    },
+    /// A traversal started; no private prefix can be exposed or evaluated again.
+    Failed {
+        /// Same allocations and prepaid cleanup in a cancel-only wrapper.
+        owner: LcApplicationFailed<'i, P, N>,
+        /// Original structured phase error, never truncated to a cell code.
+        error: LcProductError,
+    },
+}
+impl<P: Scalar, const N: usize> fmt::Debug for LcApplicationEvaluated<'_, P, N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LcApplicationEvaluated")
+            .finish_non_exhaustive()
+    }
+}
+impl<P: Scalar, const N: usize> fmt::Debug for LcApplicationFailed<'_, P, N> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("LcApplicationFailed")
+            .finish_non_exhaustive()
+    }
+}
+impl<P: Scalar + 'static, const N: usize> LcApplicationEvaluated<'_, P, N> {
+    /// Diagnostic producer identity grants no ordinary pin or result access.
+    #[must_use]
+    pub const fn ticket(&self) -> LoanTicket {
+        self.owner.ticket()
+    }
+    /// Discard the private candidate using its original prepaid cleanup.
+    /// # Errors
+    /// Refuses foreign or stale cancellation authority without spending Work.
+    pub fn cancel(
+        &mut self,
+        heap: &mut Heap,
+        account: &mut ExecutionAccount,
+    ) -> Result<CancellationReceipt, LoanError> {
+        self.owner.cancel(heap, account)
+    }
+}
+impl<P: Scalar + 'static, const N: usize> LcApplicationFailed<'_, P, N> {
+    /// Discard the failed traversal using its original prepaid cleanup.
+    /// # Errors
+    /// Refuses foreign or stale cancellation authority without spending Work.
+    pub fn cancel(
+        &mut self,
+        heap: &mut Heap,
+        account: &mut ExecutionAccount,
+    ) -> Result<CancellationReceipt, LoanError> {
+        self.owner.cancel(heap, account)
+    }
+}
+#[expect(
+    clippy::result_large_err,
+    reason = "failures return the original owner without allocating"
+)]
+impl<'i, P: Scalar + 'static, const N: usize> LcApplicationPending<'i, P, N> {
+    /// Preflight complete captured coverage and execute one wholly prepaid private traversal.
+    /// # Errors
+    /// Readiness and prepayment refusals return this pending owner; an unexpected started
+    /// traversal failure returns a cancel-only owner and its original structured error.
+    pub fn evaluate(
+        mut self,
+        account: &mut ExecutionAccount,
+    ) -> Result<LcApplicationEvaluated<'i, P, N>, LcApplicationEvaluationFailure<'i, P, N>> {
+        let mut started = false;
+        match super::run(&mut self, account, &mut started) {
+            Ok(()) => Ok(LcApplicationEvaluated { owner: self }),
+            Err(error) if started => Err(LcApplicationEvaluationFailure::Failed {
+                owner: LcApplicationFailed { owner: self },
+                error,
+            }),
+            Err(error) => Err(LcApplicationEvaluationFailure::Pending { owner: self, error }),
+        }
+    }
+}

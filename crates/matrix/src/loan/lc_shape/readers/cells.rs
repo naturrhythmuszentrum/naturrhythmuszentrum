@@ -2,6 +2,7 @@
 //! Complete original-role observations preflight every companion before the first load.
 
 mod product;
+pub(in crate::loan) use product::LcKernelStage;
 pub use product::{
     LcFrequencyPrelude, LcFrequencyTarget, LcInputProduct, LcProductCell, LcProductError,
     LcQuantityDemand, LcRequestedCell, LcRequestedState, LcRequestedValues,
@@ -104,6 +105,25 @@ struct Selected<'a, P: Scalar> {
     address: usize,
 }
 impl<'a, P: Scalar + 'static, const N: usize> LcInputReaders<'a, P, N> {
+    /// Plane binding is included once in readiness's per-row tariff.
+    pub(in crate::loan) fn into_cells_prepaid(self) -> Result<LcInputCells<'a, P, N>, LoanError> {
+        let bound = self.bind_planes()?;
+        Ok(LcInputCells {
+            readers: self,
+            bound,
+        })
+    }
+    /// Both charged and prepaid callers use the same five-visit plane gate per row.
+    fn bind_planes(&self) -> Result<[Option<Bound<'a, P>>; N], LoanError> {
+        let mut bound = std::array::from_fn(|_| None);
+        for (slot, reader) in bound.iter_mut().zip(&self.readers) {
+            *slot = Some(bind(
+                reader.as_ref().ok_or(LoanError::UnsupportedContract)?,
+            )?);
+        }
+        Ok(bound)
+    }
+
     /// Resolve all original scalar companion planes once without loading a value.
     /// # Errors
     /// Refuses another account, incomplete representations and exhausted Work.
@@ -122,12 +142,7 @@ impl<'a, P: Scalar + 'static, const N: usize> LcInputReaders<'a, P, N> {
             "LC input cell binding",
             |budget| {
                 crate::loan::charge(budget, work::<N>(5)?)?;
-                let mut bound = std::array::from_fn(|_| None);
-                for (slot, reader) in bound.iter_mut().zip(&self.readers) {
-                    let reader = reader.as_ref().ok_or(LoanError::UnsupportedContract)?;
-                    *slot = Some(bind(reader)?);
-                }
-                Ok::<_, LoanError>(bound)
+                self.bind_planes()
             },
         )?;
         Ok(LcInputCells {
@@ -194,6 +209,10 @@ impl<'a, P: Scalar + 'static, const N: usize> LcInputCells<'a, P, N> {
             *slot = self.select_member(index, cell)?;
         }
         Ok(selected)
+    }
+    /// Readiness shares complete selection without loading a numerical component.
+    pub(in crate::loan) fn preflight(&self, cell: usize) -> Result<(), LoanError> {
+        self.select(cell).map(|_| ())
     }
     /// Resolve one position without loading any numerical companion.
     fn select_member(&self, index: usize, cell: usize) -> Result<Selected<'a, P>, LoanError> {

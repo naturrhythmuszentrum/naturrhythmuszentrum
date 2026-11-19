@@ -10,6 +10,20 @@ use tracing::Level;
 /// Process-local observation identities are distinct even if a subscriber recycles span identifiers.
 static NEXT_ATTEMPT: AtomicU64 = AtomicU64::new(1);
 
+/// Fixed observation metadata, independent of whether Work is charged per cell or per traversal.
+pub(super) struct Attempt {
+    /// Original logical tuple.
+    pub(super) cell: usize,
+    /// Fixed requested quantity vocabulary.
+    pub(super) demand: &'static str,
+    /// Public selected read or private origin traversal.
+    pub(super) consumer: &'static str,
+    /// Original continuation account identity.
+    pub(super) account: u64,
+    /// Cumulative Work before the attempt.
+    pub(super) work: u64,
+}
+
 impl<P: Scalar + 'static, const N: usize> LcInputProduct<'_, P, N> {
     /// Observe one complete public attempt without changing its result or original ledger charges.
     pub(super) fn observe_attempt<R>(
@@ -20,52 +34,69 @@ impl<P: Scalar + 'static, const N: usize> LcInputProduct<'_, P, N> {
         run: impl FnOnce(&mut ExecutionAccount) -> Result<R, LcProductError>,
         state: impl FnOnce(&R) -> LcRequestedState<P>,
     ) -> Result<R, LcProductError> {
+        let attempt = Attempt {
+            cell,
+            demand,
+            consumer: "requested",
+            account: account.identity,
+            work: account.usage().work,
+        };
+        self.observe_prepaid(
+            &attempt,
+            || {
+                let result = run(account);
+                (result, account.usage().work)
+            },
+            state,
+        )
+    }
+
+    /// The caller owns any Work phase; this boundary only observes its supplied attempt.
+    pub(super) fn observe_prepaid<R>(
+        &self,
+        attempt: &Attempt,
+        run: impl FnOnce() -> (Result<R, LcProductError>, u64),
+        state: impl FnOnce(&R) -> LcRequestedState<P>,
+    ) -> Result<R, LcProductError> {
+        let Attempt {
+            cell,
+            demand,
+            consumer,
+            account,
+            work,
+        } = *attempt;
         let span = tracing::span!(target: "nrz::lc", Level::TRACE, "nrz.barrier",
             family = "lc", revision = 2_u64, owner = "nrz-matrix",
-            question = "frequency", operation = "positive-domain", consumer = "requested", demand,
-            scope = "local-represented-inputs", account = account.identity,
+            question = "frequency", operation = "positive-domain", consumer, demand,
+            scope = "local-represented-inputs", account,
             schema = self.cells.readers.inventory.input(0).map(crate::loan::lc_shape::LcInputShape::specialization_key),
             inductance = self.positions[0], capacitance = self.positions[1],
             axes = ?self.cells.readers.axes, cell, format = ?P::PRECISION,
             arithmetic_revision = self.context.revision(),
-            attempt = tracing::field::Empty, work = account.usage().work,
+            attempt = tracing::field::Empty, work,
             outcome = tracing::field::Empty, reason = tracing::field::Empty);
         if span.is_disabled() {
-            return run(account);
+            return run().0;
         }
         let Ok(attempt) = crate::heap::identity::allocate_identity(&NEXT_ATTEMPT) else {
             tracing::event!(name: "nrz.observer.loss", target: "nrz::lc", parent: &span,
                 Level::TRACE, owner = "nrz-matrix", reason = "attempt-identity-exhausted");
             span.record("outcome", "incomplete");
-            return run(account);
+            return run().0;
         };
         span.record("attempt", attempt);
         span.in_scope(|| {
-            decision(
-                attempt,
-                "attempted",
-                "none",
-                "none",
-                "none",
-                account.usage().work,
-            );
+            decision(attempt, "attempted", "none", "none", "none", work);
             self.claims(attempt);
-            let result = run(account);
+            let (result, work) = run();
             let (outcome, target, reason, continuation) = match &result {
                 Ok(result) => outcome(state(result)),
                 Err(error) => ("refused", "none", refusal(error), "none"),
             };
-            span.record("work", account.usage().work);
+            span.record("work", work);
             span.record("outcome", outcome);
             span.record("reason", reason);
-            decision(
-                attempt,
-                outcome,
-                target,
-                reason,
-                continuation,
-                account.usage().work,
-            );
+            decision(attempt, outcome, target, reason, continuation, work);
             result
         })
     }

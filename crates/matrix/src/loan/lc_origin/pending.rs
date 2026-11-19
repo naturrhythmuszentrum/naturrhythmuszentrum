@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Consuming checked admission owns private storage; numerical execution remains gated.
+//! Consuming checked admission owns private storage; private execution is implemented, publication remains gated.
 mod admission;
 mod check;
+pub(in crate::loan) mod execution;
 mod plan;
 pub(in crate::loan) mod reclaim;
 
@@ -65,18 +66,6 @@ struct Native {
 /// use nrz_matrix::{LcApplicationPending, Heap, ExecutionAccount};
 /// fn publish(mut owner: LcApplicationPending<'_, f64, 5>, heap: &mut Heap, account: &mut ExecutionAccount) {
 ///     let _ = owner.publish(heap, account);
-/// }
-/// ```
-/// ```compile_fail,E0599
-/// use nrz_matrix::{LcApplicationPending, ExecutionAccount};
-/// fn evaluate(mut owner: LcApplicationPending<'_, f32, 5>, account: &mut ExecutionAccount) {
-///     let _ = owner.evaluate(account);
-/// }
-/// ```
-/// ```compile_fail,E0599
-/// use nrz_matrix::{LcApplicationPending, ExecutionAccount};
-/// fn evaluate(mut owner: LcApplicationPending<'_, f64, 5>, account: &mut ExecutionAccount) {
-///     let _ = owner.evaluate(account);
 /// }
 /// ```
 #[repr(C)]
@@ -266,7 +255,7 @@ fn release_storage(storage: Box<Storage>) -> (Rc<MaskRecord>, Rc<LayoutRecord>) 
 }
 
 #[cfg(test)]
-pub(in crate::loan) fn assert_private<P: Scalar, const N: usize>(
+pub(in crate::loan) fn assert_private_demand_0_3_11<P: Scalar, const N: usize>(
     owner: &LcApplicationPending<'_, P, N>,
 ) {
     let native = owner.native.as_ref().expect("pending native storage");

@@ -4,6 +4,7 @@
 mod authority;
 mod boundaries;
 mod bridge;
+mod execution;
 mod pending;
 use super::fixture::{self, TestResult};
 use crate::{

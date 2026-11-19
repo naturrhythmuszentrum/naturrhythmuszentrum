@@ -60,7 +60,7 @@ fn publish<'a, P: Scalar + 'static>(
     let values = VALUES.map(|rows| rows.map(|row| row.map(|n| P::from_u8(n) / P::from_u8(32))));
     publish_values(inventory, axes, heap, account, cells, shift, &values)
 }
-fn publish_values<'a, P: Scalar + 'static>(
+pub(in crate::loan::lc_shape::tests) fn publish_values<'a, P: Scalar + 'static>(
     inventory: &'a LcInputInventory<P, 5>,
     axes: &LcShapeAxes,
     heap: &mut Heap,

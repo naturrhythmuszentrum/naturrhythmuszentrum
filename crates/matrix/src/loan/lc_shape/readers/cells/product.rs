@@ -2,6 +2,7 @@
 //! Explicit original L and C positions feed one local enclosed multiplication.
 
 mod frequency;
+pub(in crate::loan) use frequency::LcKernelStage;
 pub use frequency::{
     LcFrequencyPrelude, LcFrequencyTarget, LcQuantityDemand, LcRequestedCell, LcRequestedState,
     LcRequestedValues,
@@ -67,6 +68,38 @@ impl<P: Scalar, const N: usize> LcProductCell<'_, P, N> {
     }
 }
 impl<'a, P: Scalar + 'static, const N: usize> LcInputCells<'a, P, N> {
+    /// Role and environment admission are funded by readiness before this binding.
+    pub(in crate::loan) fn into_product_prepaid(
+        self,
+        positions: [usize; 2],
+    ) -> Result<LcInputProduct<'a, P, N>, LcProductError> {
+        for (position, quantity) in positions
+            .into_iter()
+            .zip([LcQuantity::Inductance, LcQuantity::Capacitance])
+        {
+            let member = self
+                .readers
+                .inventory
+                .input(position)
+                .ok_or(LoanError::UnsupportedContract)?;
+            let input = member
+                .question()
+                .relation()
+                .inputs()
+                .get(position)
+                .ok_or(LoanError::UnsupportedContract)?;
+            if input.quantity() != quantity {
+                return Err(LoanError::TargetMismatch.into());
+            }
+        }
+        let context = ArithmeticContext::new().map_err(KernelError::from)?;
+        Ok(LcInputProduct {
+            cells: self,
+            positions,
+            context,
+        })
+    }
+
     /// Bind explicit original inductance and capacitance roles once for this tile.
     /// # Errors
     /// Refuses foreign accounts, missing or wrong roles, Work and arithmetic context.
@@ -86,31 +119,7 @@ impl<'a, P: Scalar + 'static, const N: usize> LcInputCells<'a, P, N> {
             .ledger
             .with_work_phase(crate::loan::FAMILY, "LC input product binding", |budget| {
                 crate::loan::charge(budget, 4)?;
-                for (position, quantity) in positions
-                    .into_iter()
-                    .zip([LcQuantity::Inductance, LcQuantity::Capacitance])
-                {
-                    let member = self
-                        .readers
-                        .inventory
-                        .input(position)
-                        .ok_or(LoanError::UnsupportedContract)?;
-                    let input = member
-                        .question()
-                        .relation()
-                        .inputs()
-                        .get(position)
-                        .ok_or(LoanError::UnsupportedContract)?;
-                    if input.quantity() != quantity {
-                        return Err(LoanError::TargetMismatch.into());
-                    }
-                }
-                let context = ArithmeticContext::new().map_err(KernelError::from)?;
-                Ok(LcInputProduct {
-                    cells: self,
-                    positions,
-                    context,
-                })
+                self.into_product_prepaid(positions)
             })
     }
 }

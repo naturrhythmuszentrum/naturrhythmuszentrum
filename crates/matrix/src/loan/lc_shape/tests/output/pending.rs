@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Checked pending owns all allocations while exposing only demand and cancellation.
-mod receipts;
+pub(super) mod receipts;
 use super::{TestResult, demand, request, setup};
 use crate::{LcOmegaOutput, LcOutputCellState, LoanError};
 use nrz_bindings::Limits;
@@ -10,6 +10,9 @@ use nrz_scalar::Scalar;
 /// ´test:unit:lc-origin-outcome-partition-encoding´
 #[test]
 fn lc_origin_outcome_partition_encoding() -> TestResult {
+    super::execution::images::<f32>()?;
+    super::execution::images::<f64>()?;
+    crate::loan::lc_origin::pending::execution::checks::mapping()?;
     lifecycle::<f32>(false)?;
     lifecycle::<f64>(false)
 }
@@ -18,6 +21,8 @@ fn lc_origin_outcome_partition_encoding() -> TestResult {
 /// ´test:unit:lc-origin-source-closure-retry-history´
 #[test]
 fn lc_origin_source_closure_retry_history() -> TestResult {
+    super::execution::refusals::<f32>()?;
+    super::execution::refusals::<f64>()?;
     heap_first::<f32>()?;
     heap_first::<f64>()?;
     exhausted_drop::<f32>()?;
@@ -30,6 +35,8 @@ fn lc_origin_source_closure_retry_history() -> TestResult {
 /// ´test:unit:lc-origin-phase-receipts´
 #[test]
 fn lc_origin_phase_receipts() -> TestResult {
+    super::execution::receipts::<f32>()?;
+    super::execution::receipts::<f64>()?;
     receipts::check::<f32>()?;
     receipts::check::<f64>()
 }
@@ -69,7 +76,7 @@ fn lifecycle<P: Scalar + 'static>(abandon: bool) -> TestResult {
     let mut pending = prepared
         .admit(&mut s.heap, selected, &mut s.account)
         .map_err(|f| f.into_parts().1)?;
-    crate::loan::lc_origin::pending::assert_private(&pending);
+    crate::loan::lc_origin::pending::assert_private_demand_0_3_11(&pending);
     assert_eq!(crate::loan::fault::take_lc_pair_visits(), 5 * 40);
     assert_eq!(crate::loan::fault::reads(), 0);
     assert_eq!(s.heap.loans.debits.iter().flatten().count(), before + 17);

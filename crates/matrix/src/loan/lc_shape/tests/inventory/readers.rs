@@ -2,7 +2,7 @@
 //! Original positional roles are read only through one complete authenticated inventory.
 
 mod boundaries;
-mod cells;
+pub(in crate::loan::lc_shape::tests) mod cells;
 mod refusals;
 use super::{TestResult, VALUES, fixture, setup, source};
 use crate::loan::application::tests::binary::oracle::Rational;
@@ -59,7 +59,7 @@ pub(in crate::loan::lc_shape::tests) fn publish<'a, P: Scalar + 'static>(
         let cells = match mode {
             0 => vec![],
             1 => selected.to_vec(),
-            2 => (0..12).collect(),
+            2 => (0..axes.combined.axis().capacity()).collect(),
             _ => return Err("coverage mode".into()),
         };
         let schema = inventory.input(index).ok_or("original member")?;

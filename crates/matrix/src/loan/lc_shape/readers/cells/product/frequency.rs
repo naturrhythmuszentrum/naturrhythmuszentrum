@@ -4,11 +4,13 @@
 mod observation;
 mod prelude;
 mod requested;
+mod traversal;
 use super::{LcInputCell, LcInputProduct, LcProductCell, LcProductError, work};
 use crate::{Elementwise, KernelError};
 use nrz_scalar::Scalar;
 pub use prelude::LcFrequencyPrelude;
 pub use requested::{LcQuantityDemand, LcRequestedCell, LcRequestedState, LcRequestedValues};
+pub(in crate::loan) use traversal::LcKernelStage;
 
 /// Original target whose sign obstructed the local frequency continuation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

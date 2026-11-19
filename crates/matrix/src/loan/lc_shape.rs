@@ -8,7 +8,7 @@ pub use output::{
     LcOmegaOutput, LcOmegaPrepareFailure, LcOmegaPrepared, LcOutputCellState, LcOutputDeclaration,
     LcOutputPending, LcOutputPublicationError,
 };
-mod readers;
+pub(in crate::loan) mod readers;
 use super::{ExecutionAccount, HostTileDeclaration, LoanError, charge};
 use crate::{CellAxis, CellProduct, Coverage};
 pub use inventory::LcInputInventory;

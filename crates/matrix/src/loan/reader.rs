@@ -97,7 +97,7 @@ fn record_ticket(record: &PinRecord) -> Result<LoanTicket, LoanError> {
     })
 }
 /// Check the immutable origin before borrowing its native component map.
-fn checked_record_reader<P: Scalar + 'static>(
+pub(in crate::loan) fn checked_record_reader<P: Scalar + 'static>(
     record: &Rc<PinRecord>,
 ) -> Result<TileReader<'_, P>, LoanError> {
     let pin = record.payload.as_ref().ok_or(LoanError::WrongLoan)?;

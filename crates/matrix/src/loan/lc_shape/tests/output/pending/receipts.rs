@@ -14,6 +14,8 @@ static DISPATCHERS: Mutex<()> = Mutex::new(());
 #[derive(Default)]
 struct Receipt {
     name: &'static str,
+    parent: Option<u64>,
+    consumer: String,
     application: u64,
     operation: String,
     outcome: String,
@@ -27,6 +29,7 @@ impl Visit for Receipt {
             "operation" => self.operation = value.into(),
             "outcome" => self.outcome = value.into(),
             "reason" => self.reason = value.into(),
+            "consumer" => self.consumer = value.into(),
             _ => {}
         }
     }
@@ -40,12 +43,12 @@ impl Visit for Receipt {
     }
     fn record_debug(&mut self, _: &Field, _: &dyn std::fmt::Debug) {}
 }
-struct Observer(Arc<Mutex<Vec<Receipt>>>);
+struct Observer(Arc<Mutex<Vec<Receipt>>>, Mutex<Vec<u64>>);
 impl Subscriber for Observer {
     fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         matches!(
             metadata.name(),
-            "nrz.work.phase" | "nrz.loan" | "nrz.retire"
+            "nrz.work.phase" | "nrz.loan" | "nrz.retire" | "nrz.walk" | "nrz.barrier"
         )
     }
     fn new_span(&self, attributes: &Attributes<'_>) -> Id {
@@ -55,6 +58,13 @@ impl Subscriber for Observer {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         let mut receipt = Receipt {
             name: attributes.metadata().name(),
+            parent: attributes.parent().map(Id::into_u64).or_else(|| {
+                self.1
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .last()
+                    .copied()
+            }),
             ..Receipt::default()
         };
         attributes.record(&mut receipt);
@@ -71,8 +81,21 @@ impl Subscriber for Observer {
     }
     fn record_follows_from(&self, _: &Id, _: &Id) {}
     fn event(&self, _: &Event<'_>) {}
-    fn enter(&self, _: &Id) {}
-    fn exit(&self, _: &Id) {}
+    fn enter(&self, id: &Id) {
+        self.1
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(id.into_u64());
+    }
+    fn exit(&self, id: &Id) {
+        assert_eq!(
+            self.1
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .pop(),
+            Some(id.into_u64())
+        );
+    }
 }
 
 pub(super) fn check<P: Scalar + 'static>() -> TestResult {
@@ -104,16 +127,19 @@ pub(super) fn check<P: Scalar + 'static>() -> TestResult {
         s.account.ledger.work(consume, crate::loan::AT)?;
         let before = s.account.usage().work;
         let receipts = Arc::new(Mutex::new(Vec::new()));
-        tracing::subscriber::with_default(Observer(Arc::clone(&receipts)), || -> TestResult {
-            let result = prepared.admit(&mut s.heap, selected, &mut s.account);
-            if short {
-                assert!(result.is_err());
-            } else {
-                let mut pending = result.map_err(|f| f.into_parts().1)?;
-                pending.cancel(&mut s.heap, &mut s.account)?;
-            }
-            Ok(())
-        })?;
+        tracing::subscriber::with_default(
+            Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
+            || -> TestResult {
+                let result = prepared.admit(&mut s.heap, selected, &mut s.account);
+                if short {
+                    assert!(result.is_err());
+                } else {
+                    let mut pending = result.map_err(|f| f.into_parts().1)?;
+                    pending.cancel(&mut s.heap, &mut s.account)?;
+                }
+                Ok(())
+            },
+        )?;
         let receipts = receipts
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -190,9 +216,10 @@ fn abandonment<P: Scalar + 'static>(short: bool) -> TestResult {
     let before = s.account.usage().work;
     drop(pending);
     let receipts = Arc::new(Mutex::new(Vec::new()));
-    let outcome = tracing::subscriber::with_default(Observer(Arc::clone(&receipts)), || {
-        s.heap.reconcile_detached(&mut s.account, 1, Some(cursor))
-    });
+    let outcome = tracing::subscriber::with_default(
+        Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
+        || s.heap.reconcile_detached(&mut s.account, 1, Some(cursor)),
+    );
     if short {
         assert!(matches!(outcome, crate::ScanOutcome::WorkExhausted(_)));
         assert_eq!(s.account.usage().work - before, 1);
@@ -228,4 +255,70 @@ fn abandonment<P: Scalar + 'static>(short: bool) -> TestResult {
     assert_eq!(phase.work.last(), Some(&s.account.usage().work));
     drop(receipts);
     Ok(())
+}
+
+/// Actual span parentage joins every selected attempt to its application, without cell Work phases.
+pub(in crate::loan::lc_shape::tests::output) fn traversal<T>(
+    expected: [u64; 5],
+    run: impl FnOnce() -> T,
+) -> T {
+    let _guard = DISPATCHERS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let [application, before, readiness, evaluation, demanded] = expected;
+    let receipts = Arc::new(Mutex::new(Vec::new()));
+    let result = tracing::subscriber::with_default(
+        Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
+        run,
+    );
+    let receipts = receipts
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let phases: Vec<_> = receipts
+        .iter()
+        .filter(|r| r.name == "nrz.work.phase")
+        .collect();
+    assert_eq!(phases.len(), 2);
+    assert_eq!(phases[0].operation, "LC readiness");
+    assert_eq!(phases[1].operation, "LC evaluation");
+    assert_eq!(phases[0].ledger, phases[1].ledger);
+    assert_ne!(phases[0].ledger, 0);
+    assert_eq!(phases[0].work.first(), Some(&before));
+    assert_eq!(phases[0].work.last(), Some(&(before + readiness)));
+    assert_eq!(phases[1].work.first(), Some(&(before + readiness)));
+    assert_eq!(
+        phases[1].work.last(),
+        Some(&(before + readiness + evaluation))
+    );
+    assert!(phases.iter().all(|phase| phase.outcome == "completed"));
+    let (walk, span) = receipts
+        .iter()
+        .enumerate()
+        .find(|(_, r)| r.name == "nrz.walk")
+        .expect("application evaluation span");
+    assert_eq!(span.application, application);
+    let barriers: Vec<_> = receipts
+        .iter()
+        .filter(|r| r.name == "nrz.barrier")
+        .collect();
+    assert_eq!(
+        barriers.len(),
+        usize::try_from(demanded).expect("bounded demand")
+    );
+    for barrier in barriers {
+        assert_eq!(
+            barrier.parent,
+            Some(u64::try_from(walk + 1).expect("span index"))
+        );
+        assert_eq!(barrier.consumer, "origin-traversal");
+        assert!(
+            barrier
+                .work
+                .iter()
+                .all(|work| *work == before + readiness + evaluation)
+        );
+        assert_eq!(barrier.outcome, "completed");
+    }
+    drop(receipts);
+    result
 }

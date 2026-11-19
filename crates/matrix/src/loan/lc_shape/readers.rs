@@ -2,6 +2,7 @@
 //! Complete positional inventory authority accompanies a borrowed current-reader set.
 
 mod cells;
+pub(in crate::loan) use cells::LcKernelStage;
 pub use cells::{
     LcFrequencyPrelude, LcFrequencyTarget, LcInputCell, LcInputCells, LcInputProduct,
     LcInputReading, LcProductCell, LcProductError, LcQuantityDemand, LcRequestedCell,
@@ -130,4 +131,55 @@ impl<P: Scalar, const N: usize> LcInputReaders<'_, P, N> {
     pub fn reader(&self, index: usize) -> Option<&TileReader<'_, P>> {
         self.readers.get(index).and_then(Option::as_ref)
     }
+}
+
+impl<'a, P: Scalar + 'static, const N: usize> LcInputReaders<'a, P, N> {
+    /// Borrow the exact captured closure after readiness prepays its complete row inventory.
+    pub(in crate::loan) fn captured(
+        inventory: &'a LcInputInventory<P, N>,
+        rows: &'a [crate::loan::lc_origin::LcSourceRow],
+    ) -> Result<Self, LoanError> {
+        if rows.len() != N {
+            return Err(LoanError::TargetMismatch);
+        }
+        let axes = rows.first().ok_or(LoanError::UnsupportedContract)?.axes;
+        let mut readers = std::array::from_fn(|_| None);
+        for (index, (slot, row)) in readers.iter_mut().zip(rows).enumerate() {
+            let original = inventory.input(index).ok_or(LoanError::TargetMismatch)?;
+            if row.position != index
+                || row.schema != original.specialization_key()
+                || row.axes != axes
+            {
+                return Err(LoanError::TargetMismatch);
+            }
+            let reader = crate::loan::reader::checked_record_reader(&row.pin)?;
+            let mapped = reader.bundle;
+            let source = mapped.origin.lc_source()?;
+            if mapped.identity != row.mapped
+                || source.identity != row.source
+                || source.projection != row.projection
+                || source.identity.layout != row.layout
+                || source.declaration.axis != row.axes.instances
+                || reader.account != original.account
+            {
+                return Err(LoanError::TargetMismatch);
+            }
+            if !same_symbols(&row.symbols[0], &source.declaration.symbols)
+                || !same_symbols(&row.symbols[1], &mapped.declaration.symbols)
+                || mapped.qualified != row.companions.map(Some)
+            {
+                return Err(LoanError::TargetMismatch);
+            }
+            *slot = Some(reader);
+        }
+        Ok(Self {
+            inventory,
+            axes,
+            readers,
+        })
+    }
+}
+/// Compare the exact three original symbols without cloning their owning edges.
+fn same_symbols(left: &nrz_bindings::BindingSymbols, right: &nrz_bindings::BindingSymbols) -> bool {
+    left.value() == right.value() && left.bound() == right.bound() && left.error() == right.error()
 }

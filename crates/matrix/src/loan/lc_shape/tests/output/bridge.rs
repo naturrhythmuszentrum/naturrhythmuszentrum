@@ -358,6 +358,8 @@ fn native_refusals<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-no-symbol-escape´
 #[test]
 fn lc_origin_no_symbol_escape() -> TestResult {
+    super::execution::lifetime::surface::<f32>()?;
+    super::execution::lifetime::surface::<f64>()?;
     debug_surface::<f32>()?;
     debug_surface::<f64>()
 }
@@ -417,6 +419,8 @@ fn debug_surface<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-phase-work-boundaries´
 #[test]
 fn lc_origin_phase_work_boundaries() -> TestResult {
+    super::execution::work::<f32>()?;
+    super::execution::work::<f64>()?;
     super::pending::state_work::<f32>()?;
     super::pending::state_work::<f64>()?;
     super::pending::planning::<f32>()?;
@@ -491,6 +495,8 @@ fn capture_work<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-retained-staged-boundaries´
 #[test]
 fn lc_origin_retained_staged_boundaries() -> TestResult {
+    super::execution::lifetime::heap_first::<f32>()?;
+    super::execution::lifetime::heap_first::<f64>()?;
     super::pending::unwind::<f32>()?;
     super::pending::unwind::<f64>()?;
     super::pending::bytes::<f32>()?;
