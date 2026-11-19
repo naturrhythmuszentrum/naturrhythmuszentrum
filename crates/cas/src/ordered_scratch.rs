@@ -100,17 +100,20 @@ impl<K: Key, V> Map<K, V> {
             .len()
             .checked_add(additional)
             .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
-        budget.check(
-            BudgetKind::StagedPayloadBytes,
-            size(count, at)?.saturating_mul(size(std::mem::size_of::<(K, V)>(), at)?),
-            at,
-        )?;
-        if count > self.reserved {
+        let target = if count > self.reserved {
             let doubled = self
                 .reserved
                 .checked_mul(2)
                 .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
-            let target = count.max(doubled).max(4);
+            count.max(doubled).max(4)
+        } else {
+            self.reserved
+        };
+        let bytes = size(target, at)?
+            .checked_mul(size(std::mem::size_of::<(K, V)>(), at)?)
+            .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
+        budget.check(BudgetKind::StagedPayloadBytes, bytes, at)?;
+        if count > self.reserved {
             budget.work(size(self.entries.len(), at)?, at)?;
             self.entries
                 .try_reserve_exact(target - self.entries.len())
