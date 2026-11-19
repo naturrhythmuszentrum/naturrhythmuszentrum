@@ -55,13 +55,23 @@ Use `nrz-docgen data` to derive datasets, `nrz-docgen render` to render document
 
 A label has three colon-separated components: a lowercase alphanumeric kind, a lowercase alphanumeric area, and a lowercase semantic name with hyphens between words. Each name is unique within its area, including across kinds, and remains stable across file moves. A head mints its label in one backtick span after the middle-dot separator: document titles use a level-one heading, sections use a section heading, and environment heads use the bold environment name and title as the first line of a paragraph. These identities make references independent of file layout (`dec:vision:labels-and-ownership`).
 
-Document-title kinds are `spec` for the architecture, `reg` for the register, `plan` for the plan, and `guide` for the readme and contributing guide. Sections use `sec`. Environment name and kind pairs are Definition `def`, Decision `dec`, Rule `rule`, Requirement `req`, Principle `prin`, Convention `conv`, Table `tab`, Step `step`, Caveat `cav`, Open Question `open`, Example `ex`, Problem `prob`, Counterexample `cex`, Criterion `crit`, Procedure `alg`, Gate `gate`, and Register `reg`. The architecture uses area `vision`, the register uses `exemplars`, and these three new documents use `nrz`.
+Document-title kinds are `spec` for the architecture, `reg` for the register, `plan` for the plan, and `guide` for the readme and contributing guide. Sections use `sec`. Environment name and kind pairs are Definition `def`, Decision `dec`, Rule `rule`, Requirement `req`, Principle `prin`, Invariant `inv`, Convention `conv`, Table `tab`, Step `step`, Caveat `cav`, Open Question `open`, Example `ex`, Problem `prob`, Counterexample `cex`, Criterion `crit`, Procedure `alg`, Gate `gate`, and Register `reg`. The architecture uses area `vision`, the register uses `exemplars`, and these three new documents use `nrz`.
 
 A citation is its label as a backtick span inside parentheses in running text, never in square brackets, and resolves to exactly one mint. These five documents share one owner, so citations across them use the same ordinary form. Never enclose an inline-code span in bare square brackets. Prose paragraphs occupy one line, tables use Markdown, and these five documents use no code fences except the readme's single three-command fence and the contributing guide's verification-command fence. The linter checks the label and citation structure so that a rendered explanation remains traceable.
 
 **Rule (Check ownership and metadata)** · `rule:nrz:linter-and-ownership`
 
 Sources, inputs, templates, datasets, and renders carry the required metadata and pass the host linter's `check` and `fmt --check`. Ownership follows the declared subtree responsibility: NRZ owns the root files and declarations, while DOCS owns the design and engineering documents, README and this contributing guide, together with their templates. Package owners hold their declared partitions. Every owner may cite the root corpus; root prose cannot import a package premise. DOCS cites package statements through its declared imports. Use the actual linter configuration to resolve owner identities and envelope fields. This keeps generated and handwritten material within the same ownership and traceability rules (`dec:vision:labels-and-ownership`), (`rule:vision:metadata-and-licenses`), (`cav:vision:estate-schema-and-reproducibility`).
+
+## Invariants and their sources · `sec:nrz:contributing-invariants`
+
+Use the existing label and citation form (`rule:nrz:stable-labels-and-citations`) and the registered Invariant/`inv` kind (`[ORCHESTRATION-sec:kinds:invariants]`). Keep this table current for every repository document that mints an `inv` statement. External invariant labels and their source locations resolve through `.linter/imports/orchestration.toml`.
+
+|Document|Place|
+|--------|-----|
+|None currently|No repository document mints an `inv` statement.|
+
+A property cited under another kind, such as a rule, decision or requirement, is already written authority and needs no entry here. Stable collection order is such a rule (`rule:nrz:stable-collection-order`).
 
 ## Verification · `sec:nrz:contributing-verification`
 
