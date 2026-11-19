@@ -65,13 +65,13 @@ pub(super) fn run<P: Scalar + 'static>() -> TestResult {
         let before = s.account.usage().work;
         crate::loan::fault::reset_reads();
         let injection = crate::loan::fault::Injection::after(0);
-        let mut candidate = pending.evaluate(&mut s.account).map_err(failure)?;
+        let candidate = pending.evaluate(&mut s.account).map_err(failure)?;
         assert_eq!(s.account.usage().work - before, 436);
         assert_eq!(crate::loan::fault::reads(), 45);
         assert_eq!(crate::loan::fault::Injection::attempts(), 0);
         drop(injection);
         checks::cells(&candidate, &expected)?;
-        candidate.cancel(&mut s.heap, &mut s.account)?;
+        super::super::publication::images(candidate, &expected, mask, &mut s.heap, &mut s.account)?;
     }
     Ok(())
 }

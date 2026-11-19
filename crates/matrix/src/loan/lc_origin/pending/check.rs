@@ -119,7 +119,7 @@ pub(super) fn all<P: Scalar + 'static, const N: usize>(
 }
 
 /// Reuse the original host/mapped checks, with their complete fixed tariff prepaid by admission.
-fn source(heap: &Heap, row: &LcSourceRow) -> Result<(), LoanError> {
+pub(super) fn source(heap: &Heap, row: &LcSourceRow) -> Result<(), LoanError> {
     let State::Published(original_owner) = &heap.loans.group(row.source)?.state else {
         return Err(LoanError::StaleDependency);
     };

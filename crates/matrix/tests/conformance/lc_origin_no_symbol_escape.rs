@@ -103,3 +103,54 @@
 //! use nrz_matrix::LcOmegaPrepareFailure;
 //! fn escape(owner: LcOmegaPrepareFailure<'_, f64, 5>) { let _ = owner.declaration; }
 //! ```
+//!
+//! The completed route admits only specialized borrowing and prepaid release.
+//! ```rust
+//! use nrz_matrix::{LcPublishedResult, Heap, ExecutionAccount, HostChannel, LoanError};
+//! fn read(result: &LcPublishedResult<f32>, heap: &Heap, account: &mut ExecutionAccount) -> Result<f32, LoanError> {
+//!     result.current_reader(heap, account)?.read(HostChannel::Center, 0, account)
+//! }
+//! fn release(result: LcPublishedResult<f64>, account: &mut ExecutionAccount) -> Result<(), (LcPublishedResult<f64>, LoanError)> {
+//!     result.release(account)
+//! }
+//! ```
+//!
+//! ```compile_fail,E0599
+//! use nrz_matrix::LcPublishedResult;
+//! fn escape(result: LcPublishedResult<f32>) { let _ = result.symbols(); }
+//! ```
+//!
+//! ```compile_fail,E0599
+//! use nrz_matrix::LcPublishedResult;
+//! fn escape(result: LcPublishedResult<f32>) { let _ = result.clone(); }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use nrz_matrix::{LcPublishedResult, PublishedTile};
+//! fn escape(result: LcPublishedResult<f32>) { let _: PublishedTile<f32> = result.into(); }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use nrz_matrix::{LcPublishedResult, LcShapeTile};
+//! fn escape(result: LcPublishedResult<f32>) { let _: LcShapeTile<'_, f32> = result.into(); }
+//! ```
+//!
+//! ```compile_fail,E0599
+//! use nrz_matrix::LcPublishedResult;
+//! fn escape(result: LcPublishedResult<f64>) { let _ = result.symbols(); }
+//! ```
+//!
+//! ```compile_fail,E0599
+//! use nrz_matrix::LcPublishedResult;
+//! fn escape(result: LcPublishedResult<f64>) { let _ = result.clone(); }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use nrz_matrix::{LcPublishedResult, PublishedTile};
+//! fn escape(result: LcPublishedResult<f64>) { let _: PublishedTile<f64> = result.into(); }
+//! ```
+//!
+//! ```compile_fail,E0277
+//! use nrz_matrix::{LcPublishedResult, LcShapeTile};
+//! fn escape(result: LcPublishedResult<f64>) { let _: LcShapeTile<'_, f64> = result.into(); }
+//! ```

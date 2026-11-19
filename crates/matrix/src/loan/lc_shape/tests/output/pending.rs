@@ -10,6 +10,8 @@ use nrz_scalar::Scalar;
 /// ´test:unit:lc-origin-outcome-partition-encoding´
 #[test]
 fn lc_origin_outcome_partition_encoding() -> TestResult {
+    super::publication::partition::<f32>()?;
+    super::publication::partition::<f64>()?;
     super::execution::images::<f32>()?;
     super::execution::images::<f64>()?;
     crate::loan::lc_origin::pending::execution::checks::mapping()?;
@@ -21,6 +23,10 @@ fn lc_origin_outcome_partition_encoding() -> TestResult {
 /// ´test:unit:lc-origin-source-closure-retry-history´
 #[test]
 fn lc_origin_source_closure_retry_history() -> TestResult {
+    super::publication::stale::<f32>()?;
+    super::publication::stale::<f64>()?;
+    super::publication::history::<f32>()?;
+    super::publication::history::<f64>()?;
     super::execution::refusals::<f32>()?;
     super::execution::refusals::<f64>()?;
     heap_first::<f32>()?;
@@ -35,6 +41,8 @@ fn lc_origin_source_closure_retry_history() -> TestResult {
 /// ´test:unit:lc-origin-phase-receipts´
 #[test]
 fn lc_origin_phase_receipts() -> TestResult {
+    super::publication::receipts::<f32>()?;
+    super::publication::receipts::<f64>()?;
     super::execution::receipts::<f32>()?;
     super::execution::receipts::<f64>()?;
     receipts::check::<f32>()?;

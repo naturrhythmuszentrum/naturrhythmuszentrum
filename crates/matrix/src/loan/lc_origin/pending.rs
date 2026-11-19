@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Consuming checked admission owns private storage; private execution is implemented, publication remains gated.
+//! Checked admission, private execution and sealed publication preserve distinct capabilities.
 mod admission;
 mod check;
 pub(in crate::loan) mod execution;
 mod plan;
+pub(in crate::loan) mod publication;
 pub(in crate::loan) mod reclaim;
 
 use super::{LcBundleOwner, LcStorage, LcUse};
@@ -20,9 +21,9 @@ use std::{fmt, rc::Rc};
 /// Storage specialized to the sealed omega correspondence.
 type Storage = LcStorage<LcOmegaCorrespondence>;
 /// Complete-bundle shell specialized to the same correspondence.
-type Bundle = LcBundleOwner<LcOmegaCorrespondence>;
+pub(in crate::loan) type Bundle = LcBundleOwner<LcOmegaCorrespondence>;
 /// Initial use shell specialized to the same correspondence.
-type Use = LcUse<LcOmegaCorrespondence>;
+pub(in crate::loan) type Use = LcUse<LcOmegaCorrespondence>;
 
 /// Field order destroys both private shells before storage's final liveness edge.
 #[repr(C)]

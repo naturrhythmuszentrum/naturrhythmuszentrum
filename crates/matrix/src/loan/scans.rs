@@ -414,6 +414,11 @@ impl Heap {
         }
         let expired = match &debit.kind {
             AllocationKind::LcPending { .. } => return Err(LoanError::WrongLoan),
+            AllocationKind::LcBundle(_) | AllocationKind::LcUse { .. } => {
+                return super::lc_origin::pending::publication::reclaim::debit(
+                    self, slot, budget, changed,
+                );
+            }
             AllocationKind::PreparedOwner { witness, .. } => witness.strong_count() == 0,
             AllocationKind::PreparedUse(witness) => witness.strong_count() == 0,
             AllocationKind::LcClosure(witness) | AllocationKind::LcRows(witness) => {
@@ -499,6 +504,7 @@ impl Heap {
         let eligible = match &group.state {
             State::Retiring => true,
             State::Published(owner) => Rc::strong_count(owner) == 1,
+            State::LcPublished(owner) => Rc::strong_count(owner) == 1,
             State::Out(_) | State::LcOut(_) | State::Reserved => false,
         };
         if !eligible {
@@ -534,6 +540,10 @@ impl Heap {
                         * usize::from(bundle.retained_law.is_some()),
             )?;
             self.validate_published_bundle(bundle)?;
+        }
+        if let State::LcPublished(owner) = &group.state {
+            charge(budget, 6)?;
+            super::lc_origin::pending::publication::validate::current(self, owner)?;
         }
         let revision = self.loans.next_revision()?;
         let edges = identity.channels.into_iter().flatten().count() + 4;

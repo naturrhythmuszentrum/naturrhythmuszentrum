@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Funded preparation records and private future execution layouts; no publication authority.
+//! Closed LC owners retain the original law, captured sources and sealed numerical outcomes.
 //!
 //! C is the future checked correspondence owner, not an erased receipt or a stand-in
 //! proof. Only its sized Rc edge is native storage; its backend inventory is separate.
-#![expect(
-    dead_code,
-    reason = "execution layouts precede gated numerical owner construction"
+#![cfg_attr(
+    test,
+    expect(
+        dead_code,
+        reason = "layout inventories include unconstructed alternatives"
+    )
 )]
 
 use super::{
@@ -20,6 +23,7 @@ use std::rc::Rc;
 
 /// No implicit padding: status, target and explicit closed reason code.
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct LcOutcome {
     /// Explicit version-one outcome status byte.
     status: u8,
@@ -65,6 +69,7 @@ pub(in crate::loan) struct LcClosure {
 
 /// Closed schedule metadata contains no C-sized intermediate storage.
 #[repr(C)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(in crate::loan) struct LcSchedule {
     /// Original ordered inductance and capacitance positions.
     pub(in crate::loan) positions: [usize; 2],
@@ -78,13 +83,15 @@ pub(in crate::loan) struct LcSchedule {
 
 /// The only certainty claim permitted by this layout slice.
 #[repr(u8)]
-enum LcCertainty {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LcCertainty {
     /// Neither feasibility nor determinacy is asserted.
     Undecided,
 }
 
 /// Inline locators bind the immutable storage; they do not replace checked evidence.
 #[repr(C)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 struct LcSeal {
     /// Exact immutable owner or occupation identity.
     identity: Identity,
@@ -197,7 +204,7 @@ struct LcStorage<C> {
 
 /// Private shell is completed before any owning edge escapes; seal is never boxed.
 #[repr(C)]
-struct LcBundleOwner<C> {
+pub(in crate::loan) struct LcBundleOwner<C> {
     /// Boxed storage ownership, absent only while the private shell is empty.
     storage: Option<Box<LcStorage<C>>>,
     /// Inline complete seal, absent only while the private shell is empty.
@@ -219,7 +226,7 @@ struct LcUsePayload<C> {
 
 /// Empty initial shell is reserved beside storage, never inside its own bundle.
 #[repr(C)]
-struct LcUse<C> {
+pub(in crate::loan) struct LcUse<C> {
     /// Complete use payload, absent only in the private initial shell.
     payload: Option<LcUsePayload<C>>,
 }
@@ -244,5 +251,16 @@ pub(in crate::loan) mod pending;
 impl Drop for LcLiveness {
     fn drop(&mut self) {
         crate::loan::fault::witness_expiring(self.receipt);
+    }
+}
+
+impl<C> std::fmt::Debug for LcBundleOwner<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LcBundleOwner").finish_non_exhaustive()
+    }
+}
+impl<C> std::fmt::Debug for LcUse<C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LcUse").finish_non_exhaustive()
     }
 }

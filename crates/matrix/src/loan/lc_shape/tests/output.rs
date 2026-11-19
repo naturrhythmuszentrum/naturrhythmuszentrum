@@ -6,6 +6,7 @@ mod boundaries;
 mod bridge;
 mod execution;
 mod pending;
+mod publication;
 use super::fixture::{self, TestResult};
 use crate::{
     ExecutionAccount, Heap, LcInputInventory, LcOmegaOutput, LcOutputCellState,

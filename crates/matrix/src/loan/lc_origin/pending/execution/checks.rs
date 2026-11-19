@@ -50,6 +50,7 @@ pub(in crate::loan) fn mapping() -> TestResult {
     mapping::check()
 }
 mod mapping;
+pub(in crate::loan) mod state;
 
 /// New wrappers reuse the same native owner; binding and per-cell workspace are stack values.
 pub(in crate::loan) fn layout<P: Scalar>() {

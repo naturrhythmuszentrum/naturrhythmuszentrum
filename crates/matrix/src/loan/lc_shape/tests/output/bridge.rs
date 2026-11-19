@@ -419,6 +419,10 @@ fn debug_surface<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-phase-work-boundaries´
 #[test]
 fn lc_origin_phase_work_boundaries() -> TestResult {
+    super::publication::reader_work::<f32>()?;
+    super::publication::reader_work::<f64>()?;
+    super::publication::work::<f32>()?;
+    super::publication::work::<f64>()?;
     super::execution::work::<f32>()?;
     super::execution::work::<f64>()?;
     super::pending::state_work::<f32>()?;
@@ -495,6 +499,8 @@ fn capture_work<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-retained-staged-boundaries´
 #[test]
 fn lc_origin_retained_staged_boundaries() -> TestResult {
+    super::publication::uses::<f32>()?;
+    super::publication::uses::<f64>()?;
     super::execution::lifetime::heap_first::<f32>()?;
     super::execution::lifetime::heap_first::<f64>()?;
     super::pending::unwind::<f32>()?;

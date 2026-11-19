@@ -82,7 +82,12 @@ enum CandidateAllocationKind {
     /// Proposed LC bundle witness.
     LcBundle(Weak<LcBundleOwner<Unavailable>>),
     /// Proposed LC outside-use witness.
-    LcUse(Weak<LcUse<Unavailable>>),
+    LcUse {
+        /// Use lifetime expiration witness.
+        witness: Weak<LcUse<Unavailable>>,
+        /// Initial admission receipt or additional fixed receipt in one niche word.
+        receipt: Option<std::num::NonZeroU64>,
+    },
 }
 
 /// Whole candidate group catches optional-row niche changes as well as enum width.
@@ -199,6 +204,12 @@ fn inventory<P: nrz_scalar::Scalar>() {
     native_matrix_inventory::<P>();
     crate::loan::lc_shape::bridge_layout::<P>();
     super::pending::layout::<P>();
+    // The implemented owner types preserve the independently inventoried generic headers.
+    assert_eq!(size_of::<super::pending::Bundle>(), 408);
+    assert_eq!(size_of::<super::pending::Use>(), 48);
+    assert_eq!(size_of::<crate::LcPublishedResult<P>>(), 8);
+    assert_eq!(size_of::<crate::LcResultReader<'_, P>>(), 8);
+    assert_eq!(size_of::<crate::LcOutcomeView<'_, '_, P>>(), 16);
     super::pending::execution::checks::layout::<P>();
     // BundlePin owns the same 8-byte Rc<PinRecord> edge as the row, plus a zero-size marker.
     assert_eq!(size_of::<crate::BundlePin<P>>(), 8);

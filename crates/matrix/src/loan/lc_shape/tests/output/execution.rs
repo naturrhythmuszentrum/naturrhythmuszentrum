@@ -3,7 +3,7 @@
 mod boundaries;
 mod cases;
 pub(super) mod lifetime;
-mod oracle;
+pub(super) mod oracle;
 use super::{TestResult, demand, request, setup};
 use crate::loan::lc_origin::pending::execution::checks;
 use crate::{LcApplicationEvaluationFailure, LcOmegaOutput, LcProductError, LoanError};
@@ -45,7 +45,7 @@ pub(super) fn images<P: Scalar + 'static>() -> TestResult {
             crate::loan::fault::reset_scalars();
             let injection = crate::loan::fault::Injection::after(0);
             let before = s.account.usage().work;
-            let mut candidate = pending.evaluate(&mut s.account).map_err(failure)?;
+            let candidate = pending.evaluate(&mut s.account).map_err(failure)?;
             assert_eq!(candidate.ticket(), ticket);
             let d = u64::try_from(selected.len())?;
             assert_eq!(s.account.usage().work - before, 214 + 74 * d);
@@ -59,10 +59,7 @@ pub(super) fn images<P: Scalar + 'static>() -> TestResult {
             );
             drop(injection);
             checks::cells(&candidate, &expected)?;
-            let before = s.account.usage().work;
-            candidate.cancel(&mut s.heap, &mut s.account)?;
-            assert_eq!(s.account.usage().work, before);
-            drop(candidate);
+            super::publication::images(candidate, &expected, mask, &mut s.heap, &mut s.account)?;
             s.heap.retire_mask(mask, &mut s.account.ledger)?;
             super::fixture::retire_layout(&mut s.heap, &mut s.account, mask.layout())?;
             for layout in layouts {
@@ -73,7 +70,7 @@ pub(super) fn images<P: Scalar + 'static>() -> TestResult {
     }
     Ok(())
 }
-fn failure<P: Scalar, const N: usize>(
+pub(super) fn failure<P: Scalar, const N: usize>(
     failure: LcApplicationEvaluationFailure<'_, P, N>,
 ) -> LcProductError {
     match failure {

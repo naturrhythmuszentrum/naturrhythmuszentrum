@@ -179,6 +179,15 @@ pub(super) enum AllocationKind {
     LcClosure(Weak<super::lc_origin::LcClosure>),
     /// Separate allocation role for the exact positional row backing.
     LcRows(Weak<super::lc_origin::LcClosure>),
+    /// Completed LC bundle shell expiration, without ordinary pin authority.
+    LcBundle(Weak<super::lc_origin::pending::Bundle>),
+    /// Each separately funded specialized LC use shell.
+    LcUse {
+        /// Expiration witness, never upgraded by reconciliation.
+        witness: Weak<super::lc_origin::pending::Use>,
+        /// Issued-use fixed receipt; initial use inherits the application's admission receipt.
+        receipt: Option<std::num::NonZeroU64>,
+    },
 }
 /// Closed authority classes prevent a bundle occupation authenticating a law debit.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -414,6 +423,8 @@ pub(super) enum State {
     Out(Weak<Liveness>),
     /// Detached LC storage has no ordinary pin-index occupation.
     LcOut(Weak<super::lc_origin::LcLiveness>),
+    /// Immutable sealed LC output; ordinary bundle dispatch must refuse it.
+    LcPublished(Rc<super::lc_origin::pending::Bundle>),
     /// Exactly one immutable bundle registry root.
     Published(Rc<BundleOwner>),
     /// Payload is destroyed; fixed local evidence can still require delivery.

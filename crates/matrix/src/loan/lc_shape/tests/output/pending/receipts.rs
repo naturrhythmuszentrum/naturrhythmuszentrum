@@ -17,6 +17,20 @@ struct Receipt {
     parent: Option<u64>,
     consumer: String,
     application: u64,
+    join: u64,
+    correspondence: u64,
+    seal_application: u64,
+    query: u64,
+    output_declaration: u64,
+    sign_attempts_application: u64,
+    source_closure: u64,
+    attempt: u64,
+    outcome_records: u64,
+    terminal_revision: u64,
+    delivered: bool,
+    demand: String,
+    completed_mask: String,
+    terminal_ticket: String,
     operation: String,
     outcome: String,
     reason: String,
@@ -37,18 +51,45 @@ impl Visit for Receipt {
         match field.name() {
             "ledger" => self.ledger = value,
             "application" => self.application = value,
+            "join" => self.join = value,
+            "correspondence" => self.correspondence = value,
+            "seal_application" => self.seal_application = value,
+            "query" => self.query = value,
+            "output_declaration" => self.output_declaration = value,
+            "sign_attempts_application" => self.sign_attempts_application = value,
+            "source_closure" => self.source_closure = value,
+            "attempt" => self.attempt = value,
+            "outcome_records" => self.outcome_records = value,
+            "terminal_revision" => self.terminal_revision = value,
             "work" => self.work.push(value),
             _ => {}
         }
     }
-    fn record_debug(&mut self, _: &Field, _: &dyn std::fmt::Debug) {}
+    fn record_bool(&mut self, field: &Field, value: bool) {
+        if field.name() == "delivered" {
+            self.delivered = value;
+        }
+    }
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
+        match field.name() {
+            "demand" => self.demand = format!("{value:?}"),
+            "completed_mask" => self.completed_mask = format!("{value:?}"),
+            "terminal_ticket" => self.terminal_ticket = format!("{value:?}"),
+            _ => {}
+        }
+    }
 }
 struct Observer(Arc<Mutex<Vec<Receipt>>>, Mutex<Vec<u64>>);
 impl Subscriber for Observer {
     fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         matches!(
             metadata.name(),
-            "nrz.work.phase" | "nrz.loan" | "nrz.retire" | "nrz.walk" | "nrz.barrier"
+            "nrz.work.phase"
+                | "nrz.loan"
+                | "nrz.retire"
+                | "nrz.walk"
+                | "nrz.barrier"
+                | "nrz.publish"
         )
     }
     fn new_span(&self, attributes: &Attributes<'_>) -> Id {
@@ -318,6 +359,98 @@ pub(in crate::loan::lc_shape::tests::output) fn traversal<T>(
                 .all(|work| *work == before + readiness + evaluation)
         );
         assert_eq!(barrier.outcome, "completed");
+    }
+    drop(receipts);
+    result
+}
+
+/// The publication receipt joins attempts through their application, without enumerating sign keys.
+pub(in crate::loan::lc_shape::tests::output) fn publication<T>(
+    expected: [u64; 6],
+    masks: [crate::MaskVersion; 2],
+    ticket: crate::LoanTicket,
+    before: u64,
+    run: impl FnOnce() -> T,
+) -> T {
+    let _guard = DISPATCHERS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let receipts = Arc::new(Mutex::new(Vec::new()));
+    let result = tracing::subscriber::with_default(
+        Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
+        run,
+    );
+    let receipts = receipts
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let phases: Vec<_> = receipts
+        .iter()
+        .filter(|r| r.name == "nrz.work.phase")
+        .collect();
+    assert_eq!(phases.len(), 3);
+    let mut work = before;
+    for (phase, (operation, tariff)) in phases.iter().zip([
+        ("LC readiness", 249),
+        ("LC evaluation", 187),
+        ("LC publication", 639),
+    ]) {
+        assert_eq!(phase.operation, operation);
+        assert_eq!(phase.ledger, phases[0].ledger);
+        assert_ne!(phase.ledger, 0);
+        assert_eq!(phase.work.first(), Some(&work));
+        work += tariff;
+        assert_eq!(phase.work.last(), Some(&work));
+        assert_eq!(phase.outcome, "completed");
+    }
+    let (walk_index, walk) = receipts
+        .iter()
+        .enumerate()
+        .find(|(_, r)| r.name == "nrz.walk")
+        .expect("evaluation walk");
+    assert_eq!(walk.application, expected[0]);
+    let publish: Vec<_> = receipts
+        .iter()
+        .filter(|r| r.name == "nrz.publish")
+        .collect();
+    assert_eq!(publish.len(), 1);
+    let publish = publish[0];
+    assert_eq!(
+        [
+            publish.application,
+            publish.join,
+            publish.correspondence,
+            publish.query,
+            publish.source_closure,
+            publish.output_declaration
+        ],
+        expected
+    );
+    assert_ne!(publish.output_declaration, 0);
+    assert_eq!(publish.sign_attempts_application, walk.application);
+    assert_eq!(publish.seal_application, publish.application);
+    assert_ne!(publish.outcome_records, 0);
+    assert_ne!(publish.terminal_revision, 0);
+    assert!(publish.delivered);
+    assert_eq!(publish.demand, format!("{:?}", masks[0]));
+    assert_eq!(publish.completed_mask, format!("{:?}", masks[1]));
+    assert_eq!(publish.terminal_ticket, format!("{ticket:?}"));
+    let barriers: Vec<_> = receipts
+        .iter()
+        .filter(|r| r.name == "nrz.barrier")
+        .collect();
+    assert_eq!(barriers.len(), 3);
+    for (index, barrier) in barriers.iter().enumerate() {
+        assert_ne!(barrier.attempt, 0);
+        assert!(
+            barriers[..index]
+                .iter()
+                .all(|other| other.attempt != barrier.attempt)
+        );
+        assert_eq!(
+            barrier.parent,
+            Some(u64::try_from(walk_index + 1).expect("bounded span"))
+        );
+        assert_eq!(barrier.consumer, "origin-traversal");
     }
     drop(receipts);
     result

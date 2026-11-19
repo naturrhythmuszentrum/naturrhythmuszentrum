@@ -110,3 +110,9 @@ const fn words(count: usize) -> usize {
 
 #[cfg(test)]
 mod tests;
+
+pub use lc_origin::LcCertainty;
+pub use lc_origin::pending::publication::{
+    LcAssurance, LcCellOutcome, LcOutcomeKind, LcOutcomeView, LcPublicationFailure,
+    LcPublishedResult, LcResultReader,
+};

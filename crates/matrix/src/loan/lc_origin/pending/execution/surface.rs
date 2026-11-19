@@ -5,7 +5,7 @@ use crate::{CancellationReceipt, ExecutionAccount, Heap, LcProductError, LoanErr
 use nrz_scalar::Scalar;
 use std::fmt;
 
-/// An evaluated private candidate has no numerical reader or publication route in this slice.
+/// An evaluated private candidate can attempt sealed publication or cancel, without exposing private values.
 ///
 /// ```compile_fail,E0599
 /// use nrz_matrix::{LcApplicationEvaluated, ExecutionAccount};
@@ -39,10 +39,6 @@ use std::fmt;
 /// ```
 /// ```compile_fail,E0599
 /// use nrz_matrix::LcApplicationEvaluated;
-/// fn escape(owner: LcApplicationEvaluated<'_, f32, 5>) { let _ = owner.publish(); }
-/// ```
-/// ```compile_fail,E0599
-/// use nrz_matrix::LcApplicationEvaluated;
 /// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.symbols(); }
 /// ```
 /// ```compile_fail,E0599
@@ -61,13 +57,9 @@ use std::fmt;
 /// use nrz_matrix::LcApplicationEvaluated;
 /// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.read(); }
 /// ```
-/// ```compile_fail,E0599
-/// use nrz_matrix::LcApplicationEvaluated;
-/// fn escape(owner: LcApplicationEvaluated<'_, f64, 5>) { let _ = owner.publish(); }
-/// ```
 pub struct LcApplicationEvaluated<'i, P: Scalar, const N: usize> {
     /// Same funded storage, captured closure and original inventory borrow.
-    pub(super) owner: LcApplicationPending<'i, P, N>,
+    pub(in crate::loan::lc_origin::pending) owner: LcApplicationPending<'i, P, N>,
 }
 /// An unexpected traversal failure retains cleanup authority but cannot evaluate again.
 ///
@@ -160,6 +152,19 @@ impl<P: Scalar, const N: usize> fmt::Debug for LcApplicationFailed<'_, P, N> {
     }
 }
 impl<P: Scalar + 'static, const N: usize> LcApplicationEvaluated<'_, P, N> {
+    /// Inspect producer state and immutable demand, including after cancellation.
+    /// Requested unpublished cells report `Pending`; cancelled ones report `Cancelled`.
+    /// This does not expose private terminal outcomes.
+    /// # Errors
+    /// Refuses foreign accounts, out-of-range tuples or exhausted one-Work inspection.
+    pub fn cell_state(
+        &self,
+        cell: usize,
+        account: &mut ExecutionAccount,
+    ) -> Result<crate::LcOutputCellState, LoanError> {
+        self.owner.cell_state(cell, account)
+    }
+
     /// Diagnostic producer identity grants no ordinary pin or result access.
     #[must_use]
     pub const fn ticket(&self) -> LoanTicket {
@@ -177,6 +182,19 @@ impl<P: Scalar + 'static, const N: usize> LcApplicationEvaluated<'_, P, N> {
     }
 }
 impl<P: Scalar + 'static, const N: usize> LcApplicationFailed<'_, P, N> {
+    /// Inspect producer state and immutable demand, including after cancellation.
+    /// Requested unpublished cells report `Pending`; cancelled ones report `Cancelled`.
+    /// This does not expose private terminal outcomes.
+    /// # Errors
+    /// Refuses foreign accounts, out-of-range tuples or exhausted one-Work inspection.
+    pub fn cell_state(
+        &self,
+        cell: usize,
+        account: &mut ExecutionAccount,
+    ) -> Result<crate::LcOutputCellState, LoanError> {
+        self.owner.cell_state(cell, account)
+    }
+
     /// Discard the failed traversal using its original prepaid cleanup.
     /// # Errors
     /// Refuses foreign or stale cancellation authority without spending Work.
@@ -211,4 +229,13 @@ impl<'i, P: Scalar + 'static, const N: usize> LcApplicationPending<'i, P, N> {
             Err(error) => Err(LcApplicationEvaluationFailure::Pending { owner: self, error }),
         }
     }
+}
+
+/// Test the failed facade's retained demand without exporting its private owner or storage.
+#[cfg(test)]
+pub(super) fn assert_cancelled_failed<P: Scalar, const N: usize>(
+    owner: &LcApplicationFailed<'_, P, N>,
+) {
+    assert!(owner.owner.native.is_none());
+    assert!(owner.owner.cancelled.is_some());
 }
