@@ -132,9 +132,17 @@ pub struct CheckedEnclosure {
     pub(super) certificate: EnclosureCertificate,
     /// Final checked outward presentation.
     pub(super) interval: Interval,
+    /// CAS-computed logical size of this retained checked receipt.
+    pub(super) retained_bytes: u64,
 }
 
 impl CheckedEnclosure {
+    /// CAS-computed retained size data; this is not evidence of inclusion.
+    #[must_use]
+    pub const fn retained_bytes(&self) -> u64 {
+        self.retained_bytes
+    }
+
     /// Original request whose complete identity qualifies this result.
     #[must_use]
     pub const fn request(&self) -> &EnclosureRequest {
