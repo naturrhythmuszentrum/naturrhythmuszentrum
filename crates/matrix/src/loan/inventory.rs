@@ -40,6 +40,13 @@ impl Heap {
             .with_work_phase(super::FAMILY, "occupation inventory", |budget| {
                 charge(budget, 1)?;
                 let group = self.loans.group(ticket.identity)?;
+                if matches!(
+                    group.debits,
+                    super::registry::DebitInventory::LcApplication(_)
+                ) || matches!(group.state, super::registry::State::LcOut(_))
+                {
+                    return Err(LoanError::WrongLoan);
+                }
                 let mut result = LoanInventory::default();
                 if let super::registry::State::Published(owner) = &group.state
                     && let Some(law) = owner
@@ -70,6 +77,7 @@ impl Heap {
                             | AllocationKind::PreparedUse(_)
                             | AllocationKind::LcClosure(_)
                             | AllocationKind::LcRows(_)
+                            | AllocationKind::LcPending { .. }
                             | AllocationKind::Constant(_) => return Err(LoanError::WrongLoan),
                         };
                         *total = total

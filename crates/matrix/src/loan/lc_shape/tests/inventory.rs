@@ -136,7 +136,11 @@ fn source<P: Scalar + 'static>(
     shift: usize,
 ) -> TestResult<crate::PublishedTile<P>> {
     let mut loan = fixture::granted(heap.request_loan(schema.source(axes, account)?, account))?;
-    for (cell, values) in VALUES[schema.input_index()].into_iter().enumerate() {
+    for (cell, values) in VALUES[schema.input_index()]
+        .into_iter()
+        .take(axes.instances.capacity())
+        .enumerate()
+    {
         for (channel, numerator) in HostChannel::ALL.into_iter().zip(values) {
             if cell != 1 || channel != HostChannel::Error || shift == 1 {
                 loan.write_component(

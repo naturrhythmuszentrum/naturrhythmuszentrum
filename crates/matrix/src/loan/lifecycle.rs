@@ -428,6 +428,14 @@ impl Heap {
             .get(identity.root.slot)
             .and_then(Option::as_ref)
         {
+            if matches!(
+                group.debits,
+                super::registry::DebitInventory::LcApplication(_)
+            ) {
+                drop(self.masks.layouts.remove(identity.layout.key));
+                drop(self.masks.masks.remove(identity.mask.key));
+                return;
+            }
             let pin = group.pin;
             if self
                 .loans

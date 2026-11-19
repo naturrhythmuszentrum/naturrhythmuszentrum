@@ -110,20 +110,22 @@ pub(super) fn request<P: Scalar + 'static>(
     let destination = schema.destination(axes, account)?;
     let layout = heap.create_cell_layout(
         axes.combined.axis(),
-        crate::Layout::contiguous(crate::Extent::new(12, 1)?)?,
+        crate::Layout::contiguous(crate::Extent::new(axes.combined.axis().capacity(), 1)?)?,
         &mut account.ledger,
     )?;
     let demand = heap.create_mask(layout, cells, &mut account.ledger)?;
     let map = heap.cell_entry_map(
-        crate::Extent::new(2, 1)?,
+        crate::Extent::new(axes.instances.capacity(), 1)?,
         demand,
         Some((schema.projection(axes, account)?, crate::CellFactor::Outer)),
         &mut account.ledger,
     )?;
     let owner = crate::conversion_testing::owner()?;
     let quantity = schema.question().relation().inputs()[schema.input_index()].descriptor();
-    let input_shape = crate::conversion_testing::shape(&owner, quantity, 2)?;
-    let output_shape = crate::conversion_testing::shape(&owner, quantity, 12)?;
+    let input_shape =
+        crate::conversion_testing::shape(&owner, quantity, axes.instances.capacity())?;
+    let output_shape =
+        crate::conversion_testing::shape(&owner, quantity, axes.combined.axis().capacity())?;
     let operation = crate::OperationDraft::map_cell_copy(input_shape, output_shape, map)?
         .check(ExecutionLimits::default())?;
     Ok(PointwiseRequest {

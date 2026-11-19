@@ -168,6 +168,13 @@ pub(super) enum AllocationKind {
     PreparedUse(Weak<super::retained_expm1::PreparedExpm1UseRecord>),
     /// Shared source-free numerical constant, observed only for expiration and pointer identity.
     Constant(Weak<dyn std::any::Any>),
+    /// Pending LC allocations share the final liveness witness.
+    LcPending {
+        /// Expiration only; never upgraded by reconciliation.
+        witness: Weak<super::lc_origin::LcLiveness>,
+        /// This debit retains the shared liveness header charge until last.
+        header: bool,
+    },
     /// Expiration witness for the shared LC closure header.
     LcClosure(Weak<super::lc_origin::LcClosure>),
     /// Separate allocation role for the exact positional row backing.
@@ -178,12 +185,47 @@ pub(super) enum AllocationKind {
 pub(super) enum DebitOwner {
     /// Numerical group occupation.
     Bundle(Identity),
+    /// Checked LC application occupation, separate from ordinary bundle authority.
+    LcApplication(LcDebitIdentity),
     /// Heap/account/owner identity, without fictitious numerical occupations.
     Prepared(super::retained_expm1::LawIdentity),
     /// Heap scope for an adopted immutable numerical constant, without bundle authority.
     Constant(u64),
     /// A funded LC join without a fictitious numerical occupation.
     LcJoin(super::lc_origin::LcJoinIdentity),
+}
+/// Compact LC accounting locator; the globally unique request retains exact occupation identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[repr(C)]
+pub(super) struct LcDebitIdentity {
+    /// Original heap scope.
+    pub(super) scope: u64,
+    /// Original account.
+    pub(super) account: u64,
+    /// Root generation used only to find a possibly remaining group witness.
+    pub(super) root: Key,
+    /// Globally unique nonwrapping application request.
+    pub(super) request: u64,
+    /// Original occupation nonce.
+    nonce: u64,
+    /// Original cleanup receipt.
+    receipt: u64,
+    /// Precision whose scalar elements remain charged.
+    format: Format,
+}
+impl LcDebitIdentity {
+    /// Project the accounting identity without copying channel, layout or mask locators.
+    pub(super) const fn of(identity: Identity) -> Self {
+        Self {
+            scope: identity.scope,
+            account: identity.account,
+            root: identity.root,
+            request: identity.request,
+            nonce: identity.nonce,
+            receipt: identity.receipt,
+            format: identity.format,
+        }
+    }
 }
 /// The accounting record owns no payload and never duplicates its charge.
 #[derive(Debug)]
@@ -336,6 +378,8 @@ pub(super) enum DebitInventory {
     Application([Option<(usize, u64)>; 17]),
     /// Five-role prepared application, including both endpoint tracking inventories.
     PreparedApplication([Option<(usize, u64)>; 23]),
+    /// Closed LC storage adopts two closure tokens and adds seventeen allocations.
+    LcApplication([Option<(usize, u64)>; 19]),
     /// Two-input applications add one side-owner debit without widening the largest variant.
     BinaryApplication([Option<(usize, u64)>; 18]),
 }
@@ -343,6 +387,7 @@ impl DebitInventory {
     /// Exact active variant, without inventing extra host debit positions.
     pub(super) const fn entries(&self) -> &[Option<(usize, u64)>] {
         match self {
+            Self::LcApplication(entries) => entries,
             Self::Host(entries) => entries,
             Self::Application(entries) => entries,
             Self::PreparedApplication(entries) => entries,
@@ -352,6 +397,7 @@ impl DebitInventory {
     /// Mutate only the fixed inventory selected at admission.
     pub(super) const fn entries_mut(&mut self) -> &mut [Option<(usize, u64)>] {
         match self {
+            Self::LcApplication(entries) => entries,
             Self::Host(entries) => entries,
             Self::Application(entries) => entries,
             Self::PreparedApplication(entries) => entries,
@@ -366,6 +412,8 @@ pub(super) enum State {
     Reserved,
     /// Sole writable owner is outside the heap.
     Out(Weak<Liveness>),
+    /// Detached LC storage has no ordinary pin-index occupation.
+    LcOut(Weak<super::lc_origin::LcLiveness>),
     /// Exactly one immutable bundle registry root.
     Published(Rc<BundleOwner>),
     /// Payload is destroyed; fixed local evidence can still require delivery.
@@ -404,13 +452,17 @@ impl Registry {
     pub(crate) fn elements(&self) -> Result<[usize; 2], crate::HeapError> {
         let mut elements = [0_usize; 2];
         for debit in self.debits.iter().flatten() {
-            let DebitOwner::Bundle(identity) = debit.owner else {
-                if debit.elements != 0 {
-                    return Err(crate::HeapError::Capacity);
+            let format = match debit.owner {
+                DebitOwner::Bundle(identity) => identity.format,
+                DebitOwner::LcApplication(identity) => identity.format,
+                _ => {
+                    if debit.elements != 0 {
+                        return Err(crate::HeapError::Capacity);
+                    }
+                    continue;
                 }
-                continue;
             };
-            let index = identity.format.index();
+            let index = format.index();
             elements[index] = elements[index]
                 .checked_add(debit.elements)
                 .ok_or(crate::HeapError::Capacity)?;

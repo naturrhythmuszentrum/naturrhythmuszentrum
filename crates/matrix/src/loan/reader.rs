@@ -366,18 +366,53 @@ impl Heap {
     ) -> Result<(), LoanError> {
         self.current_record(&pin.record, budget)
     }
-    /// Typed and erased pins share the exact current-occupation and registry-index checks.
+    /// Current pin checks retain their original event-by-event charging boundary.
     pub(super) fn current_record(
         &self,
         record: &Rc<PinRecord>,
         budget: &mut nrz_bindings::Budget,
     ) -> Result<(), LoanError> {
-        charge(budget, 1)?;
+        self.current_record_visits(record, &mut |visits| charge(budget, visits))
+    }
+    /// Current bundle checks retain their original event-by-event charging boundary.
+    pub(in crate::loan) fn current_owner(
+        &self,
+        bundle: &Bundle,
+        budget: &mut nrz_bindings::Budget,
+    ) -> Result<(), LoanError> {
+        self.current_owner_visits(bundle, &mut |visits| charge(budget, visits))
+    }
+    /// Closed LC admission prepays the complete host and mapped visit inventory together.
+    pub(in crate::loan) fn current_lc_pair_prepaid(
+        &self,
+        original: &Bundle,
+        mapped: &Rc<PinRecord>,
+    ) -> Result<(), LoanError> {
+        self.current_owner_visits(original, &mut |visits| {
+            #[cfg(test)]
+            super::fault::lc_pair_visit(visits);
+            let _ = visits;
+            Ok(())
+        })?;
+        self.current_record_visits(mapped, &mut |visits| {
+            #[cfg(test)]
+            super::fault::lc_pair_visit(visits);
+            let _ = visits;
+            Ok(())
+        })
+    }
+    /// Typed and erased pins share the exact current-occupation and registry-index checks.
+    fn current_record_visits(
+        &self,
+        record: &Rc<PinRecord>,
+        visit: &mut impl FnMut(usize) -> Result<(), LoanError>,
+    ) -> Result<(), LoanError> {
+        visit(1)?;
         let ticket = record_ticket(record)?;
         if ticket.identity.scope != self.scope {
             return Err(LoanError::ForeignOwner);
         }
-        charge(budget, 1)?;
+        visit(1)?;
         let group = self.loans.group(ticket.identity)?;
         let State::Published(owner) = &group.state else {
             return Err(LoanError::StaleDependency);
@@ -386,7 +421,7 @@ impl Heap {
         if !Rc::ptr_eq(owner, &payload.bundle) {
             return Err(LoanError::StaleDependency);
         }
-        charge(budget, 1)?;
+        visit(1)?;
         let indexed = self
             .loans
             .pins
@@ -403,17 +438,16 @@ impl Heap {
             return Err(LoanError::WrongLoan);
         }
         let bundle = owner.payload.as_ref().ok_or(LoanError::WrongLoan)?;
-        self.current_owner(bundle, budget)
+        self.current_owner_visits(bundle, visit)
     }
     /// Bare tickets and retained pins share the same declaration, attachment and native checks.
-    pub(in crate::loan) fn current_owner(
+    fn current_owner_visits(
         &self,
         bundle: &Bundle,
-        budget: &mut nrz_bindings::Budget,
+        visit: &mut impl FnMut(usize) -> Result<(), LoanError>,
     ) -> Result<(), LoanError> {
         let channels = bundle.channels.iter().flatten().count();
-        charge(
-            budget,
+        visit(
             channels
                 + 2 * usize::from(bundle.endpoints.is_some())
                 + 5
@@ -429,10 +463,7 @@ impl Heap {
                     * usize::from(bundle.retained_law.is_some()),
         )?;
         self.validate_published_bundle(bundle)?;
-        charge(
-            budget,
-            channels + 1 + 3 * usize::from(bundle.endpoints.is_some()),
-        )?;
+        visit(channels + 1 + 3 * usize::from(bundle.endpoints.is_some()))?;
         bundle.origin.validate_current(bundle)?;
         if bundle.layout.axis != bundle.declaration.axis
             || bundle.layout.components.extent() != bundle.declaration.extent
@@ -440,7 +471,7 @@ impl Heap {
             return Err(LoanError::LayoutMismatch);
         }
         for key in bundle.identity.channels.into_iter().flatten() {
-            charge(budget, 1)?;
+            visit(1)?;
             let crate::heap::descriptors::DescriptorRecord::Managed(record) =
                 self.descriptors.slots.get(key)?
             else {
@@ -452,7 +483,7 @@ impl Heap {
                 return Err(LoanError::StaleDependency);
             }
         }
-        charge(budget, 3)?;
+        visit(3)?;
         self.mask(bundle.identity.mask, bundle.identity.layout)?;
         Ok(())
     }

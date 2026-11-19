@@ -4,6 +4,7 @@
 mod authority;
 mod boundaries;
 mod bridge;
+mod pending;
 use super::fixture::{self, TestResult};
 use crate::{
     ExecutionAccount, Heap, LcInputInventory, LcOmegaOutput, LcOutputCellState,

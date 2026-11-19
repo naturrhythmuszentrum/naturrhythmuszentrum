@@ -198,6 +198,7 @@ fn inventory<P: nrz_scalar::Scalar>() {
     assert_eq!(size_of::<Rc<Unavailable>>(), 8);
     native_matrix_inventory::<P>();
     crate::loan::lc_shape::bridge_layout::<P>();
+    super::pending::layout::<P>();
     // BundlePin owns the same 8-byte Rc<PinRecord> edge as the row, plus a zero-size marker.
     assert_eq!(size_of::<crate::BundlePin<P>>(), 8);
     // Source row: 48 symbols + 8 pin + 16 position/schema + 432 occupations

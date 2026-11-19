@@ -12,6 +12,7 @@ mod error;
 pub(crate) mod fault;
 mod inventory;
 mod lc_origin;
+pub use lc_origin::pending::{LcApplicationAdmissionFailure, LcApplicationPending};
 mod lc_shape;
 pub use lc_shape::{
     LcFrequencyPrelude, LcFrequencyTarget, LcInputCell, LcInputCells, LcInputInventory,

@@ -4,6 +4,8 @@
 use super::LoanError;
 use std::cell::Cell;
 thread_local! {
+    /// Inherited host/mapped visits actually traversed by checked LC admission.
+    static LC_PAIR_VISITS: Cell<usize> = const { Cell::new(0) };
     /// Actual backing destructions, logical elements and rounded bytes after native owner drop.
     static RELEASED_NUMERICAL: Cell<[usize; 3]> = const { Cell::new([0; 3]) };
     /// Actual stores include failed-component placeholders and never count zero initialization.
@@ -251,4 +253,13 @@ pub(super) fn released_numerical(elements: usize, bytes: usize) {
 /// Observe real native backing release without retaining a payload edge.
 pub(super) fn numerical_releases() -> [usize; 3] {
     RELEASED_NUMERICAL.get()
+}
+
+/// Count actual inherited visits independently of the admission tariff.
+pub(crate) fn lc_pair_visit(visits: usize) {
+    LC_PAIR_VISITS.set(LC_PAIR_VISITS.get() + visits);
+}
+/// Reset or observe the current thread's inherited LC visit count.
+pub(crate) fn take_lc_pair_visits() -> usize {
+    LC_PAIR_VISITS.replace(0)
 }

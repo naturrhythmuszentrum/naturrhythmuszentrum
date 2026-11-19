@@ -123,7 +123,8 @@ struct LcChannel {
 
 /// Expiration witness is the final retaining field of storage.
 #[repr(C)]
-struct LcLiveness {
+#[derive(Debug)]
+pub(in crate::loan) struct LcLiveness {
     /// Exact immutable owner or occupation identity.
     identity: Identity,
     /// Original prepaid cleanup receipt identity.
@@ -235,4 +236,13 @@ pub(in crate::loan) struct LcJoinIdentity {
     pub(in crate::loan) account: u64,
     /// Nonwrapping identity shared by the closure and cleanup receipts.
     pub(in crate::loan) join: u64,
+}
+
+pub(in crate::loan) mod pending;
+
+#[cfg(test)]
+impl Drop for LcLiveness {
+    fn drop(&mut self) {
+        crate::loan::fault::witness_expiring(self.receipt);
+    }
 }

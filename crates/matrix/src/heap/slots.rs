@@ -510,6 +510,138 @@ pub(crate) fn growth_capacity<T>(old: usize, required: usize) -> Result<usize, H
         .max(minimum))
 }
 
+/// Exact occupation keys selected before allocation under an exclusive heap borrow.
+#[repr(C)]
+pub(crate) struct FixedSlotPlan<const N: usize> {
+    /// Selected future keys in declaration order.
+    keys: [Key; N],
+    /// Original table length, checked before preparation.
+    length: usize,
+    /// Exact replacement capacity.
+    capacity: usize,
+}
+impl<const N: usize> FixedSlotPlan<N> {
+    /// Logical length after appending selected keys.
+    pub(crate) fn resulting_len(&self) -> usize {
+        self.keys
+            .iter()
+            .fold(self.length, |length, key| length.max(key.slot + 1))
+    }
+    /// Capacity arithmetic without another vacancy scan.
+    pub(crate) fn growth<T>(&self, table: &Slots<T>) -> Result<(usize, usize), HeapError> {
+        let old = table.owned_bytes()?;
+        let new = self
+            .capacity
+            .checked_mul(size_of::<Slot<T>>())
+            .ok_or(HeapError::Capacity)?;
+        Ok((
+            new.checked_sub(old).ok_or(HeapError::Capacity)?,
+            if new > old { old } else { 0 },
+        ))
+    }
+}
+impl<T> Slots<T> {
+    /// Plan fixed occupations without allocating temporary key storage.
+    pub(crate) fn plan_fixed<const N: usize>(
+        &self,
+        limit: usize,
+    ) -> Result<FixedSlotPlan<N>, HeapError> {
+        // Unlike change_mode/reusable_keys, this walker chooses keys before Work prepayment
+        // without allocating. Both walkers must select vacant slots in index order, skip
+        // exhausted generations, increment reusable generations and append generation-one keys.
+        // prepare_fixed validates those selected keys under the same exclusive heap borrow.
+        let mut keys = [Key {
+            slot: 0,
+            generation: 0,
+        }; N];
+        let mut found = 0;
+        for (slot, entry) in self.entries.iter().enumerate() {
+            if found < N
+                && entry.value.is_none()
+                && let Some(generation) = entry.generation.checked_add(1)
+            {
+                keys[found] = Key { slot, generation };
+                found += 1;
+            }
+        }
+        let end = self
+            .entries
+            .len()
+            .checked_add(N - found)
+            .ok_or(HeapError::Capacity)?;
+        if end > limit {
+            return Err(HeapError::Capacity);
+        }
+        for (key, slot) in keys[found..].iter_mut().zip(self.entries.len()..end) {
+            *key = Key {
+                slot,
+                generation: 1,
+            };
+        }
+        Ok(FixedSlotPlan {
+            keys,
+            length: self.entries.len(),
+            capacity: end.max(self.entries.capacity()),
+        })
+    }
+    /// Materialize fixed selected keys without repeating the vacancy walk.
+    pub(crate) fn prepare_fixed<const N: usize>(
+        &mut self,
+        plan: &FixedSlotPlan<N>,
+        guard: &mut crate::loan::preparation::Preparation,
+    ) -> Result<SlotPlan, HeapError> {
+        if self.entries.len() != plan.length || self.entries.capacity() > plan.capacity {
+            return Err(HeapError::StaleHandle);
+        }
+        let mut appended = plan.length;
+        for key in &plan.keys {
+            if let Some(entry) = self.entries.get(key.slot) {
+                if entry.value.is_some() || entry.generation.checked_add(1) != Some(key.generation)
+                {
+                    return Err(HeapError::StaleHandle);
+                }
+            } else {
+                if key.generation != 1 || key.slot != appended {
+                    return Err(HeapError::StaleHandle);
+                }
+                appended += 1;
+            }
+        }
+        #[cfg(test)]
+        if N != 0 {
+            crate::loan::fault::before().map_err(|_| HeapError::Capacity)?;
+        }
+        let mut keys = Vec::new();
+        keys.try_reserve_exact(N).map_err(|_| HeapError::Capacity)?;
+        if N != 0 {
+            guard.acquired(true).map_err(|_| HeapError::Capacity)?;
+        }
+        keys.extend(plan.keys);
+        if keys.capacity() != N {
+            return Err(HeapError::Capacity);
+        }
+        if plan.capacity > self.entries.capacity() {
+            #[cfg(test)]
+            crate::loan::fault::before().map_err(|_| HeapError::Capacity)?;
+            let mut replacement = Vec::new();
+            replacement
+                .try_reserve_exact(plan.capacity)
+                .map_err(|_| HeapError::Capacity)?;
+            guard.acquired(true).map_err(|_| HeapError::Capacity)?;
+            if replacement.capacity() != plan.capacity {
+                return Err(HeapError::Capacity);
+            }
+            replacement.append(&mut self.entries);
+            self.entries = replacement;
+            guard.retain_table();
+        }
+        Ok(SlotPlan {
+            keys,
+            retired: Vec::new(),
+        })
+    }
+}
+
 /// Inaccessible occupation exhaustion and no-fail link invariants.
 #[cfg(test)]
 mod tests {

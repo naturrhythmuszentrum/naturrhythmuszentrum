@@ -277,7 +277,7 @@ fn inventory(group: &Group, bundle: &Bundle) -> Result<(), LoanError> {
             .is_some_and(|item| item.prepared.is_none() && item.endpoint_tokens.binary().is_none()),
         DebitInventory::BinaryApplication(_) => evidence
             .is_some_and(|item| item.prepared.is_none() && item.endpoint_tokens.binary().is_some()),
-        DebitInventory::PreparedApplication(_) => false,
+        DebitInventory::PreparedApplication(_) | DebitInventory::LcApplication(_) => false,
     };
     if !matches
         || receipt.ticket.identity != bundle.identity

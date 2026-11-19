@@ -385,7 +385,31 @@ fn debug_surface<P: Scalar + 'static>() -> TestResult {
         )
         .map_err(|failure| failure.into_parts().1)?;
     assert_eq!(format!("{prepared:?}"), "LcOmegaPrepared { .. }");
-    drop(prepared);
+    let selected = super::demand(&mut s.heap, &s.axes, &[], &mut s.account)?;
+    let mut pending = prepared
+        .admit(&mut s.heap, selected, &mut s.account)
+        .map_err(|f| f.into_parts().1)?;
+    assert_eq!(
+        format!("{pending:?}"),
+        "LcApplicationPending { pending: true, .. }"
+    );
+    assert!(
+        s.heap
+            .acquire_pin::<P>(pending.ticket(), &mut s.account)
+            .is_err()
+    );
+    assert!(matches!(
+        s.heap.loan_inventory(pending.ticket(), &mut s.account),
+        Err(LoanError::WrongLoan)
+    ));
+    pending.cancel(&mut s.heap, &mut s.account)?;
+    assert!(matches!(
+        s.heap.loan_inventory(pending.ticket(), &mut s.account),
+        Err(LoanError::WrongLoan)
+    ));
+    drop(pending);
+    s.heap.retire_mask(selected, &mut s.account.ledger)?;
+    super::fixture::retire_layout(&mut s.heap, &mut s.account, selected.layout())?;
     members.finish(&mut s.heap, &mut s.account)
 }
 
@@ -393,10 +417,18 @@ fn debug_surface<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-phase-work-boundaries´
 #[test]
 fn lc_origin_phase_work_boundaries() -> TestResult {
+    super::pending::state_work::<f32>()?;
+    super::pending::state_work::<f64>()?;
+    super::pending::planning::<f32>()?;
+    super::pending::planning::<f64>()?;
+    super::pending::refusals::<f32>()?;
+    super::pending::refusals::<f64>()?;
     capture_work::<f32>()?;
     capture_work::<f64>()?;
     combined_work::<f32>()?;
-    combined_work::<f64>()
+    combined_work::<f64>()?;
+    super::pending::work::<f32>()?;
+    super::pending::work::<f64>()
 }
 fn capture_work<P: Scalar + 'static>() -> TestResult {
     use crate::loan::lc_shape::output::bridge::{borrowed::prepare_borrowed, capture};
@@ -459,6 +491,12 @@ fn capture_work<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:lc-origin-retained-staged-boundaries´
 #[test]
 fn lc_origin_retained_staged_boundaries() -> TestResult {
+    super::pending::unwind::<f32>()?;
+    super::pending::unwind::<f64>()?;
+    super::pending::bytes::<f32>()?;
+    super::pending::bytes::<f64>()?;
+    super::pending::prefixes::<f32>()?;
+    super::pending::prefixes::<f64>()?;
     prepared_bytes::<f32>()?;
     prepared_bytes::<f64>()?;
     scope_boundaries::<f32>()?;

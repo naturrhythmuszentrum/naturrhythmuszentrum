@@ -353,6 +353,9 @@ impl Heap {
         let Some(group) = self.loans.groups.get(slot).and_then(Option::as_ref) else {
             return Ok(());
         };
+        if matches!(group.state, State::LcOut(_)) {
+            return super::lc_origin::pending::reclaim::abandoned(self, slot, budget);
+        }
         let State::Out(witness) = &group.state else {
             return Ok(());
         };
@@ -406,7 +409,11 @@ impl Heap {
         let Some(debit) = self.loans.debits.get(slot).and_then(Option::as_ref) else {
             return Ok(());
         };
+        if matches!(debit.kind, AllocationKind::LcPending { .. }) {
+            return super::lc_origin::pending::reclaim::debit(self, slot, budget, changed);
+        }
         let expired = match &debit.kind {
+            AllocationKind::LcPending { .. } => return Err(LoanError::WrongLoan),
             AllocationKind::PreparedOwner { witness, .. } => witness.strong_count() == 0,
             AllocationKind::PreparedUse(witness) => witness.strong_count() == 0,
             AllocationKind::LcClosure(witness) | AllocationKind::LcRows(witness) => {
@@ -492,7 +499,7 @@ impl Heap {
         let eligible = match &group.state {
             State::Retiring => true,
             State::Published(owner) => Rc::strong_count(owner) == 1,
-            State::Out(_) | State::Reserved => false,
+            State::Out(_) | State::LcOut(_) | State::Reserved => false,
         };
         if !eligible {
             return Ok(());
@@ -534,8 +541,10 @@ impl Heap {
         let debits = group.debits;
         self.loans.groups[slot] = None;
         self.retire_native_reservations(identity);
-        for (position, key) in debits.entries().iter().copied().flatten() {
-            self.loans.release(position, key);
+        if !matches!(debits, super::registry::DebitInventory::LcApplication(_)) {
+            for (position, key) in debits.entries().iter().copied().flatten() {
+                self.loans.release(position, key);
+            }
         }
         for key in identity.channels.into_iter().flatten() {
             drop(self.descriptors.slots.remove(key));

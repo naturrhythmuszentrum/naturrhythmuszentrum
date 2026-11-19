@@ -26,33 +26,33 @@ use std::{fmt, rc::Rc};
 #[repr(C)]
 pub struct LcOmegaPrepared<'i, P: Scalar, const N: usize> {
     /// Exact original declaration and inventory borrow, moved only after successful join.
-    declaration: LcOmegaOutput<'i, P, N>,
+    pub(in crate::loan) declaration: LcOmegaOutput<'i, P, N>,
     /// Frozen mathematical law, distinct from native occupation authority.
-    correspondence: Rc<LcOmegaCorrespondence>,
+    pub(in crate::loan) correspondence: Rc<LcOmegaCorrespondence>,
     /// Complete captured input closure and its prepaid native reservation tokens.
-    receipt: LcOmegaJoinReceipt,
+    pub(in crate::loan) receipt: LcOmegaJoinReceipt,
 }
 
 /// Inline unforgeable result of the funded native join.
 #[repr(C)]
-pub(in crate::loan::lc_shape) struct LcOmegaJoinReceipt {
+pub(in crate::loan) struct LcOmegaJoinReceipt {
     /// Exact positional closure, independent of caller tile and reader lifetimes.
-    pub(super) closure: Rc<LcClosure>,
+    pub(in crate::loan) closure: Rc<LcClosure>,
     /// Fresh join identity, also funding both cleanup receipts.
-    pub(super) join: u64,
+    pub(in crate::loan) join: u64,
     /// Fixed requested operands, specialization and revision stamps.
-    pub(super) schedule: LcSchedule,
+    pub(in crate::loan) schedule: LcSchedule,
     /// Shared closure header reservation.
-    pub(super) header: Token,
+    pub(in crate::loan) header: Token,
     /// Exact-capacity positional backing reservation.
-    pub(super) rows: Token,
+    pub(in crate::loan) rows: Token,
 }
 
 /// Consuming refusal retains the identical original declaration without allocating an error box.
 #[repr(C)]
 pub struct LcOmegaPrepareFailure<'i, P: Scalar, const N: usize> {
     /// Original declaration is recoverable even after private CAS publication.
-    declaration: LcOmegaOutput<'i, P, N>,
+    pub(in crate::loan) declaration: LcOmegaOutput<'i, P, N>,
     /// Precise bindings or native refusal, including its completed cumulative prefix.
     error: LcShapeError,
 }

@@ -55,17 +55,17 @@ pub struct LcOutputDeclaration<'a> {
 #[derive(Debug)]
 pub struct LcOmegaOutput<'a, P: Scalar, const N: usize> {
     /// Retain every original constraint and fixed tuple specialization by borrowing its owner.
-    inventory: &'a LcInputInventory<P, N>,
+    pub(in crate::loan) inventory: &'a LcInputInventory<P, N>,
     /// Ordered original operands of the declared positive-root rate expression.
-    positions: [usize; 2],
+    pub(in crate::loan) positions: [usize; 2],
     /// Explicit exact angle operand distinguishes omega from its equal-coordinate rate.
     radian: EntryMeaning,
     /// Coherent inverse-time operand of the retained ordered multiplication relation.
     rate: Descriptor,
     /// Fresh angular-frequency value and own-target deterministic companions.
-    symbols: BindingSymbols,
+    pub(in crate::loan) symbols: BindingSymbols,
     /// Nonwrapping identity fixes this requested-quantity specialization.
-    key: u64,
+    pub(in crate::loan) key: u64,
 }
 impl<'a, P: Scalar, const N: usize> LcOmegaOutput<'a, P, N> {
     /// Declare the omega-only deterministic inventory before any numerical reservation.

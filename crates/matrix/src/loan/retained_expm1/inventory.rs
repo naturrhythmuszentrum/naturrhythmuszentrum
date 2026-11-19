@@ -73,6 +73,7 @@ impl Heap {
                             }
                             AllocationKind::LcClosure(_)
                             | AllocationKind::LcRows(_)
+                            | AllocationKind::LcPending { .. }
                             | AllocationKind::Constant(_)
                             | AllocationKind::Numerical
                             | AllocationKind::Tracking
