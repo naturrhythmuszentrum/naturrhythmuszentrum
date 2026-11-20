@@ -220,3 +220,15 @@ pub(in crate::loan) fn receipt<P: Scalar + 'static>(
     );
     Ok(())
 }
+
+/// Borrow the actual published owner for the known-overlap control; no new retaining edge.
+pub(in crate::loan) fn correspondence<P: Scalar>(
+    result: &super::LcPublishedResult<P>,
+) -> &nrz_bindings::LcOmegaCorrespondence {
+    &result
+        .bundle()
+        .storage
+        .as_ref()
+        .expect("published storage")
+        .correspondence
+}

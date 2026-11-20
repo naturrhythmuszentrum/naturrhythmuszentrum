@@ -7,6 +7,18 @@ pub(in crate::lc_omega) fn identity(
     declaration: &LcOmegaDeclarationToken,
     budget: &mut Budget,
 ) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    // Owning-layer witness of the exact by-value -> outer-Rc move used by native join.
+    // Only this control can retain the private inner Rc; no identity handle is exported.
+    let owner = LcOmegaCorrespondence::construct(declaration, budget)?;
+    let store = Rc::clone(&owner.cas);
+    let moved = Rc::new(owner);
+    let same_store_after_move = Rc::ptr_eq(&store, &moved.cas);
+    let self_identity = moved.shares_allocation(&moved);
+    assert!(same_store_after_move);
+    assert!(self_identity);
+    let independent = LcOmegaCorrespondence::construct(declaration, budget)?;
+    let distinct_store = !moved.shares_allocation(&independent);
+    assert!(distinct_store);
     let (cas, expected, _) = prepare(declaration, None, budget)?;
     let (_, _, foreign) = prepare(declaration, None, budget)?;
     let result = seal(cas, foreign, declaration, &expected, budget);

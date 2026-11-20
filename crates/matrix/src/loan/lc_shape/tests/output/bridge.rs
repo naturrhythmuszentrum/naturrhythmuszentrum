@@ -1091,3 +1091,188 @@ fn paused_debits(heap: &mut Heap, account: &mut ExecutionAccount, reverse: bool)
     }
     Err("closure debits did not reconcile in two passes".into())
 }
+
+/// Owning-layer inventories and the literal independent oracle partition the live union.
+/// ´test:unit:lc-omega-graph-retained-overlap´
+#[test]
+fn lc_omega_graph_retained_overlap() -> TestResult {
+    retained_overlap::<f32>()?;
+    retained_overlap::<f64>()
+}
+
+fn retained_overlap<P: Scalar + 'static>() -> TestResult {
+    use crate::loan::lc_shape::output::bridge::controls;
+    let mut s = setup::<P>(Limits::default(), [2, 3, 2])?;
+    let output = LcOmegaOutput::declare(
+        &s.inventory,
+        request(&s.registry, &s.radian),
+        &mut s.account,
+    )?;
+    controls::retained_overlap(
+        &output,
+        &s.registry,
+        [oracle::retained(false), oracle::retained(true)],
+        &mut s.account,
+    )?;
+    // Independent scenarios get independent original fixtures and accounts. Each
+    // failed prefix and its retry stay on one cumulative ledger with unchanged limits.
+    for replay in [false, true] {
+        for fail_after in [None, Some(0), Some(1), Some(2)] {
+            retained_native::<P>(replay, fail_after)?;
+        }
+    }
+    published_overlap::<P>()?;
+    // Existing independent native cleanup/transaction witnesses preserve every pin.
+    allocation_refusals::<P>()?;
+    // Exact/one-below original/helper handoffs, including the replay input.
+    scope_boundaries::<P>()
+}
+
+fn retained_native<P: Scalar + 'static>(replay: bool, fail_after: Option<usize>) -> TestResult {
+    use crate::loan::lc_shape::output::bridge::controls;
+    let mut s = setup::<P>(Limits::default(), [2, 3, 2])?;
+    let output = LcOmegaOutput::declare(
+        &s.inventory,
+        request(&s.registry, &s.radian),
+        &mut s.account,
+    )?;
+    let members = super::super::inventory::readers::publish(
+        &s.inventory,
+        &s.axes,
+        &mut s.heap,
+        &mut s.account,
+        1,
+        0,
+    )?;
+    let tiles = members.references();
+    controls::retained_transfer(
+        &output,
+        &mut s.heap,
+        &tiles,
+        &s.registry,
+        (replay, oracle::retained(replay), fail_after),
+        &mut s.account,
+    )?;
+    drop(tiles);
+    members.finish(&mut s.heap, &mut s.account)
+}
+
+fn published_overlap<P: Scalar + 'static>() -> TestResult {
+    use crate::loan::lc_shape::output::bridge::{
+        controls, prepare_lc_omega_correspondence,
+        retained_overlap::{Candidate, Observation},
+    };
+    let mut s = setup::<P>(Limits::default(), [2, 3, 2])?;
+    let output = LcOmegaOutput::declare(
+        &s.inventory,
+        request(&s.registry, &s.radian),
+        &mut s.account,
+    )?;
+    let members = super::super::inventory::readers::publish(
+        &s.inventory,
+        &s.axes,
+        &mut s.heap,
+        &mut s.account,
+        2,
+        1,
+    )?;
+    let source = prepare_lc_omega_correspondence(&output, &s.registry, None, &mut s.account)?;
+    let construction = Candidate::new(&source)?;
+    assert_eq!(construction.captured.logical_allowance, Some(416));
+    assert_eq!(construction.initial_slot, 8);
+    assert_eq!(
+        construction.correspondence.logical_allowance,
+        Some(oracle::retained(false))
+    );
+    assert_eq!(
+        construction.logical_allowance,
+        424 + oracle::retained(false)
+    );
+    let certificate = source.certificate(&mut s.account.ledger)?;
+    let certificate_report = Observation::certificate(&certificate);
+    assert_eq!(certificate_report.observed_residence, Some(10_366));
+    assert_eq!(
+        construction.logical_allowance + certificate.retained_bytes(),
+        46_256
+    );
+    drop(source);
+    let prepared = controls::retained_timeline_prepare(
+        output,
+        &mut s.heap,
+        &members.references(),
+        &s.registry,
+        (&certificate, oracle::retained(true)),
+        &mut s.account,
+    )?;
+    let witness = std::rc::Rc::downgrade(&prepared.correspondence);
+    check_published_overlap(&witness, &certificate, &mut s.account)?;
+    let mask = super::demand(&mut s.heap, &s.axes, &[0, 3, 11], &mut s.account)?;
+    let pending = prepared
+        .admit(&mut s.heap, mask, &mut s.account)
+        .map_err(|f| f.into_parts().1)?;
+    check_published_overlap(&witness, &certificate, &mut s.account)?;
+    let evaluated = pending
+        .evaluate(&mut s.account)
+        .map_err(super::execution::failure)?;
+    check_published_overlap(&witness, &certificate, &mut s.account)?;
+    let result = evaluated
+        .publish(&mut s.heap, &mut s.account)
+        .map_err(|f| f.error)?;
+    check_published_overlap(&witness, &certificate, &mut s.account)?;
+    let owner = witness
+        .upgrade()
+        .ok_or("same correspondence survives publication")?;
+    let before = s.account.usage();
+    let actual = crate::loan::lc_origin::pending::publication::checks::correspondence(&result);
+    let report = Observation::correspondence(actual);
+    assert_eq!(report.logical_allowance, Some(oracle::retained(true)));
+    let same_store =
+        report.same_allocation(&Observation::correspondence(&owner), &mut s.account.ledger)?;
+    assert!(same_store);
+    assert_eq!(s.account.usage(), before);
+    drop(owner);
+    result.release(&mut s.account).map_err(|(_, error)| error)?;
+    // The heap's published bundle still owns the correspondence until its normal
+    // residence scan reconciles the released use; dropping a carrier is not that scan.
+    assert_eq!(witness.strong_count(), 1);
+    check_published_overlap(&witness, &certificate, &mut s.account)?;
+    s.heap.residence(&mut s.account, 100_000)?;
+    assert_eq!(witness.strong_count(), 0);
+    s.heap.retire_mask(mask, &mut s.account.ledger)?;
+    super::fixture::retire_layout(&mut s.heap, &mut s.account, mask.layout())?;
+    members.finish(&mut s.heap, &mut s.account)?;
+    assert_eq!(witness.strong_count(), 0);
+    assert_eq!(certificate_report.observed_residence, Some(10_366));
+    let same = certificate_report.same_allocation(
+        &Observation::certificate(&certificate),
+        &mut s.account.ledger,
+    )?;
+    assert!(same);
+    drop(certificate);
+    Ok(())
+}
+
+fn check_published_overlap(
+    witness: &std::rc::Weak<nrz_bindings::LcOmegaCorrespondence>,
+    certificate: &nrz_bindings::readings::algebra::enclosure::lc_root::Certificate,
+    account: &mut crate::ExecutionAccount,
+) -> TestResult {
+    use crate::loan::lc_shape::output::bridge::retained_overlap::Observation;
+    let owner = witness
+        .upgrade()
+        .ok_or("replay correspondence remains live")?;
+    let shared = std::rc::Rc::clone(&owner);
+    let report = Observation::correspondence(&owner);
+    assert_eq!(report.logical_allowance, Some(oracle::retained(true)));
+    assert_eq!(
+        416 + owner.retained_bytes() + certificate.retained_bytes(),
+        46_224
+    );
+    let same =
+        report.same_allocation(&Observation::correspondence(&shared), &mut account.ledger)?;
+    assert!(same);
+    let same_certificate = Observation::certificate(certificate)
+        .same_allocation(&Observation::certificate(certificate), &mut account.ledger)?;
+    assert!(same_certificate);
+    Ok(())
+}

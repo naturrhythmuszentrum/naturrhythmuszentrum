@@ -26,6 +26,7 @@ fn lc_root_registered_replay() -> TestResult {
     let portable = certificate.to_bytes(&mut ledger()?)?;
     golden(&portable);
     let proposal = Certificate::from_bytes(&portable, &mut ledger()?)?;
+    super::super::service::certificate_allocation_control(certificate);
     let mut receiver = fixture()?;
     assert!(receipt.request(&receiver.cas).is_err());
     let checked = receiver

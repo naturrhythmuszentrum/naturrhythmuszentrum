@@ -13,6 +13,19 @@ use std::sync::Arc;
 pub struct Certificate(Vec<u8>);
 
 impl Certificate {
+    /// Whether both certificates refer to the same allocated byte buffer.
+    ///
+    /// This identity-only observation survives wrapper moves. Equal independent
+    /// copies are distinct; zero-capacity certificates have no buffer and return
+    /// false, including against themselves. No address, bytes, capacity or proof
+    /// authority is exported, and no allocation or reservation occurs.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        self.0.capacity() != 0
+            && other.0.capacity() != 0
+            && std::ptr::eq(self.0.as_ptr(), other.0.as_ptr())
+    }
+
     /// Actual retained input residence, available without copying untrusted bytes.
     #[must_use]
     pub const fn retained_bytes(&self) -> u64 {
@@ -235,4 +248,22 @@ fn copy(bytes: &[u8], budget: &mut Budget) -> Result<Vec<u8>, Fault> {
         .map_err(|_| Fault::allocation(AT))?;
     result.extend_from_slice(bytes);
     Ok(result)
+}
+
+/// Owning-layer move witness, extending the existing registered replay control.
+#[cfg(test)]
+pub(super) fn certificate_allocation_control(value: Certificate) {
+    let pointer = value.0.as_ptr();
+    let moved = Box::new(value);
+    assert_eq!(pointer, moved.0.as_ptr());
+    let same_buffer = moved.shares_allocation(&moved);
+    assert!(same_buffer);
+    let copy = (*moved).clone();
+    assert_eq!(*moved, copy);
+    let distinct_copy = !moved.shares_allocation(&copy);
+    assert!(distinct_copy);
+    let empty = Certificate(Vec::new());
+    let empty_copy = Certificate(Vec::new());
+    let no_buffer = !empty.shares_allocation(&empty) && !empty.shares_allocation(&empty_copy);
+    assert!(no_buffer);
 }

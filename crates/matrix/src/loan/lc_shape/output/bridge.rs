@@ -5,6 +5,7 @@ pub(in crate::loan::lc_shape) mod capture;
 #[cfg(test)]
 pub(in crate::loan::lc_shape) mod controls;
 mod prepared;
+pub(in crate::loan::lc_shape) mod retained_overlap;
 pub use prepared::{LcOmegaPrepareFailure, LcOmegaPrepared};
 
 use super::{LcOmegaOutput, LcShapeError};

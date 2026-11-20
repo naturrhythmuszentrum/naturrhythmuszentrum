@@ -165,6 +165,16 @@ impl LcOmegaCorrespondence {
         })
     }
 
+    /// Whether both correspondences own the same immutable receiving-store allocation.
+    ///
+    /// This identity-only observation survives carrier moves and distinguishes
+    /// independently allocated equal stores. It exports no address, graph handle,
+    /// capacity or additional proof authority; it allocates and reserves nothing.
+    #[must_use]
+    pub fn shares_allocation(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.cas, &other.cas)
+    }
+
     /// New retained correspondence residence, excluding existing original owners.
     #[must_use]
     pub fn retained_bytes(&self) -> u64 {
