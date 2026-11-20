@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Original LC input transport retains the checked question and complete tuple roles.
 
+pub(in crate::loan) mod exact_scope;
 mod inventory;
 mod lifecycle;
 mod output;

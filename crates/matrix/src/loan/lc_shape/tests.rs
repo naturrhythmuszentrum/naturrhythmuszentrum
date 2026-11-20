@@ -3,6 +3,7 @@
 
 mod authority;
 mod boundaries;
+mod exact_scope;
 mod fixture;
 mod inventory;
 mod observation;
