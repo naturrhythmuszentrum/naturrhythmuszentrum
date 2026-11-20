@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Non-executable scoped storage precedes graph validation and publication.
 //! Uncovered authority/backend and delivery rows never become a complete total.
+
 #![cfg_attr(
     not(test),
     expect(
         dead_code,
-        reason = "the private owner increment precedes the consuming walk increment"
+        reason = "the adapter increment wires the crate-private graph core"
     )
 )]
 
@@ -15,6 +16,7 @@ mod records;
 mod reserve;
 #[cfg(test)]
 mod tests;
+mod walk;
 
 use super::{ExecutionAccount, LoanError, charge, registry::CleanupReceipt};
 use crate::storage::Format;
@@ -147,6 +149,7 @@ impl Reservation {
                 if handle.owner != self.backing.identity {
                     return Err(LoanError::ForeignOwner);
                 }
+                // N: inspect the authenticated slot and its occupation generation.
                 charge(budget, 1)?;
                 let node = self
                     .backing
