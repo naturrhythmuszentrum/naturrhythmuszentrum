@@ -258,3 +258,25 @@ fn refusals<P: Scalar + 'static>() -> TestResult {
     fixture::retire_layout(&mut s.heap, &mut s.account, selected.layout())?;
     fixture::empty(&mut s.heap, &mut s.account)
 }
+
+/// Every sink control is joined with both native declaration formats on their original accounts.
+/// ´test:unit:lc-omega-graph-evidence-sink´
+#[test]
+fn lc_omega_graph_evidence_sink() -> TestResult {
+    crate::loan::graph::sink::tests::run()?;
+    sink_returns::<f32>()?;
+    sink_returns::<f64>()
+}
+
+fn sink_returns<P: Scalar + 'static>() -> TestResult {
+    let mut s = setup::<P>(Limits::default(), [2, 3, 2])?;
+    for variant in 0..6 {
+        let output = LcOmegaOutput::declare(
+            &s.inventory,
+            request(&s.registry, &s.radian),
+            &mut s.account,
+        )?;
+        crate::loan::graph::sink::tests::returned(output, variant, &mut s.account)?;
+    }
+    Ok(())
+}

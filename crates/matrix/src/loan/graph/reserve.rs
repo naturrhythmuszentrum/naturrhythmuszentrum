@@ -37,6 +37,10 @@ impl Reservation {
         identity: impl FnOnce() -> Result<u64, crate::HeapError>,
     ) -> Result<Self, LoanError> {
         Inventory::authenticate(prior, account)?;
+        if account.delivery.is_some() {
+            charge(&mut account.ledger, 1)?;
+        }
+        let delivery = super::sink::live_bytes(account)?;
         let plan =
             account
                 .ledger
@@ -45,8 +49,9 @@ impl Reservation {
                     // N: inspect every proposed attempt record before checked summation.
                     charge(budget, args.attempts.len())?;
                     let plan = Plan::new(args)?;
-                    let combined = u64::try_from(add(existing.covered_bytes, plan.retained)?)
-                        .map_err(|_| LoanError::ByteOverflow)?;
+                    let combined =
+                        u64::try_from(add(add(existing.covered_bytes, delivery)?, plan.retained)?)
+                            .map_err(|_| LoanError::ByteOverflow)?;
                     budget.check(BudgetKind::PayloadBytes, combined, crate::loan::AT)?;
                     budget.check(BudgetKind::StagedPayloadBytes, combined, crate::loan::AT)?;
                     charge(budget, plan.work)?;

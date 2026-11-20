@@ -5,6 +5,7 @@ mod admission;
 mod bitmap;
 mod control;
 mod drive;
+pub(crate) use drive::Capacity;
 mod invalidation;
 #[cfg(test)]
 mod tests;

@@ -14,6 +14,7 @@ mod inventory;
 mod plan;
 mod records;
 mod reserve;
+pub(in crate::loan) mod sink;
 #[cfg(test)]
 mod tests;
 mod walk;

@@ -126,6 +126,23 @@ impl<'i, P: Scalar + 'static, const N: usize> LcOmegaOutput<'i, P, N> {
         )
     }
 
+    /// Preserve the original declaration and structured error by move, including private failure.
+    const fn refused(self, error: LcShapeError) -> LcOmegaPrepareFailure<'i, P, N> {
+        LcOmegaPrepareFailure {
+            declaration: self,
+            error,
+        }
+    }
+
+    /// The K control reaches the identical consuming carrier with owning-layer error fixtures.
+    #[cfg(test)]
+    pub(in crate::loan) const fn sink_refusal(
+        self,
+        error: LcShapeError,
+    ) -> LcOmegaPrepareFailure<'i, P, N> {
+        self.refused(error)
+    }
+
     /// Shared reader borrows end before the exclusive reservation/capture transaction.
     pub(in crate::loan::lc_shape) fn prepare_on(
         self,
@@ -161,10 +178,7 @@ impl<'i, P: Scalar + 'static, const N: usize> LcOmegaOutput<'i, P, N> {
                 correspondence,
                 receipt,
             }),
-            Err(error) => Err(LcOmegaPrepareFailure {
-                declaration: self,
-                error,
-            }),
+            Err(error) => Err(self.refused(error)),
         }
     }
 }

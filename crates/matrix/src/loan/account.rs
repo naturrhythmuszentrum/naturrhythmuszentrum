@@ -11,6 +11,8 @@ pub struct ExecutionAccount {
     pub(crate) identity: u64,
     /// The caller's original ledger, including prior cumulative usage.
     pub(crate) ledger: Budget,
+    /// Lazy account-resident delivery reservation; no graph-owned edge can erase it.
+    pub(in crate::loan) delivery: Option<std::rc::Rc<std::cell::Cell<usize>>>,
 }
 
 impl ExecutionAccount {
@@ -21,6 +23,7 @@ impl ExecutionAccount {
         Ok(Self {
             identity: crate::heap::identity::identity()?,
             ledger,
+            delivery: None,
         })
     }
 
