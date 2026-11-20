@@ -10,6 +10,7 @@ mod endpoint_view;
 mod error;
 #[cfg(test)]
 pub(crate) mod fault;
+pub(crate) mod graph;
 mod inventory;
 mod lc_origin;
 pub use lc_origin::pending::execution::{
