@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Unavailable isolation capability, reserved for its owning lane.
+//! Unavailable isolation capability, reserved until independent checking is implemented.
 
 /// This leaf has no checker or producer until its supplied-certificate tests land.
 pub(crate) const fn availability() -> super::Availability {
@@ -11,7 +11,7 @@ pub(crate) const fn schema_availability(_tag: u8) -> super::Availability {
     super::Availability::Unavailable
 }
 
-/// Reject every application until this lane supplies its independent typed checker.
+/// Reject every application until an independent typed checker is implemented.
 pub(crate) fn check(
     _cas: &crate::graph::Cas,
     _draft: &crate::proof_model::ApplicationDraft,

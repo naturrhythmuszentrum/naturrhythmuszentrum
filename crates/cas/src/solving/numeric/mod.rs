@@ -11,10 +11,7 @@
 
 #![cfg_attr(
     not(test),
-    expect(
-        dead_code,
-        reason = "the next coefficient lane consumes this numeric leaf"
-    )
+    expect(dead_code, reason = "reserved for coefficient construction")
 )]
 
 mod gaussian;

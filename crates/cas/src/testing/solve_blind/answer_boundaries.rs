@@ -7,7 +7,7 @@ use crate::model::Field;
 use crate::solving::{SolveAnswer, SolveForm};
 use crate::testing::common::TestResult;
 
-/// Fixed tower-closure diagnostics 2 and 4 measurements include both expected comparisons and sealing both outputs.
+/// Fixed tower-closure replay measurements include both expected comparisons and sealing both outputs.
 #[derive(Clone, Copy)]
 struct Boundary {
     kind: BudgetKind,

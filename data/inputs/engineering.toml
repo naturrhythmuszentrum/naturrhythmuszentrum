@@ -602,7 +602,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo run -p nrz-docgen -- data"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "docgen-data-peak-rss"
@@ -612,7 +612,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo run -p nrz-docgen -- data"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "docgen-render-wall"
@@ -622,7 +622,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo run -p nrz-docgen -- render"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "docgen-render-peak-rss"
@@ -632,7 +632,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo run -p nrz-docgen -- render"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "docgen-check-wall"
@@ -642,7 +642,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo run -p nrz-docgen -- check"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "docgen-check-peak-rss"
@@ -652,7 +652,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo run -p nrz-docgen -- check"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-tests-wall"
@@ -662,7 +662,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo test --workspace --no-fail-fast"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-tests-peak-rss"
@@ -672,7 +672,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo test --workspace --no-fail-fast"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "strict-clippy-wall"
@@ -682,7 +682,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "strict-clippy-peak-rss"
@@ -692,7 +692,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo clippy --workspace --all-targets -- -D warnings -W clippy::pedantic -W clippy::nursery"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-rustdoc-wall"
@@ -702,7 +702,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-rustdoc-peak-rss"
@@ -712,7 +712,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "RUSTDOCFLAGS='-D warnings' cargo doc --workspace --no-deps"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-tests-passed"
@@ -722,7 +722,7 @@ unit = "tests"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo test --workspace --no-fail-fast"
-source = "diagnostic 5 on sojka; includes the command's unit, integration and documentation tests; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; includes the command's unit, integration and documentation tests; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-tests-failed"
@@ -732,7 +732,7 @@ unit = "tests"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "cargo test --workspace --no-fail-fast"
-source = "diagnostic 5 on sojka; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on sojka; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "host-project-wall"
@@ -742,7 +742,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter project --write"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "host-project-peak-rss"
@@ -752,7 +752,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter project --write"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "host-check-wall"
@@ -762,7 +762,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter check"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "host-check-peak-rss"
@@ -772,7 +772,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter check"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "host-coverage-wall"
@@ -782,7 +782,7 @@ unit = "s"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter coverage"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "host-coverage-peak-rss"
@@ -792,7 +792,7 @@ unit = "KiB"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter coverage"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "adopted-constants"
@@ -802,7 +802,7 @@ unit = "constants"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter check"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "adopted-file-indexes"
@@ -812,7 +812,7 @@ unit = "indexes"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter check"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "adopted-matrix-folders"
@@ -822,7 +822,7 @@ unit = "folders"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter check"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "workspace-test-declarations"
@@ -832,7 +832,7 @@ unit = "declarations"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter coverage"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[measurements]]
 id = "adopted-claimed-tests"
@@ -842,7 +842,7 @@ unit = "declarations"
 date = "2026-10-22"
 commit = "c9cd0b2ac48b6fc92b9eecb59f2b8cb6d38daede"
 command = "orchestration-linter coverage"
-source = "diagnostic 5 on the host; same seed and diagnostic patch; seed 51105aeb4927f5e2d0bb76a607d87aae1d40c00b; diag-5.patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
+source = "measurement on the host; same base commit and instrumentation patch; base commit 51105aeb4927f5e2d0bb76a607d87aae1d40c00b plus instrumentation patch SHA-256 fd6f0bf7144ac9d808bd2bf3503d40812c9ec37842c508acee660c9f22247668"
 
 [[source_versions]]
 path = "tools/docgen/src/golden.rs"

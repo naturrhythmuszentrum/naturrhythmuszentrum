@@ -9,10 +9,7 @@
 
 #![cfg_attr(
     not(test),
-    expect(
-        dead_code,
-        reason = "the next solving lane consumes these generic producer interfaces"
-    )
+    expect(dead_code, reason = "reserved for generic solving producers")
 )]
 
 #[expect(

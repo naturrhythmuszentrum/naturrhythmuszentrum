@@ -1959,7 +1959,7 @@ fn check_value(
     }
 }
 
-/// Only manifestly coprime denominator-one fractions precede the normalization lane.
+/// Only manifestly coprime denominator-one fractions precede normalization.
 fn check_fraction(
     state: &State,
     base: &Handle,

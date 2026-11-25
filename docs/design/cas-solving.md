@@ -281,7 +281,7 @@ These are exact mathematical identities, rank statements and symbolic families. 
 
 The initial ban on unbounded fresh variables remains: only finitely generated scoped auxiliaries with checked elimination are permitted. Concrete syntax, sole-current format and policy replacements are specified by (`def:nrz:cas-symbol-sorts-wire-replacement`). These coordinated changes keep retained propositions intact while removing RealRestriction and adding explicit same-sort evaluation and Real sign/count trust; they do not reinterpret old bytes.
 
-Original occurrence preservation, full source traversal, physical validation before normalization, capture-safe substitution, shared expression nodes, immutable contexts, acyclic proof dependencies and atomic admission remain unchanged. The existing parser remains an expression parser; this concept does not claim it already parses equation systems or linked root selections. A later syntax proposal must enter through the same occurrence/receipt boundary. Existing piecewise, distributional and numerical contracts keep their domains and assurance meanings. There is no code, dependency, parser, registry or client migration in this round.
+Original occurrence preservation, full source traversal, physical validation before normalization, capture-safe substitution, shared expression nodes, immutable contexts, acyclic proof dependencies and atomic admission remain unchanged. The existing parser remains an expression parser; this concept does not claim it already parses equation systems or linked root selections. A later syntax proposal must enter through the same occurrence/receipt boundary. Existing piecewise, distributional and numerical contracts keep their domains and assurance meanings. There is no code, dependency, parser, registry or client migration in this document.
 
 **Procedure (Later design and implementation commits)** · `alg:nrz:cas-solving-delivery`
 
@@ -301,7 +301,7 @@ These are implementation requirements, not capabilities delivered by this specif
 
 ## Mathematical sources and verification status · `sec:nrz:cas-solving-references`
 
-All new bibliographic records below are recalled from knowledge and unverified against external copies in this round. In particular, author spellings, editions, dates and theorem locations still need bibliographic verification; no page number or direct quotation is asserted. The permitted run supplied local repository sources, and no external implementation, layout or test suite was consulted. The elementary polynomial identities, branch counterexamples, component-split argument and worked examples are recomputed in this document. The cited texts support the named general theorems; they do not supply this graph representation, cost policy or proof encoding.
+All new bibliographic records below are recalled from knowledge and unverified against external copies in this document. In particular, author spellings, editions, dates and theorem locations still need bibliographic verification; no page number or direct quotation is asserted. This document uses local repository sources and does not rely on an external implementation, layout or test suite. The elementary polynomial identities, branch counterexamples, component-split argument and worked examples are recomputed in this document. The cited texts support the named general theorems; they do not supply this graph representation, cost policy or proof encoding.
 
 **Attribution (Lagrange and the historical formula)** · `credit:nrz:cas-solving-lagrange`
 

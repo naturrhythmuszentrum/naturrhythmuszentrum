@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-//! Unavailable rational capability, reserved for its owning lane.
+//! Unavailable rational capability, reserved until independent checking is implemented.
 
 /// This leaf has no checker or producer until its supplied-certificate tests land.
 pub(crate) const fn availability() -> super::Availability {

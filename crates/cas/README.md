@@ -1667,7 +1667,7 @@ The ordinary portable witness retains the original context, basis, offset, order
 
 **Example (Composition and replay costs for lattice ranges)** · `ex:cas:lattice-cover-range-costs`
 
-With basis and scalar prerequisites already retained, the identity-basis `ℤ^2` cover costs 123,740 Work with a 2,332-byte witness; fresh inspection costs 459,702 Work. The signed-box cover costs 195,240 Work with 3,664 bytes and 753,465 replay Work. The one-coordinate parameter/count intersection costs 154,306 Work with 3,005 bytes and 560,941 replay Work (`test:integration:lattice-cover-costs`). Replay rechecks the determinant, both inverse identities and scalar floor lemmas, so these fresh costs belong beside composition costs when budgeting the later target-selection lane (`rule:cas:lattice-cover-replay`).
+With basis and scalar prerequisites already retained, the identity-basis `ℤ^2` cover costs 123,740 Work with a 2,332-byte witness; fresh inspection costs 459,702 Work. The signed-box cover costs 195,240 Work with 3,664 bytes and 753,465 replay Work. The one-coordinate parameter/count intersection costs 154,306 Work with 3,005 bytes and 560,941 replay Work (`test:integration:lattice-cover-costs`). Replay rechecks the determinant, both inverse identities and scalar floor lemmas, so these fresh costs belong beside composition costs when budgeting target selection (`rule:cas:lattice-cover-replay`).
 
 **Example (Composition and replay costs for affine fixtures)** · `ex:cas:lattice-cover-affine-costs`
 

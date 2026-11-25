@@ -108,7 +108,7 @@ The absence of a primitive in the admitted expression vocabulary is a representa
 
 **Construction (Polynomial roots and local inversion)** · `constr:nrz:cas-taylor-newton-roots`
 
-Taylor's first-order model at a gives f(a+h)=f(a)+f'(a)h plus a remainder. Solving that affine model when f'(a) is nonzero gives the Newton candidate a-f(a)/f'(a). The graph can derive this exact formula for the root of the affine model. It cannot conclude that the candidate is a root of f by deleting the remainder. Local convergence or an error estimate needs a separately stated theorem with its neighborhood and derivative bounds; numerical iteration and certified bounds are outside this lane. The implicit/inverse-function route similarly requires a nonsingular derivative at the operating point and establishes only a local branch (`credit:nrz:cas-analysis-literature`).
+Taylor's first-order model at a gives f(a+h)=f(a)+f'(a)h plus a remainder. Solving that affine model when f'(a) is nonzero gives the Newton candidate a-f(a)/f'(a). The graph can derive this exact formula for the root of the affine model. It cannot conclude that the candidate is a root of f by deleting the remainder. Local convergence or an error estimate needs a separately stated theorem with its neighborhood and derivative bounds; numerical iteration and certified bounds are outside this work. The implicit/inverse-function route similarly requires a nonsingular derivative at the operating point and establishes only a local branch (`credit:nrz:cas-analysis-literature`).
 
 Repeated roots are classified first by vanishing derivatives, as in (`constr:nrz:cas-derivative-factorization`). Higher Taylor terms expose the leading local power when the linear derivative vanishes, explaining why an ordinary Newton denominator is then invalid. Polynomial expressions may retain exact algebraic-root requests with their defining polynomial, field, multiplicity and selection conditions; radicals are not required for representability. A candidate root is verified by exact substitution into the original equation. A complete solution-set witness must also account for every branch and any excluded denominator cases; a single successful substitution cannot do so.
 
@@ -159,7 +159,7 @@ A series request specifies its expansion variables, point, order and whether it 
 
 **Table (Twelve reference formula capabilities)** · `tab:nrz:cas-reference-coverage`
 
-The identifiers below name the unsupported formulas identified by the reference migration. Their mathematical sources remain the unchanged problem inputs. The table describes required representability and possible witness routes, not implemented behavior. the CAS implementation design (`spec:nrz:cas-design`) selects which reductions the CAS-foundation step (`step:nrz:cas-foundation`) executes; numerical values and certified enclosures are outside this lane.
+The identifiers below name the unsupported formulas identified by the reference migration. Their mathematical sources remain the unchanged problem inputs. The table describes required representability and possible witness routes, not implemented behavior. the CAS implementation design (`spec:nrz:cas-design`) selects which reductions the CAS-foundation step (`step:nrz:cas-foundation`) executes; numerical values and certified enclosures are outside this work.
 
 |Identifier|Required representation|Witness route|
 |----------|-----------------------|-------------|

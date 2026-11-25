@@ -62,7 +62,7 @@ pub(crate) mod proof;
     not(test),
     expect(
         dead_code,
-        reason = "the later search lane consumes unsealed elementary recipes"
+        reason = "reserved for search that will consume unsealed elementary recipes"
     )
 )]
 #[expect(

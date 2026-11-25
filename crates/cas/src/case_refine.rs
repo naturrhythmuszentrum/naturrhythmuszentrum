@@ -458,7 +458,7 @@ impl Scheduler<'_, '_> {
     }
 }
 
-/// Only strict binary arithmetic has a common-refinement producer in this lane.
+/// Only strict binary arithmetic has a common-refinement producer in the current implementation.
 fn eligible(cas: &Cas, id: LogicalId, budget: &mut crate::budget::Budget) -> Result<bool, Fault> {
     let value = cas.state.expression(id, budget)?;
     if !matches!(

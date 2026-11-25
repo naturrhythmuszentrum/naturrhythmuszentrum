@@ -160,11 +160,11 @@ pub use model::{
 pub enum Availability {
     /// No executable checker or producer exists in this build.
     Unavailable,
-    /// The owning lane has enabled independently replayed checking.
+    /// Independent replayed checking is enabled.
     Available,
 }
 
-/// Report leaf capabilities in the documented lane ownership order.
+/// Report leaf capabilities in the documented capability order.
 #[must_use]
 pub const fn capabilities() -> [Availability; 14] {
     [
