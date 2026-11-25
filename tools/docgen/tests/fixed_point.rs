@@ -18,13 +18,17 @@
 //! | [`tracked_ordinal_refusal_is_read_only`] | docgen | The check reads tracked working bytes and names the exact refusal location. |
 //! | [`tracked_ordinal_path_refuses`] | docgen | Tracked filenames are checked even when their contents contain no prose. |
 //! | [`golden_check_precedes_tracked_read`] | docgen | Exercise the real command: a bounded golden refusal precedes a tracked-text sentinel. |
+//! | [`tracked_process_name_refuses`] | docgen | A tracked process identifier reports its path, line and exact spelling without writes. |
+//! | [`tracked_process_name_path_refuses`] | docgen | A tracked process identifier in a path reports line zero. |
+//! | [`commit_message_check_uses_stdin`] | docgen | The message command reads one subject and body, including invalid input. |
 
 //! Binary-level checks of the documentation fixed point and exit classes.
 
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 /// Build a minimal complete documentation tree.
 fn fixture(root: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -577,5 +581,104 @@ fn golden_check_precedes_tracked_read() -> Result<(), Box<dyn std::error::Error>
     assert!(error.contains("golden Bytes"), "{error}");
     assert!(!error.contains("ordinal-step-code"), "{error}");
     assert_eq!(fs::read(path)?, bytes);
+    Ok(())
+}
+
+/// A tracked process identifier reports its path, line and exact spelling without writes.
+/// ´claim:docgen:tracked-process-name-refuses´
+/// ´test:integration:tracked-process-name-refuses´
+#[test]
+fn tracked_process_name_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    assert_eq!(run(root, "data")?.status.code(), Some(0));
+    assert_eq!(run(root, "render")?.status.code(), Some(0));
+    fs::write(root.join("tracked.txt"), "ordinary text\n")?;
+    track_fixture(root)?;
+    let code = format!("{}-{}", "lane", "alpha42");
+    fs::write(
+        root.join("tracked.txt"),
+        format!("ordinary text\n{code} describes scheduling\n"),
+    )?;
+    let before = snapshot(root)?;
+    let output = run(root, "check")?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8(output.stderr)?
+            .contains(&format!("process-name at tracked.txt:2: {code}"))
+    );
+    assert_eq!(snapshot(root)?, before);
+    Ok(())
+}
+
+/// A tracked process identifier in a path reports line zero.
+/// ´claim:docgen:tracked-process-name-path-refuses´
+/// ´test:integration:tracked-process-name-path-refuses´
+#[test]
+fn tracked_process_name_path_refuses() -> Result<(), Box<dyn std::error::Error>> {
+    let directory = tempfile::tempdir()?;
+    let root = directory.path();
+    fixture(root)?;
+    let code = format!("{}-{}", "lane", "42alpha");
+    let path = format!("{code}.txt");
+    fs::write(root.join(&path), [])?;
+    track_fixture(root)?;
+    let before = snapshot(root)?;
+    let output = run(root, "check")?;
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8(output.stderr)?.contains(&format!("process-name at {path}:0: {code}"))
+    );
+    assert_eq!(snapshot(root)?, before);
+    Ok(())
+}
+
+/// The message command reads one subject and body, including invalid input.
+/// ´claim:docgen:commit-message-check-uses-stdin´
+/// ´test:integration:commit-message-check-uses-stdin´
+#[test]
+fn commit_message_check_uses_stdin() -> Result<(), Box<dyn std::error::Error>> {
+    let run_message = |message: &[u8]| -> Result<Output, Box<dyn std::error::Error>> {
+        let mut child = Command::new(env!("CARGO_BIN_EXE_nrz-docgen"))
+            .arg("check-message")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()?;
+        child
+            .stdin
+            .take()
+            .ok_or_else(|| std::io::Error::other("missing stdin"))?
+            .write_all(message)?;
+        Ok(child.wait_with_output()?)
+    };
+    let clean = run_message(
+        b"docs: explain measured result\n\nMeasured on 2026-11-25 at commit abc123.\n",
+    )?;
+    assert_eq!(clean.status.code(), Some(0));
+    let code = format!("{}-{}", "gate", "B42");
+    let refused = run_message(format!("docs: explain result\n\nMeasured by {code}.\n").as_bytes())?;
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(
+        String::from_utf8(refused.stderr)?
+            .contains(&format!("process-name at <commit-message>:3: {code}"))
+    );
+    let ordinal = format!("{} {}", "Stage", "3a");
+    let refused = run_message(format!("docs: describe {ordinal}\n\nWhy.\n").as_bytes())?;
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(String::from_utf8(refused.stderr)?.contains(&format!(
+        "ordinal-step-code at <commit-message>:1: {ordinal}"
+    )));
+    let invalid = run_message(&[0xff])?;
+    assert_eq!(invalid.status.code(), Some(2));
+    assert!(String::from_utf8(invalid.stderr)?.contains("commit-message input:"));
+    let directory = tempfile::tempdir()?;
+    let unreadable = Command::new(env!("CARGO_BIN_EXE_nrz-docgen"))
+        .arg("check-message")
+        .stdin(Stdio::from(fs::File::open(directory.path())?))
+        .output()?;
+    assert_eq!(unreadable.status.code(), Some(1));
+    assert!(String::from_utf8(unreadable.stderr)?.contains("commit-message input:"));
     Ok(())
 }

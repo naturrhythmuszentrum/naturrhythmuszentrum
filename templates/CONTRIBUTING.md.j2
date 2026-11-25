@@ -81,7 +81,7 @@ A property cited under another kind, such as a rule, decision or requirement, is
 
 **Rule (Required verification)** · `rule:nrz:required-verification`
 
-Every shipped unit must meet the gate of record (`gate:nrz:verification-of-candidate`). After fetching the candidate, first check commit policy over every commit past the base: a Conventional Commits subject of at most 72 characters, a non-empty body explaining why, and no `squash:` prefix (`rule:nrz:commit-subject-and-body`), (`rule:nrz:fold-working-squashes`). Then run these commands from the repository root, in order:
+Every shipped unit must meet the gate of record (`gate:nrz:verification-of-candidate`). After fetching the candidate, first check commit policy over every commit past the base: a Conventional Commits subject of at most 72 characters, a non-empty body explaining why, and no `squash:` prefix, then pass each subject and body to `nrz-docgen check-message` on standard input (`rule:nrz:commit-subject-and-body`), (`rule:nrz:fold-working-squashes`). Then run these commands from the repository root, in order:
 
 ```sh
 cargo fmt --all -- --check

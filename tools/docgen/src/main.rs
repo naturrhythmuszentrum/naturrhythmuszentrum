@@ -7,7 +7,7 @@
     reason = "nrz-cas uses petgraph 0.8.3 with hashbrown 0.15 while indexmap uses hashbrown 0.17"
 )]
 
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -29,7 +29,7 @@ struct Cli {
     root: PathBuf,
 }
 
-/// The three supported stages.
+/// Generation stages and the commit-message policy command.
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Derive committed JSON datasets.
@@ -38,6 +38,8 @@ enum Command {
     Render,
     /// Check the committed generation fixed point.
     Check,
+    /// Check one UTF-8 commit subject and body from standard input.
+    CheckMessage,
 }
 
 /// Parse arguments, execute one stage, and return the documented exit class.
@@ -49,6 +51,13 @@ fn main() -> ExitCode {
     let result = match command.command {
         Command::Data => nrz_docgen::data(&command.root),
         Command::Render => nrz_docgen::render(&command.root),
+        Command::CheckMessage => {
+            let mut message = String::new();
+            if let Err(problem) = io::stdin().read_to_string(&mut message) {
+                return message_input_failure(&problem);
+            }
+            nrz_docgen::check_message(&message)
+        }
         Command::Check => {
             return match nrz_docgen::check(&command.root) {
                 Ok(findings) => {
@@ -104,4 +113,17 @@ fn runtime_failure(problem: &nrz_docgen::Error) -> ExitCode {
         return ExitCode::FAILURE;
     }
     ExitCode::FAILURE
+}
+
+/// Distinguish invalid UTF-8 from an I/O read failure.
+fn message_input_failure(problem: &io::Error) -> ExitCode {
+    let stderr = io::stderr();
+    if writeln!(stderr.lock(), "commit-message input: {problem}").is_err() {
+        return ExitCode::FAILURE;
+    }
+    if problem.kind() == io::ErrorKind::InvalidData {
+        ExitCode::from(2)
+    } else {
+        ExitCode::FAILURE
+    }
 }

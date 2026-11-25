@@ -32,6 +32,9 @@
 |(`test:integration:tracked-ordinal-refusal-is-read-only`)|docgen|The check reads tracked working bytes and names the exact refusal location.|
 |(`test:integration:tracked-ordinal-path-refuses`)|docgen|Tracked filenames are checked even when their contents contain no prose.|
 |(`test:integration:golden-check-precedes-tracked-read`)|docgen|Exercise the real command: a bounded golden refusal precedes a tracked-text sentinel.|
+|(`test:integration:tracked-process-name-refuses`)|docgen|A tracked process identifier reports its path, line and exact spelling without writes.|
+|(`test:integration:tracked-process-name-path-refuses`)|docgen|A tracked process identifier in a path reports line zero.|
+|(`test:integration:commit-message-check-uses-stdin`)|docgen|The message command reads one subject and body, including invalid input.|
 |(`test:integration:preserves-every-reference-payload-field`)|docgen|Every original value, magnitude, identity, citation and documentary string survives exactly. Additional entries must pass authoritative v2 validation and the generated fixed point.|
 |(`test:integration:preservation-rejects-missing-or-changed-originals`)|docgen|Neither removing an original source nor changing its documentary payload can pass preservation.|
 |(`test:integration:compact-golden-associations`)|docgen|Exact binary64 inputs, row identities, targets and relative golden widths remain associated. Each row passes the unchanged bounded reader before its stronger coverage assertions. Every positive operand with endpoint evidence has a sigmoid upper endpoint above 1/2 or a tanh lower endpoint below the operand, excluding nonzero identity singletons.|

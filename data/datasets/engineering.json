@@ -5502,6 +5502,14 @@
     },
     {
       "category": "failure",
+      "meaning": "A tracked path, text line or commit message contains a process name; the refusal retains its location and exact matched spelling.",
+      "owner": "DOCGEN",
+      "source": "tools/docgen/src/error.rs",
+      "type_name": "Error",
+      "variant": "ProcessName"
+    },
+    {
+      "category": "failure",
       "meaning": "A template cannot be loaded or evaluated.",
       "owner": "DOCGEN",
       "source": "tools/docgen/src/error.rs",
@@ -5883,7 +5891,7 @@
       "path": "tools/docgen/src/check.rs"
     },
     {
-      "fingerprint": "2fca5daf99cc8e7a",
+      "fingerprint": "aca09339d900bed3",
       "path": "tools/docgen/src/error.rs"
     },
     {

@@ -1,0 +1,20 @@
+{# SPDX-License-Identifier: CC0-1.0 -#}
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# Process-name guard evidence · `guide:docgen:process-name-evidence`
+
+The scanner implements the public-text naming rule in `CONTRIBUTING.md` over Git-tracked paths and current UTF-8 lines. Its first pattern requires one of the scheduling nouns lane, run, round, step, gate or candidate joined by a hyphen or underscore to an identifier whose first segment contains a digit. A joined noun nested inside another hyphenated product name is ignored. A one-digit underscore index, a `2d`, `3d` or `2x2` underscore shape, and a hyphenated `v` version tail remain product names. Thus SIMD `lane_0` passes, while a multi-digit or letter-digit process segment still refuses. The separator and first-segment digit make a process code more likely than ordinary prose; they leave a measured process count, a mathematical step number and an unnumbered product candidate alone. Its second pattern requires a review finding or diagnostic run followed by a separator and a digit-bearing identifier. Those phrases identify a numbered process record, while an unnumbered review finding remains ordinary prose. Its third pattern requires diagnostic or its plural followed by a space and a digit, or the abbreviated patch basename joined to a digit. A two-number range is retained as one spelling. These forms identify a numbered measurement process rather than the measured work; a program diagnostic code without that number pattern remains valid. Its fourth pattern recognizes a relative sweep pointer; it is an unstable reference to scheduling context. The four forms are case-insensitive and return the original spelling. Product diagnostic codes such as `E404`, fixture names, types, units, versions and dates have no such context and remain valid. The phrase formed by `diagnostic`, a space and `404` is refused as a numbered process reference even if a program meant it as a code; write the program code in its own code form. Decimal diagnostic quantities, and previous round or previous lane in algorithm and SIMD prose, remain valid because those phrases alone cannot identify the working process. These patterns deliberately leave other conceivable spellings to review; extending them requires evidence that the tracked tree and product names still pass. A scan of main `00f7009c` on 2026-11-25 found 203 matching occurrences across eight tracked files. The cleanup reworded their authored sources and regenerated the affected datasets and documents before the guard was added.
+
+The tracked scan uses the existing sorted Git inventory and reads only regular, non-binary UTF-8 files. A matched path reports line zero; a matched text line reports its one-based line. The `check-message` command applies the same ordinal and process-name patterns to one UTF-8 subject and body read from standard input, with `<commit-message>` as its location marker. It reports the first refusal, returns status 1 for a match or I/O read failure, status 2 for usage or invalid UTF-8 input and status 0 for clean text. The commit-policy gate invokes it for every commit message.
+
+The integration tests `tracked_process_name_refuses`, `tracked_process_name_path_refuses` and `commit_message_check_uses_stdin` exercise location reporting and the command interface. Forbidden examples are assembled from separate words in test sources, so the tests obey the repository rule.
+
+## Unit test matrix · `tab:docgen:process-names-unit-test-matrix`
+
+**Table (Unit test matrix)**
+
+|Test|Area|Claim|
+|----|----|-----|
+|(`test:unit:joined-process-identifiers-refuse`)|docgen|Joined scheduling nouns with identifiers refuse and preserve spelling.|
+|(`test:unit:numbered-records-and-relative-pointers-refuse`)|docgen|Numbered process records, diagnostic references and relative pointers refuse.|
+|(`test:unit:product-and-measurement-names-pass`)|docgen|Product codes, physical notation, dates and generic nouns pass.|

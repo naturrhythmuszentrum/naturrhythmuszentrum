@@ -16,14 +16,24 @@ pub enum Error {
         #[source]
         source: crate::golden::Error,
     },
-    /// A tracked text file or path contains an ordinal schedule code.
+    /// A tracked text file, path or commit message contains an ordinal schedule code.
     #[error("ordinal-step-code at {path}:{line}: {matched}")]
     OrdinalCode {
-        /// Root-relative tracked path.
+        /// Root-relative tracked path or commit-message input marker.
         path: String,
         /// One-based text line, or zero for the path itself.
         line: usize,
         /// Exact refused schedule-code spelling.
+        matched: String,
+    },
+    /// A tracked text file, path, or commit message contains a process name.
+    #[error("process-name at {path}:{line}: {matched}")]
+    ProcessName {
+        /// Root-relative tracked path or the commit-message input marker.
+        path: String,
+        /// One-based text line, or zero for the path itself.
+        line: usize,
+        /// Exact refused process-name spelling.
         matched: String,
     },
     /// The tracked text inventory could not be obtained.

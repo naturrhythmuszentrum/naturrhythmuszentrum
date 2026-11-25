@@ -7,9 +7,9 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::error::{self, Error};
-use crate::ordinals;
+use crate::{ordinals, process_names};
 
-/// Refuse the first ordinal code in sorted tracked paths or UTF-8 text lines.
+/// Refuse the first ordinal or process name in sorted tracked paths or UTF-8 text lines.
 pub(crate) fn check(root: &Path) -> Result<(), Error> {
     for path in paths(root)? {
         check_path(root, &path)?;
@@ -43,6 +43,9 @@ fn check_path(root: &Path, path: &str) -> Result<(), Error> {
     if let Some(matched) = ordinals::find(path) {
         return Err(refusal(path, 0, matched));
     }
+    if let Some(matched) = process_names::find(path) {
+        return Err(process_refusal(path, 0, matched));
+    }
     let full = root.join(path);
     let metadata = match fs::symlink_metadata(&full) {
         Ok(metadata) => metadata,
@@ -58,9 +61,7 @@ fn check_path(root: &Path, path: &str) -> Result<(), Error> {
     }
     if let Ok(source) = std::str::from_utf8(&bytes) {
         for (line, text) in source.lines().enumerate() {
-            if let Some(matched) = ordinals::find(text) {
-                return Err(refusal(path, line + 1, matched));
-            }
+            check_line(path, line + 1, text)?;
         }
     }
     Ok(())
@@ -69,6 +70,34 @@ fn check_path(root: &Path, path: &str) -> Result<(), Error> {
 /// Keep the exact matched spelling and one-based source location in the refusal.
 fn refusal(path: &str, line: usize, matched: &str) -> Error {
     Error::OrdinalCode {
+        path: path.to_owned(),
+        line,
+        matched: matched.to_owned(),
+    }
+}
+
+/// Apply both public-text grammars to a subject and body read from standard input.
+pub(crate) fn check_message(message: &str) -> Result<(), Error> {
+    for (line, text) in message.lines().enumerate() {
+        check_line("<commit-message>", line + 1, text)?;
+    }
+    Ok(())
+}
+
+/// Keep path and one-based line for either named refusal.
+fn check_line(path: &str, line: usize, text: &str) -> Result<(), Error> {
+    if let Some(matched) = ordinals::find(text) {
+        return Err(refusal(path, line, matched));
+    }
+    if let Some(matched) = process_names::find(text) {
+        return Err(process_refusal(path, line, matched));
+    }
+    Ok(())
+}
+
+/// Preserve the exact process-name spelling in a path-bearing error.
+fn process_refusal(path: &str, line: usize, matched: &str) -> Error {
+    Error::ProcessName {
         path: path.to_owned(),
         line,
         matched: matched.to_owned(),

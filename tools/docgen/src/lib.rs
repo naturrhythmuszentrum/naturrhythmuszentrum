@@ -24,6 +24,11 @@ mod ordinals;
     clippy::redundant_pub_crate,
     reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
 )]
+mod process_names;
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "items shared across private modules stay crate-visible because the workspace denies unreachable_pub"
+)]
 mod tracked;
 
 #[expect(
@@ -128,7 +133,7 @@ pub fn render(root: &Path) -> Result<(), Error> {
 ///
 /// # Errors
 ///
-/// Returns a path-bearing failure for ordinal schedule codes, unavailable tracked-file
+/// Returns a path-bearing failure for ordinal schedule codes, process names, unavailable tracked-file
 /// inventory, invalid sources, manifests, templates, or I/O.
 pub fn check(root: &Path) -> Result<Vec<Finding>, Error> {
     // Admit bounded authored inputs before the tracked-text scan can read them whole.
@@ -146,6 +151,15 @@ pub fn check(root: &Path) -> Result<Vec<Finding>, Error> {
         .map(|document| manifest::template_path(&document.output))
         .collect();
     check::compare(root, &first, &second, &templates)
+}
+
+/// Check one UTF-8 commit subject and body supplied by the caller.
+///
+/// # Errors
+///
+/// Returns the first ordinal or process-name refusal with a one-based message line.
+pub fn check_message(message: &str) -> Result<(), Error> {
+    tracked::check_message(message)
 }
 
 /// Derive dataset bytes and parsed values together.

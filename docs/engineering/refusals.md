@@ -42,6 +42,7 @@ Wrappers retain their underlying numerical or symbolic cause. Recovery stop enum
 |DOCGEN|`Error`|`Membership`|failure|Workspace membership or a supported manifest fact is invalid.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`OrdinalCode`|failure|A tracked path or text line contains an ordinal schedule code; the refusal retains its path, line and exact matched spelling.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`Payload`|failure|A typed record or its semantic constraints are invalid.|`tools/docgen/src/error.rs`|
+|DOCGEN|`Error`|`ProcessName`|failure|A tracked path, text line or commit message contains a process name; the refusal retains its location and exact matched spelling.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`Template`|failure|A template cannot be loaded or evaluated.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`TemplateHeader`|failure|A template header violates the declared source contract.|`tools/docgen/src/error.rs`|
 |DOCGEN|`Error`|`TomlSyntax`|failure|An input TOML document is syntactically invalid.|`tools/docgen/src/error.rs`|
