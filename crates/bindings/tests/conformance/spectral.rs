@@ -19,6 +19,7 @@ fn lc_spectral_exact_work_boundary() -> TestResult {
     fixture.check(&mut measured)?;
     let required = measured.usage().work + 17;
     for work in [required, required - 1] {
+        let mut fixture = prepared(["5", "1/10", "1/2000"])?;
         let mut budget = Budget::new(Limits {
             work,
             ..Limits::default()

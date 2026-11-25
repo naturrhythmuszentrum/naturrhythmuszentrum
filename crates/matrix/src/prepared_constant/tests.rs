@@ -170,7 +170,10 @@ fn constant_export_goldens() -> Result {
     let prepared = result?;
     let graph_counts = prepared.graph.counts();
     assert!(
-        prepared.graph.expression(&request.target).is_ok(),
+        prepared
+            .graph
+            .expression(&request.target, &mut Budget::new(Limits::default())?)
+            .is_ok(),
         "producing graph must retain the original target"
     );
     assert_eq!(b.usage().work, 17 + used);

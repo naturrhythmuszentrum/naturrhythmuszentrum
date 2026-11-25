@@ -75,7 +75,7 @@ fn structural_key(
     out.count(roots.len())?;
     let mut bytes = out.finish();
     for root in roots {
-        cas.state.region(*root)?;
+        cas.state.region(*root, budget)?;
         let syntax = crate::wire_build::syntax_key(cas, *root, budget)?;
         let mut out = Encoder::new(budget, AT);
         out.raw(&bytes)?;

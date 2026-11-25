@@ -14,6 +14,13 @@ fn fixture() -> TestResult<(Cas, Handle, Handle, Handle, Handle)> {
     fixture_with_twins(false)
 }
 
+fn fixture_budget() -> Result<Budget, nrz_cas::Fault> {
+    Budget::new(Limits {
+        work: 100_000,
+        ..Limits::default()
+    })
+}
+
 fn fixture_with_twins(twins: bool) -> TestResult<(Cas, Handle, Handle, Handle, Handle)> {
     let mut cas = Cas::new(Limits::default())?;
     let mut declarations = environment(Field::Real, &["x", "y"]);
@@ -25,7 +32,7 @@ fn fixture_with_twins(twins: bool) -> TestResult<(Cas, Handle, Handle, Handle, H
     let header = admit(
         &mut cas,
         Draft::Header(HeaderDraft::Core(declarations)),
-        &mut default_budget()?,
+        &mut fixture_budget()?,
     )?;
     let nodes = cas.admit(
         &[
@@ -80,7 +87,7 @@ fn fixture_with_twins(twins: bool) -> TestResult<(Cas, Handle, Handle, Handle, H
                 &[],
             ),
         ],
-        &mut default_budget()?,
+        &mut fixture_budget()?,
     )?;
     let object = admit(
         &mut cas,
@@ -97,7 +104,7 @@ fn fixture_with_twins(twins: bool) -> TestResult<(Cas, Handle, Handle, Handle, H
                 Reference::Existing(nodes[6].clone()),
             ],
         }),
-        &mut default_budget()?,
+        &mut fixture_budget()?,
     )?;
     Ok((cas, header, object, nodes[3].clone(), nodes[4].clone()))
 }
@@ -109,7 +116,9 @@ fn compose_coordinate_substitution() -> TestResult {
     use nrz_cas::proof::{ApplicationDraft, Certificate, Statement};
     use nrz_cas::series::{SeriesOperation as O, SeriesStatement as S};
     let (mut cas, _, input, _, y) = fixture_with_twins(true)?;
-    let original = cas.series_object(&input)?.clone();
+    let original = cas
+        .series_object(&input, &mut crate::testing::budgets::graph_budget()?)?
+        .clone();
     let inner = admit(
         &mut cas,
         Draft::SeriesObject(SeriesObject {
@@ -212,8 +221,13 @@ fn series_calculus_coordinate_twins() -> TestResult {
     };
     for integrate in [false, true] {
         let (mut cas, header, input, x, y) = fixture_with_twins(true)?;
-        let original = cas.series_object(&input)?.clone();
-        let domain = cas.admissible_region(&original.context)?;
+        let original = cas
+            .series_object(&input, &mut crate::testing::budgets::graph_budget()?)?
+            .clone();
+        let domain = cas.admissible_region(
+            &original.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?;
         let source = admit(
             &mut cas,
             Draft::Source {
@@ -290,7 +304,12 @@ fn series_calculus_coordinate_twins() -> TestResult {
             }],
             &mut default_budget()?,
         )?;
-        assert_eq!(base.cas.series_object(&changed)?.variable, y);
+        assert_eq!(
+            base.cas
+                .series_object(&changed, &mut crate::testing::budgets::graph_budget()?)?
+                .variable,
+            y
+        );
         assert_ne!(output, &changed);
         *output = changed;
         steps.push(ApplicationDraft {
@@ -319,7 +338,9 @@ fn series_calculus_coordinate_twins() -> TestResult {
 #[test]
 fn series_coordinate_substitution_identity() -> TestResult {
     let (mut cas, _, object, x, y) = fixture()?;
-    let before = cas.series_object(&object)?.clone();
+    let before = cas
+        .series_object(&object, &mut crate::testing::budgets::graph_budget()?)?
+        .clone();
     let transformed = cas.substitute(
         &object,
         &[
@@ -334,7 +355,7 @@ fn series_coordinate_substitution_identity() -> TestResult {
         ],
         &mut default_budget()?,
     )?;
-    let after = cas.series_object(&transformed)?;
+    let after = cas.series_object(&transformed, &mut crate::testing::budgets::graph_budget()?)?;
     assert_ne!(object, transformed);
     assert_eq!(after.variable, y);
     assert_eq!(
@@ -383,12 +404,21 @@ fn series_coordinate_substitution_identity() -> TestResult {
 /// Equal-spelled coordinates and their source syntax move together only through new checked evidence.
 /// ´test:integration:series-source-coordinate-substitution´
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the substitution control checks the complete evidence lifecycle"
+)]
 fn series_source_coordinate_substitution() -> TestResult {
     use nrz_cas::proof::Statement;
     use nrz_cas::series::{SeriesStatement, SourceClause, SourceRequest};
     let (mut cas, header, input, x, y) = fixture_with_twins(true)?;
-    let basis = cas.series_object(&input)?.clone();
-    let domain = cas.admissible_region(&basis.context)?;
+    let basis = cas
+        .series_object(&input, &mut crate::testing::budgets::graph_budget()?)?
+        .clone();
+    let domain = cas.admissible_region(
+        &basis.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let source = admit(
         &mut cas,
         Draft::Source {
@@ -449,7 +479,12 @@ fn series_source_coordinate_substitution() -> TestResult {
         .cas
         .substitute(&old_output, &substitutions, &mut default_budget()?)?;
     assert_ne!(new_source, sine);
-    assert_eq!(base.cas.series_object(&new_output)?.variable, y);
+    assert_eq!(
+        base.cas
+            .series_object(&new_output, &mut crate::testing::budgets::graph_budget()?)?
+            .variable,
+        y
+    );
     let mut changed = request.clone();
     changed.source = new_source.clone();
     changed.variable = y.clone();
@@ -526,7 +561,7 @@ fn attempt(kind: BudgetKind, amount: u64) -> TestResult<(bool, u64)> {
     }
     let mut budget = Budget::new(limits)?;
     budget.work(37, Location::new("prior series substitution"))?;
-    let before = cas.canonical_snapshot(&mut default_budget()?)?;
+    let before = cas.canonical_snapshot(&mut fixture_budget()?)?;
     let result = budget.with_retained_payload(
         113,
         Location::new("retained series substitution"),
@@ -546,11 +581,14 @@ fn attempt(kind: BudgetKind, amount: u64) -> TestResult<(bool, u64)> {
             matches!(fault.kind,nrz_cas::FaultKind::Exhausted {budget,..} if budget==kind),
             "{fault:?}"
         );
-        assert_eq!(cas.canonical_snapshot(&mut default_budget()?)?, before);
+        assert_eq!(cas.canonical_snapshot(&mut fixture_budget()?)?, before);
     } else {
         assert_eq!(
-            cas.series_object(result.as_ref().map_err(|_| "substitution")?)?
-                .variable,
+            cas.series_object(
+                result.as_ref().map_err(|_| "substitution")?,
+                &mut fixture_budget()?,
+            )?
+            .variable,
             y
         );
     }
@@ -574,12 +612,12 @@ const DIMENSIONS: [BudgetKind; 8] = [
 fn series_substitution_resource_boundaries() -> TestResult {
     for ((kind, ceiling), prefix) in DIMENSIONS
         .into_iter()
-        .zip([27_356, 24_001, 5544, 12, 27, 1, 2, 3])
+        .zip([27_362, 24_001, 5544, 12, 27, 1, 2, 3])
         .zip([
-            27_278, 24_381, 27_356, 27_356, 27_356, 26_840, 24_637, 24_637,
+            27_360, 24_381, 27_356, 27_356, 27_356, 26_840, 24_637, 24_637,
         ])
     {
-        assert_eq!(attempt(kind, ceiling)?, (true, 27_356));
+        assert_eq!(attempt(kind, ceiling)?, (true, 27_362));
         assert_eq!(attempt(kind, ceiling - 1)?, (false, prefix));
     }
     Ok(())

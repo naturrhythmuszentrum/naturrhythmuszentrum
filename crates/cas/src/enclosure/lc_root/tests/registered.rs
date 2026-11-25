@@ -13,8 +13,12 @@ fn lc_root_registered_replay() -> TestResult {
     let original = source.request.clone();
     let before = source.cas.counts();
     let receipt = source.cas.construct_lc_root(&original, &mut ledger()?)?;
-    assert_eq!(receipt.request(&source.cas)?, &original);
-    assert!(receipt.request(&source.cas.full_copy_for_test()).is_err());
+    assert_eq!(receipt.request(&source.cas, &mut ledger()?)?, &original);
+    assert!(
+        receipt
+            .request(&source.cas.full_copy_for_test(), &mut ledger()?)
+            .is_err()
+    );
     assert_eq!(receipt.formal_schema(), &SCHEMA);
     assert!(super::super::super::ENCLOSURE_SCHEMAS.contains(&SCHEMA));
     assert_eq!(source.cas.retained_judgment_count(), 1);
@@ -28,11 +32,14 @@ fn lc_root_registered_replay() -> TestResult {
     let proposal = Certificate::from_bytes(&portable, &mut ledger()?)?;
     super::super::service::certificate_allocation_control(certificate);
     let mut receiver = fixture()?;
-    assert!(receipt.request(&receiver.cas).is_err());
+    assert!(receipt.request(&receiver.cas, &mut ledger()?).is_err());
     let checked = receiver
         .cas
         .check_lc_root(&receiver.request, &proposal, &mut ledger()?)?;
-    assert_eq!(checked.request(&receiver.cas)?, &receiver.request);
+    assert_eq!(
+        checked.request(&receiver.cas, &mut ledger()?)?,
+        &receiver.request
+    );
     assert_eq!(
         checked.certificate(&receiver.cas, &mut ledger()?)?,
         proposal
@@ -40,7 +47,10 @@ fn lc_root_registered_replay() -> TestResult {
     let again = receiver
         .cas
         .check_lc_root(&receiver.request, &proposal, &mut ledger()?)?;
-    assert_eq!(again.request(&receiver.cas)?, &receiver.request);
+    assert_eq!(
+        again.request(&receiver.cas, &mut ledger()?)?,
+        &receiver.request
+    );
     assert_eq!(receiver.cas.retained_judgment_count(), 1);
     Ok(())
 }
@@ -84,6 +94,7 @@ fn lc_root_registered_mutations() -> TestResult {
 /// ´claim:cas:lc-root-registered-originals´
 #[test]
 fn lc_root_registered_originals() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut source = fixture()?;
     let receipt = source
         .cas
@@ -118,9 +129,15 @@ fn lc_root_registered_originals() -> TestResult {
         assert!(matches!(error.kind, crate::FaultKind::Invalid(_)));
         assert_eq!(f.cas.retained_judgment_count(), 0);
     }
-    let root = f.cas.checked(&f.request.targets[1])?;
-    let exponent = f.cas.state.expression(root)?.operands[1];
-    let index = f.cas.state.indices[&exponent];
+    let root = f.cas.checked(&f.request.targets[1], &mut budget)?;
+    let exponent = f.cas.state.expression(root, &mut budget)?.operands[1];
+    let index = f
+        .cas
+        .state
+        .indices
+        .peek(&exponent)
+        .copied()
+        .ok_or("index missing")?;
     let crate::graph::Vertex::Expression(value) = &mut f.cas.state.graph[index] else {
         return Err("exponent".into());
     };
@@ -159,7 +176,7 @@ fn lc_root_registered_boundaries() -> TestResult {
     assert_eq!(receiver.cas.retained_judgment_bytes(), 8086);
     assert_eq!(
         (build.usage().work, replay.usage().work),
-        (173_200, 187_375)
+        (173_205, 187_380)
     );
     let events = |rows: Vec<crate::testing::work_trace::Row>| {
         rows.into_iter()
@@ -175,13 +192,13 @@ fn lc_root_registered_boundaries() -> TestResult {
         events(build_rows),
         expected(&[
             ("LC root family checker", 13_881),
+            ("LC root judgment publication", 7039),
             ("candidate", 163),
             ("checking", 135),
             ("encoding", 78),
-            ("lookup", 7039),
             ("originals", 61),
             ("proof transaction", 256),
-            ("publication", 8128),
+            ("publication", 8133),
             ("rational encoding", 128),
             ("typed witness DAG", 137_965),
             ("typed witness record", 5366),
@@ -191,13 +208,13 @@ fn lc_root_registered_boundaries() -> TestResult {
         events(replay_rows),
         expected(&[
             ("LC root family checker", 13_881),
+            ("LC root judgment publication", 7039),
             ("candidate", 18),
             ("checking", 135),
             ("encoding", 78),
-            ("lookup", 7039),
             ("originals", 61),
             ("proof transaction", 7292),
-            ("publication", 8104),
+            ("publication", 8109),
             ("rational encoding", 128),
             ("typed witness DAG", 137_965),
             ("typed witness record", 5366),
@@ -208,13 +225,13 @@ fn lc_root_registered_boundaries() -> TestResult {
     // Transfer: candidate888 + 2*7038 key buffers + 16 Arc counts + 24 Vec + 16 Arc.
     // Append: retained8110 + (18*4+24) dependency buffer. Transfer is the larger peak.
     // Replay retains the supplied 7036+24 bytes and reserves one fewer binder handle (24).
-    boundaries(&certificate, 0, 173_200, 41_675)?;
+    boundaries(&certificate, 0, 173_205, 41_675)?;
     // The receiving service reserves this getter, not a separately copied buffer.
     assert_eq!(certificate.retained_bytes(), 7036 + 24);
     boundaries(
         &certificate,
         1,
-        187_375,
+        187_380,
         41_675 + certificate.retained_bytes() - 24,
     )?;
     rollback()?;
@@ -253,7 +270,7 @@ fn boundaries(certificate: &Certificate, mode: usize, work: u64, bytes: u64) -> 
                 }
             });
             if admitted {
-                assert_eq!(result?.request(&f.cas)?, &f.request);
+                assert_eq!(result?.request(&f.cas, &mut ledger()?)?, &f.request);
                 assert_eq!(budget.usage().work, work + 7);
                 assert_eq!(f.cas.retained_judgment_count(), 1);
             } else {
@@ -293,7 +310,7 @@ fn rollback() -> TestResult {
     assert!(
         receipt
             .ok_or("no completed inner receipt")?
-            .request(&f.cas)
+            .request(&f.cas, &mut ledger()?)
             .is_err()
     );
     Ok(())

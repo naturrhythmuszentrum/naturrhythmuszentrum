@@ -101,6 +101,7 @@ impl Fixture {
         &mut self,
         value: &Handle,
     ) -> TestResult<crate::test_api::proof::ApplicationDraft> {
+        let mut budget = crate::testing::common::default_budget()?;
         use crate::test_api::solving::{SolveProblemData, SolveSchema, SolveView};
         let (_, expected) = self.expectations(&Term::Q("0"), &[Rational::zero()], 0)?;
         let Statement::Solve(statement) = expected.statement else {
@@ -109,7 +110,9 @@ impl Fixture {
         let SolveStatement::Member(mut statement) = *statement else {
             return Err("member".into());
         };
-        let SolveView::SolveProblem(original) = self.cas.solve_view(&statement.problem)? else {
+        let SolveView::SolveProblem(original) =
+            self.cas.solve_view(&statement.problem, &mut budget)?
+        else {
             return Err("problem".into());
         };
         let original = original.clone();
@@ -167,6 +170,7 @@ impl Fixture {
         crate::test_api::proof::Judgment,
         crate::test_api::proof::Judgment,
     )> {
+        let mut budget = crate::testing::common::default_budget()?;
         use crate::test_api::domain::Layer;
         use crate::test_api::series::{ResidualSubject, SeriesStatement};
         use crate::test_api::solving::{SolveProblemData, TupleData};
@@ -188,7 +192,11 @@ impl Fixture {
         let (expression, _) = self.term(term, residual.len())?;
         let output = self.object(residual)?;
         let zero = self.node(Operator::Rational(Rational::zero()), &[])?;
-        let coefficients = self.cas.series_object(&output)?.coefficients.clone();
+        let coefficients = self
+            .cas
+            .series_object(&output, &mut budget)?
+            .coefficients
+            .clone();
         let (kind, arguments) = if residual.len() == 1 {
             (PredicateKind::Equal, vec![coefficients[0].clone(), zero])
         } else {

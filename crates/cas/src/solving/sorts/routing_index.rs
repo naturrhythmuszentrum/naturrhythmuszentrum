@@ -38,7 +38,7 @@ pub(super) fn resolve(
     let mut complex = Vec::new();
     while let Some((index, exiting)) = pending.pop() {
         let id = *headers.get(&index, budget, AT)?.ok_or_else(invalid)?;
-        let header = cas.state.header(id)?;
+        let header = cas.state.header(id, budget)?;
         budget.work(size(header.declarations().len().saturating_add(1), AT)?, AT)?;
         if exiting {
             for declaration in header.declarations() {
@@ -88,8 +88,8 @@ fn forest(
         .try_reserve(headers.len().saturating_mul(2))
         .map_err(|_| Fault::allocation(AT))?;
     for (index, id) in headers.iter() {
-        if let Some(parent) = cas.state.header(*id)?.parent {
-            let parent = *cas.state.indices.get(&parent).ok_or_else(invalid)?;
+        if let Some(parent) = cas.state.header(*id, budget)?.parent {
+            let parent = cas.state.index(parent, budget)?;
             if children.get(&parent, budget, AT)?.is_none() {
                 children.insert(parent, Vec::new(), budget, AT)?;
             }
@@ -201,7 +201,7 @@ fn scratch(
     for id in headers.values() {
         budget.work(256, AT)?;
         bytes = bytes.saturating_add(
-            size(cas.state.header(*id)?.declarations().len(), AT)?.saturating_mul(256),
+            size(cas.state.header(*id, budget)?.declarations().len(), AT)?.saturating_mul(256),
         );
     }
     for queries in uses.values() {

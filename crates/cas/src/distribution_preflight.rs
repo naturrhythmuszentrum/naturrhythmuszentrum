@@ -19,7 +19,7 @@ pub(crate) fn check(
 ) -> Result<(), Fault> {
     let input = cas
         .state
-        .expression(*inputs.first().ok_or_else(invalid)?)?
+        .expression(*inputs.first().ok_or_else(invalid)?, budget)?
         .clone();
     match &request.task {
         Task::ApplyAt { .. } if input.sort == Sort::Distribution => {
@@ -34,13 +34,13 @@ pub(crate) fn check(
             if input.sort != Sort::Distribution || *order == 0 {
                 return Err(invalid());
             }
-            let definition = cas.state.space(input.space.ok_or_else(invalid)?)?;
+            let definition = cas.state.space(input.space.ok_or_else(invalid)?, budget)?;
             if definition.coordinate != *coordinate || definition.domain != domain.logical_id() {
                 return Err(invalid());
             }
             budget.check(BudgetKind::Depth, u64::from(*order), AT)?;
         }
-        _ => operation(cas, &request.task, inputs, &input)?,
+        _ => operation(cas, &request.task, inputs, &input, budget)?,
     }
     if matches!(
         request.task,
@@ -62,12 +62,13 @@ fn operation(
     task: &Task,
     inputs: &[LogicalId],
     input: &Expression,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     if matches!(task, Task::Product { .. } | Task::SmoothMultiply { .. })
         && input.sort == Sort::Distribution
         && cas
             .state
-            .expression(*inputs.get(1).ok_or_else(invalid)?)?
+            .expression(*inputs.get(1).ok_or_else(invalid)?, budget)?
             .sort
             == Sort::Distribution
     {
@@ -78,13 +79,18 @@ fn operation(
     }
     match task {
         Task::Equal { domain, .. } if input.space.is_some() => {
-            if cas.state.space(input.space.ok_or_else(invalid)?)?.domain != domain.logical_id() {
+            if cas
+                .state
+                .space(input.space.ok_or_else(invalid)?, budget)?
+                .domain
+                != domain.logical_id()
+            {
                 return Err(invalid());
             }
         }
         Task::SmoothMultiply { space } => {
             if !inputs.iter().any(|id| {
-                cas.state.expression(*id).is_ok_and(|value| {
+                cas.state.expression(*id, budget).is_ok_and(|value| {
                     value.sort == Sort::Distribution && value.space == Some(space.logical_id())
                 })
             }) {
@@ -92,7 +98,9 @@ fn operation(
             }
         }
         Task::Product { requested_sort } => {
-            let right = cas.state.expression(*inputs.get(1).ok_or_else(invalid)?)?;
+            let right = cas
+                .state
+                .expression(*inputs.get(1).ok_or_else(invalid)?, budget)?;
             if (input.sort == Sort::Distribution || right.sort == Sort::Distribution)
                 && *requested_sort != Sort::Distribution
             {
@@ -100,7 +108,9 @@ fn operation(
             }
         }
         Task::Pair { space, action_mode } => {
-            let function = cas.state.expression(*inputs.get(1).ok_or_else(invalid)?)?;
+            let function = cas
+                .state
+                .expression(*inputs.get(1).ok_or_else(invalid)?, budget)?;
             let ordinary = *action_mode == ActionMode::Test;
             if input.sort != Sort::Distribution
                 || input.space != Some(space.logical_id())

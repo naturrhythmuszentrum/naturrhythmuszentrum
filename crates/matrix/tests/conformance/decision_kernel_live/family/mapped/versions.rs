@@ -17,7 +17,10 @@ use nrz_bindings::readings::algebra::{
 fn kernel_mapped_family_version_refusal() -> TestResult {
     let (mut source, family, _) = mapped_fixture()?;
     let target = family.source.clone();
-    let domain = source.frame.cas.admissible_region(&source.context)?;
+    let domain = source.frame.cas.admissible_region(
+        &source.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     let record = ScalarKernelRecord {
         lower: family.lower.clone(),
         upper: family.upper.clone(),

@@ -10,10 +10,15 @@ use crate::number::Rational;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A dispatch restricted to explicit matrices and their ordered products.
-pub(crate) fn applicable(state: &State, left: LogicalId, right: LogicalId) -> Result<bool, Fault> {
+pub(crate) fn applicable(
+    state: &State,
+    left: LogicalId,
+    right: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     for id in [left, right] {
         if matches!(
-            state.expression(id)?.operator,
+            state.expression(id, budget)?.operator,
             Operator::Matrix { .. } | Operator::MatrixMultiply
         ) {
             return Ok(true);
@@ -44,7 +49,7 @@ pub(crate) fn definition(state: &State, root: LogicalId, budget: &mut Budget) ->
         if !visited.insert(id) {
             continue;
         }
-        let term = state.expression(id)?;
+        let term = state.expression(id, budget)?;
         match term.operator {
             Operator::Matrix { .. } => {}
             Operator::MatrixMultiply => {
@@ -60,8 +65,12 @@ pub(crate) fn definition(state: &State, root: LogicalId, budget: &mut Budget) ->
 }
 
 /// Shape arithmetic is checked before allocating; no unused empty axis is traversed.
-pub(crate) fn shape(state: &State, id: LogicalId) -> Result<(u32, u32), Fault> {
-    match &state.expression(id)?.sort {
+pub(crate) fn shape(
+    state: &State,
+    id: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<(u32, u32), Fault> {
+    match &state.expression(id, budget)?.sort {
         Sort::Value(AtomicSort::Matrix {
             field: Field::Real,
             rows: Extent::Literal(rows),
@@ -78,7 +87,7 @@ pub(crate) fn equal(
     right: LogicalId,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    if shape(state, left)? != shape(state, right)? {
+    if shape(state, left, budget)? != shape(state, right, budget)? {
         return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
     }
     let first = expand(state, left, budget)?;
@@ -142,7 +151,7 @@ pub(super) fn expand(
         if values.contains_key(&id) {
             continue;
         }
-        let term = state.expression(id)?;
+        let term = state.expression(id, budget)?;
         let composite = matches!(term.operator, Operator::MatrixMultiply);
         if composite && !expanded {
             budget.check(
@@ -179,8 +188,8 @@ fn expand_node(
     values: &BTreeMap<LogicalId, Vec<Fraction>>,
     budget: &mut Budget,
 ) -> Result<Vec<Fraction>, Fault> {
-    let term = state.expression(id)?;
-    let (rows, columns) = shape(state, id)?;
+    let term = state.expression(id, budget)?;
+    let (rows, columns) = shape(state, id, budget)?;
     let count = crate::readings::affine::length(rows, columns)?;
     budget.check(BudgetKind::MatrixEntries, size(count, AT)?, AT)?;
     budget.check(
@@ -207,7 +216,7 @@ fn expand_node(
             let [left, right] = term.operands.as_slice() else {
                 return Err(fragment());
             };
-            let (_, inner) = shape(state, *left)?;
+            let (_, inner) = shape(state, *left, budget)?;
             let first = values.get(left).ok_or_else(fragment)?;
             let second = values.get(right).ok_or_else(fragment)?;
             for position in 0..count {

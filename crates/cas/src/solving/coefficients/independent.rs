@@ -16,11 +16,7 @@ pub(crate) fn object(
     scope: &Scope,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let index = *cas
-        .state
-        .indices
-        .get(&cas.checked(handle)?)
-        .ok_or_else(invalid)?;
+    let index = cas.state.index(cas.checked(handle, budget)?, budget)?;
     let mut pending = vector(1, budget)?;
     pending.push(index);
     let mut seen = vector(0, budget)?;
@@ -60,11 +56,11 @@ pub(crate) fn surroundings(
     scope: &Scope,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let local = cas.state.context(cas.checked(context)?)?;
+    let local = cas.state.context(cas.checked(context, budget)?, budget)?;
     let mut parent = local.parent;
     while let Some(id) = parent {
         budget.work(1, AT)?;
-        let frame = cas.state.context(id)?;
+        let frame = cas.state.context(id, budget)?;
         for (_, predicate) in frame.frame.iter().chain(&frame.assumptions) {
             object(cas, &cas.handle(*predicate), scope, budget)?;
         }
@@ -86,7 +82,7 @@ pub(crate) fn conditions(
         if hypothesis.context != *context && hypothesis.slot != 0 {
             object(
                 cas,
-                &crate::context_check::predicate(cas, hypothesis)?,
+                &crate::context_check::predicate(cas, hypothesis, budget)?,
                 scope,
                 budget,
             )?;

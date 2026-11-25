@@ -11,8 +11,12 @@ use nrz_cas::syntax::{Draft, Operator, PredicateKind};
 use nrz_cas::{Handle, Rational, Reference};
 
 fn positive_family(case: &mut Fixture) -> TestResult {
-    let header = case.cas.context_header(&case.context)?;
-    let domain = case.cas.admissible_region(&case.context)?;
+    let header = case
+        .cas
+        .context_header(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
+    let domain = case
+        .cas
+        .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
     let mut assumptions = Vec::new();
     for name in ["C", "L"] {
         let term = case.symbol(name)?;
@@ -235,6 +239,8 @@ fn normalization_resource_measurements() -> TestResult {
         keys.usage().work,
         u64::try_from(key.as_bytes().len())?,
     ];
-    assert_eq!(row, [573_160, 683_997, 1_882, 158_429, 4_168]);
+    // Previous proof/replay Work 573160/683997; each adds 8 retained kinds
+    // + 8 identity insertions + 8 vertex admissions = 24. Key is unchanged.
+    assert_eq!(row, [573_184, 684_021, 1_882, 158_429, 4_168]);
     Ok(())
 }

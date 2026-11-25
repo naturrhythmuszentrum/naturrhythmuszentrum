@@ -38,7 +38,7 @@ pub(crate) fn construct(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<Construction, Fault> {
-    let form = cas.state.source_form(source)?.clone();
+    let form = cas.state.source_form(source, budget)?.clone();
     let mut build = Build {
         reached: form.domain,
         conditions: ScopedConditions::default(),
@@ -158,6 +158,7 @@ impl Build {
                         .first()
                         .ok_or_else(invalid)?
                         .logical_id(),
+                    budget,
                 )?
                 .sort
                 .clone(),

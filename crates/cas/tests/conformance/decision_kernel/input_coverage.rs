@@ -65,7 +65,9 @@ fn family(mapped: bool) -> TestResult<(Fixture, RationalEnclosure)> {
     ];
     request.target = target.clone();
     request.context = context.clone();
-    request.input_family = source.cas.admissible_region(&context)?;
+    request.input_family = source
+        .cas
+        .admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?;
     request.lower = records[3].lower.clone();
     request.upper = records[3].upper.clone();
     let input_family = request.input_family.clone();
@@ -83,7 +85,7 @@ fn family(mapped: bool) -> TestResult<(Fixture, RationalEnclosure)> {
 /// ´claim:cas:decision-kernel-family-coverage-baseline´
 #[test]
 fn decision_kernel_family_coverage_baseline() -> TestResult {
-    baseline(false, [1264, 1263])
+    baseline(false, [1280, 1279])
 }
 
 /// An affine expression still lacks the source premise and authenticated reading definition.
@@ -91,7 +93,7 @@ fn decision_kernel_family_coverage_baseline() -> TestResult {
 /// ´claim:cas:decision-kernel-mapped-coverage-baseline´
 #[test]
 fn decision_kernel_mapped_coverage_baseline() -> TestResult {
-    baseline(true, [3474, 3473])
+    baseline(true, [3490, 3489])
 }
 
 /// Measure a fresh store's refusal, preserving prior Work and every graph record.

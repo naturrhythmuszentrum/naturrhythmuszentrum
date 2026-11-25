@@ -133,8 +133,12 @@ impl Cas {
     ///
     /// # Errors
     /// Refuses a foreign handle or a handle of another vertex kind.
-    pub fn series_object(&self, handle: &Handle) -> Result<&SeriesObject<Handle>, Fault> {
-        match self.state.node(self.checked(handle)?)? {
+    pub fn series_object(
+        &self,
+        handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<&SeriesObject<Handle>, Fault> {
+        match self.state.node(self.checked(handle, budget)?, budget)? {
             Vertex::SeriesObject(value) => Ok(value),
             _ => Err(Fault::invalid(InvalidCode::Reference, AT)),
         }
@@ -150,8 +154,9 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         draft.preflight(budget)?;
-        let value = draft
-            .resolve(&mut |reference| Ok(self.handle(self.resolve(state, reference, locals)?)))?;
+        let value = draft.resolve(&mut |reference| {
+            Ok(self.handle(self.resolve(state, reference, locals, budget)?))
+        })?;
         validate(state, &value, budget)?;
         let count = value.references().count();
         budget.work(size(count, AT)?, AT)?;
@@ -180,20 +185,20 @@ impl Cas {
 fn validate(state: &State, value: &SeriesObject<Handle>, budget: &mut Budget) -> Result<(), Fault> {
     budget.specialized(BudgetKind::JetOrder, u64::from(value.order - 1), false, AT)?;
     budget.specialized(BudgetKind::JetEntries, u64::from(value.order), true, AT)?;
-    let Vertex::Solve(field) = state.node(value.field.logical_id())? else {
+    let Vertex::Solve(field) = state.node(value.field.logical_id(), budget)? else {
         return Err(Fault::invalid(InvalidCode::Reference, AT));
     };
     let SolveDraft::CoefficientDomain(field) = field.as_ref() else {
         return Err(Fault::invalid(InvalidCode::Reference, AT));
     };
     let mut supported = matches!(field, CoefficientDomainData::Rational);
-    let context = state.context(value.context.logical_id())?;
+    let context = state.context(value.context.logical_id(), budget)?;
     let header = context.header_id;
-    let region = state.region(context.admissible)?;
+    let region = state.region(context.admissible, budget)?;
     if region.scope != value.scope {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
-    let variable = state.expression(value.variable.logical_id())?;
+    let variable = state.expression(value.variable.logical_id(), budget)?;
     if variable.header != header || variable.scope != value.scope {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
@@ -204,7 +209,7 @@ fn validate(state: &State, value: &SeriesObject<Handle>, budget: &mut Budget) ->
     }
     for reference in std::iter::once(&value.centre).chain(value.coefficients.iter()) {
         budget.work(1, AT)?;
-        let expression = state.expression(reference.logical_id())?;
+        let expression = state.expression(reference.logical_id(), budget)?;
         if expression.header != header || expression.scope != value.scope {
             return Err(Fault::invalid(InvalidCode::Scope, AT));
         }
@@ -243,7 +248,10 @@ fn independent(
     }
     // Admitted rational literals have no semantic children. Preserve their
     // existing admission schedule without constructing a traversal workspace.
-    if matches!(state.expression(root)?.operator, Operator::Rational(_)) {
+    if matches!(
+        state.expression(root, budget)?.operator,
+        Operator::Rational(_)
+    ) {
         return Ok(());
     }
     budget.work(64, AT)?;
@@ -260,7 +268,7 @@ fn independent_walk(
     variable: LogicalId,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let coordinate = state.expression(variable)?;
+    let coordinate = state.expression(variable, budget)?;
     let Operator::Free(key) = &coordinate.operator else {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     };
@@ -272,7 +280,7 @@ fn independent_walk(
     while let Some((id, depth)) = pending.pop() {
         budget.work(1, AT)?;
         budget.check(BudgetKind::Depth, depth, AT)?;
-        let node = state.node(id)?;
+        let node = state.node(id, budget)?;
         if let Vertex::Expression(expression) = node {
             if let Operator::Free(name) = &expression.operator {
                 budget.work(size(name.len().max(key.len()), AT)?, AT)?;

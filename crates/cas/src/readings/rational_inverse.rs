@@ -161,7 +161,7 @@ fn rational(cas: &Cas, value: &Handle, budget: &mut Budget) -> Result<Rational, 
 
 /// Remove the homogeneous row only after checking its native representation.
 fn extract(cas: &Cas, root: &Handle, count: u32, budget: &mut Budget) -> Result<AffineMap, Fault> {
-    let term = cas.state.expression(cas.checked(root)?)?;
+    let term = cas.state.expression(cas.checked(root, budget)?, budget)?;
     if !matches!(term.operator, Operator::Matrix { .. }) {
         return Err(invalid(InvalidCode::ReadingDefinition));
     }

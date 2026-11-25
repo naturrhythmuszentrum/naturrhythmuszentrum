@@ -43,7 +43,7 @@ pub(super) fn expected(
     let subject = if relation { &n } else { &q };
     for (strict, handle) in [(false, &family.lower), (true, &family.upper)] {
         if let Some(handle) = handle {
-            let endpoint = affine::get(values, cas.checked(handle)?)?;
+            let endpoint = affine::get(values, cas.checked(handle, budget)?)?;
             range(&mut result, subject, endpoint, strict, budget)?;
         }
     }
@@ -72,7 +72,7 @@ pub(super) fn reservation(
         .saturating_mul(2_048)
         .saturating_add(1_024);
     for endpoint in [&family.lower, &family.upper].into_iter().flatten() {
-        for coefficient in affine::get(values, cas.checked(endpoint)?)? {
+        for coefficient in affine::get(values, cas.checked(endpoint, budget)?)? {
             budget.work(1, AT)?;
             bytes = bytes.saturating_add(number_bytes(coefficient).saturating_mul(4));
         }

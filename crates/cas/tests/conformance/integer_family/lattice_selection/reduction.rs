@@ -110,7 +110,7 @@ fn lattice_reduced_skew() -> TestResult {
         citations
             .last()
             .ok_or("missing citation")?
-            .auxiliary_schema(&receiver)?
+            .auxiliary_schema(&receiver, &mut crate::testing::budgets::graph_budget()?)?
             .ok_or("missing schema")?
             .name,
         "decision.lattice-reduced-nearest-selection"
@@ -234,22 +234,22 @@ struct Costs {
 /// Original skew followed by its simultaneous reduced-coordinate ties.
 const COSTS: [Costs; 2] = [
     Costs {
-        proof: 695_582,
-        replay: 1_652_636,
-        preparation: 311_228,
-        outputs: 132_441,
-        identity_replay: 205_491,
+        proof: 695_879,
+        replay: 1_653_410,
+        preparation: 311_513,
+        outputs: 132_555,
+        identity_replay: 205_676,
         selection_bytes: 4_905,
         selection_records: 83,
         identity_bytes: 1_604,
         identity_records: 33,
     },
     Costs {
-        proof: 684_538,
-        replay: 1_634_489,
-        preparation: 303_578,
-        outputs: 130_563,
-        identity_replay: 200_146,
+        proof: 684_835,
+        replay: 1_635_257,
+        preparation: 303_863,
+        outputs: 130_677,
+        identity_replay: 200_325,
         selection_bytes: 4_853,
         selection_records: 82,
         identity_bytes: 1_554,

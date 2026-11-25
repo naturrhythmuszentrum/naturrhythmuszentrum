@@ -59,7 +59,15 @@ impl Cas {
         let previous = budget.restrict_storage(&self.limits);
         let result = self.prepare_constant_node(context, original, budget);
         budget.restore_limits(previous);
-        self.constant_preparation(result?)
+        let index = result?;
+        let Some(crate::graph::Vertex::AnonymousLemma(node)) = self.state.graph.node_weight(index)
+        else {
+            return Err(Fault::invalid(crate::error::InvalidCode::Reference, AT));
+        };
+        let crate::graph::AnonymousLemma::Constant(node) = node.as_ref() else {
+            return Err(Fault::invalid(crate::error::InvalidCode::Reference, AT));
+        };
+        Ok(&node.constant)
     }
 }
 

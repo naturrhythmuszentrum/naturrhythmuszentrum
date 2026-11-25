@@ -83,7 +83,7 @@ pub(super) fn candidate(
 /// ´claim:matrix:lattice-live-costs´
 #[test]
 fn lattice_live_costs() -> TestResult {
-    for (kind, work_limits) in [(0, [65_971, 65_970]), (1, [30_747, 30_746])] {
+    for (kind, work_limits) in [(0, [66_028, 66_027]), (1, [30_785, 30_784])] {
         for (position, work) in work_limits.into_iter().enumerate() {
             lifecycle(kind, work, position == 0)?;
         }
@@ -143,7 +143,7 @@ fn lifecycle(kind: u8, work: u64, accepted: bool) -> TestResult {
         assert_eq!(budget.usage().work - current, 34);
     }
     assert_eq!(budget.usage().work, work);
-    assert_eq!(preparation - 17, if kind == 0 { 65_265 } else { 29_721 });
+    assert_eq!(preparation - 17, if kind == 0 { 65_322 } else { 29_759 });
     assert_eq!(publication - preparation, if kind == 0 { 225 } else { 289 });
     assert_eq!(current - publication, if kind == 0 { 429 } else { 685 });
     assert_eq!(heap.provenance_usage(), before);

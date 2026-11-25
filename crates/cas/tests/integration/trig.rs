@@ -84,7 +84,12 @@ fn trig_original_occurrences() -> TestResult {
         let nodes = f.cas.operands(&output, &mut default_budget()?)?;
         assert_eq!(nodes.len(), 2);
         assert_eq!(nodes[0], nodes[1]);
-        assert_eq!(f.cas.expression(&nodes[0])?.0, &operator);
+        assert_eq!(
+            f.cas
+                .expression(&nodes[0], &mut crate::testing::budgets::graph_budget()?)?
+                .0,
+            &operator
+        );
         let quotient = f
             .cas
             .operands(&nodes[0], &mut default_budget()?)?

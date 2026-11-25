@@ -51,7 +51,7 @@ impl CompanionReading {
             u32::try_from(law.targets()[0].entries().len()).map_err(|_| ReadingError::Shape)?;
         let columns =
             u32::try_from(law.targets()[1].entries().len()).map_err(|_| ReadingError::Shape)?;
-        if header != cas.context_header(&parameters.context)?
+        if header != cas.context_header(&parameters.context, budget)?
             || support::shape(&sort)? != [rows, columns]
         {
             return Err(ReadingError::Shape.into());

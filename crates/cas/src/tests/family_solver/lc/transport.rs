@@ -35,6 +35,7 @@ impl Transport {
 }
 
 fn fixture() -> TestResult<Transport> {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut source, request) = super::fixture::request([1, 1], true)?;
     let crate::request::Outcome::Solved { answer, .. } = source.cas.run(&request) else {
         return Err("LC scalar transport baseline".into());
@@ -63,8 +64,11 @@ fn fixture() -> TestResult<Transport> {
             _ => None,
         })
         .ok_or("LC product sign")?;
-    let (_, [subject]) =
-        crate::solving::elementary::evidence::predicate(&source.cas, predicate.logical_id())?
+    let (_, [subject]) = crate::solving::elementary::evidence::predicate(
+        &source.cas,
+        predicate.logical_id(),
+        &mut budget,
+    )?
     else {
         return Err("LC positive product".into());
     };
@@ -72,8 +76,11 @@ fn fixture() -> TestResult<Transport> {
     let crate::request::Task::Solve(specification) = &request.task else {
         return Err("LC solve request".into());
     };
-    let problem =
-        crate::solving::graph::problem(&source.cas.state, specification.problem.logical_id())?;
+    let problem = crate::solving::graph::problem(
+        &source.cas.state,
+        specification.problem.logical_id(),
+        &mut budget,
+    )?;
     let domain = problem.coefficient_domain.clone();
     let region = problem.region.clone();
     Ok(Transport {

@@ -195,7 +195,7 @@ fn large_inputs() -> TestResult<(nrz_cas::Cas, Vec<nrz_cas::Handle>)> {
 #[test]
 fn trig_values_borrowed_early_exits() -> TestResult {
     use nrz_cas::Location;
-    use nrz_cas::limits::{Budget, BudgetKind, Limits};
+    use nrz_cas::limits::{BudgetKind, Limits};
     let (mut cas, inputs) = large_inputs()?;
     let snapshot = cas.canonical_snapshot(&mut default_budget()?)?;
     for input in inputs {
@@ -207,7 +207,7 @@ fn trig_values_borrowed_early_exits() -> TestResult {
                 } else {
                     Vec::new()
                 };
-                let mut budget = Budget::new(Limits {
+                let mut budget = nrz_cas::limits::Budget::new(Limits {
                     work,
                     staged_payload_bytes: staging,
                     ..Limits::default()
@@ -258,8 +258,10 @@ fn accept(f: &mut Fixture) -> TestResult {
     assert_eq!(witness.hypotheses().len(), 1);
     assert!(!witness.is_unconditional());
     assert_eq!(
-        f.cas
-            .statement_hypothesis_kind(&witness.judgment().statement)?,
+        f.cas.statement_hypothesis_kind(
+            &witness.judgment().statement,
+            &mut crate::testing::budgets::graph_budget()?
+        )?,
         HypothesisKind::Equality
     );
     Ok(())

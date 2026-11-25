@@ -74,7 +74,7 @@ pub(crate) fn dependencies(
             )?;
             budget.work(1, AT)?;
             edges.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
-            edges.push((cas.checked(&value.definition)?, Edge::DependsOn));
+            edges.push((cas.checked(&value.definition, budget)?, Edge::DependsOn));
         }
         if let ScalarKernelLaw::Family(input) = &record.law {
             budget.check(
@@ -89,7 +89,7 @@ pub(crate) fn dependencies(
                 &input.family.premises[0].context,
                 &input.family.premises[1].context,
             ] {
-                edges.push((cas.checked(handle)?, Edge::DependsOn));
+                edges.push((cas.checked(handle, budget)?, Edge::DependsOn));
             }
         }
     }

@@ -44,8 +44,8 @@ impl Cas {
         map: &AxisMap,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let root = self.checked(root)?;
-        crate::descriptor::metadata(&self.state, root)?;
+        let root = self.checked(root, budget)?;
+        crate::descriptor::metadata(&self.state, root, budget)?;
         let mapping = Mapping::validate(self, map, budget)?;
         self.transaction(budget, |candidate, budget| {
             let output = mapping.transform(candidate, root, budget)?;
@@ -78,7 +78,7 @@ impl Mapping {
             result.header(cas, *left, *right, budget)?;
         }
         for (left, right) in &result.spaces {
-            result.space(cas, *left, *right)?;
+            result.space(cas, *left, *right, budget)?;
         }
         Ok(result)
     }
@@ -91,8 +91,8 @@ impl Mapping {
         right: LogicalId,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        let old = cas.state.header(left)?;
-        let new = cas.state.header(right)?;
+        let old = cas.state.header(left, budget)?;
+        let new = cas.state.header(right, budget)?;
         let mut expected = old.environment.environment().clone();
         for declaration in &mut expected.declarations {
             budget.work(1, AT)?;
@@ -131,9 +131,15 @@ impl Mapping {
     }
 
     /// A space keeps its declared family and field; its transformed interval is checked later.
-    fn space(&self, cas: &Cas, left: LogicalId, right: LogicalId) -> Result<(), Fault> {
-        let old = cas.state.space(left)?;
-        let new = cas.state.space(right)?;
+    fn space(
+        &self,
+        cas: &Cas,
+        left: LogicalId,
+        right: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        let old = cas.state.space(left, budget)?;
+        let new = cas.state.space(right, budget)?;
         if self.headers.get(&old.header) != Some(&new.header)
             || self.key(&old.coordinate) != new.coordinate
             || old.field != new.field
@@ -159,7 +165,7 @@ impl Mapping {
                 continue;
             }
             let mut children = crate::descriptor::children(&cas.state, id, budget)?;
-            if let Vertex::Region(region) = cas.state.node(id)?
+            if let Vertex::Region(region) = cas.state.node(id, budget)?
                 && let AmbientDomain::Product { coordinates } = &region.ambient
             {
                 children.push((
@@ -193,17 +199,17 @@ impl Mapping {
         mapped: &BTreeMap<LogicalId, Handle>,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        if let Vertex::Solve(value) = cas.state.node(id)? {
+        if let Vertex::Solve(value) = cas.state.node(id, budget)? {
             let value = value.clone();
             return self.solve_node(cas, &value, mapped, budget);
         }
-        let (header, scope) = crate::descriptor::metadata(&cas.state, id)?;
-        let header = cas.handle(*self.headers.get(&header).ok_or_else(invalid)?);
+        let (original_header, scope) = crate::descriptor::metadata(&cas.state, id, budget)?;
+        let header = cas.handle(*self.headers.get(&original_header).ok_or_else(invalid)?);
         let scope: Scope = scope
             .iter()
             .map(|frame| frame.iter().map(|sort| self.atomic(sort)).collect())
             .collect();
-        let operator = match cas.state.node(id)? {
+        let operator = match cas.state.node(id, budget)? {
             Vertex::Expression(value) => Some(self.operator(&value.operator)),
             _ => None,
         };
@@ -214,7 +220,15 @@ impl Mapping {
                 .map(Reference::Existing)
                 .ok_or_else(invalid)
         };
-        let mut draft = crate::substitution_draft::rebuild(cas, id, scope, operator, &mut resolve)?;
+        let vertex = cas.state.node(id, budget)?;
+        let mut draft = crate::substitution_draft::rebuild(
+            cas,
+            vertex,
+            original_header,
+            scope,
+            operator,
+            &mut resolve,
+        )?;
         self.reheader(&mut draft, &header)?;
         if let Draft::Region(region) | Draft::FamilyRegion { region, .. } = &mut draft
             && let AmbientDomain::Product { coordinates } = &mut region.ambient
@@ -225,7 +239,7 @@ impl Mapping {
                 .ok_or_else(invalid)?;
         }
         let output = crate::case_syntax::admit(cas, draft, budget)?;
-        self.check_output(cas, id, output.logical_id())?;
+        self.check_output(cas, id, output.logical_id(), budget)?;
         Ok(output)
     }
 
@@ -319,15 +333,21 @@ impl Mapping {
     }
 
     /// Exact mapped intervals and expression spaces must match the supplied target identities.
-    fn check_output(&self, cas: &Cas, old: LogicalId, new: LogicalId) -> Result<(), Fault> {
-        match cas.state.node(old)? {
+    fn check_output(
+        &self,
+        cas: &Cas,
+        old: LogicalId,
+        new: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<(), Fault> {
+        match cas.state.node(old, budget)? {
             Vertex::Space(_) if self.spaces.get(&old) != Some(&new) => return Err(invalid()),
             Vertex::Expression(value) => {
                 let expected = value
                     .space
                     .map(|id| self.spaces.get(&id).copied().ok_or_else(invalid))
                     .transpose()?;
-                if cas.state.expression(new)?.space != expected {
+                if cas.state.expression(new, budget)?.space != expected {
                     return Err(invalid());
                 }
             }
@@ -420,8 +440,8 @@ fn identities(
     let mut targets = BTreeSet::new();
     for (left, right) in pairs {
         budget.work(size(pairs.len(), AT)?, AT)?;
-        let left = cas.checked(left)?;
-        let right = cas.checked(right)?;
+        let left = cas.checked(left, budget)?;
+        let right = cas.checked(right, budget)?;
         if result.insert(left, right).is_some() || !targets.insert(right) {
             return Err(invalid());
         }

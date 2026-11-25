@@ -24,15 +24,15 @@ pub(crate) fn retained_option(
     context: &Handle,
     budget: &mut Budget,
 ) -> Result<Option<(LogicalId, LogicalId)>, Fault> {
-    let frame = cas.state.context(cas.checked(context)?)?;
+    let frame = cas.state.context(cas.checked(context, budget)?, budget)?;
     let Some(introduction) = frame.introduction else {
         return Ok(None);
     };
     budget.work(4, AT)?;
-    let Vertex::Proof(application) = cas.state.node(introduction)? else {
+    let Vertex::Proof(application) = cas.state.node(introduction, budget)? else {
         return Err(invalid());
     };
-    let Vertex::ScopedApplication(proof) = cas.state.node(*application)? else {
+    let Vertex::ScopedApplication(proof) = cas.state.node(*application, budget)? else {
         return Err(invalid());
     };
     let Certificate::Decision(evidence) = &proof.certificate else {
@@ -58,7 +58,9 @@ pub(crate) fn check(
     let Some((function, association)) = retained_option(cas, &draft.context, budget)? else {
         return Ok(None);
     };
-    let frame = cas.state.context(cas.checked(&draft.context)?)?;
+    let frame = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
     let Statement::Equality {
         left,
         right,
@@ -70,7 +72,7 @@ pub(crate) fn check(
     };
     if left.logical_id() != function
         || domain.logical_id() != frame.admissible
-        || cas.checked(right)? != cas.state.arm(association)?.value
+        || cas.checked(right, budget)? != cas.state.arm(association, budget)?.value
     {
         return Err(invalid());
     }
@@ -121,13 +123,17 @@ pub(crate) fn undefined(
     if region.logical_id()
         != cas
             .state
-            .context(cas.checked(&request.context)?)?
+            .context(cas.checked(&request.context, budget)?, budget)?
             .admissible
-        || cas.state.occurrence(cas.checked(&input.root)?)?.expression != function
+        || cas
+            .state
+            .occurrence(cas.checked(&input.root, budget)?, budget)?
+            .expression
+            != function
     {
         return Ok(false);
     }
-    let value = cas.state.arm(association)?.value;
+    let value = cas.state.arm(association, budget)?.value;
     let order = crate::case_syntax::order(cas, &[value], budget)?;
     let domains = crate::case_syntax::domains(cas, &order, region.logical_id(), budget)?;
     match crate::case_obligations::empty(cas, *domains.get(&value).ok_or_else(invalid)?, budget) {

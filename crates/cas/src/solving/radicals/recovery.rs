@@ -202,7 +202,7 @@ fn dependencies(
 ) -> Result<(), Fault> {
     if matches!(
         cas.state
-            .region(construction.region.logical_id())?
+            .region(construction.region.logical_id(), budget)?
             .expression,
         crate::domain_model::RegionExpr::Ambient
     ) {

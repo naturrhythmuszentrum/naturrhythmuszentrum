@@ -34,17 +34,17 @@ pub(super) fn matches(
     let Some((cas, root)) = original.graph() else {
         return Ok(false);
     };
-    let term = cas.state.expression(cas.checked(root)?)?;
+    let term = cas.state.expression(cas.checked(root, budget)?, budget)?;
     if term.operator != Operator::GeneralPower(Branch::StrictReal) {
         return Ok(false);
     }
     let [base, exponent] = term.operands.as_slice() else {
         return Ok(false);
     };
-    let Operator::Rational(base) = &cas.state.expression(*base)?.operator else {
+    let Operator::Rational(base) = &cas.state.expression(*base, budget)?.operator else {
         return Ok(false);
     };
-    let Operator::Rational(exponent) = &cas.state.expression(*exponent)?.operator else {
+    let Operator::Rational(exponent) = &cas.state.expression(*exponent, budget)?.operator else {
         return Ok(false);
     };
     let half = Rational::from_ratio(1, 2, budget)?;

@@ -24,10 +24,10 @@ fn parent_inclusion(
         if current == source {
             return Ok(true);
         }
-        match domain(&cas.state, current)? {
+        match domain(&cas.state, current, budget)? {
             CoefficientDomainData::Quotient { level } => {
                 let SolveDraft::ExtensionLevel(extension) =
-                    crate::solving::graph::object(&cas.state, level.logical_id())?
+                    crate::solving::graph::object(&cas.state, level.logical_id(), budget)?
                 else {
                     return Err(invalid());
                 };
@@ -36,7 +36,7 @@ fn parent_inclusion(
             CoefficientDomainData::Fraction { base, .. } => current = base,
             CoefficientDomainData::Gaussian => {
                 return Ok(matches!(
-                    domain(&cas.state, source)?,
+                    domain(&cas.state, source, budget)?,
                     CoefficientDomainData::Rational
                 ));
             }
@@ -59,14 +59,17 @@ fn parameters(
         if map.mode != MapMode::Specialization {
             return Err(invalid());
         }
-        let CoefficientDomainData::Fraction { base, .. } = domain(&cas.state, &map.source)? else {
+        let CoefficientDomainData::Fraction { base, .. } = domain(&cas.state, &map.source, budget)?
+        else {
             return Err(invalid());
         };
         let MapTarget::ScalarAmbient { field, .. } = &map.target else {
             return Err(invalid());
         };
-        if matches!(domain(&cas.state, base)?, CoefficientDomainData::Gaussian)
-            && *field != crate::model::Field::Complex
+        if matches!(
+            domain(&cas.state, base, budget)?,
+            CoefficientDomainData::Gaussian
+        ) && *field != crate::model::Field::Complex
         {
             return Err(invalid());
         }
@@ -79,7 +82,7 @@ fn parameters(
             return Err(invalid());
         }
         let SolveDraft::CoordinateSpace(product) =
-            crate::solving::graph::object(&cas.state, coordinates.logical_id())?
+            crate::solving::graph::object(&cas.state, coordinates.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -88,7 +91,7 @@ fn parameters(
         }
         for (image, coordinate) in map.images.iter().zip(&product.coordinates) {
             budget.work(crate::graph::size(coordinate.key.len(), AT)?, AT)?;
-            let expression = cas.state.expression(cas.checked(image)?)?;
+            let expression = cas.state.expression(cas.checked(image, budget)?, budget)?;
             if !matches!(&expression.operator, Operator::Free(key) if key == &coordinate.key)
                 || expression.header != product.header.logical_id()
             {
@@ -135,7 +138,7 @@ fn parent_map<'a>(
     let [image] = map.images.as_slice() else {
         return Err(invalid());
     };
-    let expression = cas.state.expression(cas.checked(image)?)?;
+    let expression = cas.state.expression(cas.checked(image, budget)?, budget)?;
     let (Operator::RootValue { slot }, Some(ExpressionAttachment::SelectedRoot(selected))) =
         (&expression.operator, &expression.attachment)
     else {
@@ -144,7 +147,7 @@ fn parent_map<'a>(
     let selection_handle = cas.handle(*selected);
     existence(&selection_handle, &map.region, premises, budget)?;
     let SolveDraft::RootSelection(selection) =
-        crate::solving::graph::object(&cas.state, *selected)?
+        crate::solving::graph::object(&cas.state, *selected, budget)?
     else {
         return Err(invalid());
     };
@@ -153,12 +156,12 @@ fn parent_map<'a>(
         .get(usize::try_from(*slot).map_err(|_| invalid())?)
         .ok_or_else(invalid)?;
     let SolveDraft::RootRelation(relation) =
-        crate::solving::graph::object(&cas.state, relation_handle.logical_id())?
+        crate::solving::graph::object(&cas.state, relation_handle.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     let SolveDraft::ExtensionLevel(extension) =
-        crate::solving::graph::object(&cas.state, level.logical_id())?
+        crate::solving::graph::object(&cas.state, level.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -166,7 +169,7 @@ fn parent_map<'a>(
         return Err(invalid());
     }
     let SolveDraft::CoefficientMap(parent) =
-        crate::solving::graph::object(&cas.state, relation.map.logical_id())?
+        crate::solving::graph::object(&cas.state, relation.map.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -208,7 +211,7 @@ pub(crate) fn check(
             if let MapTarget::CoefficientDomain { domain: target } = &current.target {
                 return coefficient_target(cas, current, target, premises, budget);
             }
-            match domain(&cas.state, &current.source)? {
+            match domain(&cas.state, &current.source, budget)? {
                 CoefficientDomainData::Rational | CoefficientDomainData::Gaussian => {
                     return super::proof::ground_map(cas, current, budget);
                 }
@@ -246,7 +249,7 @@ fn coefficient_target(
             .map_err(|error| super::proof::fault(&error))?;
         return Ok(());
     }
-    let (_, extension) = crate::solving::towers::arithmetic::level(&engine)
+    let (_, extension) = crate::solving::towers::arithmetic::level(&engine, budget)
         .map_err(|error| super::proof::fault(&error))?;
     super::proof::defined(cas, &extension.polynomial, &map.region, premises, budget)?;
     for image in &map.images {

@@ -236,14 +236,14 @@ fn select(
     coordinates: &[String],
 ) -> Result<usize, SensitivityError> {
     let syntax = &original.original().syntax;
-    if graph.cas.expression(syntax)?.0 != &Operator::Call("sqrt".into()) {
+    if graph.cas.expression(syntax, &mut graph.budget)?.0 != &Operator::Call("sqrt".into()) {
         return Err(SensitivityError::UnsupportedRecipe);
     }
     let operands = graph.cas.operands(syntax, &mut graph.budget)?;
     let [operand] = operands.as_slice() else {
         return Err(SensitivityError::UnsupportedRecipe);
     };
-    let (Operator::Free(key), _) = graph.cas.expression(operand)? else {
+    let (Operator::Free(key), _) = graph.cas.expression(operand, &mut graph.budget)? else {
         return Err(SensitivityError::UnsupportedRecipe);
     };
     coordinates

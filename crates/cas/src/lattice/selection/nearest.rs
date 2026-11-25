@@ -44,7 +44,10 @@ pub(super) fn with_basis(
 ) -> Result<(), Fault> {
     let entries = &cas
         .state
-        .expression(cas.checked(&selection.cover.index.basis.basis)?)?
+        .expression(
+            cas.checked(&selection.cover.index.basis.basis, budget)?,
+            budget,
+        )?
         .operands;
     let slots = size(entries.len(), AT)?;
     budget.check(BudgetKind::MatrixEntries, slots, AT)?;
@@ -108,7 +111,7 @@ pub(super) fn cuts(
     }
     let half = Rational::from_ratio(1, 2, budget)?;
     for (coordinate, selected) in selection.values.iter().enumerate() {
-        let value = super::literal(cas, selected, &selection.cover.index.basis.context)?;
+        let value = super::literal(cas, selected, &selection.cover.index.basis.context, budget)?;
         let (lower, upper) = super::bounds(enclosure, coordinate)?;
         let lower = lower.add(&half, budget)?;
         let upper = upper.add(&half, budget)?;

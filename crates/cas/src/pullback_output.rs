@@ -19,7 +19,7 @@ pub(crate) fn check(
 ) -> Result<(), Fault> {
     crate::distribution_check::membership(
         cas,
-        cas.checked(&claim.result)?,
+        cas.checked(&claim.result, budget)?,
         &claim.target_space,
         &[],
         budget,
@@ -29,20 +29,25 @@ pub(crate) fn check(
     for zero in &evidence.zeros {
         expected += usize::from(contains(&target, &zero.point, budget)?);
     }
-    let actual = crate::distribution_linear::terms(cas, cas.checked(&claim.result)?, &[], budget)?;
+    let actual =
+        crate::distribution_linear::terms(cas, cas.checked(&claim.result, budget)?, &[], budget)?;
     if actual.len() != expected {
         return Err(invalid());
     }
     let mut seen = std::collections::BTreeSet::new();
     for (term, coefficient) in actual.values() {
-        let term = cas
-            .state
-            .expression(cas.checked(term.as_ref().ok_or_else(invalid)?)?)?;
+        let term = cas.state.expression(
+            cas.checked(term.as_ref().ok_or_else(invalid)?, budget)?,
+            budget,
+        )?;
         if term.operator != (Operator::Delta { order: 0 }) {
             return Err(invalid());
         }
-        let point =
-            crate::distribution_check::rational(cas, *term.operands.first().ok_or_else(invalid)?)?;
+        let point = crate::distribution_check::rational(
+            cas,
+            *term.operands.first().ok_or_else(invalid)?,
+            budget,
+        )?;
         budget.work(size(evidence.zeros.len(), AT)?.saturating_mul(128), AT)?;
         let zero = evidence
             .zeros

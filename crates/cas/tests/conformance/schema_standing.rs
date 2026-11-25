@@ -41,7 +41,10 @@ fn formal_register_standing_is_complete() {
 
 /// Introduce two distinct root assumptions without changing their original predicate identities.
 fn assume_pair(fixture: &mut Fixture) -> TestResult {
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let mut assumptions = Vec::new();
     for (key, kind, subject) in [
         ("x-positive", PredicateKind::Positive, fixture.x.clone()),
@@ -115,7 +118,13 @@ fn steps(fixture: &mut Fixture) -> TestResult<Vec<ApplicationDraft>> {
 fn labels(cas: &Cas, witness: &VerifiedWitness) -> TestResult<Vec<&'static str>> {
     let mut result = Vec::new();
     for reference in witness.hypotheses() {
-        result.push(reference.qualified(cas)?.kind.formal_schema().label);
+        result.push(
+            reference
+                .qualified(cas, &mut crate::testing::budgets::graph_budget()?)?
+                .kind
+                .formal_schema()
+                .label,
+        );
     }
     Ok(result)
 }

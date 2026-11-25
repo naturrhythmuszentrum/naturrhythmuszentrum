@@ -23,7 +23,7 @@ pub(crate) fn check(
         pending.push(expression);
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            let value = cas.state.expression(id)?;
+            let value = cas.state.expression(id, budget)?;
             match (&value.operator, &value.attachment) {
                 (
                     Operator::Rational(_)
@@ -47,7 +47,7 @@ pub(crate) fn check(
                     Some(ExpressionAttachment::ExactCoefficient { value, map }),
                 ) => {
                     let SolveDraft::CoefficientMap(mapping) =
-                        crate::solving::graph::object(&cas.state, *map)?
+                        crate::solving::graph::object(&cas.state, *map, budget)?
                     else {
                         return Err(invalid());
                     };
@@ -97,7 +97,7 @@ fn explicit(
                 predicate,
             } if domain == region => {
                 if let (crate::model::PredicateKind::Defined, [argument]) =
-                    super::evidence::predicate(cas, predicate.logical_id())?
+                    super::evidence::predicate(cas, predicate.logical_id(), budget)?
                     && *argument == id
                 {
                     return Ok(());

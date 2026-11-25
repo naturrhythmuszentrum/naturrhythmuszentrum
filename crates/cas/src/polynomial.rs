@@ -373,7 +373,7 @@ fn convert_mode(
         if values.contains_key(&id) {
             continue;
         }
-        let term = state.expression(id)?;
+        let term = state.expression(id, budget)?;
         let determinant = matches!(
             term.operator,
             Operator::MatrixMap(crate::model::MatrixOperation::Determinant)
@@ -611,7 +611,7 @@ fn materialize_fraction(
             *coefficient = coefficient.div(&scale, budget)?;
         }
     }
-    let expression = cas.state.expression(root)?;
+    let expression = cas.state.expression(root, budget)?;
     let context = expression.header;
     let sort = expression.sort.clone();
     let numerator = materialize(cas, context, &sort, &value.numerator, budget)?;
@@ -871,7 +871,7 @@ pub(crate) fn materialize_univariate(
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
     crate::univariate::validate(coefficients, budget)?;
-    let source = cas.state.expression(model)?;
+    let source = cas.state.expression(model, budget)?;
     let context = source.header;
     let sort = source.sort.clone();
     let mut value = Polynomial {

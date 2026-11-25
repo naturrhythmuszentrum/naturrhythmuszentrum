@@ -42,7 +42,7 @@ impl Rendering {
     pub(crate) fn new(cas: &Cas, map: &Handle, budget: &mut Budget) -> Result<Self, Fault> {
         budget.work(1, AT)?;
         let SolveDraft::CoefficientMap(data) =
-            crate::solving::graph::object(&cas.state, cas.checked(map)?)?
+            crate::solving::graph::object(&cas.state, cas.checked(map, budget)?, budget)?
         else {
             return Err(invalid());
         };
@@ -74,7 +74,7 @@ impl Rendering {
         }
         for (field, image) in polynomial.variables.iter().zip(images) {
             budget.work(1, AT)?;
-            let expression = cas.state.expression(cas.checked(image)?)?;
+            let expression = cas.state.expression(cas.checked(image, budget)?, budget)?;
             if (
                 field,
                 expression.header,

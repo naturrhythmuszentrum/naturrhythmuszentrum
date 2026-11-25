@@ -26,18 +26,18 @@ fn parameter(
     budget: &mut Budget,
 ) -> Result<Element, CoefficientFailure> {
     let CoefficientDomainData::Fraction { coordinates, .. } =
-        crate::solving::coefficients::storage::domain(engine.state, engine.domain)?
+        crate::solving::coefficients::storage::domain(engine.state, engine.domain, budget)?
     else {
         return Err(CoefficientFailure::Unsupported(
             SolveReason::CoefficientDomainUnavailable,
         ));
     };
     let crate::solving::SolveDraft::CoordinateSpace(frame) =
-        crate::solving::graph::object(engine.state, coordinates.logical_id())?
+        crate::solving::graph::object(engine.state, coordinates.logical_id(), budget)?
     else {
         return Err(invalid().into());
     };
-    let (ground, width, _) = engine.fraction_shape()?;
+    let (ground, width, _) = engine.fraction_shape(budget)?;
     budget.work(crate::graph::size(width, super::AT)?, super::AT)?;
     let slot = frame
         .coordinates
@@ -154,11 +154,12 @@ fn literal(
 ) -> Result<Dense, CoefficientFailure> {
     use crate::graph::ExpressionAttachment;
     use crate::solving::{MapTarget, SolveDraft};
-    let expression = cas.state.expression(id)?;
+    let expression = cas.state.expression(id, budget)?;
     let Some(ExpressionAttachment::ExactCoefficient { value, map }) = &expression.attachment else {
         return Err(unsupported());
     };
-    let SolveDraft::CoefficientMap(mapping) = crate::solving::graph::object(&cas.state, *map)?
+    let SolveDraft::CoefficientMap(mapping) =
+        crate::solving::graph::object(&cas.state, *map, budget)?
     else {
         return Err(invalid().into());
     };
@@ -197,13 +198,13 @@ pub(crate) fn expression(
     let mut values = vector(1, budget)?;
     while let Some((id, ready)) = pending.pop() {
         budget.work(1, super::AT)?;
-        if crate::solving::family::local(cas, id)? {
+        if crate::solving::family::local(cas, id, budget)? {
             values.push(crate::solving::family::polynomial::read(
                 cas, engine, id, unknown, region, budget,
             )?);
             continue;
         }
-        let current = cas.state.expression(id)?;
+        let current = cas.state.expression(id, budget)?;
         budget.check(BudgetKind::Depth, current.depth, super::AT)?;
         if !ready && !current.operands.is_empty() {
             reserve(
@@ -248,14 +249,14 @@ pub(crate) fn polynomial(
     problem: &SolveProblemData<crate::graph::Handle>,
     budget: &mut Budget,
 ) -> Result<Dense, CoefficientFailure> {
-    let coordinates = proof::coordinates(cas, &problem.unknowns)?;
+    let coordinates = proof::coordinates(cas, &problem.unknowns, budget)?;
     let [unknown] = coordinates.coordinates.as_slice() else {
         return Err(CoefficientFailure::Unsupported(
             SolveReason::GeneralNonlinearSystem,
         ));
     };
     let (PredicateKind::Equal, [left, right]) =
-        evidence::predicate(cas, problem.predicate.logical_id())?
+        evidence::predicate(cas, problem.predicate.logical_id(), budget)?
     else {
         return Err(unsupported());
     };

@@ -97,7 +97,7 @@ impl Cas {
         for root in roots {
             retained = retained.saturating_add(crate::proof_view::application_bytes(
                 self,
-                self.checked(root)?,
+                self.checked(root, budget)?,
                 budget,
             )?);
         }
@@ -110,7 +110,7 @@ impl Cas {
             ids.try_reserve_exact(roots.len())
                 .map_err(|_| Fault::allocation(AT))?;
             for root in roots {
-                let id = self.checked(root)?;
+                let id = self.checked(root, budget)?;
                 premises.push(crate::proof_view::application(self, id, budget)?);
                 ids.push(id);
             }

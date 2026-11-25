@@ -13,7 +13,12 @@ use nrz_scalar::ArithmeticContext;
 #[test]
 fn phasor_solve_publication_work_refusal_is_atomic() -> TestResult {
     let context = ArithmeticContext::new()?;
-    let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let publication = case.publication(&mut ledger()?)?;
     let mut budget = ledger()?;
     case.heap
@@ -24,7 +29,12 @@ fn phasor_solve_publication_work_refusal_is_atomic() -> TestResult {
         (needed - 1, 0, false),
         (needed, 1, false),
     ] {
-        let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+        let mut case = fixture::case(
+            -75.0_f64,
+            0.0,
+            false,
+            &mut fixture::resources::fresh_budget()?,
+        )?;
         let publication = case.publication(&mut ledger()?)?;
         let before = case.heap.descriptors.iter().count();
         let mut budget = Budget::new(Limits {
@@ -49,7 +59,12 @@ fn phasor_solve_publication_work_refusal_is_atomic() -> TestResult {
 /// ´test:unit:phasor-solve-publication-capacity-refusal-is-atomic´
 #[test]
 fn phasor_solve_publication_capacity_refusal_is_atomic() -> TestResult {
-    let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let publication = case.publication(&mut ledger()?)?;
     let before = case.heap.descriptors.iter().count();
     case.heap.limits.descriptors = before;
@@ -68,7 +83,12 @@ fn phasor_solve_publication_capacity_refusal_is_atomic() -> TestResult {
 #[test]
 fn phasor_solve_rechecks_every_companion_version() -> TestResult {
     for index in 0..16 {
-        let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+        let mut case = fixture::case(
+            -75.0_f64,
+            0.0,
+            false,
+            &mut fixture::resources::fresh_budget()?,
+        )?;
         let publication = case.publication(&mut ledger()?)?;
         let context = ArithmeticContext::new()?;
         let result = case
@@ -88,7 +108,7 @@ fn phasor_solve_rechecks_every_companion_version() -> TestResult {
 /// ´test:unit:phasor-solve-costs-are-pinned´
 #[test]
 fn phasor_solve_costs_are_pinned() -> TestResult {
-    let mut budget = fixture::budget()?;
+    let mut budget = fixture::resources::fresh_budget()?;
     let mut case = fixture::case(-75.0_f64, 0.0, false, &mut budget)?;
     let prepared = budget.usage().work;
     let solve = case.solve(
@@ -142,7 +162,7 @@ fn phasor_solve_costs_are_pinned() -> TestResult {
             restoration_cost
         ),
         (
-            [153_006, 220_493, 1_766_789, 1_775_896],
+            [153_126, 220_613, 1_767_214, 1_776_321],
             10_840,
             9603,
             336,
@@ -150,7 +170,7 @@ fn phasor_solve_costs_are_pinned() -> TestResult {
             5520,
             752_808,
             95_335,
-            1_836_699,
+            1_837_124,
             [756_904, 756_904],
             [26_002, 376, 5526, 95_499]
         )
@@ -220,18 +240,19 @@ fn phasor_solve_refuses_uncovered_fixed_components() -> TestResult {
 /// ´test:unit:phasor-fixed-zero-keeps-original-domain-guard´
 #[test]
 fn phasor_fixed_zero_keeps_original_domain_guard() -> TestResult {
-    let mut case = fixture::fixed_case(0, 0.0_f64, false, &mut fixture::budget()?)?;
+    let mut case =
+        fixture::fixed_case(0, 0.0_f64, false, &mut fixture::resources::fresh_budget()?)?;
     assert!(case.definition.fixed_inputs()[0].iter().all(|value| {
         value
             .as_ref()
             .is_some_and(nrz_bindings::readings::algebra::Rational::is_zero)
     }));
-    let publication = case.publication(&mut fixture::budget()?)?;
+    let publication = case.publication(&mut fixture::resources::fresh_budget()?)?;
     assert!(matches!(
         case.heap.publish_phasor_solve(
             &publication,
             &ArithmeticContext::new()?,
-            &mut fixture::budget()?
+            &mut fixture::resources::fresh_budget()?
         ),
         Err(crate::PhasorError::ZeroImpedance)
     ));

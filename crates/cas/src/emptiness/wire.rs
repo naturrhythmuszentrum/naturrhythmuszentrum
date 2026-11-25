@@ -96,7 +96,7 @@ pub(crate) fn measure(cas: &Cas, dag: &EmptinessDag, budget: &mut Budget) -> Res
         budget.check(BudgetKind::ProofNodes, size(dag.nodes.len(), AT)?, AT)?;
         let mut out = Encoder::new(budget, AT);
         encode(dag, &mut out, &mut |handle, out| {
-            cas.checked(handle)?;
+            cas.checked(handle, out.budget())?;
             crate::statement::handle(handle, out)
         })?;
         let bytes = size(out.finish().len(), AT)?.saturating_mul(32);

@@ -128,7 +128,7 @@ fn lc_driven_plan_shared_voltage_statistics() -> TestResult {
 /// Independent scalar rational oracles retain the signed cross block and shared source identity.
 fn nominal<P: Scalar + 'static>() -> TestResult {
     let mut case = setup::<P>(false, false)?;
-    let mut budget = super::budget()?;
+    let mut budget = super::fresh_budget()?;
     case.plan
         .execute(&mut case.heap, &case.context, &mut budget)?;
     assert_eq!(
@@ -162,7 +162,7 @@ fn nominal<P: Scalar + 'static>() -> TestResult {
     assert!(result.usage()[0].work > receipt[1].work);
     assert!(
         case.plan
-            .execute(&mut case.heap, &case.context, &mut super::budget()?)
+            .execute(&mut case.heap, &case.context, &mut super::fresh_budget()?)
             .is_err()
     );
     Ok(())
@@ -181,7 +181,7 @@ fn unavailable<P: Scalar + 'static>() -> TestResult {
     assert!(setup::<P>(false, true).is_err());
     let mut case = setup::<P>(true, false)?;
     case.plan
-        .execute(&mut case.heap, &case.context, &mut super::budget()?)?;
+        .execute(&mut case.heap, &case.context, &mut super::fresh_budget()?)?;
     assert_eq!(case.plan.status(), Status::Blocked, "{:?}", reasons(&case));
     assert_eq!(
         case.plan.driven().continuation(0),
@@ -217,7 +217,7 @@ fn lifetime<P: Scalar + 'static>() -> TestResult {
     for index in 0..4 {
         let mut case = setup::<P>(false, false)?;
         case.plan
-            .execute(&mut case.heap, &case.context, &mut super::budget()?)?;
+            .execute(&mut case.heap, &case.context, &mut super::fresh_budget()?)?;
         let target = if index < 3 {
             case.sources[index].clone()
         } else {
@@ -247,10 +247,13 @@ fn lifetime<P: Scalar + 'static>() -> TestResult {
 
 /// Literal scoped execution twins preserve deterministic current prefixes after a late statistical refusal.
 /// ´test:integration:lc-driven-plan-statistics-execution-boundaries´
+/// The scoped execution gains 360 receiving-store Work over unchanged operation Work: 124
+/// retained-kind counts, 112 identity insertions, 12 retained-kind insertions,
+/// and 112 vertex admissions. Lookup floors cancel their old graph counterparts.
 #[test]
 fn lc_driven_plan_statistics_execution_boundaries() -> TestResult {
     let work = [measure::<f32>()?, measure::<f64>()?];
-    assert_eq!(work, [[1_913_118, 4_136], [1_913_214, 4_144]]);
+    assert_eq!(work, [[1_913_478, 4_136], [1_913_574, 4_144]]);
     boundaries::<f32>(work[0][0])?;
     boundaries::<f64>(work[1][0])
 }
@@ -258,7 +261,7 @@ fn lc_driven_plan_statistics_execution_boundaries() -> TestResult {
 /// Declaration costs remain outside this scoped execution pin; fixed wrapper bytes exclude child owners.
 fn measure<P: Scalar + 'static>() -> TestResult<[u64; 2]> {
     let mut case = setup::<P>(false, false)?;
-    let mut budget = super::budget()?;
+    let mut budget = super::fresh_budget()?;
     case.plan
         .execute(&mut case.heap, &case.context, &mut budget)?;
     assert_eq!(
@@ -297,7 +300,7 @@ fn boundaries<P: Scalar + 'static>(work: u64) -> TestResult {
         }
         assert!(
             case.plan
-                .execute(&mut case.heap, &case.context, &mut super::budget()?)
+                .execute(&mut case.heap, &case.context, &mut super::fresh_budget()?)
                 .is_err()
         );
     }

@@ -76,24 +76,30 @@ impl Runner<'_> {
 
     /// Abs and ramp retain named first derivatives through an explicit almost-everywhere bridge.
     fn named_once(&mut self, input: &Handle) -> Result<(Handle, Handle), Fault> {
-        let value = self.cas.state.expression(input.logical_id())?;
+        let value = self
+            .cas
+            .state
+            .expression(input.logical_id(), self.generation)?;
         let step = value.operator == Operator::RegularEmbed
-            && value.operands.first().is_some_and(|id| self.cas.state.expression(*id).is_ok_and(|function|
+            && value.operands.first().is_some_and(|id| self.cas.state.expression(*id, self.generation).is_ok_and(|function|
                 matches!(&function.operator, Operator::NamedCase(name) if name.name == CaseName::Step)));
         let (output, proof) = if step {
             self.delta_primitive(input)?
         } else {
             self.once(input)?
         };
-        let Some(name) = named_target(self.cas, input)? else {
+        let Some(name) = named_target(self.cas, input, self.generation)? else {
             return Ok((output, proof));
         };
-        let domain = self
-            .cas
-            .handle(self.cas.state.space(self.space.logical_id())?.domain);
+        let domain = self.cas.handle(
+            self.cas
+                .state
+                .space(self.space.logical_id(), self.generation)?
+                .domain,
+        );
         let representative = self.cas.named_case(&domain, &name, self.generation)?;
         let (target, _) = self.embed(&representative)?;
-        let source = crate::distribution_ae::representative(self.cas, &output)?;
+        let source = crate::distribution_ae::representative(self.cas, &output, self.generation)?;
         let certificate = crate::distribution_ae::certificate(
             self.cas,
             &source,
@@ -146,8 +152,12 @@ impl Runner<'_> {
         &mut self,
         input: &Handle,
     ) -> Result<Option<(Handle, Handle)>, Fault> {
-        let function = crate::distribution_ae::representative(self.cas, input)?;
-        let definition = self.cas.state.space(self.space.logical_id())?.clone();
+        let function = crate::distribution_ae::representative(self.cas, input, self.generation)?;
+        let definition = self
+            .cas
+            .state
+            .space(self.space.logical_id(), self.generation)?
+            .clone();
         let mut classical = None;
         for proof in &self.premises {
             let application =
@@ -213,14 +223,18 @@ fn classical_endpoint(
 }
 
 /// Name recognition supplies an expanded candidate, never a trusted analytic shortcut.
-fn named_target(cas: &crate::graph::Cas, input: &Handle) -> Result<Option<NamedCase>, Fault> {
-    let value = cas.state.expression(input.logical_id())?;
+fn named_target(
+    cas: &crate::graph::Cas,
+    input: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<Option<NamedCase>, Fault> {
+    let value = cas.state.expression(input.logical_id(), budget)?;
     if value.operator != Operator::RegularEmbed {
         return Ok(None);
     }
     let function = cas
         .state
-        .expression(*value.operands.first().ok_or_else(invalid)?)?;
+        .expression(*value.operands.first().ok_or_else(invalid)?, budget)?;
     let Operator::NamedCase(name) = &function.operator else {
         return Ok(None);
     };
@@ -237,14 +251,18 @@ fn named_target(cas: &crate::graph::Cas, input: &Handle) -> Result<Option<NamedC
 }
 
 /// Both named and expanded producers are eligible before their completed proofs are compared.
-pub(crate) fn named(cas: &crate::graph::Cas, input: &Handle) -> Result<bool, Fault> {
-    let value = cas.state.expression(input.logical_id())?;
+pub(crate) fn named(
+    cas: &crate::graph::Cas,
+    input: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
+    let value = cas.state.expression(input.logical_id(), budget)?;
     if value.operator != Operator::RegularEmbed {
         return Ok(false);
     }
     Ok(matches!(
         cas.state
-            .expression(*value.operands.first().ok_or_else(invalid)?)?
+            .expression(*value.operands.first().ok_or_else(invalid)?, budget)?
             .operator,
         Operator::NamedCase(_)
     ))

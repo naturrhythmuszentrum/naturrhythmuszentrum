@@ -37,7 +37,7 @@ fn usage(measured: &BudgetUsage, kind: BudgetKind) -> TestResult<u64> {
     }
 }
 
-fn budget(boundary: Boundary, cap: u64) -> TestResult<Budget> {
+fn fresh_budget(boundary: Boundary, cap: u64) -> TestResult<Budget> {
     let mut limits = Limits::blind_cubic();
     match boundary.kind {
         BudgetKind::Work => limits.work = cap,
@@ -56,12 +56,13 @@ fn at_cap(
     cap: u64,
     expected_work: u64,
 ) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let bytes = super::answer::exported(cas, answer.facts.last().ok_or("presentation")?)?;
     let (mut fixture, coverage, presentation) =
         super::answer::receiver(cas, answer, &["d", "c", "b", "a"], field)?;
-    assert_eq!(fixture.cas.state.proof_count(), 0);
+    assert_eq!(fixture.cas.state.proof_count(&mut budget)?, 0);
     let before = fixture.cas.counts();
-    let mut ledger = budget(boundary, cap)?;
+    let mut ledger = self::fresh_budget(boundary, cap)?;
     let result = fixture
         .cas
         .replay_answer(&bytes, &coverage, &presentation, &mut ledger);
@@ -85,7 +86,7 @@ fn at_cap(
             "{fault:?}"
         );
         assert_eq!(fixture.cas.counts(), before);
-        assert_eq!(fixture.cas.state.proof_count(), 0);
+        assert_eq!(fixture.cas.state.proof_count(&mut budget)?, 0);
         assert!(ledger.usage().work > 0);
         assert!(ledger.usage().coefficient_ops > 0);
     }
@@ -95,8 +96,8 @@ fn at_cap(
 /// The receiver and replay ledger both retain the unchanged blind-cubic profile except the tested cap.
 pub(crate) fn check(field: &Field) -> TestResult {
     let (coefficient_ops, work) = match field {
-        Field::Complex => (2_940_416, 381_017_101),
-        Field::Real => (2_008_224, 382_249_082),
+        Field::Complex => (2_940_416, 381_026_807),
+        Field::Real => (2_008_224, 382_258_092),
         _ => return Err("symbolic boundary field".into()),
     };
     let (cas, answer) = source(field)?;

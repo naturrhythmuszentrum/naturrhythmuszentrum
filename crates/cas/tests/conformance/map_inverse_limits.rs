@@ -242,6 +242,9 @@ fn map_proof_work_and_payload_boundaries() -> TestResult {
 }
 
 /// Record complete Work and minimum storage capacities for the independent general-map fixture.
+/// Operations 0, 4, 5 and 7 add local-entry Work of 450, 189, 10 and 10;
+/// operations 1, 2, 3 and 6 use only unchanged lookup floors. The commit
+/// ledger expands each moved row; non-Work columns are unchanged.
 /// ´test:integration:map-resource-measurements´
 #[test]
 fn map_resource_measurements() -> TestResult {
@@ -280,14 +283,14 @@ fn map_resource_measurements() -> TestResult {
     assert_eq!(
         rows,
         [
-            [0, 393_214, 3_420, 69, 84_798, 28_242, 2_956, 1_247],
+            [0, 393_657, 3_420, 69, 84_798, 28_242, 2_956, 1_247],
             [1, 3_390, 4, 0, 2_910, 147, 0, 0],
             [2, 9_796, 16, 0, 12_668, 147, 0, 0],
             [3, 1_110, 0, 0, 753, 68, 0, 0],
-            [4, 328_731, 2_932, 69, 88_548, 28_242, 2_424, 1_247],
-            [5, 166_807, 1_516, 34, 33_024, 12_104, 0, 0],
+            [4, 328_920, 2_932, 69, 88_548, 28_242, 2_424, 1_247],
+            [5, 166_817, 1_516, 34, 33_024, 12_104, 0, 0],
             [6, 1_247, 0, 0, 0, 0, 1_247, 1_247],
-            [7, 229_503, 1_600, 32, 33_024, 12_127, 0, 0],
+            [7, 229_513, 1_600, 32, 33_024, 12_127, 0, 0],
         ]
     );
     Ok(())

@@ -58,7 +58,7 @@ pub(super) fn original<P: Scalar>(
         return Err(LiveDecisionError::Recipe);
     };
     let graph = source.owner().cas()?;
-    if graph.expression(&observable.expression.syntax)?.0 != &Operator::Div {
+    if graph.expression(&observable.expression.syntax, budget)?.0 != &Operator::Div {
         return Err(LiveDecisionError::Recipe);
     }
     let operands = graph.operands(&observable.expression.syntax, budget)?;
@@ -67,7 +67,7 @@ pub(super) fn original<P: Scalar>(
     };
     let mut order = [0; 2];
     for (slot, node) in [first, second].into_iter().enumerate() {
-        let (Operator::Free(name), _) = graph.expression(node)? else {
+        let (Operator::Free(name), _) = graph.expression(node, budget)? else {
             return Err(LiveDecisionError::Recipe);
         };
         order[slot] = association

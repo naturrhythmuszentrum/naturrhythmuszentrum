@@ -150,7 +150,7 @@ pub(super) fn compile(
     };
     for id in order {
         budget.work(1, AT)?;
-        let Some((kind, arguments)) = predicate(cas, *id)? else {
+        let Some((kind, arguments)) = predicate(cas, *id, budget)? else {
             continue;
         };
         let retained = program
@@ -259,11 +259,12 @@ pub(super) const fn holds(comparison: Comparison, sign: Ordering) -> bool {
 }
 
 /// Borrow a native condition or Boolean expression without treating other nodes as predicates.
-pub(super) fn predicate(
-    cas: &Cas,
+pub(super) fn predicate<'a>(
+    cas: &'a Cas,
     id: LogicalId,
-) -> Result<Option<(&PredicateKind, &[LogicalId])>, Fault> {
-    Ok(match cas.state.node(id)? {
+    budget: &mut Budget,
+) -> Result<Option<(&'a PredicateKind, &'a [LogicalId])>, Fault> {
+    Ok(match cas.state.node(id, budget)? {
         Vertex::Condition(value) => Some((&value.kind, &value.arguments)),
         Vertex::Expression(value) => match &value.operator {
             Operator::Predicate(kind) => Some((kind, &value.operands)),

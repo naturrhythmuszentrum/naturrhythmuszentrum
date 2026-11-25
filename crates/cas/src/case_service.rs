@@ -32,12 +32,12 @@ pub(crate) fn handles(
         } => Ok(true),
         Task::Simplify | Task::Equal { .. } => {
             for id in inputs {
-                if crate::solving::family::local(cas, *id)? {
+                if crate::solving::family::local(cas, *id, budget)? {
                     return Ok(true);
                 }
             }
             for id in case_syntax::order(cas, inputs, budget)? {
-                if cas.state.expression(id)?.domain.is_some() {
+                if cas.state.expression(id, budget)?.domain.is_some() {
                     return Ok(true);
                 }
             }
@@ -227,7 +227,7 @@ impl Runner<'_> {
             Task::ElaborateCases => Some(
                 self.cas
                     .state
-                    .source_form(*inputs.first().ok_or_else(invalid)?)?
+                    .source_form(*inputs.first().ok_or_else(invalid)?, self.generation)?
                     .domain,
             ),
             _ => None,
@@ -254,7 +254,7 @@ impl Runner<'_> {
         conclusion: Statement,
         premises: &[Handle],
     ) -> Result<Handle, Fault> {
-        if crate::solving::family::native::handles(self.cas, &conclusion)? {
+        if crate::solving::family::native::handles(self.cas, &conclusion, self.checker)? {
             return crate::solving::family::recipes::push(
                 &mut self.plan,
                 self.cas,
@@ -280,7 +280,7 @@ impl Runner<'_> {
 
     /// Ordered signatures retain the exact source descriptor and every guarded requirement.
     fn elaborate(&mut self, source: &Handle) -> Result<Handle, Fault> {
-        let context = self.cas.checked(&self.request.context)?;
+        let context = self.cas.checked(&self.request.context, self.generation)?;
         let mut earlier = Vec::new();
         let mut premises = Vec::new();
         for witness in &self.request.premises {
@@ -298,9 +298,12 @@ impl Runner<'_> {
             &earlier,
             self.generation,
         )?;
-        let domain = self
-            .cas
-            .handle(self.cas.state.source_form(source.logical_id())?.domain);
+        let domain = self.cas.handle(
+            self.cas
+                .state
+                .source_form(source.logical_id(), self.generation)?
+                .domain,
+        );
         self.push(
             Primitive::CaseOrdered,
             Statement::Elaboration {
@@ -322,7 +325,9 @@ impl Runner<'_> {
             if function.logical_id() != original {
                 return Err(invalid());
             }
-            let right = self.cas.handle(self.cas.state.arm(association)?.value);
+            let right = self
+                .cas
+                .handle(self.cas.state.arm(association, self.generation)?.value);
             let premises = self.certified_selection_premise(region)?;
             return self.push(
                 Primitive::CaseSelect,
@@ -338,30 +343,32 @@ impl Runner<'_> {
         let arms = self
             .cas
             .state
-            .expression(function.logical_id())?
+            .expression(function.logical_id(), self.generation)?
             .arms
             .clone();
         for id in case_syntax::canonical(self.cas, &arms, self.generation)? {
-            let arm = self.cas.state.arm(id)?.clone();
-            let contained = if crate::solving::family::local(self.cas, function.logical_id())? {
-                if crate::solving::family::region::subset(
-                    self.cas,
-                    region.logical_id(),
-                    arm.region,
-                    self.generation,
-                )? {
-                    Ok(())
+            let arm = self.cas.state.arm(id, self.generation)?.clone();
+            let contained =
+                if crate::solving::family::local(self.cas, function.logical_id(), self.generation)?
+                {
+                    if crate::solving::family::region::subset(
+                        self.cas,
+                        region.logical_id(),
+                        arm.region,
+                        self.generation,
+                    )? {
+                        Ok(())
+                    } else {
+                        Err(invalid())
+                    }
                 } else {
-                    Err(invalid())
-                }
-            } else {
-                crate::case_check::subset(
-                    self.cas,
-                    region.logical_id(),
-                    arm.region,
-                    self.generation,
-                )
-            };
+                    crate::case_check::subset(
+                        self.cas,
+                        region.logical_id(),
+                        arm.region,
+                        self.generation,
+                    )
+                };
             match contained {
                 Ok(()) => {
                     let right = self.cas.handle(arm.value);
@@ -390,7 +397,10 @@ impl Runner<'_> {
 
     /// Preserve the supplied certified membership as a checked premise of local selection.
     fn certified_selection_premise(&mut self, region: &Handle) -> Result<Vec<Handle>, Fault> {
-        let frame = self.cas.state.context(self.request.context.logical_id())?;
+        let frame = self
+            .cas
+            .state
+            .context(self.request.context.logical_id(), self.generation)?;
         if frame.introduction.is_none() {
             return Ok(Vec::new());
         }
@@ -425,16 +435,24 @@ impl Runner<'_> {
     /// Totality is a definedness fact on the requested region, with the complete cover recorded.
     fn coverage(&mut self, function: &Handle, region: &Handle) -> Result<Handle, Fault> {
         if matches!(
-            self.cas.state.expression(function.logical_id())?.operator,
+            self.cas
+                .state
+                .expression(function.logical_id(), self.generation)?
+                .operator,
             crate::model::Operator::Sine
                 | crate::model::Operator::Cosine
                 | crate::model::Operator::Arctangent
         ) {
             return self.trig_coverage(function, region);
         }
-        if crate::solving::family::local(self.cas, function.logical_id())? {
-            for id in &self.cas.state.expression(function.logical_id())?.arms {
-                let arm = self.cas.state.arm(*id)?;
+        if crate::solving::family::local(self.cas, function.logical_id(), self.generation)? {
+            for id in &self
+                .cas
+                .state
+                .expression(function.logical_id(), self.generation)?
+                .arms
+            {
+                let arm = self.cas.state.arm(*id, self.generation)?;
                 if !crate::solving::family::region::subset(
                     self.cas,
                     region.logical_id(),
@@ -503,7 +521,10 @@ impl Runner<'_> {
         loop {
             self.generation
                 .work(1, Location::new("trigonometric coverage"))?;
-            let expression = self.cas.state.expression(current.logical_id())?;
+            let expression = self
+                .cas
+                .state
+                .expression(current.logical_id(), self.generation)?;
             if !matches!(
                 expression.operator,
                 crate::model::Operator::Sine
@@ -535,7 +556,7 @@ impl Runner<'_> {
                 node = *self
                     .cas
                     .state
-                    .expression(node)?
+                    .expression(node, self.generation)?
                     .operands
                     .first()
                     .ok_or_else(invalid)?;
@@ -561,11 +582,11 @@ impl Runner<'_> {
 
     /// Refinement is scheduled lazily; its complete cover remains an explicit premise.
     fn simplify(&mut self, function: &Handle) -> Result<Handle, Fault> {
-        if crate::solving::family::local(self.cas, function.logical_id())? {
+        if crate::solving::family::local(self.cas, function.logical_id(), self.generation)? {
             let domain = self.cas.handle(
                 self.cas
                     .state
-                    .context(self.request.context.logical_id())?
+                    .context(self.request.context.logical_id(), self.generation)?
                     .admissible,
             );
             return self.push(
@@ -590,7 +611,7 @@ impl Runner<'_> {
         let domain = self.cas.handle(
             self.cas
                 .state
-                .context(self.request.context.logical_id())?
+                .context(self.request.context.logical_id(), self.generation)?
                 .admissible,
         );
         self.push(
@@ -648,10 +669,10 @@ fn classify_context(
         {
             return Ok(pending());
         }
-        let mut current = Some(cas.checked(&request.context)?);
+        let mut current = Some(cas.checked(&request.context, budget)?);
         while let Some(id) = current {
             budget.condition(1, Location::new("case context classification"))?;
-            let frame = cas.state.context(id)?;
+            let frame = cas.state.context(id, budget)?;
             if !frame.assumptions.is_empty() || !frame.frame.is_empty() {
                 return Ok(pending());
             }

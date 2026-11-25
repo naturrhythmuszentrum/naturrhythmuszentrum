@@ -26,11 +26,15 @@ pub(crate) struct Action {
 
 impl Action {
     /// Reject shape mismatches before paying for a complete transaction copy.
-    pub(crate) fn plausible(&self, cas: &Cas) -> Result<bool, Fault> {
+    pub(crate) fn plausible(
+        &self,
+        cas: &Cas,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<bool, Fault> {
         if self.known.is_some() {
             return Ok(true);
         }
-        let expression = cas.state.expression(self.leaf)?;
+        let expression = cas.state.expression(self.leaf, budget)?;
         match self.primitive {
             Primitive::Power => {
                 let Operator::IntegerPower(exponent) = expression.operator else {
@@ -41,7 +45,7 @@ impl Action {
                 }
                 let base = expression.operands.first().copied().ok_or_else(invalid)?;
                 Ok(matches!(
-                    cas.state.expression(base)?.operator,
+                    cas.state.expression(base, budget)?.operator,
                     Operator::Add | Operator::Sub | Operator::Mul
                 ))
             }
@@ -55,7 +59,7 @@ impl Action {
                     .get(position)
                     .copied()
                     .ok_or_else(invalid)?;
-                Ok(cas.state.expression(child)?.operator == Operator::Add)
+                Ok(cas.state.expression(child, budget)?.operator == Operator::Add)
             }
             Primitive::RationalIdentity => Ok(true),
             _ => Ok(false),
@@ -81,8 +85,8 @@ pub(crate) fn actions(
     while let Some((id, path)) = pending.pop() {
         budget.work(1, AT)?;
         budget.check(BudgetKind::Depth, size(path.len(), AT)?, AT)?;
-        let expression = cas.state.expression(id)?;
-        expansion |= expandable(cas, id)?;
+        let expression = cas.state.expression(id, budget)?;
+        expansion |= expandable(cas, id, budget)?;
         let count = size(paths.len(), AT)?
             .checked_add(1)
             .ok_or_else(|| Fault::capacity(BudgetKind::PeakExpressionSize, AT))?;
@@ -197,19 +201,22 @@ fn action_order(action: &Action) -> (&'static str, &[u32], Option<(u64, LogicalI
 }
 
 /// A coefficient shortcut waits for explicit nontrivial algebraic expansion opportunities.
-fn expandable(cas: &Cas, id: LogicalId) -> Result<bool, Fault> {
-    let expression = cas.state.expression(id)?;
+fn expandable(cas: &Cas, id: LogicalId, budget: &mut crate::budget::Budget) -> Result<bool, Fault> {
+    let expression = cas.state.expression(id, budget)?;
     if let Operator::IntegerPower(exponent) = expression.operator {
         let base = expression.operands.first().copied().ok_or_else(invalid)?;
         return Ok(exponent >= 2
             && matches!(
-                cas.state.expression(base)?.operator,
+                cas.state.expression(base, budget)?.operator,
                 Operator::Add | Operator::Sub | Operator::Mul
             ));
     }
     if expression.operator == Operator::Mul {
         for child in &expression.operands {
-            if matches!(cas.state.expression(*child)?.operator, Operator::Add) {
+            if matches!(
+                cas.state.expression(*child, budget)?.operator,
+                Operator::Add
+            ) {
                 return Ok(true);
             }
         }
@@ -241,7 +248,7 @@ pub(crate) fn propose(
             .and_then(|n| u32::try_from(n).ok())
             .ok_or_else(invalid)?;
         let imported = crate::known::append(&mut plan, cas, known.proof, budget)?;
-        let output = cas.checked(&plan.get(imported)?.right)?;
+        let output = cas.checked(&plan.get(imported)?.right, budget)?;
         plan.push(
             step(
                 cas,
@@ -320,7 +327,7 @@ fn replacement(
     action: &Action,
     budget: &mut Budget,
 ) -> Result<Option<LogicalId>, Fault> {
-    let expression = cas.state.expression(action.leaf)?;
+    let expression = cas.state.expression(action.leaf, budget)?;
     let operator = expression.operator.clone();
     let operands = expression.operands.clone();
     let child = |position| operands.get(position).copied().ok_or_else(invalid);
@@ -399,7 +406,7 @@ fn distribute(
     sum: LogicalId,
     budget: &mut Budget,
 ) -> Result<Option<LogicalId>, Fault> {
-    let expression = cas.state.expression(sum)?;
+    let expression = cas.state.expression(sum, budget)?;
     if expression.operator != Operator::Add {
         return Ok(None);
     }
@@ -429,7 +436,7 @@ fn replace(
         .try_reserve_exact(path.len())
         .map_err(|_| Fault::allocation(AT))?;
     for position in path {
-        let expression = cas.state.expression(root)?;
+        let expression = cas.state.expression(root, budget)?;
         let index = usize::try_from(*position).map_err(|_| invalid())?;
         let child = expression
             .operands
@@ -441,7 +448,7 @@ fn replace(
     }
     let mut output = replacement;
     for (parent, position) in ancestors.into_iter().rev() {
-        let expression = cas.state.expression(parent)?;
+        let expression = cas.state.expression(parent, budget)?;
         let operator = expression.operator.clone();
         let mut operands = expression.operands.clone();
         *operands.get_mut(position).ok_or_else(invalid)? = output;

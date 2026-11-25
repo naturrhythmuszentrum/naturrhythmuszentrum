@@ -70,7 +70,8 @@ pub(crate) fn measured<T>(run: impl FnOnce() -> TestResult<T>) -> TestResult<(T,
 /// Admit only the proposed set's object DAG; there are no application or conclusion records.
 pub(crate) fn proposal(source: &Cas, set: &Handle, receiver: &mut Cas) -> TestResult<Handle> {
     let mut budget = Budget::new(Limits::blind_cubic())?;
-    let bytes = crate::wire_build::syntax_key(source, source.checked(set)?, &mut budget)?;
+    let bytes =
+        crate::wire_build::syntax_key(source, source.checked(set, &mut budget)?, &mut budget)?;
     let mut budget = Budget::new(Limits::blind_cubic())?;
     let mut reader = Reader::new(&bytes, &mut budget)?;
     assert_eq!(reader.take(8)?, b"NRZSYN04");
@@ -85,7 +86,7 @@ pub(crate) fn proposal(source: &Cas, set: &Handle, receiver: &mut Cas) -> TestRe
     let Some(Decoded::Object(handle)) = records.get(root) else {
         return Err("proposal root is not syntax".into());
     };
-    assert_eq!(receiver.state.proof_count(), 0);
+    assert_eq!(receiver.state.proof_count(&mut budget)?, 0);
     Ok(handle.clone())
 }
 
@@ -157,8 +158,11 @@ pub(crate) fn full_replay(
             let expected = crate::wire_build::judgment_key(cas, expected, budget)?;
             cas.transaction(budget, |candidate, budget| {
                 let witness = crate::wire_decode::inspect(candidate, bytes, budget)?;
-                let canonical =
-                    crate::wire::encode(candidate, candidate.checked(witness.proof())?, budget)?;
+                let canonical = crate::wire::encode(
+                    candidate,
+                    candidate.checked(witness.proof(), budget)?,
+                    budget,
+                )?;
                 if canonical != bytes {
                     return Err(Fault::invalid(
                         crate::error::InvalidCode::Encoding,

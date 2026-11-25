@@ -63,7 +63,7 @@ fn coverage_dependency(
     budget: &mut Budget,
 ) -> Result<VerifiedWitness, Fault> {
     let mut visited = BTreeSet::new();
-    let mut pending = vec![cas.checked(presentation.proof())?];
+    let mut pending = vec![cas.checked(presentation.proof(), budget)?];
     while let Some(proof) = pending.pop() {
         budget.work(1, AT)?;
         if !visited.insert(proof) {

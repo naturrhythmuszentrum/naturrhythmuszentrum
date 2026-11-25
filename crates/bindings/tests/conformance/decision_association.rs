@@ -38,7 +38,7 @@ fn case(source: &str, doubled_unit: bool, variant: u8) -> TestResult<IntegerDeci
 
 /// Measure new association construction and complete identity checking independently.
 /// ´test:integration:decision-association-costs´
-/// ´claim:bindings:decision-association-costs´ Two fresh symbol graphs require 22233 association Work and 8 authentication Work with unchanged retained bytes.
+/// ´claim:bindings:decision-association-costs´ Two fresh symbol graphs require 22323 association Work and 8 authentication Work with unchanged retained bytes.
 #[test]
 fn decision_association_costs() -> TestResult {
     let case = case("original LC source", false, 0)?;
@@ -63,7 +63,7 @@ fn decision_association_costs() -> TestResult {
         associated.operands()[1].original()?.descriptor(),
         symbols[1].value().descriptor()
     );
-    assert_eq!(construction, 22_233);
+    assert_eq!(construction, 22_323);
     assert_eq!(budget.usage().work - construction, 8);
     assert_eq!(associated.retained_payload_bytes(), 8996);
     Ok(())
@@ -115,12 +115,12 @@ fn decision_association_refusals() -> TestResult {
 
 /// New association Work is cumulative, including usage spent before either operation.
 /// ´test:integration:decision-association-work-boundaries´
-/// ´claim:bindings:decision-association-work-boundaries´ Frozen source environments reduce cumulative association Work from 24428 to 22250 while one-below refusal preserves its source.
+/// ´claim:bindings:decision-association-work-boundaries´ Frozen source environments reduce cumulative association Work from 24428 to 22340 while one-below refusal preserves its source.
 #[test]
 fn decision_association_work_boundaries() -> TestResult {
     let original = case("original LC source", false, 0)?;
     let before = original.source().owner().cas()?.counts();
-    for (work, accepted) in [(22_250, true), (22_249, false)] {
+    for (work, accepted) in [(22_340, true), (22_339, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()
@@ -129,7 +129,7 @@ fn decision_association_work_boundaries() -> TestResult {
         let result = original.associate_inputs(&mut budget);
         if accepted {
             assert_eq!(result?.operands().len(), 2);
-            assert_eq!(budget.usage().work, 22_250);
+            assert_eq!(budget.usage().work, 22_340);
         } else {
             let Err(DecisionError::Symbols(nrz_bindings::AdmissionError::Algebra(fault))) = result
             else {

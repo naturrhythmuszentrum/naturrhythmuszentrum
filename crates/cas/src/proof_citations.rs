@@ -58,7 +58,8 @@ impl ProofCitation {
         cas: &Cas,
         budget: &mut Budget,
     ) -> Result<Option<&'static crate::proof::LemmaSchema>, Fault> {
-        let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof)?)? else {
+        let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof, budget)?, budget)?
+        else {
             return Ok(None);
         };
         let uses_pi = match &value.certificate {
@@ -89,8 +90,10 @@ impl ProofCitation {
     pub fn auxiliary_schema(
         &self,
         cas: &Cas,
+        budget: &mut Budget,
     ) -> Result<Option<&'static crate::proof::LemmaSchema>, Fault> {
-        let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof)?)? else {
+        let Source::Scoped(value) = Source::read(cas, cas.checked(&self.proof, budget)?, budget)?
+        else {
             return Ok(None);
         };
         if matches!(
@@ -148,14 +151,16 @@ enum Source<'a> {
 
 impl<'a> Source<'a> {
     /// Authenticate a proof node and borrow its single checked application.
-    fn read(cas: &'a Cas, proof: LogicalId) -> Result<Self, Fault> {
-        let Vertex::Proof(application) = cas.state.node(proof)? else {
+    fn read(cas: &'a Cas, proof: LogicalId, budget: &mut Budget) -> Result<Self, Fault> {
+        let Vertex::Proof(application) = cas.state.node(proof, budget)? else {
             return Err(invalid());
         };
-        match cas.state.node(*application)? {
+        match cas.state.node(*application, budget)? {
             Vertex::Application(value) => Ok(Self::Scalar(value)),
             Vertex::ScopedApplication(value) => Ok(Self::Scoped(value)),
-            Vertex::AnonymousLemma(_) => Ok(Self::Scoped(cas.series_application(*application)?)),
+            Vertex::AnonymousLemma(_) => {
+                Ok(Self::Scoped(cas.series_application(*application, budget)?))
+            }
             _ => Err(invalid()),
         }
     }
@@ -177,31 +182,31 @@ impl<'a> Source<'a> {
     }
 
     /// A certified membership use retains the proof that introduced its exact slot.
-    fn introduction(self, cas: &Cas) -> Result<Option<LogicalId>, Fault> {
+    fn introduction(self, cas: &Cas, budget: &mut Budget) -> Result<Option<LogicalId>, Fault> {
         if let Self::Scoped(value) = self
             && let crate::proof_model::Certificate::Hypothesis(reference) = &value.certificate
             && reference.slot == 0
         {
             return Ok(cas
                 .state
-                .context(cas.checked(&reference.context)?)?
+                .context(cas.checked(&reference.context, budget)?, budget)?
                 .introduction);
         }
         Ok(None)
     }
 
     /// Read the proposition family without rebuilding or rechecking its certificate.
-    fn kind(self, cas: &Cas) -> Result<HypothesisKind, Fault> {
+    fn kind(self, cas: &Cas, budget: &mut Budget) -> Result<HypothesisKind, Fault> {
         match self {
             Self::Scoped(value)
                 if matches!(
                     &value.certificate,
                     crate::proof_model::Certificate::Decision(_)
-                ) || self.introduction(cas)?.is_some() =>
+                ) || self.introduction(cas, budget)?.is_some() =>
             {
                 Ok(HypothesisKind::CertifiedRegionMembership)
             }
-            Self::Scoped(value) => cas.statement_hypothesis_kind(&value.judgment.statement),
+            Self::Scoped(value) => cas.statement_hypothesis_kind(&value.judgment.statement, budget),
             Self::Scalar(value) => Ok(match &value.relation {
                 Relation::EqualOnDomain => HypothesisKind::Equality,
                 Relation::Derivative { .. } => HypothesisKind::Derivative,
@@ -261,7 +266,7 @@ fn closure(
         if visited.contains(&proof) {
             continue;
         }
-        let source = Source::read(cas, proof)?;
+        let source = Source::read(cas, proof, budget)?;
         budget.check(
             BudgetKind::ProofNodes,
             size(visited.len(), AT)?.saturating_add(1),
@@ -273,7 +278,7 @@ fn closure(
         budget.work(size(premises.len(), AT)?, AT)?;
         meter.reserve(&mut pending, premises.len(), budget)?;
         pending.extend_from_slice(premises);
-        if let Some(introduction) = source.introduction(cas)? {
+        if let Some(introduction) = source.introduction(cas, budget)? {
             meter.reserve(&mut pending, 1, budget)?;
             pending.push(introduction);
         }
@@ -293,7 +298,7 @@ fn closure(
 fn root_frame(cas: &Cas, mut context: LogicalId, budget: &mut Budget) -> Result<LogicalId, Fault> {
     loop {
         budget.work(1, AT)?;
-        let frame = cas.state.context(context)?;
+        let frame = cas.state.context(context, budget)?;
         budget.check(BudgetKind::HypothesisDepth, frame.depth, AT)?;
         let Some(parent) = frame.parent else {
             return Ok(context);
@@ -304,7 +309,13 @@ fn root_frame(cas: &Cas, mut context: LogicalId, budget: &mut Budget) -> Result<
 
 /// Resolve a retained scalar provenance key with prepaid full-string comparisons.
 fn named_slot(cas: &Cas, context: LogicalId, key: &str, budget: &mut Budget) -> Result<u32, Fault> {
-    for (slot, (name, _)) in cas.state.context(context)?.assumptions.iter().enumerate() {
+    for (slot, (name, _)) in cas
+        .state
+        .context(context, budget)?
+        .assumptions
+        .iter()
+        .enumerate()
+    {
         budget.work(size(name.len().max(key.len()), AT)?.saturating_add(1), AT)?;
         if name == key {
             return u32::try_from(slot).map_err(|_| invalid());
@@ -333,7 +344,7 @@ fn scalar_hypotheses(
             context: cas.handle(context),
             slot,
         };
-        result.push(reference.qualified(cas)?);
+        result.push(reference.qualified(cas, budget)?);
     }
     meter.reserve(&mut result, value.conditions.qualified.len(), budget)?;
     for (frame, slot) in &value.conditions.qualified {
@@ -342,7 +353,7 @@ fn scalar_hypotheses(
             context: cas.handle(*frame),
             slot: *slot,
         };
-        result.push(reference.qualified(cas)?);
+        result.push(reference.qualified(cas, budget)?);
     }
     Ok(result)
 }
@@ -361,7 +372,7 @@ fn hypotheses(
             meter.reserve(&mut result, value.conditions.hypotheses.len(), budget)?;
             for reference in &value.conditions.hypotheses {
                 budget.work(1, AT)?;
-                result.push(reference.qualified(cas)?);
+                result.push(reference.qualified(cas, budget)?);
             }
             Ok(result)
         }
@@ -391,7 +402,7 @@ fn residuals(
             meter.reserve(&mut result, value.conditions.residuals.len(), budget)?;
             for guard in &value.conditions.residuals {
                 budget.work(1, AT)?;
-                result.push(cas.predicate_hypothesis_kind(&guard.predicate)?);
+                result.push(cas.predicate_hypothesis_kind(&guard.predicate, budget)?);
             }
         }
     }
@@ -409,13 +420,13 @@ fn premises(
     meter.reserve(&mut result, source.premises().len(), budget)?;
     for proof in source.premises() {
         budget.work(1, AT)?;
-        let kind = Source::read(cas, *proof)?.kind(cas)?;
+        let kind = Source::read(cas, *proof, budget)?.kind(cas, budget)?;
         result.push(PremiseCitation {
             proof: cas.handle(*proof),
             kind,
         });
     }
-    if let Some(proof) = source.introduction(cas)? {
+    if let Some(proof) = source.introduction(cas, budget)? {
         meter.reserve(&mut result, 1, budget)?;
         budget.work(1, AT)?;
         result.push(PremiseCitation {
@@ -434,7 +445,7 @@ fn citation(
     budget: &mut Budget,
 ) -> Result<ProofCitation, Fault> {
     budget.work(1, AT)?;
-    let source = Source::read(cas, proof)?;
+    let source = Source::read(cas, proof, budget)?;
     Ok(ProofCitation {
         proof: cas.handle(proof),
         primitive: source.primitive(),
@@ -471,8 +482,8 @@ impl Cas {
         proof: &Handle,
         budget: &mut Budget,
     ) -> Result<Vec<ProofCitation>, Fault> {
-        let root = self.checked(proof)?;
-        Source::read(self, root)?;
+        let root = self.checked(proof, budget)?;
+        Source::read(self, root, budget)?;
         let mut meter = Meter::default();
         let ordered = closure(self, root, &mut meter, budget)?;
         let mut result = Vec::new();

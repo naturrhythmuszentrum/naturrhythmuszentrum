@@ -30,8 +30,12 @@ pub(crate) struct SeriesLemma {
 
 impl Cas {
     /// Borrow only graph-owned, current checked evidence with its actual incoming edge.
-    pub(crate) fn series_application(&self, id: LogicalId) -> Result<&CheckedApplication, Fault> {
-        let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+    pub(crate) fn series_application(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&CheckedApplication, Fault> {
+        let Vertex::AnonymousLemma(node) = self.state.node(id, budget)? else {
             return Err(invalid());
         };
         let AnonymousLemma::Series(node) = node.as_ref() else {
@@ -41,8 +45,10 @@ impl Cas {
         else {
             return Err(invalid());
         };
-        let source = self.state.indices[&self.checked(statement.input())?];
-        let target = self.state.indices[&id];
+        let source = self
+            .state
+            .index(self.checked(statement.input(), budget)?, budget)?;
+        let target = self.state.index(id, budget)?;
         let citation = node.citation.ok_or_else(invalid)?;
         if !Arc::ptr_eq(&node.owner, &self.memo_owner)
             || node.generation > self.memo_epoch
@@ -68,7 +74,7 @@ impl Cas {
         else {
             return Err(invalid());
         };
-        let original = self.checked(statement.input())?;
+        let original = self.checked(statement.input(), budget)?;
         let mut out = crate::encoding::Encoder::new(budget, AT);
         out.byte(4)?;
         out.unsigned(1)?;
@@ -102,6 +108,7 @@ impl Cas {
                 .checked_add(bytes)
                 .ok_or_else(invalid)?;
             budget.check(BudgetKind::OutputBytes, total, AT)?;
+            let source = state.index(original, budget)?;
             let before = state.graph.node_count();
             let id = cas.insert(
                 state,
@@ -117,9 +124,9 @@ impl Cas {
                 bytes,
                 budget,
             )?;
-            let index = state.indices[&id];
             if state.graph.node_count() > before {
-                let source = state.indices[&original];
+                // An appended node occupies the old tail; source lookup was prepaid above.
+                let index = crate::graph::NodeIndex::new(before);
                 let citation = state.graph.add_edge(source, index, Edge::CheckedEvidence);
                 let Vertex::AnonymousLemma(node) = &mut state.graph[index] else {
                     return Err(invalid());
@@ -138,7 +145,8 @@ impl Cas {
                 0,
                 budget,
             )?;
-            budget.check(BudgetKind::ProofNodes, state.proof_count(), AT)?;
+            let proof_count = state.proof_count(budget)?;
+            budget.check(BudgetKind::ProofNodes, proof_count, AT)?;
             Ok(cas.handle(proof))
         })
     }

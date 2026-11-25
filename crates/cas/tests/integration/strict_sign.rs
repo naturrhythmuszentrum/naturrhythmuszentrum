@@ -8,6 +8,9 @@ use crate::testing::readings::ledger;
 use crate::testing::strict_sign::{expected, fixture};
 
 /// All four strict-sign combinations transport through products, quotients, reciprocals and negation.
+/// Each moved Work pin equals unchanged operation Work plus reached receiving-store local entries;
+/// the commit ledger expands every proof and replay row. Old/new lookup
+/// floors are equal, and witness bytes are unchanged.
 /// ´test:integration:strict-sign-oracle-and-fresh-replay´
 #[test]
 fn strict_sign_oracle_and_fresh_replay() -> TestResult {
@@ -57,22 +60,22 @@ fn strict_sign_oracle_and_fresh_replay() -> TestResult {
     assert_eq!(
         costs,
         vec![
-            (-1, -1, 0, 27_123, 58_372, 705),
-            (-1, -1, 1, 27_123, 58_372, 705),
-            (-1, -1, 2, 33_082, 71_234, 846),
-            (-1, -1, 3, 35_864, 77_364, 911),
-            (-1, 1, 0, 25_644, 54_660, 662),
-            (-1, 1, 1, 25_644, 54_660, 662),
-            (-1, 1, 2, 31_601, 67_389, 803),
-            (-1, 1, 3, 34_382, 73_458, 868),
-            (1, -1, 0, 25_644, 54_661, 662),
-            (1, -1, 1, 25_644, 54_661, 662),
-            (1, -1, 2, 31_601, 67_390, 803),
-            (1, -1, 3, 34_382, 73_459, 868),
-            (1, 1, 0, 24_166, 50_988, 619),
-            (1, 1, 1, 24_166, 50_988, 619),
-            (1, 1, 2, 30_121, 63_584, 760),
-            (1, 1, 3, 32_901, 69_592, 825),
+            (-1, -1, 0, 27_133, 58_382, 705),
+            (-1, -1, 1, 27_135, 58_382, 705),
+            (-1, -1, 2, 33_094, 71_244, 846),
+            (-1, -1, 3, 35_876, 77_374, 911),
+            (-1, 1, 0, 25_654, 54_670, 662),
+            (-1, 1, 1, 25_656, 54_670, 662),
+            (-1, 1, 2, 31_613, 67_399, 803),
+            (-1, 1, 3, 34_394, 73_468, 868),
+            (1, -1, 0, 25_654, 54_671, 662),
+            (1, -1, 1, 25_656, 54_671, 662),
+            (1, -1, 2, 31_613, 67_400, 803),
+            (1, -1, 3, 34_394, 73_469, 868),
+            (1, 1, 0, 24_176, 50_998, 619),
+            (1, 1, 1, 24_178, 50_998, 619),
+            (1, 1, 2, 30_133, 63_594, 760),
+            (1, 1, 3, 32_913, 69_602, 825),
         ]
     );
     for (left, right, index, generation, replay, _) in costs {
@@ -88,6 +91,8 @@ fn strict_sign_oracle_and_fresh_replay() -> TestResult {
 }
 
 /// Repeated monomial factors use the existing even and odd power rules with strict leaf evidence.
+/// Positive and negative power rows have independent local-entry receipts
+/// in the commit ledger; each ordinary boundary still checks N and N-1.
 /// ´test:integration:strict-sign-power-oracle´
 #[test]
 fn strict_sign_power_oracle() -> TestResult {
@@ -134,10 +139,10 @@ fn strict_sign_power_oracle() -> TestResult {
     assert_eq!(
         costs,
         vec![
-            (-1, 2, 24_188, 52_256, 645),
-            (-1, 3, 24_188, 52_256, 645),
-            (1, 2, 22_710, 48_601, 602),
-            (1, 3, 22_710, 48_601, 602),
+            (-1, 2, 24_198, 52_266, 645),
+            (-1, 3, 24_198, 52_266, 645),
+            (1, 2, 22_720, 48_611, 602),
+            (1, 3, 22_720, 48_611, 602),
         ]
     );
     for (sign, exponent, generation, replay, _) in costs {

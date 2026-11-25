@@ -18,12 +18,15 @@ fn lc_original_driven_source_invalidation() -> TestResult {
 fn sources<P: Scalar + 'static>() -> TestResult {
     for channel in 0..4 {
         let mut case = setup::<P>(false)?;
-        let outputs = produce(&mut case, &mut crate::phasor_solve_testing::budget()?)?;
+        let outputs = produce(
+            &mut case,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+        )?;
         let current = case.rows[0].current(outputs[0].readings().bindings(), &mut ledger()?)?;
         let current = case.heap.publish_phasor_solve(
             &current,
             &case.context,
-            &mut crate::phasor_solve_testing::budget()?,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
         )?;
         let source = &case.spectrum.inputs()[channel / 2];
         if channel % 2 == 0 {
@@ -82,12 +85,15 @@ fn sources<P: Scalar + 'static>() -> TestResult {
 /// A coarse expanded RHS retires its same-graph row, preserving other rows and the independent root.
 fn rhs<P: Scalar + 'static>() -> TestResult {
     let mut case = setup::<P>(false)?;
-    let outputs = produce(&mut case, &mut crate::phasor_solve_testing::budget()?)?;
+    let outputs = produce(
+        &mut case,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+    )?;
     let current = case.rows[0].current(outputs[0].readings().bindings(), &mut ledger()?)?;
     let current = case.heap.publish_phasor_solve(
         &current,
         &case.context,
-        &mut crate::phasor_solve_testing::budget()?,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
     )?;
     let voltage = case.rows[0].voltage();
     let original = case.heap.reading_entries(voltage)?;
@@ -148,7 +154,10 @@ fn refusals<P: Scalar + 'static>() -> TestResult {
             .publish_lc_impedance_reusing(&case.outputs[0], root, &case.context, &mut ledger()?)
             .is_err()
     );
-    let outputs = produce(&mut case, &mut crate::phasor_solve_testing::budget()?)?;
+    let outputs = produce(
+        &mut case,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+    )?;
     let root = case
         .batch
         .result(0, &case.heap, &case.context, &mut ledger()?)?;

@@ -141,12 +141,12 @@ fn fraction_frame(
     budget: &mut Budget,
 ) -> Result<(Handle, Vec<Field>), Fault> {
     let crate::solving::CoefficientDomainData::Fraction { base, coordinates } =
-        crate::solving::coefficients::storage::domain(&cas.state, domain)?
+        crate::solving::coefficients::storage::domain(&cas.state, domain, budget)?
     else {
         return Err(crate::solving::coefficients::storage::invalid());
     };
     let SolveDraft::CoordinateSpace(product) =
-        crate::solving::graph::object(&cas.state, coordinates.logical_id())?
+        crate::solving::graph::object(&cas.state, coordinates.logical_id(), budget)?
     else {
         return Err(crate::solving::coefficients::storage::invalid());
     };

@@ -67,8 +67,8 @@ impl SourceJacobianCache {
         key: &SourceJacobianKey,
         budget: &mut Budget,
     ) -> Result<Option<usize>, Fault> {
-        cas.checked(&key.context)?;
-        cas.checked(&key.original)?;
+        cas.checked(&key.context, budget)?;
+        cas.checked(&key.original, budget)?;
         budget.check(BudgetKind::StagedPayloadBytes, self.bytes, AT)?;
         budget.check(BudgetKind::OutputBytes, self.bytes, AT)?;
         for (index, value) in self.entries.iter().enumerate() {
@@ -76,7 +76,7 @@ impl SourceJacobianCache {
                 size(value.key.bytes.len().max(key.bytes.len()), AT)?.saturating_add(1),
                 AT,
             )?;
-            let local = cas.checked(&value.key.context).is_ok();
+            let local = cas.checked(&value.key.context, budget).is_ok();
             if local && value.key == *key {
                 return Ok(Some(index));
             }

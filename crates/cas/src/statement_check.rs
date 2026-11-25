@@ -12,9 +12,14 @@ const fn invalid() -> Fault {
 }
 
 /// Compare exact coordinate and binder interpretations of set operands.
-fn regions(cas: &Cas, first: &Handle, second: &Handle) -> Result<(), Fault> {
-    let left = cas.state.region(cas.checked(first)?)?;
-    let right = cas.state.region(cas.checked(second)?)?;
+fn regions(
+    cas: &Cas,
+    first: &Handle,
+    second: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let left = cas.state.region(cas.checked(first, budget)?, budget)?;
+    let right = cas.state.region(cas.checked(second, budget)?, budget)?;
     if left.ambient != right.ambient || left.scope != right.scope {
         return Err(invalid());
     }
@@ -28,17 +33,18 @@ fn endpoints(
     right: &Handle,
     domain: &Handle,
     same_sort: bool,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    if crate::solving::family::body(cas, cas.checked(left)?)?.is_some()
-        || crate::solving::family::body(cas, cas.checked(right)?)?.is_some()
+    if crate::solving::family::body(cas, cas.checked(left, budget)?, budget)?.is_some()
+        || crate::solving::family::body(cas, cas.checked(right, budget)?, budget)?.is_some()
     {
         return crate::solving::family::native::validate_endpoints(
-            cas, left, right, domain, same_sort,
+            cas, left, right, domain, same_sort, budget,
         );
     }
-    let left = cas.state.expression(cas.checked(left)?)?;
-    let right = cas.state.expression(cas.checked(right)?)?;
-    let domain = cas.state.region(cas.checked(domain)?)?;
+    let left = cas.state.expression(cas.checked(left, budget)?, budget)?;
+    let right = cas.state.expression(cas.checked(right, budget)?, budget)?;
+    let domain = cas.state.region(cas.checked(domain, budget)?, budget)?;
     if left.scope != right.scope
         || (same_sort && left.sort != right.sort)
         || (!domain.scope.is_empty() && domain.scope != left.scope)
@@ -49,6 +55,10 @@ fn endpoints(
 }
 
 /// Validate every currently represented role before it can become a checked judgment.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the complete statement role dispatch remains visible in one exhaustive match"
+)]
 pub(crate) fn validate(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, Location::new("statement object roles"), {
         budget.work(1, Location::new("statement object roles"))?;
@@ -69,9 +79,11 @@ pub(crate) fn validate(cas: &Cas, statement: &Statement, budget: &mut Budget) ->
                 crate::lattice::cover::check::roles(cas, value, budget)?;
             }
             Statement::IntegerSelection(value) => {
-                crate::decision_integer_selection::roles(cas, value)?;
+                crate::decision_integer_selection::roles(cas, value, budget)?;
             }
-            Statement::IntegerFamily(value) => crate::decision_cut::family::roles(cas, value)?,
+            Statement::IntegerFamily(value) => {
+                crate::decision_cut::family::roles(cas, value, budget)?;
+            }
             Statement::Solve(value) => crate::solving::graph::statement(cas, value, budget)?,
             Statement::Germ(value) => crate::germ_check::validate(cas, value, budget)?,
             Statement::Split(value) => crate::split_geometry::validate(cas, value, budget)?,
@@ -83,79 +95,92 @@ pub(crate) fn validate(cas: &Cas, statement: &Statement, budget: &mut Budget) ->
                 right,
                 domain,
                 ..
-            } => endpoints(cas, left, right, domain, true)?,
+            } => endpoints(cas, left, right, domain, true, budget)?,
             Statement::DerivativeOn {
                 function,
                 derivative,
                 domain,
                 ..
             } => {
-                endpoints(cas, function, derivative, domain, true)?;
+                endpoints(cas, function, derivative, domain, true, budget)?;
             }
             Statement::Jacobian {
                 input,
                 output,
                 domain,
                 ..
-            } => endpoints(cas, input, output, domain, false)?,
+            } => endpoints(cas, input, output, domain, false, budget)?,
             Statement::SquareFree {
                 input,
                 output,
                 domain,
                 ..
-            } => endpoints(cas, input, output, domain, true)?,
+            } => endpoints(cas, input, output, domain, true, budget)?,
             Statement::PredicateFact { region, predicate } => {
-                let region = cas.state.region(cas.checked(region)?)?;
+                let region = cas.state.region(cas.checked(region, budget)?, budget)?;
                 let (_, scope) = crate::domain_admission::predicate_context(
                     &cas.state,
-                    cas.checked(predicate)?,
+                    cas.checked(predicate, budget)?,
+                    budget,
                 )?;
                 if !region.scope.is_empty() && region.scope != *scope {
                     return Err(invalid());
                 }
             }
-            Statement::Subset { subset, superset } => regions(cas, subset, superset)?,
-            Statement::Disjoint { left, right } => regions(cas, left, right)?,
+            Statement::Subset { subset, superset } => regions(cas, subset, superset, budget)?,
+            Statement::Disjoint { left, right } => regions(cas, left, right, budget)?,
             Statement::Cover { domain, members } => {
-                cas.state.region(cas.checked(domain)?)?;
+                cas.state.region(cas.checked(domain, budget)?, budget)?;
                 for member in members {
-                    regions(cas, domain, member)?;
+                    regions(cas, domain, member, budget)?;
                 }
             }
             Statement::Empty { region } | Statement::Constructor { region, .. } => {
-                cas.state.region(cas.checked(region)?)?;
+                cas.state.region(cas.checked(region, budget)?, budget)?;
             }
             Statement::DefinedDomain { function, domain } => {
-                endpoints(cas, function, function, domain, true)?;
+                endpoints(cas, function, function, domain, true, budget)?;
             }
             Statement::Compatibility {
                 left,
                 right,
                 region,
             } => {
-                compatibility(cas, left, right, region)?;
+                compatibility(cas, left, right, region, budget)?;
             }
             Statement::Elaboration {
                 source,
                 result,
                 domain,
             } => {
-                cas.state.source_form(cas.checked(source)?)?;
-                let result = cas.state.expression(cas.checked(result)?)?;
-                regions(cas, &cas.handle(result.domain.ok_or_else(invalid)?), domain)?;
+                cas.state
+                    .source_form(cas.checked(source, budget)?, budget)?;
+                let result = cas.state.expression(cas.checked(result, budget)?, budget)?;
+                regions(
+                    cas,
+                    &cas.handle(result.domain.ok_or_else(invalid)?),
+                    domain,
+                    budget,
+                )?;
             }
-            _ => boundary(cas, statement)?,
+            _ => boundary(cas, statement, budget)?,
         }
         Ok(())
     })
 }
 
 /// Compatibility compares exact arm regions and the original scalar sort.
-fn compatibility(cas: &Cas, left: &Handle, right: &Handle, region: &Handle) -> Result<(), Fault> {
-    let left = cas.state.arm(cas.checked(left)?)?;
-    let right = cas.state.arm(cas.checked(right)?)?;
-    regions(cas, &cas.handle(left.region), region)?;
-    regions(cas, &cas.handle(right.region), region)?;
+fn compatibility(
+    cas: &Cas,
+    left: &Handle,
+    right: &Handle,
+    region: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let left = cas.state.arm(cas.checked(left, budget)?, budget)?;
+    let right = cas.state.arm(cas.checked(right, budget)?, budget)?;
+    regions(cas, &cas.handle(left.region), region, budget)?;
+    regions(cas, &cas.handle(right.region), region, budget)?;
     if left.sort != right.sort {
         return Err(invalid());
     }
@@ -163,7 +188,7 @@ fn compatibility(cas: &Cas, left: &Handle, right: &Handle, region: &Handle) -> R
 }
 
 /// Later boundary statements still retain exact object categories without executable rules.
-fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
+fn boundary(cas: &Cas, statement: &Statement, budget: &mut Budget) -> Result<(), Fault> {
     match statement {
         Statement::Incidence {
             region,
@@ -171,9 +196,9 @@ fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
             neighborhood,
             ..
         } => {
-            regions(cas, region, neighborhood)?;
-            let region = cas.state.region(cas.checked(region)?)?;
-            let boundary = cas.state.boundary(cas.checked(boundary)?)?;
+            regions(cas, region, neighborhood, budget)?;
+            let region = cas.state.region(cas.checked(region, budget)?, budget)?;
+            let boundary = cas.state.boundary(cas.checked(boundary, budget)?, budget)?;
             if region.scope != boundary.scope || region.ambient != boundary.ambient {
                 return Err(invalid());
             }
@@ -183,13 +208,15 @@ fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
             boundary,
             value,
         } => {
-            let function = cas.state.expression(cas.checked(function)?)?;
-            let boundary = cas.state.boundary(cas.checked(boundary)?)?;
+            let function = cas
+                .state
+                .expression(cas.checked(function, budget)?, budget)?;
+            let boundary = cas.state.boundary(cas.checked(boundary, budget)?, budget)?;
             if function.scope != boundary.scope {
                 return Err(invalid());
             }
             if let Ownership::Present(value) = value {
-                let value = cas.state.expression(cas.checked(value)?)?;
+                let value = cas.state.expression(cas.checked(value, budget)?, budget)?;
                 if function.sort != value.sort || function.scope != value.scope {
                     return Err(invalid());
                 }
@@ -202,10 +229,10 @@ fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
             values,
             ..
         } => {
-            cas.state.boundary(cas.checked(boundary)?)?;
-            endpoints(cas, function, function, region, true)?;
+            cas.state.boundary(cas.checked(boundary, budget)?, budget)?;
+            endpoints(cas, function, function, region, true, budget)?;
             for value in values {
-                endpoints(cas, function, value, region, true)?;
+                endpoints(cas, function, value, region, true, budget)?;
             }
         }
         Statement::Jump {
@@ -214,9 +241,11 @@ fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
             value,
             ..
         } => {
-            let function = cas.state.expression(cas.checked(function)?)?;
-            let boundary = cas.state.boundary(cas.checked(boundary)?)?;
-            let value = cas.state.expression(cas.checked(value)?)?;
+            let function = cas
+                .state
+                .expression(cas.checked(function, budget)?, budget)?;
+            let boundary = cas.state.boundary(cas.checked(boundary, budget)?, budget)?;
+            let value = cas.state.expression(cas.checked(value, budget)?, budget)?;
             if function.scope != boundary.scope
                 || function.scope != value.scope
                 || function.sort != value.sort
@@ -224,7 +253,7 @@ fn boundary(cas: &Cas, statement: &Statement) -> Result<(), Fault> {
                 return Err(invalid());
             }
         }
-        _ => crate::boundary_roles::validate(cas, statement)?,
+        _ => crate::boundary_roles::validate(cas, statement, budget)?,
     }
     Ok(())
 }

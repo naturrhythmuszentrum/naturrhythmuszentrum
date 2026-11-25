@@ -117,7 +117,7 @@ impl JointSources {
         edges: Vec<SourceEdge>,
         budget: &mut Budget,
     ) -> Result<Self, SourceError> {
-        let _header = cas.context_header(context)?;
+        let _header = cas.context_header(context, budget)?;
         support::capacity::<ReadingSource>(sources.len(), budget)?;
         support::capacity::<SourceEdge>(edges.len(), budget)?;
         let count = sources
@@ -293,7 +293,7 @@ fn check_edge(
             let (sort, operator, _, header) = support::inspect(cas, premise, budget)?;
             if sort != Sort::Value(AtomicSort::Boolean)
                 || !matches!(operator, Operator::Free(_))
-                || header != cas.context_header(context)?
+                || header != cas.context_header(context, budget)?
             {
                 return Err(SourceError::Premise);
             }

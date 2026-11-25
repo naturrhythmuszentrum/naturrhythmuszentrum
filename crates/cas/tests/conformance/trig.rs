@@ -36,11 +36,17 @@ fn trig_real_admission() -> TestResult {
         [integer]
     );
     inputs.push(embedded);
-    let ambient = f.cas.scalar_ambient(&f.x)?;
+    let ambient = f
+        .cas
+        .scalar_ambient(&f.x, &mut crate::testing::budgets::graph_budget()?)?;
     let scope = vec![vec![AtomicSort::Scalar(Field::Real)]];
     let bound = f.scoped(Operator::Bound { depth: 0, slot: 0 }, scope.clone(), &[])?;
     assert!(ambient.is_some());
-    assert_ne!(ambient, f.cas.scalar_ambient(&f.z)?);
+    assert_ne!(
+        ambient,
+        f.cas
+            .scalar_ambient(&f.z, &mut crate::testing::budgets::graph_budget()?)?
+    );
     for (operator, name) in operators() {
         f.scoped(
             operator.clone(),
@@ -53,8 +59,16 @@ fn trig_real_admission() -> TestResult {
             let opaque = f.term(Operator::Call(name.into()), std::slice::from_ref(input))?;
             assert_eq!(node, again);
             assert_ne!(node, opaque);
-            assert_eq!(f.cas.expression(&node)?, (&operator, &real()));
-            assert_eq!(f.cas.scalar_ambient(&node)?, ambient);
+            assert_eq!(
+                f.cas
+                    .expression(&node, &mut crate::testing::budgets::graph_budget()?)?,
+                (&operator, &real())
+            );
+            assert_eq!(
+                f.cas
+                    .scalar_ambient(&node, &mut crate::testing::budgets::graph_budget()?)?,
+                ambient
+            );
             assert_eq!(
                 f.cas.operands(&node, &mut default_budget()?)?,
                 std::slice::from_ref(input)

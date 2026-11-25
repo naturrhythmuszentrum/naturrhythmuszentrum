@@ -90,10 +90,10 @@ fn prepared(kind: u32) -> TestResult<Selection> {
     let original = RationalBoxEnclosure {
         target: target.clone(),
         context: source.question.basis.context.clone(),
-        input_family: source
-            .frame
-            .cas
-            .admissible_region(&source.question.basis.context)?,
+        input_family: source.frame.cas.admissible_region(
+            &source.question.basis.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?,
         coordinates,
     };
     let inverse = source.basis.inverse().map().expression().clone();
@@ -325,10 +325,10 @@ fn originals(
         result.push(RationalEnclosure {
             target,
             context: source.question.basis.context.clone(),
-            input_family: source
-                .frame
-                .cas
-                .admissible_region(&source.question.basis.context)?,
+            input_family: source.frame.cas.admissible_region(
+                &source.question.basis.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             lower: Rational::from_ratio(bounds.0, bounds.1, &mut ledger()?)?,
             upper: Rational::from_ratio(bounds.2, bounds.3, &mut ledger()?)?,
             origin,
@@ -381,7 +381,7 @@ fn citations(cas: &Cas, witness: &VerifiedWitness, pi: bool) -> TestResult {
     let citations = cas.proof_citations(witness.proof(), &mut ledger()?)?;
     let citation = citations.last().ok_or("missing tuple citation")?;
     let schema = citation
-        .auxiliary_schema(cas)?
+        .auxiliary_schema(cas, &mut crate::testing::budgets::graph_budget()?)?
         .ok_or("missing tuple schema")?;
     assert_eq!(
         (schema.name, schema.version),

@@ -18,7 +18,7 @@ fn lc_spectral_original_transport() -> TestResult {
     let names = law
         .transport_hypotheses()
         .iter()
-        .map(|reference| fixture.source.cas.hypothesis_name(reference))
+        .map(|reference| fixture.source.cas.hypothesis_name(reference, &mut budget))
         .collect::<Result<Vec<_>, _>>()?;
     assert_eq!(names, vec![Some("positive-L"), Some("positive-C")]);
     assert_eq!(law.multiplicities(), [1, 1]);
@@ -30,7 +30,7 @@ fn lc_spectral_original_transport() -> TestResult {
             law.retained_payload_bytes(),
             fixture.construction_work
         ),
-        (65_588, 832, 1_465_542)
+        (65_612, 832, 1_466_130)
     );
     Ok(())
 }

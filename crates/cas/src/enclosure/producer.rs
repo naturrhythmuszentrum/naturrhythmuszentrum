@@ -51,7 +51,7 @@ pub(super) fn generate_planned(
         .saturating_add(512);
     for (index, id) in schedule.iter().copied().enumerate() {
         boundary(budget, interrupt)?;
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         let right = if expression.operands.is_empty() {
             None
         } else {
@@ -125,6 +125,7 @@ pub(super) fn generate_planned(
                 !powers.is_empty(),
                 !derivatives.is_empty(),
             ),
+            budget,
         )?,
         version: 1,
         scope,
@@ -156,7 +157,7 @@ fn coordinate<'a>(
 ) -> Result<&'a Interval, Fault> {
     budget.work(crate::graph::size(request.coordinates.len(), AT)?, AT)?;
     for bound in &request.coordinates {
-        if cas.checked(&bound.coordinate)? == id {
+        if cas.checked(&bound.coordinate, budget)? == id {
             return Ok(&bound.interval);
         }
     }
@@ -190,12 +191,17 @@ const fn invalid() -> Fault {
 }
 
 /// Select the implemented family without granting the proposed transcript authority.
-fn law(cas: &Cas, request: &EnclosureRequest, logs: bool) -> Result<super::EnclosureLaw, Fault> {
+fn law(
+    cas: &Cas,
+    request: &EnclosureRequest,
+    logs: bool,
+    budget: &mut crate::budget::Budget,
+) -> Result<super::EnclosureLaw, Fault> {
     Ok(if logs {
         super::EnclosureLaw::LogAtanh
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_roots
     {
         super::EnclosureLaw::RootGrid
@@ -253,7 +259,7 @@ fn node(
 ) -> Result<Generated, Fault> {
     let (grid, plan, index) = schedule;
     let (left, right) = inputs;
-    let expression = cas.state.expression(id)?;
+    let expression = cas.state.expression(id, budget)?;
     if matches!(expression.operator, Operator::PositivePower) {
         return power_node(
             cas,
@@ -271,7 +277,7 @@ fn node(
         Operator::Rational(value) => Interval::singleton(value, budget)?,
         Operator::Free(_) => coordinate(cas, request, id, budget)?.copied(budget)?,
         Operator::NaturalLog => {
-            let original = cas.state.expression(expression.operands[0])?;
+            let original = cas.state.expression(expression.operands[0], budget)?;
             let (bound, evidence) = logarithm(
                 right.ok_or_else(invalid)?,
                 &original.operator,
@@ -405,11 +411,17 @@ fn power_node(
     budget: &mut Budget,
     interrupt: &mut impl FnMut(BudgetUsage) -> bool,
 ) -> Result<Generated, Fault> {
-    let Operator::Rational(exponent) = &cas.state.expression(expression.operands[1])?.operator
+    let Operator::Rational(exponent) = &cas
+        .state
+        .expression(expression.operands[1], budget)?
+        .operator
     else {
         return Err(invalid());
     };
-    let original = &cas.state.expression(expression.operands[0])?.operator;
+    let original = &cas
+        .state
+        .expression(expression.operands[0], budget)?
+        .operator;
     if (base.lower().is_zero() || base.lower().is_negative())
         && matches!(original, Operator::Rational(_) | Operator::Free(_))
     {
@@ -437,11 +449,12 @@ fn transcript_law(
     cas: &Cas,
     request: &EnclosureRequest,
     families: (bool, bool, bool, bool),
+    budget: &mut crate::budget::Budget,
 ) -> Result<super::EnclosureLaw, Fault> {
     let (logs, exps, powers, derivatives) = families;
     if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_clamp
         != crate::enclosure::ClampShape::Smooth
     {
@@ -454,20 +467,20 @@ fn transcript_law(
         super::EnclosureLaw::PositivePower
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_saturation
         == 2
     {
         super::EnclosureLaw::TanhCompose
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_saturation
         == 1
     {
         super::EnclosureLaw::SigmoidCompose
     } else if !exps {
-        law(cas, request, logs)?
+        law(cas, request, logs, budget)?
     } else {
         super::EnclosureLaw::ExpTaylor
     })
@@ -488,8 +501,12 @@ fn derivative_node(
         return Err(invalid());
     };
     let (schedule, records, index) = source;
-    let count = usize::try_from(cas.state.expression(expression.operands[0])?.unfolded)
-        .map_err(|_| invalid())?;
+    let count = usize::try_from(
+        cas.state
+            .expression(expression.operands[0], budget)?
+            .unfolded,
+    )
+    .map_err(|_| invalid())?;
     let first = index.checked_sub(count).ok_or_else(invalid)?;
     let source = super::derivative::Segment {
         cas,

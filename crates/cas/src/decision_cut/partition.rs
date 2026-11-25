@@ -22,7 +22,9 @@ pub(crate) fn check(
     budget: &mut Budget,
 ) -> Result<CheckedCasePartition, Fault> {
     let bytes = payload(contract, budget)?;
-    let function = cas.state.expression(cas.checked(&contract.function)?)?;
+    let function = cas
+        .state
+        .expression(cas.checked(&contract.function, budget)?, budget)?;
     let scratch = size(function.arms.len(), AT)?
         .saturating_mul(64)
         .saturating_add(size(contract.coordinates.len(), AT)?.saturating_mul(512));
@@ -74,7 +76,9 @@ fn prepare(
     contract: &CasePartition,
     budget: &mut Budget,
 ) -> Result<(CaseCut, LogicalId, Vec<LogicalId>), Fault> {
-    let function = cas.state.expression(cas.checked(&contract.function)?)?;
+    let function = cas
+        .state
+        .expression(cas.checked(&contract.function, budget)?, budget)?;
     budget.specialized(
         BudgetKind::CaseArms,
         size(function.arms.len(), AT)?,
@@ -121,7 +125,7 @@ fn prepare(
     roots.push(initial[0]);
     for id in &function.arms {
         budget.work(1, AT)?;
-        let arm = cas.state.arm(*id)?;
+        let arm = cas.state.arm(*id, budget)?;
         if arm.header != header || !arm.scope.is_empty() {
             return Err(invalid(InvalidCode::Scope));
         }
@@ -167,7 +171,7 @@ pub(crate) fn reuse(
     cut: &CaseCut,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    cas.checked(&partition.contract.function)?;
+    cas.checked(&partition.contract.function, budget)?;
     let bytes = super::input_payload(cut, budget)?;
     budget.work(bytes.saturating_add(partition.bytes), AT)?;
     let coordinates = cut.bounds.iter().map(|value| &value.coordinate);

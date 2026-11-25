@@ -36,6 +36,7 @@ fn conclusion(
     cas: &Cas,
     draft: &ApplicationDraft,
     certificate: &CertificateCoefficientIdentity,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     let Statement::PredicateFact { predicate, region } = &draft.conclusion else {
         return Err(invalid());
@@ -43,20 +44,21 @@ fn conclusion(
     if *region != certificate.region {
         return Err(invalid());
     }
-    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate)?)? else {
+    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     let [argument] = condition.arguments.as_slice() else {
         return Err(invalid());
     };
-    let frame = cas.state.region(cas.checked(region)?)?;
+    let frame = cas.state.region(cas.checked(region, budget)?, budget)?;
     if condition.kind != crate::model::PredicateKind::NonZero
         || condition.header != frame.header
         || condition.scope != frame.scope
     {
         return Err(invalid());
     }
-    let expression = cas.state.expression(*argument)?;
+    let expression = cas.state.expression(*argument, budget)?;
     let Some(ExpressionAttachment::ExactCoefficient { value, map }) = &expression.attachment else {
         return Err(invalid());
     };
@@ -141,7 +143,7 @@ pub(crate) fn check(
     if exponent == 0 {
         return Err(invalid());
     }
-    conclusion(cas, draft, certificate)?;
+    conclusion(cas, draft, certificate, budget)?;
     let inherited = conditions(cas, draft, premises, budget)?;
     let map = mapping(
         cas,

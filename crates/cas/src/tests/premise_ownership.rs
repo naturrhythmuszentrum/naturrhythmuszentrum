@@ -8,7 +8,7 @@ use crate::graph::{Cas, Handle};
 use crate::proof_model::{ApplicationDraft, Certificate, Judgment, VerifiedWitness};
 use crate::rule::Primitive;
 use crate::testing::common::TestResult;
-use crate::testing::native::budget as default_budget;
+use crate::testing::native::fresh_budget as default_budget;
 use crate::testing::native::{Fixture as Base, admit, predicate, term};
 use crate::wire_build::Entity;
 use crate::wire_read::Reader;
@@ -125,6 +125,7 @@ struct Record {
 
 /// Patch symbolic dependencies without changing the record's certificate or slots.
 fn record(cas: &Cas, witness: &VerifiedWitness) -> TestResult<Record> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut value = crate::wire_records::describe(
         cas,
         &Entity::Object(witness.proof().logical_id()),
@@ -134,7 +135,12 @@ fn record(cas: &Cas, witness: &VerifiedWitness) -> TestResult<Record> {
     let mut records = Vec::new();
     for (offset, entity) in value.references {
         let decoded = match entity {
-            Entity::Object(id) if matches!(cas.state.node(id)?, crate::graph::Vertex::Proof(_)) => {
+            Entity::Object(id)
+                if matches!(
+                    cas.state.node(id, &mut budget)?,
+                    crate::graph::Vertex::Proof(_)
+                ) =>
+            {
                 Decoded::Application(cas.handle(id))
             }
             Entity::Object(id) => Decoded::Object(cas.handle(id)),
@@ -200,7 +206,7 @@ fn supplied_premise_surplus_slots() -> TestResult {
             fault,
             Fault::invalid(InvalidCode::Rule, Location::new("typed proof admission"))
         );
-        assert_eq!(budget.usage().work, 32_529);
+        assert_eq!(budget.usage().work, 32_539);
         assert_eq!(budget.limits(), &limits);
         assert_eq!(snapshot(&base.cas)?, before);
         let ordinary = base

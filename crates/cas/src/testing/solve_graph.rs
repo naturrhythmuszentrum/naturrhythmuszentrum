@@ -254,8 +254,10 @@ pub(crate) fn coefficient_witness() -> TestResult<(Cas, crate::test_api::proof::
 
 /// Construct a family proposal using either its bound slot or an escaped free declaration.
 pub(crate) fn family_draft(fixture: &mut Fixture, escaped: bool) -> TestResult<Draft> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::test_api::solving::{FamilyMapData, SolveView};
-    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem)? else {
+    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem, &mut budget)?
+    else {
         return Err("problem missing".into());
     };
     let coefficients = problem.coefficients.clone();
@@ -602,8 +604,9 @@ fn replace_predicate(
     predicate: Handle,
     denominators: Vec<Handle>,
 ) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let crate::test_api::solving::SolveView::SolveProblem(base) =
-        fixture.cas.solve_view(&fixture.problem)?
+        fixture.cas.solve_view(&fixture.problem, &mut budget)?
     else {
         return Err("problem missing".into());
     };

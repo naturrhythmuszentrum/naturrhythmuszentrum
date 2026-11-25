@@ -48,14 +48,15 @@ pub(crate) fn certificate(
             budget.check(BudgetKind::RegionNodes, size(regions.len(), AT)?, AT)?;
             crate::region_check::measure(partition, budget)?;
             for region in regions {
-                cas.state.region(cas.checked(region)?)?;
+                cas.state.region(cas.checked(region, budget)?, budget)?;
             }
         }
         BoundaryCertificate::Polynomial {
             polynomial,
             coefficients,
         } => {
-            cas.state.expression(cas.checked(polynomial)?)?;
+            cas.state
+                .expression(cas.checked(polynomial, budget)?, budget)?;
             crate::univariate::validate(coefficients, budget)?;
             let bytes = crate::univariate::payload(coefficients, budget)?;
             budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;

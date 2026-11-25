@@ -215,7 +215,12 @@ pub(crate) fn production(kind: usize) -> TestResult<super::series_proof::Product
     let O::Truncate { input, .. } = &f.operation else {
         return Err("baseline".into());
     };
-    let field = f.base.cas.series_object(input)?.field.clone();
+    let field = f
+        .base
+        .cas
+        .series_object(input, &mut crate::testing::budgets::graph_budget()?)?
+        .field
+        .clone();
     let (p, q, order) = match kind {
         13 => (&["0", "1", "1", "0"][..], &["0", "1", "-1", "0"][..], None),
         14 => (&["0", "1", "1"][..], &["0", "1", "1"][..], Some(2)),

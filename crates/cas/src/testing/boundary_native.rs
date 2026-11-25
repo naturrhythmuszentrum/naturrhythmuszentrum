@@ -2,7 +2,7 @@
 //! Crate fixture exposes checked applications solely for adversarial mutation tests.
 
 use super::common::TestResult;
-use super::native::{Fixture, budget};
+use super::native::{Fixture, fresh_budget};
 use crate::boundary_derivative::DerivativeJob;
 use crate::boundary_model::{CaseName, NamedCase};
 use crate::boundary_producer::Runner;
@@ -44,7 +44,7 @@ fn point_evidence(obstructed: bool) -> TestResult<Evidence> {
                 coordinate: "x".into(),
                 parameter: None,
             },
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?
     } else {
         fixture.x.clone()
@@ -53,7 +53,7 @@ fn point_evidence(obstructed: bool) -> TestResult<Evidence> {
         &mut fixture.cas,
         &fixture.domain,
         &crate::number::Rational::zero(),
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let request = Request {
         task: Task::Boundary {
@@ -67,8 +67,8 @@ fn point_evidence(obstructed: bool) -> TestResult<Evidence> {
         limits: crate::budget::LimitsOverride::default(),
     };
     let policy = SearchPolicy::default();
-    let mut generation = budget()?;
-    let mut checker = budget()?;
+    let mut generation = fresh_budget()?;
+    let mut checker = fresh_budget()?;
     let mut runner = Runner {
         cas: &mut fixture.cas,
         request: &request,
@@ -90,13 +90,13 @@ fn point_evidence(obstructed: bool) -> TestResult<Evidence> {
 /// Preserve all actual premise identities before testing a modified proposal.
 fn extract(fixture: Fixture, proof: &Handle) -> TestResult<Evidence> {
     let application =
-        crate::proof_view::application(&fixture.cas, proof.logical_id(), &mut budget()?)?;
+        crate::proof_view::application(&fixture.cas, proof.logical_id(), &mut fresh_budget()?)?;
     let mut premises = Vec::new();
     for id in &application.premises {
         premises.push(crate::proof_view::application(
             &fixture.cas,
             *id,
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?);
     }
     let draft = ApplicationDraft {

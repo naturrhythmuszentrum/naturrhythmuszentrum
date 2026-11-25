@@ -13,10 +13,14 @@ pub(super) fn preflight(
     cas: &Cas,
     request: &EnclosureRequest,
     policy: RefinementPolicy,
-    budget: &Budget,
+    budget: &mut Budget,
 ) -> Result<Option<u32>, Fault> {
-    let target = cas.state.expression(cas.checked(&request.target)?)?;
-    let context = cas.state.context(cas.checked(&request.context)?)?;
+    let target = cas
+        .state
+        .expression(cas.checked(&request.target, budget)?, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&request.context, budget)?, budget)?;
     if target.header != context.header_id || !target.scope.is_empty() {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
@@ -91,7 +95,7 @@ pub(super) fn key(
         .into_iter()
         .chain(request.coordinates.iter().map(|v| &v.coordinate))
     {
-        let bytes = crate::wire_build::syntax_key(cas, cas.checked(handle)?, budget)?;
+        let bytes = crate::wire_build::syntax_key(cas, cas.checked(handle, budget)?, budget)?;
         budget.check(
             BudgetKind::StagedPayloadBytes,
             footprint_blobs(&blobs).saturating_add(size(bytes.len(), AT)?),
@@ -147,13 +151,17 @@ fn footprint_blobs(blobs: &[Vec<u8>]) -> u64 {
 
 /// Check coordinate ownership, scalar sorts and uniqueness.
 fn validate(cas: &Cas, request: &EnclosureRequest, budget: &mut Budget) -> Result<(), Fault> {
-    let target = cas.state.expression(cas.checked(&request.target)?)?;
+    let target = cas
+        .state
+        .expression(cas.checked(&request.target, budget)?, budget)?;
     for (index, coordinate) in request.coordinates.iter().enumerate() {
         budget.work(
             u64::try_from(index).unwrap_or(u64::MAX).saturating_add(1),
             AT,
         )?;
-        let expression = cas.state.expression(cas.checked(&coordinate.coordinate)?)?;
+        let expression = cas
+            .state
+            .expression(cas.checked(&coordinate.coordinate, budget)?, budget)?;
         if !matches!(expression.operator, Operator::Free(_))
             || expression.header != target.header
             || !expression.scope.is_empty()
@@ -187,8 +195,8 @@ pub(super) fn schedule(
     request: &EnclosureRequest,
     budget: &mut Budget,
 ) -> Result<Vec<LogicalId>, Fault> {
-    let root = cas.checked(&request.target)?;
-    let count = cas.state.expression(root)?.unfolded;
+    let root = cas.checked(&request.target, budget)?;
+    let count = cas.state.expression(root, budget)?.unfolded;
     budget.check(BudgetKind::ProofNodes, count, AT)?;
     budget.check(
         BudgetKind::StagedPayloadBytes,
@@ -212,7 +220,7 @@ pub(super) fn schedule(
             result.push(id);
             continue;
         }
-        let value = cas.state.expression(id)?;
+        let value = cas.state.expression(id, budget)?;
         if !value.supported_enclosure || !value.scope.is_empty() || !scalar(&value.sort) {
             return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
         }

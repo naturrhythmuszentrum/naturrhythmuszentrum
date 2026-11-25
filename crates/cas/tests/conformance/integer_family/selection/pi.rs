@@ -13,7 +13,8 @@ fn dependencies(cas: &Cas, witness: &VerifiedWitness) -> TestResult {
     let mut family = 0;
     let mut pi = 0;
     for citation in cas.proof_citations(witness.proof(), &mut ledger()?)? {
-        if let Some(schema) = citation.auxiliary_schema(cas)?
+        if let Some(schema) =
+            citation.auxiliary_schema(cas, &mut crate::testing::budgets::graph_budget()?)?
             && schema.name == "decision.integer-floor-family"
         {
             assert_eq!(schema.version, 2);
@@ -118,7 +119,7 @@ fn integer_family_pi_costs() -> TestResult {
         receiver.inspect(&bytes, &mut replay)?;
         rows.push((budget.usage().work, replay.usage().work, bytes.len()));
     }
-    assert_eq!(rows, [(168_544, 248_957, 1_562), (201_417, 301_425, 1_812)]);
+    assert_eq!(rows, [(168_637, 249_217, 1_562), (201_510, 301_721, 1_812)]);
     Ok(())
 }
 
@@ -204,10 +205,10 @@ fn resource_attempt(
 #[test]
 fn integer_family_pi_resources() -> TestResult {
     for (bounded, replay, work) in [
-        (false, false, 168_544),
-        (false, true, 248_957),
-        (true, false, 201_417),
-        (true, true, 301_425),
+        (false, false, 168_637),
+        (false, true, 249_217),
+        (true, false, 201_510),
+        (true, true, 301_721),
     ] {
         resource_attempt(bounded, replay, work, 0, true)?;
         resource_attempt(bounded, replay, work - 1, 0, false)?;

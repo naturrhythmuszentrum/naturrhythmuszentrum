@@ -10,8 +10,8 @@ use nrz_bindings::{Budget, Descriptor, Limits};
 #[test]
 fn quantity_product_covariance_work_boundaries() -> TestResult {
     for (warm, required, charged, refused) in [
-        (false, 878_596, 832_130, 722_401),
-        (true, 10_443, 10_443, 8_762),
+        (false, 879_377, 832_852, 723_015),
+        (true, 10_488, 10_488, 8_807),
     ] {
         for accepted in [false, true] {
             let ratio = Descriptor::ratio();
@@ -73,8 +73,8 @@ fn exhaustion(fault: nrz_matrix::QuantityError<f64>, warm: bool) {
             fault.kind,
             FaultKind::Exhausted {
                 budget: BudgetKind::Work,
-                limit: 10_442,
-                needed: 10_443,
+                limit: 10_487,
+                needed: 10_488,
                 ..
             }
         ));

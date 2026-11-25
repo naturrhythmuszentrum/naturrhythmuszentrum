@@ -40,7 +40,7 @@ impl OperatorApplication {
         budget: &mut Budget,
     ) -> Result<Self, ReadingOperationError> {
         let (node, axes, entries) = build(cas, operator, input, budget)?;
-        let claim = expected(cas, operator.context(), &node)?;
+        let claim = expected(cas, operator.context(), &node, budget)?;
         let step = ApplicationDraft {
             rule: Primitive::Reflexivity,
             context: claim.context.clone(),
@@ -73,7 +73,8 @@ impl OperatorApplication {
         budget: &mut Budget,
     ) -> Result<Self, ReadingOperationError> {
         let (node, axes, entries) = build(cas, operator, input, budget)?;
-        let witness = cas.replay(bytes, &expected(cas, operator.context(), &node)?, budget)?;
+        let claim = expected(cas, operator.context(), &node, budget)?;
+        let witness = cas.replay(bytes, &claim, budget)?;
         if !witness.is_discharged() {
             return Err(ReadingOperationError::Unproved);
         }
@@ -172,7 +173,12 @@ fn build(
 }
 
 /// A native result is defined by syntax, so the scoped equality names that exact expression twice.
-fn expected(cas: &Cas, context: &Handle, node: &Handle) -> Result<Judgment, ReadingOperationError> {
+fn expected(
+    cas: &Cas,
+    context: &Handle,
+    node: &Handle,
+    budget: &mut Budget,
+) -> Result<Judgment, ReadingOperationError> {
     Ok(Judgment {
         context: context.clone(),
         layer: Layer::Pointwise,
@@ -180,7 +186,7 @@ fn expected(cas: &Cas, context: &Handle, node: &Handle) -> Result<Judgment, Read
         statement: Statement::Equality {
             left: node.clone(),
             right: node.clone(),
-            domain: cas.admissible_region(context)?,
+            domain: cas.admissible_region(context, budget)?,
             domain_contract: DomainContract::DefinedAndEqual,
         },
         residuals: Vec::new(),

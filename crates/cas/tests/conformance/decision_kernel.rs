@@ -12,7 +12,7 @@ use nrz_cas::decision::{
     EnclosureOrigin, RationalEnclosure, ScalarKernelCertificate, ScalarKernelLaw,
     ScalarKernelRecord,
 };
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Branch, Operator};
 use nrz_cas::{FaultKind, InvalidCode, Location};
 
@@ -67,7 +67,10 @@ fn prepared(kind: u8) -> TestResult<(Fixture, RationalEnclosure)> {
         }
     };
     let last = records.last().ok_or("missing result")?;
-    let input_family = source.cas.admissible_region(&source.context)?;
+    let input_family = source.cas.admissible_region(
+        &source.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let request = RationalEnclosure {
         target: target.clone(),
         context: source.context.clone(),
@@ -182,7 +185,9 @@ fn decision_kernel_nominal_coverage_refuses() -> TestResult {
     )?;
     request.target = coordinate.clone();
     request.context = local.clone();
-    request.input_family = source.cas.admissible_region(&local)?;
+    request.input_family = source
+        .cas
+        .admissible_region(&local, &mut crate::testing::budgets::graph_budget()?)?;
     request.lower = rational(3, 2)?;
     request.upper = request.lower.clone();
     let family = request.input_family.clone();
@@ -247,17 +252,17 @@ struct KernelCost {
 /// Constant, reciprocal and optimized positive-root receipts measured before pinning.
 const KERNEL_COSTS: [KernelCost; 3] = [
     KernelCost {
-        work: 10_196,
+        work: 10_218,
         bytes: 1320,
         records: 1,
     },
     KernelCost {
-        work: 22_961,
+        work: 22_995,
         bytes: 1720,
         records: 2,
     },
     KernelCost {
-        work: 69_071,
+        work: 69_128,
         bytes: 1720,
         records: 2,
     },
@@ -277,7 +282,7 @@ fn decision_kernel_work_boundaries() -> TestResult {
                 work,
                 ..Limits::default()
             };
-            let mut budget = Budget::new(limits.clone())?;
+            let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
             budget.work(17, Location::new("prior scalar kernel"))?;
             let result = source.cas.check_rational_enclosure(&request, &mut budget);
             if work == cost.work {
@@ -292,8 +297,8 @@ fn decision_kernel_work_boundaries() -> TestResult {
                 assert!(matches!(fault.kind, FaultKind::Exhausted {
                     budget: BudgetKind::Work, limit, needed, ..
                 } if limit == cost.work - 1 && needed == cost.work));
-                assert_eq!(fault.location, Location::new("exact rational enclosure"));
-                assert_eq!(budget.usage().work, cost.work - cost.bytes);
+                assert_eq!(fault.location, Location::new("retained kind count"));
+                assert_eq!(budget.usage().work, cost.work - 1);
             }
             if work == cost.work {
                 assert_eq!(source.cas.counts().vertices, before.vertices + 1);
@@ -381,7 +386,7 @@ fn decision_kernel_root_cost_components() -> TestResult {
             reconstructed.usage().work,
             relations.usage().work
         ],
-        [57_657, 56_527, 2176]
+        [57_711, 56_581, 2176]
     );
     Ok(())
 }

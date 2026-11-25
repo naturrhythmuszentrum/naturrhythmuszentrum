@@ -10,7 +10,12 @@ use nrz_scalar::ArithmeticContext;
 /// ´test:unit:phasor-solve-payload-boundaries´
 #[test]
 fn phasor_solve_payload_boundaries() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,
@@ -81,7 +86,12 @@ fn policy(staged: bool, limit: u64) -> TestResult<Budget> {
 /// ´test:unit:phasor-solve-publication-payload-boundaries´
 #[test]
 fn phasor_solve_publication_payload_boundaries() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,
@@ -116,7 +126,12 @@ fn phasor_solve_publication_payload_boundaries() -> TestResult {
 /// ´test:unit:phasor-restoration-shares-evidence-and-bounds-output´
 #[test]
 fn phasor_restoration_shares_evidence_and_bounds_output() -> TestResult {
-    let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let current = case.publication(&mut ledger()?)?;
     let context = ArithmeticContext::new()?;
     let solved = case

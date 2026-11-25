@@ -39,8 +39,8 @@ impl Cas {
                 declarations,
                 spaces,
             } => {
-                let parent = self.resolve(state, parent, locals)?;
-                let inherited = state.header(parent)?;
+                let parent = self.resolve(state, parent, locals, budget)?;
+                let inherited = state.header(parent, budget)?;
                 let mut environment = inherited.environment.environment().clone();
                 for declaration in declarations {
                     if declaration_index(
@@ -125,8 +125,8 @@ impl Cas {
             if slots[index].is_some() || !space_sort(&declarations[index].sort) {
                 return Err(Fault::invalid(InvalidCode::Sort, AT));
             }
-            let space = self.resolve(state, &draft.space, locals)?;
-            state.space(space)?;
+            let space = self.resolve(state, &draft.space, locals, budget)?;
+            state.space(space, budget)?;
             slots[index] = Some(space);
         }
         let mut result = Vec::new();
@@ -151,8 +151,13 @@ impl Cas {
     pub fn context_header(
         &self,
         context: &crate::graph::Handle,
+        budget: &mut crate::budget::Budget,
     ) -> Result<crate::graph::Handle, Fault> {
-        Ok(self.handle(self.state.context(self.checked(context)?)?.header_id))
+        Ok(self.handle(
+            self.state
+                .context(self.checked(context, budget)?, budget)?
+                .header_id,
+        ))
     }
 }
 
@@ -169,7 +174,7 @@ pub(crate) fn embeds(
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
     crate::work_observation::observe!(budget, AT, {
-        state.header(actual)?;
+        state.header(actual, budget)?;
         let mut current = target;
         let mut depth = 0_u64;
         loop {
@@ -178,7 +183,7 @@ pub(crate) fn embeds(
             if current == actual {
                 return Ok(true);
             }
-            let Some(parent) = state.header(current)?.parent else {
+            let Some(parent) = state.header(current, budget)?.parent else {
                 return Ok(false);
             };
             current = parent;
@@ -203,10 +208,11 @@ pub(crate) fn expression_space(
         || crate::distribution_syntax::scalar_action(operator)
         || explicit.is_some() && crate::distribution_syntax::action_arithmetic(operator))
     {
-        if operands
-            .iter()
-            .any(|id| state.expression(*id).is_ok_and(|v| v.space.is_some()))
-        {
+        if operands.iter().any(|id| {
+            state
+                .expression(*id, budget)
+                .is_ok_and(|v| v.space.is_some())
+        }) {
             return Err(Fault::invalid(InvalidCode::Sort, AT));
         }
         return if explicit.is_none() {
@@ -223,7 +229,7 @@ pub(crate) fn expression_space(
     let space = explicit
         .or(declared)
         .ok_or_else(|| Fault::invalid(InvalidCode::Sort, AT))?;
-    let value = state.space(space)?;
+    let value = state.space(space, budget)?;
     if declared.is_some_and(|expected| expected != space)
         || !embeds(state, value.header, header, budget)?
     {
@@ -231,7 +237,7 @@ pub(crate) fn expression_space(
     }
     for operand in operands {
         if state
-            .expression(*operand)?
+            .expression(*operand, budget)?
             .space
             .is_some_and(|actual| actual != space)
         {
@@ -257,7 +263,7 @@ fn declaration_space(
             .checked_add(1)
             .ok_or_else(|| Fault::capacity(BudgetKind::Depth, AT))?;
         budget.work(1, AT)?;
-        let value = state.header(current)?;
+        let value = state.header(current, budget)?;
         if let Some((_, space)) = value.spaces.iter().find(|(name, _)| name == key) {
             return Ok(Some(*space));
         }
@@ -275,8 +281,13 @@ impl Cas {
     pub fn expression_header(
         &self,
         expression: &crate::graph::Handle,
+        budget: &mut crate::budget::Budget,
     ) -> Result<crate::graph::Handle, Fault> {
-        Ok(self.handle(self.state.expression(self.checked(expression)?)?.header))
+        Ok(self.handle(
+            self.state
+                .expression(self.checked(expression, budget)?, budget)?
+                .header,
+        ))
     }
 }
 
@@ -288,8 +299,12 @@ impl Cas {
     pub fn expression_scope(
         &self,
         expression: &crate::graph::Handle,
+        budget: &mut crate::budget::Budget,
     ) -> Result<&crate::model::Scope, Fault> {
-        Ok(&self.state.expression(self.checked(expression)?)?.scope)
+        Ok(&self
+            .state
+            .expression(self.checked(expression, budget)?, budget)?
+            .scope)
     }
 }
 
@@ -301,8 +316,10 @@ impl Cas {
     pub fn predicate_kind(
         &self,
         predicate: &crate::graph::Handle,
+        budget: &mut Budget,
     ) -> Result<&crate::model::PredicateKind, Fault> {
-        let crate::graph::Vertex::Condition(value) = self.state.node(self.checked(predicate)?)?
+        let crate::graph::Vertex::Condition(value) =
+            self.state.node(self.checked(predicate, budget)?, budget)?
         else {
             return Err(Fault::invalid(InvalidCode::Reference, AT));
         };
@@ -318,7 +335,8 @@ impl Cas {
         predicate: &crate::graph::Handle,
         budget: &mut Budget,
     ) -> Result<Vec<crate::graph::Handle>, Fault> {
-        let crate::graph::Vertex::Condition(value) = self.state.node(self.checked(predicate)?)?
+        let crate::graph::Vertex::Condition(value) =
+            self.state.node(self.checked(predicate, budget)?, budget)?
         else {
             return Err(Fault::invalid(InvalidCode::Reference, AT));
         };
@@ -508,12 +526,14 @@ mod tests {
     /// ´test:unit:header-key-index-preserves-default-admission´
     #[test]
     fn header_key_index_preserves_default_admission() -> TestResult {
+        let mut budget = crate::testing::common::default_budget()?;
         for count in [0, 1, 2, 94] {
             let mut cas = Cas::new(Limits::default())?;
             let nodes = cas.admit(&[core(count)], &mut Budget::new(Limits::default())?)?;
-            let header = cas
-                .state
-                .header(cas.checked(nodes.first().ok_or("header")?)?)?;
+            let header = cas.state.header(
+                cas.checked(nodes.first().ok_or("header")?, &mut budget)?,
+                &mut budget,
+            )?;
             assert_eq!(header.environment.declarations.len(), count);
             assert!(
                 header

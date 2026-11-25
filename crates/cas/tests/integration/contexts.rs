@@ -17,7 +17,10 @@ use crate::testing::proofs::Fixture;
 #[test]
 fn conditional_parent_evidence_replay() -> TestResult {
     let mut fixture = Fixture::new()?;
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let predicate = admit(
         &mut fixture.cas,
         Draft::Condition {
@@ -40,7 +43,9 @@ fn conditional_parent_evidence_replay() -> TestResult {
         }),
         &mut budget()?,
     )?;
-    let region = fixture.cas.admissible_region(&frame)?;
+    let region = fixture
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
     let fact = Statement::PredicateFact {
         region: region.clone(),
         predicate: predicate.clone(),

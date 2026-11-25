@@ -154,16 +154,23 @@ fn same_results(
     expected: &crate::Cas,
     expected_handles: &[crate::Handle],
 ) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::graph::{Vertex, vertex_key};
     assert_eq!(actual.counts(), expected.counts());
     assert_eq!(actual_handles.len(), expected_handles.len());
     for (left, right) in actual_handles.iter().zip(expected_handles) {
-        let left_id = actual.checked(left)?;
-        let right_id = expected.checked(right)?;
+        let left_id = actual.checked(left, &mut budget)?;
+        let right_id = expected.checked(right, &mut budget)?;
         assert_eq!(left_id.kind, right_id.kind);
-        match (actual.state.node(left_id)?, expected.state.node(right_id)?) {
+        match (
+            actual.state.node(left_id, &mut budget)?,
+            expected.state.node(right_id, &mut budget)?,
+        ) {
             (Vertex::Source(_), Vertex::Source(_)) => {
-                assert_eq!(actual.source(left)?, expected.source(right)?);
+                assert_eq!(
+                    actual.source(left, &mut budget)?,
+                    expected.source(right, &mut budget)?
+                );
             }
             (Vertex::Occurrence(left), Vertex::Occurrence(right)) => {
                 assert_eq!(left.span, right.span);
@@ -173,13 +180,13 @@ fn same_results(
                 assert_eq!(
                     left.source
                         .map(|id| actual
-                            .source(&actual.handle(id))
+                            .source(&actual.handle(id), &mut budget)
                             .map(|(key, text)| (key.to_owned(), text.to_owned())))
                         .transpose()?,
                     right
                         .source
                         .map(|id| expected
-                            .source(&expected.handle(id))
+                            .source(&expected.handle(id), &mut budget)
                             .map(|(key, text)| (key.to_owned(), text.to_owned())))
                         .transpose()?
                 );
@@ -214,7 +221,8 @@ fn region_step(
     cas: &crate::Cas,
     context: &crate::Handle,
 ) -> Result<crate::proof::ApplicationDraft, crate::Fault> {
-    let region = cas.admissible_region(context)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let region = cas.admissible_region(context, &mut budget)?;
     Ok(crate::proof::ApplicationDraft {
         rule: crate::proof::Primitive::RegionConstruct,
         context: context.clone(),
@@ -447,6 +455,7 @@ fn journal_retry_comparison_rejects_swapped_children() -> TestResult {
 /// ´test:crate:journal-proof-publication-refusal´
 #[test]
 fn journal_proof_publication_refusal() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, witness) = Fixture::with_witness()?;
     let mut control = fixture.cas.full_copy_for_test();
     let context = &witness.judgment().context;
@@ -475,7 +484,7 @@ fn journal_proof_publication_refusal() -> TestResult {
     let expected = control.check_proof(context, &[step], &mut default_budget()?)?;
     assert_ne!(actual.proof(), expected.proof());
     assert_eq!(actual.bytes, expected.bytes);
-    assert_eq!(fixture.cas.state.proof_count(), 2);
+    assert_eq!(fixture.cas.state.proof_count(&mut budget)?, 2);
     assert_eq!(fixture.cas.counts(), control.counts());
     Ok(())
 }

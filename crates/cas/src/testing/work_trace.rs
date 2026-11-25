@@ -47,7 +47,7 @@ pub(crate) struct Ledger {
     pub(crate) first: u64,
     /// Latest observed boundary, including destruction inside the observation.
     pub(crate) last: u64,
-    /// Exclusive Work assigned to named operations.
+    /// Exclusive Work assigned to named operations or purpose-bearing phases.
     pub(crate) classified: u64,
     /// Explicit gaps or unnamed root Work, never silently clamped.
     pub(crate) remainder: u64,
@@ -156,6 +156,12 @@ pub(crate) fn uncoordinated<T>(
 
 /// Keep refused results; reject incomplete evidence without replacing the active observer.
 pub(crate) fn measured<T>(run: impl FnOnce() -> T) -> TestResult<(T, Vec<Row>)> {
+    let (result, report) = measured_report(run)?;
+    Ok((result, report.rows))
+}
+
+/// Retain the explicit per-ledger remainder for fixtures that reconcile a whole call.
+pub(crate) fn measured_report<T>(run: impl FnOnce() -> T) -> TestResult<(T, Report)> {
     let nested = tracing::dispatcher::get_default(|dispatch| {
         dispatch.downcast_ref::<WorkSubscriber>().is_some()
     });
@@ -167,5 +173,5 @@ pub(crate) fn measured<T>(run: impl FnOnce() -> T) -> TestResult<(T, Vec<Row>)> 
         return Err("incomplete Work observation".into());
     }
     legacy::compare(&report)?;
-    Ok((result, report.rows))
+    Ok((result, report))
 }

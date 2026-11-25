@@ -170,7 +170,7 @@ impl Compiler<'_> {
         if self.meanings.contains_key(&(mode, id)) {
             return Ok(());
         }
-        if let Some(meaning) = self.absent(mode, id)? {
+        if let Some(meaning) = self.absent(mode, id, budget)? {
             self.meanings.insert((mode, id), meaning);
             return Ok(());
         }
@@ -200,11 +200,16 @@ impl Compiler<'_> {
     }
 
     /// A proved empty base can decide membership without evaluating an unreachable predicate.
-    fn absent(&self, mode: Mode, id: LogicalId) -> Result<Option<Meaning>, Fault> {
+    fn absent(
+        &self,
+        mode: Mode,
+        id: LogicalId,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<Option<Meaning>, Fault> {
         if mode != Mode::Region {
             return Ok(None);
         }
-        let candidates = match &self.state.region(id)?.expression {
+        let candidates = match &self.state.region(id, budget)?.expression {
             RegionExpr::GuardTrue { base, .. }
             | RegionExpr::GuardFalse { base, .. }
             | RegionExpr::Difference { base, .. } => std::slice::from_ref(base),
@@ -243,7 +248,7 @@ impl Compiler<'_> {
 
     /// Set membership keeps defined-and-true separate from defined-and-false.
     fn region(&mut self, id: LogicalId, budget: &mut Budget) -> Result<Meaning, Fault> {
-        let expression = self.state.region(id)?.expression.clone();
+        let expression = self.state.region(id, budget)?.expression.clone();
         let formula = match expression {
             RegionExpr::Ambient => Formula::Constant(true),
             RegionExpr::Empty => Formula::Constant(false),
@@ -294,7 +299,7 @@ impl Compiler<'_> {
 
     /// Compile a strict Boolean predicate, preserving its own definedness.
     fn predicate(&mut self, id: LogicalId, budget: &mut Budget) -> Result<Meaning, Fault> {
-        let (kind, arguments) = predicate(self.state, id)?;
+        let (kind, arguments) = predicate(self.state, id, budget)?;
         let kind = kind.clone();
         let arguments = arguments.to_vec();
         let mut defined = Vec::new();
@@ -395,7 +400,7 @@ impl Compiler<'_> {
 
     /// Derive strict value definedness independently of a simplified coefficient view.
     fn defined(&mut self, id: LogicalId, budget: &mut Budget) -> Result<usize, Fault> {
-        let value = self.state.expression(id)?;
+        let value = self.state.expression(id, budget)?;
         let operator = value.operator.clone();
         let arguments = value.operands.clone();
         let mut required = Vec::new();
@@ -509,8 +514,12 @@ fn fold(formula: Formula, previous: &[Formula], budget: &mut Budget) -> Result<F
 }
 
 /// Resolve a Boolean expression or a graph predicate without changing its meaning.
-fn predicate(state: &State, id: LogicalId) -> Result<(&PredicateKind, &[LogicalId]), Fault> {
-    match state.node(id)? {
+fn predicate<'a>(
+    state: &'a State,
+    id: LogicalId,
+    budget: &mut Budget,
+) -> Result<(&'a PredicateKind, &'a [LogicalId]), Fault> {
+    match state.node(id, budget)? {
         Vertex::Condition(value) => Ok((&value.kind, &value.arguments)),
         Vertex::Expression(value) => match &value.operator {
             Operator::Predicate(kind) => Ok((kind, &value.operands)),
@@ -529,7 +538,7 @@ fn dependencies(
 ) -> Result<Vec<(Mode, LogicalId)>, Fault> {
     let mut result = Vec::new();
     match mode {
-        Mode::Region => match &state.region(id)?.expression {
+        Mode::Region => match &state.region(id, budget)?.expression {
             RegionExpr::Ambient | RegionExpr::Empty => {}
             RegionExpr::GuardTrue { base, predicate }
             | RegionExpr::GuardFalse { base, predicate } => {
@@ -552,7 +561,7 @@ fn dependencies(
             }
         },
         Mode::Predicate => {
-            let (kind, arguments) = predicate(state, id)?;
+            let (kind, arguments) = predicate(state, id, budget)?;
             let mode = if matches!(
                 kind,
                 PredicateKind::And | PredicateKind::Or | PredicateKind::Not
@@ -567,7 +576,7 @@ fn dependencies(
             result.extend(arguments.iter().map(|id| (mode, *id)));
         }
         Mode::Defined => {
-            let expression = state.expression(id)?;
+            let expression = state.expression(id, budget)?;
             if matches!(expression.operator, Operator::Predicate(_)) {
                 result
                     .try_reserve_exact(1)
@@ -767,7 +776,7 @@ pub(crate) fn partition_at(
     boundary: Option<&Rational>,
     budget: &mut Budget,
 ) -> Result<RegionCertificate, Fault> {
-    let first = state.region(roots.first().copied().ok_or_else(unknown)?)?;
+    let first = state.region(roots.first().copied().ok_or_else(unknown)?, budget)?;
     let (coordinate, integer) = match &first.ambient {
         AmbientDomain::Real(key) => (key.as_str(), false),
         AmbientDomain::Integer(key) => (key.as_str(), true),
@@ -775,7 +784,7 @@ pub(crate) fn partition_at(
         AmbientDomain::Opaque(_) | AmbientDomain::Product { .. } => return Err(unknown()),
     };
     for root in roots {
-        let region = state.region(*root)?;
+        let region = state.region(*root, budget)?;
         if region.ambient != first.ambient || region.scope != first.scope {
             return Err(unknown());
         }
@@ -874,7 +883,7 @@ pub(crate) fn boundary_point(
     boundary: LogicalId,
     budget: &mut Budget,
 ) -> Result<Rational, Fault> {
-    let boundary = state.boundary(boundary)?;
+    let boundary = state.boundary(boundary, budget)?;
     let AmbientDomain::Real(coordinate) = &boundary.ambient else {
         return Err(unknown());
     };

@@ -26,10 +26,11 @@ fn strict(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(3, AT)?;
-    let RegionExpr::GuardTrue { predicate, .. } = &cas.state.region(region)?.expression else {
+    let RegionExpr::GuardTrue { predicate, .. } = &cas.state.region(region, budget)?.expression
+    else {
         return Err(invalid());
     };
-    let Vertex::Condition(predicate) = cas.state.node(*predicate)? else {
+    let Vertex::Condition(predicate) = cas.state.node(*predicate, budget)? else {
         return Err(invalid());
     };
     let [argument] = predicate.arguments.as_slice() else {
@@ -38,14 +39,14 @@ fn strict(
     if predicate.kind != PredicateKind::Positive {
         return Err(invalid());
     }
-    let expression = cas.state.expression(subject)?;
+    let expression = cas.state.expression(subject, budget)?;
     if !matches!(expression.operator, Operator::Free(_)) {
         return Err(invalid());
     }
     if *argument == subject {
         return Ok(());
     }
-    let negative = cas.state.expression(*argument)?;
+    let negative = cas.state.expression(*argument, budget)?;
     if negative.operator == Operator::Neg && negative.operands == [subject] {
         Ok(())
     } else {
@@ -74,16 +75,23 @@ pub(crate) fn check(
         crate::graph::size(membership.conditions.hypotheses.len(), AT)?.saturating_add(6),
         AT,
     )?;
-    let context = cas.checked(&draft.context)?;
-    let frame = cas.state.context(cas.checked(&reference.context)?)?;
+    let context = cas.checked(&draft.context, budget)?;
+    let frame = cas
+        .state
+        .context(cas.checked(&reference.context, budget)?, budget)?;
     if reference.slot != 0
         || frame.introduction.is_none()
         || !draft.substitutions.is_empty()
-        || !crate::context_check::ancestor(cas, cas.checked(&reference.context)?, context, budget)?
+        || !crate::context_check::ancestor(
+            cas,
+            cas.checked(&reference.context, budget)?,
+            context,
+            budget,
+        )?
     {
         return Err(invalid());
     }
-    let region = cas.handle(cas.state.context(context)?.admissible);
+    let region = cas.handle(cas.state.context(context, budget)?.admissible);
     let restriction = frame.restriction.ok_or_else(invalid)?;
     let expected = Statement::Subset {
         subset: region.clone(),
@@ -103,7 +111,8 @@ pub(crate) fn check(
     else {
         return Err(invalid());
     };
-    let Vertex::Condition(predicate) = cas.state.node(cas.checked(predicate)?)? else {
+    let Vertex::Condition(predicate) = cas.state.node(cas.checked(predicate, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     let [subject] = predicate.arguments.as_slice() else {
@@ -145,7 +154,11 @@ pub(crate) fn discharge(
     {
         return Err(invalid());
     }
-    let region = cas.handle(cas.state.context(cas.checked(&draft.context)?)?.admissible);
+    let region = cas.handle(
+        cas.state
+            .context(cas.checked(&draft.context, budget)?, budget)?
+            .admissible,
+    );
     if guard.home != draft.context
         || guard.region != region
         || !guard.scope.is_empty()
@@ -167,7 +180,10 @@ pub(crate) fn discharge(
     {
         return Err(invalid());
     }
-    let Vertex::Condition(predicate) = cas.state.node(cas.checked(&guard.predicate)?)? else {
+    let Vertex::Condition(predicate) = cas
+        .state
+        .node(cas.checked(&guard.predicate, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     if predicate.kind != PredicateKind::NonZero || predicate.arguments.len() != 1 {

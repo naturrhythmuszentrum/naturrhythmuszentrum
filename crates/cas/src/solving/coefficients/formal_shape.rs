@@ -36,7 +36,7 @@ fn scopes(source: &Scope, target: &[Vec<AtomicSort>], frame: &Scope) -> Result<(
 
 /// Each operand comparison is prepaid, including the full metadata payload.
 fn charge(state: &State, id: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
-    let (_, key) = crate::graph::vertex_key(state.node(id)?, state, budget)?;
+    let (_, key) = crate::graph::vertex_key(state.node(id, budget)?, state, budget)?;
     budget.work(crate::graph::size(key.len(), AT)?.max(1), AT)
 }
 
@@ -218,7 +218,7 @@ fn node(
 ) -> Result<(), Fault> {
     charge(state, left, budget)?;
     charge(state, right, budget)?;
-    match (state.node(left)?, state.node(right)?) {
+    match (state.node(left, budget)?, state.node(right, budget)?) {
         (Vertex::Expression(a), Vertex::Expression(b)) => expressions(a, b, scope, pending, budget),
         (Vertex::Region(a), Vertex::Region(b)) => regions(a, b, scope, pending, budget),
         (Vertex::Condition(a), Vertex::Condition(b)) => {
@@ -271,8 +271,8 @@ pub(crate) fn introduction(
     region: LogicalId,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let base = state.region(parent)?;
-    let local = state.region(region)?;
+    let base = state.region(parent, budget)?;
+    let local = state.region(region, budget)?;
     if base.scope == local.scope {
         return Ok(false);
     }
@@ -293,7 +293,7 @@ fn children(
 ) -> Result<Option<Vec<LogicalId>>, Fault> {
     charge(&cas.state, id, budget)?;
     let mut result = vector(0, budget)?;
-    match cas.state.node(id)? {
+    match cas.state.node(id, budget)? {
         Vertex::Expression(value) => {
             scopes(&value.scope, &[], scope)?;
             if value.scope.is_empty() {
@@ -352,6 +352,7 @@ fn draft(
     cas: &Cas,
     id: LogicalId,
     known: &std::collections::BTreeMap<LogicalId, Handle>,
+    budget: &mut Budget,
 ) -> Result<Draft, Fault> {
     let mut resolve = |child| {
         known
@@ -360,7 +361,9 @@ fn draft(
             .map(Reference::Existing)
             .ok_or_else(invalid)
     };
-    match cas.state.node(id)? {
+    let header = crate::descriptor::metadata(&cas.state, id, budget)?.0;
+    let vertex = cas.state.node(id, budget)?;
+    match vertex {
         Vertex::Expression(value) => {
             if let Some(ExpressionAttachment::ExactCoefficient {
                 value: coefficient,
@@ -375,14 +378,15 @@ fn draft(
             }
             crate::substitution_draft::rebuild(
                 cas,
-                id,
+                vertex,
+                header,
                 Vec::new(),
                 Some(value.operator.clone()),
                 &mut resolve,
             )
         }
         Vertex::Region(_) | Vertex::Condition(_) => {
-            crate::substitution_draft::rebuild(cas, id, Vec::new(), None, &mut resolve)
+            crate::substitution_draft::rebuild(cas, vertex, header, Vec::new(), None, &mut resolve)
         }
         Vertex::Solve(value) => {
             let SolveDraft::CoefficientMap(map) = value.as_ref() else {
@@ -438,7 +442,7 @@ pub(crate) fn erase(
 ) -> Result<Handle, Fault> {
     super::independent::object(cas, root, scope, budget)?;
     let mut pending = vector(1, budget)?;
-    pending.push((cas.checked(root)?, false));
+    pending.push((cas.checked(root, budget)?, false));
     let mut known = std::collections::BTreeMap::new();
     while let Some((id, expanded)) = pending.pop() {
         budget.work(crate::graph::size(known.len(), AT)?.max(1), AT)?;
@@ -450,7 +454,7 @@ pub(crate) fn erase(
             continue;
         };
         if expanded {
-            let value = draft(cas, id, &known)?;
+            let value = draft(cas, id, &known, budget)?;
             let handle = cas
                 .admit(std::slice::from_ref(&value), budget)?
                 .into_iter()

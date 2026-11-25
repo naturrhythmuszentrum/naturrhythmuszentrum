@@ -9,7 +9,7 @@ use crate::request_model::Request;
 use crate::search::SearchPolicy;
 use crate::task::Task;
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture, budget};
+use crate::testing::native::{Fixture, fresh_budget};
 
 /// Altering a side or coefficient fails even with the original checked branch premises.
 /// ´test:crate:germ-restriction-witness-tampering´
@@ -32,7 +32,7 @@ fn germ_restriction_witness_tampering() -> TestResult {
                     &mut fixture.cas,
                     &draft,
                     &premises,
-                    &mut budget()?
+                    &mut fresh_budget()?
                 )
                 .is_err()
             );
@@ -52,8 +52,13 @@ fn germ_series_remainder_tampering() -> TestResult {
     };
     value.remainders = vec![vec![Rational::one()]];
     assert!(
-        crate::scoped_check::check_application(&mut fixture.cas, &draft, &premises, &mut budget()?)
-            .is_err()
+        crate::scoped_check::check_application(
+            &mut fixture.cas,
+            &draft,
+            &premises,
+            &mut fresh_budget()?
+        )
+        .is_err()
     );
     draft = original;
     let Statement::Germ(value) = &mut draft.conclusion else {
@@ -64,8 +69,13 @@ fn germ_series_remainder_tampering() -> TestResult {
         analytic: true,
     };
     assert!(
-        crate::scoped_check::check_application(&mut fixture.cas, &draft, &premises, &mut budget()?)
-            .is_err()
+        crate::scoped_check::check_application(
+            &mut fixture.cas,
+            &draft,
+            &premises,
+            &mut fresh_budget()?
+        )
+        .is_err()
     );
     Ok(())
 }
@@ -77,7 +87,7 @@ fn evidence(series: bool) -> TestResult<(Fixture, ApplicationDraft, Vec<CheckedA
         &mut fixture.cas,
         &fixture.domain,
         &Rational::zero(),
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let at = GermAt {
         coordinate: "x".into(),
@@ -105,20 +115,20 @@ fn evidence(series: bool) -> TestResult<(Fixture, ApplicationDraft, Vec<CheckedA
         &request,
         &[fixture.x.logical_id()],
         &SearchPolicy::default(),
-        &mut budget()?,
-        &mut budget()?,
+        &mut fresh_budget()?,
+        &mut fresh_budget()?,
     )?;
     let application = crate::proof_view::application(
         &fixture.cas,
         result.witness.proof().logical_id(),
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let mut premises = Vec::new();
     for id in &application.premises {
         premises.push(crate::proof_view::application(
             &fixture.cas,
             *id,
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?);
     }
     let draft = ApplicationDraft {

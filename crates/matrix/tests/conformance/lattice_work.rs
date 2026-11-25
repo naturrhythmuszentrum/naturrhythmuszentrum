@@ -105,7 +105,7 @@ const fn expected() -> [Costs; 2] {
         Costs {
             kind: 0,
             capture: 4107,
-            enclosure: 59_464,
+            enclosure: 59_521,
             preparation: 1694,
             publication: 225,
             current: 98,
@@ -119,7 +119,7 @@ const fn expected() -> [Costs; 2] {
         Costs {
             kind: 1,
             capture: 6417,
-            enclosure: 21_282,
+            enclosure: 21_320,
             preparation: 2022,
             publication: 289,
             current: 162,

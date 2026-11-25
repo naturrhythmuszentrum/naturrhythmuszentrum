@@ -67,7 +67,8 @@ impl Cas {
         roots: &[Handle],
         budget: &mut Budget,
     ) -> Result<SortRouting, Fault> {
-        let original = crate::solving::graph::problem(&self.state, self.checked(problem)?)?;
+        let original =
+            crate::solving::graph::problem(&self.state, self.checked(problem, budget)?, budget)?;
         let mut scan = Scan {
             seen: Map::new(),
             pending: Vec::new(),
@@ -77,7 +78,7 @@ impl Cas {
         };
         scan.enqueue(self, problem.logical_id(), 1, budget)?;
         for root in roots {
-            scan.enqueue(self, self.checked(root)?, 1, budget)?;
+            scan.enqueue(self, self.checked(root, budget)?, 1, budget)?;
         }
         scan.walk(self, budget)?;
         let (real, complex) = super::routing_index::resolve(
@@ -114,7 +115,7 @@ impl<'a> Scan<'a> {
         budget: &mut Budget,
     ) -> Result<(), Fault> {
         budget.work(256, AT)?;
-        let index = *cas.state.indices.get(&id).ok_or_else(invalid)?;
+        let index = cas.state.index(id, budget)?;
         self.push(index, depth, budget)
     }
 
@@ -183,16 +184,14 @@ impl<'a> Scan<'a> {
         expression: &'a Expression,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        if expression.ambient != super::ambient(&cas.state, expression.header, &expression.sort)? {
+        if expression.ambient
+            != super::ambient(&cas.state, expression.header, &expression.sort, budget)?
+        {
             return Err(Fault::invalid(InvalidCode::AmbientSpaceMismatch, AT));
         }
         match &expression.operator {
             Operator::Free(key) => {
-                let index = *cas
-                    .state
-                    .indices
-                    .get(&expression.header)
-                    .ok_or_else(invalid)?;
+                let index = cas.state.index(expression.header, budget)?;
                 self.header(cas, expression.header, budget)?;
                 budget.work(size(key.len(), AT)?, AT)?;
                 if self.uses.get(&index, budget, AT)?.is_none() {
@@ -216,12 +215,12 @@ impl<'a> Scan<'a> {
     fn header(&mut self, cas: &Cas, mut id: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
         loop {
             budget.work(256, AT)?;
-            let index = *cas.state.indices.get(&id).ok_or_else(invalid)?;
+            let index = cas.state.index(id, budget)?;
             if self.headers.get(&index, budget, AT)?.is_some() {
                 return Ok(());
             }
             self.headers.insert(index, id, budget, AT)?;
-            let Some(parent) = cas.state.header(id)?.parent else {
+            let Some(parent) = cas.state.header(id, budget)?.parent else {
                 return Ok(());
             };
             id = parent;

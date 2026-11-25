@@ -58,10 +58,10 @@ pub(crate) fn check(
             crate::case_calculus::prefix_domain(cas, premises, region, budget)?;
         }
     }
-    let reason = obstruction(cas, value, below, above)?;
+    let reason = obstruction(cas, value, below, above, budget)?;
     match (&draft.conclusion, reason) {
         (Statement::DerivativeAt(result), None)
-            if rational(cas, &result.value)? == rational(cas, below.2)? =>
+            if rational(cas, &result.value, budget)? == rational(cas, below.2, budget)? =>
         {
             Ok(())
         }
@@ -80,13 +80,14 @@ fn obstruction(
     value: &Handle,
     below: (&Handle, &Handle, &Handle),
     above: (&Handle, &Handle, &Handle),
+    budget: &mut crate::budget::Budget,
 ) -> Result<Option<NonexistenceReason>, Fault> {
-    let actual = rational(cas, value)?;
-    Ok(if actual != rational(cas, below.1)? {
+    let actual = rational(cas, value, budget)?;
+    Ok(if actual != rational(cas, below.1, budget)? {
         Some(NonexistenceReason::Discontinuous(Side::Below))
-    } else if actual != rational(cas, above.1)? {
+    } else if actual != rational(cas, above.1, budget)? {
         Some(NonexistenceReason::Discontinuous(Side::Above))
-    } else if rational(cas, below.2)? != rational(cas, above.2)? {
+    } else if rational(cas, below.2, budget)? != rational(cas, above.2, budget)? {
         Some(NonexistenceReason::UnequalSlopes)
     } else {
         None

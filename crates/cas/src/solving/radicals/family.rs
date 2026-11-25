@@ -77,8 +77,8 @@ fn maps(
     problem: &Handle,
     budget: &mut Budget,
 ) -> Result<(Handle, Handle), Fault> {
-    let original = crate::solving::elementary::proof::problem(cas, problem)?;
-    let unknowns = crate::solving::elementary::proof::coordinates(cas, &original.unknowns)?;
+    let original = crate::solving::elementary::proof::problem(cas, problem, budget)?;
+    let unknowns = crate::solving::elementary::proof::coordinates(cas, &original.unknowns, budget)?;
     let [coordinate] = unknowns.coordinates.as_slice() else {
         return Err(invalid());
     };
@@ -114,7 +114,7 @@ fn image(
     family: &Handle,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let domain = crate::solving::elementary::proof::problem(cas, problem)?
+    let domain = crate::solving::elementary::proof::problem(cas, problem, budget)?
         .domain
         .clone();
     let branch = materialize::admit(

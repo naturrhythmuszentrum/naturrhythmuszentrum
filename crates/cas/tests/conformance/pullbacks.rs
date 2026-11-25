@@ -92,7 +92,10 @@ fn pullback_certificate_tampering() -> TestResult {
     let evidence = fixture
         .base
         .cas
-        .pullback_certificate(&result.witness)?
+        .pullback_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         .clone();
     for mutation in 0..5 {
         let mut changed = evidence.clone();
@@ -137,7 +140,10 @@ fn pullback_map_and_space_tampering() -> TestResult {
     let evidence = fixture
         .base
         .cas
-        .pullback_certificate(&result.witness)?
+        .pullback_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         .clone();
     for mutation in 0..4 {
         let mut claim = result.witness.judgment().statement.clone();
@@ -184,7 +190,10 @@ fn pullback_incomplete_witness_refusal() -> TestResult {
     let mut evidence = fixture
         .base
         .cas
-        .pullback_certificate(&result.witness)?
+        .pullback_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         .clone();
     let _removed = evidence.zeros.pop();
     let draft = application(
@@ -276,7 +285,10 @@ fn pullback_simple_zero_interval_support() -> TestResult {
         fixture
             .base
             .cas
-            .pullback_certificate(&result.witness)?
+            .pullback_certificate(
+                &result.witness,
+                &mut crate::testing::budgets::graph_budget()?
+            )?
             .zeros
             .len(),
         2

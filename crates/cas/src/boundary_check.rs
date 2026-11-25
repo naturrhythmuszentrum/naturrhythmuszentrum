@@ -82,9 +82,12 @@ pub(crate) fn equality(
 pub(crate) fn rational<'a>(
     cas: &'a Cas,
     value: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a crate::number::Rational, Fault> {
-    let crate::model::Operator::Rational(number) =
-        &cas.state.expression(cas.checked(value)?)?.operator
+    let crate::model::Operator::Rational(number) = &cas
+        .state
+        .expression(cas.checked(value, budget)?, budget)?
+        .operator
     else {
         return Err(invalid());
     };

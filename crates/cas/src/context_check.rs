@@ -30,7 +30,7 @@ pub(crate) fn ancestor(
     let mut current = Some(context);
     while let Some(id) = current {
         budget.condition(1, AT)?;
-        let frame = cas.state.context(id)?;
+        let frame = cas.state.context(id, budget)?;
         budget.check(BudgetKind::HypothesisDepth, frame.depth, AT)?;
         if id == introducing {
             return Ok(true);
@@ -41,8 +41,14 @@ pub(crate) fn ancestor(
 }
 
 /// Resolve a qualified predicate slot; membership slot zero has a separate typed law.
-pub(crate) fn predicate(cas: &Cas, hypothesis: &HypothesisRef) -> Result<Handle, Fault> {
-    let context = cas.state.context(cas.checked(&hypothesis.context)?)?;
+pub(crate) fn predicate(
+    cas: &Cas,
+    hypothesis: &HypothesisRef,
+    budget: &mut Budget,
+) -> Result<Handle, Fault> {
+    let context = cas
+        .state
+        .context(cas.checked(&hypothesis.context, budget)?, budget)?;
     let slot = usize::try_from(hypothesis.slot).map_err(|_| invalid())?;
     let frame = if context.parent.is_some() {
         &context.frame
@@ -69,18 +75,18 @@ pub(crate) fn hypothesis(
     if !draft.premises.is_empty() || !draft.substitutions.is_empty() {
         return Err(invalid());
     }
-    let context = cas.checked(&draft.context)?;
-    let introducing = cas.checked(&reference.context)?;
+    let context = cas.checked(&draft.context, budget)?;
+    let introducing = cas.checked(&reference.context, budget)?;
     if !ancestor(cas, introducing, context, budget)? {
         return Err(invalid());
     }
-    let frame = cas.state.context(introducing)?;
+    let frame = cas.state.context(introducing, budget)?;
     if frame.parent.is_some() && reference.slot == 0 {
         let Statement::Subset { subset, superset } = &draft.conclusion else {
             return Err(invalid());
         };
-        if cas.checked(subset)? != cas.state.context(context)?.admissible
-            || Some(cas.checked(superset)?) != frame.restriction
+        if cas.checked(subset, budget)? != cas.state.context(context, budget)?.admissible
+            || Some(cas.checked(superset, budget)?) != frame.restriction
         {
             return Err(invalid());
         }
@@ -92,8 +98,8 @@ pub(crate) fn hypothesis(
         else {
             return Err(invalid());
         };
-        if cas.checked(region)? != cas.state.context(context)?.admissible
-            || *expected != predicate(cas, reference)?
+        if cas.checked(region, budget)? != cas.state.context(context, budget)?.admissible
+            || *expected != predicate(cas, reference, budget)?
         {
             return Err(invalid());
         }
@@ -158,7 +164,10 @@ fn intersection(
     if left == right {
         return Ok(left.clone());
     }
-    let region = cas.state.region(cas.checked(left)?)?.clone();
+    let region = cas
+        .state
+        .region(cas.checked(left, budget)?, budget)?
+        .clone();
     let handles = cas.admit(
         &[Draft::Region(RegionDraft {
             header: Reference::Existing(cas.handle(region.header)),
@@ -181,13 +190,13 @@ fn embed_hypotheses(
     target: &Handle,
     budget: &mut Budget,
 ) -> Result<Vec<HypothesisRef>, Fault> {
-    let target_id = cas.checked(target)?;
-    let source_id = cas.checked(&source.judgment.context)?;
+    let target_id = cas.checked(target, budget)?;
+    let source_id = cas.checked(&source.judgment.context, budget)?;
     if ancestor(cas, source_id, target_id, budget)? {
         return Ok(source.conditions.hypotheses.clone());
     }
-    let original = cas.state.context(source_id)?;
-    let destination = cas.state.context(target_id)?;
+    let original = cas.state.context(source_id, budget)?;
+    let destination = cas.state.context(target_id, budget)?;
     if original.parent.is_some()
         || destination.parent.is_some()
         || !crate::header::embeds(
@@ -235,7 +244,7 @@ pub(crate) fn weaken(
     {
         return Err(invalid());
     }
-    if crate::solving::family::restriction::applies(cas, premises)? {
+    if crate::solving::family::restriction::applies(cas, premises, budget)? {
         return crate::solving::family::restriction::check(cas, draft, premises, budget);
     }
     let source = premises.first().ok_or_else(invalid)?;
@@ -252,12 +261,16 @@ pub(crate) fn weaken(
     ) {
         return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
     }
-    let target = cas.handle(cas.state.context(cas.checked(&draft.context)?)?.admissible);
+    let target = cas.handle(
+        cas.state
+            .context(cas.checked(&draft.context, budget)?, budget)?
+            .admissible,
+    );
     let original = match domain(&source.judgment.statement) {
         Some(value) => value.clone(),
         None => cas.handle(
             cas.state
-                .context(cas.checked(&source.judgment.context)?)?
+                .context(cas.checked(&source.judgment.context, budget)?, budget)?
                 .admissible,
         ),
     };
@@ -299,15 +312,15 @@ pub(crate) fn close(
     if !draft.substitutions.is_empty() {
         return Err(invalid());
     }
-    if crate::solving::coefficients::formal_close::boundary(cas, draft, premises)? {
+    if crate::solving::coefficients::formal_close::boundary(cas, draft, premises, budget)? {
         return crate::solving::coefficients::formal_close::close(cas, draft, premises, budget);
     }
     let child = premises.first().ok_or_else(invalid)?;
     let construction = premises.get(1).ok_or_else(invalid)?;
-    let frame_id = cas.checked(frame)?;
-    let local = cas.state.context(frame_id)?;
+    let frame_id = cas.checked(frame, budget)?;
+    let local = cas.state.context(frame_id, budget)?;
     let parent = local.parent.ok_or_else(invalid)?;
-    if cas.checked(&draft.context)? != parent
+    if cas.checked(&draft.context, budget)? != parent
         || child.judgment.context != *frame
         || child.judgment.statement != draft.conclusion
         || construction.judgment.context != draft.context
@@ -324,7 +337,12 @@ pub(crate) fn close(
     let mut used = BTreeSet::new();
     for reference in &child.conditions.hypotheses {
         if reference.context != *frame {
-            if !ancestor(cas, cas.checked(&reference.context)?, parent, budget)? {
+            if !ancestor(
+                cas,
+                cas.checked(&reference.context, budget)?,
+                parent,
+                budget,
+            )? {
                 return Err(invalid());
             }
             result.hypotheses.push(reference.clone());
@@ -333,7 +351,7 @@ pub(crate) fn close(
         if reference.slot == 0 {
             continue;
         }
-        let predicate = predicate(cas, reference)?;
+        let predicate = predicate(cas, reference, budget)?;
         let region = cas.handle(local.admissible);
         let fact = Statement::PredicateFact {
             region: region.clone(),
@@ -345,8 +363,11 @@ pub(crate) fn close(
             used.insert(position);
             crate::statement::merge(cas, &mut result, &proof.conditions, budget)?;
         } else {
-            let (_, scope) =
-                crate::domain_admission::predicate_context(&cas.state, cas.checked(&predicate)?)?;
+            let (_, scope) = crate::domain_admission::predicate_context(
+                &cas.state,
+                cas.checked(&predicate, budget)?,
+                budget,
+            )?;
             let required = GuardedObligation {
                 home: draft.context.clone(),
                 scope: scope.clone(),

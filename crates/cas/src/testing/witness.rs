@@ -96,8 +96,10 @@ pub(crate) fn guarded(
     term: &Handle,
 ) -> TestResult<GuardedObligation> {
     use crate::test_api::syntax::{Draft, PredicateKind};
-    let header = cas.expression_header(term)?;
-    let scope = cas.expression_scope(term)?.clone();
+    let header = cas.expression_header(term, &mut crate::testing::budgets::graph_budget()?)?;
+    let scope = cas
+        .expression_scope(term, &mut crate::testing::budgets::graph_budget()?)?
+        .clone();
     let kind = match kind {
         crate::test_api::proof::GuardKind::Defined => PredicateKind::Defined,
         crate::test_api::proof::GuardKind::NonZero => PredicateKind::NonZero,
@@ -117,7 +119,7 @@ pub(crate) fn guarded(
         scope,
         layer: Layer::Pointwise,
         space: None,
-        region: cas.admissible_region(context)?,
+        region: cas.admissible_region(context, &mut crate::testing::budgets::graph_budget()?)?,
         predicate,
     })
 }

@@ -40,8 +40,13 @@ const fn count(step: &ProofStep, needed: usize) -> Result<(), Fault> {
 }
 
 /// Read an exact unary shape.
-pub(crate) fn unary(state: &State, id: LogicalId, operator: &Operator) -> Result<LogicalId, Fault> {
-    let term = state.expression(id)?;
+pub(crate) fn unary(
+    state: &State,
+    id: LogicalId,
+    operator: &Operator,
+    budget: &mut crate::budget::Budget,
+) -> Result<LogicalId, Fault> {
+    let term = state.expression(id, budget)?;
     if term.operator != *operator || term.operands.len() != 1 {
         return Err(mismatch());
     }
@@ -53,8 +58,9 @@ pub(crate) fn binary(
     state: &State,
     id: LogicalId,
     operator: &Operator,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(LogicalId, LogicalId), Fault> {
-    let term = state.expression(id)?;
+    let term = state.expression(id, budget)?;
     if term.operator != *operator || term.operands.len() != 2 {
         return Err(mismatch());
     }
@@ -71,7 +77,7 @@ pub(crate) fn literal(
     expected: i64,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let Operator::Rational(value) = &state.expression(id)?.operator else {
+    let Operator::Rational(value) = &state.expression(id, budget)?.operator else {
         return Ok(false);
     };
     value.check(budget, AT)?;
@@ -80,12 +86,17 @@ pub(crate) fn literal(
 }
 
 /// Enforce the scalar field and strict-power convention before any field schema.
-pub(crate) fn scalar(state: &State, context: LogicalId, id: LogicalId) -> Result<(), Fault> {
-    let environment = &state.context(context)?.environment;
+pub(crate) fn scalar(
+    state: &State,
+    context: LogicalId,
+    id: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let environment = &state.context(context, budget)?.environment;
     if !matches!(environment.field, Field::Rational | Field::Real)
         || environment.branch != Branch::StrictReal
         || !matches!(
-            state.expression(id)?.sort,
+            state.expression(id, budget)?.sort,
             Sort::Value(AtomicSort::Scalar(Field::Rational | Field::Real))
         )
     {
@@ -118,15 +129,15 @@ pub(crate) fn equality(
     if step.relation != Relation::EqualOnDomain {
         return Err(mismatch());
     }
-    let left = cas.checked(&step.left)?;
-    let right = cas.checked(&step.right)?;
+    let left = cas.checked(&step.left, budget)?;
+    let right = cas.checked(&step.right, budget)?;
     let state = &cas.state;
     let valid = match step.primitive {
-        Primitive::Jets if crate::polynomial::matrix::applicable(state, left, right)? => {
+        Primitive::Jets if crate::polynomial::matrix::applicable(state, left, right, budget)? => {
             count(step, 0)?;
             crate::polynomial::matrix::equal(state, left, right, budget)?
         }
-        Primitive::Jets if crate::readings::check::applicable(state, left, right)? => {
+        Primitive::Jets if crate::readings::check::applicable(state, left, right, budget)? => {
             count(step, 0)?;
             crate::readings::check::equal(state, left, right, budget)?
         }
@@ -156,7 +167,7 @@ pub(crate) fn equality(
             congruence(state, left, right, step, premise(step, earlier, 0)?, budget)?
         }
         _ => {
-            scalar(state, context, left)?;
+            scalar(state, context, left, budget)?;
             count(step, 0)?;
             field(state, left, right, step.primitive, budget)?
         }
@@ -177,8 +188,8 @@ fn congruence(
         return Ok(false);
     }
     for position in &step.path {
-        let a = state.expression(left)?;
-        let b = state.expression(right)?;
+        let a = state.expression(left, budget)?;
+        let b = state.expression(right, budget)?;
         prepay_shape(a, budget)?;
         prepay_shape(b, budget)?;
         budget.work(size(a.operands.len(), AT)?, AT)?;
@@ -215,14 +226,14 @@ fn field(
         | Primitive::MulCommute
         | Primitive::AddAssociate
         | Primitive::MulAssociate
-        | Primitive::Distribute => structural_field(state, left, right, primitive),
+        | Primitive::Distribute => structural_field(state, left, right, primitive, budget),
         Primitive::AddZero | Primitive::MulOne | Primitive::MulZero => {
             let operator = if primitive == Primitive::AddZero {
                 Operator::Add
             } else {
                 Operator::Mul
             };
-            let (a, b) = binary(state, left, &operator)?;
+            let (a, b) = binary(state, left, &operator, budget)?;
             let expected = i64::from(primitive == Primitive::MulOne);
             Ok(literal(state, b, expected, budget)?
                 && if primitive == Primitive::MulZero {
@@ -232,11 +243,11 @@ fn field(
                 })
         }
         Primitive::AddInverse => {
-            let (a, b) = binary(state, left, &Operator::Add)?;
-            Ok(unary(state, b, &Operator::Neg)? == a && literal(state, right, 0, budget)?)
+            let (a, b) = binary(state, left, &Operator::Add, budget)?;
+            Ok(unary(state, b, &Operator::Neg, budget)? == a && literal(state, right, 0, budget)?)
         }
         Primitive::Cancel => {
-            let (a, b) = binary(state, left, &Operator::Div)?;
+            let (a, b) = binary(state, left, &Operator::Div, budget)?;
             Ok(a == b && literal(state, right, 1, budget)?)
         }
         Primitive::Power => power(state, left, right, budget),
@@ -258,6 +269,7 @@ fn structural_field(
     left: LogicalId,
     right: LogicalId,
     primitive: Primitive,
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, Fault> {
     match primitive {
         Primitive::AddCommute | Primitive::MulCommute => {
@@ -266,8 +278,8 @@ fn structural_field(
             } else {
                 Operator::Mul
             };
-            let (a, b) = binary(state, left, &operator)?;
-            Ok(binary(state, right, &operator)? == (b, a))
+            let (a, b) = binary(state, left, &operator, budget)?;
+            Ok(binary(state, right, &operator, budget)? == (b, a))
         }
         Primitive::AddAssociate | Primitive::MulAssociate => {
             let operator = if primitive == Primitive::AddAssociate {
@@ -275,17 +287,17 @@ fn structural_field(
             } else {
                 Operator::Mul
             };
-            let (ab, c) = binary(state, left, &operator)?;
-            let (a, b) = binary(state, ab, &operator)?;
-            let (x, bc) = binary(state, right, &operator)?;
-            Ok(x == a && binary(state, bc, &operator)? == (b, c))
+            let (ab, c) = binary(state, left, &operator, budget)?;
+            let (a, b) = binary(state, ab, &operator, budget)?;
+            let (x, bc) = binary(state, right, &operator, budget)?;
+            Ok(x == a && binary(state, bc, &operator, budget)? == (b, c))
         }
         Primitive::Distribute => {
-            let (a, bc) = binary(state, left, &Operator::Mul)?;
-            let (b, c) = binary(state, bc, &Operator::Add)?;
-            let (ab, ac) = binary(state, right, &Operator::Add)?;
-            Ok(binary(state, ab, &Operator::Mul)? == (a, b)
-                && binary(state, ac, &Operator::Mul)? == (a, c))
+            let (a, bc) = binary(state, left, &Operator::Mul, budget)?;
+            let (b, c) = binary(state, bc, &Operator::Add, budget)?;
+            let (ab, ac) = binary(state, right, &Operator::Add, budget)?;
+            Ok(binary(state, ab, &Operator::Mul, budget)? == (a, b)
+                && binary(state, ac, &Operator::Mul, budget)? == (a, c))
         }
         _ => Err(mismatch()),
     }
@@ -298,7 +310,7 @@ fn power(
     right: LogicalId,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let term = state.expression(left)?;
+    let term = state.expression(left, budget)?;
     let Operator::IntegerPower(exponent) = term.operator else {
         return Err(mismatch());
     };
@@ -307,17 +319,17 @@ fn power(
         0 => literal(state, right, 1, budget),
         1 => Ok(right == base),
         2.. => {
-            let (a, b) = binary(state, right, &Operator::Mul)?;
+            let (a, b) = binary(state, right, &Operator::Mul, budget)?;
             let previous = exponent.checked_sub(1).ok_or_else(mismatch)?;
-            Ok(a == base && unary(state, b, &Operator::IntegerPower(previous))? == base)
+            Ok(a == base && unary(state, b, &Operator::IntegerPower(previous), budget)? == base)
         }
         _ => {
             let positive = exponent
                 .checked_neg()
                 .ok_or_else(|| Fault::capacity(BudgetKind::DecimalExponent, AT))?;
-            let (a, b) = binary(state, right, &Operator::Div)?;
+            let (a, b) = binary(state, right, &Operator::Div, budget)?;
             Ok(literal(state, a, 1, budget)?
-                && unary(state, b, &Operator::IntegerPower(positive))? == base)
+                && unary(state, b, &Operator::IntegerPower(positive), budget)? == base)
         }
     }
 }
@@ -329,10 +341,10 @@ fn exact(
     right: LogicalId,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let term = state.expression(left)?;
-    let number = |position: usize| -> Result<&Rational, Fault> {
+    let term = state.expression(left, budget)?;
+    let mut number = |position: usize| -> Result<&Rational, Fault> {
         let id = term.operands.get(position).copied().ok_or_else(mismatch)?;
-        match &state.expression(id)?.operator {
+        match &state.expression(id, budget)?.operator {
             Operator::Rational(value) => Ok(value),
             _ => Err(mismatch()),
         }
@@ -352,7 +364,7 @@ fn exact(
     };
     budget.work(budget.limits().component_bits, AT)?;
     Ok(matches!(
-        &state.expression(right)?.operator,
+        &state.expression(right, budget)?.operator,
         Operator::Rational(expected) if *expected == value,
     ))
 }

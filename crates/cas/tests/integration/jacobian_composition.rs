@@ -104,7 +104,13 @@ fn reading_jacobian_overlap_introduces_no_direction() -> TestResult {
     let result = compose(&mut case)?;
     assert_eq!(result.direct().key().coordinates().sources, ["u0", "u1"]);
     assert_eq!(
-        case.fixture.cas.expression(result.direct().matrix())?.0,
+        case.fixture
+            .cas
+            .expression(
+                result.direct().matrix(),
+                &mut crate::testing::budgets::graph_budget()?
+            )?
+            .0,
         &nrz_cas::syntax::Operator::Matrix {
             rows: 1,
             columns: 2

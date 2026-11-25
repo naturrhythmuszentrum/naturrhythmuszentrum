@@ -11,7 +11,7 @@ fn limits() -> Limits {
     }
 }
 fn large() -> Result<Budget, Fault> {
-    Budget::new(limits())
+    crate::budget::Budget::new(limits())
 }
 fn configured_case(n: i64, d: u64, p: i64) -> TestResult<(Fixture, EnclosureRequest)> {
     let mut f = Fixture::with_names_and_limits(&["x"], limits())?;
@@ -24,18 +24,18 @@ fn configured_case(n: i64, d: u64, p: i64) -> TestResult<(Fixture, EnclosureRequ
 
 /// Base, exponent numerator, precision, and cold/generator/checker/fresh-replay Work.
 const CASES: [(i64, u64, i64, u32, [u64; 4]); 12] = [
-    (1, 2, 1, 4, [2_242_506, 1_067_071, 1_138_358, 1_160_840]),
-    (1, 2, 1, 8, [2_989_208, 1_434_223, 1_517_362, 1_540_390]),
-    (1, 2, 1, 16, [4_596_440, 2_234_765, 2_322_924, 2_347_080]),
-    (2, 1, 1, 4, [2_146_333, 1_041_219, 1_068_026, 1_090_519]),
-    (2, 1, 1, 8, [2_874_660, 1_402_415, 1_434_614, 1_457_650]),
-    (2, 1, 1, 16, [4_467_864, 2_200_941, 2_228_204, 2_252_328]),
-    (1, 2, -2, 4, [2_429_362, 1_160_211, 1_231_910, 1_254_556]),
-    (1, 2, -2, 8, [3_210_096, 1_545_591, 1_626_710, 1_649_910]),
-    (1, 2, -2, 16, [4_999_232, 2_441_037, 2_519_268, 2_543_600]),
-    (2, 1, -2, 4, [2_327_756, 1_134_763, 1_155_806, 1_178_398]),
-    (2, 1, -2, 8, [3_095_056, 1_513_943, 1_543_318, 1_566_518]),
-    (2, 1, -2, 16, [4_863_500, 2_405_549, 2_419_048, 2_443_356]),
+    (1, 2, 1, 4, [2_242_511, 1_067_071, 1_138_358, 1_160_845]),
+    (1, 2, 1, 8, [2_989_213, 1_434_223, 1_517_362, 1_540_395]),
+    (1, 2, 1, 16, [4_596_445, 2_234_765, 2_322_924, 2_347_085]),
+    (2, 1, 1, 4, [2_146_338, 1_041_219, 1_068_026, 1_090_524]),
+    (2, 1, 1, 8, [2_874_665, 1_402_415, 1_434_614, 1_457_655]),
+    (2, 1, 1, 16, [4_467_869, 2_200_941, 2_228_204, 2_252_333]),
+    (1, 2, -2, 4, [2_429_367, 1_160_211, 1_231_910, 1_254_561]),
+    (1, 2, -2, 8, [3_210_101, 1_545_591, 1_626_710, 1_649_915]),
+    (1, 2, -2, 16, [4_999_237, 2_441_037, 2_519_268, 2_543_605]),
+    (2, 1, -2, 4, [2_327_761, 1_134_763, 1_155_806, 1_178_403]),
+    (2, 1, -2, 8, [3_095_061, 1_513_943, 1_543_318, 1_566_523]),
+    (2, 1, -2, 16, [4_863_505, 2_405_549, 2_419_048, 2_443_361]),
 ];
 
 /// All twelve cases attain their width in one round and pass independent exact cubing and fresh replay.
@@ -120,7 +120,7 @@ fn enclosure_power_limiting_resource() -> TestResult {
         .cas
         .enclose(&request, power_policy(), &mut large()?, &mut |_| false)?;
     assert_eq!(report.outcome, EnclosureOutcome::Bound);
-    assert_eq!(report.work, 2_146_333);
+    assert_eq!(report.work, 2_146_338);
     assert_eq!(report.completed_rounds, 1);
     assert!(report.precision_met);
     Ok(())
@@ -185,13 +185,17 @@ fn enclosure_power_analytic_work_pins() -> TestResult {
 /// ´claim:cas:enclosure-power-analytic-phase-pins´
 #[test]
 fn enclosure_power_analytic_phase_pins() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     for (n, d, p, precision, pins) in CASES {
         let policy = RefinementPolicy {
             precision,
             ..power_policy()
         };
         let (f, request) = configured_case(n, d, p)?;
-        let target = f.cas.state.expression(f.cas.checked(&request.target)?)?;
+        let target = f
+            .cas
+            .state
+            .expression(f.cas.checked(&request.target, &mut budget)?, &mut budget)?;
         let plans = planning::Plans::new(target, policy).ok_or("plan")?;
         let grid = plans.grid(precision + 8);
         let scope = scope::key(&f.cas, &request, &mut large()?)?;

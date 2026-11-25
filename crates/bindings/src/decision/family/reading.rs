@@ -46,7 +46,7 @@ pub(super) fn check(
         {
             return Err(DecisionError::Source);
         }
-        let (Operator::AffineReading(map), _) = cas.expression(reading.node())? else {
+        let (Operator::AffineReading(map), _) = cas.expression(reading.node(), budget)? else {
             return Err(DecisionError::Source);
         };
         if map.as_ref() != reading.map() {

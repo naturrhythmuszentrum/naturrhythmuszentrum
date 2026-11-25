@@ -175,7 +175,7 @@ fn boundaries<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
     let exact = maps(&descriptor(Scale::pi()?)?)?;
     let context = ArithmeticContext::new()?;
     let circle = pi::<P>(&context, &mut Budget::new(Limits::default())?)?;
-    for (direction, work) in [84_517, 28_192].into_iter().enumerate() {
+    for (direction, work) in [84_656, 28_257].into_iter().enumerate() {
         let ceiling = Limits {
             work: work + 17,
             staged_payload_bytes: staged,
@@ -193,11 +193,8 @@ fn boundaries<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
             }
             let mut budget = prior(limits)?;
             let before = budget.usage();
-            assert!(
-                conversion
-                    .certify_pi(&circle, &exact_policy(), &context, &mut budget)
-                    .is_err()
-            );
+            let refused = conversion.certify_pi(&circle, &exact_policy(), &context, &mut budget);
+            assert!(refused.is_err());
             let spent = if resource == 0 { work - 1 } else { 1 };
             assert_eq!(budget.usage().work, before.work + spent);
             let mut budget = prior(ceiling.clone())?;
@@ -211,12 +208,12 @@ fn boundaries<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
                 output_bytes: 24,
                 ..Limits::default()
             })?;
-            let reused =
+            let cached =
                 conversion
                     .clone()
                     .certify_pi(&circle, &exact_policy(), &context, &mut warm)?;
-            assert!(reused.reused());
-            assert_eq!(reused.new_owned_bytes(), 0);
+            assert!(cached.reused());
+            assert_eq!(cached.new_owned_bytes(), 0);
         }
     }
     Ok(())
@@ -249,7 +246,7 @@ fn pi_coordinate_schema_unsupported_constants() -> TestResult {
     for (value, receipts) in
         values
             .into_iter()
-            .zip([[109_030, 77_332], [165_492, 132_027], [128_555, 88_997]])
+            .zip([[109_212, 77_482], [165_682, 132_193], [128_733, 89_135]])
     {
         let exact = maps(&descriptor(Scale::Expression(value))?)?;
         for (conversion, spent) in contracts(&exact, 1)?.into_iter().zip(receipts) {

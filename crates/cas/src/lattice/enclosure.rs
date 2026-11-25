@@ -94,21 +94,23 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    let context = cas.state.context(cas.checked(&contract.context)?)?;
-    let target = cas.checked(&contract.target)?;
-    if cas.checked(&contract.input_family)? != context.admissible {
+    let context = cas
+        .state
+        .context(cas.checked(&contract.context, budget)?, budget)?;
+    let target = cas.checked(&contract.target, budget)?;
+    if cas.checked(&contract.input_family, budget)? != context.admissible {
         return Err(mismatch());
     }
-    let (rows, columns) = cas.lattice_rectangle(target, context.header_id)?;
+    let (rows, columns) = cas.lattice_rectangle(target, context.header_id, budget)?;
     if rows == 0 || columns != 1 || size(contract.coordinates.len(), AT)? != u64::from(rows) {
         return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
     }
     budget.check(BudgetKind::MatrixEntries, u64::from(rows), AT)?;
-    let entries = &cas.state.expression(target)?.operands;
+    let entries = &cas.state.expression(target, budget)?.operands;
     let mut bytes = 256_u64;
     for (entry, coordinate) in entries.iter().zip(&contract.coordinates) {
         budget.work(3, AT)?;
-        if cas.checked(&coordinate.target)? != *entry
+        if cas.checked(&coordinate.target, budget)? != *entry
             || coordinate.context != contract.context
             || coordinate.input_family != contract.input_family
         {

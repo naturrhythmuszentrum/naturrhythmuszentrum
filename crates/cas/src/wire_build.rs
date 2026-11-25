@@ -131,11 +131,13 @@ pub(crate) fn key(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result<Key,
             Key::Guard(out.finish())
         }
         Entity::Statement(value) => {
-            crate::graph::encode_id(cas.checked(&value.context)?, &mut out)?;
+            let context = cas.checked(&value.context, out.budget())?;
+            crate::graph::encode_id(context, &mut out)?;
             out.byte(value.layer.tag())?;
             out.byte(u8::from(value.space.is_some()))?;
             if let Some(space) = &value.space {
-                crate::graph::encode_id(cas.checked(space)?, &mut out)?;
+                let space_id = cas.checked(space, out.budget())?;
+                crate::graph::encode_id(space_id, &mut out)?;
             }
             crate::statement::encode(&value.statement, &mut out, crate::statement::handle)?;
             Key::Statement(out.finish())

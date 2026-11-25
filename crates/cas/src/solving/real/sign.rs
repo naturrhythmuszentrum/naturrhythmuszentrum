@@ -35,9 +35,16 @@ pub(super) const fn entails(actual: u8, claim: RealSignConclusion) -> Result<(),
 }
 
 /// Every operand has exactly the original Real frame and no distribution space.
-pub(super) fn scalar(cas: &Cas, subject: &Handle, region: &Handle) -> Result<(), Fault> {
-    let term = cas.state.expression(cas.checked(subject)?)?;
-    let region = cas.state.region(cas.checked(region)?)?;
+pub(super) fn scalar(
+    cas: &Cas,
+    subject: &Handle,
+    region: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let term = cas
+        .state
+        .expression(cas.checked(subject, budget)?, budget)?;
+    let region = cas.state.region(cas.checked(region, budget)?, budget)?;
     if term.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || term.header != region.header
         || term.scope != region.scope
@@ -78,7 +85,7 @@ pub(super) fn check(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        super::region(cas, &draft.context, &certificate.region)?;
+        super::region(cas, &draft.context, &certificate.region, budget)?;
         super::closure::check(
             cas,
             certificate.steps.iter().map(|step| &step.subject),
@@ -119,7 +126,7 @@ pub(super) fn check(
                 domain,
                 domain_contract: crate::proof_model::DomainContract::DefinedAndEqual,
             } if *domain == certificate.region && root.conclusion == RealSignConclusion::Zero => {
-                let difference = cas.state.expression(root.subject.logical_id())?;
+                let difference = cas.state.expression(root.subject.logical_id(), budget)?;
                 if difference.operator != crate::model::Operator::Sub
                     || difference.operands != [left.logical_id(), right.logical_id()]
                 {

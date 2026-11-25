@@ -223,7 +223,7 @@ impl Form {
         crate::work_observation::observe!(budget, AT, {
             let pairs = product(size(self.terms.len(), AT)?, size(other.terms.len(), AT)?)?;
             if matches!(
-                super::storage::domain(engine.state, engine.domain)?,
+                super::storage::domain(engine.state, engine.domain, budget)?,
                 crate::solving::CoefficientDomainData::Fraction { .. }
             ) {
                 budget.work(pairs, AT)?;
@@ -298,10 +298,10 @@ impl Form {
             let mut coefficient = &term.coefficient;
             let mut domain = engine.domain;
             if let crate::solving::CoefficientDomainData::Quotient { level } =
-                super::storage::domain(engine.state, domain)?
+                super::storage::domain(engine.state, domain, budget)?
             {
                 let crate::solving::SolveDraft::ExtensionLevel(level) =
-                    crate::solving::graph::object(engine.state, level.logical_id())?
+                    crate::solving::graph::object(engine.state, level.logical_id(), budget)?
                 else {
                     return Err(invalid().into());
                 };
@@ -318,7 +318,7 @@ impl Form {
                 coefficient = entry;
             }
             if !matches!(
-                super::storage::domain(engine.state, domain)?,
+                super::storage::domain(engine.state, domain, budget)?,
                 crate::solving::CoefficientDomainData::Fraction { .. }
             ) {
                 return Ok(false);
@@ -391,7 +391,7 @@ impl Form {
         budget: &mut Budget,
     ) -> Result<(), CoefficientFailure> {
         if !matches!(
-            super::storage::domain(engine.state, engine.domain)?,
+            super::storage::domain(engine.state, engine.domain, budget)?,
             crate::solving::CoefficientDomainData::Fraction { .. }
         ) {
             return Err(invalid().into());

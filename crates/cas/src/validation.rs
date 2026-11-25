@@ -398,7 +398,7 @@ pub(crate) fn condition(
             .map_err(|_| Fault::allocation(AT))?;
         for argument in arguments {
             budget.work(1, AT)?;
-            let value = state.expression(*argument)?;
+            let value = state.expression(*argument, budget)?;
             if !crate::header::embeds(state, value.header, context, budget)?
                 || value.scope != *scope
             {
@@ -474,7 +474,7 @@ pub(crate) fn expression(
         scope_limit(&draft.scope, budget)?;
         declared_sort(&draft.sort, budget)?;
         binding_shape(&draft.operator, draft.binding.as_ref(), operands.len())?;
-        let environment = &state.header(context)?.environment;
+        let environment = &state.header(context, budget)?.environment;
         sort_extents(&draft.sort, environment, budget)?;
         for frame in &draft.scope {
             for slot in frame {
@@ -503,7 +503,7 @@ pub(crate) fn expression(
         let mut unfolded = 1_u64;
         for (position, operand) in operands.iter().enumerate() {
             budget.work(1, AT)?;
-            let child = state.expression(*operand)?;
+            let child = state.expression(*operand, budget)?;
             if !crate::header::embeds(state, child.header, context, budget)? {
                 return Err(Fault::invalid(InvalidCode::Context, AT));
             }
@@ -560,8 +560,8 @@ fn symbol_relation(
     if result_id == target_id {
         return Err(Fault::invalid(InvalidCode::Reference, AT));
     }
-    let result = state.expression(*result_id)?;
-    let target = state.expression(*target_id)?;
+    let result = state.expression(*result_id, budget)?;
+    let target = state.expression(*target_id, budget)?;
     let result_shape = relation_endpoint(result, budget)?;
     let target_shape = relation_endpoint(target, budget)?;
     if result.header != context {
@@ -614,7 +614,7 @@ fn root_polynomial(
         if !visited.insert(id) {
             continue;
         }
-        let value = state.expression(id)?;
+        let value = state.expression(id, budget)?;
         match &value.operator {
             Operator::Rational(number) => number.check(budget, AT)?,
             Operator::Free(key) if key == variable => {}
@@ -625,7 +625,8 @@ fn root_polynomial(
             | Operator::IntegerPower(0..) => {}
             Operator::Div => {
                 let denominator = value.operands.get(1).copied().ok_or_else(sort_error)?;
-                let Operator::Rational(number) = &state.expression(denominator)?.operator else {
+                let Operator::Rational(number) = &state.expression(denominator, budget)?.operator
+                else {
                     return Err(sort_error());
                 };
                 if number.is_zero() {
@@ -1214,13 +1215,13 @@ pub(crate) fn occurrence(
         return Err(sort_error());
     }
     for (child, (_, expected)) in value.children.iter().zip(&dependencies) {
-        if state.occurrence(*child)?.expression != *expected {
+        if state.occurrence(*child, budget)?.expression != *expected {
             return Err(sort_error());
         }
     }
     match (value.source, value.provenance) {
         (Some(source), None) => {
-            let Vertex::Source(source) = state.node(source)? else {
+            let Vertex::Source(source) = state.node(source, budget)? else {
                 return Err(Fault::invalid(InvalidCode::Reference, AT));
             };
             if let Some(span) = value.span {
@@ -1239,7 +1240,7 @@ pub(crate) fn occurrence(
         }
         (None, Some(provenance)) if value.span.is_none() => {
             if !matches!(
-                state.node(provenance)?,
+                state.node(provenance, budget)?,
                 Vertex::Expression(_)
                     | Vertex::Occurrence(_)
                     | Vertex::SourceForm(_)
@@ -1251,7 +1252,7 @@ pub(crate) fn occurrence(
         }
         _ => return Err(Fault::invalid(InvalidCode::Span, AT)),
     }
-    let names = crate::descriptor::binding(state, value.expression)?
+    let names = crate::descriptor::binding(state, value.expression, budget)?
         .map_or(0, |binding| binding.sorts.len());
     if !value.binder_names.is_empty() && value.binder_names.len() != names {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
@@ -1452,15 +1453,16 @@ mod tests {
     /// ´test:unit:symbol-relation-has-no-equation-authority´
     #[test]
     fn symbol_relation_has_no_equation_authority() -> TestResult {
+        let mut budget = crate::testing::common::default_budget()?;
         let (mut cas, original) = fixture()?;
-        let before = cas.state.proof_count();
+        let before = cas.state.proof_count(&mut budget);
         let handles = cas.admit(&[Draft::Expression(original)], &mut ledger()?)?;
         let relation = handles.first().ok_or("relation")?;
-        let id = cas.checked(relation)?;
+        let id = cas.checked(relation, &mut budget)?;
         assert!(crate::polynomial::equal(&cas.state, id, id, false, &mut ledger()?).is_err());
         assert!(crate::polynomial::normalize(&mut cas, id, &mut ledger()?).is_err());
-        assert!(cas.solve_view(relation).is_err());
-        assert_eq!(cas.state.proof_count(), before);
+        assert!(cas.solve_view(relation, &mut budget).is_err());
+        assert_eq!(cas.state.proof_count(&mut budget), before);
         Ok(())
     }
 

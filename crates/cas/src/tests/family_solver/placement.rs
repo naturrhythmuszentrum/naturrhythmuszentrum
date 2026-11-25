@@ -166,6 +166,7 @@ fn positive(fixture: &mut Fixture, family: &Family) -> TestResult<Family> {
 /// ´test:crate:mixed-family-missing-arm-stays-undefined´
 #[test]
 fn mixed_family_missing_arm_stays_undefined() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut fixture = Fixture::new()?;
     let family = fixture.family()?;
     let local = positive(&mut fixture, &family)?;
@@ -182,7 +183,12 @@ fn mixed_family_missing_arm_stays_undefined() -> TestResult {
         .cas
         .family_expression(&data, &mut Budget::new(Limits::default())?)?;
     assert_eq!(
-        fixture.cas.state.expression(cases.logical_id())?.arms.len(),
+        fixture
+            .cas
+            .state
+            .expression(cases.logical_id(), &mut budget)?
+            .arms
+            .len(),
         1
     );
     let root =

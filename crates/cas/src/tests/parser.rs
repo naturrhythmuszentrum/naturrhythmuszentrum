@@ -29,6 +29,7 @@ fn declared_store() -> TestResult<(Cas, Handle)> {
 /// ´test:crate:parsed-graph-occurrences´
 #[test]
 fn parsed_graph_occurrences() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut cas, header) = declared_store()?;
     let original = parse_original(
         &mut cas,
@@ -37,22 +38,24 @@ fn parsed_graph_occurrences() -> TestResult {
         &header,
         &mut default_budget()?,
     )?;
-    let root = cas.state.occurrence(original.root.logical_id())?;
+    let root = cas
+        .state
+        .occurrence(original.root.logical_id(), &mut budget)?;
     assert_eq!(root.span, Some(Span { start: 0, end: 5 }));
     assert_eq!(root.expression, original.syntax.logical_id());
     assert_eq!(root.children.len(), 2);
     let first = *root.children.first().ok_or("first use")?;
     let second = *root.children.get(1).ok_or("second use")?;
     assert_ne!(first, second);
-    let left = cas.state.occurrence(first)?;
-    let right = cas.state.occurrence(second)?;
+    let left = cas.state.occurrence(first, &mut budget)?;
+    let right = cas.state.occurrence(second, &mut budget)?;
     assert_eq!(left.expression, right.expression);
     assert_eq!(left.span, Some(Span { start: 1, end: 2 }));
     assert_eq!(right.span, Some(Span { start: 3, end: 4 }));
     assert_eq!(left.source, root.source);
     assert_eq!(right.source, root.source);
     assert!(root.provenance.is_none());
-    let expression = cas.state.expression(root.expression)?;
+    let expression = cas.state.expression(root.expression, &mut budget)?;
     assert_eq!(expression.operator, Operator::Add);
     assert_eq!(expression.operands, vec![left.expression, right.expression]);
     assert_eq!(expression.header, header.logical_id());

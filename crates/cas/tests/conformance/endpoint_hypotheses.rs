@@ -18,7 +18,10 @@ fn endpoint_current_ancestor_slot() -> TestResult {
     let mut f = chain(false, false)?;
     for nested in [false, true] {
         let context = if nested {
-            let region = f.fixture.cas.admissible_region(&f.frame)?;
+            let region = f
+                .fixture
+                .cas
+                .admissible_region(&f.frame, &mut crate::testing::budgets::graph_budget()?)?;
             admit(
                 &mut f.fixture.cas,
                 Draft::Context(ContextDraft::Local {
@@ -36,7 +39,10 @@ fn endpoint_current_ancestor_slot() -> TestResult {
         let Statement::Equality { domain, .. } = &mut step.conclusion else {
             return Err("equality".into());
         };
-        *domain = f.fixture.cas.admissible_region(&context)?;
+        *domain = f
+            .fixture
+            .cas
+            .admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?;
         let witness = f
             .fixture
             .cas
@@ -71,7 +77,10 @@ fn endpoint_invalid_qualified_slots() -> TestResult {
         }),
         &mut budget()?,
     )?;
-    let region = f.fixture.cas.admissible_region(&f.frame)?;
+    let region = f
+        .fixture
+        .cas
+        .admissible_region(&f.frame, &mut crate::testing::budgets::graph_budget()?)?;
     for reference in [
         HypothesisRef {
             context: foreign.frame,
@@ -150,7 +159,10 @@ fn endpoint_predicate_declaration_frame() -> TestResult {
         context: f.frame.clone(),
         rule: Primitive::ContextHypothesis,
         conclusion: Statement::PredicateFact {
-            region: f.fixture.cas.admissible_region(&f.frame)?,
+            region: f
+                .fixture
+                .cas
+                .admissible_region(&f.frame, &mut crate::testing::budgets::graph_budget()?)?,
             predicate,
         },
         premises: vec![],
@@ -191,7 +203,10 @@ fn endpoint_sibling_lookup_residual() -> TestResult {
     let Statement::Equality { domain, .. } = &mut step.conclusion else {
         return Err("equality".into());
     };
-    *domain = f.fixture.cas.admissible_region(&sibling)?;
+    *domain = f
+        .fixture
+        .cas
+        .admissible_region(&sibling, &mut crate::testing::budgets::graph_budget()?)?;
     let witness = f
         .fixture
         .cas

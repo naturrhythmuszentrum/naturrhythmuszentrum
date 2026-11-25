@@ -76,8 +76,9 @@ pub(crate) fn copied<T: Clone>(value: &[T], budget: &mut Budget) -> Result<Vec<T
 pub(crate) fn domain<'a>(
     state: &'a State,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a CoefficientDomainData<Handle>, Fault> {
-    match super::super::graph::object(state, handle.logical_id())? {
+    match super::super::graph::object(state, handle.logical_id(), budget)? {
         SolveDraft::CoefficientDomain(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -87,8 +88,9 @@ pub(crate) fn domain<'a>(
 pub(crate) fn value<'a>(
     state: &'a State,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a CoefficientValueObject<Handle>, Fault> {
-    match super::super::graph::object(state, handle.logical_id())? {
+    match super::super::graph::object(state, handle.logical_id(), budget)? {
         SolveDraft::CoefficientValue(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -98,8 +100,9 @@ pub(crate) fn value<'a>(
 pub(crate) fn polynomial<'a>(
     state: &'a State,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a PolynomialData<Handle>, Fault> {
-    match super::super::graph::object(state, handle.logical_id())? {
+    match super::super::graph::object(state, handle.logical_id(), budget)? {
         SolveDraft::Polynomial(value) => Ok(value),
         _ => Err(invalid()),
     }

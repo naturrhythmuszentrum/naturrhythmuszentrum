@@ -25,13 +25,13 @@ pub(crate) fn projection(
     let Some(draft) = draft else {
         return Ok(None);
     };
-    let family_id = cas.resolve(state, &draft.family, locals)?;
-    let stratum = cas.resolve(state, &draft.stratum, locals)?;
+    let family_id = cas.resolve(state, &draft.family, locals, budget)?;
+    let stratum = cas.resolve(state, &draft.stratum, locals, budget)?;
     let family_handle = cas.handle(family_id);
-    let shape = family(state, &family_handle)?;
-    let original = base(state, &shape.base)?;
-    let stratum_data = state.region(stratum)?;
-    let domain = state.region(original.domain.logical_id())?;
+    let shape = family(state, &family_handle, budget)?;
+    let original = base(state, &shape.base, budget)?;
+    let stratum_data = state.region(stratum, budget)?;
+    let domain = state.region(original.domain.logical_id(), budget)?;
     if original.header.logical_id() != header
         || stratum_data.header != header
         || stratum_data.ambient != domain.ambient
@@ -41,7 +41,7 @@ pub(crate) fn projection(
         return Err(invalid());
     }
     super::admission::base_dependencies(state, original, &cas.handle(stratum), budget)?;
-    product(state, ambient, original, shape)?;
+    product(state, ambient, original, shape, budget)?;
     edges
         .try_reserve(2)
         .map_err(|_| Fault::allocation(super::admission::AT))?;
@@ -59,13 +59,15 @@ fn product(
     ambient: &AmbientDomain,
     original: &super::ParameterBaseData<crate::graph::Handle>,
     shape: &super::SpaceFamilyData<crate::graph::Handle>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let AmbientDomain::Product { coordinates } = ambient else {
         return Err(invalid());
     };
-    let total = crate::solving::graph::coordinates(state, coordinates.logical_id())?;
-    let base = crate::solving::graph::coordinates(state, original.coordinates.logical_id())?;
-    let fibre = crate::solving::graph::coordinates(state, shape.coefficients.logical_id())?;
+    let total = crate::solving::graph::coordinates(state, coordinates.logical_id(), budget)?;
+    let base =
+        crate::solving::graph::coordinates(state, original.coordinates.logical_id(), budget)?;
+    let fibre = crate::solving::graph::coordinates(state, shape.coefficients.logical_id(), budget)?;
     if !total
         .coordinates
         .iter()

@@ -155,7 +155,7 @@ fn expected(
         statement: Statement::Solve(Box::new(SolveStatement::Coverage(StatementCoverage {
             problem: original.problem().clone(),
             set: set.clone(),
-            region: cas.admissible_region(&original.request().context)?,
+            region: cas.admissible_region(&original.request().context, budget)?,
         }))),
     })
 }

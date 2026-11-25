@@ -116,7 +116,7 @@ impl Cas {
         generation: &mut Budget,
         checker: &mut Budget,
     ) -> Result<Option<Execution>, Fault> {
-        let context = self.checked(&request.context)?;
+        let context = self.checked(&request.context, generation)?;
         if matches!(&request.task, crate::task::Task::Pullback { .. }) {
             self.check_nonempty_request(context, generation)?;
             let result = crate::pullback_producer::execute(
@@ -151,7 +151,7 @@ impl Cas {
                 fault: None,
             }));
         }
-        if crate::distribution_search::handles(self, &request.task, inputs)? {
+        if crate::distribution_search::handles(self, &request.task, inputs, generation)? {
             self.check_nonempty_request(context, generation)?;
             return crate::distribution_search::execute(
                 self, request, inputs, policy, generation, checker,
@@ -185,14 +185,18 @@ impl Cas {
         generation: &mut Budget,
         checker: &mut Budget,
     ) -> Result<Execution, Fault> {
-        let context = self.checked(&request.context)?;
+        let context = self.checked(&request.context, generation)?;
         let mut inputs = Vec::new();
         inputs
             .try_reserve_exact(request.inputs.len())
             .map_err(|_| Fault::allocation(AT))?;
         for root in &request.inputs {
             generation.work(1, AT)?;
-            inputs.push(self.state.occurrence(self.checked(&root.root)?)?.expression);
+            inputs.push(
+                self.state
+                    .occurrence(self.checked(&root.root, generation)?, generation)?
+                    .expression,
+            );
         }
         if let Some(result) =
             self.native_execution(request, &inputs, policy, generation, checker)?
@@ -259,7 +263,7 @@ impl Cas {
         context: LogicalId,
         generation: &mut Budget,
     ) -> Result<(), Fault> {
-        let admissible = self.state.context(context)?.admissible;
+        let admissible = self.state.context(context, generation)?.admissible;
         match crate::region_cache::partition(self, &[admissible], generation) {
             Ok(cells) => {
                 if cells
@@ -290,8 +294,8 @@ impl Cas {
     ) -> Result<SearchResult, Fault> {
         self.transaction(generation, |candidate, generation| {
             let output = crate::polynomial::normalize(candidate, input, generation)?;
-            let before = candidate.state.expression(input)?.unfolded;
-            let after = candidate.state.expression(output)?.unfolded;
+            let before = candidate.state.expression(input, generation)?.unfolded;
+            let after = candidate.state.expression(output, generation)?.unfolded;
             let growth = after.saturating_sub(before);
             generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
             let mut plan = crate::producer::Plan::default();
@@ -343,9 +347,9 @@ impl Cas {
             let plan =
                 crate::square_free::produce(candidate, context, input, variable, generation)?;
             let proposal = plan.steps.last().ok_or_else(invalid)?;
-            let output = candidate.checked(&proposal.right)?;
-            let before = candidate.state.expression(input)?.unfolded;
-            let after = candidate.state.expression(output)?.unfolded;
+            let output = candidate.checked(&proposal.right, generation)?;
+            let before = candidate.state.expression(input, generation)?.unfolded;
+            let after = candidate.state.expression(output, generation)?.unfolded;
             let growth = after.saturating_sub(before);
             generation.check(BudgetKind::ExpansionCredits, growth, AT)?;
             let witness = plan.verify(candidate, context, checker)?;
@@ -410,7 +414,7 @@ impl Cas {
                     peak = peak.max(
                         candidate
                             .state
-                            .expression(candidate.checked(endpoint)?)?
+                            .expression(candidate.checked(endpoint, generation)?, generation)?
                             .unfolded,
                     );
                 }
@@ -628,7 +632,7 @@ mod compose_outcomes {
     };
     use crate::task::Task;
     use crate::testing::common::TestResult;
-    use crate::testing::native::{Fixture, admit, budget};
+    use crate::testing::native::{Fixture, admit};
 
     /// Actual nonunit evidence remains owned when classified as a mathematical refusal.
     /// ´test:unit:reciprocal-public-outcome-evidence´
@@ -638,7 +642,11 @@ mod compose_outcomes {
         let input = f.object(&[crate::Rational::zero(), crate::Rational::one()])?;
         let fault = f
             .cas
-            .compute_series(&O::Reciprocal { input }, &[], &mut budget()?)
+            .compute_series(
+                &O::Reciprocal { input },
+                &[],
+                &mut crate::testing::native::fresh_budget()?,
+            )
             .expect_err("nonunit");
         assert_eq!(
             fault.kind,
@@ -732,7 +740,7 @@ mod compose_outcomes {
                         order: 1,
                     },
                     &[],
-                    &mut budget()?,
+                    &mut crate::testing::native::fresh_budget()?,
                 )?;
                 let unavailable_field = admit(
                     &mut f.cas,
@@ -740,10 +748,17 @@ mod compose_outcomes {
                         crate::solving::CoefficientDomainData::Gaussian,
                     )),
                 )?;
-                let mut ledger = budget()?;
+                let mut ledger = crate::testing::native::fresh_budget()?;
                 ledger.work(37, Location::new("composition outcome prior spend"))?;
-                let root = f.cas.materialize_derived(&f.one, &f.one, &mut budget()?)?;
-                let receipt = f.cas.walk_derived(&root, &mut budget()?)?.receipt;
+                let root = f.cas.materialize_derived(
+                    &f.one,
+                    &f.one,
+                    &mut crate::testing::native::fresh_budget()?,
+                )?;
+                let receipt = f
+                    .cas
+                    .walk_derived(&root, &mut crate::testing::native::fresh_budget()?)?
+                    .receipt;
                 let request = Request {
                     task: Task::Simplify,
                     context: f.context.clone(),
@@ -759,7 +774,9 @@ mod compose_outcomes {
                     &mut ledger,
                 )?;
                 assert!(!unsupported);
-                let before = f.cas.canonical_snapshot(&mut budget()?)?;
+                let before = f
+                    .cas
+                    .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?;
                 let order = if kind == 3 { 2 } else { 1 };
                 let certificate = C::Compose {
                     form: 0,
@@ -845,7 +862,11 @@ mod compose_outcomes {
                     _ => InvalidCode::SeriesUnsupported,
                 };
                 assert_eq!(fault.kind, FaultKind::Invalid(code));
-                assert_eq!(before, f.cas.canonical_snapshot(&mut budget()?)?);
+                assert_eq!(
+                    before,
+                    f.cas
+                        .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?
+                );
                 assert!(ledger.usage().work > 37);
                 if kind == 0 {
                     assert_eq!(
@@ -916,7 +937,7 @@ mod tests {
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-    fn budget() -> Result<Budget, Fault> {
+    fn fresh_budget() -> Result<Budget, Fault> {
         Budget::new(Limits {
             work: 2_000_000_000,
             ..Limits::default()
@@ -937,7 +958,7 @@ mod tests {
     }
 
     fn fixture() -> TestResult<(Cas, Vec<Handle>)> {
-        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let mut cas = Cas::new(self::fresh_budget()?.limits().clone())?;
         let nodes = cas.admit(
             &[
                 Draft::Header(HeaderDraft::Core(Environment {
@@ -979,13 +1000,14 @@ mod tests {
                     hypotheses: vec![],
                 }),
             ],
-            &mut budget()?,
+            &mut self::fresh_budget()?,
         )?;
         Ok((cas, nodes))
     }
 
     fn claim(cas: &mut Cas, nodes: &[Handle], kind: u8) -> TestResult<Judgment> {
-        let m = cas.admissible_region(&nodes[6])?;
+        let mut budget = crate::testing::common::default_budget()?;
+        let m = cas.admissible_region(&nodes[6], &mut budget)?;
         let expression = if kind == 0 {
             RegionExpr::Meet(vec![Reference::Existing(nodes[1].clone())])
         } else {
@@ -1002,7 +1024,7 @@ mod tests {
                     ambient: AmbientDomain::Assignments,
                     expression,
                 })],
-                &mut budget()?,
+                &mut self::fresh_budget()?,
             )?
             .remove(0);
         Ok(Judgment {
@@ -1037,8 +1059,8 @@ mod tests {
         for kind in 0..5 {
             let (mut cas, nodes) = fixture()?;
             let claim = claim(&mut cas, &nodes, kind)?;
-            let root = cas.materialize_derived(&nodes[3], &nodes[3], &mut budget()?)?;
-            let receipt = cas.walk_derived(&root, &mut budget()?)?.receipt;
+            let root = cas.materialize_derived(&nodes[3], &nodes[3], &mut self::fresh_budget()?)?;
+            let receipt = cas.walk_derived(&root, &mut self::fresh_budget()?)?.receipt;
             let request = Request {
                 task: Task::Simplify,
                 context: nodes[6].clone(),
@@ -1046,13 +1068,13 @@ mod tests {
                 premises: vec![],
                 limits: crate::budget::LimitsOverride::default(),
             };
-            let mut ledger = budget()?;
+            let mut ledger = self::fresh_budget()?;
             let limits = ledger.limits().clone();
             let (record, unsupported) =
                 cas.prepare_execution(&request, &SearchPolicy::default(), &limits, &mut ledger)?;
             assert!(!unsupported);
-            let before = cas.canonical_snapshot(&mut budget()?)?;
-            let header = cas.checked(&nodes[0])?;
+            let before = cas.canonical_snapshot(&mut self::fresh_budget()?)?;
+            let header = cas.checked(&nodes[0], &mut self::fresh_budget()?)?;
             // Feed the completion classifier an actual conversion fault, not a fabricated code.
             // The candidate allocation makes rollback observable independently of classification.
             let result = cas.transaction(&mut ledger, |cas, ledger| {
@@ -1128,7 +1150,7 @@ mod tests {
                 Outcome::Invalid { fault: actual, .. } if kind == 3 => assert_eq!(actual, fault),
                 other => return Err(format!("changed scalar capability outcome: {other:?}").into()),
             }
-            assert_eq!(cas.canonical_snapshot(&mut budget()?)?, before);
+            assert_eq!(cas.canonical_snapshot(&mut self::fresh_budget()?)?, before);
         }
         Ok(())
     }
@@ -1202,19 +1224,28 @@ mod tests {
                     substitutions: Vec::new(),
                     certificate: crate::proof_model::Certificate::None,
                 };
-                let (certificate, _) =
-                    crate::case_check::reconstruct(&mut f.cas, &draft, &[], &mut budget()?)?;
+                let (certificate, _) = crate::case_check::reconstruct(
+                    &mut f.cas,
+                    &draft,
+                    &[],
+                    &mut self::fresh_budget()?,
+                )?;
                 draft.certificate = crate::proof_model::Certificate::Cases(Box::new(certificate));
                 proofs.push(
                     f.cas
-                        .check_proof(&f.context, &[draft], &mut budget()?)?
+                        .check_proof(&f.context, &[draft], &mut self::fresh_budget()?)?
                         .proof()
                         .clone(),
                 );
                 SeriesOperation::Integrate { input, constant }
             };
-            let root = f.cas.materialize_derived(&f.one, &f.one, &mut budget()?)?;
-            let receipt = f.cas.walk_derived(&root, &mut budget()?)?.receipt;
+            let root = f
+                .cas
+                .materialize_derived(&f.one, &f.one, &mut self::fresh_budget()?)?;
+            let receipt = f
+                .cas
+                .walk_derived(&root, &mut self::fresh_budget()?)?
+                .receipt;
             let request = Request {
                 task: Task::Simplify,
                 context: f.context.clone(),
@@ -1222,7 +1253,7 @@ mod tests {
                 premises: Vec::new(),
                 limits: crate::budget::LimitsOverride::default(),
             };
-            let mut ledger = budget()?;
+            let mut ledger = self::fresh_budget()?;
             let limits = ledger.limits().clone();
             let (record, unsupported) = f.cas.prepare_execution(
                 &request,
@@ -1231,7 +1262,7 @@ mod tests {
                 &mut ledger,
             )?;
             assert!(!unsupported);
-            let before = f.cas.canonical_snapshot(&mut budget()?)?;
+            let before = f.cas.canonical_snapshot(&mut self::fresh_budget()?)?;
             let fault = f
                 .cas
                 .compute_series(&operation, &proofs, &mut ledger)
@@ -1263,7 +1294,10 @@ mod tests {
                 Outcome::Invalid { fault: actual, .. } if kind >= 2 => assert_eq!(actual, fault),
                 other => return Err(format!("changed calculus outcome: {other:?}").into()),
             }
-            assert_eq!(f.cas.canonical_snapshot(&mut budget()?)?, before);
+            assert_eq!(
+                f.cas.canonical_snapshot(&mut self::fresh_budget()?)?,
+                before
+            );
         }
         Ok(())
     }
@@ -1285,8 +1319,13 @@ mod tests {
                 crate::solving::CoefficientDomainData::Rational,
             )),
         )?;
-        let root = f.cas.materialize_derived(&f.one, &f.one, &mut budget()?)?;
-        let receipt = f.cas.walk_derived(&root, &mut budget()?)?.receipt;
+        let root = f
+            .cas
+            .materialize_derived(&f.one, &f.one, &mut self::fresh_budget()?)?;
+        let receipt = f
+            .cas
+            .walk_derived(&root, &mut self::fresh_budget()?)?
+            .receipt;
         let request = Request {
             task: Task::Simplify,
             context: f.context.clone(),
@@ -1307,7 +1346,7 @@ mod tests {
             C::Neg,
             C::Mul,
         ] {
-            let mut ledger = budget()?;
+            let mut ledger = self::fresh_budget()?;
             let limits = ledger.limits().clone();
             let (record, unsupported) = f.cas.prepare_execution(
                 &request,
@@ -1327,7 +1366,7 @@ mod tests {
                 context: f.context.clone(),
                 order: 1,
             };
-            let before = f.cas.canonical_snapshot(&mut budget()?)?;
+            let before = f.cas.canonical_snapshot(&mut self::fresh_budget()?)?;
             let fault = f
                 .cas
                 .expand_series_source(&source, &[], &mut ledger)
@@ -1336,7 +1375,10 @@ mod tests {
             assert!(
                 matches!(outcome(record,Execution{result:None,fault:Some(fault.clone())},&ledger.usage(),&BudgetUsage::default()),Outcome::Invalid{fault:actual,..} if actual==fault)
             );
-            assert_eq!(f.cas.canonical_snapshot(&mut budget()?)?, before);
+            assert_eq!(
+                f.cas.canonical_snapshot(&mut self::fresh_budget()?)?,
+                before
+            );
         }
         let predicate = admit(
             &mut f.cas,
@@ -1359,9 +1401,11 @@ mod tests {
             certificate: crate::proof_model::Certificate::None,
         };
         let (certificate, _) =
-            crate::case_check::reconstruct(&mut f.cas, &draft, &[], &mut budget()?)?;
+            crate::case_check::reconstruct(&mut f.cas, &draft, &[], &mut self::fresh_budget()?)?;
         draft.certificate = crate::proof_model::Certificate::Cases(Box::new(certificate));
-        let ordinary = f.cas.check_proof(&f.context, &[draft], &mut budget()?)?;
+        let ordinary = f
+            .cas
+            .check_proof(&f.context, &[draft], &mut self::fresh_budget()?)?;
         let pi = crate::testing::native::term(
             &mut f.cas,
             &f.header,
@@ -1374,7 +1418,7 @@ mod tests {
             C::ArctangentOrigin,
             C::PolynomialSeed,
         ] {
-            let mut ledger = budget()?;
+            let mut ledger = self::fresh_budget()?;
             let limits = ledger.limits().clone();
             let (record, unsupported) = f.cas.prepare_execution(
                 &request,
@@ -1394,7 +1438,7 @@ mod tests {
                 context: f.context.clone(),
                 order: 1,
             };
-            let before = f.cas.canonical_snapshot(&mut budget()?)?;
+            let before = f.cas.canonical_snapshot(&mut self::fresh_budget()?)?;
             let fault = f
                 .cas
                 .expand_series_source(&source, &[ordinary.proof().clone()], &mut ledger)
@@ -1406,7 +1450,10 @@ mod tests {
             assert!(
                 matches!(outcome(record.clone(),Execution{result:None,fault:Some(fault.clone())},&ledger.usage(),&BudgetUsage::default()),Outcome::Unresolved{request,blocker,..} if request==record && blocker==Some(fault))
             );
-            assert_eq!(f.cas.canonical_snapshot(&mut budget()?)?, before);
+            assert_eq!(
+                f.cas.canonical_snapshot(&mut self::fresh_budget()?)?,
+                before
+            );
         }
         Ok(())
     }

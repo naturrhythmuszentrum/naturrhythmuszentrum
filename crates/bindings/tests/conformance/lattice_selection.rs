@@ -101,7 +101,10 @@ fn enclosure(fixture: &mut LatticeFixture, kind: u8) -> TestResult<LatticeEnclos
         .operands(&fixture.target, &mut ledger()?)?;
     let count = originals.len();
     let context = fixture.frame.context.clone();
-    let input_family = fixture.frame.cas.admissible_region(&context)?;
+    let input_family = fixture.frame.cas.admissible_region(
+        &context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let mut coordinates = Vec::new();
     for row in 0..count {
         let start = row * (count + 1);

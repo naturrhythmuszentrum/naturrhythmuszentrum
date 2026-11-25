@@ -111,9 +111,9 @@ fn attempt(
 fn lc_spectral_construction_phase_boundaries() -> TestResult {
     use crate::spectral_testing::construction;
     let expected = [
-        [108_364, 434_653, 465_907, 1_009_270, 0, 4_945, 2_018_194],
-        [37_235, 336_003, 366_745, 873_133, 54_239, 2_972, 1_667_355],
-        [37_235, 336_003, 366_745, 873_133, 54_239, 2_972, 1_667_355],
+        [108_424, 434_881, 466_135, 1_009_342, 0, 4_945, 2_018_782],
+        [37_295, 336_231, 366_973, 873_205, 54_245, 2_972, 1_667_949],
+        [37_295, 336_231, 366_973, 873_205, 54_245, 2_972, 1_667_949],
     ];
     for (mode, row) in expected.into_iter().enumerate() {
         assert_eq!(construction(mode, [Limits::default().work; 5])?, row);
@@ -183,7 +183,7 @@ fn lc_spectral_result_definition_boundaries() -> TestResult {
 /// ´test:integration:lc-spectral-complete-construction-work-boundaries´
 #[test]
 fn lc_spectral_complete_construction_work_boundaries() {
-    for (phase, required) in [1_613_116, 932_710].into_iter().enumerate() {
+    for (phase, required) in [1_613_704, 933_148].into_iter().enumerate() {
         for work in [required, required - 1] {
             let mut limits = [Limits::default().work; 2];
             limits[phase] = work;
@@ -245,23 +245,23 @@ fn lc_spectral_output_construction_costs() -> TestResult {
         ),
         (
             &crate::spectral_testing::Costs {
-                setup: 63_788,
+                setup: 63_812,
                 views: [
-                    [105_292, 92_085],
-                    [106_099, 93_035],
-                    [58_772, 50_913],
-                    [58_866, 51_007],
-                    [59_738, 48_895],
-                    [59_101, 48_226]
+                    [105_334, 92_103],
+                    [106_135, 93_053],
+                    [58_802, 50_931],
+                    [58_896, 51_025],
+                    [59_762, 48_913],
+                    [59_125, 48_244]
                 ],
                 components: [
-                    [51_395, 50_399],
-                    [48_772, 47_776],
-                    [48_941, 47_945],
-                    [49_028, 48_032]
+                    [51_413, 50_411],
+                    [48_790, 47_788],
+                    [48_959, 47_957],
+                    [49_046, 48_044]
                 ],
                 overlaps: [
-                    [31_688, 29_436],
+                    [31_700, 29_448],
                     [17_633, 15_381],
                     [17_633, 15_381],
                     [17_633, 15_381],
@@ -269,14 +269,14 @@ fn lc_spectral_output_construction_costs() -> TestResult {
                     [17_633, 15_381]
                 ],
                 companions: [
-                    [11_550, 5_167],
-                    [11_550, 5_167],
-                    [11_582, 5_199],
-                    [11_582, 5_199],
-                    [10_564, 3_979],
-                    [10_564, 3_979],
-                    [10_596, 4_011],
-                    [10_596, 4_011]
+                    [11_568, 5_173],
+                    [11_568, 5_173],
+                    [11_600, 5_205],
+                    [11_600, 5_205],
+                    [10_582, 3_985],
+                    [10_582, 3_985],
+                    [10_614, 4_017],
+                    [10_614, 4_017]
                 ],
                 adapters: 718,
             },

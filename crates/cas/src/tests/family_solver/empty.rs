@@ -22,17 +22,19 @@ fn ledger() -> TestResult<Budget> {
 }
 
 fn setup() -> TestResult<(Fixture, Handle, Handle, Vec<ApplicationDraft>)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request) = super::request(2)?;
     let Task::Solve(specification) = &request.task else {
         return Err("solve request".into());
     };
     let problem = specification.problem.clone();
     let original =
-        crate::solving::graph::problem(&fixture.cas.state, problem.logical_id())?.clone();
+        crate::solving::graph::problem(&fixture.cas.state, problem.logical_id(), &mut budget)?
+            .clone();
     let original_region = fixture
         .cas
         .state
-        .region(original.region.logical_id())?
+        .region(original.region.logical_id(), &mut budget)?
         .clone();
     let over = original_region.lies_over.ok_or("family region")?;
     let family = fixture.cas.handle(over.family);
@@ -132,6 +134,7 @@ fn family_emptiness_piece_retained_and_replayed() -> TestResult {
 /// ´test:crate:family-emptiness-coverage-mutations-refuse´
 #[test]
 fn family_emptiness_coverage_mutations_refuse() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, problem, _, prefix) = setup()?;
     let witness = empty_witness(&mut fixture, &prefix)?;
     let piece =
@@ -166,7 +169,12 @@ fn family_emptiness_coverage_mutations_refuse() -> TestResult {
             value.cover = None;
         } else {
             value.region.clone_from(
-                &crate::solving::graph::problem(&fixture.cas.state, problem.logical_id())?.region,
+                &crate::solving::graph::problem(
+                    &fixture.cas.state,
+                    problem.logical_id(),
+                    &mut budget,
+                )?
+                .region,
             );
         }
         let mut steps = prefix.clone();
@@ -191,7 +199,7 @@ fn family_emptiness_resource_measurements() -> TestResult {
     let witness = empty_witness(&mut fixture, &steps)?;
     let mut generation = ledger()?;
     let mut checking = ledger()?;
-    let (result, production_rows) = crate::testing::work_trace::measured(|| {
+    let (result, production_report) = crate::testing::work_trace::measured_report(|| {
         fixture
             .cas
             .family_empty_piece(&problem, &witness, &mut generation, &mut checking)
@@ -202,9 +210,11 @@ fn family_emptiness_resource_measurements() -> TestResult {
         .export_witness(&piece.coverage, &mut ledger()?)?;
     let mut replay = ledger()?;
     let mut target = crate::Cas::new(Limits::blind_cubic())?;
-    let (result, replay_rows) =
-        crate::testing::work_trace::measured(|| target.inspect(&bytes, &mut replay))?;
+    let (result, replay_report) =
+        crate::testing::work_trace::measured_report(|| target.inspect(&bytes, &mut replay))?;
     assert!(result?.is_discharged());
+    let production_rows = &production_report.rows;
+    let replay_rows = &replay_report.rows;
     assert_eq!(
         [
             generation.usage().work,
@@ -212,10 +222,16 @@ fn family_emptiness_resource_measurements() -> TestResult {
             replay.usage().work,
             u64::try_from(bytes.len())?
         ],
-        [4_155, 63_854, 185_411, 1_775]
+        [4_170, 63_866, 185_650, 1_775]
     );
+    let production_remainder: u64 = production_report
+        .ledgers
+        .values()
+        .map(|ledger| ledger.remainder)
+        .sum();
+    assert_eq!(production_remainder, 12);
     assert_eq!(
-        production_rows.iter().map(|row| row.work).sum::<u64>(),
+        production_rows.iter().map(|row| row.work).sum::<u64>() + production_remainder,
         generation.usage().work + checking.usage().work
     );
     assert_eq!(

@@ -67,7 +67,9 @@ pub(crate) fn chain(reordered: bool, depth: usize) -> TestResult<Chain> {
             }),
             &mut budget()?,
         )?;
-        let domain = f.cas.admissible_region(&frame)?;
+        let domain = f
+            .cas
+            .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
         for guarded in &mut guarded_domains {
             *guarded = meet(&mut f, &[guarded.clone(), domain.clone()])?;
         }

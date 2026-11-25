@@ -109,12 +109,12 @@ impl<'a, 'b> Components<'a, 'b> {
                 .evaluation
                 .cas
                 .state
-                .region(self.evaluation.region.logical_id())?;
+                .region(self.evaluation.region.logical_id(), budget)?;
             let offset = self
                 .evaluation
                 .cas
                 .state
-                .header(region.header)?
+                .header(region.header, budget)?
                 .environment
                 .declarations
                 .len();
@@ -150,7 +150,7 @@ impl<'a, 'b> Components<'a, 'b> {
         bound: &[Parts],
         budget: &mut Budget,
     ) -> Result<Parts, Fault> {
-        let expression = self.evaluation.cas.state.expression(id)?;
+        let expression = self.evaluation.cas.state.expression(id, budget)?;
         match (&expression.operator, &expression.attachment) {
             (Operator::Rational(value), None) => Parts::rational(
                 self.evaluation,
@@ -187,8 +187,12 @@ impl<'a, 'b> Components<'a, 'b> {
         budget: &mut Budget,
     ) -> Result<Parts, Fault> {
         crate::work_observation::observe!(budget, AT, {
-            let expression = self.evaluation.cas.state.expression(id)?;
-            let header = self.evaluation.cas.state.header(expression.header)?;
+            let expression = self.evaluation.cas.state.expression(id, budget)?;
+            let header = self
+                .evaluation
+                .cas
+                .state
+                .header(expression.header, budget)?;
             for (index, declaration) in header.environment.declarations.iter().enumerate() {
                 budget.work(1, AT)?;
                 if declaration.key != key {
@@ -249,7 +253,10 @@ impl<'a, 'b> Components<'a, 'b> {
         budget: &mut Budget,
     ) -> Result<Parts, Fault> {
         let evaluation = self.evaluation;
-        match (&evaluation.cas.state.expression(id)?.operator, values) {
+        match (
+            &evaluation.cas.state.expression(id, budget)?.operator,
+            values,
+        ) {
             (Operator::Add, [a, b]) => a.sum(b, false, evaluation, budget),
             (Operator::Sub, [a, b]) => a.sum(b, true, evaluation, budget),
             (Operator::Mul, [a, b]) => a.mul(b, evaluation, budget),
@@ -284,7 +291,7 @@ impl<'a, 'b> Components<'a, 'b> {
     ) -> Result<Parts, Fault> {
         self.depth = self.depth.checked_add(1).ok_or_else(invalid)?;
         budget.check(BudgetKind::Depth, self.depth, AT)?;
-        let result = if crate::solving::family::local(self.evaluation.cas, root)? {
+        let result = if crate::solving::family::local(self.evaluation.cas, root, budget)? {
             crate::solving::family::components::read(self, root, bound, budget)
         } else {
             self.walk(root, bound, budget)
@@ -306,20 +313,20 @@ impl<'a, 'b> Components<'a, 'b> {
             let mut values = vector(1, budget)?;
             while let Some((id, ready)) = pending.pop() {
                 budget.work(1, AT)?;
-                if crate::solving::family::local(self.evaluation.cas, id)? {
+                if crate::solving::family::local(self.evaluation.cas, id, budget)? {
                     let value = self.expression(id, bound, budget)?;
                     reserve(&mut values, 1, budget)?;
                     values.push(value);
                     continue;
                 }
-                let expression = self.evaluation.cas.state.expression(id)?;
+                let expression = self.evaluation.cas.state.expression(id, budget)?;
                 budget.check(BudgetKind::Depth, expression.depth, AT)?;
                 if expression.header
                     != self
                         .evaluation
                         .cas
                         .state
-                        .region(self.evaluation.region.logical_id())?
+                        .region(self.evaluation.region.logical_id(), budget)?
                         .header
                     || expression.space.is_some()
                 {

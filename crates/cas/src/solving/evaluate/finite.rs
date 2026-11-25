@@ -32,7 +32,8 @@ pub(super) fn polynomial(
     images: &[Value],
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
-    let stored = crate::solving::coefficients::storage::polynomial(&evaluation.cas.state, handle)?;
+    let stored =
+        crate::solving::coefficients::storage::polynomial(&evaluation.cas.state, handle, budget)?;
     if stored.domain != *evaluation.engine.domain || stored.variables.len() != images.len() {
         return Err(invalid());
     }
@@ -84,6 +85,7 @@ pub(super) fn localization(
         let (kind, arguments) = crate::solving::elementary::evidence::predicate(
             evaluation.cas,
             predicate.logical_id(),
+            budget,
         )?;
         let [argument] = arguments else {
             return Err(invalid());

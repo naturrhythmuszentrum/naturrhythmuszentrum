@@ -281,8 +281,12 @@ fn claim(
         return Err(invalid(InvalidCode::Expm1Environment));
     }
     let original = &request.original;
-    let root = cas.state.expression(cas.checked(&original.target)?)?;
-    let context = cas.state.context(cas.checked(&original.context)?)?;
+    let root = cas
+        .state
+        .expression(cas.checked(&original.target, budget)?, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&original.context, budget)?, budget)?;
     let shape = root.operator == Operator::Sub
         && root.operands.len() == 2
         && root.scope.is_empty()
@@ -291,8 +295,8 @@ fn claim(
     if !shape {
         return Err(invalid(InvalidCode::Expm1Claim));
     }
-    let exponential = cas.state.expression(root.operands[0])?;
-    let one = cas.state.expression(root.operands[1])?;
+    let exponential = cas.state.expression(root.operands[0], budget)?;
+    let one = cas.state.expression(root.operands[1], budget)?;
     if exponential.operator != Operator::Exponential
         || exponential.operands.len() != 1
         || !matches!(&one.operator,Operator::Rational(value) if value == &Rational::one())
@@ -300,14 +304,14 @@ fn claim(
         return Err(invalid(InvalidCode::Expm1Claim));
     }
     let argument_id = exponential.operands[0];
-    let argument = cas.state.expression(argument_id)?;
+    let argument = cas.state.expression(argument_id, budget)?;
     let range = match &argument.operator {
         Operator::Rational(value) if original.coordinates.is_empty() => {
             Cow::Owned(super::super::Interval::singleton(value, budget)?)
         }
         Operator::Free(_)
             if original.coordinates.len() == 1
-                && cas.checked(&original.coordinates[0].coordinate)? == argument_id =>
+                && cas.checked(&original.coordinates[0].coordinate, budget)? == argument_id =>
         {
             Cow::Borrowed(&original.coordinates[0].interval)
         }

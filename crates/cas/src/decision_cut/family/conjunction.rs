@@ -95,7 +95,7 @@ pub(super) fn check(
         let mut masks = BTreeMap::new();
         for id in &order {
             budget.work(size(masks.len(), AT)?.saturating_add(1), AT)?;
-            if let Vertex::Region(region) = cas.state.node(*id)? {
+            if let Vertex::Region(region) = cas.state.node(*id, budget)? {
                 let mask = region_mask(cas, &region.expression, &masks, expected, values, budget)?;
                 masks.insert(*id, mask);
             }
@@ -151,7 +151,7 @@ fn predicate_mask(
     values: &Values,
     budget: &mut Budget,
 ) -> Result<u8, Fault> {
-    let Vertex::Condition(predicate) = cas.state.node(id)? else {
+    let Vertex::Condition(predicate) = cas.state.node(id, budget)? else {
         return Err(invalid());
     };
     let arguments = &predicate.arguments;

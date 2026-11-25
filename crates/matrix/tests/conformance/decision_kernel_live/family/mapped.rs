@@ -146,20 +146,20 @@ fn kernel_mapped_family_lifecycle() -> TestResult {
     };
     assert!(matches!(fault, LiveDecisionError::Retired));
     assert_eq!(heap.provenance_usage(), heap_before);
-    assert_eq!(setup.usage().work, 95_335);
+    assert_eq!(setup.usage().work, 95_549);
     assert_eq!(captured - 17, 2952);
-    assert_eq!(traced - captured, 351_397);
-    assert_eq!(selected - traced, 366_864);
+    assert_eq!(traced - captured, 351_689);
+    assert_eq!(selected - traced, 367_056);
     assert_eq!(prepared_work - selected, 6984);
     assert_eq!(publication - prepared_work, 193);
     assert_eq!(current - publication, 191);
     assert_eq!(budget.usage().work - current, 35);
-    assert_eq!(budget.usage().work, 728_633);
-    assert_eq!(setup.usage().work + budget.usage().work - 17, 823_951);
+    assert_eq!(budget.usage().work, 729_117);
+    assert_eq!(setup.usage().work + budget.usage().work - 17, 824_649);
     assert_eq!(retained, 10_408);
     assert_eq!(exported, 2877);
     assert_eq!(bytes.len(), 2877);
-    assert_eq!(replayed, 550_862);
+    assert_eq!(replayed, 551_298);
     Ok(())
 }
 

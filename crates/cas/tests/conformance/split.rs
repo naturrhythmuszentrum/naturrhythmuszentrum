@@ -25,7 +25,10 @@ fn split_finite_point_extension() -> TestResult {
             return Err("split value".into());
         };
         assert_eq!(value.value, Rational::parse("17/3", &mut budget()?)?);
-        let evidence = fixture.cas.split_certificate(&result.witness)?;
+        let evidence = fixture.cas.split_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?;
         let point = evidence
             .points
             .iter()
@@ -134,7 +137,13 @@ fn split_certificate_tampering() -> TestResult {
         let function = named(&mut fixture, CaseName::Abs)?;
         let request = fixture.request(task(kind, "-1", "2")?, &[function])?;
         let result = fixture.proved(&request)?;
-        let evidence = fixture.cas.split_certificate(&result.witness)?.clone();
+        let evidence = fixture
+            .cas
+            .split_certificate(
+                &result.witness,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?
+            .clone();
         for mutation in 0..4 {
             let mut changed = evidence.clone();
             let piece = changed.pieces.first_mut().ok_or("piece")?;

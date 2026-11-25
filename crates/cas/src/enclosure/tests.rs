@@ -472,7 +472,7 @@ fn enclosure_cold_warm_work() -> TestResult {
         EnclosureOutcome::Exhausted
     );
     assert_eq!(f.cas.canonical_snapshot(&mut ledger()?)?, snapshot);
-    assert_eq!((cold.work, warm.work), (78_336, 20_259));
+    assert_eq!((cold.work, warm.work), (78_341, 20_259));
     let mut short = Budget::new(Limits {
         work: 20_258,
         ..Limits::default()
@@ -485,7 +485,7 @@ fn enclosure_cold_warm_work() -> TestResult {
     );
     let (mut fresh, expected) = product_fixture()?;
     let mut exact = Budget::new(Limits {
-        work: 78_336,
+        work: 78_341,
         ..Limits::default()
     })?;
     assert_eq!(
@@ -497,7 +497,7 @@ fn enclosure_cold_warm_work() -> TestResult {
     );
     let (mut fresh, expected) = product_fixture()?;
     let mut short = Budget::new(Limits {
-        work: 78_335,
+        work: 78_340,
         ..Limits::default()
     })?;
     assert_eq!(
@@ -685,7 +685,7 @@ fn enclosure_phase_work_pins() -> TestResult {
             replay.usage().work,
             publication.usage().work
         ),
-        (16_169, 37_516, 2_961)
+        (16_169, 37_516, 2_964)
     );
     for (limit, passes) in [(16_169, true), (16_168, false)] {
         let mut bounded = Budget::new(Limits {
@@ -709,7 +709,7 @@ fn enclosure_phase_work_pins() -> TestResult {
         let outcome = checker::check(&f.cas, &request, &certificate, &mut bounded, &mut |_| false);
         assert_eq!(outcome.is_ok(), passes);
     }
-    for (limit, passes) in [(2_961, true), (2_960, false)] {
+    for (limit, passes) in [(2_964, true), (2_963, false)] {
         let (mut target, expected) = product_fixture()?;
         let value = checker::check(
             &target.cas,

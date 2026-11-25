@@ -251,7 +251,10 @@ impl Cas {
                 budget.with_retained_payload(bytes, AT, |budget| {
                     let draft = ApplicationDraft {
                         rule: statement.clause.primitive(),
-                        context: cas.series_object(&statement.output)?.context.clone(),
+                        context: cas
+                            .series_object(&statement.output, budget)?
+                            .context
+                            .clone(),
                         conclusion: Statement::Series(Box::new(SeriesStatement::Source(
                             statement.clone(),
                         ))),
@@ -333,7 +336,7 @@ fn premise_bytes(cas: &Cas, proofs: &[Handle], budget: &mut Budget) -> Result<u6
         bytes = bytes
             .checked_add(crate::proof_view::application_bytes(
                 cas,
-                cas.checked(proof)?,
+                cas.checked(proof, budget)?,
                 budget,
             )?)
             .ok_or_else(invalid)?;
@@ -361,7 +364,7 @@ fn publish(
         }
         premises.push(crate::proof_view::application(
             cas,
-            cas.checked(proof)?,
+            cas.checked(proof, budget)?,
             budget,
         )?);
     }
@@ -423,7 +426,8 @@ fn candidate(
             SourceClause::Add | SourceClause::Mul => 2,
             _ => 1,
         };
-        let application = crate::proof_view::application(cas, cas.checked(&proofs[slot])?, budget)?;
+        let application =
+            crate::proof_view::application(cas, cas.checked(&proofs[slot], budget)?, budget)?;
         match object(&application)? {
             SeriesStatement::Reciprocal { output, .. }
             | SeriesStatement::Truncate { output, .. }
@@ -485,7 +489,11 @@ fn candidate(
             .coefficients
             .try_reserve_exact(n)
             .map_err(|_| Fault::allocation(AT))?;
-        let header = cas.handle(cas.state.context(cas.checked(&request.context)?)?.header_id);
+        let header = cas.handle(
+            cas.state
+                .context(cas.checked(&request.context, budget)?, budget)?
+                .header_id,
+        );
         for index in 0..n {
             let zero = Rational::zero();
             let value = super::produce::copied(values.get(index).unwrap_or(&zero), budget)?;
@@ -511,7 +519,7 @@ fn candidate(
             .pop()
             .ok_or_else(invalid)?
     };
-    let actual = cas.series_object(&output)?;
+    let actual = cas.series_object(&output, budget)?;
     compatible(&basis, actual, budget)?;
     if actual.order != request.order {
         return Err(invalid());
@@ -534,17 +542,21 @@ fn candidate(
 
 /// Validate the original source and identical domain without copying the graph.
 pub(super) fn roles(cas: &Cas, value: &SourceStatement, budget: &mut Budget) -> Result<(), Fault> {
-    let basis = cas.series_object(&value.output)?;
+    let basis = cas.series_object(&value.output, budget)?;
     basis.preflight(budget)?;
-    let source = cas.state.expression(cas.checked(&value.source)?)?;
-    let context = cas.state.context(cas.checked(&basis.context)?)?;
+    let source = cas
+        .state
+        .expression(cas.checked(&value.source, budget)?, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&basis.context, budget)?, budget)?;
     crate::rule_check::prepay_shape(source, budget)?;
     let header = context.header_id;
     if source.header != header
         || source.scope != basis.scope
         || source.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || source.space.is_some()
-        || cas.checked(&value.domain)? != context.admissible
+        || cas.checked(&value.domain, budget)? != context.admissible
     {
         return Err(invalid());
     }
@@ -590,7 +602,7 @@ fn check_inner(
         return Err(invalid());
     }
     roles(cas, value, budget)?;
-    let basis = cas.series_object(&value.output)?;
+    let basis = cas.series_object(&value.output, budget)?;
     if draft.context != basis.context
         || premises.iter().any(|p| p.judgment.context != draft.context)
     {
@@ -599,11 +611,11 @@ fn check_inner(
     super::codec::measure(certificate, budget)?;
     match value.clause {
         SourceClause::SineOrigin | SourceClause::CosineOrigin | SourceClause::ArctangentOrigin => {
-            defined(cas, &value.source, basis, premises)?;
+            defined(cas, &value.source, basis, premises, budget)?;
             origin(cas, value, evidence, budget)?;
         }
         SourceClause::PolynomialSeed => {
-            defined(cas, &value.source, basis, premises)?;
+            defined(cas, &value.source, basis, premises, budget)?;
             if !evidence.companion.is_empty() || !evidence.units.is_empty() {
                 return Err(invalid());
             }
@@ -648,7 +660,7 @@ fn selected(
         budget.specialized(BudgetKind::JetEntries, 1, true, AT)?;
         let zero = Rational::zero();
         equal(
-            number(cas, output)?,
+            number(cas, output, budget)?,
             values.get(index).unwrap_or(&zero),
             budget,
         )?;
@@ -678,8 +690,10 @@ fn origin(
     evidence: &SourceCertificate,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let basis = cas.series_object(&value.output)?;
-    let source = cas.state.expression(cas.checked(&value.source)?)?;
+    let basis = cas.series_object(&value.output, budget)?;
+    let source = cas
+        .state
+        .expression(cas.checked(&value.source, budget)?, budget)?;
     let operator = match value.clause {
         SourceClause::SineOrigin => Operator::Sine,
         SourceClause::CosineOrigin => Operator::Cosine,
@@ -688,8 +702,8 @@ fn origin(
     };
     budget.work(2, AT)?;
     if source.operator != operator
-        || source.operands.as_slice() != [cas.checked(&basis.variable)?]
-        || !number(cas, &basis.centre)?.is_zero()
+        || source.operands.as_slice() != [cas.checked(&basis.variable, budget)?]
+        || !number(cas, &basis.centre, budget)?.is_zero()
     {
         return Err(unsupported());
     }
@@ -776,8 +790,8 @@ fn source<'a>(
         return Err(invalid());
     }
     compatible(
-        cas.series_object(&previous.output)?,
-        cas.series_object(&value.output)?,
+        cas.series_object(&previous.output, budget)?,
+        cas.series_object(&value.output, budget)?,
         budget,
     )?;
     Ok(previous)
@@ -824,12 +838,12 @@ fn borrowed<'a>(
     budget.work(1, AT)?;
     #[cfg(test)]
     SLOT_VISITS.with(|n| n.set(n.get() + 1));
-    let Vertex::Proof(id) = cas.state.node(cas.checked(proof)?)? else {
+    let Vertex::Proof(id) = cas.state.node(cas.checked(proof, budget)?, budget)? else {
         return Err(invalid());
     };
-    match cas.state.node(*id)? {
+    match cas.state.node(*id, budget)? {
         Vertex::ScopedApplication(value) => Ok(value),
-        Vertex::AnonymousLemma(_) => cas.series_application(*id),
+        Vertex::AnonymousLemma(_) => cas.series_application(*id, budget),
         _ => Err(invalid()),
     }
 }
@@ -878,7 +892,7 @@ pub(crate) fn preflight_slots(
         }
         if let Statement::PredicateFact { predicate, .. } = statement {
             let crate::graph::Vertex::Condition(condition) =
-                cas.state.node(cas.checked(predicate)?)?
+                cas.state.node(cas.checked(predicate, budget)?, budget)?
             else {
                 return Err(invalid());
             };
@@ -903,7 +917,7 @@ fn literal_one(
     expected: &crate::graph::Expression,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let literal = cas.state.expression(id)?;
+    let literal = cas.state.expression(id, budget)?;
     if literal.header != expected.header
         || literal.scope != expected.scope
         || literal.space != expected.space
@@ -930,18 +944,22 @@ fn nonzero(
     factor: &Handle,
     basis: &SeriesObject<Handle>,
     premise: &CheckedApplication,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     let Statement::PredicateFact { region, predicate } = &premise.judgment.statement else {
         return Err(invalid());
     };
-    let context = cas.state.context(cas.checked(&basis.context)?)?;
-    let crate::graph::Vertex::Condition(condition) = cas.state.node(cas.checked(predicate)?)?
+    let context = cas
+        .state
+        .context(cas.checked(&basis.context, budget)?, budget)?;
+    let crate::graph::Vertex::Condition(condition) =
+        cas.state.node(cas.checked(predicate, budget)?, budget)?
     else {
         return Err(invalid());
     };
     if region.logical_id() != context.admissible
         || condition.kind != crate::model::PredicateKind::NonZero
-        || condition.arguments.as_slice() != [cas.checked(factor)?]
+        || condition.arguments.as_slice() != [cas.checked(factor, budget)?]
         || condition.header != context.header_id
         || condition.scope != basis.scope
     {
@@ -958,8 +976,10 @@ fn quotient(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     use SeriesStatement as S;
-    let basis = cas.series_object(&value.output)?;
-    let expression = cas.state.expression(cas.checked(&value.source)?)?;
+    let basis = cas.series_object(&value.output, budget)?;
+    let expression = cas
+        .state
+        .expression(cas.checked(&value.source, budget)?, budget)?;
     budget.work(2, AT)?;
     let [numerator, denominator] = expression.operands.as_slice() else {
         return Err(invalid());
@@ -968,13 +988,19 @@ fn quotient(
         return Err(invalid());
     }
     let left = source(cas, value, &premises[0], budget)?;
-    if cas.series_object(&left.output)?.order != basis.order {
+    if cas.series_object(&left.output, budget)?.order != basis.order {
         return Err(invalid());
     }
-    defined(cas, &value.source, basis, &premises[premises.len() - 1..])?;
+    defined(
+        cas,
+        &value.source,
+        basis,
+        &premises[premises.len() - 1..],
+        budget,
+    )?;
     if value.clause == SourceClause::Reciprocal {
         literal_one(cas, *numerator, expression, budget)?;
-        if *denominator != cas.checked(&left.source)? {
+        if *denominator != cas.checked(&left.source, budget)? {
             return Err(invalid());
         }
         let S::Reciprocal { input, output } = object(&premises[1])? else {
@@ -983,19 +1009,21 @@ fn quotient(
         if input != &left.output || output != &value.output {
             return Err(invalid());
         }
-        nonzero(cas, &left.source, basis, &premises[2])?;
+        nonzero(cas, &left.source, basis, &premises[2], budget)?;
     } else {
         let right = source(cas, value, &premises[1], budget)?;
         let reciprocal = source(cas, value, &premises[2], budget)?;
         if reciprocal.clause != SourceClause::Reciprocal
-            || *numerator != cas.checked(&left.source)?
-            || *denominator != cas.checked(&right.source)?
-            || cas.series_object(&right.output)?.order != basis.order
-            || cas.series_object(&reciprocal.output)?.order != basis.order
+            || *numerator != cas.checked(&left.source, budget)?
+            || *denominator != cas.checked(&right.source, budget)?
+            || cas.series_object(&right.output, budget)?.order != basis.order
+            || cas.series_object(&reciprocal.output, budget)?.order != basis.order
         {
             return Err(invalid());
         }
-        let original = cas.state.expression(cas.checked(&reciprocal.source)?)?;
+        let original = cas
+            .state
+            .expression(cas.checked(&reciprocal.source, budget)?, budget)?;
         let [one, original_denominator] = original.operands.as_slice() else {
             return Err(invalid());
         };
@@ -1033,7 +1061,7 @@ fn quotient(
         {
             return Err(invalid());
         }
-        nonzero(cas, &right.source, basis, &premises[4])?;
+        nonzero(cas, &right.source, basis, &premises[4], budget)?;
     }
     Ok(())
 }
@@ -1054,7 +1082,7 @@ fn lifted(
     if matches!(value.clause, L::Reciprocal | L::Quotient) {
         return quotient(cas, value, premises, budget);
     }
-    let basis = cas.series_object(&value.output)?;
+    let basis = cas.series_object(&value.output, budget)?;
     let left = source(cas, value, &premises[0], budget)?;
     if value.clause == L::Truncate {
         let S::Truncate { input, output } = object(&premises[1])? else {
@@ -1066,11 +1094,19 @@ fn lifted(
             Err(invalid())
         };
     }
-    if cas.series_object(&left.output)?.order != basis.order {
+    if cas.series_object(&left.output, budget)?.order != basis.order {
         return Err(invalid());
     }
-    defined(cas, &value.source, basis, &premises[premises.len() - 1..])?;
-    let expression = cas.state.expression(cas.checked(&value.source)?)?;
+    defined(
+        cas,
+        &value.source,
+        basis,
+        &premises[premises.len() - 1..],
+        budget,
+    )?;
+    let expression = cas
+        .state
+        .expression(cas.checked(&value.source, budget)?, budget)?;
     budget.work(size(expression.operands.len(), AT)?, AT)?;
     match value.clause {
         L::Add | L::Sub | L::Mul => {
@@ -1082,8 +1118,11 @@ fn lifted(
             };
             if expression.operator != operator
                 || expression.operands.as_slice()
-                    != [cas.checked(&left.source)?, cas.checked(&right.source)?]
-                || cas.series_object(&right.output)?.order != basis.order
+                    != [
+                        cas.checked(&left.source, budget)?,
+                        cas.checked(&right.source, budget)?,
+                    ]
+                || cas.series_object(&right.output, budget)?.order != basis.order
             {
                 return Err(invalid());
             }
@@ -1100,7 +1139,7 @@ fn lifted(
                     return Err(invalid());
                 }
                 equal(
-                    number(cas, scalar)?,
+                    number(cas, scalar, budget)?,
                     &Rational::one().negated(budget)?,
                     budget,
                 )?;
@@ -1155,12 +1194,12 @@ fn lifted(
                 return Err(invalid());
             }
             super::check::constant(cas, basis, scalar, budget)?;
-            let child = cas.checked(&left.source)?;
-            let scalar_id = cas.checked(scalar)?;
+            let child = cas.checked(&left.source, budget)?;
+            let scalar_id = cas.checked(scalar, budget)?;
             let correct = match value.clause {
                 L::Neg => {
                     equal(
-                        number(cas, scalar)?,
+                        number(cas, scalar, budget)?,
                         &Rational::one().negated(budget)?,
                         budget,
                     )?;
@@ -1233,9 +1272,11 @@ fn polynomial(
 ) -> Result<Vec<Rational>, Fault> {
     budget.work(1, AT)?;
     budget.check(BudgetKind::Depth, depth, AT)?;
-    let expression = cas.state.expression(cas.checked(handle)?)?;
+    let expression = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     crate::rule_check::prepay_shape(expression, budget)?;
-    let context = cas.state.context(cas.checked(&basis.context)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&basis.context, budget)?, budget)?;
     let header = context.header_id;
     if expression.header != header
         || expression.scope != basis.scope
@@ -1245,7 +1286,7 @@ fn polynomial(
     }
     if handle == &basis.variable {
         let mut result = zeros(2, budget)?;
-        result[0] = super::produce::copied(number(cas, &basis.centre)?, budget)?;
+        result[0] = super::produce::copied(number(cas, &basis.centre, budget)?, budget)?;
         result[1] = Rational::one();
         return Ok(result);
     }
@@ -1375,11 +1416,12 @@ mod reciprocal_slots {
     fn reciprocal_literal_one_frame() -> TestResult {
         use crate::graph::{Draft, ExpressionDraft, Reference};
         use crate::testing::series_residual::admit;
+        let mut budget = crate::testing::common::default_budget()?;
         let mut f = Fixture::with_extension(&["1"])?;
         let parent = f
             .cas
             .state
-            .header(f.header.logical_id())?
+            .header(f.header.logical_id(), &mut budget)?
             .parent
             .ok_or("parent header")?;
         let ancestor = f.cas.handle(parent);
@@ -1402,7 +1444,7 @@ mod reciprocal_slots {
         // Header ancestry does admit a distinct literal and a composite using it.
         for numerator in [one, ancestor_one] {
             let source = f.node(Operator::Div, &[numerator.clone(), f.x.clone()])?;
-            let expected = f.cas.state.expression(source.logical_id())?;
+            let expected = f.cas.state.expression(source.logical_id(), &mut budget)?;
             let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
             let result = literal_one(
                 &f.cas,
@@ -1410,7 +1452,12 @@ mod reciprocal_slots {
                 expected,
                 &mut default_budget()?,
             );
-            if f.cas.state.expression(numerator.logical_id())?.header == expected.header {
+            if f.cas
+                .state
+                .expression(numerator.logical_id(), &mut budget)?
+                .header
+                == expected.header
+            {
                 result?;
             } else {
                 assert_eq!(
@@ -1430,7 +1477,7 @@ mod reciprocal_slots {
         let mut f = Fixture::new(&["1"], "0", false, false)?;
         let proof = f.compose()?;
         let slots = vec![proof.proof().clone(); 4];
-        for work in [0, 1] {
+        for (work, visits) in [(0, 0), (2, 1)] {
             SLOT_VISITS.with(|n| n.set(0));
             SLOT_COPIES.with(|n| n.set(0));
             let mut budget = Budget::new(Limits {
@@ -1452,7 +1499,7 @@ mod reciprocal_slots {
                     FaultKind::Invalid(InvalidCode::Rule)
                 }
             );
-            assert_eq!(SLOT_VISITS.with(std::cell::Cell::get), work);
+            assert_eq!(SLOT_VISITS.with(std::cell::Cell::get), visits);
             assert_eq!(SLOT_COPIES.with(std::cell::Cell::get), 0);
         }
         let output = f.object(&f.candidate.clone())?;

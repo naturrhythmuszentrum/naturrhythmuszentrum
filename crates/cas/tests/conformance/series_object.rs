@@ -20,10 +20,16 @@ fn series_object_exact_identity() -> TestResult {
         let (mut f, object) = fixture(values)?;
         let handle = admit(&mut f, object.clone())?;
         assert_eq!(handle, admit(&mut f, object.clone())?);
-        let retained = f.cas.series_object(&handle)?;
+        let retained = f
+            .cas
+            .series_object(&handle, &mut crate::testing::budgets::graph_budget()?)?;
         assert_eq!(usize::try_from(retained.order)?, values.len());
         for (coefficient, expected) in retained.coefficients.iter().zip(values) {
-            let Operator::Rational(value) = f.cas.expression(coefficient)?.0 else {
+            let Operator::Rational(value) = f
+                .cas
+                .expression(coefficient, &mut crate::testing::budgets::graph_budget()?)?
+                .0
+            else {
                 return Err("coefficient category".into());
             };
             assert_eq!(value.exact_string(&mut default_budget()?)?, *expected);

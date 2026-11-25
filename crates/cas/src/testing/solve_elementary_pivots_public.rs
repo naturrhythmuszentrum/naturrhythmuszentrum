@@ -133,7 +133,10 @@ pub(crate) fn embedded_fraction(nonzero: bool) -> TestResult<BinomialFixture> {
     }
     let parameter = base.free("a")?;
     let (polynomial, map) = base.parameter_binomial(&parameter)?;
-    let SolveView::Polynomial(polynomial) = base.cas.solve_view(&polynomial)? else {
+    let SolveView::Polynomial(polynomial) = base
+        .cas
+        .solve_view(&polynomial, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing parameter polynomial".into());
     };
     let domain = polynomial.domain.clone();
@@ -166,7 +169,10 @@ fn alternate_map(base: &mut Fixture, original: &Handle) -> TestResult<Handle> {
     let one = base.coefficient(1)?;
     let algebra = base.algebra.clone();
     let denominator = base.polynomial(&algebra, &[(0, one)])?;
-    let SolveView::CoefficientMap(map) = base.cas.solve_view(original)? else {
+    let SolveView::CoefficientMap(map) = base
+        .cas
+        .solve_view(original, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing coefficient map".into());
     };
     let map = map.clone();
@@ -249,11 +255,16 @@ fn polynomial_identity(
     };
     let SolveView::CoefficientDomain(crate::test_api::solving::CoefficientDomainData::Quotient {
         level,
-    }) = base.cas.solve_view(&base.algebra)?
+    }) = base
+        .cas
+        .solve_view(&base.algebra, &mut crate::testing::budgets::graph_budget()?)?
     else {
         return Err("missing quotient".into());
     };
-    let SolveView::ExtensionLevel(extension) = base.cas.solve_view(level)? else {
+    let SolveView::ExtensionLevel(extension) = base
+        .cas
+        .solve_view(level, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing extension".into());
     };
     let parent = extension.parent.clone();

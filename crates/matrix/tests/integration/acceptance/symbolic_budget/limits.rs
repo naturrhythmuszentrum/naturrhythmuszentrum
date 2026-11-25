@@ -46,7 +46,12 @@ fn full_ladder_symbolic_work_has_explicit_boundary() -> ResultOf {
             baseline.generation,
             baseline.replay
         ),
-        (4_916_627, 1_703_795, 4_922_310, 2_174_460)
+        // Construction receipt: 1,703,795 + 524 retained-kind counts + 524 identity
+        // insertions + 322 occurrence admissions + 66 vertex admissions - 0 displaced
+        // graph charges = 1,705,231. The interning-lookup floor is 20,726 on both sides.
+        // Replay maximum: 2,174,460 + 380 retained-kind counts + 7 local counts
+        // + 394 identity insertions + 394 vertex admissions = 2,175,635.
+        (4_916_627, 1_705_231, 4_922_310, 2_175_635)
     );
     Ok(())
 }

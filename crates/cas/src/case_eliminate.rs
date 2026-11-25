@@ -23,8 +23,15 @@ pub(crate) fn reconstruct(
     ) {
         return Err(invalid());
     }
-    let context = cas.state.context(cas.checked(&draft.context)?)?;
-    crate::case_check::subset(cas, cas.checked(domain)?, context.admissible, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
+    crate::case_check::subset(
+        cas,
+        cas.checked(domain, budget)?,
+        context.admissible,
+        budget,
+    )?;
     let cover = premises.first().ok_or_else(invalid)?;
     let Statement::Cover {
         domain: covered,
@@ -50,13 +57,13 @@ pub(crate) fn reconstruct(
         let Certificate::Close { frame } = &child.certificate else {
             return Err(invalid());
         };
-        let local = cas.state.context(cas.checked(frame)?)?;
-        if local.parent != Some(cas.checked(&draft.context)?)
-            || local.restriction != Some(cas.checked(member)?)
+        let local = cas.state.context(cas.checked(frame, budget)?, budget)?;
+        if local.parent != Some(cas.checked(&draft.context, budget)?)
+            || local.restriction != Some(cas.checked(member, budget)?)
         {
             return Err(invalid());
         }
-        crate::case_check::subset(cas, local.admissible, cas.checked(domain)?, budget)?;
+        crate::case_check::subset(cas, local.admissible, cas.checked(domain, budget)?, budget)?;
         let expected =
             crate::context_check::restricted(&draft.conclusion, &cas.handle(local.admissible));
         if child.judgment.statement != expected {
@@ -68,7 +75,7 @@ pub(crate) fn reconstruct(
             }
             crate::case_check::subset(
                 cas,
-                cas.checked(&residual.region)?,
+                cas.checked(&residual.region, budget)?,
                 local.admissible,
                 budget,
             )?;

@@ -8,7 +8,7 @@ use crate::testing::builders::admit;
 use crate::testing::common::TestResult;
 use crate::testing::readings::ledger;
 use nrz_cas::decision::EnclosureOrigin;
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::proof::{Certificate, VerifiedWitness};
 use nrz_cas::{Cas, FaultKind, Handle, InvalidCode, Location};
 
@@ -100,7 +100,7 @@ fn decision_pi_membership_costs() -> TestResult {
     receiver.inspect(&bytes, &mut replay)?;
     assert_eq!(
         (work, replay.usage().work, bytes.len()),
-        (382_265, 609_118, 3_073)
+        (382_346, 609_594, 3_073)
     );
     Ok(())
 }
@@ -128,7 +128,7 @@ fn resource_attempt(replay: bool, amount: u64, prior: u64, accepted: bool) -> Te
         work: amount,
         ..Limits::default()
     };
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(prior, Location::new("prior pi membership work"))?;
     let result = if let Some(bytes) = bytes {
         cas.inspect(&bytes, &mut budget)
@@ -159,7 +159,7 @@ fn resource_attempt(replay: bool, amount: u64, prior: u64, accepted: bool) -> Te
 /// ´test:integration:decision-pi-membership-resources´
 #[test]
 fn decision_pi_membership_resources() -> TestResult {
-    for (replay, work) in [(false, 382_265), (true, 609_118)] {
+    for (replay, work) in [(false, 382_346), (true, 609_594)] {
         resource_attempt(replay, work, 0, true)?;
         resource_attempt(replay, work - 1, 0, false)?;
         resource_attempt(replay, work, 1, false)?;

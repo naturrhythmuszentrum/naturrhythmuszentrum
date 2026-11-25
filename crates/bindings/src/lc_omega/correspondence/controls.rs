@@ -58,7 +58,8 @@ pub(in crate::lc_omega) fn published_failure(
         budget.with_retained_payload(declaration.retained_bytes()?, AT, |budget| {
             prepare(declaration, None, budget)
         })?;
-    assert!(receipt.request(&cas).is_ok());
+    let mut inspection = crate::exact::budget()?;
+    assert!(receipt.request(&cas, &mut inspection).is_ok());
     assert_eq!(cas.counts().payload_bytes, 20_514 + 10_119 + 1170);
     seal(cas, receipt, declaration, &request, budget)
 }
@@ -88,14 +89,14 @@ pub(in crate::lc_omega) fn source_tariffs(
     let expected = translated.admit(&mut cas, original.positions, budget)?;
     assert_eq!(
         budget.usage().work - before,
-        57_567 + 128,
+        57_567 + 128 + 70 + 80 + 5 + 80,
         "batch admission and expected request"
     );
     let before = budget.usage().work;
     let receipt = cas.construct_lc_root(&expected, budget)?;
     assert_eq!(
         budget.usage().work - before,
-        259_400,
+        259_400 + 2 + 1 + 2,
         "registered construction"
     );
     let before = budget.usage().work;

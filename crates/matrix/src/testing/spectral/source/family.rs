@@ -47,7 +47,9 @@ pub(super) fn store(limits: Limits, budget: &mut Budget) -> TestResult<Fixture> 
     )?;
     let real = scalar(&mut cas, &header, "L", Field::Real, budget)?;
     let complex = scalar(&mut cas, &header, "z", Field::Complex, budget)?;
-    let complex_space = cas.scalar_ambient(&complex)?.ok_or("Complex ambient")?;
+    let complex_space = cas
+        .scalar_ambient(&complex, budget)?
+        .ok_or("Complex ambient")?;
     Ok(Fixture {
         cas,
         header,

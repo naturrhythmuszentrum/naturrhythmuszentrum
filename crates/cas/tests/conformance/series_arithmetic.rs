@@ -16,23 +16,26 @@ fn series_arithmetic_hand_fixtures() -> TestResult {
         assert_eq!(
             f.base
                 .cas
-                .series_object(match &f.expected.statement {
-                    Statement::Series(s) => match s.as_ref() {
-                        nrz_cas::series::SeriesStatement::Source(_)
-                        | nrz_cas::series::SeriesStatement::EvaluatedResidual { .. } =>
-                            return Err("object fixture".into()),
-                        nrz_cas::series::SeriesStatement::Reciprocal { input, .. }
-                        | nrz_cas::series::SeriesStatement::Truncate { input, .. }
-                        | nrz_cas::series::SeriesStatement::Scale { input, .. }
-                        | nrz_cas::series::SeriesStatement::Derive { input, .. }
-                        | nrz_cas::series::SeriesStatement::Integrate { input, .. }
-                        | nrz_cas::series::SeriesStatement::Coefficient { input, .. } => input,
-                        nrz_cas::series::SeriesStatement::Add { left, .. }
-                        | nrz_cas::series::SeriesStatement::Compose { left, .. }
-                        | nrz_cas::series::SeriesStatement::Mul { left, .. } => left,
+                .series_object(
+                    match &f.expected.statement {
+                        Statement::Series(s) => match s.as_ref() {
+                            nrz_cas::series::SeriesStatement::Source(_)
+                            | nrz_cas::series::SeriesStatement::EvaluatedResidual { .. } =>
+                                return Err("object fixture".into()),
+                            nrz_cas::series::SeriesStatement::Reciprocal { input, .. }
+                            | nrz_cas::series::SeriesStatement::Truncate { input, .. }
+                            | nrz_cas::series::SeriesStatement::Scale { input, .. }
+                            | nrz_cas::series::SeriesStatement::Derive { input, .. }
+                            | nrz_cas::series::SeriesStatement::Integrate { input, .. }
+                            | nrz_cas::series::SeriesStatement::Coefficient { input, .. } => input,
+                            nrz_cas::series::SeriesStatement::Add { left, .. }
+                            | nrz_cas::series::SeriesStatement::Compose { left, .. }
+                            | nrz_cas::series::SeriesStatement::Mul { left, .. } => left,
+                        },
+                        _ => return Err("series".into()),
                     },
-                    _ => return Err("series".into()),
-                })?
+                    &mut crate::testing::budgets::graph_budget()?
+                )?
                 .field,
             f.field
         );

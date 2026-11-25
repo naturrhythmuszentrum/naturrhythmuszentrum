@@ -8,8 +8,12 @@ use crate::graph::{Cas, Expression, Handle, LogicalId, size};
 use crate::model::Operator;
 
 /// Resolve one declared base without accepting a printed name as authority.
-pub(super) fn declaration(cas: &Cas, base: LogicalId) -> Result<&Expression, Fault> {
-    let value = cas.state.expression(base)?;
+pub(super) fn declaration<'a>(
+    cas: &'a Cas,
+    base: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Expression, Fault> {
+    let value = cas.state.expression(base, budget)?;
     let declared = match value.operator {
         Operator::Free(_) => value,
         Operator::AffineReading(_) => {
@@ -18,7 +22,7 @@ pub(super) fn declaration(cas: &Cas, base: LogicalId) -> Result<&Expression, Fau
                 .first()
                 .copied()
                 .ok_or_else(|| invalid(InvalidCode::ReadingDefinition))?;
-            cas.state.expression(id)?
+            cas.state.expression(id, budget)?
         }
         _ => return Err(invalid(InvalidCode::ReadingDefinition)),
     };
@@ -39,8 +43,8 @@ pub(super) fn same(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(2, AT)?;
-    let first = declaration(cas, left)?;
-    let second = declaration(cas, right)?;
+    let first = declaration(cas, left, budget)?;
+    let second = declaration(cas, right, budget)?;
     let (Operator::Free(first_key), Operator::Free(second_key)) =
         (&first.operator, &second.operator)
     else {
@@ -66,7 +70,7 @@ pub(super) fn selection<'a>(
     budget: &mut Budget,
 ) -> Result<(LogicalId, &'a EntrySelection), Fault> {
     budget.work(1, AT)?;
-    let value = cas.state.expression(cas.checked(handle)?)?;
+    let value = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     let Operator::Select(selected) = &value.operator else {
         return Err(invalid(InvalidCode::SelectionExpected));
     };
@@ -75,7 +79,7 @@ pub(super) fn selection<'a>(
         .first()
         .copied()
         .ok_or_else(|| invalid(InvalidCode::ReadingDefinition))?;
-    declaration(cas, base)?;
-    selected.validate(&cas.state.expression(base)?.sort, budget)?;
+    declaration(cas, base, budget)?;
+    selected.validate(&cas.state.expression(base, budget)?.sort, budget)?;
     Ok((base, selected))
 }

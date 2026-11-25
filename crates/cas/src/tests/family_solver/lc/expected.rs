@@ -56,10 +56,11 @@ fn map(
     region: &Handle,
     images: &[Handle],
 ) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let over = fixture
         .cas
         .state
-        .region(region.logical_id())?
+        .region(region.logical_id(), &mut budget)?
         .lies_over
         .as_ref()
         .ok_or("LC projection")?;
@@ -80,15 +81,20 @@ fn map(
 }
 
 pub(super) fn identity(fixture: &mut Fixture, request: &Request) -> TestResult<Judgment> {
+    let mut budget = crate::testing::common::default_budget()?;
     let Task::Solve(specification) = &request.task else {
         return Err("LC solve request".into());
     };
-    let original =
-        crate::solving::graph::problem(&fixture.cas.state, specification.problem.logical_id())?
-            .clone();
+    let original = crate::solving::graph::problem(
+        &fixture.cas.state,
+        specification.problem.logical_id(),
+        &mut budget,
+    )?
+    .clone();
     let (_, [left, _]) = crate::solving::elementary::evidence::predicate(
         &fixture.cas,
         original.predicate.logical_id(),
+        &mut budget,
     )?
     else {
         return Err("LC equation".into());

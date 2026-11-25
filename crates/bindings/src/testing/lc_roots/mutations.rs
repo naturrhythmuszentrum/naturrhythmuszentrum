@@ -17,7 +17,11 @@ pub(crate) fn problem_data(cas: &Cas, request: &Request) -> TestResult<SolveProb
     let Task::Solve(specification) = &request.task else {
         return Err("LC task".into());
     };
-    let SolveView::SolveProblem(data) = cas.solve_view(&specification.problem)? else {
+    let SolveView::SolveProblem(data) = cas.solve_view(
+        &specification.problem,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?
+    else {
         return Err("LC problem".into());
     };
     Ok(data.clone())
@@ -90,13 +94,21 @@ pub(crate) fn rebind(
 }
 
 pub(crate) fn roots(cas: &Cas, set: &Handle) -> TestResult<Vec<Handle>> {
-    let SolveView::SolutionSet(data) = cas.solve_view(set)? else {
+    let SolveView::SolutionSet(data) = cas.solve_view(
+        set,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?
+    else {
         return Err("LC set".into());
     };
     let [branch] = data.branches.as_slice() else {
         return Err("LC finite branch".into());
     };
-    let SolveView::SolutionBranch(data) = cas.solve_view(branch)? else {
+    let SolveView::SolutionBranch(data) = cas.solve_view(
+        branch,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?
+    else {
         return Err("LC branch".into());
     };
     let SolutionBranchKind::Finite { tuples } = &data.kind else {
@@ -116,7 +128,7 @@ pub(crate) fn omit_placement(
         domain::{ContextDraft, RegionDraft, RegionExpr},
         source::{SyntaxNode, SyntaxRole},
     };
-    let domain = cas.admissible_region(&request.context)?;
+    let domain = cas.admissible_region(&request.context, budget)?;
     let syntax = cas.describe_syntax(&domain, budget)?;
     let SyntaxNode::Region(ambient, _) = syntax.node else {
         return Err("LC region".into());

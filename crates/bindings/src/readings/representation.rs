@@ -158,7 +158,7 @@ fn build(
         statement: Statement::Equality {
             left: left.clone(),
             right: node.clone(),
-            domain: cas.admissible_region(context)?,
+            domain: cas.admissible_region(context, budget)?,
             domain_contract: DomainContract::DefinedAndEqual,
         },
         residuals: Vec::new(),
@@ -223,7 +223,7 @@ fn reconstruct(
     meaning::map_meanings(&expansion, reading.entries(), &selected, budget)?;
     let (sort, _, _, _) = support::inspect(cas, reading.selected(), budget)?;
     let (declared, _, _, header) = support::inspect(cas, &symbol, budget)?;
-    if declared != sort || header != cas.context_header(reading.family().context())? {
+    if declared != sort || header != cas.context_header(reading.family().context(), budget)? {
         return Err(ReadingError::Definition);
     }
     let expected = cas.define_reading(&symbol, reading.node(), &expansion, budget)?;

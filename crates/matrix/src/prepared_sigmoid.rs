@@ -373,16 +373,16 @@ fn transform(
     policy: SigmoidPreparationPolicy,
     budget: &mut Budget,
 ) -> Result<Request, PreparedSigmoidError> {
-    let (operator, sort) = cas.expression(&original.target)?;
+    let (operator, sort) = cas.expression(&original.target, budget)?;
     if operator != &Operator::Sigmoid
         || original.goal != EnclosureGoal::Width
-        || !cas.expression_scope(&original.target)?.is_empty()
+        || !cas.expression_scope(&original.target, budget)?.is_empty()
     {
         return Err(PreparedSigmoidError::Operation);
     }
     let sort = sort.clone();
-    let header = cas.expression_header(&original.target)?;
-    if header != cas.context_header(&original.context)? {
+    let header = cas.expression_header(&original.target, budget)?;
+    if header != cas.context_header(&original.context, budget)? {
         return Err(PreparedSigmoidError::Operation);
     }
     let operands = cas.operands(&original.target, budget)?;
@@ -391,7 +391,7 @@ fn transform(
     };
     let lower = represented(domain[0], budget)?;
     let upper = represented(domain[1], budget)?;
-    let (operator, _) = cas.expression(argument)?;
+    let (operator, _) = cas.expression(argument, budget)?;
     let mut coordinates = Vec::new();
     let transformed = match operator {
         Operator::Free(_) => {

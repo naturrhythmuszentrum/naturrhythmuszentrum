@@ -522,8 +522,10 @@ fn positive_cofactor_work_boundary() -> TestResult {
         .cas
         .check_proof(&baseline.base.context, &baseline.steps, &mut measured)?;
     let required = measured.usage().work;
-    // NRZCAS04 adds 9,059 witness-DAG Work and 138 record-encoding Work; arithmetic is unchanged.
-    assert_eq!(required, 298_753);
+    // Unchanged operation Work 298,753 +20 retained-kind replacements +2 first-kind entries
+    // +24 identity-index insertions +24 admissions = 298,823. The old/new
+    // interning lookup floor is equal; arithmetic remains unchanged.
+    assert_eq!(required, 298_823);
     for cap in [
         required,
         required.checked_sub(1).ok_or("empty positive ledger")?,
@@ -597,8 +599,10 @@ fn real_witness_work_boundary() -> TestResult {
         .cas
         .check_proof(&fixture.base.context, &fixture.steps, &mut measured)?;
     let required = measured.usage().work;
-    // NRZCAS04 adds 5,731 witness-DAG Work and 100 record-encoding Work; arithmetic is unchanged.
-    assert_eq!(required, 127_037);
+    // Unchanged operation Work 127,037 +8 retained-kind replacements +2 first-kind entries
+    // +12 identity-index insertions +12 admissions = 127,071. The old/new
+    // interning lookup floor is equal; arithmetic remains unchanged.
+    assert_eq!(required, 127_071);
     for cap in [
         required,
         required.checked_sub(1).ok_or("empty inclusion ledger")?,

@@ -160,7 +160,10 @@ fn constructor_boundary(
         };
         fixture::work_refusal(error, limits.work, prior + work)?;
         assert_eq!(account.usage().work, prior + work - (3 + 2 * 2 + 2));
-        returned.expression(&request.original.target)?;
+        returned.expression(
+            &request.original.target,
+            &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+        )?;
         assert_eq!(returned.counts(), exemplar.counts());
         assert_eq!(returned.retained_judgment_count(), 1);
         assert_eq!(

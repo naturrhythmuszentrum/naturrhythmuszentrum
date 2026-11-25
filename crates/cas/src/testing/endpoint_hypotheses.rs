@@ -43,7 +43,9 @@ pub(crate) fn chain(reordered: bool, consume: bool) -> TestResult<Chain> {
         }),
         &mut budget()?,
     )?;
-    let region = fixture.cas.admissible_region(&frame)?;
+    let region = fixture
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
     let quotient = fixture.term(Operator::Div, &[fixture.x.clone(), fixture.x.clone()])?;
     let conclusion = Statement::Equality {
         left: quotient.clone(),

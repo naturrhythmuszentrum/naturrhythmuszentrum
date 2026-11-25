@@ -4,7 +4,7 @@
 use crate::proof_model::{Ownership, Statement};
 use crate::testing::boundary_native::obstruction;
 use crate::testing::common::TestResult;
-use crate::testing::native::budget;
+use crate::testing::native::fresh_budget;
 
 /// Swapping an incident side or the exact function identity invalidates the primitive.
 /// ´test:crate:boundary-function-and-side-tampering´
@@ -15,7 +15,7 @@ fn boundary_function_and_side_tampering() -> TestResult {
         &mut evidence.fixture.cas,
         &evidence.draft,
         &evidence.premises,
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let mut wrong_side = evidence.premises.clone();
     let Statement::Jet { side, .. } =
@@ -29,7 +29,7 @@ fn boundary_function_and_side_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &evidence.draft,
             &wrong_side,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -43,7 +43,7 @@ fn boundary_function_and_side_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &wrong_function,
             &evidence.premises,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -73,7 +73,7 @@ fn boundary_owned_point_tampering() -> TestResult {
                 &mut evidence.fixture.cas,
                 &evidence.draft,
                 &premises,
-                &mut budget()?
+                &mut fresh_budget()?
             )
             .is_err()
         );
@@ -88,7 +88,7 @@ fn boundary_owned_point_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &changed,
             &evidence.premises,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -108,7 +108,7 @@ fn finite_boundary_completeness_tampering() -> TestResult {
         &value.function,
         &evidence.fixture.domain,
         "x",
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let draft = crate::proof_model::ApplicationDraft {
         context: evidence.fixture.context.clone(),
@@ -118,7 +118,12 @@ fn finite_boundary_completeness_tampering() -> TestResult {
         substitutions: Vec::new(),
         certificate: crate::proof_model::Certificate::Boundary(Box::new(certificate)),
     };
-    crate::scoped_check::check_application(&mut evidence.fixture.cas, &draft, &[], &mut budget()?)?;
+    crate::scoped_check::check_application(
+        &mut evidence.fixture.cas,
+        &draft,
+        &[],
+        &mut fresh_budget()?,
+    )?;
     let mut changed = draft.clone();
     let Statement::BoundaryPartition(value) = &mut changed.conclusion else {
         return Err("partition".into());
@@ -129,7 +134,7 @@ fn finite_boundary_completeness_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &changed,
             &[],
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -147,7 +152,7 @@ fn finite_boundary_completeness_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &changed,
             &[],
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -169,7 +174,7 @@ fn boundary_value_and_jet_coefficient_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &evidence.draft,
             &evidence.premises,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -179,7 +184,7 @@ fn boundary_value_and_jet_coefficient_tampering() -> TestResult {
         earlier.push(crate::proof_view::application(
             &evidence.fixture.cas,
             *id,
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?);
     }
     let mut draft = crate::proof_model::ApplicationDraft {
@@ -203,7 +208,7 @@ fn boundary_value_and_jet_coefficient_tampering() -> TestResult {
             &mut evidence.fixture.cas,
             &draft,
             &earlier,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -231,7 +236,7 @@ fn named_case_definition_tampering() -> TestResult {
             &forged,
             &fixture.domain,
             "x",
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );

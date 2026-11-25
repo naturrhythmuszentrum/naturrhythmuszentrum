@@ -30,7 +30,9 @@ pub(super) fn identity(
     let ScalarKernelLaw::Family(source) = &source.law else {
         return Err(invalid());
     };
-    let definition = cas.state.expression(cas.checked(&value.definition)?)?;
+    let definition = cas
+        .state
+        .expression(cas.checked(&value.definition, budget)?, budget)?;
     let Operator::AffineReading(map) = &definition.operator else {
         return Err(invalid());
     };
@@ -41,13 +43,17 @@ pub(super) fn identity(
     let scalar = definition.sort == Sort::Value(AtomicSort::Scalar(Field::Real));
     if !shape
         || !scalar
-        || definition.header != cas.state.context(cas.checked(context)?)?.header_id
+        || definition.header
+            != cas
+                .state
+                .context(cas.checked(context, budget)?, budget)?
+                .header_id
         || !definition.scope.is_empty()
         || definition.binding.is_some()
         || definition.space.is_some()
         || definition.domain.is_some()
         || definition.attachment.is_some()
-        || *selected != cas.checked(&source.family.source)?
+        || *selected != cas.checked(&source.family.source, budget)?
         || map.coefficients() != std::slice::from_ref(&value.scale)
         || map.offsets() != std::slice::from_ref(&value.offset)
     {

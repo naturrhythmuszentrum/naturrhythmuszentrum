@@ -24,11 +24,10 @@ fn exact(source: &Selection, target: Handle, ratio: (i64, u64)) -> TestResult<Ra
     Ok(RationalEnclosure {
         target: target.clone(),
         context: source.expected.cover.index.basis.context.clone(),
-        input_family: source
-            .source
-            .frame
-            .cas
-            .admissible_region(&source.expected.cover.index.basis.context)?,
+        input_family: source.source.frame.cas.admissible_region(
+            &source.expected.cover.index.basis.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?,
         lower: value.clone(),
         upper: value.clone(),
         origin: EnclosureOrigin::ExactRational {
@@ -84,10 +83,10 @@ fn skew() -> TestResult<Selection> {
     let original = RationalBoxEnclosure {
         target: expected.target.clone(),
         context: expected.cover.index.basis.context.clone(),
-        input_family: source
-            .frame
-            .cas
-            .admissible_region(&expected.cover.index.basis.context)?,
+        input_family: source.frame.cas.admissible_region(
+            &expected.cover.index.basis.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?,
         coordinates: Vec::new(),
     };
     let enclosure = LatticeEnclosure::Original(Box::new(LatticeBoxEnclosure {
@@ -143,8 +142,8 @@ fn skew_enclosure(source: &mut Selection, targets: &[Handle]) -> TestResult {
 #[test]
 fn lattice_nearest_floor_work() -> TestResult {
     for (mut source, proof, replay, bytes, records) in [
-        (prepared(5)?, 335_639, 883_988, 3_745, 71),
-        (skew()?, 502_480, 1_437_374, 4_638, 82),
+        (prepared(5)?, 335_746, 884_500, 3_745, 71),
+        (skew()?, 502_606, 1_437_971, 4_638, 82),
     ] {
         baseline_proof(&mut source, proof + 36, false)?;
         let witness =

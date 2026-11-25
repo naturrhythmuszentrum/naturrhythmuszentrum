@@ -67,7 +67,7 @@ pub(crate) fn order(
 /// Retain all original dependencies, including those of unsupported expressions.
 fn dependencies(cas: &Cas, id: LogicalId, budget: &mut Budget) -> Result<Vec<LogicalId>, Fault> {
     let mut result = Vec::new();
-    match cas.state.node(id)? {
+    match cas.state.node(id, budget)? {
         Vertex::Expression(value) => copy(&mut result, &value.operands, budget)?,
         Vertex::Condition(value) => copy(&mut result, &value.arguments, budget)?,
         Vertex::Region(value) => match &value.expression {

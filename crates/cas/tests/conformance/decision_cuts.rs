@@ -36,7 +36,11 @@ fn association(
     region: Handle,
     value: Handle,
 ) -> TestResult<(Handle, Handle)> {
-    let sort = fixture.cas.expression(&value)?.1.clone();
+    let sort = fixture
+        .cas
+        .expression(&value, &mut crate::testing::budgets::graph_budget()?)?
+        .1
+        .clone();
     let arm = admit(
         &mut fixture.cas,
         Draft::CaseArm(CaseArmDraft {
@@ -425,10 +429,18 @@ fn decision_cut_cumulative_ledger() -> TestResult {
 fn decision_cut_integer_result() -> TestResult {
     let (mut source, mut cut) = fixture(Example::Integer)?;
     assert_eq!(
-        source.cas.expression(&cut.function)?.1,
+        source
+            .cas
+            .expression(&cut.function, &mut crate::testing::budgets::graph_budget()?)?
+            .1,
         &Sort::Value(AtomicSort::Integer)
     );
-    assert_eq!(source.cas.scalar_ambient(&cut.function)?, None);
+    assert_eq!(
+        source
+            .cas
+            .scalar_ambient(&cut.function, &mut crate::testing::budgets::graph_budget()?)?,
+        None
+    );
     accept(&source, &cut)?;
     let (_, region) = source.regions(Example::Integer)?;
     let value = source.number(3, 1)?;

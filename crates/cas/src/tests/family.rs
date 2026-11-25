@@ -96,6 +96,7 @@ fn expected(fixture: &mut Fixture, operation: &Operator, part: &Operator) -> Tes
 /// ´test:crate:family-addition-component-identities´
 #[test]
 fn family_addition_component_identities() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut fixture = Fixture::new()?;
     let family = fixture.family()?;
     let context = context(&mut fixture, &family)?;
@@ -105,11 +106,11 @@ fn family_addition_component_identities() -> TestResult {
         prove(&mut fixture, &context, &left, &right)?;
     }
     assert_eq!(
-        fixture.cas.expression(&fixture.real)?.1,
+        fixture.cas.expression(&fixture.real, &mut budget)?.1,
         &Sort::Value(AtomicSort::Scalar(Field::Real))
     );
     assert_eq!(
-        fixture.cas.expression(&fixture.complex)?.1,
+        fixture.cas.expression(&fixture.complex, &mut budget)?.1,
         &Sort::Value(AtomicSort::Scalar(Field::Complex))
     );
     Ok(())
@@ -230,6 +231,7 @@ fn replay(fixture: &Fixture, witness: &crate::proof_model::VerifiedWitness) -> T
 /// ´test:crate:family-placement-inside-replays´
 #[test]
 fn family_placement_inside_replays() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut fixture = Fixture::new()?;
     let family = fixture.family()?;
     let context = context(&mut fixture, &family)?;
@@ -251,11 +253,11 @@ fn family_placement_inside_replays() -> TestResult {
         return Err("inside query unresolved".into());
     };
     assert_eq!(
-        fixture.cas.expression(&argument)?.1,
+        fixture.cas.expression(&argument, &mut budget)?.1,
         &Sort::Value(AtomicSort::Scalar(Field::Real))
     );
     assert_eq!(
-        fixture.cas.expression(&location)?.1,
+        fixture.cas.expression(&location, &mut budget)?.1,
         &Sort::Value(AtomicSort::Scalar(Field::Complex))
     );
     for proof in &*incidence {
@@ -470,6 +472,7 @@ fn family_restriction_rejects_widening() -> TestResult {
 /// ´test:crate:family-overlap-compatibility-replays´
 #[test]
 fn family_overlap_compatibility_replays() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut fixture = Fixture::new()?;
     let family = fixture.family()?;
     let context = context(&mut fixture, &family)?;
@@ -485,7 +488,7 @@ fn family_overlap_compatibility_replays() -> TestResult {
         *fixture
             .cas
             .state
-            .expression(first.logical_id())?
+            .expression(first.logical_id(), &mut budget)?
             .arms
             .first()
             .ok_or("missing arm")?,
@@ -494,7 +497,7 @@ fn family_overlap_compatibility_replays() -> TestResult {
         *fixture
             .cas
             .state
-            .expression(second.logical_id())?
+            .expression(second.logical_id(), &mut budget)?
             .arms
             .first()
             .ok_or("missing arm")?,

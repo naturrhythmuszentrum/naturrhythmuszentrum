@@ -18,7 +18,7 @@ pub(crate) fn read(
 ) -> Result<Parts, Fault> {
     crate::work_observation::observe!(budget, AT, {
         let evaluation = components.evaluation;
-        if let Some(value) = body(evaluation.cas, root)? {
+        if let Some(value) = body(evaluation.cas, root, budget)? {
             if region::family(evaluation.cas, evaluation.region.logical_id(), budget)?
                 != value.family.logical_id()
             {
@@ -54,12 +54,12 @@ fn cases(
 ) -> Result<Parts, Fault> {
     crate::work_observation::observe!(budget, AT, {
         let evaluation = components.evaluation;
-        let expression = evaluation.cas.state.expression(root)?;
+        let expression = evaluation.cas.state.expression(root, budget)?;
         let mut result: Option<Parts> = None;
         for id in &expression.arms {
             budget.work(1, AT)?;
-            let arm = evaluation.cas.state.arm(*id)?;
-            if body(evaluation.cas, arm.value)?.is_none()
+            let arm = evaluation.cas.state.arm(*id, budget)?;
+            if body(evaluation.cas, arm.value, budget)?.is_none()
                 || !region::subset(
                     evaluation.cas,
                     evaluation.region.logical_id(),

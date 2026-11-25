@@ -45,7 +45,7 @@ pub(crate) fn contained(
             if id == target {
                 return Ok(true);
             }
-            bases(&state.region(id)?.expression, &mut pending, budget)?;
+            bases(&state.region(id, budget)?.expression, &mut pending, budget)?;
         }
         Ok(false)
     })
@@ -60,10 +60,10 @@ fn guard(
     truth: bool,
     budget: &mut Budget,
 ) -> Result<Option<(Polynomial, bool)>, Fault> {
-    let Vertex::Condition(condition) = state.node(predicate)? else {
+    let Vertex::Condition(condition) = state.node(predicate, budget)? else {
         return Ok(None);
     };
-    let frame = state.region(region)?;
+    let frame = state.region(region, budget)?;
     if (condition.header, &condition.scope) != (frame.header, &frame.scope) {
         return Ok(None);
     }
@@ -111,10 +111,10 @@ fn at_source(
     crate::work_observation::observe!(budget, AT, {
         let mut pending = vector(1, budget)?;
         pending.push(region.logical_id());
-        let frame = state.region(region.logical_id())?;
+        let frame = state.region(region.logical_id(), budget)?;
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            let current = state.region(id)?;
+            let current = state.region(id, budget)?;
             if (current.header, &current.scope, &current.ambient)
                 != (frame.header, &frame.scope, &frame.ambient)
             {
@@ -153,11 +153,11 @@ fn visit(
             if at_source(state, current, region, &mut visitor, budget)? {
                 return Ok(true);
             }
-            let CoefficientDomainData::Quotient { level } = domain(state, current)? else {
+            let CoefficientDomainData::Quotient { level } = domain(state, current, budget)? else {
                 return Ok(false);
             };
             let SolveDraft::ExtensionLevel(extension) =
-                crate::solving::graph::object(state, level.logical_id())?
+                crate::solving::graph::object(state, level.logical_id(), budget)?
             else {
                 return Err(invalid());
             };

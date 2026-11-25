@@ -324,10 +324,10 @@ fn frozen_symbol_schema_is_send_and_sync() {
 
 /// A retained schema owns its freeze while each result pays only fresh graph admission.
 /// ´test:integration:frozen-symbol-declaration-work-boundaries´
-/// ´claim:bindings:frozen-symbol-work´ A schema freezes at 3046 Work and warm declarations require 7870, with atomic refusal at 7869 and unchanged earlier evidence.
+/// ´claim:bindings:frozen-symbol-work´ A schema freezes at 3046 Work and warm declarations require 7915, with atomic refusal at 7914 and unchanged earlier evidence.
 #[test]
 fn frozen_symbol_declaration_work_boundaries() -> TestResult {
-    for limit in [7_870, 7_869] {
+    for limit in [7_915, 7_914] {
         let mut freeze = Budget::new(Limits::default())?;
         let schema = nrz_bindings::SymbolSchema::freeze(
             &Descriptor::ratio(),
@@ -346,9 +346,9 @@ fn frozen_symbol_declaration_work_boundaries() -> TestResult {
             ..Limits::default()
         })?;
         let result = schema.declare(&mut budget);
-        if limit == 7_870 {
+        if limit == 7_915 {
             let second = result?;
-            assert_eq!(budget.usage().work, 7_870);
+            assert_eq!(budget.usage().work, 7_915);
             assert_ne!(first.value(), second.value());
             assert_ne!(first.bound(), second.bound());
             assert_ne!(first.error(), second.error());

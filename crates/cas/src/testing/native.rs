@@ -11,7 +11,7 @@ use crate::model::{Declaration, Environment, Operator, PredicateKind};
 use crate::number::Rational;
 
 /// Ample ordinary work leaves the explicitly tested limit as the only changed dimension.
-pub(crate) fn budget() -> TestResult<Budget> {
+pub(crate) fn fresh_budget() -> TestResult<Budget> {
     Ok(Budget::new(Limits {
         work: 2_000_000_000,
         replay_work: 2_000_000_000,
@@ -42,7 +42,7 @@ pub(crate) struct Fixture {
 impl Fixture {
     /// Construct independently chosen leaves, association and ambient context.
     pub(crate) fn new() -> TestResult<Self> {
-        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
         let (header, domain, context) = roots(&mut cas)?;
         let x = term(&mut cas, &header, Operator::Free("x".into()), &[])?;
         let zero = term(&mut cas, &header, Operator::Rational(Rational::zero()), &[])?;
@@ -82,7 +82,7 @@ impl Fixture {
 
 /// Admit one untrusted node, with no unchecked fixture indexing.
 pub(crate) fn admit(cas: &mut Cas, draft: Draft) -> TestResult<Handle> {
-    cas.admit(&[draft], &mut budget()?)?
+    cas.admit(&[draft], &mut fresh_budget()?)?
         .first()
         .cloned()
         .ok_or_else(|| "missing fixture node".into())

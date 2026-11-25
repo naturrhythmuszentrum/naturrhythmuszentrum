@@ -36,12 +36,12 @@ fn object(
 
 /// Build one reachable record without admitting any new mathematics.
 pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result<Record, Fault> {
-    let series = series_entity(cas, value)?;
+    let series = series_entity(cas, value, budget)?;
     if series {
         return crate::series::portable::describe(cas, value, budget);
     }
     let application = match value {
-        Entity::Object(id) if matches!(cas.state.node(*id)?, Vertex::Proof(_)) => {
+        Entity::Object(id) if matches!(cas.state.node(*id, budget)?, Vertex::Proof(_)) => {
             Some(crate::proof_view::application(cas, *id, budget)?)
         }
         _ => None,
@@ -80,11 +80,8 @@ pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result
         out.count(application.substitutions.len())?;
         for substitution in application.substitutions {
             out.name(&substitution.key)?;
-            object(
-                &mut out,
-                &mut record.references,
-                cas.checked(&substitution.replacement)?,
-            )?;
+            let id = cas.checked(&substitution.replacement, out.budget())?;
+            object(&mut out, &mut record.references, id)?;
         }
         if let (
             crate::proof_model::Certificate::Region(certificate),
@@ -124,7 +121,8 @@ pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result
             ));
         } else {
             crate::statement::certificate(&application.certificate, &mut out, |handle, out| {
-                object(out, &mut record.references, cas.checked(handle)?)
+                let id = cas.checked(handle, out.budget())?;
+                object(out, &mut record.references, id)
             })?;
         }
     } else {
@@ -135,10 +133,10 @@ pub(crate) fn describe(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result
 }
 
 /// Identify finite-series records without changing ordinary application traversal.
-fn series_entity(cas: &Cas, value: &Entity) -> Result<bool, Fault> {
+fn series_entity(cas: &Cas, value: &Entity, budget: &mut Budget) -> Result<bool, Fault> {
     Ok(match value {
         Entity::SeriesStatement(_) | Entity::SeriesCertificate(_) => true,
-        Entity::Object(id) => crate::series::portable::is_series(cas, *id)?,
+        Entity::Object(id) => crate::series::portable::is_series(cas, *id, budget)?,
         Entity::Statement(value) => {
             matches!(value.statement, crate::proof_model::Statement::Series(_))
         }
@@ -189,10 +187,13 @@ fn describe_entity(
                 .space
                 .as_ref()
                 .map(|value| Entity::Object(value.logical_id()));
-            object(out, &mut record.references, cas.checked(&value.home)?)?;
+            let home = cas.checked(&value.home, out.budget())?;
+            object(out, &mut record.references, home)?;
             encoding::scope(&value.scope, out)?;
-            object(out, &mut record.references, cas.checked(&value.region)?)?;
-            object(out, &mut record.references, cas.checked(&value.predicate)?)
+            let region = cas.checked(&value.region, out.budget())?;
+            object(out, &mut record.references, region)?;
+            let predicate = cas.checked(&value.predicate, out.budget())?;
+            object(out, &mut record.references, predicate)
         }
         Entity::Statement(value) => describe_statement(cas, value, selection_cover, record, out),
         Entity::Conclusion(value) => {
@@ -228,11 +229,8 @@ fn describe_entity(
             record.sets.push((start..record.references.len()).collect());
             out.count(hypotheses.len())?;
             for hypothesis in hypotheses {
-                object(
-                    out,
-                    &mut record.references,
-                    cas.checked(&hypothesis.context)?,
-                )?;
+                let context = cas.checked(&hypothesis.context, out.budget())?;
+                object(out, &mut record.references, context)?;
                 out.unsigned(u64::from(hypothesis.slot))?;
             }
             Ok(())
@@ -255,7 +253,8 @@ fn describe_statement(
         .space
         .as_ref()
         .map(|value| Entity::Object(value.logical_id()));
-    object(out, &mut record.references, cas.checked(&value.context)?)?;
+    let context = cas.checked(&value.context, out.budget())?;
+    object(out, &mut record.references, context)?;
     let start = record.references.len();
     if let Statement::LatticeSelection(selection) | Statement::LatticeNearestSelection(selection) =
         &value.statement
@@ -272,14 +271,17 @@ fn describe_statement(
             &mut record.references,
             Entity::Statement(Box::new(selection_cover.ok_or_else(invalid)?)),
         )?;
-        object(out, &mut record.references, cas.checked(&selection.target)?)?;
+        let target = cas.checked(&selection.target, out.budget())?;
+        object(out, &mut record.references, target)?;
         out.count(selection.values.len())?;
         for selected in &selection.values {
-            object(out, &mut record.references, cas.checked(selected)?)?;
+            let selected = cas.checked(selected, out.budget())?;
+            object(out, &mut record.references, selected)?;
         }
     } else {
         crate::statement::encode(&value.statement, out, |value, out| {
-            object(out, &mut record.references, cas.checked(value)?)
+            let id = cas.checked(value, out.budget())?;
+            object(out, &mut record.references, id)
         })?;
     }
     if let Statement::Cover { members, .. } = &value.statement {
@@ -306,7 +308,7 @@ fn describe_object(
     record: &mut Record,
     out: &mut Encoder<'_>,
 ) -> Result<(), Fault> {
-    match cas.state.node(id)? {
+    match cas.state.node(id, out.budget())? {
         Vertex::Header(value) => describe_header(value, record, out)?,
 
         Vertex::Region(value) => describe_region(value, record, out)?,
@@ -361,7 +363,7 @@ fn describe_remaining(
     record: &mut Record,
     out: &mut Encoder<'_>,
 ) -> Result<(), Fault> {
-    match cas.state.node(id)? {
+    match cas.state.node(id, out.budget())? {
         Vertex::Solve(value) => describe_solve(cas, value, record, out)?,
         Vertex::SeriesObject(value) => {
             record.tag = 38;
@@ -493,7 +495,8 @@ fn describe_solve(
     record.tag = value.record_tag();
     let start = record.references.len();
     value.encode(out, &mut |handle, out| {
-        object(out, &mut record.references, cas.checked(handle)?)
+        let id = cas.checked(handle, out.budget())?;
+        object(out, &mut record.references, id)
     })?;
     let set_start = match value {
         SolveDraft::SolutionSet(_) => Some(start.checked_add(1).ok_or_else(invalid)?),

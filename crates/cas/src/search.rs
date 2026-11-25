@@ -177,7 +177,7 @@ impl Search {
             generation,
         )?;
         let witness = plan.verify(cas, context, checker)?;
-        let peak = cas.state.expression(original)?.unfolded;
+        let peak = cas.state.expression(original, generation)?.unfolded;
         let metrics = metrics(cas, &witness, 0, peak, 0, generation)?;
         let mut result = Self {
             frontier: Frontier::default(),
@@ -250,7 +250,7 @@ impl Search {
         generation: &mut Budget,
         checker: &mut Budget,
     ) -> Result<(), Fault> {
-        if !action.plausible(cas)? {
+        if !action.plausible(cas, generation)? {
             return Ok(());
         }
         let mut skipped = false;
@@ -281,9 +281,13 @@ impl Search {
                 BudgetKind::Transitions,
                 generation,
             )?;
-            let endpoint = candidate.checked(&plan.steps.last().ok_or_else(invalid)?.right)?;
-            let unfolded = candidate.state.expression(endpoint)?.unfolded;
-            let earlier_size = candidate.state.expression(previous.endpoint)?.unfolded;
+            let endpoint =
+                candidate.checked(&plan.steps.last().ok_or_else(invalid)?.right, generation)?;
+            let unfolded = candidate.state.expression(endpoint, generation)?.unfolded;
+            let earlier_size = candidate
+                .state
+                .expression(previous.endpoint, generation)?
+                .unfolded;
             let growth = unfolded.saturating_sub(earlier_size);
             let credits = previous
                 .metrics
@@ -327,7 +331,7 @@ impl Search {
         trace: Vec<Handle>,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        let endpoint = cas.checked(&witness.claim.right)?;
+        let endpoint = cas.checked(&witness.claim.right, budget)?;
         let rank = rank(cas, endpoint, self.target, budget)?;
         let claim = crate::wire::claim_key(cas, &witness.claim, budget)?;
         let key = self.policy.state_key(&claim, budget)?;
@@ -454,12 +458,13 @@ fn metrics(
     credits: u64,
     budget: &mut Budget,
 ) -> Result<Metrics, Fault> {
-    let proof = crate::proof_storage::application(cas, cas.checked(&witness.proof)?)?;
+    let proof =
+        crate::proof_storage::application(cas, cas.checked(&witness.proof, budget)?, budget)?;
     let bytes = size(witness.bytes.len(), AT)?;
     budget.work(bytes, AT)?;
     let depth = proof.depth;
     let mut support = BTreeSet::new();
-    let mut pending = vec![cas.checked(&witness.proof)?];
+    let mut pending = vec![cas.checked(&witness.proof, budget)?];
     while let Some(id) = pending.pop() {
         budget.work(
             size(support.len(), AT)?
@@ -470,7 +475,7 @@ fn metrics(
         if !support.insert(id) {
             continue;
         }
-        let value = crate::proof_storage::application(cas, id)?;
+        let value = crate::proof_storage::application(cas, id, budget)?;
         support.insert(value.context);
         for required in &value.conditions.requirements {
             support.insert(required.term);
@@ -518,13 +523,13 @@ fn rank(
         if !visited.insert(id) {
             continue;
         }
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         let repeated = expression.operands.len() == 2
             && expression.operands.first() == expression.operands.get(1);
         let literals = !expression.operands.is_empty()
             && expression.operands.iter().all(|child| {
                 cas.state
-                    .expression(*child)
+                    .expression(*child, budget)
                     .is_ok_and(|value| matches!(value.operator, Operator::Rational(_),))
             });
         let pending_scalar = matches!(
@@ -544,7 +549,7 @@ fn rank(
             .map_err(|_| Fault::allocation(AT))?;
         pending.extend_from_slice(&expression.operands);
     }
-    let expression = cas.state.expression(root)?;
+    let expression = cas.state.expression(root, budget)?;
     Ok([
         u64::from(target.is_some_and(|goal| goal != root)),
         unresolved,

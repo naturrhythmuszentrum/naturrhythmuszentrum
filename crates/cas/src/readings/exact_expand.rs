@@ -22,7 +22,7 @@ pub(crate) fn expand(
         if values.contains_key(&id) {
             continue;
         }
-        let term = cas.state.expression(id)?;
+        let term = cas.state.expression(id, budget)?;
         if matches!(term.operator, Operator::MatrixMultiply) && !expanded {
             budget.check(
                 BudgetKind::StagedPayloadBytes,
@@ -60,10 +60,10 @@ fn node(
     values: &BTreeMap<LogicalId, Vec<LogicalId>>,
     budget: &mut Budget,
 ) -> Result<Vec<LogicalId>, Fault> {
-    let (rows, columns) = crate::polynomial::matrix::shape(&cas.state, id)?;
+    let (rows, columns) = crate::polynomial::matrix::shape(&cas.state, id, budget)?;
     super::storage::slots(length(rows, columns)?, budget, |budget| {
         let mut result = reserve(length(rows, columns)?, budget)?;
-        let term = cas.state.expression(id)?;
+        let term = cas.state.expression(id, budget)?;
         match term.operator {
             Operator::Matrix { .. } => result.extend_from_slice(&term.operands),
             Operator::MatrixMultiply => {
@@ -71,7 +71,7 @@ fn node(
                     return Err(invalid(InvalidCode::ReadingDefinition));
                 };
                 let header = term.header;
-                let (_, inner) = crate::polynomial::matrix::shape(&cas.state, *left)?;
+                let (_, inner) = crate::polynomial::matrix::shape(&cas.state, *left, budget)?;
                 let first = values
                     .get(left)
                     .ok_or_else(|| invalid(InvalidCode::Reference))?;

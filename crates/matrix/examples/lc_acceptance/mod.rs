@@ -16,7 +16,7 @@ mod resources;
 use crate::reading_testing;
 use copies::{components, tickets};
 use nrz_matrix::{EntryTicket, ReadingAdapter};
-use resources::{budget, policy};
+use resources::{fresh_budget, policy};
 
 /// One operation's observed clock and deterministic accounting; bytes retain their named scope.
 #[derive(Debug)]

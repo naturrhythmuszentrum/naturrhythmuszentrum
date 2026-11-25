@@ -30,9 +30,13 @@ impl Interpretation<'_> {
     /// Borrow the exact interpretation map already checked for this application.
     fn coefficient_map(
         &self,
+        budget: &mut crate::budget::Budget,
     ) -> Result<&crate::solving::CoefficientMapData<Handle>, crate::error::Fault> {
-        let SolveDraft::CoefficientMap(map) =
-            crate::solving::graph::object(&self.cas.state, self.cas.checked(self.map)?)?
+        let SolveDraft::CoefficientMap(map) = crate::solving::graph::object(
+            &self.cas.state,
+            self.cas.checked(self.map, budget)?,
+            budget,
+        )?
         else {
             return Err(invalid());
         };
@@ -47,7 +51,7 @@ impl Interpretation<'_> {
     ) -> Result<super::model::Element, CoefficientFailure> {
         super::transport::coefficient(
             self.cas,
-            self.coefficient_map()?,
+            self.coefficient_map(budget)?,
             &self.engine,
             handle,
             budget,
@@ -57,8 +61,8 @@ impl Interpretation<'_> {
     /// Graph polynomials retain their ordered bound slots, independent of declaration display names.
     fn polynomial(&self, handle: &Handle, budget: &mut Budget) -> Result<Form, CoefficientFailure> {
         super::proof::defined(self.cas, handle, self.region, self.premises, budget)?;
-        let stored = super::storage::polynomial(&self.cas.state, handle)?;
-        let map = self.coefficient_map()?;
+        let stored = super::storage::polynomial(&self.cas.state, handle, budget)?;
+        let map = self.coefficient_map(budget)?;
         if stored.domain != *self.engine.domain && stored.domain != map.source {
             return Err(invalid().into());
         }
@@ -104,7 +108,7 @@ impl Interpretation<'_> {
 
     /// Leaves are canonical coefficients or scoped polynomial variables, with explicit root existence.
     fn atom(&self, id: LogicalId, budget: &mut Budget) -> Result<Form, CoefficientFailure> {
-        let expression = self.cas.state.expression(id)?;
+        let expression = self.cas.state.expression(id, budget)?;
         match (&expression.operator, &expression.attachment) {
             (Operator::Rational(value), None) => {
                 Form::constant(self.engine.rational(value, budget)?, &self.engine, budget)
@@ -135,7 +139,7 @@ impl Interpretation<'_> {
         operands: &[Form],
         budget: &mut Budget,
     ) -> Result<Form, CoefficientFailure> {
-        let expression = self.cas.state.expression(id)?;
+        let expression = self.cas.state.expression(id, budget)?;
         match (&expression.operator, operands) {
             (Operator::Neg, [value]) => value.neg(&self.engine, budget),
             (Operator::Add, [left, right]) => left.add(right, &self.engine, budget),
@@ -157,12 +161,12 @@ impl Interpretation<'_> {
     fn expression(&self, handle: &Handle, budget: &mut Budget) -> Result<Form, CoefficientFailure> {
         crate::work_observation::observe!(budget, AT, {
             let mut pending = vector(1, budget)?;
-            pending.push((self.cas.checked(handle)?, false));
+            pending.push((self.cas.checked(handle, budget)?, false));
             let mut values: Vec<Form> = vector(1, budget)?;
-            let region = self.cas.state.region(self.region.logical_id())?;
+            let region = self.cas.state.region(self.region.logical_id(), budget)?;
             while let Some((id, ready)) = pending.pop() {
                 budget.work(1, AT)?;
-                let expression = self.cas.state.expression(id)?;
+                let expression = self.cas.state.expression(id, budget)?;
                 budget.check(BudgetKind::Depth, expression.depth, AT)?;
                 if expression.header != region.header
                     || expression.scope != region.scope
@@ -210,11 +214,11 @@ impl Interpretation<'_> {
     ) -> Result<Form, CoefficientFailure> {
         crate::work_observation::observe!(budget, AT, {
             budget.work(1, AT)?;
-            let id = self.cas.checked(handle)?;
+            let id = self.cas.checked(handle, budget)?;
             if id.kind == crate::graph::VertexKind::Expression {
                 return self.expression(handle, budget);
             }
-            match crate::solving::graph::object(&self.cas.state, id)? {
+            match crate::solving::graph::object(&self.cas.state, id, budget)? {
                 SolveDraft::CoefficientValue(_) => {
                     super::proof::defined(self.cas, handle, self.region, self.premises, budget)?;
                     Form::constant(self.coefficient(handle, budget)?, &self.engine, budget)

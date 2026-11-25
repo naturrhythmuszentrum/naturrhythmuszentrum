@@ -85,14 +85,14 @@ pub(super) fn work(replay: bool) -> u64 {
     // Both routes therefore spend two fewer registered visits than the bindings fixture.
     let registered = if replay {
         // Reader reads Q bytes, allocates twice the 28-byte name and ten 24-byte handles.
-        343 + (wire + 296) + syntax + scope + 2 * wire + (wire + 1167) + (wire + 3) + 256
+        343 + (wire + 296) + syntax + scope + 2 * wire + (wire + 1167) + (wire + 3) + 256 + 5
     } else {
-        507 + syntax + scope + wire + (wire + 1191) + (wire + 3) + 256
+        507 + syntax + scope + wire + (wire + 1191) + (wire + 3) + 256 + 5
     };
     // Adapter: four extra nodes, six operand visits, eight allocation/cleanup
     // visits and eight returned-handle edge visits add 26 to the source inventory821.
     let total = 847 + rational_pool + rational_match + admission() + registered;
-    assert_eq!(total, if replay { 357_082 } else { 336_290 });
+    assert_eq!(total, if replay { 357_346 } else { 336_554 });
     total
 }
 
@@ -130,8 +130,9 @@ fn admission() -> u64 {
         })
         .sum::<u64>();
     assert_eq!((header, insert, expressions), (13_629, 1152, 27_188));
-    let total = encoded + 5 * 32 + pending + 256 + 44 + header + insert + expressions;
-    assert_eq!(total, 60_649);
+    let local_map = 78 + 88 + 5 + 88;
+    let total = encoded + 5 * 32 + pending + 256 + 44 + header + insert + expressions + local_map;
+    assert_eq!(total, 60_908);
     total
 }
 

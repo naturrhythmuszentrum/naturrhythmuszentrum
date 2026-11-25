@@ -3,7 +3,7 @@
 
 use super::{TestResult, ledger, original};
 use nrz_cas::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Constant, Draft, Operator};
 use nrz_cas::{
     Cas, ConstantIdentityKind, ExactConstant, Fault, FaultKind, Handle, InvalidCode, Rational,
@@ -22,7 +22,7 @@ struct Fixture {
 
 /// Add a distinct context without changing the target's declaration header.
 fn frame(cas: &mut Cas, root: &Handle, empty: bool) -> TestResult<Handle> {
-    let header = cas.expression_header(root)?;
+    let header = cas.expression_header(root, &mut crate::testing::budgets::graph_budget()?)?;
     let drafts = [
         Draft::Region(RegionDraft {
             header: Reference::Existing(header.clone()),
@@ -80,11 +80,12 @@ fn constant_cache_reuses_checked_preparation() -> TestResult {
         prepared.value()
     );
     let uncached = budget.usage().work;
-    assert_eq!(uncached, 27_938);
+    assert_eq!(uncached, 27_995);
     let again = case
         .cas
         .prepare_constant(&case.context, &case.root, &mut budget)?;
     assert!(std::ptr::eq(first, again));
+    // A warm preparation borrows its retained result for one Work.
     assert_eq!(budget.usage().work, uncached + 1);
     for kind in [
         ConstantIdentityKind::MultiplyOne,
@@ -111,7 +112,9 @@ fn constant_cache_original_identity() -> TestResult {
         .prepare_constant(&case.context, &case.root, &mut ledger()?)?
         .value()
         .clone();
-    let header = case.cas.expression_header(&case.root)?;
+    let header = case
+        .cas
+        .expression_header(&case.root, &mut crate::testing::budgets::graph_budget()?)?;
     let zero = ExactConstant::zero()
         .expression_drafts(Reference::Existing(header), &mut ledger()?)?
         .pop()
@@ -137,7 +140,10 @@ fn constant_cache_original_identity() -> TestResult {
         .prepare_constant(&case.context, &root, &mut measured)?;
     assert_eq!(prepared.value(), &expected);
     assert_eq!(prepared.original(), &root);
-    assert_eq!(measured.usage().work, direct.usage().work);
+    // Preparing also inserts the checked cache key and retained graph entries.
+    // The miss adds four Work: two retained-kind replacement units, one
+    // identity-index insertion and one key-entry insertion; shared charges cancel.
+    assert_eq!(measured.usage().work, direct.usage().work + 4);
     assert_eq!(case.cas.retained_judgment_count(), 2);
     Ok(())
 }
@@ -154,7 +160,7 @@ fn constant_cache_context_and_owner() -> TestResult {
     let mut budget = ledger()?;
     case.cas
         .prepare_constant(&changed, &case.root, &mut budget)?;
-    assert_eq!(budget.usage().work, 27_938);
+    assert_eq!(budget.usage().work, 27_996);
     assert_eq!(case.cas.retained_judgment_count(), 2);
     let mut other = fixture()?;
     let fault = refused(
@@ -170,7 +176,7 @@ fn constant_cache_context_and_owner() -> TestResult {
     other
         .cas
         .prepare_constant(&other.context, &other.root, &mut budget)?;
-    assert_eq!(budget.usage().work, 27_938);
+    assert_eq!(budget.usage().work, 27_995);
     assert_eq!(other.cas.retained_judgment_count(), 1);
     assert_eq!(case.cas.retained_judgment_count(), 2);
     Ok(())
@@ -182,15 +188,15 @@ fn constant_cache_context_and_owner() -> TestResult {
 #[test]
 fn constant_cache_work_boundaries() -> TestResult {
     let mut case = fixture()?;
-    let mut miss = Budget::new(Limits {
-        work: 27_938,
+    let mut miss = nrz_cas::limits::Budget::new(Limits {
+        work: 27_995,
         ..Limits::default()
     })?;
     case.cas
         .prepare_constant(&case.context, &case.root, &mut miss)?;
     let bytes = case.cas.retained_judgment_bytes();
     for work in [1, 0] {
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             work,
             ..Limits::default()
         })?;
@@ -206,7 +212,7 @@ fn constant_cache_work_boundaries() -> TestResult {
         assert_eq!(case.cas.retained_judgment_count(), 1);
         assert_eq!(case.cas.retained_judgment_bytes(), bytes);
     }
-    let mut prior = Budget::new(Limits {
+    let mut prior = nrz_cas::limits::Budget::new(Limits {
         work: 8,
         ..Limits::default()
     })?;
@@ -222,8 +228,8 @@ fn constant_cache_work_boundaries() -> TestResult {
     ));
     assert_eq!(prior.usage().work, 8);
     let mut fresh = fixture()?;
-    let mut short = Budget::new(Limits {
-        work: 27_937,
+    let mut short = nrz_cas::limits::Budget::new(Limits {
+        work: 27_994,
         ..Limits::default()
     })?;
     assert_work(refused(
@@ -254,15 +260,16 @@ fn assert_work(fault: Fault) {
 /// ´claim:cas:constant-cache-closed-fixtures´
 #[test]
 fn constant_cache_closed_fixtures() -> TestResult {
+    // Receiving-store map maintenance is charged on a miss; a warm reuse keeps its old floor.
     let inputs = [
-        (Operator::Constant(Constant::Pi), 10_888, true),
+        (Operator::Constant(Constant::Pi), 10_929, true),
         (
             Operator::Rational(Rational::from_ratio(3, 7, &mut ledger()?)?),
-            6_741,
+            6_763,
             true,
         ),
-        (Operator::Rational(Rational::one()), 6_453, true),
-        (Operator::Rational(Rational::zero()), 3_956, false),
+        (Operator::Rational(Rational::one()), 6_475, true),
+        (Operator::Rational(Rational::zero()), 3_978, false),
     ];
     for (operator, work, positive) in inputs {
         let (mut cas, root) = original(&[(operator, Vec::new())], false)?;
@@ -278,7 +285,7 @@ fn constant_cache_closed_fixtures() -> TestResult {
             ConstantIdentityKind::AddZero,
         ] {
             for _ in 0..2 {
-                let mut exact = Budget::new(Limits {
+                let mut exact = nrz_cas::limits::Budget::new(Limits {
                     work: 1,
                     ..Limits::default()
                 })?;
@@ -286,7 +293,7 @@ fn constant_cache_closed_fixtures() -> TestResult {
                 assert!(std::ptr::eq(witness.preparation(), prepared));
                 assert_eq!(exact.usage().work, 1);
             }
-            let mut exhausted = Budget::new(Limits {
+            let mut exhausted = nrz_cas::limits::Budget::new(Limits {
                 work: 0,
                 ..Limits::default()
             })?;
@@ -310,7 +317,10 @@ fn constant_cache_domain_refusal() -> TestResult {
     let bytes = case.cas.retained_judgment_bytes();
     let zero = ExactConstant::zero()
         .expression_drafts(
-            Reference::Existing(case.cas.expression_header(&case.root)?),
+            Reference::Existing(
+                case.cas
+                    .expression_header(&case.root, &mut crate::testing::budgets::graph_budget()?)?,
+            ),
             &mut ledger()?,
         )?
         .pop()
@@ -368,7 +378,7 @@ fn constant_cache_storage_boundaries() -> TestResult {
             } else {
                 limits.staged_payload_bytes = bytes;
             }
-            let mut budget = Budget::new(limits)?;
+            let mut budget = nrz_cas::limits::Budget::new(limits)?;
             let result = case
                 .cas
                 .prepare_constant(&case.context, &case.root, &mut budget);
@@ -381,7 +391,9 @@ fn constant_cache_storage_boundaries() -> TestResult {
                 );
                 assert_eq!(fault.location.operation, "exact constant cache");
             }
-            assert_eq!(budget.usage().work, 1);
+            // An N−1 storage refusal stops before the one-Work returned result.
+            let expected_work = 1;
+            assert_eq!(budget.usage().work, expected_work);
             assert_eq!(case.cas.retained_judgment_count(), 1);
             assert_eq!(case.cas.retained_judgment_bytes(), 3_654);
         }
@@ -396,7 +408,7 @@ fn constant_cache_storage_boundaries() -> TestResult {
 fn constant_cache_miss_storage() -> TestResult {
     for bytes in [3_654, 3_653] {
         let mut case = fixture()?;
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             output_bytes: bytes,
             ..Limits::default()
         })?;
@@ -416,7 +428,8 @@ fn constant_cache_miss_storage() -> TestResult {
             ));
             assert_eq!(case.cas.retained_judgment_count(), 0);
         }
-        assert_eq!(budget.usage().work, 27_938);
+        let expected_work = if bytes == 3_654 { 27_995 } else { 27_992 };
+        assert_eq!(budget.usage().work, expected_work);
     }
     Ok(())
 }
@@ -429,7 +442,7 @@ fn constant_cache_retained_refusals() -> TestResult {
     let mut case = fixture()?;
     case.cas
         .prepare_constant(&case.context, &case.root, &mut ledger()?)?;
-    let mut budget = Budget::new(Limits {
+    let mut budget = nrz_cas::limits::Budget::new(Limits {
         staged_payload_bytes: 3_654,
         ..Limits::default()
     })?;
@@ -448,7 +461,7 @@ fn constant_cache_retained_refusals() -> TestResult {
     assert_eq!(budget.usage().work, 1);
     assert_eq!(budget.limits().staged_payload_bytes, 3_654);
     let changed = frame(&mut case.cas, &case.root, true)?;
-    let mut budget = Budget::new(Limits {
+    let mut budget = nrz_cas::limits::Budget::new(Limits {
         output_bytes: 3_654,
         ..Limits::default()
     })?;
@@ -463,7 +476,7 @@ fn constant_cache_retained_refusals() -> TestResult {
             ..
         }
     ));
-    assert_eq!(budget.usage().work, 27_938);
+    assert_eq!(budget.usage().work, 27_992);
     assert_eq!(case.cas.retained_judgment_count(), 1);
     assert_eq!(case.cas.retained_judgment_bytes(), 3_654);
     Ok(())
@@ -528,7 +541,9 @@ fn constant_cache_declaration_identity() -> TestResult {
         .cas
         .prepare_constant(&context, &changed, &mut measured)?;
     assert_eq!(prepared.value(), &expected);
-    assert_eq!(measured.usage().work, direct.usage().work);
+    // The distinct declaration adds four Work: two retained-kind replacement
+    // units, one identity-index insertion and one key-entry insertion.
+    assert_eq!(measured.usage().work, direct.usage().work + 4);
     assert_eq!(case.cas.retained_judgment_count(), 2);
     Ok(())
 }

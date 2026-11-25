@@ -14,8 +14,8 @@ use nrz_cas::{
 #[test]
 fn bindings_lc_selection_baseline() -> TestResult {
     for (bounded, selection, replay, length) in [
-        (false, 168_544, 248_957, 1_562),
-        (true, 201_417, 301_425, 1_812),
+        (false, 168_637, 249_217, 1_562),
+        (true, 201_510, 301_721, 1_812),
     ] {
         let mut source = fixture(bounded, "3", "10/Pi")?;
         let mut budget = ledger()?;
@@ -54,7 +54,7 @@ fn bindings_lc_selection_baseline() -> TestResult {
 /// ´test:integration:bindings-lc-selection-work-baseline´
 #[test]
 fn bindings_lc_selection_work_baseline() -> TestResult {
-    for (bounded, required) in [(false, 168_544), (true, 201_417)] {
+    for (bounded, required) in [(false, 168_637), (true, 201_510)] {
         for (allowance, accepted) in [(required + 17, true), (required + 16, false)] {
             let mut source = fixture(bounded, "3", "10/Pi")?;
             let before = source.frame.cas.counts();
@@ -135,12 +135,12 @@ fn bindings_lc_materialization_baseline() -> TestResult {
     Ok(())
 }
 
-/// Freezing the source environment reduces cumulative declaration and copy Work from 24642 to 23783.
+/// A frozen source environment makes the declaration and copy path cost 23,640 Work.
 /// ´test:integration:bindings-symbol-copy-decision-baseline´
-/// ´claim:bindings:bindings-symbol-copy-decision-baseline´ A source declaration and its unchanged copy graph succeed at 23553 Work and refuse at 23782.
+/// ´claim:bindings:bindings-symbol-copy-decision-baseline´ A source declaration and its unchanged copy graph succeed at 23,640 Work and refuse at 23,639.
 #[test]
 fn bindings_symbol_copy_decision_baseline() -> TestResult {
-    for (allowance, accepted) in [(23_553, true), (23_552, false)] {
+    for (allowance, accepted) in [(23_640, true), (23_639, false)] {
         let mut budget = Budget::new(Limits {
             work: allowance,
             ..Limits::default()
@@ -150,7 +150,7 @@ fn bindings_symbol_copy_decision_baseline() -> TestResult {
         let result = symbols.copy_result([1, 1], &mut budget);
         if accepted {
             result?;
-            assert_eq!(budget.usage().work, 23_553);
+            assert_eq!(budget.usage().work, 23_640);
         } else {
             let Err(nrz_bindings::AdmissionError::Algebra(fault)) = result else {
                 panic!("one-below symbol copy must refuse");

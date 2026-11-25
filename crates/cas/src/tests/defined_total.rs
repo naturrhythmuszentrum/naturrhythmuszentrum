@@ -36,7 +36,7 @@ fn defined_total_does_not_partition_product() -> TestResult {
 #[test]
 fn defined_total_sealing_boundaries() -> TestResult {
     use crate::Location;
-    use crate::limits::{Budget, BudgetKind, Limits};
+    use crate::limits::{BudgetKind, Limits};
     use crate::testing::defined_total_minimal as inventory;
     let work = inventory::seal_work() + 37;
     let staged = 16 * inventory::PAYLOADS.iter().sum::<u64>()
@@ -60,7 +60,7 @@ fn defined_total_sealing_boundaries() -> TestResult {
                 BudgetKind::StagedPayloadBytes => limits.staged_payload_bytes = amount,
                 _ => unreachable!("fixture kinds"),
             }
-            let mut budget = Budget::new(limits.clone())?;
+            let mut budget = crate::budget::Budget::new(limits.clone())?;
             budget.work(37, Location::new("prior sealing Work"))?;
             let result = budget.with_retained_payload(
                 19,
@@ -89,7 +89,7 @@ fn defined_total_sealing_boundaries() -> TestResult {
 /// Isolate the native checker so sealing cannot hide ownership of the traversal stack.
 #[test]
 fn defined_total_walk_stack_boundary() -> TestResult {
-    use crate::limits::{Budget, BudgetKind, Limits};
+    use crate::limits::{BudgetKind, Limits};
     use crate::syntax::{Branch, Operator};
     use crate::{Exhaustion, Location};
     let mut f = crate::testing::defined_total::Fixture::new(Branch::StrictReal, false, 0, false)?;
@@ -110,7 +110,7 @@ fn defined_total_walk_stack_boundary() -> TestResult {
             staged_payload_bytes: staged - u64::from(!accepted),
             ..Limits::default()
         };
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = crate::budget::Budget::new(limits.clone())?;
         budget.work(37, Location::new("prior walk Work"))?;
         let result =
             budget.with_retained_payload(19, Location::new("prior walk payload"), |budget| {

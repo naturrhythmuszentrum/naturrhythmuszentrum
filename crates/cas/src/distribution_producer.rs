@@ -133,7 +133,11 @@ impl Runner<'_> {
             if !seen.insert(term.logical_id()) {
                 continue;
             }
-            let value = self.cas.state.expression(term.logical_id())?.clone();
+            let value = self
+                .cas
+                .state
+                .expression(term.logical_id(), self.generation)?
+                .clone();
             match value.operator {
                 Operator::RegularEmbed => {
                     let function = self
@@ -193,22 +197,27 @@ impl Runner<'_> {
             return Ok(value.clone());
         }
         self.ensure(input)?;
-        let result =
-            if self.cas.state.expression(input.logical_id())?.operator == Operator::RegularEmbed {
-                match self.classical_bridge(input)? {
-                    Some(result) => result,
-                    None => self.jump(input)?,
-                }
-            } else {
-                self.linear_derivative(input)?
-            };
+        let result = if self
+            .cas
+            .state
+            .expression(input.logical_id(), self.generation)?
+            .operator
+            == Operator::RegularEmbed
+        {
+            match self.classical_bridge(input)? {
+                Some(result) => result,
+                None => self.jump(input)?,
+            }
+        } else {
+            self.linear_derivative(input)?
+        };
         self.derivatives.insert(input.logical_id(), result.clone());
         Ok(result)
     }
 
     /// Expand one regular derivative with all interior impulses.
     fn jump(&mut self, input: &Handle) -> Result<(Handle, Handle), Fault> {
-        let function = crate::distribution_ae::representative(self.cas, input)?;
+        let function = crate::distribution_ae::representative(self.cas, input, self.generation)?;
         let (source_proof, certificate) = self.regular(&function)?;
         let scalar = crate::distribution_jump::regular_output(
             self.cas,
@@ -264,7 +273,13 @@ impl Runner<'_> {
         let mut premises = self.premises.clone();
         for (term, _) in terms.values() {
             let term = term.as_ref().ok_or_else(invalid)?;
-            if self.cas.state.expression(term.logical_id())?.operator == Operator::RegularEmbed {
+            if self
+                .cas
+                .state
+                .expression(term.logical_id(), self.generation)?
+                .operator
+                == Operator::RegularEmbed
+            {
                 premises.push(self.once(term)?.1);
             }
         }

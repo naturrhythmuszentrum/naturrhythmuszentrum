@@ -58,7 +58,7 @@ fn coefficients<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
     let context = ArithmeticContext::new()?;
     let circle = pi::<P>(&context, &mut Budget::new(Limits::default())?)?;
     let exact = Limits {
-        work: 84_589,
+        work: 84_728,
         staged_payload_bytes: staged,
         output_bytes: output,
         ..Limits::default()
@@ -73,17 +73,14 @@ fn coefficients<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
         }
         let mut limited = ledger(limits)?;
         let before = limited.usage();
-        assert!(
-            conversion
-                .certify_pi(&circle, &exact_policy(), &context, &mut limited)
-                .is_err()
-        );
-        let spent = if field == 0 { 84_571 } else { 1 };
+        let refused = conversion.certify_pi(&circle, &exact_policy(), &context, &mut limited);
+        assert!(refused.is_err());
+        let spent = if field == 0 { 84_710 } else { 1 };
         assert_eq!(limited.usage().work, before.work + spent);
         let mut complete = ledger(exact.clone())?;
         let usage = conversion.certify_pi(&circle, &exact_policy(), &context, &mut complete)?;
-        assert_eq!(usage.work(), 84_572);
-        assert_eq!(complete.usage().work, 84_589);
+        assert_eq!(usage.work(), 84_711);
+        assert_eq!(complete.usage().work, 84_728);
         assert!(!usage.reused());
     }
     Ok(())
@@ -177,8 +174,8 @@ fn pi_conversion_cache_keys_retain_original_regions() -> TestResult {
     let mut complete = Budget::new(Limits::default())?;
     let first = conversion.certify_pi(&single, &exact_policy(), &context, &mut complete)?;
     let second = conversion.certify_pi(&double, &exact_policy(), &context, &mut complete)?;
-    assert_eq!(first.work(), 84_572);
-    assert_eq!(second.work(), 84_573);
+    assert_eq!(first.work(), 84_711);
+    assert_eq!(second.work(), 84_712);
     assert!(!second.reused());
     let hit = conversion.certify_pi(&single, &exact_policy(), &context, &mut complete)?;
     assert_eq!(hit.work(), 3);
@@ -188,7 +185,7 @@ fn pi_conversion_cache_keys_retain_original_regions() -> TestResult {
     assert!(!single.same_region(&distinct));
     let replacement = conversion.certify_pi(&distinct, &exact_policy(), &context, &mut complete)?;
     assert!(!replacement.reused());
-    assert_eq!(replacement.work(), 84_574);
+    assert_eq!(replacement.work(), 84_713);
     assert_eq!(replacement.new_owned_bytes(), 112);
     Ok(())
 }
@@ -197,8 +194,8 @@ fn pi_conversion_cache_keys_retain_original_regions() -> TestResult {
 /// ´test:integration:pi-conversion-cumulative-owner-boundary´
 #[test]
 fn pi_conversion_cumulative_owner_boundary() -> TestResult {
-    cumulative::<f32>(85_260)?;
-    cumulative::<f64>(86_646)
+    cumulative::<f32>(85_399)?;
+    cumulative::<f64>(86_785)
 }
 
 /// The final cache hit succeeds at the complete limit and refuses atomically one Work below it.

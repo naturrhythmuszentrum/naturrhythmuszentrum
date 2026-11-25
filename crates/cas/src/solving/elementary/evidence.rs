@@ -16,11 +16,12 @@ use crate::solving::coefficients::proof::fault;
 use crate::solving::coefficients::storage::{reserve, vector};
 
 /// Borrow condition syntax from either supported graph representation.
-pub(crate) fn predicate(
-    cas: &crate::graph::Cas,
+pub(crate) fn predicate<'a>(
+    cas: &'a crate::graph::Cas,
     id: LogicalId,
-) -> Result<(&PredicateKind, &[LogicalId]), Fault> {
-    match cas.state.node(id)? {
+    budget: &mut Budget,
+) -> Result<(&'a PredicateKind, &'a [LogicalId]), Fault> {
+    match cas.state.node(id, budget)? {
         Vertex::Condition(value) => Ok((&value.kind, &value.arguments)),
         Vertex::Expression(value) => match &value.operator {
             Operator::Predicate(kind) => Ok((kind, &value.operands)),
@@ -102,11 +103,11 @@ impl Evaluation<'_> {
             pending.push(self.region.logical_id());
             while let Some(id) = pending.pop() {
                 budget.work(1, AT)?;
-                match &self.cas.state.region(id)?.expression {
+                match &self.cas.state.region(id, budget)?.expression {
                     RegionExpr::GuardTrue { base, predicate }
                     | RegionExpr::GuardFalse { base, predicate } => {
                         let truth = matches!(
-                            self.cas.state.region(id)?.expression,
+                            self.cas.state.region(id, budget)?.expression,
                             RegionExpr::GuardTrue { .. }
                         );
                         reserve(&mut result, 1, budget)?;
@@ -139,7 +140,7 @@ impl Evaluation<'_> {
             }
             let original = self.unbound();
             for (id, truth) in self.predicates(budget)? {
-                let (kind, arguments) = predicate(self.cas, id)?;
+                let (kind, arguments) = predicate(self.cas, id, budget)?;
                 let candidate = match (kind, arguments, truth) {
                     (PredicateKind::NonZero | PredicateKind::Positive, [argument], true) => {
                         original.expression(*argument, false, budget)?
@@ -203,7 +204,7 @@ impl Evaluation<'_> {
             }
             for (id, truth) in self.predicates(budget)? {
                 if let (PredicateKind::Equal, [left, right], true) = {
-                    let (kind, args) = predicate(self.cas, id)?;
+                    let (kind, args) = predicate(self.cas, id, budget)?;
                     (kind, args, truth)
                 } {
                     let difference = original.expression(*left, false, budget)?.sub(
@@ -261,7 +262,7 @@ impl Evaluation<'_> {
             pending.push(root);
             while let Some(id) = pending.pop() {
                 budget.work(1, AT)?;
-                let (kind, arguments) = predicate(self.cas, id)?;
+                let (kind, arguments) = predicate(self.cas, id, budget)?;
                 match (kind, arguments) {
                     (PredicateKind::And, _) => {
                         reserve(&mut pending, arguments.len(), budget)?;
@@ -297,7 +298,7 @@ impl Evaluation<'_> {
             pending.push(root);
             while let Some(id) = pending.pop() {
                 budget.work(1, AT)?;
-                match &self.cas.state.region(id)?.expression {
+                match &self.cas.state.region(id, budget)?.expression {
                     RegionExpr::Ambient => {}
                     RegionExpr::GuardTrue { base, predicate } => {
                         self.predicate(*predicate, budget)?;

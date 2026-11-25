@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public original-claim controls for the closed prepared schedule.
+
 use nrz_cas::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
 use nrz_cas::enclosure::prepared_expm1::{Counts, Outcome, Policy, Prepared, Proof, Request};
 use nrz_cas::enclosure::{CoordinateBound, EnclosureGoal, EnclosureRequest, Interval};

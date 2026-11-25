@@ -19,7 +19,12 @@ fn guarded(
     kind: PredicateKind,
     arguments: &[Handle],
 ) -> TestResult<Handle> {
-    let original = fixture.cas.state.region(base.logical_id())?.clone();
+    let mut budget = crate::testing::common::default_budget()?;
+    let original = fixture
+        .cas
+        .state
+        .region(base.logical_id(), &mut budget)?
+        .clone();
     let over = original.lies_over.ok_or("family metadata")?;
     let family = fixture.cas.handle(over.family);
     let stratum = fixture.cas.handle(over.stratum);
@@ -54,7 +59,8 @@ fn guarded(
 
 /// A local context's exact meet, rather than its restriction alone, is the theorem region.
 fn local_steps(fixture: &mut Fixture, parent: &Handle) -> TestResult<Vec<ApplicationDraft>> {
-    let base = fixture.cas.admissible_region(parent)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let base = fixture.cas.admissible_region(parent, &mut budget)?;
     let subject = fixture.real.clone();
     let positive = guarded(
         fixture,
@@ -84,7 +90,7 @@ fn local_steps(fixture: &mut Fixture, parent: &Handle) -> TestResult<Vec<Applica
             hypotheses: Vec::new(),
         }),
     )?;
-    let region = fixture.cas.admissible_region(&context)?;
+    let region = fixture.cas.admissible_region(&context, &mut budget)?;
     assert_ne!(region, restriction);
     Ok(vec![ApplicationDraft {
         rule: crate::rule::Primitive::RegionDecide,

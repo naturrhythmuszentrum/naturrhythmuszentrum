@@ -42,14 +42,14 @@ pub(crate) fn smooth(
         } => {
             budget.specialized(BudgetKind::PairingSteps, 1, true, AT)?;
             crate::distribution_action::well_formed(cas, pairing, space, premises, budget)?;
-            let pair = cas.state.expression(pairing.logical_id())?.clone();
+            let pair = cas.state.expression(pairing.logical_id(), budget)?.clone();
             if pair.operator != Operator::Pair {
                 return Err(invalid());
             }
             let [product, test] = pair.operands.as_slice() else {
                 return Err(invalid());
             };
-            let product = cas.state.expression(*product)?.clone();
+            let product = cas.state.expression(*product, budget)?.clone();
             let [function, distribution] = product.operands.as_slice() else {
                 return Err(invalid());
             };
@@ -109,20 +109,20 @@ pub(crate) fn expand(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let value = cas.state.expression(product.logical_id())?.clone();
+    let value = cas.state.expression(product.logical_id(), budget)?.clone();
     let [function, distribution] = value.operands.as_slice() else {
         return Err(invalid());
     };
     if value.operator != Operator::SmoothMultiply {
         return Err(invalid());
     }
-    let delta = cas.state.expression(*distribution)?.clone();
+    let delta = cas.state.expression(*distribution, budget)?.clone();
     let Operator::Delta { order } = delta.operator else {
         return Err(invalid());
     };
     budget.specialized(BudgetKind::DeltaOrder, u64::from(order), false, AT)?;
     let location = cas.handle(*delta.operands.first().ok_or_else(invalid)?);
-    let point = crate::distribution_check::rational(cas, location.logical_id())?.clone();
+    let point = crate::distribution_check::rational(cas, location.logical_id(), budget)?.clone();
     let coefficients =
         crate::distribution_regular::polynomial(cas, &cas.handle(*function), space, budget)?;
     let header = cas.handle(value.header);

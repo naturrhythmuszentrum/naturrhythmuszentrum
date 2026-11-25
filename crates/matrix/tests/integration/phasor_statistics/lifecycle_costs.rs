@@ -40,7 +40,7 @@ type Prepared = (
 );
 
 fn prepare(dependencies: DependencyPolicy) -> TestResult<Prepared> {
-    let mut case = fixture::lifecycle_case(dependencies, &mut super::budget()?)?;
+    let mut case = fixture::lifecycle_case(dependencies, &mut super::fresh_budget()?)?;
     let means = case.means(&mut ledger()?)?;
     let executions = case.executions(&means, &mut ledger()?)?;
     let statistics = case.heap.evaluate_phasor_statistics(

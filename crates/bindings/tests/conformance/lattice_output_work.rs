@@ -29,14 +29,14 @@ struct Cost {
 const COSTS: [Cost; 3] = [
     Cost {
         kind: 0,
-        admission: 87_711,
+        admission: 87_785,
         site: 385,
         bytes: 35_044,
         site_bytes: 384,
     },
     Cost {
         kind: 1,
-        admission: 199_056,
+        admission: 199_290,
         site: 514,
         bytes: 58_054,
         site_bytes: 512,

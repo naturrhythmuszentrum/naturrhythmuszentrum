@@ -46,7 +46,7 @@ pub(crate) fn execute(
             &policy.costs,
             generation,
         )?,
-        named: eligible(cas, &request.task, inputs)?,
+        named: eligible(cas, &request.task, inputs, generation)?,
     };
     let mut queue = Frontier::default();
     let key = intent_key(cas, request, inputs, generation)?;
@@ -54,7 +54,7 @@ pub(crate) fn execute(
         queue.producer(
             id,
             key.clone(),
-            pending_metrics(cas, request, inputs, &key)?,
+            pending_metrics(cas, request, inputs, &key, generation)?,
             generation,
         )?;
     }
@@ -153,12 +153,17 @@ fn compare(
 }
 
 /// Both routes are meaningful for transparent named regular distributions.
-fn eligible(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<bool, Fault> {
+fn eligible(
+    cas: &Cas,
+    task: &Task,
+    inputs: &[LogicalId],
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     let root = cas.handle(*inputs.first().ok_or_else(invalid)?);
     let input = match task {
         Task::Differentiate { .. } => root,
         Task::Simplify => {
-            let value = cas.state.expression(root.logical_id())?;
+            let value = cas.state.expression(root.logical_id(), budget)?;
             if !matches!(value.operator, Operator::DistributionDerivative { .. }) {
                 return Ok(false);
             }
@@ -166,7 +171,7 @@ fn eligible(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<bool, Fault>
         }
         _ => return Ok(false),
     };
-    crate::distribution_recipes::named(cas, &input)
+    crate::distribution_recipes::named(cas, &input, budget)
 }
 
 /// Full context, request payload, spaces, roots and source support remain in the queue identity.
@@ -210,8 +215,11 @@ fn pending_metrics(
     request: &Request,
     inputs: &[LogicalId],
     key: &[u8],
+    budget: &mut crate::budget::Budget,
 ) -> Result<Metrics, Fault> {
-    let first = cas.state.expression(*inputs.first().ok_or_else(invalid)?)?;
+    let first = cas
+        .state
+        .expression(*inputs.first().ok_or_else(invalid)?, budget)?;
     let mut support: BTreeSet<_> = request
         .inputs
         .iter()

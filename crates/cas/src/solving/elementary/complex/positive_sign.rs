@@ -26,12 +26,12 @@ impl Components<'_, '_> {
     /// Every sign node is a real scalar in the exact target region's header and scope.
     fn real_node(&self, id: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
         budget.work(1, AT)?;
-        let expression = self.evaluation.cas.state.expression(id)?;
+        let expression = self.evaluation.cas.state.expression(id, budget)?;
         let region = self
             .evaluation
             .cas
             .state
-            .region(self.evaluation.region.logical_id())?;
+            .region(self.evaluation.region.logical_id(), budget)?;
         if (expression.header, &expression.scope, &expression.sort)
             != (
                 region.header,
@@ -64,6 +64,7 @@ impl Components<'_, '_> {
             let (kind, arguments) = super::super::super::evidence::predicate(
                 self.evaluation.cas,
                 predicate.logical_id(),
+                budget,
             )?;
             if arguments != [id] {
                 continue;
@@ -87,14 +88,14 @@ impl Components<'_, '_> {
     /// The real part of the exact product with its own conjugate is a sum of two real squares.
     fn norm(&self, id: LogicalId, budget: &mut Budget) -> Result<bool, Fault> {
         budget.work(1, AT)?;
-        let expression = self.evaluation.cas.state.expression(id)?;
+        let expression = self.evaluation.cas.state.expression(id, budget)?;
         let [operand] = expression.operands.as_slice() else {
             return Ok(false);
         };
         if expression.operator != Operator::RealPart {
             return Ok(false);
         }
-        let product = self.evaluation.cas.state.expression(*operand)?;
+        let product = self.evaluation.cas.state.expression(*operand, budget)?;
         let [left, right] = product.operands.as_slice() else {
             return Ok(false);
         };
@@ -103,7 +104,7 @@ impl Components<'_, '_> {
         }
         for (value, candidate) in [(*left, *right), (*right, *left)] {
             budget.work(1, AT)?;
-            let conjugate = self.evaluation.cas.state.expression(candidate)?;
+            let conjugate = self.evaluation.cas.state.expression(candidate, budget)?;
             if conjugate.operator == Operator::Conjugate && conjugate.operands.as_slice() == [value]
             {
                 return Ok(true);
@@ -124,7 +125,7 @@ impl Components<'_, '_> {
         if facts.nonnegative {
             return Ok(facts);
         }
-        let expression = self.evaluation.cas.state.expression(id)?;
+        let expression = self.evaluation.cas.state.expression(id, budget)?;
         if let Operator::Rational(value) = &expression.operator {
             let order = value.compare(&crate::number::Rational::zero(), budget)?;
             return Ok(Sign {
@@ -158,8 +159,13 @@ impl Components<'_, '_> {
     }
 
     /// Products require every factor and sums require every summand to be nonnegative.
-    fn sign_operation(&self, id: LogicalId, values: &[Sign]) -> Result<Sign, Fault> {
-        let expression = self.evaluation.cas.state.expression(id)?;
+    fn sign_operation(
+        &self,
+        id: LogicalId,
+        values: &[Sign],
+        budget: &mut crate::budget::Budget,
+    ) -> Result<Sign, Fault> {
+        let expression = self.evaluation.cas.state.expression(id, budget)?;
         let [left, right] = values else {
             return Err(invalid());
         };
@@ -192,7 +198,7 @@ impl Components<'_, '_> {
         let mut values = vector(1, budget)?;
         while let Some((id, ready)) = pending.pop() {
             self.real_node(id, budget)?;
-            let expression = self.evaluation.cas.state.expression(id)?;
+            let expression = self.evaluation.cas.state.expression(id, budget)?;
             let leaf = self.sign_leaf(draft, certificate, id, budget)?;
             if !ready
                 && !leaf.nonnegative
@@ -219,7 +225,7 @@ impl Components<'_, '_> {
                 let count = if ready { expression.operands.len() } else { 0 };
                 let start = values.len().checked_sub(count).ok_or_else(invalid)?;
                 let value = if ready {
-                    self.sign_operation(id, values.get(start..).ok_or_else(invalid)?)?
+                    self.sign_operation(id, values.get(start..).ok_or_else(invalid)?, budget)?
                 } else {
                     leaf
                 };

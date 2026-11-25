@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Encoding the complete proof closure is distinct from copying its sealed transport.
 
-use crate::limits::{Budget, BudgetKind};
+use crate::limits::BudgetKind;
 use crate::syntax::Operator;
 use crate::testing::common::{TestResult, default_budget};
 use crate::testing::trig::operators;
@@ -14,7 +14,7 @@ fn attempt(operator: Operator, kind: BudgetKind, amount: u64) -> TestResult<(boo
     let before = cas.canonical_snapshot(&mut default_budget()?)?;
     let expected = cas.export_witness(&proof, &mut default_budget()?)?;
     let ceilings = limits(kind, amount)?;
-    let mut budget = Budget::new(ceilings.clone())?;
+    let mut budget = crate::budget::Budget::new(ceilings.clone())?;
     budget.work(37, Location::new("prior trig encoding Work"))?;
     let result =
         budget.with_retained_payload(19, Location::new("prior trig encoding payload"), |budget| {

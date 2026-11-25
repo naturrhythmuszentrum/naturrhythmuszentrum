@@ -21,7 +21,7 @@ pub(crate) fn binomial(
     order: u32,
     budget: &mut Budget,
 ) -> Result<Option<Handle>, Fault> {
-    let stored = polynomial(&cas.state, &relation.polynomial)?;
+    let stored = polynomial(&cas.state, &relation.polynomial, budget)?;
     let leading = stored.terms.first().ok_or_else(invalid)?;
     if leading.exponents.as_slice() != [order] || order == 0 || stored.terms.len() > 2 {
         return Err(invalid());
@@ -105,7 +105,7 @@ pub(crate) fn positive_selection(
             return Err(invalid());
         }
         let crate::graph::Vertex::Condition(predicate) =
-            cas.state.node(selection.predicate.logical_id())?
+            cas.state.node(selection.predicate.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -117,7 +117,9 @@ pub(crate) fn positive_selection(
         let [argument] = predicate.arguments.as_slice() else {
             return Err(invalid());
         };
-        if cas.state.expression(*argument)?.operator != (Operator::Bound { depth: 0, slot: 0 }) {
+        if cas.state.expression(*argument, budget)?.operator
+            != (Operator::Bound { depth: 0, slot: 0 })
+        {
             return Err(invalid());
         }
         Ok(strict)
@@ -143,7 +145,7 @@ fn sign_premise(
                 continue;
             }
             let crate::graph::Vertex::Condition(condition) =
-                cas.state.node(predicate.logical_id())?
+                cas.state.node(predicate.logical_id(), budget)?
             else {
                 return Err(invalid());
             };
@@ -155,14 +157,14 @@ fn sign_premise(
             let [argument] = condition.arguments.as_slice() else {
                 continue;
             };
-            let expression = cas.state.expression(*argument)?;
+            let expression = cas.state.expression(*argument, budget)?;
             if expression.operator != Operator::Neg {
                 continue;
             }
             let [operand] = expression.operands.as_slice() else {
                 continue;
             };
-            let literal = cas.state.expression(*operand)?;
+            let literal = cas.state.expression(*operand, budget)?;
             if matches!(&literal.attachment, Some(ExpressionAttachment::ExactCoefficient { value, map }) if *value == constant.logical_id() && *map == relation.map.logical_id())
             {
                 return Ok(true);
@@ -184,7 +186,7 @@ pub(crate) fn sign(
     let Some(constant) = constant else {
         return if strict { Err(invalid()) } else { Ok(()) };
     };
-    let stored = crate::solving::coefficients::storage::value(&cas.state, constant)?;
+    let stored = crate::solving::coefficients::storage::value(&cas.state, constant, budget)?;
     let engine = Engine {
         state: &cas.state,
         domain: &stored.domain,

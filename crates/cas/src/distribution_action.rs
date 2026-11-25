@@ -17,7 +17,7 @@ pub(crate) fn well_formed(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let value = cas.state.expression(pairing.logical_id())?.clone();
+    let value = cas.state.expression(pairing.logical_id(), budget)?.clone();
     let [distribution, function] = value.operands.as_slice() else {
         return Err(invalid());
     };
@@ -66,11 +66,11 @@ pub(crate) fn delta_value(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let pair = cas.state.expression(pairing.logical_id())?.clone();
+    let pair = cas.state.expression(pairing.logical_id(), budget)?.clone();
     let [distribution, function] = pair.operands.as_slice() else {
         return Err(invalid());
     };
-    let delta = cas.state.expression(*distribution)?.clone();
+    let delta = cas.state.expression(*distribution, budget)?.clone();
     let Operator::Delta { order } = delta.operator else {
         return Err(invalid());
     };
@@ -80,7 +80,7 @@ pub(crate) fn delta_value(
     if pair.operator == Operator::PairNearSupport {
         let coefficients =
             crate::distribution_regular::polynomial(cas, &cas.handle(*function), space, budget)?;
-        let point = crate::distribution_check::rational(cas, location.logical_id())?;
+        let point = crate::distribution_check::rational(cas, location.logical_id(), budget)?;
         let mut value = crate::jet_polynomial::trace(
             &coefficients,
             point,
@@ -125,7 +125,7 @@ pub(crate) fn linear_value(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let pair = cas.state.expression(pairing.logical_id())?.clone();
+    let pair = cas.state.expression(pairing.logical_id(), budget)?.clone();
     let [distribution, function] = pair.operands.as_slice() else {
         return Err(invalid());
     };

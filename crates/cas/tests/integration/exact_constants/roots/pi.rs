@@ -146,6 +146,11 @@ fn constant_square_root_pi_enclosures() -> TestResult {
 }
 
 /// Literal Pi-root costs include N/N−1 refusals, prior Work and a spent monotone ledger.
+/// Direct Pi admission: unchanged operation Work 59,574 +14 retained counts +6 kind entries
+/// +19 identity entries +26 admissions -7 unjournaled inverses = 59,632. Two-Pi admission: unchanged operation Work
+/// 81,440 +20 +6 +22 +32 -10 unjournaled inverses = 81,510. The enclosures add one kind entry
+/// and 3 checked-record entries: 89,711 +69 -8 = 89,772 and 119,183 +84
+/// -11 = 119,256. Old/new lookup floors are equal.
 /// ´test:integration:constant-square-root-pi-costs´
 /// ´claim:cas:constant-square-root-pi-costs´
 #[test]
@@ -154,15 +159,15 @@ fn constant_square_root_pi_costs() -> TestResult {
         (
             false,
             Costs {
-                admission: 59_574,
-                enclosure: 89_711,
+                admission: 59_632,
+                enclosure: 89_772,
             },
         ),
         (
             true,
             Costs {
-                admission: 81_440,
-                enclosure: 119_183,
+                admission: 81_510,
+                enclosure: 119_256,
             },
         ),
     ];
@@ -244,11 +249,15 @@ fn constant_square_root_pi_original_square() -> TestResult {
 }
 
 /// Repeated Pi-root enclosures cite the retained certificate under the same store generation.
+/// Warm direct Pi: unchanged operation Work 72,282 +14 counts +6 kind entries +19 identity
+/// entries +26 admissions -7 unjournaled inverses = 72,340. Two-Pi: unchanged
+/// operation Work 101,754 +20 +6 +22 +32 -10 unjournaled inverses = 101,824;
+/// the retained Machin lookup floor remains unchanged.
 /// ´test:integration:constant-square-root-pi-warm-costs´
 /// ´claim:cas:constant-square-root-pi-warm-costs´
 #[test]
 fn constant_square_root_pi_warm_costs() -> TestResult {
-    for (product, work) in [(false, 72_282), (true, 101_754)] {
+    for (product, work) in [(false, 72_340), (true, 101_824)] {
         let (mut cas, contract) = enclosure(product)?;
         cas.check_rational_enclosure(&contract, &mut ledger()?)?;
         let mut warm = ledger()?;

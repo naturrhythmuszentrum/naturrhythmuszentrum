@@ -65,6 +65,10 @@ fn series_small_polynomial_oracles() -> TestResult {
 /// Every result position is independently changed while all valid original arithmetic rows remain intact.
 /// ´test:integration:series-every-output-position-refused´
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "the exhaustive position control retains one operation for every output"
+)]
 fn series_every_output_position_refused() -> TestResult {
     for kind in 0..16 {
         let count = match kind {
@@ -93,7 +97,11 @@ fn series_every_output_position_refused() -> TestResult {
             }
             .clone();
             let replacement = if matches!(kind, 5 | 6) {
-                let (Operator::Rational(value), _) = f.base.cas.expression(&target)? else {
+                let (Operator::Rational(value), _) = f
+                    .base
+                    .cas
+                    .expression(&target, &mut crate::testing::budgets::graph_budget()?)?
+                else {
                     return Err("rational".into());
                 };
                 f.base.term(
@@ -101,9 +109,15 @@ fn series_every_output_position_refused() -> TestResult {
                     &[],
                 )?
             } else {
-                let object = f.base.cas.series_object(&target)?.clone();
-                let (Operator::Rational(value), _) =
-                    f.base.cas.expression(&object.coefficients[index])?
+                let object = f
+                    .base
+                    .cas
+                    .series_object(&target, &mut crate::testing::budgets::graph_budget()?)?
+                    .clone();
+                let (Operator::Rational(value), _) = f.base.cas.expression(
+                    &object.coefficients[index],
+                    &mut crate::testing::budgets::graph_budget()?,
+                )?
                 else {
                     return Err("rational".into());
                 };

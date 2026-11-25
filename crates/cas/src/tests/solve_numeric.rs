@@ -364,7 +364,8 @@ fn gaussian_shared_ledger() -> TestResult {
     assert_eq!(budget.usage().arithmetic_steps, before.arithmetic_steps);
     assert_eq!(budget.usage().coefficient_ops, 5);
     let (cas, _, object) = stored(&real, &imaginary)?;
-    let crate::solving::SolveView::CoefficientValue(data) = cas.solve_view(&object)? else {
+    let crate::solving::SolveView::CoefficientValue(data) = cas.solve_view(&object, &mut budget)?
+    else {
         return Err("Gaussian value missing".into());
     };
     assert_eq!(

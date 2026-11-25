@@ -105,9 +105,9 @@ pub(crate) fn images(
 ) -> Result<Vec<Handle>, CoefficientFailure> {
     let mut keys = crate::solving::coefficients::storage::vector(0, budget)?;
     if let crate::solving::CoefficientDomainData::Fraction { coordinates, .. } =
-        crate::solving::coefficients::storage::domain(&cas.state, domain)?
+        crate::solving::coefficients::storage::domain(&cas.state, domain, budget)?
     {
-        let frame = crate::solving::elementary::proof::coordinates(cas, coordinates)?;
+        let frame = crate::solving::elementary::proof::coordinates(cas, coordinates, budget)?;
         crate::solving::coefficients::storage::reserve(&mut keys, frame.coordinates.len(), budget)?;
         for coordinate in &frame.coordinates {
             if coordinate.field != crate::model::Field::Real {

@@ -22,7 +22,7 @@ pub(crate) fn expression(
         return Ok(None);
     }
     if let Operator::Free(key) = operator {
-        let header = cas.state.header(construction.header.logical_id())?;
+        let header = cas.state.header(construction.header.logical_id(), budget)?;
         let declaration = header
             .environment
             .declarations
@@ -44,7 +44,7 @@ pub(crate) fn expression(
     }
     let mixed = operands.iter().any(|value| {
         cas.state
-            .expression(value.logical_id())
+            .expression(value.logical_id(), budget)
             .is_ok_and(|value| value.sort == Sort::Value(AtomicSort::Scalar(Field::Real)))
     });
     if !mixed {
@@ -52,17 +52,17 @@ pub(crate) fn expression(
     }
     let over = cas
         .state
-        .region(construction.region.logical_id())?
+        .region(construction.region.logical_id(), budget)?
         .lies_over
         .clone()
         .ok_or_else(invalid)?;
     let family = cas.handle(over.family);
-    let ambient = super::mapping::family_data(&cas.state, &family)?
+    let ambient = super::mapping::family_data(&cas.state, &family, budget)?
         .fibre_space
         .clone();
     let mut arguments = crate::solving::coefficients::storage::vector(operands.len(), budget)?;
     for operand in operands {
-        let (value, role) = argument(cas, operand)?;
+        let (value, role) = argument(cas, operand, budget)?;
         arguments.push(FamilyArgument {
             role,
             value: Reference::Existing(value),
@@ -84,16 +84,20 @@ pub(crate) fn expression(
 }
 
 /// Nested native views retain the underlying family's original argument association.
-fn argument(cas: &Cas, value: &Handle) -> Result<(Handle, FamilyArgumentRole), Fault> {
-    if body(cas, value.logical_id())?.is_some() {
+fn argument(
+    cas: &Cas,
+    value: &Handle,
+    budget: &mut Budget,
+) -> Result<(Handle, FamilyArgumentRole), Fault> {
+    if body(cas, value.logical_id(), budget)?.is_some() {
         return Ok((value.clone(), FamilyArgumentRole::Family));
     }
-    let expression = cas.state.expression(value.logical_id())?;
+    let expression = cas.state.expression(value.logical_id(), budget)?;
     if let [arm] = expression.arms.as_slice()
-        && body(cas, cas.state.arm(*arm)?.value)?.is_some()
+        && body(cas, cas.state.arm(*arm, budget)?.value, budget)?.is_some()
     {
         return Ok((
-            cas.handle(cas.state.arm(*arm)?.value),
+            cas.handle(cas.state.arm(*arm, budget)?.value),
             FamilyArgumentRole::Family,
         ));
     }
@@ -113,7 +117,7 @@ pub(crate) fn projection(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     use crate::proof_model::{Certificate, Statement};
-    let predicate = crate::solving::elementary::proof::problem(cas, problem)?
+    let predicate = crate::solving::elementary::proof::problem(cas, problem, budget)?
         .predicate
         .clone();
     let mut domains = super::recipes::regions(

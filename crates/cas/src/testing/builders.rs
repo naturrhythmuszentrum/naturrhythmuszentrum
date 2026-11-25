@@ -73,7 +73,7 @@ pub(crate) fn expression(
     operands: &[Handle],
     budget: &mut Budget,
 ) -> TestResult<Handle> {
-    let header = cas.context_header(context)?;
+    let header = cas.context_header(context, budget)?;
     admit(
         cas,
         expression_draft(

@@ -78,13 +78,17 @@ static EMPTY_SCOPE: Scope = Vec::new();
 const AT: Location = Location::new("typed syntax descriptor");
 
 /// Borrow metadata without interpreting a non-expression as scalar syntax.
-pub(crate) fn metadata(state: &State, id: LogicalId) -> Result<(LogicalId, &Scope), Fault> {
-    match state.node(id)? {
+pub(crate) fn metadata<'a>(
+    state: &'a State,
+    id: LogicalId,
+    budget: &mut Budget,
+) -> Result<(LogicalId, &'a Scope), Fault> {
+    match state.node(id, budget)? {
         Vertex::SeriesObject(value) => Ok((
-            state.context(value.context.logical_id())?.header_id,
+            state.context(value.context.logical_id(), budget)?.header_id,
             &value.scope,
         )),
-        Vertex::Solve(value) => crate::solving::graph::metadata(state, value)?
+        Vertex::Solve(value) => crate::solving::graph::metadata(state, value, budget)?
             .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT)),
         Vertex::Expression(v) => Ok((v.header, &v.scope)),
         Vertex::Condition(v) => Ok((v.header, &v.scope)),
@@ -98,8 +102,12 @@ pub(crate) fn metadata(state: &State, id: LogicalId) -> Result<(LogicalId, &Scop
 }
 
 /// Borrow a binder only from an expression that actually introduces it.
-pub(crate) fn binding(state: &State, id: LogicalId) -> Result<Option<&Binding>, Fault> {
-    Ok(match state.node(id)? {
+pub(crate) fn binding<'a>(
+    state: &'a State,
+    id: LogicalId,
+    budget: &mut Budget,
+) -> Result<Option<&'a Binding>, Fault> {
+    Ok(match state.node(id, budget)? {
         Vertex::Expression(v) => v.binding.as_ref(),
         _ => None,
     })
@@ -145,7 +153,7 @@ pub(crate) fn children(
     budget: &mut Budget,
 ) -> Result<Vec<(SyntaxRole, LogicalId)>, Fault> {
     let mut out = Vec::new();
-    match state.node(id)? {
+    match state.node(id, budget)? {
         Vertex::SeriesObject(value) => {
             for (position, dependency) in value.references().enumerate() {
                 push(
@@ -271,8 +279,8 @@ impl Cas {
         root: &Handle,
         budget: &mut Budget,
     ) -> Result<SyntaxDescriptor, Fault> {
-        let id = self.checked(root)?;
-        let (header, scope) = metadata(&self.state, id)?;
+        let id = self.checked(root, budget)?;
+        let (header, scope) = metadata(&self.state, id, budget)?;
         let children = children(&self.state, id, budget)?;
         let mut dependencies = Vec::new();
         dependencies
@@ -289,7 +297,7 @@ impl Cas {
             node: payload(&self.state, id, budget)?,
             header: self.handle(header),
             scope: scope.clone(),
-            binding: binding(&self.state, id)?.cloned(),
+            binding: binding(&self.state, id, budget)?.cloned(),
             dependencies,
         })
     }
@@ -302,7 +310,7 @@ fn payload(
     budget: &mut Budget,
 ) -> Result<crate::descriptor_model::SyntaxNode, Fault> {
     use crate::descriptor_model::{ExpressionSyntax, SpaceSyntax, SyntaxNode};
-    let value = state.node(id)?;
+    let value = state.node(id, budget)?;
     let (_, key) = crate::graph::vertex_key(value, state, budget)?;
     let bytes = size(key.len(), AT)?
         .checked_mul(4)
@@ -416,9 +424,9 @@ fn attachment_children(
 }
 
 /// Declaration frames and coefficient algebra records are immutable substitution axes.
-pub(crate) fn fixed_axis(state: &State, id: LogicalId) -> Result<bool, Fault> {
+pub(crate) fn fixed_axis(state: &State, id: LogicalId, budget: &mut Budget) -> Result<bool, Fault> {
     use crate::solving::SolveDraft;
-    Ok(match state.node(id)? {
+    Ok(match state.node(id, budget)? {
         Vertex::Header(_) | Vertex::Context(_) => true,
         Vertex::Solve(value) => matches!(
             value.as_ref(),
@@ -449,8 +457,10 @@ pub(crate) fn occurrence_children(
         .map_err(|_| Fault::allocation(AT))?;
     for dependency in dependencies {
         budget.work(1, AT)?;
-        let global = match state.node(dependency.1)? {
-            Vertex::Solve(value) => crate::solving::graph::metadata(state, value)?.is_none(),
+        let global = match state.node(dependency.1, budget)? {
+            Vertex::Solve(value) => {
+                crate::solving::graph::metadata(state, value, budget)?.is_none()
+            }
             Vertex::Header(_) | Vertex::Context(_) => true,
             _ => false,
         };

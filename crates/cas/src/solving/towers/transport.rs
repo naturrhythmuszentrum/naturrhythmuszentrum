@@ -11,9 +11,13 @@ use crate::solving::{
 };
 
 /// Borrow the exact admitted joint selection; metadata never supplies existence.
-fn selection<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a RootSelectionData<Handle>, Fault> {
+fn selection<'a>(
+    cas: &'a Cas,
+    handle: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a RootSelectionData<Handle>, Fault> {
     let SolveDraft::RootSelection(value) =
-        crate::solving::graph::object(&cas.state, cas.checked(handle)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -21,9 +25,13 @@ fn selection<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a RootSelectionData<
 }
 
 /// Borrow a relation without replacing its coefficient interpretation.
-fn relation<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a RootRelationData<Handle>, Fault> {
+fn relation<'a>(
+    cas: &'a Cas,
+    handle: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a RootRelationData<Handle>, Fault> {
     let SolveDraft::RootRelation(value) =
-        crate::solving::graph::object(&cas.state, cas.checked(handle)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -39,8 +47,8 @@ fn pair(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let first = relation(cas, left)?;
-    let second = relation(cas, right)?;
+    let first = relation(cas, left, budget)?;
+    let second = relation(cas, right, budget)?;
     if first.polynomial != split.left_factor
         || second.polynomial != split.right_factor
         || first.region != split.region
@@ -58,7 +66,7 @@ fn pair(
         return Err(invalid());
     }
     let SolveDraft::CoefficientMap(mapping) =
-        crate::solving::graph::object(&cas.state, first.map.logical_id())?
+        crate::solving::graph::object(&cas.state, first.map.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -76,8 +84,8 @@ pub(crate) fn check(
     let [left, right] = handles else {
         return Err(invalid());
     };
-    let first = selection(cas, left)?;
-    let second = selection(cas, right)?;
+    let first = selection(cas, left, budget)?;
+    let second = selection(cas, right, budget)?;
     if first.header != second.header
         || first.scope != second.scope
         || first.predicate != second.predicate

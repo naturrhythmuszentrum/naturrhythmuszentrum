@@ -587,7 +587,11 @@ impl Fixture {
         let unknown = self.base.free("x")?;
         let predicate = self.base.equation(&unknown, &unknown)?;
         let problem = self.base.problem("x", &predicate, &[])?;
-        let solving::SolveView::SolveProblem(value) = self.base.cas.solve_view(&problem)? else {
+        let solving::SolveView::SolveProblem(value) = self
+            .base
+            .cas
+            .solve_view(&problem, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("Real representation problem".into());
         };
         let (coordinates, domain) = (value.unknowns.clone(), value.domain.clone());
@@ -768,7 +772,10 @@ pub(crate) fn complex_original(
 ) -> TestResult<(crate::test_api::Cas, crate::test_api::request::Request)> {
     use crate::testing::sorts::{admit as add, expression};
     let mut fixture = crate::testing::sort_routing::Fixture::new(Field::Real, 0)?;
-    let solving::SolveView::SolveProblem(original) = fixture.cas.solve_view(&fixture.problem)?
+    let solving::SolveView::SolveProblem(original) = fixture.cas.solve_view(
+        &fixture.problem,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?
     else {
         return Err("Complex original problem".into());
     };

@@ -17,9 +17,14 @@ use crate::testing::sorts::{Fixture, admit, reference};
 
 /// Check a singleton fibre cover through the existing region constructor.
 fn fibre_cover(fixture: &mut Fixture, context: &Handle) -> TestResult<VerifiedWitness> {
-    let domain = fixture
-        .cas
-        .handle(fixture.cas.state.context(context.logical_id())?.admissible);
+    let mut budget = crate::testing::common::default_budget()?;
+    let domain = fixture.cas.handle(
+        fixture
+            .cas
+            .state
+            .context(context.logical_id(), &mut budget)?
+            .admissible,
+    );
     let draft = ApplicationDraft {
         rule: crate::rule::Primitive::RegionConstruct,
         context: context.clone(),
@@ -38,21 +43,28 @@ fn fibre_cover(fixture: &mut Fixture, context: &Handle) -> TestResult<VerifiedWi
 
 /// Use the existing Real trichotomy with the exact three original base strata.
 fn base_cover(fixture: &mut Fixture, groups: &[FamilyCoverGroup]) -> TestResult<VerifiedWitness> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut members = Vec::new();
     for group in groups {
-        let frame = fixture.cas.state.context(group.context.logical_id())?;
+        let frame = fixture
+            .cas
+            .state
+            .context(group.context.logical_id(), &mut budget)?;
         let over = fixture
             .cas
             .state
-            .region(frame.admissible)?
+            .region(frame.admissible, &mut budget)?
             .lies_over
             .as_ref()
             .ok_or("missing stratum")?;
         members.push(fixture.cas.handle(over.stratum));
     }
     let first = members.first().ok_or("no strata")?;
-    let crate::domain::RegionExpr::GuardTrue { base, .. } =
-        fixture.cas.state.region(first.logical_id())?.expression
+    let crate::domain::RegionExpr::GuardTrue { base, .. } = fixture
+        .cas
+        .state
+        .region(first.logical_id(), &mut budget)?
+        .expression
     else {
         return Err("base guard".into());
     };
@@ -212,6 +224,7 @@ fn mixed_family_omitted_zero_keeps_pieces() -> TestResult {
 /// ´test:crate:mixed-family-empty-piece-retained´
 #[test]
 fn mixed_family_empty_piece_retained() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request) = request(5)?;
     let Task::Solve(specification) = &request.task else {
         return Err("solve task".into());
@@ -228,13 +241,16 @@ fn mixed_family_empty_piece_retained() -> TestResult {
         return Err("coverage claim".into());
     };
     let crate::solving::SolveDraft::SolutionSet(set) =
-        crate::solving::graph::object(&fixture.cas.state, claim.set.logical_id())?
+        crate::solving::graph::object(&fixture.cas.state, claim.set.logical_id(), &mut budget)?
     else {
         return Err("empty set".into());
     };
     assert_eq!(set.branches.len(), 1);
-    let crate::solving::SolveDraft::SolutionBranch(branch) =
-        crate::solving::graph::object(&fixture.cas.state, set.branches[0].logical_id())?
+    let crate::solving::SolveDraft::SolutionBranch(branch) = crate::solving::graph::object(
+        &fixture.cas.state,
+        set.branches[0].logical_id(),
+        &mut budget,
+    )?
     else {
         return Err("empty branch".into());
     };

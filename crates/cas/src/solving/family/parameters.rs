@@ -95,7 +95,7 @@ pub(crate) fn fraction(
         return Ok(None);
     }
     let crate::solving::CoefficientDomainData::Fraction { coordinates, .. } =
-        crate::solving::coefficients::storage::domain(&evaluation.cas.state, &map.source)?
+        crate::solving::coefficients::storage::domain(&evaluation.cas.state, &map.source, budget)?
     else {
         return Err(invalid());
     };
@@ -104,7 +104,7 @@ pub(crate) fn fraction(
         let crate::model::Operator::Free(key) = &evaluation
             .cas
             .state
-            .expression(image.logical_id())?
+            .expression(image.logical_id(), budget)?
             .operator
         else {
             return Err(invalid());

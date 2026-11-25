@@ -435,9 +435,9 @@ fn lattice_basis_costs() -> TestResult {
     assert_eq!(
         measured,
         [
-            (1, 478_183, 721, 997, 997, 20_963),
-            (2, 493_501, 821, 1_147, 1_147, 25_052),
-            (3, 281_469, 688, 971, 971, 13_405),
+            (1, 478_402, 721, 997, 997, 20_963),
+            (2, 493_768, 821, 1_147, 1_147, 25_052),
+            (3, 281_616, 688, 971, 971, 13_405),
         ]
     );
     Ok(())
@@ -455,7 +455,7 @@ fn bounded(kind: BudgetKind, amount: u64) -> TestResult<Budget> {
         BudgetKind::PayloadBytes => limits.payload_bytes = amount,
         _ => return Err("unsupported lattice budget fixture".into()),
     }
-    Ok(Budget::new(limits)?)
+    Ok(nrz_cas::limits::Budget::new(limits)?)
 }
 
 fn resource_attempt(
@@ -498,7 +498,7 @@ fn resource_attempt(
 /// ´test:integration:lattice-basis-work´
 #[test]
 fn lattice_basis_work() -> TestResult {
-    for (kind, needed) in [(1, 478_183), (2, 493_501), (3, 281_469)] {
+    for (kind, needed) in [(1, 478_402), (2, 493_768), (3, 281_616)] {
         assert!(resource_attempt(kind, BudgetKind::Work, needed, 0, 0)?);
         assert!(!resource_attempt(kind, BudgetKind::Work, needed - 1, 0, 0)?);
         assert!(!resource_attempt(kind, BudgetKind::Work, needed, 37, 0)?);

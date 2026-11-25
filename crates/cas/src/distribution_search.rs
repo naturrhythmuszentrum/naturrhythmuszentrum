@@ -19,7 +19,12 @@ use crate::task::Task;
 use std::collections::BTreeMap;
 
 /// Distribution roots and scalar actions never enter the scalar projection search.
-pub(crate) fn handles(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<bool, Fault> {
+pub(crate) fn handles(
+    cas: &Cas,
+    task: &Task,
+    inputs: &[LogicalId],
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     if matches!(
         task,
         Task::PrimitiveUnique { .. }
@@ -37,7 +42,7 @@ pub(crate) fn handles(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<bo
     }
     if matches!(task, Task::Simplify | Task::Equal { .. }) {
         for input in inputs {
-            if cas.state.expression(*input)?.space.is_some() {
+            if cas.state.expression(*input, budget)?.space.is_some() {
                 return Ok(true);
             }
         }
@@ -55,7 +60,7 @@ pub(crate) fn execute(
     checker: &mut Budget,
 ) -> Result<Execution, Fault> {
     crate::distribution_preflight::check(cas, request, inputs, generation)?;
-    if request_space(cas, &request.task, inputs)?.is_none() {
+    if request_space(cas, &request.task, inputs, generation)?.is_none() {
         return Ok(Execution {
             result: None,
             fault: None,
@@ -79,9 +84,9 @@ pub(crate) fn route(
     generation: &mut Budget,
     checker: &mut Budget,
 ) -> Result<crate::search::SearchResult, Fault> {
-    let space = request_space(cas, &request.task, inputs)?.ok_or_else(invalid)?;
+    let space = request_space(cas, &request.task, inputs, generation)?.ok_or_else(invalid)?;
     cas.transaction(generation, |candidate, generation| {
-        let header = candidate.context_header(&request.context)?;
+        let header = candidate.context_header(&request.context, generation)?;
         let roots: Vec<_> = inputs.iter().map(|id| candidate.handle(*id)).collect();
         let mut runner = Runner {
             cas: candidate,
@@ -122,10 +127,14 @@ fn finish(
         runner
             .cas
             .state
-            .expression(root.logical_id())
+            .expression(root.logical_id(), runner.generation)
             .map(|v| v.unfolded)
     })?;
-    let after = runner.cas.state.expression(output.logical_id())?.unfolded;
+    let after = runner
+        .cas
+        .state
+        .expression(output.logical_id(), runner.generation)?
+        .unfolded;
     runner.plan.expansion(before, after, runner.generation)?;
     let trace = roots.first().map_or_else(
         || vec![output.clone()],
@@ -153,7 +162,12 @@ fn finish(
 }
 
 /// Resolve the exact space from intent or from an already typed distribution input.
-fn request_space(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<Option<Handle>, Fault> {
+fn request_space(
+    cas: &Cas,
+    task: &Task,
+    inputs: &[LogicalId],
+    budget: &mut crate::budget::Budget,
+) -> Result<Option<Handle>, Fault> {
     match task {
         Task::PrimitiveUnique { space }
         | Task::EmbedRegular { space }
@@ -161,7 +175,7 @@ fn request_space(cas: &Cas, task: &Task, inputs: &[LogicalId]) -> Result<Option<
         | Task::SmoothMultiply { space } => Ok(Some(space.clone())),
         _ => {
             for input in inputs {
-                if let Some(space) = cas.state.expression(*input)?.space {
+                if let Some(space) = cas.state.expression(*input, budget)?.space {
                     return Ok(Some(cas.handle(space)));
                 }
             }
@@ -195,7 +209,11 @@ fn run(
             let test = inputs.get(1).ok_or_else(invalid)?;
             if *action_mode == crate::task::ActionMode::Test
                 && matches!(
-                    runner.cas.state.expression(first.logical_id())?.operator,
+                    runner
+                        .cas
+                        .state
+                        .expression(first.logical_id(), runner.generation)?
+                        .operator,
                     Operator::DistributionDerivative { order: 1 }
                 )
             {
@@ -206,7 +224,13 @@ fn run(
         }
         Task::SmoothMultiply { .. } | Task::Product { .. } => {
             let second = inputs.get(1).ok_or_else(invalid)?;
-            if runner.cas.state.expression(first.logical_id())?.sort == Sort::Distribution {
+            if runner
+                .cas
+                .state
+                .expression(first.logical_id(), runner.generation)?
+                .sort
+                == Sort::Distribution
+            {
                 runner.multiply(second, first)
             } else {
                 runner.multiply(first, second)
@@ -225,7 +249,11 @@ fn simplify(
     named: bool,
     known: &[crate::distribution_known::Known],
 ) -> Result<(Handle, Handle), Fault> {
-    let value = runner.cas.state.expression(input.logical_id())?.clone();
+    let value = runner
+        .cas
+        .state
+        .expression(input.logical_id(), runner.generation)?
+        .clone();
     if let Operator::DistributionDerivative { order } = value.operator {
         let source = runner
             .cas
@@ -267,7 +295,7 @@ fn reduce(runner: &mut Runner<'_>, input: &Handle) -> Result<(Handle, Vec<Handle
     let mut premises = runner.premises.clone();
     let order = crate::case_syntax::order(runner.cas, &[input.logical_id()], runner.generation)?;
     for id in order {
-        let value = runner.cas.state.expression(id)?.clone();
+        let value = runner.cas.state.expression(id, runner.generation)?.clone();
         match value.operator {
             Operator::DistributionDerivative { .. } => {
                 let term = runner.cas.handle(id);
@@ -316,12 +344,12 @@ fn equal(
         runner
             .cas
             .state
-            .expression(value.logical_id())
+            .expression(value.logical_id(), runner.generation)
             .is_ok_and(|expression| expression.operator == Operator::RegularEmbed)
     });
     let (rule, certificate) = if both_regular {
-        let first = crate::distribution_ae::representative(runner.cas, left)?;
-        let second = crate::distribution_ae::representative(runner.cas, right)?;
+        let first = crate::distribution_ae::representative(runner.cas, left, runner.generation)?;
+        let second = crate::distribution_ae::representative(runner.cas, right, runner.generation)?;
         let certificate = crate::distribution_ae::certificate(
             runner.cas,
             &first,

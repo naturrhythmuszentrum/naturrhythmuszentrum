@@ -18,18 +18,18 @@ pub(super) fn sign(
     budget: &mut Budget,
 ) -> Result<Sign, Fault> {
     let mut pending = vector(1, budget)?;
-    pending.push(cas.checked(region)?);
+    pending.push(cas.checked(region, budget)?);
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        match &cas.state.region(id)?.expression {
+        match &cas.state.region(id, budget)?.expression {
             RegionExpr::GuardTrue { base, predicate } => {
                 let (kind, arguments) =
-                    crate::solving::elementary::evidence::predicate(cas, *predicate)?;
+                    crate::solving::elementary::evidence::predicate(cas, *predicate, budget)?;
                 if let (PredicateKind::Positive, [argument]) = (kind, arguments) {
                     if *argument == subject.logical_id() {
                         return Ok(Sign::Positive);
                     }
-                    let expression = cas.state.expression(*argument)?;
+                    let expression = cas.state.expression(*argument, budget)?;
                     if expression.operator == Operator::Neg
                         && expression.operands == [subject.logical_id()]
                     {

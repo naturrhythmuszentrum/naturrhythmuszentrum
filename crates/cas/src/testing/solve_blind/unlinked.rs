@@ -28,8 +28,10 @@ fn factors(
     let mut roots = Vec::new();
     let mut mapping = None;
     for factor in &certificate.factors {
-        let Some(ExpressionAttachment::ExactCoefficient { value, map }) =
-            &cas.state.expression(factor.root.logical_id())?.attachment
+        let Some(ExpressionAttachment::ExactCoefficient { value, map }) = &cas
+            .state
+            .expression(factor.root.logical_id(), budget)?
+            .attachment
         else {
             return Err("missing mapped root".into());
         };
@@ -37,7 +39,8 @@ fn factors(
         if mapping.as_ref().is_some_and(|previous| previous != &map) {
             return Err("different root maps".into());
         }
-        let stored = crate::solving::coefficients::storage::value(&cas.state, &cas.handle(*value))?;
+        let stored =
+            crate::solving::coefficients::storage::value(&cas.state, &cas.handle(*value), budget)?;
         let engine = Engine {
             state: &cas.state,
             domain: &stored.domain,
@@ -67,9 +70,9 @@ fn unity(cas: &Cas, domain: &Handle, budget: &mut Budget) -> TestResult<Element>
             state: &cas.state,
             domain: &current,
         };
-        let (_, extension) = arithmetic::level(&engine)?;
+        let (_, extension) = arithmetic::level(&engine, budget)?;
         if matches!(
-            crate::solving::coefficients::storage::domain(&cas.state, &extension.parent)?,
+            crate::solving::coefficients::storage::domain(&cas.state, &extension.parent, budget)?,
             crate::solving::CoefficientDomainData::Quotient { .. }
         ) {
             let parent = extension.parent.clone();

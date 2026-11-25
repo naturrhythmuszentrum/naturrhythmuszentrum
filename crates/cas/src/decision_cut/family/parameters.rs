@@ -44,13 +44,13 @@ fn parameters(
         .try_reserve_exact(2)
         .map_err(|_| Fault::allocation(AT))?;
     for endpoint in [&family.lower, &family.upper].into_iter().flatten() {
-        roots.push(cas.checked(endpoint)?);
+        roots.push(cas.checked(endpoint, budget)?);
     }
     let order = plan::order(cas, &roots, budget)?;
     let bytes = size(order.len(), AT)?.saturating_mul(256);
     budget.with_retained_payload(bytes, AT, |budget| {
         for id in &order {
-            let value = cas.state.expression(*id)?;
+            let value = cas.state.expression(*id, budget)?;
             if matches!(value.operator, Operator::Free(_)) {
                 let parameter = cas.handle(*id);
                 if parameter == family.index || parameter == family.coordinate {
@@ -93,13 +93,13 @@ fn reconstruct(
         crate::decision_cut::Coordinates::Mixed,
         budget,
     )?;
-    let domain = cas.checked(&family.domain)?;
+    let domain = cas.checked(&family.domain, budget)?;
     let mut roots = vec![relation[0], domain];
     roots
         .try_reserve_exact(2)
         .map_err(|_| Fault::allocation(AT))?;
     for endpoint in [&family.lower, &family.upper].into_iter().flatten() {
-        roots.push(cas.checked(endpoint)?);
+        roots.push(cas.checked(endpoint, budget)?);
     }
     let order = plan::order(cas, &roots, budget)?;
     let scratch = size(order.len(), AT)?.saturating_mul(256);

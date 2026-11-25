@@ -77,9 +77,9 @@ fn lc_root_replay_exact_work_boundaries() -> TestResult {
     let theorem = proof()?;
     let bytes = &theorem.bytes;
     for (work, replay, accepted) in [
-        (1_417_100, 1_417_099, true),
-        (1_417_099, 1_417_099, false),
-        (1_417_100, 1_417_098, false),
+        (1_417_506, 1_417_505, true),
+        (1_417_505, 1_417_505, false),
+        (1_417_506, 1_417_504, false),
     ] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
@@ -106,13 +106,13 @@ fn lc_root_replay_exact_work_boundaries() -> TestResult {
 fn lc_root_replay_carries_requests_and_retries() -> TestResult {
     let theorem = proof()?;
     let bytes = &theorem.bytes;
-    for ceiling in [2_832_204, 2_832_203] {
+    for ceiling in [2_832_610, 2_832_609] {
         let (mut fixture, request) = original([1, 1], &mut ledger()?)?;
         let set = proposal(&mut fixture, &theorem)?;
         let problem = RootProblem::check(&mut fixture.cas, request, &mut ledger()?)?;
         let mut budget = Budget::new(Limits {
             work: ceiling,
-            replay_work: 1_417_099,
+            replay_work: 1_417_505,
             ..Limits::default()
         })?;
         budget.work(17, Location::new("earlier symbolic work"))?;
@@ -124,7 +124,7 @@ fn lc_root_replay_carries_requests_and_retries() -> TestResult {
             Location::new("retained earlier coverage"),
             |budget| RootCoverage::replay(&mut fixture.cas, &problem, set.clone(), bytes, budget),
         );
-        assert_eq!(second.is_ok(), ceiling == 2_832_204);
+        assert_eq!(second.is_ok(), ceiling == 2_832_610);
         if second.is_err() {
             exhausted(&second, &[BudgetKind::Work])?;
             let spent = budget.usage();
@@ -203,7 +203,7 @@ fn lc_root_coverage_refuses_missing_placement() -> TestResult {
 /// ´test:integration:stable-collection-bindings-generation-work-boundary´
 #[test]
 fn stable_collection_bindings_generation_work_boundary() -> TestResult {
-    let required = 822_665;
+    let required = 823_148;
     for short in [0, 1] {
         let (mut fixture, mut request) = original([1, 1], &mut ledger()?)?;
         request.limits.work = Some(required - short);

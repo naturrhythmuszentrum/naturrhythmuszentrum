@@ -69,7 +69,7 @@ fn setup<P: Scalar + 'static>(widen: bool) -> TestResult<Case<P>> {
             false,
             heap,
             true,
-            &mut crate::phasor_solve_testing::budget()?,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
         )?;
         let phase = AxisPhasePlan::new(
             original.case.clone(),
@@ -150,7 +150,7 @@ fn lc_driven_fixed_row_continuation_table() -> TestResult {
 /// The middle domain refusal preserves both outer currents and the shared original spectrum.
 fn nominal<P: Scalar + 'static>() -> TestResult {
     let mut case = setup::<P>(false)?;
-    let mut budget = crate::phasor_solve_testing::budget()?;
+    let mut budget = crate::phasor_solve_testing::resources::fresh_budget()?;
     assert!(
         case.batch
             .phase(FIRST_ROW, &case.heap, &case.context, &mut budget)
@@ -271,7 +271,10 @@ fn lc_driven_fixed_row_undecided_continuation() -> TestResult {
 /// No default current or phase appears when the complete admitted box crosses zero.
 fn undecided<P: Scalar + 'static>() -> TestResult {
     let mut case = setup::<P>(true)?;
-    execute(&mut case, &mut crate::phasor_solve_testing::budget()?)?;
+    execute(
+        &mut case,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+    )?;
     assert_eq!(case.batch.statuses(0), Some([Status::Undecided; 3]));
     assert_eq!(
         case.batch.continuation(0),

@@ -27,7 +27,7 @@ pub(super) fn check(
             budget.with_retained_payload(retained, support::AT, |budget| {
                 support::inspect(cas, node, budget)
             })?;
-        if header != cas.context_header(frame.context())? {
+        if header != cas.context_header(frame.context(), budget)? {
             return Err(ReadingError::Definition);
         }
         admitted(cas, proposed, node, &operator, &operands, budget)?;

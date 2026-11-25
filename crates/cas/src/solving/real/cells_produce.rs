@@ -93,7 +93,7 @@ impl Leaf<'_> {
                 }),
                 self.budget,
             )?;
-            let shape = super::count::cell(self.cas, cell)?;
+            let shape = super::count::cell(self.cas, cell, self.budget)?;
             let finite = [&shape.left, &shape.right]
                 .into_iter()
                 .filter(|endpoint| matches!(endpoint, RealEndpoint::RealExpression(_)))

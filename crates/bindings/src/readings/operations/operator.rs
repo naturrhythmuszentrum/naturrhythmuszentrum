@@ -93,7 +93,7 @@ impl LinearOperator {
     ) -> Result<Self, ReadingOperationError> {
         let (sort, _, _, header) = support::inspect(cas, node, budget)?;
         let [rows, columns] = support::shape(&sort)?;
-        if header != cas.context_header(context)? {
+        if header != cas.context_header(context, budget)? {
             return Err(ReadingError::Definition.into());
         }
         for (axis, count) in axes.iter().zip([rows, columns]) {

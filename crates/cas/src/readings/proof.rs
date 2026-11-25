@@ -27,11 +27,17 @@ impl Cas {
         right: &Handle,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
-        let ordered = check::applicable(&self.state, self.checked(left)?, self.checked(right)?)?;
+        let ordered = check::applicable(
+            &self.state,
+            self.checked(left, budget)?,
+            self.checked(right, budget)?,
+            budget,
+        )?;
         let matrix = crate::polynomial::matrix::applicable(
             &self.state,
-            self.checked(left)?,
-            self.checked(right)?,
+            self.checked(left, budget)?,
+            self.checked(right, budget)?,
+            budget,
         )?;
         if !ordered && !matrix {
             return Err(invalid(InvalidCode::ReadingDefinition));
@@ -39,8 +45,16 @@ impl Cas {
         if matrix {
             let previous = budget.restrict_storage(&self.limits);
             let result = (|| {
-                crate::polynomial::matrix::definition(&self.state, self.checked(left)?, budget)?;
-                crate::polynomial::matrix::definition(&self.state, self.checked(right)?, budget)
+                crate::polynomial::matrix::definition(
+                    &self.state,
+                    self.checked(left, budget)?,
+                    budget,
+                )?;
+                crate::polynomial::matrix::definition(
+                    &self.state,
+                    self.checked(right, budget)?,
+                    budget,
+                )
             })();
             budget.restore_limits(previous);
             result?;
@@ -51,7 +65,7 @@ impl Cas {
             conclusion: Statement::Equality {
                 left: left.clone(),
                 right: right.clone(),
-                domain: self.admissible_region(context)?,
+                domain: self.admissible_region(context, budget)?,
                 domain_contract: DomainContract::DefinedAndEqual,
             },
             premises: Vec::new(),

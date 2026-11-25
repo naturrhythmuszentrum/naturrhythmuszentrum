@@ -36,7 +36,7 @@ fn step(
     inputs: &[(u32, Sign)],
     budget: &mut Budget,
 ) -> Result<RealSignStep, Fault> {
-    let expression = cas.state.expression(id)?;
+    let expression = cas.state.expression(id, budget)?;
     let subject = cas.handle(id);
     let (rule, conclusion, exponent) = match (&expression.operator, inputs) {
         (Operator::Rational(value), []) if !value.is_zero() => (
@@ -87,9 +87,14 @@ fn step(
 }
 
 /// Admit only Real expressions in the exact regional frame.
-fn operands<'a>(cas: &'a Cas, id: LogicalId, region: &Handle) -> Result<&'a [LogicalId], Fault> {
-    let expression = cas.state.expression(id)?;
-    let frame = cas.state.region(region.logical_id())?;
+fn operands<'a>(
+    cas: &'a Cas,
+    id: LogicalId,
+    region: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a [LogicalId], Fault> {
+    let expression = cas.state.expression(id, budget)?;
+    let frame = cas.state.region(region.logical_id(), budget)?;
     if expression.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || expression.header != frame.header
         || expression.scope != frame.scope
@@ -112,7 +117,9 @@ pub(super) fn certificate(
     region: &Handle,
     budget: &mut Budget,
 ) -> Result<CertificateRealSign, Fault> {
-    let original = cas.state.expression(cas.checked(subject)?)?;
+    let original = cas
+        .state
+        .expression(cas.checked(subject, budget)?, budget)?;
     budget.check(BudgetKind::Depth, original.depth, AT)?;
     budget.check(BudgetKind::ConditionSteps, original.unfolded, AT)?;
     let count = usize::try_from(original.unfolded).map_err(|_| unavailable())?;
@@ -122,7 +129,7 @@ pub(super) fn certificate(
     pending.push((subject.logical_id(), false));
     while let Some((id, ready)) = pending.pop() {
         budget.work(1, AT)?;
-        let children = operands(cas, id, region)?;
+        let children = operands(cas, id, region, budget)?;
         if !ready && !children.is_empty() {
             pending.push((id, true));
             pending.extend(children.iter().rev().map(|child| (*child, false)));

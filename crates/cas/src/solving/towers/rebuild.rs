@@ -54,11 +54,11 @@ impl Rebuilder {
         if let Some(target) = self.existing(source, budget)? {
             return Ok(target);
         }
-        let CoefficientDomainData::Quotient { level } = domain(&cas.state, source)? else {
+        let CoefficientDomainData::Quotient { level } = domain(&cas.state, source, budget)? else {
             return Ok(source.clone());
         };
         let SolveDraft::ExtensionLevel(extension) =
-            crate::solving::graph::object(&cas.state, level.logical_id())?
+            crate::solving::graph::object(&cas.state, level.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -110,7 +110,8 @@ impl Rebuilder {
         let Value::Tower(entries) = &element.value else {
             return Err(invalid());
         };
-        let (_, extension) = super::arithmetic::level(&engine).map_err(|error| fault(&error))?;
+        let (_, extension) =
+            super::arithmetic::level(&engine, budget).map_err(|error| fault(&error))?;
         let parent = Engine {
             state: &cas.state,
             domain: &extension.parent,
@@ -134,7 +135,7 @@ impl Rebuilder {
         if let Some(target) = self.existing(source, budget)? {
             return Ok(target);
         }
-        let original = crate::solving::coefficients::storage::value(&cas.state, source)?
+        let original = crate::solving::coefficients::storage::value(&cas.state, source, budget)?
             .domain
             .clone();
         let target = self.domain(cas, &original, budget)?;
@@ -161,7 +162,7 @@ impl Rebuilder {
         target: &Handle,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let stored = crate::solving::coefficients::storage::polynomial(&cas.state, source)?;
+        let stored = crate::solving::coefficients::storage::polynomial(&cas.state, source, budget)?;
         let variables = materialize::fields(&stored.variables, budget)?;
         let mut inputs = vector(stored.terms.len(), budget)?;
         for term in &stored.terms {
@@ -207,7 +208,7 @@ impl Rebuilder {
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
         budget.work(1, AT)?;
-        match crate::solving::graph::object(&cas.state, cas.checked(source)?)? {
+        match crate::solving::graph::object(&cas.state, cas.checked(source, budget)?, budget)? {
             SolveDraft::CoefficientDomain(_) => self.domain(cas, source, budget),
             SolveDraft::CoefficientValue(_) => self.coefficient(cas, source, budget),
             SolveDraft::Polynomial(stored) => {

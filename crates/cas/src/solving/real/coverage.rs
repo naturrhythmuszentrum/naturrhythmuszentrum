@@ -34,14 +34,17 @@ fn source(
     if domain != evaluation.region {
         return Err(invalid());
     }
-    let original = proof::problem(evaluation.cas, &coverage.problem)?;
+    let original = proof::problem(evaluation.cas, &coverage.problem, budget)?;
     if original.ambient != Field::Real {
         return Err(invalid());
     }
     let actual = product::equation(evaluation, original, budget)?;
     let claimed = evaluation.expression(left.logical_id(), true, budget)?;
     evaluation.zero(&actual.sub(&claimed, &evaluation.engine, budget)?, budget)?;
-    let scaled = evaluation.cas.state.expression(right.logical_id())?;
+    let scaled = evaluation
+        .cas
+        .state
+        .expression(right.logical_id(), budget)?;
     let [scalar, polynomial] = scaled.operands.as_slice() else {
         return Err(invalid());
     };
@@ -53,7 +56,7 @@ fn source(
     let [unknown] = unknowns.as_slice() else {
         return Err(invalid());
     };
-    let relation = selected::relation(evaluation.cas, &certificate.relation)?;
+    let relation = selected::relation(evaluation.cas, &certificate.relation, budget)?;
     let expected = evaluation.root_equation(unknown, relation, budget)?;
     let supplied = evaluation.expression(*polynomial, true, budget)?;
     evaluation.zero(
@@ -67,14 +70,18 @@ fn cell(
     evaluation: &Evaluation<'_>,
     entry: &Handle,
     certificate: &CertificateRealRootCount,
+    budget: &mut crate::budget::Budget,
 ) -> Result<Option<Handle>, Fault> {
-    let value = evaluation.cas.state.expression(entry.logical_id())?;
+    let value = evaluation
+        .cas
+        .state
+        .expression(entry.logical_id(), budget)?;
     let (Operator::RootValue { slot: 0 }, Some(ExpressionAttachment::SelectedRoot(handle))) =
         (&value.operator, &value.attachment)
     else {
         return Ok(None);
     };
-    let selection = selected::selection(evaluation.cas, &evaluation.cas.handle(*handle))?;
+    let selection = selected::selection(evaluation.cas, &evaluation.cas.handle(*handle), budget)?;
     if selection.relations != std::slice::from_ref(&certificate.relation) {
         return Ok(None);
     }
@@ -96,8 +103,8 @@ fn distinct(
         for second in entries.iter().skip(index + 1) {
             budget.work(1, AT)?;
             if let (Some(left), Some(right)) = (
-                cell(evaluation, first, certificate)?,
-                cell(evaluation, second, certificate)?,
+                cell(evaluation, first, certificate, budget)?,
+                cell(evaluation, second, certificate, budget)?,
             ) && left != right
             {
                 continue;
@@ -120,7 +127,7 @@ pub(super) fn check(
     if coverage.region != certificate.region {
         return Err(invalid());
     }
-    let original = proof::problem(evaluation.cas, &coverage.problem)?;
+    let original = proof::problem(evaluation.cas, &coverage.problem, budget)?;
     crate::solving::elementary::member::contained(
         evaluation.cas,
         &coverage.region,

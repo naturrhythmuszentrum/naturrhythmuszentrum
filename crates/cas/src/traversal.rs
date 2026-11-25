@@ -196,12 +196,7 @@ impl Workspace {
     /// Charge each reached immutable record once, following interpretation dependencies.
     fn reach(&mut self, cas: &Cas, root: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
         let at = Location::new("walk dependencies");
-        let index = cas
-            .state
-            .indices
-            .get(&root)
-            .copied()
-            .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))?;
+        let index = cas.state.index(root, budget)?;
         self.check(32, budget)?;
         let mut pending = vec![index];
         while let Some(index) = pending.pop() {
@@ -338,7 +333,7 @@ impl Cas {
         while let Some(frame) = stack.pop() {
             budget.work(1, at)?;
             let bytes = frame_bytes(frame.path.len())?;
-            let occurrence = self.state.occurrence(frame.id)?;
+            let occurrence = self.state.occurrence(frame.id, budget)?;
             if occurrence.source.is_some() != original {
                 return Err(Fault::invalid(InvalidCode::Span, at));
             }
@@ -382,9 +377,9 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Vec<Frame>, Fault> {
         let at = Location::new("occurrence walk");
-        let id = self.checked(root)?;
-        let target = self.state.occurrence(id)?.expression;
-        let (_, scope) = crate::descriptor::metadata(&self.state, target)?;
+        let id = self.checked(root, budget)?;
+        let target = self.state.occurrence(id, budget)?.expression;
+        let (_, scope) = crate::descriptor::metadata(&self.state, target, budget)?;
         if !scope.is_empty() {
             return Err(Fault::invalid(InvalidCode::Scope, at));
         }
@@ -405,8 +400,10 @@ impl Cas {
         events: &mut Vec<WalkEvent>,
     ) -> Result<(), Fault> {
         let at = Location::new("occurrence walk");
-        let occurrence = self.state.occurrence(frame.id)?;
-        if let Some(binding) = crate::descriptor::binding(&self.state, occurrence.expression)? {
+        let occurrence = self.state.occurrence(frame.id, budget)?;
+        if let Some(binding) =
+            crate::descriptor::binding(&self.state, occurrence.expression, budget)?
+        {
             let mut out = Encoder::new(budget, at);
             encoding::binding(Some(binding), &mut out)?;
             out.count(frame.path.len())?;
@@ -440,23 +437,25 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Visit, Fault> {
         let at = Location::new("occurrence visit");
-        let occurrence = self.state.occurrence(id)?;
-        let (_, scope) = crate::descriptor::metadata(&self.state, occurrence.expression)?;
+        let occurrence = self.state.occurrence(id, budget)?;
+        let (_, scope) = crate::descriptor::metadata(&self.state, occurrence.expression, budget)?;
+        let source = if let Some(id) = occurrence.source {
+            let Vertex::Source(source) = self.state.node(id, budget)? else {
+                return Err(Fault::invalid(InvalidCode::Reference, at));
+            };
+            Some(source)
+        } else {
+            None
+        };
         let mut out = Encoder::new(budget, at);
         encoding::scope(scope, &mut out)?;
         out.count(path.len())?;
         for position in &path {
             out.unsigned(u64::from(*position))?;
         }
-        let source = if let Some(id) = occurrence.source {
-            let Vertex::Source(source) = self.state.node(id)? else {
-                return Err(Fault::invalid(InvalidCode::Reference, at));
-            };
+        if let Some(source) = source {
             out.name(&source.key)?;
-            Some(source)
-        } else {
-            None
-        };
+        }
         let bytes = size(out.finish().len(), at)?
             .checked_add(96)
             .ok_or_else(|| Fault::capacity(BudgetKind::OutputBytes, at))?;

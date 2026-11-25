@@ -82,14 +82,14 @@ fn exhausted(fault: &Fault, limit: u64, expected: u64) {
 /// ´claim:matrix:kernel-physical-family-trace-work-boundary´
 #[test]
 fn kernel_physical_family_trace_work_boundary() -> TestResult {
-    for work in [312_761, 312_760] {
+    for work in [313_053, 313_052] {
         let mut source = Fixture::new()?;
         let graph = source.source.frame.cas.counts();
         let heap = source.heap.provenance_usage();
         let mut budget = allowance(work)?;
         let limits = budget.limits().clone();
         let result = source.trace(&mut budget);
-        if work == 312_761 {
+        if work == 313_053 {
             let trace = result?;
             assert_eq!(trace.evidence().scalar_usage().work, 732);
             assert_eq!(trace.retained_payload_bytes(), 8672);
@@ -98,12 +98,12 @@ fn kernel_physical_family_trace_work_boundary() -> TestResult {
             let Err(LiveDecisionError::Algebra(fault)) = result else {
                 panic!("trace owner must exhaust before receipt copy");
             };
-            exhausted(&fault, work, 312_761);
-            assert_eq!(fault.location, Location::new("exact rational enclosure"));
+            exhausted(&fault, work, 313_053);
+            assert_eq!(fault.location, Location::new("retained kind count"));
             assert!(budget.usage().work >= 17);
         }
         assert_eq!(budget.limits(), &limits);
-        if work != 312_761 {
+        if work != 313_053 {
             assert_eq!(source.source.frame.cas.counts(), graph);
         }
         assert_eq!(source.heap.provenance_usage(), heap);
@@ -116,7 +116,7 @@ fn kernel_physical_family_trace_work_boundary() -> TestResult {
 /// ´claim:matrix:kernel-physical-family-selection-work-boundary´
 #[test]
 fn kernel_physical_family_selection_work_boundary() -> TestResult {
-    for work in [330_065, 330_064] {
+    for work in [330_257, 330_256] {
         let mut source = Fixture::new()?;
         let trace = source.trace(&mut ledger()?)?;
         let before = source.source.frame.cas.counts();
@@ -132,7 +132,7 @@ fn kernel_physical_family_selection_work_boundary() -> TestResult {
             &source.source.steps,
             &mut budget,
         );
-        if work == 330_065 {
+        if work == 330_257 {
             let witness = result?;
             assert_eq!(witness.hypotheses().len(), 3);
             assert_eq!(budget.usage().work, work);
@@ -140,7 +140,7 @@ fn kernel_physical_family_selection_work_boundary() -> TestResult {
             let Err(fault) = result else {
                 panic!("scalar selection must refuse below its full Work boundary");
             };
-            exhausted(&fault, work, 330_065);
+            exhausted(&fault, work, 330_257);
             assert_eq!(source.source.frame.cas.counts(), before);
             assert!(budget.usage().work >= 17);
         }
@@ -220,13 +220,13 @@ fn kernel_physical_family_wire_work_boundaries() -> TestResult {
         assert_eq!(graph.counts(), before);
         assert_eq!(budget.limits(), &limits);
     }
-    for work in [486_810, 486_809] {
+    for work in [487_228, 487_227] {
         let mut receiver = Cas::new(Limits::default())?;
         let before = receiver.counts();
         let mut budget = allowance(work)?;
         let limits = budget.limits().clone();
         let result = receiver.inspect(&bytes, &mut budget);
-        if work == 486_810 {
+        if work == 487_228 {
             let witness = result?;
             assert_eq!(witness.hypotheses().len(), 3);
             assert_eq!(budget.usage().work, work);
@@ -235,7 +235,7 @@ fn kernel_physical_family_wire_work_boundaries() -> TestResult {
             let Err(fault) = result else {
                 panic!("fresh scalar replay must exhaust below its full Work boundary");
             };
-            exhausted(&fault, work, 486_810);
+            exhausted(&fault, work, 487_228);
             assert_eq!(receiver.counts(), before);
         }
         assert_eq!(budget.limits(), &limits);

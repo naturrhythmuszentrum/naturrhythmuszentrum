@@ -8,13 +8,13 @@ use nrz_cas::{Cas, Fault, FaultKind, Location};
 
 /// Kind, proof Work, fresh inspection Work and portable witness bytes.
 const COSTS: [(u32, u64, u64, usize); 4] = [
-    (1, 404_211, 1_079_157, 4_004),
-    (2, 381_163, 970_602, 4_120),
-    (4, 313_199, 767_533, 3_575),
-    (5, 335_639, 883_988, 3_745),
+    (1, 404_339, 1_079_714, 4_004),
+    (2, 381_307, 971_247, 4_120),
+    (4, 313_308, 768_083, 3_575),
+    (5, 335_746, 884_500, 3_745),
 ];
 
-fn budget(amount: u64) -> TestResult<Budget> {
+fn fresh_budget(amount: u64) -> TestResult<Budget> {
     let mut budget = Budget::new(Limits {
         work: amount,
         ..Limits::default()
@@ -33,8 +33,9 @@ fn outcome(
 ) -> TestResult<Option<VerifiedWitness>> {
     assert!(budget.usage().work > 37);
     if succeeds {
+        let witness = result?;
         assert_eq!(budget.usage().work, budget.limits().work);
-        Ok(Some(result?))
+        Ok(Some(witness))
     } else {
         let fault = result
             .err()
@@ -60,7 +61,7 @@ pub(super) fn proof_boundary(
     let cas = &mut source.source.frame.cas;
     let before = cas.counts();
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
-    let mut budget = budget(amount)?;
+    let mut budget = fresh_budget(amount)?;
     let limits = budget.limits().clone();
     let result = cas.prove_lattice_selection(
         &source.cover,
@@ -82,7 +83,7 @@ pub(super) fn replay_boundary(bytes: &[u8], amount: u64, succeeds: bool) -> Test
     let mut cas = Cas::new(Limits::default())?;
     let before = cas.counts();
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
-    let mut budget = budget(amount)?;
+    let mut budget = fresh_budget(amount)?;
     let limits = budget.limits().clone();
     let result = cas.inspect(bytes, &mut budget);
     assert_eq!(budget.limits(), &limits);
@@ -116,11 +117,11 @@ fn lattice_tuple_work() -> TestResult {
 #[test]
 fn lattice_tuple_direct_work() -> TestResult {
     for (kind, proof, replay, length) in [
-        (1, 456_354, 1_163_767, 4_113),
-        (2, 303_727, 893_699, 4_042),
-        (3, 295_200, 867_358, 3_872),
-        (4, 305_136, 768_714, 3_619),
-        (5, 334_530, 914_877, 3_862),
+        (1, 456_547, 1_164_443, 4_113),
+        (2, 303_790, 894_281, 4_042),
+        (3, 295_263, 867_922, 3_872),
+        (4, 305_223, 769_260, 3_619),
+        (5, 334_644, 915_450, 3_862),
     ] {
         proof_boundary(&mut super::direct::direct(kind)?, proof + 36, false)?;
         let bytes = proof_boundary(&mut super::direct::direct(kind)?, proof + 37, true)?

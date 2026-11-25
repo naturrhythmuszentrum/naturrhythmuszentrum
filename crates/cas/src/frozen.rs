@@ -94,8 +94,8 @@ impl Cas {
             cas.transaction(budget, |candidate, budget| {
                 candidate.pin_policy(policy, budget)?;
                 let (arcs, manifest) = snapshot(candidate, claim, policy, budget)?;
-                let start = candidate.checked(&claim.left)?;
-                let target = candidate.checked(&claim.right)?;
+                let start = candidate.checked(&claim.left, budget)?;
+                let target = candidate.checked(&claim.right, budget)?;
                 let (shortest_cost, settled) = dijkstra(&arcs, start, target, budget)?;
                 Ok(FrozenCertificate {
                     manifest,
@@ -120,14 +120,14 @@ pub(crate) fn snapshot(
     }
     let desired = crate::wire::claim_key(cas, claim, budget)?;
     validate_domain(cas, claim, budget)?;
-    let context = cas.checked(&claim.context)?;
+    let context = cas.checked(&claim.context, budget)?;
     let mut records = Vec::new();
     let mut arcs = Vec::new();
     let mut retained = 0_u64;
     let default = *policy == CostPolicy::default();
     for id in cas.state.indices.keys() {
         budget.work(1, AT)?;
-        let node = cas.state.node(*id)?;
+        let node = cas.state.node(*id, budget)?;
         let (application, cost) = match node {
             Vertex::Application(value) => (value, policy.weight(value.primitive)?),
             Vertex::ScopedApplication(value) => {
@@ -137,10 +137,13 @@ pub(crate) fn snapshot(
                 (value, policy.weight(value.primitive)?)
             }
             Vertex::Shortcut { proof, cost } if default => {
-                if crate::known::native_proof(cas, *proof)? {
+                if crate::known::native_proof(cas, *proof, budget)? {
                     continue;
                 }
-                (crate::proof_storage::application(cas, *proof)?, *cost)
+                (
+                    crate::proof_storage::application(cas, *proof, budget)?,
+                    *cost,
+                )
             }
             Vertex::PolicyShortcut {
                 proof,
@@ -148,16 +151,19 @@ pub(crate) fn snapshot(
                 policy: identity,
                 ..
             } => {
-                let Vertex::Policy(pinned) = cas.state.node(*identity)? else {
+                let Vertex::Policy(pinned) = cas.state.node(*identity, budget)? else {
                     return Err(invalid());
                 };
                 if *pinned != *policy {
                     continue;
                 }
-                if crate::known::native_proof(cas, *proof)? {
+                if crate::known::native_proof(cas, *proof, budget)? {
                     continue;
                 }
-                (crate::proof_storage::application(cas, *proof)?, *cost)
+                (
+                    crate::proof_storage::application(cas, *proof, budget)?,
+                    *cost,
+                )
             }
             _ => continue,
         };
@@ -205,9 +211,14 @@ pub(crate) fn snapshot(
 
 /// Even an empty path must preserve the source's complete defined domain.
 fn validate_domain(cas: &Cas, claim: &Claim, budget: &mut Budget) -> Result<(), Fault> {
-    let context = cas.checked(&claim.context)?;
+    let context = cas.checked(&claim.context, budget)?;
     let mut conditions = crate::conditions::Conditions::default();
-    conditions.endpoint(&cas.state, context, cas.checked(&claim.left)?, budget)?;
+    conditions.endpoint(
+        &cas.state,
+        context,
+        cas.checked(&claim.left, budget)?,
+        budget,
+    )?;
     let mut supplied = BTreeSet::new();
     for guard in &claim.residuals {
         budget.work(
@@ -218,7 +229,7 @@ fn validate_domain(cas: &Cas, claim: &Claim, budget: &mut Budget) -> Result<(), 
         )?;
         supplied.insert(crate::conditions::Obligation {
             kind: guard.kind,
-            term: cas.checked(&guard.term)?,
+            term: cas.checked(&guard.term, budget)?,
         });
     }
     if !conditions.residuals.is_subset(&supplied) {

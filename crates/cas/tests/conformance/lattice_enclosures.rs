@@ -48,7 +48,10 @@ fn fixture(kind: u32) -> TestResult<(Fixture, RationalBoxEnclosure)> {
                 },
                 target,
                 context: case.context.clone(),
-                input_family: case.cas.admissible_region(&case.context)?,
+                input_family: case.cas.admissible_region(
+                    &case.context,
+                    &mut crate::testing::budgets::graph_budget()?,
+                )?,
                 lower: Rational::from_ratio(lower, 1, &mut ledger()?)?,
                 upper: Rational::from_ratio(upper, 1, &mut ledger()?)?,
             });
@@ -92,7 +95,9 @@ fn fixture(kind: u32) -> TestResult<(Fixture, RationalBoxEnclosure)> {
             },
             target,
             context: case.context.clone(),
-            input_family: case.cas.admissible_region(&case.context)?,
+            input_family: case
+                .cas
+                .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?,
             lower: Rational::from_ratio(lower.0, lower.1, &mut ledger()?)?,
             upper: Rational::from_ratio(upper.0, upper.1, &mut ledger()?)?,
         });
@@ -105,7 +110,9 @@ fn fixture(kind: u32) -> TestResult<(Fixture, RationalBoxEnclosure)> {
     let request = RationalBoxEnclosure {
         target,
         context: case.context.clone(),
-        input_family: case.cas.admissible_region(&case.context)?,
+        input_family: case
+            .cas
+            .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?,
         coordinates,
     };
     Ok((case, request))
@@ -227,11 +234,11 @@ fn lattice_original_box_costs() -> TestResult {
     assert_eq!(
         rows,
         [
-            (0, 16_236, 1_840),
-            (1, 16_300, 1_840),
-            (2, 56_902, 1_592),
-            (3, 55_878, 1_592),
-            (4, 58_049, 1_592),
+            (0, 16_274, 1_840),
+            (1, 16_338, 1_840),
+            (2, 56_959, 1_592),
+            (3, 55_935, 1_592),
+            (4, 58_106, 1_592),
         ]
     );
     Ok(())
@@ -243,11 +250,11 @@ fn lattice_original_box_costs() -> TestResult {
 #[test]
 fn lattice_original_box_work() -> TestResult {
     for (kind, work) in [
-        (0, 16_236),
-        (1, 16_300),
-        (2, 56_902),
-        (3, 55_878),
-        (4, 58_049),
+        (0, 16_274),
+        (1, 16_338),
+        (2, 56_959),
+        (3, 55_935),
+        (4, 58_106),
     ] {
         for short in [0, 1] {
             let (mut case, request) = fixture(kind)?;

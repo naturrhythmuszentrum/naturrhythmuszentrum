@@ -46,7 +46,7 @@ impl ReadingSourceMap {
     ) -> Result<Self, SourceError> {
         let before = budget.usage();
         let context = targets[0].family().context();
-        let _header = cas.context_header(context)?;
+        let _header = cas.context_header(context, budget)?;
         check_sources(context, &sources, budget)?;
         if targets[1].family().context() != context {
             return Err(SourceError::Conflict);

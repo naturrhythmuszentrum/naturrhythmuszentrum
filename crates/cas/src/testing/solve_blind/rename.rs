@@ -5,6 +5,7 @@ use crate::testing::common::TestResult;
 
 /// Bind both original declaration frames to the same ordered values and compare their leaf inventories.
 pub(crate) fn complete() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut inventories = Vec::new();
     let mut guards = Vec::new();
     for keys in [["d", "c", "b", "a"], ["delta", "gamma", "beta", "alpha"]] {
@@ -13,10 +14,16 @@ pub(crate) fn complete() -> TestResult {
         let crate::request::Task::Solve(specification) = &request.task else {
             return Err("renaming request".into());
         };
-        let original =
-            crate::solving::elementary::proof::problem(&fixture.cas, &specification.problem)?;
-        let frame =
-            crate::solving::elementary::proof::coordinates(&fixture.cas, &original.coefficients)?;
+        let original = crate::solving::elementary::proof::problem(
+            &fixture.cas,
+            &specification.problem,
+            &mut budget,
+        )?;
+        let frame = crate::solving::elementary::proof::coordinates(
+            &fixture.cas,
+            &original.coefficients,
+            &mut budget,
+        )?;
         assert!(
             frame
                 .coordinates

@@ -92,6 +92,7 @@ fn map(inputs: u32, outputs: u32, values: &[i64]) -> TestResult<AffineMap> {
 }
 
 fn fixture() -> TestResult<(Cas, Judgment)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut cas, handles) = setup()?;
     let context = handles.get(2).ok_or("context")?.clone();
     let source = handles.get(3).ok_or("source")?;
@@ -115,7 +116,7 @@ fn fixture() -> TestResult<(Cas, Judgment)> {
         &mut ledger()?,
     )?;
     let right = cas.define_reading(symbol, &value, &expansion, &mut ledger()?)?;
-    let domain = cas.admissible_region(&context)?;
+    let domain = cas.admissible_region(&context, &mut budget)?;
     Ok((
         cas,
         Judgment {
@@ -184,8 +185,8 @@ fn expanded_representation_costs() -> TestResult {
         ),
         (
             121_700,
-            170_357,
-            256_123,
+            170_367,
+            256_133,
             509_124,
             1_732,
             vec![("poly.jets-equal", 124_915)]

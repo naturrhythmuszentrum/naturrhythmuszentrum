@@ -837,10 +837,10 @@ fn work_cases(growing: bool, replay: bool) -> (u64, u64, [(u64, u64); 9]) {
     assert_eq!(
         exact,
         match (growing, replay) {
-            (false, false) => 337_981,
-            (false, true) => 358_773,
-            (true, false) => 337_999,
-            (true, true) => 358_791,
+            (false, false) => 338_245,
+            (false, true) => 359_037,
+            (true, false) => 338_263,
+            (true, true) => 359_055,
         }
     );
     let constructed = 2 + 1_017 + binding;

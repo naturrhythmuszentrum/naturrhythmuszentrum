@@ -69,12 +69,13 @@ fn branch(
     bindings: &[(&str, Complex)],
     count: Option<usize>,
 ) -> TestResult<usize> {
-    let SolveView::SolutionSet(set) = cas.solve_view(set)? else {
+    let mut budget = crate::testing::common::default_budget()?;
+    let SolveView::SolutionSet(set) = cas.solve_view(set, &mut budget)? else {
         return Err("Real oracle set".into());
     };
     let mut selected = Vec::new();
     for (index, handle) in set.branches.iter().enumerate() {
-        let SolveView::SolutionBranch(value) = cas.solve_view(handle)? else {
+        let SolveView::SolutionBranch(value) = cas.solve_view(handle, &mut budget)? else {
             return Err("Real oracle branch".into());
         };
         if !specialize::region(cas, value.region.logical_id(), bindings)? {

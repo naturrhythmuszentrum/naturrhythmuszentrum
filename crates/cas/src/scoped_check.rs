@@ -43,7 +43,7 @@ fn preflight(cas: &Cas, steps: &[ApplicationDraft], budget: &mut Budget) -> Resu
                         | crate::series::SeriesStatement::Source(_)
                         | crate::series::SeriesStatement::EvaluatedResidual { .. }
                 )
-                && step.premises.len() != crate::series::check::premise_count(cas, value)?
+                && step.premises.len() != crate::series::check::premise_count(cas, value, budget)?
             {
                 return Err(invalid());
             }
@@ -91,7 +91,7 @@ pub(crate) fn check_supplied(
         let proof = proofs
             .get(usize::try_from(*index).map_err(|_| invalid())?)
             .ok_or_else(invalid)?;
-        ids.push(cas.checked(proof)?);
+        ids.push(cas.checked(proof, budget)?);
     }
     if let Statement::Series(value) = &step.conclusion
         && let crate::series::SeriesStatement::Source(value) = value.as_ref()
@@ -121,14 +121,14 @@ fn scalar(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(ScopedConditions, crate::scalar_model::CheckedStep), Fault> {
-    let context = cas.checked(&draft.context)?;
-    let mut step = crate::proof_view::scalar_step(cas, draft)?;
+    let context = cas.checked(&draft.context, budget)?;
+    let mut step = crate::proof_view::scalar_step(cas, draft, budget)?;
     if draft.rule == Primitive::Substitute {
         for previous in premises {
             for used in &previous.conditions.hypotheses {
                 if cas
                     .state
-                    .context(cas.checked(&used.context)?)?
+                    .context(cas.checked(&used.context, budget)?, budget)?
                     .parent
                     .is_some()
                 {
@@ -298,8 +298,8 @@ pub(crate) fn check_application(
         for hypothesis in &conditions.hypotheses {
             if !crate::context_check::ancestor(
                 cas,
-                cas.checked(&hypothesis.context)?,
-                cas.checked(&draft.context)?,
+                cas.checked(&hypothesis.context, budget)?,
+                cas.checked(&draft.context, budget)?,
                 budget,
             )? {
                 return Err(invalid());
@@ -373,7 +373,7 @@ impl Cas {
             checked.premises.clone_from(&application.premises);
         }
         let mut edges = vec![(
-            self.checked(&application.judgment.context)?,
+            self.checked(&application.judgment.context, budget)?,
             Edge::InContext,
         )];
         if let Certificate::LatticeSelection(value) = &application.certificate {
@@ -411,7 +411,7 @@ impl Cas {
         for (index, object) in objects.iter().enumerate() {
             let position = u32::try_from(index).map_err(|_| invalid())?;
             edges.push((
-                self.checked(object)?,
+                self.checked(object, budget)?,
                 crate::statement::edge_role(&application.judgment.statement, position),
             ));
         }
@@ -423,7 +423,7 @@ impl Cas {
         }
         for (index, guarded) in application.conditions.requirements.iter().enumerate() {
             edges.push((
-                self.checked(&guarded.predicate)?,
+                self.checked(&guarded.predicate, budget)?,
                 Edge::Obligation(u32::try_from(index).map_err(|_| invalid())?),
             ));
         }
@@ -445,7 +445,8 @@ impl Cas {
                 0,
                 budget,
             )?;
-            budget.check(BudgetKind::ProofNodes, state.proof_count(), AT)?;
+            let proof_count = state.proof_count(budget)?;
+            budget.check(BudgetKind::ProofNodes, proof_count, AT)?;
             Ok(cas.handle(proof))
         })
     }
@@ -475,9 +476,9 @@ impl Cas {
                         .try_reserve_exact(steps.len())
                         .map_err(|_| Fault::allocation(AT))?;
                     for step in steps {
-                        scalar.push(crate::proof_view::scalar_step(candidate, step)?);
+                        scalar.push(crate::proof_view::scalar_step(candidate, step, budget)?);
                     }
-                    let context_id = candidate.checked(context)?;
+                    let context_id = candidate.checked(context, budget)?;
                     let compiled =
                         crate::proof_check::compile(candidate, context_id, &scalar, budget)?;
                     let witness = candidate.finish_proof(&compiled, budget)?;
@@ -508,7 +509,8 @@ impl Cas {
         proof: &Handle,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
-        let application = crate::proof_view::application(self, self.checked(proof)?, budget)?;
+        let application =
+            crate::proof_view::application(self, self.checked(proof, budget)?, budget)?;
         let bytes = crate::wire::encode(self, proof.logical_id(), budget)?;
         Ok(VerifiedWitness {
             proof: proof.clone(),
@@ -579,7 +581,7 @@ impl Cas {
     ) -> Result<Vec<u8>, Fault> {
         let previous = budget.restrict_storage(&self.limits);
         let result = (|| {
-            self.checked(&witness.proof)?;
+            self.checked(&witness.proof, budget)?;
             let count = size(witness.bytes.len(), AT)?;
             budget.check(BudgetKind::WitnessBytes, count, AT)?;
             budget.check(BudgetKind::OutputBytes, count, AT)?;
@@ -607,7 +609,7 @@ fn check_source_step(
     let Statement::Series(statement) = &step.conclusion else {
         return Err(invalid());
     };
-    if step.premises.len() != crate::series::check::premise_count(cas, statement)? {
+    if step.premises.len() != crate::series::check::premise_count(cas, statement, budget)? {
         return Err(invalid());
     }
     let crate::series::SeriesStatement::Source(source) = statement.as_ref() else {
@@ -637,7 +639,7 @@ fn check_source_step(
         bytes = bytes
             .checked_add(crate::proof_view::application_bytes(
                 cas,
-                cas.checked(proof)?,
+                cas.checked(proof, budget)?,
                 budget,
             )?)
             .ok_or_else(invalid)?;
@@ -654,12 +656,12 @@ fn check_source_step(
             let proof = proofs
                 .get(usize::try_from(*index).map_err(|_| invalid())?)
                 .ok_or_else(invalid)?;
-            ids.push(cas.checked(proof)?);
+            ids.push(cas.checked(proof, budget)?);
             #[cfg(test)]
             crate::series::source::observe_slot_copy(source.clause);
             premises.push(crate::proof_view::application(
                 cas,
-                cas.checked(proof)?,
+                cas.checked(proof, budget)?,
                 budget,
             )?);
         }

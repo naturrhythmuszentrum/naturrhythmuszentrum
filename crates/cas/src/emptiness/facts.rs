@@ -20,14 +20,14 @@ pub(super) fn contained(
 ) -> Result<bool, Fault> {
     crate::work_observation::observe!(budget, AT, {
         let mut pending = crate::solving::coefficients::storage::vector(1, budget)?;
-        pending.push(cas.checked(region)?);
-        let target = cas.checked(ancestor)?;
+        pending.push(cas.checked(region, budget)?);
+        let target = cas.checked(ancestor, budget)?;
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
             if id == target {
                 return Ok(true);
             }
-            match &cas.state.region(id)?.expression {
+            match &cas.state.region(id, budget)?.expression {
                 RegionExpr::GuardTrue { base, .. }
                 | RegionExpr::GuardFalse { base, .. }
                 | RegionExpr::Difference { base, .. } => pending.push(*base),
@@ -47,8 +47,12 @@ pub(super) fn contained(
 }
 
 /// Literal zero never licenses cancellation of an undefined expression.
-fn literal_zero(cas: &Cas, id: crate::graph::LogicalId) -> Result<bool, Fault> {
-    let expression = cas.state.expression(id)?;
+fn literal_zero(
+    cas: &Cas,
+    id: crate::graph::LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
+    let expression = cas.state.expression(id, budget)?;
     Ok(matches!(&expression.operator, Operator::Rational(value) if value.is_zero()))
 }
 
@@ -60,17 +64,17 @@ pub(super) fn zero(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let mut pending = crate::solving::coefficients::storage::vector(1, budget)?;
-    pending.push(cas.checked(region)?);
-    let subject = cas.checked(subject)?;
+    pending.push(cas.checked(region, budget)?);
+    let subject = cas.checked(subject, budget)?;
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        match &cas.state.region(id)?.expression {
+        match &cas.state.region(id, budget)?.expression {
             RegionExpr::GuardTrue { base, predicate } => {
                 let (kind, arguments) =
-                    crate::solving::elementary::evidence::predicate(cas, *predicate)?;
+                    crate::solving::elementary::evidence::predicate(cas, *predicate, budget)?;
                 if let (PredicateKind::Equal, [left, right]) = (kind, arguments) {
-                    let forward = *left == subject && literal_zero(cas, *right)?;
-                    let reverse = *right == subject && literal_zero(cas, *left)?;
+                    let forward = *left == subject && literal_zero(cas, *right, budget)?;
+                    let reverse = *right == subject && literal_zero(cas, *left, budget)?;
                     if forward || reverse {
                         return Ok(());
                     }
@@ -95,10 +99,16 @@ pub(super) fn zero(
 }
 
 /// The fact must name exactly this subject; sign spelling alone grants no transfer.
-fn predicate(cas: &Cas, predicate: crate::graph::LogicalId, subject: &Handle) -> Result<(), Fault> {
-    let (kind, arguments) = crate::solving::elementary::evidence::predicate(cas, predicate)?;
+fn predicate(
+    cas: &Cas,
+    predicate: crate::graph::LogicalId,
+    subject: &Handle,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let (kind, arguments) =
+        crate::solving::elementary::evidence::predicate(cas, predicate, budget)?;
     if matches!(kind, PredicateKind::NonZero | PredicateKind::Positive)
-        && arguments == [cas.checked(subject)?]
+        && arguments == [cas.checked(subject, budget)?]
     {
         Ok(())
     } else {
@@ -134,11 +144,14 @@ pub(crate) fn nonzero(
                 }
                 let RegionExpr::GuardTrue {
                     predicate: guard, ..
-                } = &cas.state.region(cas.checked(ancestor)?)?.expression
+                } = &cas
+                    .state
+                    .region(cas.checked(ancestor, budget)?, budget)?
+                    .expression
                 else {
                     return Err(invalid());
                 };
-                predicate(cas, *guard, subject)
+                predicate(cas, *guard, subject, budget)
             }
             EmptyFact::Premise(slot) => match &premise(premises, *slot)?.judgment.statement {
                 Statement::PredicateFact {
@@ -148,7 +161,7 @@ pub(crate) fn nonzero(
                     if !contained(cas, region, domain, budget)? {
                         return Err(invalid());
                     }
-                    predicate(cas, cas.checked(guard)?, subject)
+                    predicate(cas, cas.checked(guard, budget)?, subject, budget)
                 }
                 Statement::Solve(statement) => {
                     let SolveStatement::RealSign(sign) = statement.as_ref() else {

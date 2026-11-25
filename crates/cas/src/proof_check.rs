@@ -61,7 +61,8 @@ fn measure_input(cas: &Cas, steps: &[ProofStep], budget: &mut Budget) -> Result<
                 }
                 previous = Some(&substitution.key);
                 out.name(&substitution.key)?;
-                crate::graph::encode_id(cas.checked(&substitution.replacement)?, &mut out)?;
+                let id = cas.checked(&substitution.replacement, out.budget())?;
+                crate::graph::encode_id(id, &mut out)?;
             }
             total = total
                 .checked_add(size(out.finish().len(), AT)?)
@@ -133,8 +134,12 @@ fn preflight_step(
         {
             return Err(mismatch());
         }
-        let left = cas.state.expression(cas.checked(&step.left)?)?;
-        let right = cas.state.expression(cas.checked(&step.right)?)?;
+        let left = cas
+            .state
+            .expression(cas.checked(&step.left, budget)?, budget)?;
+        let right = cas
+            .state
+            .expression(cas.checked(&step.right, budget)?, budget)?;
         if left.space.is_some() || right.space.is_some() {
             return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
         }
@@ -144,7 +149,7 @@ fn preflight_step(
             budget.check(BudgetKind::Depth, size(term.scope.len(), AT)?, AT)?;
             budget.check(BudgetKind::PeakExpressionSize, term.unfolded, AT)?;
         }
-        let header = &cas.state.context(context)?.header;
+        let header = &cas.state.context(context, budget)?.header;
         budget.work(
             size(header.len(), AT)?
                 .checked_mul(2)
@@ -155,13 +160,13 @@ fn preflight_step(
             || !crate::header::embeds(
                 &cas.state,
                 left.header,
-                cas.state.context(context)?.header_id,
+                cas.state.context(context, budget)?.header_id,
                 budget,
             )?
             || !crate::header::embeds(
                 &cas.state,
                 right.header,
-                cas.state.context(context)?.header_id,
+                cas.state.context(context, budget)?.header_id,
                 budget,
             )?
             || (step.primitive != Primitive::Jacobian && left.sort != right.sort)
@@ -233,7 +238,7 @@ pub(crate) fn compile_step(
     budget: &mut Budget,
 ) -> Result<CheckedStep, Fault> {
     crate::work_observation::observe!(budget, AT, {
-        crate::context::require_closed(&cas.state, context)?;
+        crate::context::require_closed(&cas.state, context, budget)?;
         measure_input(cas, std::slice::from_ref(step), budget)?;
         preflight_step(cas, context, step, budget)?;
         budget.work(1, AT)?;
@@ -267,10 +272,10 @@ pub(crate) fn compile_step(
             }
         }
         budget.check(BudgetKind::Depth, depth, AT)?;
-        let left = cas.checked(&step.left)?;
-        let right = cas.checked(&step.right)?;
+        let left = cas.checked(&step.left, budget)?;
+        let right = cas.checked(&step.right, budget)?;
         let affine = step.primitive == Primitive::Jets
-            && crate::readings::check::applicable(&cas.state, left, right)?;
+            && crate::readings::check::applicable(&cas.state, left, right, budget)?;
         // The affine checker traverses every original source in its closed, total grammar.
         if !affine {
             conditions.endpoint(&cas.state, context, left, budget)?;
@@ -292,7 +297,7 @@ pub(crate) fn compile_step(
         for substitution in &step.substitutions {
             substitutions.push((
                 substitution.key.clone(),
-                cas.checked(&substitution.replacement)?,
+                cas.checked(&substitution.replacement, budget)?,
             ));
         }
         Ok(CheckedStep {
@@ -335,7 +340,7 @@ fn substitute(
     }
     for required in &previous.conditions.requirements {
         let term = cas.substitute(&cas.handle(required.term), &step.substitutions, budget)?;
-        let id = cas.checked(&term)?;
+        let id = cas.checked(&term, budget)?;
         conditions.endpoint(&cas.state, context, id, budget)?;
         conditions.require(
             &cas.state,
@@ -449,7 +454,7 @@ impl Cas {
         witness: &VerifiedWitness,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        self.checked(&witness.proof)?;
+        self.checked(&witness.proof, budget)?;
         let expected = crate::wire::claim_key(self, &witness.claim, budget)?;
         let mut fresh = Self::new(self.limits.clone())?;
         let replayed = fresh.inspect(&witness.bytes, budget)?;

@@ -64,8 +64,14 @@ impl Cas {
                                 AT,
                             )?
                             .saturating_mul(
-                                size(cas.state.context(cas.checked(context)?)?.header.len(), AT)?
-                                    .saturating_add(256),
+                                size(
+                                    cas.state
+                                        .context(cas.checked(context, budget)?, budget)?
+                                        .header
+                                        .len(),
+                                    AT,
+                                )?
+                                .saturating_add(256),
                             ),
                         );
                     storage::retaining(map_bytes, budget, |budget| {
@@ -152,7 +158,10 @@ impl Cas {
             .sources
             .len()
             .saturating_add(readings.variables.len());
-        let header = &self.state.context(self.checked(context)?)?.header;
+        let header = &self
+            .state
+            .context(self.checked(context, budget)?, budget)?
+            .header;
         let copied = size(count.saturating_add(coordinates.fixed.len()), AT)?;
         let width = size(header.len(), AT)?;
         budget.check(
@@ -180,20 +189,26 @@ impl Cas {
         variables: &[String],
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let root = self.checked(original)?;
-        let inputs =
-            if self.state.expression(root)?.sort == Sort::Value(AtomicSort::Scalar(Field::Real)) {
-                vec![root]
-            } else {
-                self.reading_output_entries(root, budget)?
-            };
+        let root = self.checked(original, budget)?;
+        let inputs = if self.state.expression(root, budget)?.sort
+            == Sort::Value(AtomicSort::Scalar(Field::Real))
+        {
+            vec![root]
+        } else {
+            self.reading_output_entries(root, budget)?
+        };
         storage::retaining(
             size(inputs.len(), AT)?.saturating_mul(128),
             budget,
             |budget| {
                 let mut deriver = Deriver::default();
-                let result =
-                    deriver.jacobian(self, self.checked(context)?, &inputs, variables, budget)?;
+                let result = deriver.jacobian(
+                    self,
+                    self.checked(context, budget)?,
+                    &inputs,
+                    variables,
+                    budget,
+                )?;
                 Ok(deriver.plan.get(result)?.right.clone())
             },
         )
@@ -205,7 +220,7 @@ impl Cas {
         root: LogicalId,
         budget: &mut Budget,
     ) -> Result<Vec<LogicalId>, Fault> {
-        let (rows, columns) = crate::polynomial::matrix::shape(&self.state, root)?;
+        let (rows, columns) = crate::polynomial::matrix::shape(&self.state, root, budget)?;
         let entries = crate::readings::exact_expand::expand(self, root, budget)?;
         let mut ordered = storage::reserve(entries.len(), budget)?;
         for index in 0..entries.len() {
@@ -229,10 +244,10 @@ impl Cas {
         right: &Handle,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let first = self.checked(left)?;
-        let second = self.checked(right)?;
-        let (rows, inner) = crate::polynomial::matrix::shape(&self.state, first)?;
-        let (other, columns) = crate::polynomial::matrix::shape(&self.state, second)?;
+        let first = self.checked(left, budget)?;
+        let second = self.checked(right, budget)?;
+        let (rows, inner) = crate::polynomial::matrix::shape(&self.state, first, budget)?;
+        let (other, columns) = crate::polynomial::matrix::shape(&self.state, second, budget)?;
         if inner != other {
             return Err(invalid(InvalidCode::ReadingShape));
         }
@@ -241,7 +256,10 @@ impl Cas {
             u64::from(rows).saturating_mul(u64::from(columns)),
             AT,
         )?;
-        let header = self.state.context(self.checked(context)?)?.header_id;
+        let header = self
+            .state
+            .context(self.checked(context, budget)?, budget)?
+            .header_id;
         let id = self.generated(
             header,
             Operator::MatrixMultiply,

@@ -37,9 +37,9 @@ fn frame(
     context: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let value = cas.state.expression(function)?;
-    let context = cas.state.context(cas.checked(context)?)?;
-    let region = cas.state.region(context.admissible)?;
+    let value = cas.state.expression(function, budget)?;
+    let context = cas.state.context(cas.checked(context, budget)?, budget)?;
+    let region = cas.state.region(context.admissible, budget)?;
     crate::validation::scope_limit(&value.scope, budget)?;
     crate::rule_check::prepay_shape(value, budget)?;
     budget.work(5, AT)?;
@@ -49,7 +49,7 @@ fn frame(
     if value.scope != region.scope {
         return Err(invalid(InvalidCode::Scope));
     }
-    let environment = &cas.state.header(value.header)?.environment;
+    let environment = &cas.state.header(value.header, budget)?.environment;
     if !matches!(
         environment.field,
         Field::Rational | Field::Real | Field::Complex
@@ -74,7 +74,11 @@ fn leaf(cas: &Cas, value: &Expression, budget: &mut Budget) -> Result<(), Fault>
             Sort::Value(AtomicSort::Scalar(Field::Real | Field::Complex))
         ),
         Operator::Free(key) => {
-            let declarations = &cas.state.header(value.header)?.environment.declarations;
+            let declarations = &cas
+                .state
+                .header(value.header, budget)?
+                .environment
+                .declarations;
             let index = crate::header::declaration_index(declarations, key, budget, AT)?;
             index
                 .and_then(|index| declarations.get(index))
@@ -115,7 +119,7 @@ fn constructor(cas: &Cas, value: &Expression, budget: &mut Budget) -> Result<(),
         (Operator::Neg, [_]) | (Operator::Add | Operator::Sub | Operator::Mul, [_, _]) => Ok(()),
         (Operator::IntegerPower(exponent), [_]) if *exponent > 0 => Ok(()),
         (Operator::IntegerEmbed, [child]) => {
-            if cas.state.expression(*child)?.sort != Sort::Value(AtomicSort::Integer)
+            if cas.state.expression(*child, budget)?.sort != Sort::Value(AtomicSort::Integer)
                 || !matches!(value.sort, Sort::Value(AtomicSort::Scalar(_)))
             {
                 return Err(invalid(InvalidCode::Sort));
@@ -123,7 +127,7 @@ fn constructor(cas: &Cas, value: &Expression, budget: &mut Budget) -> Result<(),
             Ok(())
         }
         (Operator::Div, [_, denominator]) => {
-            let denominator = cas.state.expression(*denominator)?;
+            let denominator = cas.state.expression(*denominator, budget)?;
             if !matches!(value.sort, Sort::Value(AtomicSort::Scalar(_))) {
                 return Err(invalid(InvalidCode::UnsupportedFragment));
             }
@@ -145,7 +149,7 @@ fn constructor(cas: &Cas, value: &Expression, budget: &mut Budget) -> Result<(),
 
 /// Every occurrence is visited; a repeated child never gains a memoized totality flag.
 fn walk(cas: &Cas, function: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
-    let root = cas.state.expression(function)?;
+    let root = cas.state.expression(function, budget)?;
     budget.check(BudgetKind::Depth, root.depth, AT)?;
     let capacity =
         usize::try_from(root.depth).map_err(|_| Fault::capacity(BudgetKind::Depth, AT))?;
@@ -161,7 +165,7 @@ fn walk(cas: &Cas, function: LogicalId, budget: &mut Budget) -> Result<(), Fault
         budget.work(size(std::mem::size_of::<(LogicalId, usize)>(), AT)?, AT)?;
         stack.push((function, 0_usize));
         while let Some((id, next)) = stack.last_mut() {
-            let value = cas.state.expression(*id)?;
+            let value = cas.state.expression(*id, budget)?;
             if *next == 0 {
                 budget.condition(1, AT)?;
                 crate::rule_check::prepay_shape(value, budget)?;
@@ -197,7 +201,7 @@ fn walk(cas: &Cas, function: LogicalId, budget: &mut Budget) -> Result<(), Fault
             }
             if let Some(child) = value.operands.get(*next) {
                 budget.work(3 + size(std::mem::size_of::<(LogicalId, usize)>(), AT)?, AT)?;
-                let child_value = cas.state.expression(*child)?;
+                let child_value = cas.state.expression(*child, budget)?;
                 let same_sort_required = value.operator != Operator::IntegerEmbed;
                 let different_sort = child_value.sort != value.sort;
                 if same_sort_required && different_sort {
@@ -240,12 +244,15 @@ pub(crate) fn check(
     let Statement::PredicateFact { region, predicate } = &draft.conclusion else {
         return Err(invalid(InvalidCode::Rule));
     };
-    let context = cas.state.context(cas.checked(&draft.context)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
     budget.work(5, AT)?;
-    if cas.checked(region)? != context.admissible {
+    if cas.checked(region, budget)? != context.admissible {
         return Err(invalid(InvalidCode::Rule));
     }
-    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate)?)? else {
+    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate, budget)?, budget)?
+    else {
         return Err(invalid(InvalidCode::Rule));
     };
     if condition.kind != crate::model::PredicateKind::Defined {
@@ -255,7 +262,7 @@ pub(crate) fn check(
         return Err(invalid(InvalidCode::Rule));
     };
     frame(cas, *function, &draft.context, budget)?;
-    let value = cas.state.expression(*function)?;
+    let value = cas.state.expression(*function, budget)?;
     if condition.header != value.header {
         return Err(invalid(InvalidCode::Context));
     }
@@ -282,13 +289,17 @@ impl Cas {
     ) -> Result<VerifiedWitness, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                frame(cas, cas.checked(function)?, context, budget)?;
+                frame(cas, cas.checked(function, budget)?, context, budget)?;
                 let pending = std::mem::size_of::<ApplicationDraft>()
                     + std::mem::size_of::<crate::graph::Draft>()
                     + std::mem::size_of::<crate::graph::Reference>();
                 budget.with_retained_payload(size(pending, AT)?, AT, |budget| {
                     budget.work(size(pending, AT)?, AT)?;
-                    let region = cas.handle(cas.state.context(cas.checked(context)?)?.admissible);
+                    let region = cas.handle(
+                        cas.state
+                            .context(cas.checked(context, budget)?, budget)?
+                            .admissible,
+                    );
                     let predicate = crate::trig::defined::predicate(cas, function, budget)?;
                     let draft = ApplicationDraft {
                         rule: Primitive::DefinedTotal,

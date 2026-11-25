@@ -16,14 +16,16 @@ fn identities(
 ) -> TestResult<BTreeMap<LogicalId, LogicalId>> {
     let mut ids: BTreeMap<_, _> = prefix.iter().map(|id| (*id, *id)).collect();
     assert_eq!(actual_handles.len(), expected_handles.len());
+    let mut budget = default_budget()?;
     for (left, right) in actual_handles.iter().zip(expected_handles) {
-        let left = actual.checked(left)?;
-        let right = expected.checked(right)?;
+        let left = actual.checked(left, &mut budget)?;
+        let right = expected.checked(right, &mut budget)?;
         pair(&mut ids, left, right);
         // A returned proof owns an application that has no separate public return value.
-        if let (Vertex::Proof(left), Vertex::Proof(right)) =
-            (actual.state.node(left)?, expected.state.node(right)?)
-        {
+        if let (Vertex::Proof(left), Vertex::Proof(right)) = (
+            actual.state.node(left, &mut budget)?,
+            expected.state.node(right, &mut budget)?,
+        ) {
             pair(&mut ids, *left, *right);
         }
     }
@@ -66,6 +68,7 @@ pub(crate) fn normalized(
     expected_handles: &[Handle],
 ) -> TestResult<Cas> {
     let ids = identities(prefix, actual, actual_handles, expected, expected_handles)?;
+    let mut budget = default_budget()?;
     let mut copy = actual.full_copy_for_test();
     for vertex in copy.state.graph.node_weights_mut() {
         match vertex {
@@ -111,20 +114,36 @@ pub(crate) fn normalized(
             continue;
         }
         let (_, old_key) = vertex_key(
-            actual.state.node(*id)?,
+            actual.state.node(*id, &mut budget)?,
             &actual.state,
             &mut default_budget()?,
         )?;
-        assert_eq!(remaining.get(&old_key), Some(id));
-        remaining.remove(old_key.into());
+        assert_eq!(
+            remaining.get(
+                &old_key,
+                0,
+                &mut default_budget()?,
+                crate::error::Location::new("retry comparison"),
+            )?,
+            Some(id)
+        );
+        remaining.remove_prepaid(old_key.into());
         let target = mapped(&ids, *id)?;
         let (_, key) = vertex_key(
-            copy.state.node(target)?,
+            copy.state.node(target, &mut budget)?,
             &copy.state,
             &mut default_budget()?,
         )?;
-        copy.state.intern.insert(key, target, &copy.token);
+        let stored = key.into();
+        let at = crate::error::Location::new("retry comparison");
+        let (position, _) =
+            copy.state
+                .intern
+                .prepare_insert_key(&stored, false, &mut default_budget()?, at)?;
+        copy.state
+            .intern
+            .insert_prepared_key(position, stored, target, &copy.token);
     }
-    assert_eq!(format!("{remaining:?}"), "{}");
+    assert_eq!(remaining.len(), 0);
     Ok(copy)
 }

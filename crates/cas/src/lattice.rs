@@ -162,7 +162,7 @@ impl Cas {
             &admitted.question.basis,
             &admitted.question.offset,
         ] {
-            self.checked(handle)?;
+            self.checked(handle, budget)?;
         }
         if question != &admitted.question {
             return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
@@ -177,12 +177,15 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeBasis, Fault> {
         budget.work(3, AT)?;
-        let home = self.checked(&question.context)?;
-        let header = self.state.context(home)?.header_id;
-        let basis = self.checked(&question.basis)?;
-        let offset = self.checked(&question.offset)?;
-        let (rows, columns) = self.lattice_rectangle(basis, header)?;
-        if rows == 0 || rows != columns || self.lattice_rectangle(offset, header)? != (rows, 1) {
+        let home = self.checked(&question.context, budget)?;
+        let header = self.state.context(home, budget)?.header_id;
+        let basis = self.checked(&question.basis, budget)?;
+        let offset = self.checked(&question.offset, budget)?;
+        let (rows, columns) = self.lattice_rectangle(basis, header, budget)?;
+        if rows == 0
+            || rows != columns
+            || self.lattice_rectangle(offset, header, budget)? != (rows, 1)
+        {
             return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
         }
         let count = u64::from(rows).saturating_mul(u64::from(rows));
@@ -210,8 +213,13 @@ impl Cas {
     }
 
     /// Accept explicit Real matrices only, under the identical retained declaration.
-    fn lattice_rectangle(&self, id: LogicalId, header: LogicalId) -> Result<(u32, u32), Fault> {
-        let term = self.state.expression(id)?;
+    fn lattice_rectangle(
+        &self,
+        id: LogicalId,
+        header: LogicalId,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<(u32, u32), Fault> {
+        let term = self.state.expression(id, budget)?;
         let Operator::Matrix { rows, columns } = term.operator else {
             return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
         };
@@ -236,7 +244,7 @@ impl Cas {
 
     /// Copy only bounded original entry handles, preserving row-major ordering.
     fn lattice_entries(&self, id: LogicalId, budget: &mut Budget) -> Result<Vec<Handle>, Fault> {
-        let entries = &self.state.expression(id)?.operands;
+        let entries = &self.state.expression(id, budget)?.operands;
         budget.work(size(entries.len(), AT)?, AT)?;
         let mut result = Vec::new();
         result

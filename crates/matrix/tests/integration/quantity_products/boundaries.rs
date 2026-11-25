@@ -11,10 +11,10 @@ use nrz_matrix::{Heap, HeapLimits, KernelError, OperationError, Quantity, Quanti
 #[test]
 fn quantity_products_work_boundaries() -> TestResult {
     for (divide, warm, required, refused) in [
-        (false, false, 13_067, 12_939),
-        (false, true, 10_087, 9_959),
-        (true, false, 13_613, 13_485),
-        (true, true, 10_635, 10_507),
+        (false, false, 13_112, 12_984),
+        (false, true, 10_132, 10_004),
+        (true, false, 13_658, 13_530),
+        (true, true, 10_680, 10_552),
     ] {
         for admitted in [false, true] {
             work_case(divide, warm, required, refused, admitted)?;
@@ -111,7 +111,7 @@ fn execute(
 /// ´claim:matrix:quantity-products-provenance-boundaries´ Product and quotient retain their measured certificate bytes at N and refuse N-minus-one after scalar execution without publishing heap records.
 #[test]
 fn quantity_products_provenance_boundaries() -> TestResult {
-    for (divide, required, work) in [(false, 2_873, 13_067), (true, 3_185, 13_613)] {
+    for (divide, required, work) in [(false, 2_873, 13_112), (true, 3_185, 13_658)] {
         for admitted in [false, true] {
             let (context, [voltage, current, power]) = fixture()?;
             let mut heap = Heap::new(HeapLimits::default())?;
@@ -165,7 +165,7 @@ fn quantity_quotient_domain_work_boundary() -> TestResult {
         let right = bounded(&context, &mut heap, &ratio, 1.0_f64, 2.0, 0.125)?;
         let before = heap.provenance_usage();
         let mut budget = Budget::new(Limits {
-            work: if admitted { 12_516 } else { 12_515 },
+            work: if admitted { 12_561 } else { 12_560 },
             ..Limits::default()
         })?;
         let Err(QuantityError::Execution(failure)) =
@@ -181,10 +181,10 @@ fn quantity_quotient_domain_work_boundary() -> TestResult {
                 *cause,
                 nrz_scalar::KernelError::Arithmetic(nrz_scalar::ArithmeticFailure::ZeroInDivisor)
             );
-            assert_eq!((*work, budget.usage().work), (1_108, 12_516));
+            assert_eq!((*work, budget.usage().work), (1_108, 12_561));
         } else {
             assert_eq!(*cause, nrz_scalar::KernelError::WorkLimit);
-            assert_eq!((*work, budget.usage().work), (1_104, 12_512));
+            assert_eq!((*work, budget.usage().work), (1_104, 12_557));
         }
         assert_eq!(heap.provenance_usage(), before);
         assert_eq!(left.view(&heap)?.region().get(0, 0)?, 3.0);

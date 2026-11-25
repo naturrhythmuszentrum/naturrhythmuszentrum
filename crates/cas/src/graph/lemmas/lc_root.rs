@@ -4,7 +4,7 @@
 use super::{AnonymousLemma, Cas, Edge, EdgeIndex, LogicalId, Undo, Vertex, VertexKind};
 use crate::budget::{Budget, BudgetKind};
 use crate::enclosure::lc_root::{Candidate, Request, candidate_bytes};
-use crate::graph::{Handle, NodeIndex, size, storage_check};
+use crate::graph::{Handle, NodeIndex, StoredKey, size, storage_check};
 use crate::{Fault, InvalidCode, Location};
 use std::sync::Arc;
 
@@ -26,26 +26,37 @@ pub(crate) struct LcRootLemma {
 
 impl Cas {
     /// Authenticate the receipt against the live graph and actual checked-evidence edge.
-    pub(crate) fn lc_root_request(&self, handle: &Handle) -> Result<&Request, Fault> {
-        Ok(&self.lc_root_node(handle)?.candidate.original)
+    pub(crate) fn lc_root_request(
+        &self,
+        handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<&Request, Fault> {
+        Ok(&self.lc_root_node(handle, budget)?.candidate.original)
     }
 
     /// Borrow the portable checked transcript after authenticating its durable owner.
-    pub(crate) fn lc_root_wire(&self, handle: &Handle) -> Result<&[u8], Fault> {
-        Ok(&self.lc_root_node(handle)?.key[2..])
+    pub(crate) fn lc_root_wire(
+        &self,
+        handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<&[u8], Fault> {
+        Ok(&self.lc_root_node(handle, budget)?.key[2..])
     }
 
     /// A rolled-back graph handle never acquires authority from a canonical key.
-    fn lc_root_node(&self, handle: &Handle) -> Result<&LcRootLemma, Fault> {
-        let id = self.checked(handle)?;
-        let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+    fn lc_root_node(&self, handle: &Handle, budget: &mut Budget) -> Result<&LcRootLemma, Fault> {
+        let id = self.checked(handle, budget)?;
+        let Vertex::AnonymousLemma(node) = self.state.node(id, budget)? else {
             return Err(invalid());
         };
         let AnonymousLemma::LcRoot(node) = node.as_ref() else {
             return Err(invalid());
         };
-        let source = self.state.indices[&self.checked(&node.candidate.original.targets[0])?];
-        let target = self.state.indices[&id];
+        let source = self.state.index(
+            self.checked(&node.candidate.original.targets[0], budget)?,
+            budget,
+        )?;
+        let target = self.state.index(id, budget)?;
         if self.state.graph.edge_endpoints(node.citation) != Some((source, target))
             || !matches!(
                 self.state.graph.edge_weight(node.citation),
@@ -95,13 +106,16 @@ impl Cas {
         key.push(6);
         key.extend_from_slice(wire);
         let key: Arc<[u8]> = key.into();
-        budget.with_work_phase("lc-root", "lookup", |budget| {
-            budget.work((key.len() as u64).saturating_add(1), AT)
+        let floor = size(key.len(), AT)?
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
+        let existing = budget.with_work_phase("lc-root", "lookup", |budget| {
+            self.state.intern.get(key.as_ref(), floor, budget, AT)
         })?;
-        if let Some(id) = self.state.intern.get(key.as_ref()).copied() {
+        if let Some(id) = existing.copied() {
             budget.check(BudgetKind::OutputBytes, self.state.judgment_bytes, AT)?;
             let handle = self.handle(id);
-            if self.lc_root_request(&handle)? != &candidate.original {
+            if self.lc_root_request(&handle, budget)? != &candidate.original {
                 return Err(invalid());
             }
             return Ok(handle);
@@ -113,8 +127,18 @@ impl Cas {
             .map_err(|_| Fault::allocation(AT))?;
         for handle in candidate.original.handles() {
             budget.work(1, AT)?;
-            dependencies.push(self.state.indices[&self.checked(handle)?]);
+            dependencies.push(self.state.index(self.checked(handle, budget)?, budget)?);
         }
+        let source = self
+            .state
+            .index(candidate.original.targets[0].logical_id(), budget)?;
+        let stored_key: StoredKey = Arc::clone(&key).into();
+        let (intern_position, _inverse_credit) = self.state.intern.prepare_insert_key(
+            &stored_key,
+            self.state.journal.is_some(),
+            budget,
+            AT,
+        )?;
         let serial = self
             .token
             .identities
@@ -123,17 +147,38 @@ impl Cas {
             kind: VertexKind::AnonymousLemma,
             serial,
         };
+        let index_position = self.state.prepare_index_insert(id, budget)?;
+        let (count_position, next_count) = self
+            .state
+            .prepare_retain(VertexKind::AnonymousLemma, budget)?;
         self.state.record(Undo::Vertex {
             id,
             key: Some(Arc::clone(&key).into()),
             policy: None,
         })?;
-        append(self, id, candidate, key, dependencies, bytes, slots);
+        append(
+            self,
+            id,
+            candidate,
+            key,
+            dependencies,
+            bytes,
+            slots,
+            intern_position,
+            index_position,
+            count_position,
+            next_count,
+            source,
+        );
         Ok(self.handle(id))
     }
 }
 
 /// Transfer the preflighted payload and dependencies with no fallible suffix.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the preflight plan supplies twelve fixed publication values"
+)]
 fn append(
     cas: &mut Cas,
     id: LogicalId,
@@ -142,9 +187,13 @@ fn append(
     dependencies: Vec<NodeIndex<u32>>,
     bytes: u64,
     slots: u32,
+    intern_position: usize,
+    index_position: usize,
+    count_position: usize,
+    next_count: u64,
+    source: NodeIndex<u32>,
 ) {
     let citation = EdgeIndex::new(cas.state.graph.edge_count() + dependencies.len());
-    let source = cas.state.indices[&candidate.original.targets[0].logical_id()];
     let index = cas
         .state
         .graph
@@ -170,9 +219,12 @@ fn append(
     cas.state
         .graph
         .add_edge(source, index, Edge::CheckedEvidence);
-    cas.state.indices.insert(id, index);
-    cas.state.intern.insert_key(key.into(), id, &cas.token);
-    cas.state.retain(VertexKind::AnonymousLemma);
+    cas.state.indices.insert_prepared(index_position, id, index);
+    cas.state
+        .intern
+        .insert_prepared_key(intern_position, key.into(), id, &cas.token);
+    cas.state
+        .retain_prepared(VertexKind::AnonymousLemma, count_position, next_count);
     cas.state.payload = cas.state.payload.saturating_add(bytes);
     cas.state.judgment_bytes = cas.state.judgment_bytes.saturating_add(bytes);
     cas.state.judgment_count += 1;

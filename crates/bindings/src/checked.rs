@@ -192,7 +192,7 @@ impl CheckedExpression {
             .receipt;
         Ok(Request {
             task: Task::Equal {
-                domain: cas.admissible_region(context)?,
+                domain: cas.admissible_region(context, &mut ledger)?,
                 domain_contract: DomainContract::DefinedAndEqual,
             },
             context: context.clone(),

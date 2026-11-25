@@ -377,7 +377,7 @@ fn correspondence(
         let exponential = root.first().ok_or(PreparedExpm1Error::Domain)?;
         let operands = cas.operands(exponential, b)?;
         let argument = operands.first().ok_or(PreparedExpm1Error::Domain)?;
-        let (Operator::Rational(value), _) = cas.expression(argument)? else {
+        let (Operator::Rational(value), _) = cas.expression(argument, b)? else {
             return Err(PreparedExpm1Error::Domain);
         };
         if &lower != value || &upper != value {

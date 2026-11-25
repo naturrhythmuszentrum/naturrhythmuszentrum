@@ -48,9 +48,12 @@ fn parse_bounded<'a>(
         position: 0,
     };
     let id = cas
-        .checked(declarations)
+        .checked(declarations, budget)
         .map_err(|fault| input.fault(fault))?;
-    let header = cas.state.header(id).map_err(|fault| input.fault(fault))?;
+    let header = cas
+        .state
+        .header(id, budget)
+        .map_err(|fault| input.fault(fault))?;
     let mut parser = Parser {
         input,
         environment: &header.environment,

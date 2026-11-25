@@ -18,10 +18,13 @@ pub(crate) fn certificate(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<RegularCertificate, Fault> {
-    let definition = cas.state.space(cas.checked(space)?)?.clone();
+    let definition = cas
+        .state
+        .space(cas.checked(space, budget)?, budget)?
+        .clone();
     let domain = cas.handle(definition.domain);
     crate::boundary_partition::inventory(cas, function, &domain, budget)?;
-    let root = cas.checked(function)?;
+    let root = cas.checked(function, budget)?;
     let analysis = crate::case_cells::analyze(cas, root, root, definition.domain, budget)?;
     let polynomials =
         analysis.polynomial_cells(cas, root, definition.domain, &definition.coordinate, budget)?;
@@ -102,7 +105,9 @@ pub(crate) fn check(
                 return Err(invalid());
             }
             evidence(function, space, premises)?;
-            let value = cas.state.expression(cas.checked(embedding)?)?;
+            let value = cas
+                .state
+                .expression(cas.checked(embedding, budget)?, budget)?;
             if value.operator != Operator::RegularEmbed || value.operands != [function.logical_id()]
             {
                 return Err(invalid());
@@ -130,10 +135,10 @@ pub(crate) fn polynomial(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<Vec<crate::number::Rational>, Fault> {
-    let definition = cas.state.space(cas.checked(space)?)?;
+    let definition = cas.state.space(cas.checked(space, budget)?, budget)?;
     crate::polynomial::univariate(
         &cas.state,
-        cas.checked(function)?,
+        cas.checked(function, budget)?,
         &definition.coordinate,
         budget,
     )
@@ -149,7 +154,10 @@ fn action(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.specialized(crate::budget::BudgetKind::PairingSteps, 1, true, AT)?;
-    let pair = cas.state.expression(cas.checked(pairing)?)?.clone();
+    let pair = cas
+        .state
+        .expression(cas.checked(pairing, budget)?, budget)?
+        .clone();
     let [distribution, test] = pair.operands.as_slice() else {
         return Err(invalid());
     };
@@ -158,11 +166,11 @@ fn action(
     }
     crate::distribution_check::membership(cas, *distribution, space, premises, budget)?;
     crate::distribution_check::test(cas, *test, space, budget)?;
-    let regular = cas.state.expression(*distribution)?;
+    let regular = cas.state.expression(*distribution, budget)?;
     let [function] = regular.operands.as_slice() else {
         return Err(invalid());
     };
-    let output = cas.state.expression(cas.checked(value)?)?;
+    let output = cas.state.expression(cas.checked(value, budget)?, budget)?;
     if regular.operator != Operator::RegularEmbed
         || output.operator != Operator::RegularAction
         || output.operands != [*function, *test]

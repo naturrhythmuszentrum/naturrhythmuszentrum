@@ -107,7 +107,7 @@ fn certified_unit_coefficient_refusal_is_atomic() -> TestResult {
         exact.mul(&exact, &mut setup)?,
     ]
     .into_iter()
-    .zip([77_332, 132_027, 88_997])
+    .zip([77_482, 132_193, 89_135])
     {
         let definition = Rc::new(ExactCoefficient::new(
             &Descriptor::ratio(),
@@ -153,7 +153,7 @@ fn boundaries<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
     let context = ArithmeticContext::new()?;
     let circle = pi::<P>(&context, &mut Budget::new(Limits::default())?)?;
     let exact = Limits {
-        work: 28_132,
+        work: 28_197,
         staged_payload_bytes: staged,
         output_bytes: output,
         ..Limits::default()
@@ -182,13 +182,13 @@ fn boundaries<P: Scalar + 'static>(staged: u64, output: u64) -> TestResult {
         );
         if resource == 3 {
             let coefficient = result?;
-            assert_eq!(coefficient.work_used(), 28_115);
+            assert_eq!(coefficient.work_used(), 28_180);
             assert_eq!(u64::try_from(coefficient.owned_bytes())?, output);
-            assert_eq!(budget.usage().work, 28_132);
+            assert_eq!(budget.usage().work, 28_197);
             assert!(coefficient.same_region(&coefficient.clone()));
         } else {
             assert!(result.is_err());
-            let spent = if resource == 0 { 28_113 } else { 0 };
+            let spent = if resource == 0 { 28_178 } else { 0 };
             assert_eq!(budget.usage().work, before.work + spent);
         }
     }
@@ -212,7 +212,7 @@ fn certified_unit_failed_lowering_exhausts_parent_after_pi_success() -> TestResu
     let circle = pi::<f64>(&context, &mut budget)?;
     assert_eq!(budget.usage().work, 2072);
     let retained = circle.clone();
-    for expected in [30_182, 58_292, 58_292] {
+    for expected in [30_247, 58_091, 58_098] {
         let result = CertifiedCoefficient::new(
             &definition,
             &circle,
@@ -253,6 +253,6 @@ fn certified_unit_literal_construction_failure_retains_scan_work() -> TestResult
             nrz_scalar::ArithmeticFailure::ResourceLimit
         ))
     ));
-    assert_eq!(budget.usage().work, 28_127);
+    assert_eq!(budget.usage().work, 28_192);
     Ok(())
 }

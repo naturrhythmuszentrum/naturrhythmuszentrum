@@ -16,7 +16,10 @@ fn lc_driven_continuation_revalidates_selected_inputs() -> TestResult {
 fn stale<P: Scalar + 'static>() -> TestResult {
     for companion in [false, true] {
         let mut case = setup::<P>(false)?;
-        execute(&mut case, &mut crate::phasor_solve_testing::budget()?)?;
+        execute(
+            &mut case,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+        )?;
         let source = &case.sources[0][if companion { 3 } else { 0 }];
         if companion {
             let values = case.heap.reading_companion_entries(source, 4)?;
@@ -62,7 +65,10 @@ fn refused<P: Scalar + 'static>() -> TestResult {
     let values = case.heap.reading_entries(source)?;
     case.heap
         .replace_reading_entries(source, &values, &mut ledger()?)?;
-    execute(&mut case, &mut crate::phasor_solve_testing::budget()?)?;
+    execute(
+        &mut case,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+    )?;
     assert_eq!(case.batch.point_keys().collect::<Vec<_>>(), [41, 9, 73]);
     assert_eq!(
         case.batch.statuses(1),

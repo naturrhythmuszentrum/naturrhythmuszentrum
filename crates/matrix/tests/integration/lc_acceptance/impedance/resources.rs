@@ -10,7 +10,7 @@ use nrz_scalar::Scalar;
 #[test]
 fn lc_original_driven_publication_work_boundaries() -> TestResult {
     let work = [measured::<f32>()?, measured::<f64>()?];
-    assert_eq!(work, [[9_602, 7_184_906], [9_602, 7_184_906]]);
+    assert_eq!(work, [[9_602, 7_185_331], [9_602, 7_185_331]]);
     twins::<f32>(work[0][0])?;
     twins::<f64>(work[1][0])
 }

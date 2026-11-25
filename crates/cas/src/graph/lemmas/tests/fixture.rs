@@ -182,7 +182,7 @@ fn machin(cas: &mut Cas, pi: &Handle, budget: &mut Budget) -> Result<(), Fault> 
         synchronized(cas, budget, |budget| {
             atomic(cas, budget, |budget| {
                 retained(cas, budget, |budget| {
-                    validate_pi(cas, cas.checked(pi)?, &certificate, budget).map(|_| ())
+                    validate_pi(cas, cas.checked(pi, budget)?, &certificate, budget).map(|_| ())
                 })
             })
         })

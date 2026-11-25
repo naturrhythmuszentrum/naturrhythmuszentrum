@@ -93,8 +93,10 @@ impl From<std::sync::Arc<[u8]>> for StoredKey {
 #[cfg(test)]
 mod tests {
     use super::StoredKey;
+    use crate::error::Location;
     use crate::graph::intern::{InternIndex, StoreToken};
     use crate::graph::{LogicalId, VertexKind};
+    use crate::testing::common::{TestResult, default_budget};
     use std::sync::Arc;
 
     /// Large immutable bytes have one owner allocation across inventory, index and journal.
@@ -103,23 +105,26 @@ mod tests {
     /// ´claim:cas:prepared-expm1-shared-key´
     /// ´test:unit:prepared-expm1-shared-key´
     #[test]
-    fn prepared_expm1_shared_key() {
+    fn prepared_expm1_shared_key() -> TestResult {
         let inventory: Arc<[u8]> = vec![5; 65_536].into();
         let mut index = InternIndex::default();
         let id = LogicalId {
             kind: VertexKind::AnonymousLemma,
             serial: 0,
         };
-        index.insert_key(
-            Arc::clone(&inventory).into(),
-            id,
-            &Arc::new(StoreToken::default()),
-        );
+        let stored: StoredKey = Arc::clone(&inventory).into();
+        let at = Location::new("prepared expm1 shared key test");
+        let (position, _) = index.prepare_insert_key(&stored, false, &mut default_budget()?, at)?;
+        index.insert_prepared_key(position, stored, id, &Arc::new(StoreToken::default()));
         let journal: StoredKey = Arc::clone(&inventory).into();
         assert_eq!(Arc::strong_count(&inventory), 3);
         assert_eq!(journal.parts()[0].as_ptr(), inventory.as_ptr());
-        assert_eq!(index.get(&inventory), Some(&id));
+        assert_eq!(
+            index.get(&inventory, 0, &mut default_budget()?, at)?,
+            Some(&id)
+        );
         drop(journal);
         assert_eq!(Arc::strong_count(&inventory), 2);
+        Ok(())
     }
 }

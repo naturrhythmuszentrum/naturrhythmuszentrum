@@ -159,7 +159,7 @@ pub(crate) fn term(
     operands: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let source = cas.state.expression(model)?;
+    let source = cas.state.expression(model, budget)?;
     if !source.scope.is_empty() {
         return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
     }

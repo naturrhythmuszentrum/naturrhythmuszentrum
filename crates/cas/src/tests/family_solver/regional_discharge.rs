@@ -22,7 +22,12 @@ fn ledger() -> TestResult<Budget> {
 
 /// Preserve the exact mixed family, original base stratum and parameter declaration.
 fn guard(fixture: &mut Fixture, base: &Handle, subject: &Handle) -> TestResult<(Handle, Handle)> {
-    let original = fixture.cas.state.region(base.logical_id())?.clone();
+    let mut budget = crate::testing::common::default_budget()?;
+    let original = fixture
+        .cas
+        .state
+        .region(base.logical_id(), &mut budget)?
+        .clone();
     let over = original.lies_over.ok_or("original family")?;
     let predicate = admit(
         &mut fixture.cas,
@@ -145,8 +150,11 @@ fn covering(
 
 /// Build a bounded local use inside the original family's checked positive covering region.
 fn setup() -> TestResult<(Fixture, Handle, Handle, Vec<ApplicationDraft>)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request) = super::request(2)?;
-    let ambient = fixture.cas.admissible_region(&request.context)?;
+    let ambient = fixture
+        .cas
+        .admissible_region(&request.context, &mut budget)?;
     let subject = fixture.real.clone();
     let (positive, predicate) = guard(&mut fixture, &ambient, &subject)?;
     let cover = interval(&mut fixture, &positive, 0, 3)?;
@@ -170,7 +178,7 @@ fn setup() -> TestResult<(Fixture, Handle, Handle, Vec<ApplicationDraft>)> {
             }],
         }),
     )?;
-    let domain = fixture.cas.admissible_region(&local)?;
+    let domain = fixture.cas.admissible_region(&local, &mut budget)?;
     let proposals = discharge_steps(&context, &local, &cover, &domain, &predicate, &subject);
     Ok((fixture, context, ambient, proposals))
 }

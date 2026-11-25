@@ -107,11 +107,11 @@ impl IntegerDecisionCase {
             .ok_or(DecisionError::Capacity)?;
         storage::retained(bytes, budget)?;
         budget.work(bytes, storage::AT)?;
-        let expected_domain = cas.admissible_region(&specification.context)?;
+        let expected_domain = cas.admissible_region(&specification.context, budget)?;
         if expected_domain != specification.family.domain {
             return Err(DecisionError::Case);
         }
-        let header = cas.context_header(&specification.context)?;
+        let header = cas.context_header(&specification.context, budget)?;
         for node in [
             &specification.family.function,
             &specification.family.coordinate,
@@ -125,7 +125,7 @@ impl IntegerDecisionCase {
         }
         for parameter in &specification.parameters {
             let syntax = cas.describe_syntax(parameter, budget)?;
-            let (operator, sort) = cas.expression(parameter)?;
+            let (operator, sort) = cas.expression(parameter, budget)?;
             let integer = matches!(operator, Operator::Rational(number) if number.is_integer());
             if syntax.header != header
                 || !syntax.scope.is_empty()

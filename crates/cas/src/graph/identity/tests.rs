@@ -59,6 +59,7 @@ const AT: Location = Location::new("logical identity control");
 /// ´test:unit:logical-identity-every-namespace´
 #[test]
 fn logical_identity_every_namespace() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut cas = Cas::new(Limits::default())?;
     let before = cas.counts();
     for attempt in 0..3_u64 {
@@ -77,7 +78,7 @@ fn logical_identity_every_namespace() -> TestResult {
         assert_eq!(result.as_ref(), Err(&fault));
         assert_eq!(ledger.usage().work, 512);
         assert_eq!(cas.counts(), before);
-        assert_eq!(cas.state.proof_count(), 0);
+        assert_eq!(cas.state.proof_count(&mut budget)?, 0);
     }
     for kind in KINDS {
         assert_eq!(cas.token.identities.reserve(kind, 1, AT)?, 3);
@@ -110,6 +111,7 @@ fn logical_identity_counter_boundary() -> TestResult {
 /// ´test:unit:logical-identity-exhausted-admission´
 #[test]
 fn logical_identity_exhausted_admission() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut cas = Cas::new(Limits::default())?;
     let prefix = source(&mut cas, "prefix")?;
     cas.token
@@ -148,7 +150,10 @@ fn logical_identity_exhausted_admission() -> TestResult {
         Fault::capacity(BudgetKind::Vertices, Location::new("vertex admission"))
     );
     assert_eq!(
-        cas.checked(&stale).err().ok_or("stale identity")?.kind,
+        cas.checked(&stale, &mut budget)
+            .err()
+            .ok_or("stale identity")?
+            .kind,
         FaultKind::Invalid(InvalidCode::Reference)
     );
     assert_eq!(source(&mut cas, "prefix")?, prefix);
@@ -160,6 +165,7 @@ fn logical_identity_exhausted_admission() -> TestResult {
 /// ´test:unit:logical-identity-divergent-test-copies´
 #[test]
 fn logical_identity_divergent_test_copies() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut cas = Cas::new(Limits::default())?;
     let prefix = source(&mut cas, "prefix")?;
     let mut copy = cas.full_copy_for_test();
@@ -167,13 +173,22 @@ fn logical_identity_divergent_test_copies() -> TestResult {
     let right = source(&mut copy, "same content")?;
     assert_ne!(left, right);
     assert!(right.logical_id().serial > left.logical_id().serial);
-    assert_eq!(cas.source(&left)?, copy.source(&right)?);
     assert_eq!(
-        cas.checked(&right).err().ok_or("copy collision")?.kind,
+        cas.source(&left, &mut budget)?,
+        copy.source(&right, &mut budget)?
+    );
+    assert_eq!(
+        cas.checked(&right, &mut budget)
+            .err()
+            .ok_or("copy collision")?
+            .kind,
         FaultKind::Invalid(InvalidCode::Reference)
     );
     assert_eq!(
-        copy.checked(&left).err().ok_or("original collision")?.kind,
+        copy.checked(&left, &mut budget)
+            .err()
+            .ok_or("original collision")?
+            .kind,
         FaultKind::Invalid(InvalidCode::Reference)
     );
     assert_eq!(source(&mut cas, "prefix")?, prefix);
@@ -220,6 +235,7 @@ fn logical_identity_fixed_width_keys() -> TestResult {
 /// ´test:unit:logical-identity-nested-lifetimes´
 #[test]
 fn logical_identity_nested_lifetimes() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     for inner_refusal in [false, true] {
         let mut cas = Cas::new(Limits::default())?;
         let prefix = source(&mut cas, "prefix")?;
@@ -269,10 +285,10 @@ fn logical_identity_nested_lifetimes() -> TestResult {
                 assert_eq!(cas.canonical_snapshot(&mut default_budget()?)?, before);
             }
             assert_eq!(source(&mut cas, "prefix")?, clone);
-            assert_eq!(cas.source(&prefix)?, ("prefix", "prefix"));
+            assert_eq!(cas.source(&prefix, &mut budget)?, ("prefix", "prefix"));
             for stale in &discarded {
                 assert_eq!(
-                    cas.checked(stale)
+                    cas.checked(stale, &mut budget)
                         .err()
                         .ok_or("discarded suffix survived")?
                         .kind,
@@ -290,7 +306,7 @@ fn logical_identity_nested_lifetimes() -> TestResult {
             assert_ne!(stale, &different);
             assert!(same.logical_id().serial > stale.logical_id().serial);
             assert_eq!(
-                cas.checked(stale)
+                cas.checked(stale, &mut budget)
                     .err()
                     .ok_or("discarded suffix reincarnated")?
                     .kind,

@@ -29,8 +29,8 @@ impl<'a> Builder<'a> {
         spec: &AxisPhaseSpec,
         budget: &mut Budget,
     ) -> Result<Self, DecisionError> {
-        let header = cas.context_header(&spec.context)?;
-        let domain = cas.admissible_region(&spec.context)?;
+        let header = cas.context_header(&spec.context, budget)?;
+        let domain = cas.admissible_region(&spec.context, budget)?;
         let syntax = cas.describe_syntax(&domain, budget)?;
         let nrz_cas::source::SyntaxNode::Region(
             ambient,

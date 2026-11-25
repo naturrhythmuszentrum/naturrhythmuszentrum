@@ -8,7 +8,7 @@ use crate::graph::{Draft, Handle, Reference, Vertex};
 use crate::model::PredicateKind;
 use crate::proof_model::{DomainContract, GuardedObligation, Judgment, Statement};
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture, admit, budget, predicate};
+use crate::testing::native::{Fixture, admit, predicate};
 
 struct Input {
     f: Fixture,
@@ -37,6 +37,7 @@ fn meet(f: &mut Fixture, members: &[Handle]) -> TestResult<Handle> {
 }
 
 fn input(depth: usize) -> TestResult<Input> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = Fixture::new()?;
     let p = predicate(
         &mut f.cas,
@@ -65,7 +66,7 @@ fn input(depth: usize) -> TestResult<Input> {
         frames.push(frame);
     }
     let context = frames.last().ok_or("missing frame")?.clone();
-    let domain = f.cas.admissible_region(&context)?;
+    let domain = f.cas.admissible_region(&context, &mut budget)?;
     let claim = Judgment {
         context: context.clone(),
         layer: Layer::Pointwise,
@@ -94,22 +95,36 @@ fn input(depth: usize) -> TestResult<Input> {
 }
 
 fn supported(i: &Input) -> TestResult {
-    let result = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)?;
+    let result = crate::proof_view::scalar_claim(
+        &i.f.cas,
+        &i.claim,
+        &mut crate::testing::native::fresh_budget()?,
+    )?;
     assert_eq!(result.residuals.len(), 1);
     assert_eq!(result.residuals[0].term, i.f.x);
     Ok(())
 }
 
 fn unsupported(i: &Input) -> TestResult {
-    let before = i.f.cas.canonical_snapshot(&mut budget()?)?;
-    let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)
-        .expect_err("unsupported region");
+    let before =
+        i.f.cas
+            .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?;
+    let fault = crate::proof_view::scalar_claim(
+        &i.f.cas,
+        &i.claim,
+        &mut crate::testing::native::fresh_budget()?,
+    )
+    .expect_err("unsupported region");
     assert_eq!(
         fault.kind,
         FaultKind::Invalid(InvalidCode::ScalarTransportUnsupported)
     );
     assert_eq!(fault.location.operation, "scalar guarded-region transport");
-    assert_eq!(i.f.cas.canonical_snapshot(&mut budget()?)?, before);
+    assert_eq!(
+        i.f.cas
+            .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?,
+        before
+    );
     Ok(())
 }
 
@@ -135,6 +150,7 @@ fn scalar_transport_ancestor_meets() -> TestResult {
 /// ´test:crate:scalar-transport-unrecognized-members´
 #[test]
 fn scalar_transport_unrecognized_members() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     for kind in 0..6 {
         let mut i = input(2)?;
         let m = i.claim.residuals[0].region.clone();
@@ -164,7 +180,7 @@ fn scalar_transport_unrecognized_members() -> TestResult {
                         hypotheses: vec![],
                     }),
                 )?;
-                let sibling = i.f.cas.admissible_region(&sibling)?;
+                let sibling = i.f.cas.admissible_region(&sibling, &mut budget)?;
                 meet(&mut i.f, &[m, sibling])?
             }
         };
@@ -177,15 +193,24 @@ fn scalar_transport_unrecognized_members() -> TestResult {
 /// ´test:crate:scalar-transport-chain-authority´
 #[test]
 fn scalar_transport_chain_authority() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     for sever in [false, true] {
         let mut i = input(2)?;
         let m = i.claim.residuals[0].region.clone();
         let d = i.f.domain.clone();
         i.claim.residuals[0].region = meet(&mut i.f, &[m, d])?;
         supported(&i)?;
-        let id = i.f.cas.checked(i.frames.last().ok_or("missing frame")?)?;
-        let index = i.f.cas.state.indices[&id];
-        let root = i.f.cas.checked(&i.f.context)?;
+        let id =
+            i.f.cas
+                .checked(i.frames.last().ok_or("missing frame")?, &mut budget)?;
+        let index =
+            i.f.cas
+                .state
+                .indices
+                .peek(&id)
+                .copied()
+                .ok_or("index missing")?;
+        let root = i.f.cas.checked(&i.f.context, &mut budget)?;
         let Vertex::Context(frame) = &mut i.f.cas.state.graph[index] else {
             return Err("context category".into());
         };
@@ -199,6 +224,7 @@ fn scalar_transport_chain_authority() -> TestResult {
 /// ´test:crate:scalar-transport-lower-chain´
 #[test]
 fn scalar_transport_lower_chain() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut i = input(0)?;
     i.f.header = admit(
         &mut i.f.cas,
@@ -239,10 +265,13 @@ fn scalar_transport_lower_chain() -> TestResult {
         )?;
         i.frames.push(frame);
     }
-    let d = i.f.cas.admissible_region(&i.frames[1])?;
-    let m = i.f.cas.admissible_region(&i.frames[2])?;
+    let d = i.f.cas.admissible_region(&i.frames[1], &mut budget)?;
+    let m = i.f.cas.admissible_region(&i.frames[2], &mut budget)?;
     assert_ne!(
-        i.f.cas.state.region(i.f.domain.logical_id())?.header,
+        i.f.cas
+            .state
+            .region(i.f.domain.logical_id(), &mut budget)?
+            .header,
         i.f.header.logical_id()
     );
     i.claim.context = i.frames[2].clone();
@@ -264,10 +293,11 @@ fn scalar_transport_lower_chain() -> TestResult {
 /// ´test:crate:scalar-transport-edge-exclusions´
 #[test]
 fn scalar_transport_edge_exclusions() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     for kind in 0..4 {
         let mut i = input(2)?;
         let m = i.claim.residuals[0].region.clone();
-        let d = i.f.cas.admissible_region(&i.frames[1])?;
+        let d = i.f.cas.admissible_region(&i.frames[1], &mut budget)?;
         i.claim.residuals[0].region = match kind {
             0 => region(
                 &mut i.f,
@@ -284,7 +314,13 @@ fn scalar_transport_edge_exclusions() -> TestResult {
         };
         if kind >= 2 {
             supported(&i)?;
-            let index = i.f.cas.state.indices[&d.logical_id()];
+            let index =
+                i.f.cas
+                    .state
+                    .indices
+                    .peek(&d.logical_id())
+                    .copied()
+                    .ok_or("index missing")?;
             let Vertex::Region(value) = &mut i.f.cas.state.graph[index] else {
                 return Err("region".into());
             };
@@ -308,13 +344,19 @@ fn scalar_transport_parent_prepayment() -> TestResult {
     for malformed in [false, true] {
         let mut i = measured_input(1)?;
         if malformed {
-            let index = i.f.cas.state.indices[&i.frames[1].logical_id()];
+            let index =
+                i.f.cas
+                    .state
+                    .indices
+                    .peek(&i.frames[1].logical_id())
+                    .copied()
+                    .ok_or("index missing")?;
             let Vertex::Context(frame) = &mut i.f.cas.state.graph[index] else {
                 return Err("frame".into());
             };
             frame.parent = Some(i.f.x.logical_id());
         }
-        let mut limits = budget()?.limits().clone();
+        let mut limits = crate::testing::native::fresh_budget()?.limits().clone();
         limits.condition_steps = 1;
         let mut ledger = Budget::new(limits)?;
         let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut ledger)
@@ -329,8 +371,12 @@ fn scalar_transport_parent_prepayment() -> TestResult {
         assert_eq!(ledger.usage().condition_steps, 1);
         assert_eq!(fault.location.operation, "scalar guarded-region transport");
         if malformed {
-            let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)
-                .expect_err("parent category");
+            let fault = crate::proof_view::scalar_claim(
+                &i.f.cas,
+                &i.claim,
+                &mut crate::testing::native::fresh_budget()?,
+            )
+            .expect_err("parent category");
             assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
         }
     }
@@ -345,7 +391,7 @@ fn scalar_transport_depth_limit() -> TestResult {
     let m = i.claim.residuals[0].region.clone();
     let d = i.f.domain.clone();
     i.claim.residuals[0].region = meet(&mut i.f, &[m, d])?;
-    let mut limits = budget()?.limits().clone();
+    let mut limits = crate::testing::native::fresh_budget()?.limits().clone();
     limits.hypothesis_depth = 2;
     let mut ledger = Budget::new(limits)?;
     ledger.work(37, Location::new("prior scalar transport Work"))?;
@@ -367,6 +413,7 @@ fn scalar_transport_depth_limit() -> TestResult {
 /// ´test:crate:scalar-transport-projection-exclusion´
 #[test]
 fn scalar_transport_projection_exclusion() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     for position in 0..4 {
         let mut i = input(2)?;
         let m = i.claim.residuals[0].region.clone();
@@ -380,8 +427,14 @@ fn scalar_transport_projection_exclusion() -> TestResult {
             2 => d,
             _ => i.restriction.clone(),
         };
-        let id = i.f.cas.checked(&target)?;
-        let index = i.f.cas.state.indices[&id];
+        let id = i.f.cas.checked(&target, &mut budget)?;
+        let index =
+            i.f.cas
+                .state
+                .indices
+                .peek(&id)
+                .copied()
+                .ok_or("index missing")?;
         let Vertex::Region(value) = &mut i.f.cas.state.graph[index] else {
             return Err("region category".into());
         };
@@ -400,18 +453,26 @@ fn scalar_transport_projection_exclusion() -> TestResult {
 #[test]
 fn scalar_transport_identity_and_faults() -> TestResult {
     let mut i = input(1)?;
-    let mut ledger = budget()?;
+    let mut ledger = crate::testing::native::fresh_budget()?;
     ledger.work(37, Location::new("prior scalar transport Work"))?;
     let before = ledger.usage();
     crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut ledger)?;
     assert_eq!(ledger.usage(), before);
     i.claim.residuals[0].region = i.f.x.clone();
-    let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)
-        .expect_err("wrong region category");
+    let fault = crate::proof_view::scalar_claim(
+        &i.f.cas,
+        &i.claim,
+        &mut crate::testing::native::fresh_budget()?,
+    )
+    .expect_err("wrong region category");
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
     i.claim.residuals[0].predicate = i.f.x.clone();
-    let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)
-        .expect_err("old scalar category refusal");
+    let fault = crate::proof_view::scalar_claim(
+        &i.f.cas,
+        &i.claim,
+        &mut crate::testing::native::fresh_budget()?,
+    )
+    .expect_err("old scalar category refusal");
     assert_eq!(
         fault.kind,
         FaultKind::Invalid(InvalidCode::UnsupportedFragment)
@@ -424,6 +485,7 @@ fn scalar_transport_identity_and_faults() -> TestResult {
 /// ´test:crate:scalar-transport-formal-frame´
 #[test]
 fn scalar_transport_formal_frame() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut i = input(0)?;
     let lifted = admit(
         &mut i.f.cas,
@@ -444,17 +506,27 @@ fn scalar_transport_formal_frame() -> TestResult {
             hypotheses: vec![],
         }),
     )?;
-    assert_eq!(i.f.cas.admissible_region(&frame)?, lifted);
+    assert_eq!(i.f.cas.admissible_region(&frame, &mut budget)?, lifted);
     i.claim.context = frame;
-    let before = i.f.cas.canonical_snapshot(&mut budget()?)?;
-    let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)
-        .expect_err("formal conversion");
+    let before =
+        i.f.cas
+            .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?;
+    let fault = crate::proof_view::scalar_claim(
+        &i.f.cas,
+        &i.claim,
+        &mut crate::testing::native::fresh_budget()?,
+    )
+    .expect_err("formal conversion");
     assert_eq!(
         fault.kind,
         FaultKind::Invalid(InvalidCode::UnsupportedFragment)
     );
     assert_eq!(fault.location.operation, "closed context required");
-    assert_eq!(i.f.cas.canonical_snapshot(&mut budget()?)?, before);
+    assert_eq!(
+        i.f.cas
+            .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?,
+        before
+    );
     Ok(())
 }
 
@@ -484,8 +556,12 @@ fn scalar_transport_declaration_frame() -> TestResult {
         PredicateKind::NonZero,
         &[i.f.x.clone()],
     )?;
-    let fault = crate::proof_view::scalar_claim(&i.f.cas, &i.claim, &mut budget()?)
-        .expect_err("predicate declaration frame");
+    let fault = crate::proof_view::scalar_claim(
+        &i.f.cas,
+        &i.claim,
+        &mut crate::testing::native::fresh_budget()?,
+    )
+    .expect_err("predicate declaration frame");
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Context));
     Ok(())
 }
@@ -506,7 +582,7 @@ fn measured_input(kind: usize) -> TestResult<Input> {
 }
 
 fn attempt(i: &Input, resource: BudgetKind, amount: u64) -> TestResult<(bool, u64, u64)> {
-    let mut limits = budget()?.limits().clone();
+    let mut limits = crate::testing::native::fresh_budget()?.limits().clone();
     match resource {
         BudgetKind::Work => limits.work = amount,
         BudgetKind::StagedPayloadBytes => limits.staged_payload_bytes = amount,
@@ -516,13 +592,19 @@ fn attempt(i: &Input, resource: BudgetKind, amount: u64) -> TestResult<(bool, u6
     }
     let mut ledger = Budget::new(limits)?;
     ledger.work(37, Location::new("prior scalar transport Work"))?;
-    let before = i.f.cas.canonical_snapshot(&mut budget()?)?;
+    let before =
+        i.f.cas
+            .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?;
     let result = ledger.with_retained_payload(
         19,
         Location::new("prior scalar transport payload"),
         |ledger| crate::proof_view::scalar_claim(&i.f.cas, &i.claim, ledger),
     );
-    assert_eq!(i.f.cas.canonical_snapshot(&mut budget()?)?, before);
+    assert_eq!(
+        i.f.cas
+            .canonical_snapshot(&mut crate::testing::native::fresh_budget()?)?,
+        before
+    );
     let completed = match result {
         Ok(_) => true,
         Err(fault) if fault.kind == FaultKind::Invalid(InvalidCode::ScalarTransportUnsupported) => {
@@ -547,7 +629,7 @@ fn attempt(i: &Input, resource: BudgetKind, amount: u64) -> TestResult<(bool, u6
 #[test]
 fn scalar_transport_resource_boundaries() -> TestResult {
     // Complete scalar_claim operations include 37 prior Work and 19 live caller bytes.
-    // Identity schedules no entries: zero added Work, condition steps, depth or staging.
+    // Identity schedules no entries or additional Work.
     let exact = measured_input(0)?;
     for (resource, amount) in [
         (BudgetKind::Work, 37),

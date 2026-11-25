@@ -170,7 +170,11 @@ impl Runner<'_> {
         mode: &ActionMode,
         pair: &Handle,
     ) -> Result<(Primitive, Handle), Fault> {
-        let source = self.cas.state.expression(input.logical_id())?.clone();
+        let source = self
+            .cas
+            .state
+            .expression(input.logical_id(), self.generation)?
+            .clone();
         Ok(match source.operator {
             Operator::Delta { .. } => (
                 Primitive::DistDeltaPair,

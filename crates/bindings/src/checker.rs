@@ -889,7 +889,7 @@ impl<'a> State<'a> {
     fn relationship_value(&mut self, name: &str, depth: usize) -> Result<Value, Diagnostic> {
         let header = self
             .cas
-            .context_header(&self.context.semantic)
+            .context_header(&self.context.semantic, &mut self.budget)
             .map_err(|error| Diagnostic::declaration(error.into()))?;
         let mut source = Source {
             expression: Reference::Existing(header.clone()),

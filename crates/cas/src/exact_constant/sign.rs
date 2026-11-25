@@ -88,7 +88,7 @@ pub(crate) fn check(state: &State, root: LogicalId, budget: &mut Budget) -> Resu
     let mut facts = BTreeMap::new();
     let mut retained = 0_u64;
     for id in order(state, root, budget)? {
-        let term = state.expression(id)?;
+        let term = state.expression(id, budget)?;
         let previous = budget.reserve_temporary(retained, AT)?;
         let result = fact(&term.operator, &term.operands, &facts, budget);
         budget.restore_limits(previous);

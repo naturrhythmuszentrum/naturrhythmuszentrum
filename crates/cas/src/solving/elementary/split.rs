@@ -19,7 +19,7 @@ fn zero(
     expression: LogicalId,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let (kind, arguments) = super::evidence::predicate(cas, predicate)?;
+    let (kind, arguments) = super::evidence::predicate(cas, predicate, budget)?;
     let (PredicateKind::Equal, [left, right]) = (kind, arguments) else {
         return Ok(false);
     };
@@ -32,7 +32,7 @@ fn zero(
     };
     budget.work(1, AT)?;
     Ok(
-        matches!(&cas.state.expression(constant)?.operator, Operator::Rational(value) if value.is_zero()),
+        matches!(&cas.state.expression(constant, budget)?.operator, Operator::Rational(value) if value.is_zero()),
     )
 }
 
@@ -44,8 +44,10 @@ fn child(
     position: usize,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let region = cas.state.region(cas.checked(handle)?)?;
-    let source = cas.state.region(cas.checked(&certificate.region)?)?;
+    let region = cas.state.region(cas.checked(handle, budget)?, budget)?;
+    let source = cas
+        .state
+        .region(cas.checked(&certificate.region, budget)?, budget)?;
     if (&region.ambient, &region.scope, region.header)
         != (&source.ambient, &source.scope, source.header)
     {
@@ -64,7 +66,7 @@ fn child(
         if zero(cas, predicate, expression, budget)? && truth == (position == 0) {
             return Ok(());
         }
-        let (kind, arguments) = super::evidence::predicate(cas, predicate)?;
+        let (kind, arguments) = super::evidence::predicate(cas, predicate, budget)?;
         if position == 1 && truth && *kind == PredicateKind::NonZero && arguments == [expression] {
             return Ok(());
         }
@@ -73,13 +75,13 @@ fn child(
             return Ok(());
         }
     } else if truth {
-        let (kind, arguments) = super::evidence::predicate(cas, predicate)?;
+        let (kind, arguments) = super::evidence::predicate(cas, predicate, budget)?;
         if let (PredicateKind::Positive, [argument]) = (kind, arguments) {
             if position == 2 && *argument == expression {
                 return Ok(());
             }
             if position == 0 {
-                let term = cas.state.expression(*argument)?;
+                let term = cas.state.expression(*argument, budget)?;
                 if term.operator == Operator::Neg && term.operands == [expression] {
                     return Ok(());
                 }
@@ -116,8 +118,8 @@ fn eliminate(
     let SolveStatement::Coverage(coverage) = statement.as_ref() else {
         return Err(invalid());
     };
-    let original = super::proof::problem(cas, &coverage.problem)?;
-    super::proof::region(cas, &draft.context, original, &certificate.region)?;
+    let original = super::proof::problem(cas, &coverage.problem, budget)?;
+    super::proof::region(cas, &draft.context, original, &certificate.region, budget)?;
     super::member::contained(cas, &certificate.region, &original.region, budget)?;
     let Statement::Cover { domain, members } =
         &premise(premises, certificate.cover.ok_or_else(invalid)?)?
@@ -134,7 +136,7 @@ fn eliminate(
         return Err(invalid());
     }
     let SolveDraft::SolutionSet(target) =
-        crate::solving::graph::object(&cas.state, cas.checked(&coverage.set)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(&coverage.set, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -155,7 +157,7 @@ fn eliminate(
         }
         closed_region(cas, &part.region, region, budget)?;
         let SolveDraft::SolutionSet(set) =
-            crate::solving::graph::object(&cas.state, cas.checked(&part.set)?)?
+            crate::solving::graph::object(&cas.state, cas.checked(&part.set, budget)?, budget)?
         else {
             return Err(invalid());
         };
@@ -205,9 +207,13 @@ pub(crate) fn check(
     }
     let expression = cas
         .state
-        .expression(cas.checked(&certificate.expression)?)?;
-    let region = cas.state.region(cas.checked(&certificate.region)?)?;
-    let context = cas.state.context(cas.checked(&draft.context)?)?;
+        .expression(cas.checked(&certificate.expression, budget)?, budget)?;
+    let region = cas
+        .state
+        .region(cas.checked(&certificate.region, budget)?, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
     if (expression.header, &expression.scope, context.admissible)
         != (
             region.header,
@@ -256,7 +262,8 @@ fn closed_region(
     if proved == child {
         return Ok(());
     }
-    let RegionExpr::Meet(members) = &cas.state.region(proved.logical_id())?.expression else {
+    let RegionExpr::Meet(members) = &cas.state.region(proved.logical_id(), budget)?.expression
+    else {
         return Err(invalid());
     };
     if !members.contains(&child.logical_id()) {
@@ -282,8 +289,8 @@ fn empty(
     let SolveStatement::Coverage(coverage) = statement.as_ref() else {
         return Err(invalid());
     };
-    let original = super::proof::problem(cas, &coverage.problem)?;
-    super::proof::region(cas, &draft.context, original, &certificate.region)?;
+    let original = super::proof::problem(cas, &coverage.problem, budget)?;
+    super::proof::region(cas, &draft.context, original, &certificate.region, budget)?;
     super::member::contained(cas, &certificate.region, &original.region, budget)?;
     let proof = premise(premises, certificate.cover.ok_or_else(invalid)?)?;
     let Statement::Empty { region } = &proof.judgment.statement else {
@@ -301,7 +308,7 @@ fn empty(
         return Err(invalid());
     }
     let SolveDraft::SolutionSet(set) =
-        crate::solving::graph::object(&cas.state, cas.checked(&coverage.set)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(&coverage.set, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -310,7 +317,7 @@ fn empty(
     }
     let branch = set.branches.first().ok_or_else(invalid)?;
     let SolveDraft::SolutionBranch(branch) =
-        crate::solving::graph::object(&cas.state, cas.checked(branch)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(branch, budget)?, budget)?
     else {
         return Err(invalid());
     };

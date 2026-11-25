@@ -96,7 +96,8 @@ fn header(
         });
     }
     let draft = if let Some(parent) = parent {
-        let previous = cas.state.header(cas.checked(&parent)?)?;
+        let parent_id = cas.checked(&parent, reader.budget)?;
+        let previous = cas.state.header(parent_id, reader.budget)?;
         if previous.environment.field != environment.field
             || previous.environment.branch != environment.branch
         {
@@ -114,7 +115,8 @@ fn header(
         HeaderDraft::Core(environment)
     };
     let handle = admit(cas, Draft::Header(draft), reader)?;
-    let actual = &cas.state.header(cas.checked(&handle)?)?.scalar_spaces;
+    let handle_id = cas.checked(&handle, reader.budget)?;
+    let actual = &cas.state.header(handle_id, reader.budget)?.scalar_spaces;
     if !actual
         .iter()
         .copied()
@@ -251,9 +253,10 @@ fn context(
         _ => return Err(invalid()),
     };
     let value = admit(cas, Draft::Context(draft), reader)?;
-    let context = cas.state.context(cas.checked(&value)?)?;
-    if context.header_id != cas.checked(&header)?
-        || context.admissible != cas.checked(&admissible)?
+    let value_id = cas.checked(&value, reader.budget)?;
+    let context = cas.state.context(value_id, reader.budget)?;
+    if context.header_id != cas.checked(&header, reader.budget)?
+        || context.admissible != cas.checked(&admissible, reader.budget)?
     {
         return Err(invalid());
     }
@@ -320,15 +323,16 @@ pub(crate) fn decode(
                 .budget
                 .specialized(BudgetKind::BoundaryNodes, 1, true, AT)?;
         }
+        let value_id = cas.checked(&value, reader.budget)?;
         if matches!(tag, 8 | 37)
-            && cas.state.context(cas.checked(&value)?)?.parent.is_some()
+            && cas.state.context(value_id, reader.budget)?.parent.is_some()
             && reader.budget.usage().local_contexts == previous.local_contexts
         {
             reader
                 .budget
                 .specialized(BudgetKind::LocalContexts, 1, true, AT)?;
         }
-        let (expected_layer, expected_space) = match cas.state.node(cas.checked(&value)?)? {
+        let (expected_layer, expected_space) = match cas.state.node(value_id, reader.budget)? {
             Vertex::Expression(value) => (value.layer, value.space.map(|id| cas.handle(id))),
             Vertex::CaseArm(_) | Vertex::SourceForm(_) => (Layer::Pointwise, None),
             _ => (Layer::Logic, None),
@@ -473,7 +477,8 @@ fn expression(
         })
     };
     let value = admit(cas, draft, reader)?;
-    let actual = cas.state.expression(cas.checked(&value)?)?;
+    let value_id = cas.checked(&value, reader.budget)?;
+    let actual = cas.state.expression(value_id, reader.budget)?;
     if actual.ambient != claimed_ambient.as_ref().map(Handle::logical_id) {
         return Err(crate::error::Fault::invalid(
             crate::error::InvalidCode::AmbientSpaceMismatch,
@@ -547,7 +552,8 @@ fn arm_object(
         }),
         reader,
     )?;
-    if cas.state.arm(cas.checked(&handle)?)?.sort != sort {
+    let handle_id = cas.checked(&handle, reader.budget)?;
+    if cas.state.arm(handle_id, reader.budget)?.sort != sort {
         return Err(invalid());
     }
     Ok(handle)

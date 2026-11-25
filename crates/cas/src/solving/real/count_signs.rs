@@ -85,7 +85,7 @@ impl Signs<'_> {
             let positive = variations(&signs, budget)?;
             let mut negative = storage::copied(&signs, budget)?;
             for (sign, polynomial) in negative.iter_mut().zip(chain) {
-                let stored = storage::polynomial(&self.evaluation.cas.state, polynomial)?;
+                let stored = storage::polynomial(&self.evaluation.cas.state, polynomial, budget)?;
                 if !stored
                     .terms
                     .first()
@@ -107,7 +107,7 @@ impl Signs<'_> {
     fn leading(&mut self, chain: &[Handle], budget: &mut Budget) -> Result<Vec<u8>, Fault> {
         let mut signs = storage::vector(chain.len(), budget)?;
         for handle in chain {
-            let polynomial = storage::polynomial(&self.evaluation.cas.state, handle)?;
+            let polynomial = storage::polynomial(&self.evaluation.cas.state, handle, budget)?;
             let term = polynomial.terms.first().ok_or_else(invalid)?;
             let value = self
                 .evaluation
@@ -129,7 +129,7 @@ impl Signs<'_> {
         order: u32,
         budget: &mut Budget,
     ) -> Result<Value, Fault> {
-        let polynomial = storage::polynomial(&self.evaluation.cas.state, polynomial)?;
+        let polynomial = storage::polynomial(&self.evaluation.cas.state, polynomial, budget)?;
         let mut result = Value::integer(0, &self.evaluation.engine, budget)?;
         for term in &polynomial.terms {
             let exponent = *term.exponents.first().ok_or_else(invalid)?;
@@ -164,7 +164,7 @@ impl Signs<'_> {
         endpoint: &Value,
         budget: &mut Budget,
     ) -> Result<(u8, u8, bool), Fault> {
-        let stored = storage::polynomial(&self.evaluation.cas.state, polynomial)?;
+        let stored = storage::polynomial(&self.evaluation.cas.state, polynomial, budget)?;
         let degree = *stored
             .terms
             .first()

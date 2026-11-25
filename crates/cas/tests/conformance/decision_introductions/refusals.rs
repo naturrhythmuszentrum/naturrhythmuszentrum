@@ -117,7 +117,7 @@ fn decision_certified_frame_refusals() -> TestResult {
             context: sibling.clone(),
             slot: 0
         }
-        .qualified(&source.cas)?
+        .qualified(&source.cas, &mut crate::testing::budgets::graph_budget()?)?
         .kind,
         HypothesisKind::RegionMembership
     );
@@ -182,7 +182,7 @@ fn decision_certified_citation_closure() -> TestResult {
     let introduction = &citations[1];
     assert_eq!(
         introduction
-            .auxiliary_schema(&source.cas)?
+            .auxiliary_schema(&source.cas, &mut crate::testing::budgets::graph_budget()?)?
             .ok_or("schema")?
             .name,
         "decision.enclosure-membership"
@@ -197,7 +197,7 @@ fn decision_certified_citation_closure() -> TestResult {
             context: frame,
             slot: 0
         }
-        .qualified(&source.cas)?
+        .qualified(&source.cas, &mut crate::testing::budgets::graph_budget()?)?
         .kind,
         HypothesisKind::CertifiedRegionMembership
     );
@@ -220,7 +220,10 @@ fn decision_certified_citation_closure() -> TestResult {
 fn decision_certified_proof_identity() -> TestResult {
     let (mut fixture, first_frame) = admitted()?;
     let source = &mut fixture.partition.source;
-    let family = source.cas.admissible_region(&source.context)?;
+    let family = source.cas.admissible_region(
+        &source.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let mut introduction = fixture.steps[1].clone();
     introduction.premises = vec![2];
     let reflexive = ApplicationDraft {
@@ -261,8 +264,12 @@ fn decision_certified_proof_identity() -> TestResult {
     assert_ne!(second_frame, first_frame);
     let source = &mut fixture.partition.source;
     assert_eq!(
-        source.cas.admissible_region(&first_frame)?,
-        source.cas.admissible_region(&second_frame)?
+        source
+            .cas
+            .admissible_region(&first_frame, &mut crate::testing::budgets::graph_budget()?)?,
+        source
+            .cas
+            .admissible_region(&second_frame, &mut crate::testing::budgets::graph_budget()?)?
     );
     let before = source.cas.counts();
     assert_eq!(admit(&mut source.cas, draft, &mut ledger()?)?, second_frame);
@@ -308,7 +315,10 @@ fn decision_introduction_register() -> TestResult {
     let rows = source
         .cas
         .proof_citations(witness.proof(), &mut ledger()?)?;
-    assert_eq!(rows[1].auxiliary_schema(&source.cas)?, Some(&schemas[0]));
+    assert_eq!(
+        rows[1].auxiliary_schema(&source.cas, &mut crate::testing::budgets::graph_budget()?)?,
+        Some(&schemas[0])
+    );
     Ok(())
 }
 
@@ -391,7 +401,7 @@ fn decision_introduction_positive_twin() -> TestResult {
             context: frame,
             slot: 0
         }
-        .qualified(&source.cas)?
+        .qualified(&source.cas, &mut crate::testing::budgets::graph_budget()?)?
         .kind,
         HypothesisKind::CertifiedRegionMembership
     );
@@ -407,7 +417,9 @@ fn decision_certified_sign_needs_consequence() -> TestResult {
     let coordinate = fixture.partition.question.coordinates[0].clone();
     let one = source.number(1, 1)?;
     let reciprocal = source.term(nrz_cas::syntax::Operator::Div, &[one, coordinate])?;
-    let domain = source.cas.admissible_region(&frame)?;
+    let domain = source
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
     let step = crate::testing::witness::equality(
         &frame,
         &domain,
@@ -419,9 +431,10 @@ fn decision_certified_sign_needs_consequence() -> TestResult {
     assert!(!proof.is_discharged());
     assert_eq!(proof.judgment().residuals.len(), 1);
     assert_eq!(
-        source
-            .cas
-            .predicate_hypothesis_kind(&proof.judgment().residuals[0].predicate)?,
+        source.cas.predicate_hypothesis_kind(
+            &proof.judgment().residuals[0].predicate,
+            &mut crate::testing::budgets::graph_budget()?
+        )?,
         HypothesisKind::NonZero
     );
     Ok(())

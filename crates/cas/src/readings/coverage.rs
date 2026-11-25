@@ -63,9 +63,9 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<EntryCoverage, Fault> {
         budget.work(1, AT)?;
-        let base = self.checked(base)?;
-        bases::declaration(self, base)?;
-        let (_, rows, columns) = rectangle(&self.state.expression(base)?.sort)?;
+        let base = self.checked(base, budget)?;
+        bases::declaration(self, base, budget)?;
+        let (_, rows, columns) = rectangle(&self.state.expression(base, budget)?.sort)?;
         let count = super::affine::length(rows, columns)?;
         let bytes = size(count, AT)?.saturating_mul(32);
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;

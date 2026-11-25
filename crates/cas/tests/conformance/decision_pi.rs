@@ -7,7 +7,7 @@ use super::pi_bounds::cycle;
 use crate::testing::common::TestResult;
 use crate::testing::readings::ledger;
 use nrz_cas::decision::{EnclosureOrigin, RationalEnclosure};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Constant, Operator};
 use nrz_cas::{FaultKind, Handle, InvalidCode, Location};
 
@@ -52,7 +52,10 @@ fn question(
         },
         target,
         context: source.context.clone(),
-        input_family: source.cas.admissible_region(&source.context)?,
+        input_family: source.cas.admissible_region(
+            &source.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?,
         lower: rational(lower.0, lower.1)?,
         upper: rational(upper.0, upper.1)?,
     })
@@ -173,7 +176,7 @@ fn decision_pi_costs() -> TestResult {
     let checked = source.cas.check_rational_enclosure(&request, &mut budget)?;
     assert_eq!(
         (budget.usage().work, checked.retained_bytes()),
-        (57_786, 1_336)
+        (57_843, 1_336)
     );
     Ok(())
 }
@@ -184,10 +187,10 @@ fn decision_pi_costs() -> TestResult {
 #[test]
 fn decision_pi_resources() -> TestResult {
     for (kind, amount, prior, accepted) in [
-        (BudgetKind::Work, 57_786, 0, true),
-        (BudgetKind::Work, 57_785, 0, false),
-        (BudgetKind::Work, 57_786, 1, false),
-        (BudgetKind::Work, 57_787, 1, true),
+        (BudgetKind::Work, 57_843, 0, true),
+        (BudgetKind::Work, 57_842, 0, false),
+        (BudgetKind::Work, 57_843, 1, false),
+        (BudgetKind::Work, 57_844, 1, true),
         (BudgetKind::OutputBytes, 1_336, 0, true),
         (BudgetKind::OutputBytes, 1_335, 0, false),
     ] {
@@ -200,7 +203,7 @@ fn decision_pi_resources() -> TestResult {
         } else {
             limits.output_bytes = amount;
         }
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
         budget.work(prior, Location::new("prior pi replay work"))?;
         let result = source.cas.check_rational_enclosure(&request, &mut budget);
         if accepted {

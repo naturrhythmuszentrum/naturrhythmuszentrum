@@ -15,12 +15,15 @@ pub(crate) fn coefficients(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<Vec<Rational>, Fault> {
-    let coordinate = &cas.state.space(cas.checked(space)?)?.coordinate;
-    let root = cas.checked(function)?;
+    let coordinate = &cas
+        .state
+        .space(cas.checked(space, budget)?, budget)?
+        .coordinate;
+    let root = cas.checked(function, budget)?;
     let ordered = crate::case_syntax::order(cas, &[root], budget)?;
     for id in ordered {
         budget.work(1, AT)?;
-        let value = cas.state.expression(id)?;
+        let value = cas.state.expression(id, budget)?;
         match &value.operator {
             Operator::Rational(_)
             | Operator::Neg

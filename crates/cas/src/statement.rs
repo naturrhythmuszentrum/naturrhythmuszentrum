@@ -43,10 +43,17 @@ pub(crate) fn validate_guard(
     value: &GuardedObligation,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let home = cas.state.context(cas.checked(&value.home)?)?;
-    let region = cas.state.region(cas.checked(&value.region)?)?;
-    let (header, scope) =
-        crate::domain_admission::predicate_context(&cas.state, cas.checked(&value.predicate)?)?;
+    let home = cas
+        .state
+        .context(cas.checked(&value.home, budget)?, budget)?;
+    let region = cas
+        .state
+        .region(cas.checked(&value.region, budget)?, budget)?;
+    let (header, scope) = crate::domain_admission::predicate_context(
+        &cas.state,
+        cas.checked(&value.predicate, budget)?,
+        budget,
+    )?;
     if scope != &value.scope
         || (!region.scope.is_empty() && region.scope != value.scope)
         || !crate::header::embeds(&cas.state, header, home.header_id, budget)?
@@ -55,7 +62,7 @@ pub(crate) fn validate_guard(
         return Err(Fault::invalid(InvalidCode::Context, AT));
     }
     if let Some(space) = &value.space {
-        cas.state.space(cas.checked(space)?)?;
+        cas.state.space(cas.checked(space, budget)?, budget)?;
     }
     if value.layer == Layer::Distribution && value.space.is_none() {
         return Err(Fault::invalid(InvalidCode::Sort, AT));
@@ -138,7 +145,8 @@ pub(crate) fn canonical_hypotheses(
             AT,
         )?;
         for value in values.iter() {
-            cas.state.context(cas.checked(&value.context)?)?;
+            cas.state
+                .context(cas.checked(&value.context, budget)?, budget)?;
         }
         values.sort_by_key(|value| (value.context.logical_id(), value.slot));
         values.dedup();

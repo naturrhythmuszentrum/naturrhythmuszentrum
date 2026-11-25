@@ -312,7 +312,7 @@ fn lattice_output_signed_capacity() -> TestResult {
 /// ´test:integration:lattice-output-evidence-work´
 #[test]
 fn lattice_output_evidence_work() -> TestResult {
-    use nrz_cas::limits::{Budget, BudgetKind};
+    use nrz_cas::limits::BudgetKind;
     let mut source = prepared(5)?;
     let witness = selected(&mut source, &mut ledger()?)?;
     let cas = &source.source.frame.cas;
@@ -322,7 +322,7 @@ fn lattice_output_evidence_work() -> TestResult {
             work: 40 + u64::from(succeeds),
             ..Limits::default()
         };
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
         budget.work(37, nrz_cas::Location::new("prior lattice evidence Work"))?;
         let result = cas.lattice_selection_evidence(&witness, &mut budget);
         if succeeds {

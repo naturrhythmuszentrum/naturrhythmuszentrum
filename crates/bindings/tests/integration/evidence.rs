@@ -53,7 +53,11 @@ fn freeze_preserves_existing_checking_workflow() -> TestResult {
     assert_eq!(observable.evidence.assurance, "declared");
     let cas = frozen.cas()?;
     assert_eq!(
-        cas.expression(&observable.expression.syntax)?.0,
+        cas.expression(
+            &observable.expression.syntax,
+            &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?
+        )?
+        .0,
         &Operator::Sub
     );
     let walk = cas.walk_original(

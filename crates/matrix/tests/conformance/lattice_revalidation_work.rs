@@ -30,7 +30,7 @@ fn prior(work: u64) -> TestResult<Budget> {
 /// ´claim:matrix:lattice-live-attempt-preparation-boundaries´
 #[test]
 fn lattice_live_attempt_preparation_boundaries() -> TestResult {
-    for (retry, limits) in [(false, [129_235, 129_234]), (true, [146_664, 146_663])] {
+    for (retry, limits) in [(false, [129_346, 129_345]), (true, [146_775, 146_774])] {
         for (position, work) in limits.into_iter().enumerate() {
             preparation(retry, work, position == 0)?;
         }
@@ -110,9 +110,9 @@ enum Boundary {
 #[test]
 fn lattice_live_attempt_work_boundaries() -> TestResult {
     for (owner, limits) in [
-        (Boundary::Containment, [27_652, 27_651]),
-        (Boundary::Preparation, [156_870, 156_869]),
-        (Boundary::Decision, [328_431, 328_430]),
+        (Boundary::Containment, [27_690, 27_689]),
+        (Boundary::Preparation, [157_019, 157_018]),
+        (Boundary::Decision, [328_691, 328_690]),
     ] {
         for (position, work) in limits.into_iter().enumerate() {
             boundary(owner, work, position == 0)?;

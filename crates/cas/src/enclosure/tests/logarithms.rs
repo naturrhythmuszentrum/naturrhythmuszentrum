@@ -379,7 +379,7 @@ fn enclosure_log_work_pins() -> TestResult {
     let key = service::retention_key(&prefix, certificate, &mut ledger()?)?;
     assert_eq!(
         (cold.work, warm.work, replay.work),
-        (630_588, 19_985, 330_435)
+        (630_593, 19_985, 330_440)
     );
     let (mut cold_store, cold_request) = log_case(2, 1)?;
     let short = cold_store.cas.enclose(
@@ -398,7 +398,7 @@ fn enclosure_log_work_pins() -> TestResult {
         ),
         (918, 5666, 17, 4)
     );
-    for (warm, pin) in [(false, 630_588), (true, 19_985)] {
+    for (warm, pin) in [(false, 630_593), (true, 19_985)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut f, request) = log_case(2, 1)?;
             if warm {
@@ -425,7 +425,7 @@ fn enclosure_log_work_pins() -> TestResult {
             }
         }
     }
-    for (available, passes) in [(330_435, true), (330_434, false)] {
+    for (available, passes) in [(330_440, true), (330_439, false)] {
         let (mut f, expected) = log_case(2, 1)?;
         let before = f.cas.canonical_snapshot(&mut ledger()?)?;
         let report = f.cas.check_enclosure(

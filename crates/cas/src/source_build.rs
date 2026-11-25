@@ -32,7 +32,7 @@ pub(crate) fn materialize(
     provenance: Option<&Handle>,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let root = cas.checked(syntax)?;
+    let root = cas.checked(syntax, budget)?;
     let mut builder = Builder {
         cas,
         source,

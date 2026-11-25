@@ -8,7 +8,7 @@ use crate::testing::common::TestResult;
 use crate::testing::readings::ledger;
 use nrz_cas::decision::{EnclosureOrigin, RationalEnclosure};
 use nrz_cas::domain::ContextDraft;
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Constant, Draft, Operator};
 use nrz_cas::{FaultKind, Handle, InvalidCode, Location, Reference};
 
@@ -26,7 +26,10 @@ fn question(
         },
         target,
         context: source.context.clone(),
-        input_family: source.cas.admissible_region(&source.context)?,
+        input_family: source.cas.admissible_region(
+            &source.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?,
         lower: rational(lower.0, lower.1)?,
         upper: rational(upper.0, upper.1)?,
     })
@@ -157,7 +160,10 @@ fn decision_enclosure_qualified_family() -> TestResult {
         &mut ledger()?,
     )?;
     request.context = local;
-    request.input_family = source.cas.admissible_region(&request.context)?;
+    request.input_family = source.cas.admissible_region(
+        &request.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let checked = source
         .cas
         .check_rational_enclosure(&request, &mut ledger()?)?;
@@ -264,7 +270,7 @@ fn boundary(
     prior: u64,
 ) -> TestResult<bool> {
     let limits = allowance(kind, amount);
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(prior, Location::new("prior enclosure work"))?;
     let before = source.cas.counts();
     let result = source.cas.check_rational_enclosure(request, &mut budget);
@@ -282,9 +288,9 @@ fn boundary(
 
 /// Measured complete replay Work, staging, private graph payload and returned ownership.
 const ENCLOSURE_COSTS: [(u64, u64, u64, u64); 3] = [
-    (53_628, 29_187, 5_696, 800),
-    (8_785, 22_856, 1_539, 792),
-    (9_361, 22_856, 1_539, 792),
+    (53_679, 29_187, 5_696, 800),
+    (8_804, 22_856, 1_539, 792),
+    (9_380, 22_856, 1_539, 792),
 ];
 
 /// Replay has literal Work, staging, private graph and output N/N−1 boundaries.
@@ -308,7 +314,7 @@ fn decision_enclosure_resource_boundaries() -> TestResult {
         }
         assert!(!boundary(&mut source, &request, BudgetKind::Work, work, 1)?);
         let limits = allowance(BudgetKind::StagedPayloadBytes, staged);
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
         let before = source.cas.counts();
         let result =
             budget.with_retained_payload(1, Location::new("retained enclosure input"), |budget| {
@@ -329,7 +335,7 @@ fn decision_enclosure_cumulative_ledger() -> TestResult {
     for (index, (work, _, _, _)) in ENCLOSURE_COSTS.into_iter().enumerate() {
         let (mut source, request) = prepared(index)?;
         let limits = allowance(BudgetKind::Work, 2 * work);
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
         let before = source.cas.counts();
         source.cas.check_rational_enclosure(&request, &mut budget)?;
         source.cas.check_rational_enclosure(&request, &mut budget)?;

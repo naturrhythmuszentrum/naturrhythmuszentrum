@@ -9,7 +9,7 @@ use crate::search::SearchPolicy;
 use crate::task::Task;
 use crate::testing::common::TestResult;
 use crate::testing::distribution_native::{Fixture, evidence};
-use crate::testing::native::budget;
+use crate::testing::native::fresh_budget;
 
 /// Both explicitly selected producers prove the hand-specified second derivative of absolute value.
 /// ´test:crate:distribution-both-derivative-routes´
@@ -29,7 +29,11 @@ fn distribution_both_derivative_routes() -> TestResult {
         let two = crate::testing::native::term(
             &mut fixture.base.cas,
             &fixture.base.header,
-            Operator::Rational(crate::number::Rational::from_ratio(2, 1, &mut budget()?)?),
+            Operator::Rational(crate::number::Rational::from_ratio(
+                2,
+                1,
+                &mut fresh_budget()?,
+            )?),
             &[],
         )?;
         let expected = fixture.node(Operator::DistributionScale, &[two, delta])?;
@@ -66,7 +70,12 @@ fn distribution_regularity_certificate_tampering() -> TestResult {
         substitutions: Vec::new(),
         certificate: regular.certificate.clone(),
     };
-    crate::scoped_check::check_application(&mut fixture.base.cas, &draft, &[], &mut budget()?)?;
+    crate::scoped_check::check_application(
+        &mut fixture.base.cas,
+        &draft,
+        &[],
+        &mut fresh_budget()?,
+    )?;
     let original = draft.certificate.clone();
     for mode in [false, true] {
         draft.certificate.clone_from(&original);
@@ -86,7 +95,7 @@ fn distribution_regularity_certificate_tampering() -> TestResult {
                 &mut fixture.base.cas,
                 &draft,
                 &[],
-                &mut budget()?
+                &mut fresh_budget()?
             )
             .is_err()
         );
@@ -115,7 +124,7 @@ fn distribution_delta_action_tampering() -> TestResult {
         &mut fixture.base.cas,
         &draft,
         &premises,
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let original = draft.conclusion.clone();
     let Statement::Distribution(value) = &mut draft.conclusion else {
@@ -130,7 +139,7 @@ fn distribution_delta_action_tampering() -> TestResult {
             &mut fixture.base.cas,
             &draft,
             &premises,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -141,7 +150,7 @@ fn distribution_delta_action_tampering() -> TestResult {
             &mut fixture.base.cas,
             &draft,
             &premises,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
@@ -158,26 +167,28 @@ fn distribution_native_shortcut_snapshot() -> TestResult {
     let result = fixture.route(Task::Simplify, std::slice::from_ref(&formal), false)?;
     let expected = result.witness.judgment().clone();
     let policy = SearchPolicy::default();
-    let before = fixture
-        .base
-        .cas
-        .certify_frozen_cost(&expected, &policy.costs, &mut budget()?)?;
+    let before =
+        fixture
+            .base
+            .cas
+            .certify_frozen_cost(&expected, &policy.costs, &mut fresh_budget()?)?;
     assert_eq!(before.shortest_cost(), Some(2));
     fixture
         .base
         .cas
-        .register_derived(&result.witness, &expected, 1, &mut budget()?)?;
-    let after = fixture
-        .base
-        .cas
-        .certify_frozen_cost(&expected, &policy.costs, &mut budget()?)?;
+        .register_derived(&result.witness, &expected, 1, &mut fresh_budget()?)?;
+    let after =
+        fixture
+            .base
+            .cas
+            .certify_frozen_cost(&expected, &policy.costs, &mut fresh_budget()?)?;
     assert_eq!(after.shortest_cost(), Some(1));
     assert_ne!(before.manifest(), after.manifest());
     assert!(
         fixture
             .base
             .cas
-            .register_derived(&result.witness, &expected, 1, &mut budget()?)
+            .register_derived(&result.witness, &expected, 1, &mut fresh_budget()?)
             .is_err()
     );
     let request = fixture.request(Task::Simplify);
@@ -186,8 +197,8 @@ fn distribution_native_shortcut_snapshot() -> TestResult {
         &request,
         &[formal.logical_id()],
         &policy,
-        &mut budget()?,
-        &mut budget()?,
+        &mut fresh_budget()?,
+        &mut fresh_budget()?,
     )?;
     let reused = execution.result.ok_or("scheduled reuse")?;
     assert!(execution.fault.is_none());
@@ -197,11 +208,11 @@ fn distribution_native_shortcut_snapshot() -> TestResult {
         crate::proof_view::scalar_claim(
             &fixture.base.cas,
             reused.witness.judgment(),
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
-    crate::case_producer::replay(&fixture.base.cas, &reused.witness, &mut budget()?)?;
+    crate::case_producer::replay(&fixture.base.cas, &reused.witness, &mut fresh_budget()?)?;
     Ok(())
 }
 
@@ -217,7 +228,7 @@ fn distribution_jump_sign_tampering() -> TestResult {
             coordinate: "x".into(),
             parameter: Some(crate::number::Rational::zero()),
         },
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let embedded = fixture.node(Operator::RegularEmbed, &[function])?;
     let result = fixture.route(
@@ -235,7 +246,11 @@ fn distribution_jump_sign_tampering() -> TestResult {
     let negative = crate::testing::native::term(
         &mut fixture.base.cas,
         &fixture.base.header,
-        Operator::Rational(crate::number::Rational::from_ratio(-1, 1, &mut budget()?)?),
+        Operator::Rational(crate::number::Rational::from_ratio(
+            -1,
+            1,
+            &mut fresh_budget()?,
+        )?),
         &[],
     )?;
     let wrong = fixture.node(Operator::DistributionScale, &[negative, delta])?;
@@ -251,7 +266,7 @@ fn distribution_jump_sign_tampering() -> TestResult {
             &mut fixture.base.cas,
             &draft,
             &premises,
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );

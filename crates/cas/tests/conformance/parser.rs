@@ -53,7 +53,15 @@ fn operators(text: &str) -> TestResult<Vec<Operator>> {
             WalkEvent::Visit(visit) => Some(visit),
             WalkEvent::EnterBinder { .. } => None,
         })
-        .map(|visit| Ok(cas.expression(&visit.expression)?.0.clone()))
+        .map(|visit| {
+            Ok(cas
+                .expression(
+                    &visit.expression,
+                    &mut crate::testing::budgets::graph_budget()?,
+                )?
+                .0
+                .clone())
+        })
         .collect()
 }
 
@@ -221,7 +229,11 @@ fn parsed_power_conventions() -> TestResult {
             &mut default_budget()?,
         )?;
         assert_eq!(
-            cas.expression(&original.syntax)?.0,
+            cas.expression(
+                &original.syntax,
+                &mut crate::testing::budgets::graph_budget()?
+            )?
+            .0,
             &Operator::GeneralPower(branch)
         );
     }

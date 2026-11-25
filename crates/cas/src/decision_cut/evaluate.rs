@@ -98,7 +98,7 @@ pub(super) fn build(
     order: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<Values, Fault> {
-    let ambient = &cas.state.region(domain)?.ambient;
+    let ambient = &cas.state.region(domain, budget)?.ambient;
     let mut values = Values::new();
     for id in order {
         budget.condition(size(values.len(), AT)?.saturating_add(1), AT)?;
@@ -122,7 +122,7 @@ fn evaluate(
     values: &Values,
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
-    match cas.state.node(id)? {
+    match cas.state.node(id, budget)? {
         Vertex::Region(value) => {
             frame(value.header, header, value.scope.is_empty())?;
             if value.ambient != *ambient {

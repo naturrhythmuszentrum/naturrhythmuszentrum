@@ -155,7 +155,12 @@ fn residual_eleven_hand_fixtures() -> TestResult {
                 return Err("residual".into());
             };
             assert_eq!(usize::try_from(*order)?, expected.len());
-            assert_eq!(f.cas.series_object(output)?.order, *order);
+            assert_eq!(
+                f.cas
+                    .series_object(output, &mut crate::testing::budgets::graph_budget()?)?
+                    .order,
+                *order
+            );
             let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
             let result = f.cas.check_evaluated_residual(
                 &subject,
@@ -871,7 +876,9 @@ fn residual_complex_derivative_boundary() -> TestResult {
     )?;
     let derivative = handles.pop().ok_or("complex derivative")?;
     assert_eq!(
-        f.cas.expression(&derivative)?.1,
+        f.cas
+            .expression(&derivative, &mut crate::testing::budgets::graph_budget()?)?
+            .1,
         &Sort::Value(AtomicSort::Scalar(Field::Complex))
     );
     let before = f.cas.canonical_snapshot(&mut default_budget()?)?;

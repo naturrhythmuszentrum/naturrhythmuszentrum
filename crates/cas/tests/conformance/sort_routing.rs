@@ -235,7 +235,11 @@ fn scalar_routing_inspects_inactive_source_clauses() -> TestResult {
     use nrz_cas::source::{SourceClauseDraft, SourceFormDraft, SourceFormKind};
     use nrz_cas::syntax::{AtomicSort, Draft, ExpressionDraft, PredicateKind, Sort};
     let mut fixture = crate::testing::sort_routing::Fixture::new(Field::Real, 0)?;
-    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem)? else {
+    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(
+        &fixture.problem,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?
+    else {
         return Err("missing original problem".into());
     };
     let header = problem.header.clone();

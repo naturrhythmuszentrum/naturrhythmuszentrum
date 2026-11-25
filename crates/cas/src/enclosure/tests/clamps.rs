@@ -468,9 +468,9 @@ fn enclosure_clamp_work_pins() -> TestResult {
     )?;
     assert_eq!(
         (cold.work, warm.work, replay.work),
-        (185_515, 33_774, 102_228)
+        (185_520, 33_774, 102_233)
     );
-    for (is_warm, pin) in [(false, 185_515), (true, 33_774)] {
+    for (is_warm, pin) in [(false, 185_520), (true, 33_774)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut store, request) = clamp_case(0, 0, true)?;
             if is_warm {
@@ -498,7 +498,7 @@ fn enclosure_clamp_work_pins() -> TestResult {
             }
         }
     }
-    for (available, passes) in [(102_228, true), (102_227, false)] {
+    for (available, passes) in [(102_233, true), (102_232, false)] {
         let (mut store, request) = clamp_case(0, 0, true)?;
         let before = store.cas.canonical_snapshot(&mut ledger()?)?;
         let report = store.cas.check_enclosure(
@@ -528,8 +528,12 @@ fn enclosure_clamp_work_pins() -> TestResult {
 /// ´claim:cas:enclosure-clamp-phase-pins´
 #[test]
 fn enclosure_clamp_phase_pins() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (f, request) = clamp_case(0, 0, true)?;
-    let target = f.cas.state.expression(f.cas.checked(&request.target)?)?;
+    let target = f
+        .cas
+        .state
+        .expression(f.cas.checked(&request.target, &mut budget)?, &mut budget)?;
     let plans = planning::Plans::new(target, clamp_policy()).ok_or("plan")?;
     let grid = plans.grid(12);
     let scope = scope::key(&f.cas, &request, &mut ledger()?)?;
@@ -603,12 +607,13 @@ fn enclosure_clamp_size_pins() -> TestResult {
         };
         assert_eq!(
             certificate
-                .to_bytes(&mut Budget::new(limits.clone())?)
+                .to_bytes(&mut crate::budget::Budget::new(limits.clone())?)
                 .is_ok(),
             passes
         );
         assert_eq!(
-            EnclosureCertificate::from_bytes(&bytes, &mut Budget::new(limits)?).is_ok(),
+            EnclosureCertificate::from_bytes(&bytes, &mut crate::budget::Budget::new(limits)?)
+                .is_ok(),
             passes
         );
     }
@@ -631,11 +636,11 @@ fn enclosure_clamp_size_pins() -> TestResult {
                     ..Limits::default()
                 },
                 _ => Limits {
-                    work: available + 7,
+                    work: available + 10,
                     ..Limits::default()
                 },
             };
-            let mut budget = Budget::new(limits)?;
+            let mut budget = crate::budget::Budget::new(limits)?;
             budget.work(7, AT)?;
             let before = f.cas.canonical_snapshot(&mut ledger()?)?;
             assert_eq!(
@@ -675,7 +680,7 @@ fn enclosure_clamp_size_pins() -> TestResult {
 
 /// Seven earlier units remain charged while testing the new operation's allowance.
 fn precharged(available: u64) -> Result<Budget, Fault> {
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         work: available + 7,
         ..Limits::default()
     })?;

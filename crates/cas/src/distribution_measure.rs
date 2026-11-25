@@ -16,7 +16,7 @@ pub(crate) fn measure(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     if let Statement::Distribution(value) = statement {
-        cas.checked(value.space())?;
+        cas.checked(value.space(), budget)?;
         if let DistributionStatement::Derivative { order, .. } = value.as_ref() {
             budget.check(BudgetKind::Depth, u64::from(*order), AT)?;
         }
@@ -34,7 +34,7 @@ pub(crate) fn measure(
             )?;
             crate::region_check::measure(&value.partition, budget)?;
             for region in &value.regions {
-                cas.state.region(cas.checked(region)?)?;
+                cas.state.region(cas.checked(region, budget)?, budget)?;
             }
             for coefficients in value.polynomials.iter().flatten() {
                 crate::univariate::validate(coefficients, budget)?;

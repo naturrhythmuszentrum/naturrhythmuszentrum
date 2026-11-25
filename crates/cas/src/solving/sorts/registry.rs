@@ -52,23 +52,31 @@ pub(super) fn validate(value: &ScalarSpaceData) -> Result<Field, Fault> {
 }
 
 /// Inspect a checked space node rather than treating a field syntax value as its identity.
-pub(crate) fn field(state: &State, value: &Handle) -> Result<Field, Fault> {
-    match crate::solving::graph::object(state, value.logical_id())? {
+pub(crate) fn field(
+    state: &State,
+    value: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<Field, Fault> {
+    match crate::solving::graph::object(state, value.logical_id(), budget)? {
         SolveDraft::ScalarSpace(value) => validate(value),
         _ => Err(Fault::invalid(InvalidCode::Reference, AT)),
     }
 }
 
 /// There is one directed edge and no implicit identity, reverse or transitive placement.
-pub(super) fn placement(state: &State, value: &SpacePlacementData<Handle>) -> Result<(), Fault> {
+pub(super) fn placement(
+    state: &State,
+    value: &SpacePlacementData<Handle>,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     if value.specification != "placement.real-in-complex" {
         return Err(Fault::invalid(InvalidCode::SpacePlacementUnavailable, AT));
     }
     if value.version != 1 {
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
-    if field(state, &value.source)? != Field::Real
-        || field(state, &value.ambient)? != Field::Complex
+    if field(state, &value.source, budget)? != Field::Real
+        || field(state, &value.ambient, budget)? != Field::Complex
     {
         return Err(Fault::invalid(InvalidCode::AmbientSpaceMismatch, AT));
     }
@@ -103,10 +111,14 @@ impl crate::graph::Cas {
     ///
     /// # Errors
     /// Refuses foreign handles and non-expression objects.
-    pub fn scalar_ambient(&self, expression: &Handle) -> Result<Option<Handle>, Fault> {
+    pub fn scalar_ambient(
+        &self,
+        expression: &Handle,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<Option<Handle>, Fault> {
         Ok(self
             .state
-            .expression(self.checked(expression)?)?
+            .expression(self.checked(expression, budget)?, budget)?
             .ambient
             .map(|id| self.handle(id)))
     }
@@ -117,6 +129,7 @@ pub(crate) fn ambient(
     state: &State,
     header: crate::graph::LogicalId,
     sort: &crate::model::Sort,
+    budget: &mut crate::budget::Budget,
 ) -> Result<Option<crate::graph::LogicalId>, Fault> {
     let crate::model::Sort::Value(crate::model::AtomicSort::Scalar(requested)) = sort else {
         return Ok(None);
@@ -124,8 +137,8 @@ pub(crate) fn ambient(
     let Ok(expected) = specification(requested) else {
         return Ok(None);
     };
-    for id in &state.header(header)?.scalar_spaces {
-        if let SolveDraft::ScalarSpace(actual) = crate::solving::graph::object(state, *id)?
+    for id in &state.header(header, budget)?.scalar_spaces {
+        if let SolveDraft::ScalarSpace(actual) = crate::solving::graph::object(state, *id, budget)?
             && *actual == expected
         {
             return Ok(Some(*id));
@@ -143,6 +156,7 @@ impl crate::graph::Cas {
         &self,
         state: &State,
         draft: &mut SolveDraft<Handle>,
+        budget: &mut crate::budget::Budget,
     ) -> Result<(), Fault> {
         let SolveDraft::CoordinateSpace(value) = draft else {
             return Ok(());
@@ -155,8 +169,9 @@ impl crate::graph::Cas {
             let sort = crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
                 coordinate.field.clone(),
             ));
-            resolved
-                .push(ambient(state, value.header.logical_id(), &sort)?.map(|id| self.handle(id)));
+            resolved.push(
+                ambient(state, value.header.logical_id(), &sort, budget)?.map(|id| self.handle(id)),
+            );
         }
         if value.scalar_spaces.is_empty() {
             value.scalar_spaces = resolved;

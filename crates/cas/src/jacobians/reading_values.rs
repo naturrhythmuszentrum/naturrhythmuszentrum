@@ -22,10 +22,15 @@ impl Cas {
         readings: &JacobianReadings,
         budget: &mut Budget,
     ) -> Result<ReadingValues, Fault> {
-        let original = self.checked(readings.map.expression())?;
+        let original = self.checked(readings.map.expression(), budget)?;
         self.reading_coefficients_independent(original, &readings.variables, budget)?;
         let mut conditions = crate::conditions::Conditions::default();
-        conditions.endpoint(&self.state, self.checked(context)?, original, budget)?;
+        conditions.endpoint(
+            &self.state,
+            self.checked(context, budget)?,
+            original,
+            budget,
+        )?;
         if !conditions.residuals.is_empty() {
             return Err(invalid(InvalidCode::JacobianDomain));
         }
@@ -37,7 +42,8 @@ impl Cas {
                 for entry in &mut entries {
                     *entry = crate::polynomial::normalize(self, *entry, budget)?;
                 }
-                let (rows, columns) = crate::polynomial::matrix::shape(&self.state, original)?;
+                let (rows, columns) =
+                    crate::polynomial::matrix::shape(&self.state, original, budget)?;
                 let explicit = self.jacobian_rectangle(context, rows, columns, &entries, budget)?;
                 let witness = self.prove_reading_equality(
                     context,
@@ -77,7 +83,7 @@ impl Cas {
         let mut pending = vec![root];
         let mut visited = BTreeSet::new();
         while let Some(id) = pending.pop() {
-            let term = self.state.expression(id)?;
+            let term = self.state.expression(id, budget)?;
             let count = visited
                 .len()
                 .saturating_add(pending.len())
@@ -119,15 +125,24 @@ impl Cas {
         coefficients: &[LogicalId],
         budget: &mut Budget,
     ) -> Result<(Vec<Substitution>, Handle), Fault> {
-        let header = self.state.context(self.checked(context)?)?.header_id;
+        let header = self
+            .state
+            .context(self.checked(context, budget)?, budget)?
+            .header_id;
         let mut sources = storage::reserve(coordinates.sources.len(), budget)?;
         for key in &coordinates.sources {
             budget.work(size(key.len(), AT)?, AT)?;
             sources.push(self.jacobian_scalar(header, Operator::Free(key.clone()), &[], budget)?);
         }
         let count = readings.variables.len().saturating_add(sources.len());
-        let width =
-            size(self.state.context(self.checked(context)?)?.header.len(), AT)?.saturating_add(256);
+        let width = size(
+            self.state
+                .context(self.checked(context, budget)?, budget)?
+                .header
+                .len(),
+            AT,
+        )?
+        .saturating_add(256);
         storage::retaining(size(count, AT)?.saturating_mul(width), budget, |budget| {
             let mut replacements = storage::reserve(readings.variables.len(), budget)?;
             let mut mapped = storage::reserve(count, budget)?;
@@ -166,7 +181,7 @@ impl Cas {
         let offset = *entries
             .get(start.saturating_add(sources.len()))
             .ok_or_else(|| invalid(InvalidCode::ReadingShape))?;
-        let mut sum = if self.jacobian_literal_zero(offset)? {
+        let mut sum = if self.jacobian_literal_zero(offset, budget)? {
             None
         } else {
             Some(offset)
@@ -176,7 +191,7 @@ impl Cas {
             let coefficient = *entries
                 .get(start.saturating_add(column))
                 .ok_or_else(|| invalid(InvalidCode::ReadingShape))?;
-            if self.jacobian_literal_zero(coefficient)? {
+            if self.jacobian_literal_zero(coefficient, budget)? {
                 continue;
             }
             let term =
@@ -191,9 +206,13 @@ impl Cas {
     }
 
     /// The original whole-map equality has already checked every normalized literal zero.
-    fn jacobian_literal_zero(&self, expression: LogicalId) -> Result<bool, Fault> {
+    fn jacobian_literal_zero(
+        &self,
+        expression: LogicalId,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<bool, Fault> {
         Ok(
-            matches!(&self.state.expression(expression)?.operator, Operator::Rational(value) if value.is_zero()),
+            matches!(&self.state.expression(expression, budget)?.operator, Operator::Rational(value) if value.is_zero()),
         )
     }
 

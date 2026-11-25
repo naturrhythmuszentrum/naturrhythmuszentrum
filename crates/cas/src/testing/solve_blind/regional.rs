@@ -92,8 +92,9 @@ fn coefficient(
 
 /// The exact fractions a and 1 retain the original Complex coefficient frame.
 fn parameters(fixture: &mut Fixture) -> TestResult<(Handle, Handle)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let SolveView::CoefficientDomain(CoefficientDomainData::Fraction { base, .. }) =
-        fixture.cas.solve_view(&fixture.algebra)?
+        fixture.cas.solve_view(&fixture.algebra, &mut budget)?
     else {
         return Err("fraction domain".into());
     };
@@ -242,8 +243,9 @@ fn root_cell(fixture: &mut Fixture, zero: bool) -> TestResult {
 
 /// Hand-authored total coefficient a²-1 has no arithmetic normalization dependency.
 fn root_relation(fixture: &mut Fixture) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let SolveView::CoefficientDomain(CoefficientDomainData::Fraction { base, .. }) =
-        fixture.cas.solve_view(&fixture.algebra)?
+        fixture.cas.solve_view(&fixture.algebra, &mut budget)?
     else {
         return Err("fraction domain".into());
     };

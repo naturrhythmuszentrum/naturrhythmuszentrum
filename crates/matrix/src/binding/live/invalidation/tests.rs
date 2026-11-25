@@ -11,7 +11,12 @@ use std::rc::Rc;
 /// ´test:unit:phasor-operand-invalidation-is-order-independent´
 #[test]
 fn phasor_operand_invalidation_is_order_independent() -> TestResult {
-    let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let publication = case.publication(&mut ledger()?)?;
     let solved =
         case.heap
@@ -42,7 +47,12 @@ fn phasor_operand_invalidation_is_order_independent() -> TestResult {
 /// ´test:unit:phasor-publication-retains-transitive-operand-dependencies´
 #[test]
 fn phasor_publication_retains_transitive_operand_dependencies() -> TestResult {
-    let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let publication = case.publication(&mut ledger()?)?;
     let context = ArithmeticContext::new()?;
     let solved = case

@@ -60,7 +60,7 @@ impl PhysicalReading {
         let inputs = selected_meanings(family, &selection, budget)?;
         meaning::map_meanings(&definition.map, &inputs, &definition.entries, budget)?;
         let (sort, _, _, header) = support::inspect(cas, &definition.symbol, budget)?;
-        if header != cas.context_header(family.context())?
+        if header != cas.context_header(family.context(), budget)?
             || support::coordinates(&sort)? != definition.entries.len()
         {
             return Err(ReadingError::Definition);

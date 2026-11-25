@@ -7,7 +7,7 @@
 //!
 //! Draft admission, proof checking and replay, and producer transactions use one append-only rollback journal instead of copying the accumulated store. Each checkpoint restores node and edge indices, logical indexes and retained counts, interning keys, policy identities, source keys, parent claims and all payload counters on refusal. An inner refusal undoes only its edits; an inner commit remains reversible by its enclosing transaction. Work covers touched payload, a fixed 256-unit counter checkpoint, logical key probes and validation, without a transaction charge proportional to unrelated records. Storage checks still include retained occupancy, pending drafts and journal reservation; nested transaction checkpoints reserve their bounded counter inventory under the existing staged-payload ceiling. Spent work is never refunded. Earlier handles and witness bytes survive invalid input and mid-batch exhaustion unchanged. Token-owned allocation high-water marks survive rollback so a captured discarded handle cannot authenticate a later object; retries can leave gaps in logical identifiers. Full store copies are available only to tests needing an untouched control. Copying a checked application charges its own typed payload and optional scalar cache. Substitution prepays each reached record and copied scope, accumulating draft and memo workspace under the existing staged-payload limit; unrelated stored syntax contributes no work.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
@@ -26,13 +26,15 @@ use crate::source_model::{SourceForm, SourceFormDraft};
 mod identity;
 mod intern;
 mod lemmas;
+mod retained_map;
 #[cfg(test)]
 pub(crate) mod retry_comparison;
-pub(crate) use lemmas::{PendingJudgment, PiIndex, PiInventory, ScalarInventory};
+pub(crate) use lemmas::{AnonymousLemma, PendingJudgment, PiIndex, PiInventory, ScalarInventory};
 
 pub(crate) use intern::InterningSnapshot;
 pub(crate) use intern::StoredKey;
 use intern::{InternIndex, StoreToken};
+use retained_map::RetainedMap;
 
 /// A disjoint namespace for logical identifiers.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -850,7 +852,7 @@ struct Journal {
     /// Number of retained anonymous nodes under this checkpoint or state.
     judgment_count: usize,
     /// At most one retained count per fixed vertex kind.
-    retained: BTreeMap<VertexKind, u64>,
+    retained: RetainedMap<VertexKind, u64>,
     /// First undo entry owned by this checkpoint.
     start: usize,
     /// A parent checkpoint retains committed inner edits.
@@ -864,21 +866,21 @@ pub(crate) struct State {
     /// Authoritative heterogeneous graph.
     pub(crate) graph: DiGraph<Vertex, Edge, u32>,
     /// Logical-to-physical lookup, never serialized.
-    pub(crate) indices: BTreeMap<LogicalId, NodeIndex<u32>>,
+    pub(crate) indices: RetainedMap<LogicalId, NodeIndex<u32>>,
     /// Exact canonical syntax/context/condition keys.
     pub(crate) intern: InternIndex,
     /// Kind-specific scalar keys index graph nodes without retaining a second checked payload.
-    pub(crate) scalar_judgments: BTreeMap<Arc<[u8]>, LogicalId>,
+    pub(crate) scalar_judgments: RetainedMap<Arc<[u8]>, LogicalId>,
     /// Complete Machin keys index only the authoritative anonymous graph nodes.
     pub(crate) pi_judgments: PiIndex,
     /// Immutable policy identity lookup, independent of unrelated graph records.
-    pub(crate) policies: BTreeMap<(String, u32), LogicalId>,
+    pub(crate) policies: RetainedMap<(String, u32), LogicalId>,
     /// Retained records per kind, independent of logical serial high-water marks.
-    retained: BTreeMap<VertexKind, u64>,
+    retained: RetainedMap<VertexKind, u64>,
     /// Source key lookup used to reject conflicting source bytes.
-    sources: BTreeMap<String, LogicalId>,
+    sources: RetainedMap<String, LogicalId>,
     /// Parent uniqueness for all occurrence records.
-    parents: BTreeMap<LogicalId, LogicalId>,
+    parents: RetainedMap<LogicalId, LogicalId>,
     /// Measured retained source bytes.
     source_bytes: u64,
     /// Measured original occurrence count.
@@ -891,32 +893,47 @@ pub(crate) struct State {
     judgment_count: usize,
     /// Shared insertion log for all active transaction checkpoints.
     journal: Option<Vec<Undo>>,
+    /// Deterministic checkpoint allocation refusal for store-loss regression tests.
+    #[cfg(test)]
+    fail_checkpoint: bool,
 }
 
 impl State {
+    /// Whether mutations in this state have an inverse owner.
+    pub(crate) const fn is_journaled(&self) -> bool {
+        self.journal.is_some()
+    }
+
     /// Start an empty graph without allocating the requested maximum capacities.
     pub(crate) fn new() -> Self {
         Self {
             graph: DiGraph::new(),
-            indices: BTreeMap::new(),
+            indices: RetainedMap::default(),
             intern: InternIndex::default(),
-            scalar_judgments: BTreeMap::new(),
+            scalar_judgments: RetainedMap::default(),
             pi_judgments: PiIndex::default(),
-            policies: BTreeMap::new(),
-            retained: BTreeMap::new(),
-            sources: BTreeMap::new(),
-            parents: BTreeMap::new(),
+            policies: RetainedMap::default(),
+            retained: RetainedMap::default(),
+            sources: RetainedMap::default(),
+            parents: RetainedMap::default(),
             source_bytes: 0,
             originals: 0,
             payload: 0,
             judgment_bytes: 0,
             judgment_count: 0,
             journal: None,
+            #[cfg(test)]
+            fail_checkpoint: false,
         }
     }
 
     /// Capture the bounded counter inventory before any new record is inserted.
-    fn begin(&mut self) -> Journal {
+    fn begin(&mut self) -> Result<Journal, Fault> {
+        let at = Location::new("counter checkpoint");
+        #[cfg(test)]
+        if self.fail_checkpoint {
+            return Err(Fault::allocation(at));
+        }
         let checkpoint = Journal {
             counts: GraphCounts {
                 vertices: self.graph.node_count(),
@@ -927,12 +944,12 @@ impl State {
             },
             judgment_bytes: self.judgment_bytes,
             judgment_count: self.judgment_count,
-            retained: self.retained.clone(),
+            retained: self.retained.checkpoint(at)?,
             start: self.journal.as_ref().map_or(0, Vec::len),
             nested: self.journal.is_some(),
         };
         self.journal.get_or_insert_with(Vec::new);
-        checkpoint
+        Ok(checkpoint)
     }
 
     /// Reserve the undo entry before performing the corresponding mutation.
@@ -989,39 +1006,100 @@ impl State {
     fn undo(&mut self, entry: Undo) {
         match entry {
             Undo::Vertex { id, key, policy } => {
-                self.indices.remove(&id);
+                self.indices.remove_prepaid(&id);
                 if let Some(key) = key {
-                    self.intern.remove(key);
+                    self.intern.remove_prepaid(key);
                 }
                 if let Some(identity) = policy {
-                    self.policies.remove(&identity);
+                    self.policies.remove_prepaid(&identity);
                 }
             }
             Undo::ScalarJudgment { id, key } => {
-                self.indices.remove(&id);
-                self.scalar_judgments.remove(key.as_ref());
+                self.indices.remove_prepaid(&id);
+                self.scalar_judgments.remove_prepaid(key.as_ref());
             }
             Undo::PiJudgment { id, certificate } => {
-                self.indices.remove(&id);
-                self.pi_judgments.remove(certificate);
+                self.indices.remove_prepaid(&id);
+                self.pi_judgments.remove_prepaid(certificate);
             }
             Undo::Source(key) => {
-                self.sources.remove(&key);
+                self.sources.remove_prepaid(&key);
             }
             Undo::Parent(child) => {
-                self.parents.remove(&child);
+                self.parents.remove_prepaid(&child);
             }
         }
     }
 
-    /// Count retained proofs without walking unrelated objects or counting discarded identities.
-    pub(crate) fn proof_count(&self) -> u64 {
-        self.retained.get(&VertexKind::Proof).copied().unwrap_or(0)
+    /// Count retained proofs through the bounded, budgeted kind index.
+    pub(crate) fn proof_count(&self, budget: &mut Budget) -> Result<u64, Fault> {
+        Ok(self
+            .retained
+            .get(&VertexKind::Proof, 0, budget, Location::new("proof count"))?
+            .copied()
+            .unwrap_or(0))
     }
 
-    /// Record an append after preflight bounds total graph occupancy below `u32::MAX`.
-    fn retain(&mut self, kind: VertexKind) {
-        *self.retained.entry(kind).or_default() += 1;
+    /// Prepay a counter replacement or first-kind insertion before publication.
+    fn prepare_retain(
+        &mut self,
+        kind: VertexKind,
+        budget: &mut Budget,
+    ) -> Result<(usize, u64), Fault> {
+        let at = Location::new("retained kind count");
+        match self.retained.find(&kind, 0, budget, at)? {
+            Ok(position) => {
+                let (_, count) = self
+                    .retained
+                    .at(position)
+                    .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))?;
+                let next = count
+                    .checked_add(1)
+                    .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, at))?;
+                budget.work(2, at)?;
+                Ok((position, next))
+            }
+            Err(position) => {
+                self.retained.prepare_insert(position, false, budget, at)?;
+                Ok((position, 1))
+            }
+        }
+    }
+
+    /// A prepared count slot needs no further search or allocation.
+    fn retain_prepared(&mut self, kind: VertexKind, position: usize, next: u64) {
+        if let Some((stored, count)) = self.retained.at(position)
+            && *stored == kind
+        {
+            debug_assert_eq!(count.checked_add(1), Some(next));
+            self.retained.replace_prepared(position, next);
+        } else {
+            self.retained.insert_prepared(position, kind, 1);
+        }
+    }
+
+    /// Look up a sparse logical identity with its kind and serial comparison paid.
+    pub(crate) fn index(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<NodeIndex<u32>, Fault> {
+        let at = Location::new("node lookup");
+        self.indices
+            .get(&id, 0, budget, at)?
+            .copied()
+            .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))
+    }
+
+    /// Reserve the sorted identity insertion and its rollback inverse.
+    fn prepare_index_insert(&mut self, id: LogicalId, budget: &mut Budget) -> Result<usize, Fault> {
+        let at = Location::new("identity index insertion");
+        let Err(position) = self.indices.find(&id, 0, budget, at)? else {
+            return Err(Fault::invalid(InvalidCode::Reference, at));
+        };
+        self.indices
+            .prepare_insert(position, self.journal.is_some(), budget, at)?;
+        Ok(position)
     }
 
     /// Meter one structural-key probe by its own bytes, independent of retained payload.
@@ -1030,21 +1108,28 @@ impl State {
         key: &[u8],
         budget: &mut Budget,
     ) -> Result<Option<LogicalId>, Fault> {
-        lookup_work(key.len(), budget, Location::new("interning lookup"))?;
-        Ok(self.intern.get(key).copied())
+        let at = Location::new("interning lookup");
+        let floor = size(key.len(), at)?
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?;
+        Ok(self.intern.get(key, floor, budget, at)?.copied())
     }
 
     /// Look up a logical ID without indexing or trusting its kind.
-    pub(crate) fn node(&self, id: LogicalId) -> Result<&Vertex, Fault> {
-        self.indices
-            .get(&id)
-            .and_then(|index| self.graph.node_weight(*index))
+    pub(crate) fn node(&self, id: LogicalId, budget: &mut Budget) -> Result<&Vertex, Fault> {
+        let index = self.index(id, budget)?;
+        self.graph
+            .node_weight(index)
             .ok_or_else(|| Fault::invalid(InvalidCode::Reference, Location::new("node lookup")))
     }
 
     /// Read an expression of the correct vertex kind.
-    pub(crate) fn expression(&self, id: LogicalId) -> Result<&Expression, Fault> {
-        match self.node(id)? {
+    pub(crate) fn expression(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&Expression, Fault> {
+        match self.node(id, budget)? {
             Vertex::Expression(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1054,8 +1139,8 @@ impl State {
     }
 
     /// Read an immutable header of the correct graph kind.
-    pub(crate) fn header(&self, id: LogicalId) -> Result<&Header, Fault> {
-        match self.node(id)? {
+    pub(crate) fn header(&self, id: LogicalId, budget: &mut Budget) -> Result<&Header, Fault> {
+        match self.node(id, budget)? {
             Vertex::Header(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1065,8 +1150,8 @@ impl State {
     }
 
     /// Read an immutable region of the correct graph kind.
-    pub(crate) fn region(&self, id: LogicalId) -> Result<&Region, Fault> {
-        match self.node(id)? {
+    pub(crate) fn region(&self, id: LogicalId, budget: &mut Budget) -> Result<&Region, Fault> {
+        match self.node(id, budget)? {
             Vertex::Region(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1076,8 +1161,8 @@ impl State {
     }
 
     /// Read an immutable space of the correct graph kind.
-    pub(crate) fn space(&self, id: LogicalId) -> Result<&Space, Fault> {
-        match self.node(id)? {
+    pub(crate) fn space(&self, id: LogicalId, budget: &mut Budget) -> Result<&Space, Fault> {
+        match self.node(id, budget)? {
             Vertex::Space(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1087,8 +1172,8 @@ impl State {
     }
 
     /// Read an immutable arm of the correct graph kind.
-    pub(crate) fn arm(&self, id: LogicalId) -> Result<&CaseArm, Fault> {
-        match self.node(id)? {
+    pub(crate) fn arm(&self, id: LogicalId, budget: &mut Budget) -> Result<&CaseArm, Fault> {
+        match self.node(id, budget)? {
             Vertex::CaseArm(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1098,8 +1183,8 @@ impl State {
     }
 
     /// Read an immutable boundary of the correct graph kind.
-    pub(crate) fn boundary(&self, id: LogicalId) -> Result<&Boundary, Fault> {
-        match self.node(id)? {
+    pub(crate) fn boundary(&self, id: LogicalId, budget: &mut Budget) -> Result<&Boundary, Fault> {
+        match self.node(id, budget)? {
             Vertex::Boundary(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1109,8 +1194,12 @@ impl State {
     }
 
     /// Read an immutable source form of the correct graph kind.
-    pub(crate) fn source_form(&self, id: LogicalId) -> Result<&SourceForm, Fault> {
-        match self.node(id)? {
+    pub(crate) fn source_form(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&SourceForm, Fault> {
+        match self.node(id, budget)? {
             Vertex::SourceForm(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1120,8 +1209,8 @@ impl State {
     }
 
     /// Read an immutable context of the correct kind.
-    pub(crate) fn context(&self, id: LogicalId) -> Result<&Context, Fault> {
-        match self.node(id)? {
+    pub(crate) fn context(&self, id: LogicalId, budget: &mut Budget) -> Result<&Context, Fault> {
+        match self.node(id, budget)? {
             Vertex::Context(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1131,8 +1220,12 @@ impl State {
     }
 
     /// Read an occurrence of the correct kind.
-    pub(crate) fn occurrence(&self, id: LogicalId) -> Result<&Occurrence, Fault> {
-        match self.node(id)? {
+    pub(crate) fn occurrence(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&Occurrence, Fault> {
+        match self.node(id, budget)? {
             Vertex::Occurrence(value) => Ok(value),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1231,8 +1324,14 @@ impl Cas {
             let bytes = size(self.state.retained.len(), at)?
                 .checked_mul(64)
                 .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, at))?;
-            let previous = budget.reserve_temporary(bytes, at)?;
-            let checkpoint = self.state.begin();
+            let checkpoint = self.state.begin()?;
+            let previous = match budget.reserve_temporary(bytes, at) {
+                Ok(previous) => previous,
+                Err(error) => {
+                    self.state.finish(checkpoint, false);
+                    return Err(error);
+                }
+            };
             let result = crate::decision_kernel::cache::attempt(self, budget, f);
             self.state.finish(checkpoint, result.is_ok());
             if result.is_err() {
@@ -1286,19 +1385,24 @@ impl Cas {
     }
 
     /// Validate a live store-scoped handle and its logical reference.
-    pub(crate) fn checked(&self, handle: &Handle) -> Result<LogicalId, Fault> {
-        self.checked_in(&self.state, handle)
+    pub(crate) fn checked(&self, handle: &Handle, budget: &mut Budget) -> Result<LogicalId, Fault> {
+        self.checked_in(&self.state, handle, budget)
     }
 
     /// Validate an existing reference against the transaction's actual candidate state.
-    fn checked_in(&self, state: &State, handle: &Handle) -> Result<LogicalId, Fault> {
+    fn checked_in(
+        &self,
+        state: &State,
+        handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<LogicalId, Fault> {
         if !Arc::ptr_eq(&self.token, &handle.token) {
             return Err(Fault::invalid(
                 InvalidCode::ForeignHandle,
                 Location::new("handle lookup"),
             ));
         }
-        state.node(handle.id)?;
+        state.node(handle.id, budget)?;
         Ok(handle.id)
     }
 
@@ -1315,8 +1419,8 @@ impl Cas {
     /// # Errors
     /// Refuses a foreign/wrong-kind handle or insufficient work/allocation.
     pub fn operands(&self, handle: &Handle, budget: &mut Budget) -> Result<Vec<Handle>, Fault> {
-        let id = self.checked(handle)?;
-        let expression = self.state.expression(id)?;
+        let id = self.checked(handle, budget)?;
+        let expression = self.state.expression(id, budget)?;
         let at = Location::new("operand read");
         let bytes = size(expression.operands.len(), at)?
             .checked_mul(16)
@@ -1340,8 +1444,14 @@ impl Cas {
     ///
     /// # Errors
     /// Refuses foreign handles or handles of another vertex kind.
-    pub fn expression(&self, handle: &Handle) -> Result<(&Operator, &Sort), Fault> {
-        let expression = self.state.expression(self.checked(handle)?)?;
+    pub fn expression(
+        &self,
+        handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<(&Operator, &Sort), Fault> {
+        let expression = self
+            .state
+            .expression(self.checked(handle, budget)?, budget)?;
         Ok((&expression.operator, &expression.sort))
     }
 
@@ -1349,8 +1459,8 @@ impl Cas {
     ///
     /// # Errors
     /// Refuses a foreign handle or a handle of another vertex kind.
-    pub fn source(&self, handle: &Handle) -> Result<(&str, &str), Fault> {
-        match self.state.node(self.checked(handle)?)? {
+    pub fn source(&self, handle: &Handle, budget: &mut Budget) -> Result<(&str, &str), Fault> {
+        match self.state.node(self.checked(handle, budget)?, budget)? {
             Vertex::Source(source) => Ok((&source.key, &source.text)),
             _ => Err(Fault::invalid(
                 InvalidCode::Reference,
@@ -1413,8 +1523,8 @@ impl Cas {
             budget.work(payload.work, at)?;
             // The fixed vertex-kind inventory bounds checkpoint counter copying.
             budget.work(256, at)?;
+            let checkpoint = self.state.begin()?;
             let mut staged = std::mem::replace(&mut self.state, State::new());
-            let checkpoint = staged.begin();
             let result = self.admit_staged(&mut staged, drafts, reserved, budget);
             staged.finish(checkpoint, result.is_ok());
             if result.is_err() {
@@ -1469,7 +1579,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("generated syntax");
-        let header = match self.state.node(context)? {
+        let header = match self.state.node(context, budget)? {
             Vertex::Context(value) => value.header_id,
             Vertex::Header(_) => context,
             _ => return Err(Fault::invalid(InvalidCode::Reference, at)),
@@ -1512,9 +1622,10 @@ impl Cas {
         state: &State,
         reference: &Reference,
         locals: &[LogicalId],
+        budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         match reference {
-            Reference::Existing(handle) => self.checked_in(state, handle),
+            Reference::Existing(handle) => self.checked_in(state, handle, budget),
             Reference::Local(index) => usize::try_from(*index)
                 .ok()
                 .and_then(|index| locals.get(index))
@@ -1541,7 +1652,7 @@ impl Cas {
                 .try_reserve_exact(references.len())
                 .map_err(|_| Fault::allocation(at))?;
             for reference in references {
-                result.push(self.resolve(state, reference, locals)?);
+                result.push(self.resolve(state, reference, locals, budget)?);
             }
             Ok(result)
         })
@@ -1610,7 +1721,7 @@ impl Cas {
                 Location::new("condition admission"),
             ));
         };
-        let header = self.resolve(state, header, locals)?;
+        let header = self.resolve(state, header, locals, budget)?;
         let arguments = self.resolve_all(state, arguments, locals, budget)?;
         crate::validation::condition(state, kind, header, scope, &arguments, budget)?;
         let mut edges = vec![(header, Edge::InHeader)];
@@ -1653,14 +1764,14 @@ impl Cas {
                 Location::new("request admission"),
             ));
         };
-        let context = self.resolve(state, context, locals)?;
+        let context = self.resolve(state, context, locals, budget)?;
         let inputs = self.resolve_all(state, inputs, locals, budget)?;
         for handle in task.references() {
-            self.checked_in(state, handle)?;
+            self.checked_in(state, handle, budget)?;
         }
         let premises = self.resolve_all(state, premises, locals, budget)?;
         for premise in &premises {
-            if !matches!(state.node(*premise)?, Vertex::Proof(_)) {
+            if !matches!(state.node(*premise, budget)?, Vertex::Proof(_)) {
                 return Err(Fault::invalid(
                     InvalidCode::Reference,
                     Location::new("request admission"),
@@ -1700,16 +1811,26 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("source admission");
-        lookup_work(key.len(), budget, at)?;
-        if let Some(id) = state.sources.get(key) {
-            budget.work(size(text.len(), at)?, at)?;
-            if let Vertex::Source(source) = state.node(*id)?
-                && source.text == text
-            {
-                return Ok(*id);
+        let comparison = size(key.len(), at)?
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?;
+        let source_position = match state.sources.find(key, comparison, budget, at)? {
+            Ok(position) => {
+                let id = *state
+                    .sources
+                    .at(position)
+                    .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))?
+                    .1;
+                budget.work(size(text.len(), at)?, at)?;
+                if let Vertex::Source(source) = state.node(id, budget)?
+                    && source.text == text
+                {
+                    return Ok(id);
+                }
+                return Err(Fault::invalid(InvalidCode::SourceConflict, at));
             }
-            return Err(Fault::invalid(InvalidCode::SourceConflict, at));
-        }
+            Err(position) => position,
+        };
         let next = state
             .source_bytes
             .checked_add(size(text.len(), at)?)
@@ -1725,8 +1846,14 @@ impl Cas {
             pending,
             budget,
         )?;
+        let _inverse_credit =
+            state
+                .sources
+                .prepare_insert(source_position, state.journal.is_some(), budget, at)?;
         state.record(Undo::Source(key.to_owned()))?;
-        state.sources.insert(key.to_owned(), id);
+        state
+            .sources
+            .insert_prepared(source_position, key.to_owned(), id);
         state.source_bytes = next;
         Ok(id)
     }
@@ -1740,14 +1867,14 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(state, &draft.header, locals)?;
+        let header = self.resolve(state, &draft.header, locals, budget)?;
         let operands = self.resolve_all(state, &draft.operands, locals, budget)?;
         let (depth, unfolded) =
             crate::validation::expression(state, draft, header, &operands, budget)?;
         let explicit = draft
             .space
             .as_ref()
-            .map(|value| self.resolve(state, value, locals))
+            .map(|value| self.resolve(state, value, locals, budget))
             .transpose()?;
         let space = crate::header::expression_space(
             state,
@@ -1758,32 +1885,47 @@ impl Cas {
             &operands,
             budget,
         )?;
-        let ambient = crate::solving::sorts::ambient(state, header, &draft.sort)?;
-        let enclosure_exp = crate::enclosure::exp_metadata(state, &draft.operator, &operands)?;
-        let enclosure_power = crate::enclosure::power_metadata(state, &draft.operator, &operands)?;
+        let ambient = crate::solving::sorts::ambient(state, header, &draft.sort, budget)?;
+        let enclosure_exp =
+            crate::enclosure::exp_metadata(state, &draft.operator, &operands, budget)?;
+        let enclosure_power =
+            crate::enclosure::power_metadata(state, &draft.operator, &operands, budget)?;
         let (enclosure_logs, enclosure_log_bound) =
-            crate::enclosure::log_metadata(state, &draft.operator, &operands)?;
+            crate::enclosure::log_metadata(state, &draft.operator, &operands, budget)?;
         let expression = Vertex::Expression(Expression {
             enclosure_exp,
-            enclosure_clamp: crate::enclosure::clamp_metadata(state, &draft.operator, &operands)?,
+            enclosure_clamp: crate::enclosure::clamp_metadata(
+                state,
+                &draft.operator,
+                &operands,
+                budget,
+            )?,
             enclosure_derivative: crate::enclosure::derivative_depth(
                 state,
                 &draft.operator,
                 &operands,
+                budget,
             )?,
             enclosure_power,
             enclosure_saturation: crate::enclosure::saturation_metadata(
                 state,
                 &draft.operator,
                 &operands,
+                budget,
             )?,
             enclosure_logs,
             enclosure_log_bound,
-            enclosure_roots: crate::enclosure::has_roots(state, &draft.operator, &operands)?,
+            enclosure_roots: crate::enclosure::has_roots(
+                state,
+                &draft.operator,
+                &operands,
+                budget,
+            )?,
             supported_enclosure: crate::enclosure::supported_shape(
                 state,
                 &draft.operator,
                 &operands,
+                budget,
             )?,
             ambient,
             attachment: None,
@@ -1872,16 +2014,16 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         let at = Location::new("occurrence admission");
-        let expression = self.resolve(state, &draft.expression, locals)?;
+        let expression = self.resolve(state, &draft.expression, locals, budget)?;
         let source = draft
             .source
             .as_ref()
-            .map(|value| self.resolve(state, value, locals))
+            .map(|value| self.resolve(state, value, locals, budget))
             .transpose()?;
         let provenance = draft
             .provenance
             .as_ref()
-            .map(|value| self.resolve(state, value, locals))
+            .map(|value| self.resolve(state, value, locals, budget))
             .transpose()?;
         let children = self.resolve_all(state, &draft.children, locals, budget)?;
         let occurrence = Occurrence {
@@ -1897,7 +2039,7 @@ impl Cas {
         let mut edges = vec![(expression, Edge::Denotes)];
         for (position, child) in occurrence.children.iter().enumerate() {
             budget.work(1, at)?;
-            if state.parents.contains_key(child) || !unique.insert(*child) {
+            if state.parents.get(child, 0, budget, at)?.is_some() || !unique.insert(*child) {
                 return Err(Fault::invalid(InvalidCode::OccurrenceParent, at));
             }
             edges.push((*child, Edge::Child(position_u32(position)?)));
@@ -1927,8 +2069,15 @@ impl Cas {
             budget,
         )?;
         for child in unique {
+            let Err(position) = state.parents.find(&child, 0, budget, at)? else {
+                return Err(Fault::invalid(InvalidCode::Reference, at));
+            };
+            let _inverse_credit =
+                state
+                    .parents
+                    .prepare_insert(position, state.journal.is_some(), budget, at)?;
             state.record(Undo::Parent(child))?;
-            state.parents.insert(child, id);
+            state.parents.insert_prepared(position, child, id);
         }
         state.originals = originals;
         Ok(id)
@@ -1961,12 +2110,23 @@ impl Cas {
         let at = Location::new("vertex admission");
         let kind = vertex_kind(&vertex);
         let interned = !matches!(kind, VertexKind::Occurrence | VertexKind::Binder);
-        if interned {
-            lookup_work(key.len(), budget, Location::new("interning lookup"))?;
-            if let Some(id) = state.intern.get_key(&key) {
-                return Ok(*id);
+        let intern_position = if interned {
+            let lookup_at = Location::new("interning lookup");
+            let floor = size(key.len(), lookup_at)?
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Work, lookup_at))?;
+            match state.intern.find_key(&key, floor, budget, lookup_at)? {
+                Ok(position) => {
+                    return state
+                        .intern
+                        .value_at(position)
+                        .ok_or_else(|| Fault::invalid(InvalidCode::Reference, lookup_at));
+                }
+                Err(position) => Some(position),
             }
-        }
+        } else {
+            None
+        };
         let node_count = size(state.graph.node_count(), at)?
             .checked_add(1)
             .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, at))?;
@@ -2004,15 +2164,18 @@ impl Cas {
             .try_reserve_exact(edges.len())
             .map_err(|_| Fault::allocation(at))?;
         for (target, role) in edges {
-            let index = state
-                .indices
-                .get(target)
-                .copied()
-                .ok_or_else(|| Fault::invalid(InvalidCode::Reference, at))?;
+            let index = state.index(*target, budget)?;
             targets.push((index, *role));
+        }
+        if let Some(position) = intern_position {
+            state
+                .intern
+                .prepare_insert_at(position, state.journal.is_some(), budget, at)?;
         }
         let serial = self.token.identities.reserve(kind, 1, at)?;
         let id = LogicalId { kind, serial };
+        let index_position = state.prepare_index_insert(id, budget)?;
+        let (retained_position, retained_next) = state.prepare_retain(kind, budget)?;
         state.record(Undo::Vertex {
             id,
             key: interned.then(|| key.clone()),
@@ -2025,10 +2188,12 @@ impl Cas {
         for (target, role) in targets {
             let _edge = state.graph.add_edge(index, target, role);
         }
-        state.indices.insert(id, index);
-        state.retain(kind);
-        if interned {
-            state.intern.insert_key(key, id, &self.token);
+        state.indices.insert_prepared(index_position, id, index);
+        state.retain_prepared(kind, retained_position, retained_next);
+        if let Some(position) = intern_position {
+            state
+                .intern
+                .insert_prepared_key(position, key, id, &self.token);
         }
         state.payload = payload;
         Ok(id)
@@ -2065,16 +2230,6 @@ pub(crate) fn vertex_payload(
         .and_then(|n| size(edges, at).ok()?.checked_mul(32)?.checked_add(n))
         .and_then(|n| n.checked_add(certificate_bytes))
         .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, at))
-}
-
-/// Charge the key bytes and one map operation, rather than every retained entry.
-fn lookup_work(bytes: usize, budget: &mut Budget, at: Location) -> Result<(), Fault> {
-    crate::work_observation::observe!(budget, at, {
-        let charge = size(bytes, at)?
-            .checked_add(1)
-            .ok_or_else(|| Fault::capacity(BudgetKind::Work, at))?;
-        budget.work(charge, at)
-    })
 }
 
 /// Convert a host collection length without truncation.
@@ -2306,4 +2461,102 @@ fn occurrence_key(occurrence: &Occurrence, out: &mut Encoder<'_>) -> Result<(), 
         out.name(name)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod checkpoint_refusal_tests {
+    use super::{Cas, Draft};
+    use crate::budget::{Budget, BudgetKind, Limits};
+    use crate::error::{Fault, Location};
+    use crate::testing::common::TestResult;
+
+    fn populated() -> TestResult<(Cas, super::Handle)> {
+        let mut cas = Cas::new(Limits::default())?;
+        let mut budget = Budget::new(Limits::default())?;
+        let handle = cas
+            .admit(
+                &[Draft::Source {
+                    key: "checkpoint".into(),
+                    text: "retained source".into(),
+                }],
+                &mut budget,
+            )?
+            .remove(0);
+        Ok((cas, handle))
+    }
+
+    /// ´test:unit:backend-admission-checkpoint-refusal´
+    #[test]
+    fn backend_admission_checkpoint_refusal() -> TestResult {
+        let (mut cas, handle) = populated()?;
+        let counts = cas.counts();
+        let mut budget = Budget::new(Limits::default())?;
+        let limits = budget.limits().clone();
+        cas.state.fail_checkpoint = true;
+        assert_eq!(
+            cas.admit(
+                &[Draft::Source {
+                    key: "second".into(),
+                    text: "another".into(),
+                }],
+                &mut budget
+            ),
+            Err(Fault::allocation(Location::new("counter checkpoint")))
+        );
+        assert_eq!(cas.counts(), counts);
+        assert_eq!(*budget.limits(), limits);
+        assert_eq!(
+            cas.source(&handle, &mut budget)?,
+            ("checkpoint", "retained source")
+        );
+        Ok(())
+    }
+
+    /// ´test:unit:backend-transaction-checkpoint-refusal´
+    #[test]
+    fn backend_transaction_checkpoint_refusal() -> TestResult {
+        let (mut cas, handle) = populated()?;
+        let counts = cas.counts();
+        let mut budget = Budget::new(Limits::default())?;
+        let limits = budget.limits().clone();
+        cas.state.fail_checkpoint = true;
+        assert_eq!(
+            cas.transaction(&mut budget, |_, _| Ok(())),
+            Err(Fault::allocation(Location::new("counter checkpoint")))
+        );
+        assert_eq!(cas.counts(), counts);
+        assert_eq!(*budget.limits(), limits);
+        assert_eq!(
+            cas.source(&handle, &mut budget)?,
+            ("checkpoint", "retained source")
+        );
+        Ok(())
+    }
+
+    /// A checkpoint followed by a refused temporary reservation leaves no journal behind.
+    /// ´test:unit:backend-transaction-reservation-refusal´
+    #[test]
+    fn backend_transaction_reservation_refusal() -> TestResult {
+        let (mut cas, handle) = populated()?;
+        let counts = cas.counts();
+        let mut budget = Budget::new(Limits {
+            staged_payload_bytes: 0,
+            ..Limits::default()
+        })?;
+        let limits = budget.limits().clone();
+        let at = Location::new("proof transaction");
+        assert_eq!(
+            cas.transaction(&mut budget, |_, _| Ok(())),
+            Err(Fault::exhausted(BudgetKind::StagedPayloadBytes, 0, 64, at))
+        );
+        assert_eq!(budget.usage().work, 256);
+        assert_eq!(cas.counts(), counts);
+        assert!(cas.state.journal.is_none());
+        assert_eq!(*budget.limits(), limits);
+        assert_eq!(
+            cas.source(&handle, &mut budget)?,
+            ("checkpoint", "retained source")
+        );
+        Ok(())
+    }
 }

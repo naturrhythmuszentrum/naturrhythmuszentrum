@@ -64,19 +64,20 @@ fn family_domain(
     budget: &mut Budget,
 ) -> Result<(), Error> {
     budget.work(3, AT)?;
-    let SolveView::SpaceFamily(data) = cas.solve_view(family)? else {
+    let SolveView::SpaceFamily(data) = cas.solve_view(family, budget)? else {
         return Err(Error::Domain);
     };
     if data.unknowns != problem.unknowns {
         return Err(Error::Domain);
     }
-    let SolveView::CoordinateSpace(coefficients) = cas.solve_view(&data.coefficients)? else {
+    let SolveView::CoordinateSpace(coefficients) = cas.solve_view(&data.coefficients, budget)?
+    else {
         return Err(Error::Domain);
     };
     if !coefficients.coordinates.is_empty() {
         return Err(Error::Domain);
     }
-    let SolveView::ParameterBase(base) = cas.solve_view(&data.base)? else {
+    let SolveView::ParameterBase(base) = cas.solve_view(&data.base, budget)? else {
         return Err(Error::Domain);
     };
     if base.coordinates != problem.coefficients {
@@ -113,7 +114,7 @@ fn coordinates(
     budget: &mut Budget,
 ) -> Result<(), Error> {
     budget.work(1, AT)?;
-    let SolveView::CoordinateSpace(data) = cas.solve_view(node)? else {
+    let SolveView::CoordinateSpace(data) = cas.solve_view(node, budget)? else {
         return Err(Error::Domain);
     };
     if data.coordinates.len() != 2 || inputs.len() != 2 {
@@ -144,7 +145,7 @@ pub(super) fn unknown(
     budget: &mut Budget,
 ) -> Result<(), Error> {
     budget.work(1, AT)?;
-    let SolveView::CoordinateSpace(data) = cas.solve_view(space)? else {
+    let SolveView::CoordinateSpace(data) = cas.solve_view(space, budget)? else {
         return Err(Error::Structure);
     };
     let [coordinate] = data.coordinates.as_slice() else {
@@ -161,7 +162,7 @@ pub(super) fn unknown(
         0,
         budget,
     )?;
-    let (_, sort) = cas.expression(value)?;
+    let (_, sort) = cas.expression(value, budget)?;
     if *sort != Sort::Value(AtomicSort::Scalar(Field::Complex)) {
         return Err(Error::Structure);
     }
@@ -174,7 +175,7 @@ pub(super) fn target(
     operator: &super::PositiveReciprocalMap,
     budget: &mut Budget,
 ) -> Result<(), Error> {
-    let region = cas.admissible_region(operator.frame().context())?;
+    let region = cas.admissible_region(operator.frame().context(), budget)?;
     let described = cas.describe_syntax(&region, budget)?;
     let SyntaxNode::Region(AmbientDomain::Product { coordinates: space }, _) = described.node
     else {

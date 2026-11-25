@@ -19,12 +19,12 @@ pub(crate) fn contained(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let target = cas.state.region(cas.checked(parent)?)?;
+        let target = cas.state.region(cas.checked(parent, budget)?, budget)?;
         let mut pending = vector(1, budget)?;
-        pending.push(cas.checked(child)?);
+        pending.push(cas.checked(child, budget)?);
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            let current = cas.state.region(id)?;
+            let current = cas.state.region(id, budget)?;
             if (&current.ambient, &current.scope, current.header)
                 != (&target.ambient, &target.scope, target.header)
             {
@@ -92,11 +92,11 @@ pub(crate) fn check(
     {
         return Err(invalid());
     }
-    let original = problem(cas, &certificate.problem)?;
-    super::proof::region(cas, &draft.context, original, &certificate.region)?;
+    let original = problem(cas, &certificate.problem, budget)?;
+    super::proof::region(cas, &draft.context, original, &certificate.region, budget)?;
     contained(cas, &certificate.region, &original.region, budget)?;
-    let supplied = tuple(cas, &certificate.tuple)?;
-    let unknowns = coordinates(cas, &original.unknowns)?;
+    let supplied = tuple(cas, &certificate.tuple, budget)?;
+    let unknowns = coordinates(cas, &original.unknowns, budget)?;
     if (
         &supplied.coordinates,
         &supplied.scope,

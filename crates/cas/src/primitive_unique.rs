@@ -30,7 +30,7 @@ pub(crate) fn check(
     if draft.certificate != Certificate::None || !(2..=3).contains(&premises.len()) {
         return Err(invalid());
     }
-    let domain = cas.state.space(cas.checked(space)?)?.domain;
+    let domain = cas.state.space(cas.checked(space, budget)?, budget)?.domain;
     crate::region::check_open(&crate::region_cache::partition(cas, &[domain], budget)?)?;
     let first = derivative(left, space, premises.first().ok_or_else(invalid)?)?;
     let second = derivative(right, space, premises.get(1).ok_or_else(invalid)?)?;

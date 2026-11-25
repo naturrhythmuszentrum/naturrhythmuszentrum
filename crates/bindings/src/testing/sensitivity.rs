@@ -20,7 +20,10 @@ pub(crate) fn coefficient(
     expression: &Handle,
     point: &[(&str, i128)],
 ) -> TestResult<Fraction> {
-    let (operator, _) = cas.expression(expression)?;
+    let (operator, _) = cas.expression(
+        expression,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let mut ledger = Budget::new(Limits::default())?;
     let operands = cas.operands(expression, &mut ledger)?;
     let values = operands

@@ -16,7 +16,8 @@ use crate::testing::graph::{admit, expression, fixture, occurrence};
 #[test]
 fn binder_substitution() -> TestResult {
     let (mut cas, context) = fixture()?;
-    let syntax_header = cas.context_header(&context)?;
+    let syntax_header =
+        cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
     let y = expression(&mut cas, &context, Operator::Free("y".into()), real(), &[])?;
     let body = admit(
         &mut cas,
@@ -67,7 +68,11 @@ fn binder_substitution() -> TestResult {
     )?;
     let operands = cas.operands(&replaced, &mut budget()?)?;
     let body = operands.first().ok_or("sum lost its body")?;
-    assert_eq!(cas.expression(body)?.0, &Operator::Free("y".into()));
+    assert_eq!(
+        cas.expression(body, &mut crate::testing::budgets::graph_budget()?)?
+            .0,
+        &Operator::Free("y".into())
+    );
     let root = cas.materialize_derived(&replaced, &sum, &mut budget()?)?;
     let walk = cas.walk_derived(&root, &mut budget()?)?;
     assert!(matches!(

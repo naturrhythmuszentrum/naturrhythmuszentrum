@@ -21,10 +21,14 @@ const fn unavailable() -> Fault {
 }
 
 /// Conservative simultaneous proposal arrays, including binary argument slots.
-pub(crate) fn payload(cas: &Cas, subject: &Handle) -> Result<u64, Fault> {
+pub(crate) fn payload(
+    cas: &Cas,
+    subject: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<u64, Fault> {
     Ok(cas
         .state
-        .expression(cas.checked(subject)?)?
+        .expression(cas.checked(subject, budget)?, budget)?
         .unfolded
         .saturating_mul(256)
         .saturating_add(512))
@@ -37,7 +41,7 @@ pub(crate) fn certificate(
     region: &Handle,
     budget: &mut Budget,
 ) -> Result<CertificateRealSign, Fault> {
-    let bytes = payload(cas, subject)?;
+    let bytes = payload(cas, subject, budget)?;
     budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
     budget.with_retained_payload(bytes, AT, |budget| {
         build::certificate(cas, subject, region, budget)
@@ -62,7 +66,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
         self.proof_limits(budget, |cas, budget| {
-            let region = cas.admissible_region(context)?;
+            let region = cas.admissible_region(context, budget)?;
             let certificate = certificate(cas, subject, &region, budget)?;
             let conclusion = certificate.steps.last().ok_or_else(unavailable)?.conclusion;
             let step = ApplicationDraft {
@@ -79,7 +83,8 @@ impl Cas {
                 substitutions: Vec::new(),
                 certificate: Certificate::Solve(Box::new(SolveCertificate::RealSign(certificate))),
             };
-            budget.with_retained_payload(payload(cas, subject)?, AT, |budget| {
+            let payload_bytes = payload(cas, subject, budget)?;
+            budget.with_retained_payload(payload_bytes, AT, |budget| {
                 cas.transaction(budget, |candidate, budget| {
                     let witness = candidate.check_proof(context, &[step], budget)?;
                     budget.check(

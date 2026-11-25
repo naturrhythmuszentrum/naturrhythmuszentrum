@@ -176,20 +176,20 @@ fn kernel_live_trace_lifecycle() -> TestResult {
     assert!(matches!(fault, LiveDecisionError::Retired));
     assert_eq!(heap.provenance_usage(), before);
     assert_eq!(capture, 2969);
-    assert_eq!(traced - capture, 393_667);
-    assert_eq!(selected - traced, 255_220);
+    assert_eq!(traced - capture, 394_095);
+    assert_eq!(selected - traced, 255_308);
     assert_eq!(prepared_work - selected, 4949);
     assert_eq!(publication - prepared_work, 193);
     assert_eq!(counted - publication, 125);
     assert_eq!(current - counted, 66);
-    assert_eq!(current, 657_189);
+    assert_eq!(current, 657_705);
     assert_eq!(exported, 1900);
-    assert_eq!(inspected - exported, 479_332);
+    assert_eq!(inspected - exported, 479_834);
     assert_eq!(trace_bytes, 8320);
     assert_eq!(bytes.len(), 1900);
-    assert_eq!(physical.usage().work, 107_112);
+    assert_eq!(physical.usage().work, 107_334);
     assert_eq!(budget.usage().work - current, 35);
-    assert_eq!(physical.usage().work + budget.usage().work - 17, 764_319);
+    assert_eq!(physical.usage().work + budget.usage().work - 17, 765_057);
     Ok(())
 }
 

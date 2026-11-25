@@ -16,8 +16,8 @@ pub(crate) fn subset(
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let first = cas.state.region(left)?;
-        let second = cas.state.region(right)?;
+        let first = cas.state.region(left, budget)?;
+        let second = cas.state.region(right, budget)?;
         if first.ambient != second.ambient
             || first.scope != second.scope
             || first.header != second.header
@@ -36,7 +36,7 @@ pub(crate) fn subset(
         while let Some((id, depth)) = pending.pop() {
             budget.work(1, AT)?;
             budget.check(BudgetKind::Depth, depth, AT)?;
-            let value = cas.state.region(id)?;
+            let value = cas.state.region(id, budget)?;
             if id == right
                 || matches!(value.expression, RegionExpr::Empty)
                 || matches!(second.expression, RegionExpr::Ambient)
@@ -73,7 +73,7 @@ pub(crate) fn projection(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let value = cas.state.region(cas.checked(total)?)?;
+        let value = cas.state.region(cas.checked(total, budget)?, budget)?;
         let over = value.lies_over.as_ref().ok_or_else(invalid)?;
         for premise in premises {
             budget.work(1, AT)?;
@@ -103,8 +103,8 @@ pub(crate) fn lifted(
         while let Some((source, target, depth)) = pending.pop() {
             budget.work(1, AT)?;
             budget.check(BudgetKind::Depth, depth, AT)?;
-            let left = cas.state.region(source)?;
-            let right = cas.state.region(target)?;
+            let left = cas.state.region(source, budget)?;
+            let right = cas.state.region(target, budget)?;
             if left.header != right.header || left.scope != right.scope {
                 return Ok(false);
             }
@@ -180,7 +180,7 @@ pub(crate) fn family_state(
         let mut found = None;
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            let value = state.region(id)?;
+            let value = state.region(id, budget)?;
             if let Some(over) = &value.lies_over {
                 if found.is_some_and(|family| family != over.family) {
                     return Err(invalid());

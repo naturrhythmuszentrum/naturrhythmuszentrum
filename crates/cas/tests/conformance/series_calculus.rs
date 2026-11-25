@@ -31,7 +31,12 @@ fn series_calculus_coefficient_roundtrips() -> TestResult {
             .cas
             .check_proof(&f.base.context, &f.steps, &mut default_budget()?)?;
         let (operation, proofs) = if kind < 9 {
-            let constant = f.base.cas.series_object(&input)?.coefficients[0].clone();
+            let constant = f
+                .base
+                .cas
+                .series_object(&input, &mut crate::testing::budgets::graph_budget()?)?
+                .coefficients[0]
+                .clone();
             let fact = defined(&mut f.base, &constant)?;
             let proof = f
                 .base
@@ -53,12 +58,24 @@ fn series_calculus_coefficient_roundtrips() -> TestResult {
             .compute_series(&operation, &proofs, &mut default_budget()?)?;
         let (_, recovered) = endpoints(&witness.judgment().statement)?;
         assert_eq!(
-            f.base.cas.series_object(&input)?.coefficients,
-            f.base.cas.series_object(&recovered)?.coefficients
+            f.base
+                .cas
+                .series_object(&input, &mut crate::testing::budgets::graph_budget()?)?
+                .coefficients,
+            f.base
+                .cas
+                .series_object(&recovered, &mut crate::testing::budgets::graph_budget()?)?
+                .coefficients
         );
         assert_eq!(
-            f.base.cas.series_object(&input)?.order,
-            f.base.cas.series_object(&recovered)?.order
+            f.base
+                .cas
+                .series_object(&input, &mut crate::testing::budgets::graph_budget()?)?
+                .order,
+            f.base
+                .cas
+                .series_object(&recovered, &mut crate::testing::budgets::graph_budget()?)?
+                .order
         );
     }
     Ok(())
@@ -255,7 +272,14 @@ fn series_calculus_order_one_supplied_certificate() -> TestResult {
         .cas
         .export_witness(&positive, &mut default_budget()?)?;
     let (_, one) = endpoints(&source.expected.statement)?;
-    assert_eq!(source.base.cas.series_object(&one)?.order, 1);
+    assert_eq!(
+        source
+            .base
+            .cas
+            .series_object(&one, &mut crate::testing::budgets::graph_budget()?)?
+            .order,
+        1
+    );
     let supplied = ApplicationDraft {
         rule: Primitive::SeriesDerive,
         context: source.base.context.clone(),
@@ -364,7 +388,10 @@ fn series_calculus_output_extraction_endpoints() -> TestResult {
             .cas
             .check_proof(&f.base.context, &f.steps, &mut default_budget()?)?;
         let (_, output) = endpoints(&witness.judgment().statement)?;
-        let object = f.base.cas.series_object(&output)?;
+        let object = f
+            .base
+            .cas
+            .series_object(&output, &mut crate::testing::budgets::graph_budget()?)?;
         let order = object.order;
         let expected = object
             .coefficients
@@ -529,7 +556,11 @@ fn series_calculus_metadata_twins() -> TestResult {
         for change in 0..5 {
             let mut f = fixture(kind, false)?;
             let (_, output) = endpoints(&f.expected.statement)?;
-            let original = f.base.cas.series_object(&output)?.clone();
+            let original = f
+                .base
+                .cas
+                .series_object(&output, &mut crate::testing::budgets::graph_budget()?)?
+                .clone();
             let mut value = SeriesObject {
                 field: Reference::Existing(original.field),
                 centre: Reference::Existing(original.centre),

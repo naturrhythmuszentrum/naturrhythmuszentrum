@@ -13,7 +13,7 @@ fn lc_acceptance_construction_costs_and_boundaries() -> TestResult {
     let spectral = crate::spectral_testing::Fixture::new(["5", "1/10", "1/2000"])?;
     let entries = spectral.law.state().entries();
     let plan = state_fixture::plan(entries)?;
-    assert_eq!(plan.construction, [25_805, 52_236, 325_742, 495_708]);
+    assert_eq!(plan.construction, [25_817, 52_260, 325_993, 495_983]);
     assert_eq!(
         [
             plan.contract.frame().retained_payload_bytes(),
@@ -22,7 +22,7 @@ fn lc_acceptance_construction_costs_and_boundaries() -> TestResult {
         ],
         [20_464, 31_924, 31_924]
     );
-    for (kind, needed) in [495_708, 187_614, 63_848].into_iter().enumerate() {
+    for (kind, needed) in [495_983, 187_614, 63_848].into_iter().enumerate() {
         for (limit, success) in [(needed, true), (needed - 1, false)] {
             assert_eq!(
                 state_fixture::plan_with_budget(entries, &mut policy(kind, limit, 0)?).is_ok(),
@@ -30,7 +30,7 @@ fn lc_acceptance_construction_costs_and_boundaries() -> TestResult {
             );
         }
     }
-    assert!(state_fixture::plan_with_budget(entries, &mut policy(0, 495_708, 1)?).is_err());
+    assert!(state_fixture::plan_with_budget(entries, &mut policy(0, 495_983, 1)?).is_err());
     Ok(())
 }
 
@@ -46,7 +46,7 @@ fn lc_acceptance_overlap_replay_costs_and_boundaries() -> TestResult {
         assert_eq!((bytes.len(), budget.usage().work), (710, 710));
         let mut budget = ledger()?;
         replay(&bytes, &mut budget)?;
-        assert_eq!(budget.usage().work, 57_448);
+        assert_eq!(budget.usage().work, 57_495);
         for (limit, prior, success) in [(710, 0, true), (709, 0, false), (710, 1, false)] {
             assert_eq!(
                 relation
@@ -55,7 +55,7 @@ fn lc_acceptance_overlap_replay_costs_and_boundaries() -> TestResult {
                 success
             );
         }
-        for (limit, prior, success) in [(57_448, 0, true), (57_447, 0, false), (57_448, 1, false)] {
+        for (limit, prior, success) in [(57_495, 0, true), (57_494, 0, false), (57_495, 1, false)] {
             assert_eq!(
                 replay(&bytes, &mut policy(0, limit, prior)?).is_ok(),
                 success

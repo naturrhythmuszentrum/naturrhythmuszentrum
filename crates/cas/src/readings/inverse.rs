@@ -91,12 +91,12 @@ impl Cas {
     ) -> Result<CheckedMapInverse, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                let home = cas.checked(context)?;
-                let original = cas.checked(&map.expression)?;
+                let home = cas.checked(context, budget)?;
+                let original = cas.checked(&map.expression, budget)?;
                 if map.inputs != map.outputs {
                     return Err(invalid(InvalidCode::ReadingShape));
                 }
-                let header = cas.state.context(home)?.header_id;
+                let header = cas.state.context(home, budget)?.header_id;
                 let entries = exact_expand::expand(cas, original, budget)?;
                 let retained = size(entries.len(), AT)?.saturating_mul(128);
                 let previous = budget.reserve_temporary(retained, AT)?;
@@ -217,8 +217,11 @@ impl Cas {
         determinant: LogicalId,
         budget: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
-        let header = self.state.context(self.checked(context)?)?.header_id;
-        let matrix = self.checked(&original.expression)?;
+        let header = self
+            .state
+            .context(self.checked(context, budget)?, budget)?
+            .header_id;
+        let matrix = self.checked(&original.expression, budget)?;
         let actual = self.map_scalar(
             header,
             Operator::MatrixMap(crate::model::MatrixOperation::Determinant),
@@ -233,7 +236,7 @@ impl Cas {
             conclusion: Statement::Equality {
                 left: self.handle(quotient),
                 right: self.handle(one),
-                domain: self.admissible_region(context)?,
+                domain: self.admissible_region(context, budget)?,
                 domain_contract: DomainContract::DefinedAndEqual,
             },
             premises: Vec::new(),
@@ -268,16 +271,16 @@ impl Cas {
         determinant: LogicalId,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        if matches!(&self.state.expression(determinant)?.operator, Operator::Rational(value) if value.is_zero())
+        if matches!(&self.state.expression(determinant, budget)?.operator, Operator::Rational(value) if value.is_zero())
         {
             return Err(invalid(InvalidCode::ReadingSingular));
         }
-        let home = self.checked(context)?;
+        let home = self.checked(context, budget)?;
         let mut conditions = Conditions::default();
         conditions.endpoint(
             &self.state,
             home,
-            self.checked(&original.expression)?,
+            self.checked(&original.expression, budget)?,
             budget,
         )?;
         conditions.require(

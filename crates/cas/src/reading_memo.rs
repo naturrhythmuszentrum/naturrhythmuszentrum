@@ -105,7 +105,7 @@ fn lookup(cas: &Cas, key: &[u8], budget: &mut Budget) -> Result<(Option<Handle>,
     if policy != *budget.limits() {
         return Ok((None, false));
     }
-    cas.checked(&proof)?;
+    cas.checked(&proof, budget)?;
 
     Ok((Some(proof), false))
 }

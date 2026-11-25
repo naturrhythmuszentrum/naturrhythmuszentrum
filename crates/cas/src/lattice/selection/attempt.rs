@@ -49,7 +49,7 @@ pub struct CheckedLatticeAttempt {
     candidate: LatticeSelection,
     /// Both the original-target identity and every enclosure scalar have passed replay.
     enclosure: LatticeEnclosure,
-    /// Cumulative Work at successful preparation, including the caller's prior Work.
+    /// Cumulative Work after successful preparation and publication, including prior Work.
     spent_work: u64,
 }
 
@@ -109,7 +109,7 @@ impl CheckedLatticeAttempt {
         &self.cover
     }
 
-    /// Monotone caller Work recorded after complete evidence validation.
+    /// Monotone caller Work recorded after complete preparation and publication.
     #[must_use]
     pub const fn spent_work(&self) -> u64 {
         self.spent_work
@@ -177,7 +177,11 @@ impl Cas {
             )
         });
         budget.restore_limits(previous);
-        result
+        result.map(|mut attempt| {
+            // The enclosing attempt can publish checked judgments after validation.
+            attempt.spent_work = budget.usage().work;
+            attempt
+        })
     }
 
     /// Validate nearest evidence, including exact orthogonality, before attempting cuts.
@@ -202,7 +206,10 @@ impl Cas {
             )
         });
         budget.restore_limits(previous);
-        result
+        result.map(|mut attempt| {
+            attempt.spent_work = budget.usage().work;
+            attempt
+        })
     }
 
     /// Validate and prepay local evidence under both the caller's and arena's unchanged ceilings.
@@ -215,10 +222,13 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeAttempt, Fault> {
         budget.work(4, AT)?;
-        let Vertex::Proof(application) = self.state.node(self.checked(cover.proof())?)? else {
+        let Vertex::Proof(application) = self
+            .state
+            .node(self.checked(cover.proof(), budget)?, budget)?
+        else {
             return Err(invalid());
         };
-        let Vertex::ScopedApplication(premise) = self.state.node(*application)? else {
+        let Vertex::ScopedApplication(premise) = self.state.node(*application, budget)? else {
             return Err(invalid());
         };
         let bytes = super::wire::payload(self, expected, enclosure, budget)?.saturating_add(128);
@@ -263,7 +273,7 @@ impl Cas {
         attempt: &'a CheckedLatticeAttempt,
         budget: &mut Budget,
     ) -> Result<LatticeSelectionOutcome<'a>, Fault> {
-        self.checked(&attempt.cover)?;
+        self.checked(&attempt.cover, budget)?;
         let result = self.prove_lattice_selection_root(
             &attempt.cover,
             &attempt.candidate,

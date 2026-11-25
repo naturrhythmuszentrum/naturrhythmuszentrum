@@ -16,7 +16,7 @@ pub(crate) fn read(
     domain: &Handle,
     budget: &mut Budget,
 ) -> Result<Dense, CoefficientFailure> {
-    if let Some(value) = body(cas, root)? {
+    if let Some(value) = body(cas, root, budget)? {
         if region::family(cas, domain.logical_id(), budget)? != value.family.logical_id()
             || !region::subset(cas, domain.logical_id(), value.region.logical_id(), budget)?
         {
@@ -44,11 +44,11 @@ pub(crate) fn read(
             budget,
         );
     }
-    let expression = cas.state.expression(root)?;
+    let expression = cas.state.expression(root, budget)?;
     let [id] = expression.arms.as_slice() else {
         return Err(invalid().into());
     };
-    let arm = cas.state.arm(*id)?;
+    let arm = cas.state.arm(*id, budget)?;
     if !region::subset(cas, domain.logical_id(), arm.region, budget)? {
         return Err(invalid().into());
     }

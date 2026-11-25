@@ -103,10 +103,10 @@ fn declared(
     let mut pending = vec![stratum.logical_id()];
     while let Some(id) = pending.pop() {
         budget.work(1, super::AT)?;
-        match &cas.state.region(id)?.expression {
+        match &cas.state.region(id, budget)?.expression {
             crate::domain_model::RegionExpr::GuardTrue { base, predicate } => {
                 let (kind, arguments) =
-                    crate::solving::elementary::evidence::predicate(cas, *predicate)?;
+                    crate::solving::elementary::evidence::predicate(cas, *predicate, budget)?;
                 if let (PredicateKind::Positive, [subject]) = (kind, arguments) {
                     let value = crate::solving::solve_search::read::expression(
                         cas, &engine, *subject, "", stratum, budget,
@@ -144,7 +144,7 @@ fn guard(
     budget: &mut Budget,
 ) -> Result<Option<(Handle, bool, bool)>, Fault> {
     if let Some((subject, imaginary)) = declared(cas, stratum, radicand, budget)? {
-        let derived = cas.state.expression(subject.logical_id())?.operator == Operator::Div;
+        let derived = cas.state.expression(subject.logical_id(), budget)?.operator == Operator::Div;
         return Ok(Some((subject, imaginary, derived)));
     }
     transport::guard(cas, stratum, radicand, budget)
@@ -181,23 +181,23 @@ fn candidate(
     }
     let over = cas
         .state
-        .region(construction.region.logical_id())?
+        .region(construction.region.logical_id(), budget)?
         .lies_over
         .clone()
         .ok_or_else(invalid)?;
-    let family = super::mapping::family_data(&cas.state, &cas.handle(over.family))?;
-    let base = super::mapping::base_data(&cas.state, &family.base)?;
+    let family = super::mapping::family_data(&cas.state, &cas.handle(over.family), budget)?;
+    let base = super::mapping::base_data(&cas.state, &family.base, budget)?;
     let coordinates = base.coordinates.clone();
-    let width = crate::solving::graph::coordinates(&cas.state, coordinates.logical_id())?
+    let width = crate::solving::graph::coordinates(&cas.state, coordinates.logical_id(), budget)?
         .coordinates
         .len();
     let CoefficientDomainData::Fraction { base: ground, .. } =
-        crate::solving::coefficients::storage::domain(&cas.state, &source.domain)?
+        crate::solving::coefficients::storage::domain(&cas.state, &source.domain, budget)?
     else {
         return Ok(None);
     };
     if !matches!(
-        crate::solving::coefficients::storage::domain(&cas.state, ground)?,
+        crate::solving::coefficients::storage::domain(&cas.state, ground, budget)?,
         CoefficientDomainData::Rational
     ) {
         return Ok(None);

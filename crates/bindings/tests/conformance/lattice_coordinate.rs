@@ -22,67 +22,67 @@ pub(super) const COSTS: [Cost; 13] = [
     Cost {
         fixture: 0,
         name: "axis_a",
-        work: 39_823,
+        work: 39_893,
     },
     Cost {
         fixture: 0,
         name: "period0",
-        work: 39_184,
+        work: 39_246,
     },
     Cost {
         fixture: 0,
         name: "zero",
-        work: 3_964,
+        work: 3_983,
     },
     Cost {
         fixture: 1,
         name: "axis_a",
-        work: 6_463,
+        work: 6_482,
     },
     Cost {
         fixture: 1,
         name: "period0",
-        work: 39_184,
+        work: 39_246,
     },
     Cost {
         fixture: 1,
         name: "zero",
-        work: 3_964,
+        work: 3_983,
     },
     Cost {
         fixture: 1,
         name: "axis_b",
-        work: 6_463,
+        work: 6_482,
     },
     Cost {
         fixture: 1,
         name: "period1",
-        work: 39_184,
+        work: 39_246,
     },
     Cost {
         fixture: 2,
         name: "axis_a",
-        work: 6_751,
+        work: 6_770,
     },
     Cost {
         fixture: 2,
         name: "period0",
-        work: 6_656,
+        work: 6_675,
     },
     Cost {
         fixture: 2,
         name: "zero",
-        work: 3_964,
+        work: 3_983,
     },
     Cost {
         fixture: 2,
         name: "axis_b",
-        work: 6_655,
+        work: 6_674,
     },
     Cost {
         fixture: 2,
         name: "period1",
-        work: 6_656,
+        work: 6_675,
     },
 ];
 

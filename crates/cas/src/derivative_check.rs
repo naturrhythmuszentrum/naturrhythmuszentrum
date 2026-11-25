@@ -21,8 +21,9 @@ pub(crate) fn variable(
     key: &str,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    budget.work(size(state.context(context)?.header.len(), AT)?, AT)?;
-    let environment = &state.context(context)?.environment;
+    let header_len = state.context(context, budget)?.header.len();
+    budget.work(size(header_len, AT)?, AT)?;
+    let environment = &state.context(context, budget)?.environment;
     if environment.field != Field::Real
         || !environment.declarations.iter().any(|declaration| {
             declaration.key == key
@@ -42,8 +43,8 @@ pub(crate) fn check(
     context: LogicalId,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let left = cas.checked(&step.left)?;
-    let right = cas.checked(&step.right)?;
+    let left = cas.checked(&step.left, budget)?;
+    let right = cas.checked(&step.right, budget)?;
     if step.primitive == Primitive::Jacobian {
         return jacobian(&cas.state, step, earlier, context, left, right, budget);
     }
@@ -51,8 +52,8 @@ pub(crate) fn check(
         return Err(mismatch());
     };
     variable(&cas.state, context, key, budget)?;
-    scalar(&cas.state, context, left)?;
-    if !cas.state.expression(left)?.scope.is_empty() {
+    scalar(&cas.state, context, left, budget)?;
+    if !cas.state.expression(left, budget)?.scope.is_empty() {
         return Err(mismatch());
     }
     let valid = if step.primitive == Primitive::DerivativeTransport {
@@ -67,7 +68,7 @@ pub(crate) fn check(
             && derivative.right == equality.left
             && equality.right == right
     } else {
-        let term = cas.state.expression(left)?;
+        let term = cas.state.expression(left, budget)?;
         if step.premises.len() != term.operands.len() {
             return Err(mismatch());
         }
@@ -105,7 +106,7 @@ fn formula(
     derivatives: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let term = state.expression(left)?;
+    let term = state.expression(left, budget)?;
     let derivative = |position: usize| derivatives.get(position).copied().ok_or_else(mismatch);
     let operand = |position: usize| term.operands.get(position).copied().ok_or_else(mismatch);
     match (primitive, &term.operator) {
@@ -116,26 +117,27 @@ fn formula(
             literal(state, right, i64::from(key == variable), budget)
         }
         (Primitive::DifferentiateNeg, Operator::Neg) => {
-            Ok(unary(state, right, &Operator::Neg)? == derivative(0)?)
+            Ok(unary(state, right, &Operator::Neg, budget)? == derivative(0)?)
         }
         (Primitive::DifferentiateAdd, Operator::Add)
         | (Primitive::DifferentiateSub, Operator::Sub) => {
-            Ok(binary(state, right, &term.operator)? == (derivative(0)?, derivative(1)?))
+            Ok(binary(state, right, &term.operator, budget)? == (derivative(0)?, derivative(1)?))
         }
         (Primitive::DifferentiateProduct, Operator::Mul) => {
-            let (a, b) = binary(state, right, &Operator::Add)?;
+            let (a, b) = binary(state, right, &Operator::Add, budget)?;
             Ok(
-                binary(state, a, &Operator::Mul)? == (derivative(0)?, operand(1)?)
-                    && binary(state, b, &Operator::Mul)? == (operand(0)?, derivative(1)?),
+                binary(state, a, &Operator::Mul, budget)? == (derivative(0)?, operand(1)?)
+                    && binary(state, b, &Operator::Mul, budget)? == (operand(0)?, derivative(1)?),
             )
         }
         (Primitive::DifferentiateQuotient, Operator::Div) => {
-            let (numerator, denominator) = binary(state, right, &Operator::Div)?;
-            let (a, b) = binary(state, numerator, &Operator::Sub)?;
+            let (numerator, denominator) = binary(state, right, &Operator::Div, budget)?;
+            let (a, b) = binary(state, numerator, &Operator::Sub, budget)?;
             Ok(
-                binary(state, a, &Operator::Mul)? == (derivative(0)?, operand(1)?)
-                    && binary(state, b, &Operator::Mul)? == (operand(0)?, derivative(1)?)
-                    && unary(state, denominator, &Operator::IntegerPower(2))? == operand(1)?,
+                binary(state, a, &Operator::Mul, budget)? == (derivative(0)?, operand(1)?)
+                    && binary(state, b, &Operator::Mul, budget)? == (operand(0)?, derivative(1)?)
+                    && unary(state, denominator, &Operator::IntegerPower(2), budget)?
+                        == operand(1)?,
             )
         }
         (Primitive::DifferentiatePower, Operator::IntegerPower(exponent)) => {
@@ -161,11 +163,12 @@ fn power(
             let previous = exponent
                 .checked_sub(1)
                 .ok_or_else(|| Fault::capacity(BudgetKind::DecimalExponent, AT))?;
-            let (coefficient_power, actual_derivative) = binary(state, right, &Operator::Mul)?;
-            let (coefficient, power) = binary(state, coefficient_power, &Operator::Mul)?;
+            let (coefficient_power, actual_derivative) =
+                binary(state, right, &Operator::Mul, budget)?;
+            let (coefficient, power) = binary(state, coefficient_power, &Operator::Mul, budget)?;
             Ok(actual_derivative == derivative
                 && literal(state, coefficient, exponent, budget)?
-                && unary(state, power, &Operator::IntegerPower(previous))? == base)
+                && unary(state, power, &Operator::IntegerPower(previous), budget)? == base)
         }
     }
 }
@@ -183,9 +186,9 @@ fn jacobian(
     let Relation::Jacobian { variables } = &step.relation else {
         return Err(mismatch());
     };
-    let input = state.expression(left)?;
-    let output = state.expression(right)?;
-    if state.context(context)?.environment.field != Field::Real
+    let input = state.expression(left, budget)?;
+    let output = state.expression(right, budget)?;
+    if state.context(context, budget)?.environment.field != Field::Real
         || !matches!(
             input.sort,
             Sort::Value(AtomicSort::Matrix {

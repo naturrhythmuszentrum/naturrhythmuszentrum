@@ -92,7 +92,9 @@ fn case_exact_axis_map() -> TestResult {
                 SyntaxNode::Region(AmbientDomain::Real(ref key), _) if key == "u")
             ),
             SyntaxRole::Value(0) => assert_eq!(
-                *f.cas.expression(&child.target)?.0,
+                *f.cas
+                    .expression(&child.target, &mut crate::testing::budgets::graph_budget()?)?
+                    .0,
                 Operator::Free("u".into())
             ),
             _ => {}

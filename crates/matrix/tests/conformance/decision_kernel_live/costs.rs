@@ -88,14 +88,14 @@ fn exhausted(fault: &Fault, limit: u64, expected: u64) {
 /// ´claim:matrix:kernel-live-trace-work-boundary´
 #[test]
 fn kernel_live_trace_work_boundary() -> TestResult {
-    for work in [393_684, 393_683] {
+    for work in [394_112, 394_111] {
         let mut source = Fixture::new()?;
         let graph = source.source.frame.cas.counts();
         let heap = source.heap.provenance_usage();
         let mut budget = allowance(work)?;
         let limits = budget.limits().clone();
         let result = source.trace(&mut budget);
-        if work == 393_684 {
+        if work == 394_112 {
             let trace = result?;
             super::records(&trace)?;
             assert_eq!(trace.retained_payload_bytes(), 8320);
@@ -104,12 +104,12 @@ fn kernel_live_trace_work_boundary() -> TestResult {
             let Err(LiveDecisionError::Algebra(fault)) = result else {
                 panic!("trace owner must exhaust before receipt copy");
             };
-            exhausted(&fault, work, 393_684);
-            assert_eq!(fault.location, Location::new("exact rational enclosure"));
-            assert_eq!(budget.usage().work, 389_012);
+            exhausted(&fault, work, 394_112);
+            assert_eq!(fault.location, Location::new("checked scalar records"));
+            assert_eq!(budget.usage().work, 394_110);
         }
         assert_eq!(budget.limits(), &limits);
-        if work == 393_684 {
+        if work == 394_112 {
             assert_eq!(
                 source.source.frame.cas.counts().vertices,
                 graph.vertices + 2
@@ -132,7 +132,7 @@ fn kernel_live_trace_work_boundary() -> TestResult {
 /// ´claim:matrix:kernel-live-selection-work-boundary´
 #[test]
 fn kernel_live_selection_work_boundary() -> TestResult {
-    for work in [255_237, 255_236] {
+    for work in [255_325, 255_324] {
         let mut source = Fixture::new()?;
         let trace = source.trace(&mut ledger()?)?;
         let before = source.source.frame.cas.counts();
@@ -148,7 +148,7 @@ fn kernel_live_selection_work_boundary() -> TestResult {
             &source.source.steps,
             &mut budget,
         );
-        if work == 255_237 {
+        if work == 255_325 {
             let witness = result?;
             citations(&source.source.frame.cas, &witness)?;
             assert_eq!(budget.usage().work, work);
@@ -156,7 +156,7 @@ fn kernel_live_selection_work_boundary() -> TestResult {
             let Err(fault) = result else {
                 panic!("scalar selection must refuse below its full Work boundary");
             };
-            exhausted(&fault, work, 255_237);
+            exhausted(&fault, work, 255_325);
             assert_eq!(source.source.frame.cas.counts(), before);
             assert!(budget.usage().work >= 17);
         }
@@ -228,13 +228,13 @@ fn kernel_live_wire_work_boundaries() -> TestResult {
     };
     exhausted(&fault, 1916, 1917);
     assert_eq!(graph.counts(), before);
-    for work in [479_349, 479_348] {
+    for work in [479_851, 479_850] {
         let mut receiver = Cas::new(Limits::default())?;
         let before = receiver.counts();
         let mut budget = allowance(work)?;
         let limits = budget.limits().clone();
         let result = receiver.inspect(&bytes, &mut budget);
-        if work == 479_349 {
+        if work == 479_851 {
             let witness = result?;
             citations(&receiver, &witness)?;
             assert_eq!(budget.usage().work, work);
@@ -243,7 +243,7 @@ fn kernel_live_wire_work_boundaries() -> TestResult {
             let Err(fault) = result else {
                 panic!("fresh scalar replay must exhaust below its full Work boundary");
             };
-            exhausted(&fault, work, 479_349);
+            exhausted(&fault, work, 479_851);
             assert_eq!(receiver.counts(), before);
         }
         assert_eq!(budget.limits(), &limits);
@@ -364,12 +364,12 @@ fn kernel_live_trace_cost_components() -> TestResult {
     ExactConstant::from_expression(&source.source.frame.cas, &contract.target, &mut original)?;
     let mut semantic = ledger()?;
     meaning(&certificate.records, &mut semantic)?;
-    assert_eq!(complete.usage().work, 106_098);
+    assert_eq!(complete.usage().work, 106_152);
     assert_eq!(receipt.retained_bytes(), 4672);
     assert_eq!(machin, 18_019);
     assert_eq!(endpoints.usage().work, 57_674);
-    assert_eq!(original.usage().work, 27_877);
-    assert_eq!(semantic.usage().work, 112_475);
+    assert_eq!(original.usage().work, 27_931);
+    assert_eq!(semantic.usage().work, 112_711);
     let citation = 73;
     let mathematical = citation + endpoints.usage().work + original.usage().work;
     assert_eq!(complete.usage().work - mathematical, 20_474);

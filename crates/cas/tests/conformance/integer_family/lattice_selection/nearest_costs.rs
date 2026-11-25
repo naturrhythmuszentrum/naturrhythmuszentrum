@@ -8,9 +8,9 @@ use nrz_cas::{Cas, Fault, FaultKind, Location};
 
 /// Selection, fresh selection replay, full preparation, outputs, fresh identity replay, bytes, records.
 const COSTS: [(u64, u64, u64, u64, u64, usize, usize); 3] = [
-    (364_787, 913_136, 122_399, 99_607, 161_213, 3_745, 71),
-    (361_243, 904_354, 120_735, 96_281, 151_758, 3_700, 70),
-    (364_891, 913_560, 122_951, 100_327, 161_916, 3_745, 71),
+    (364_970, 913_724, 122_570, 99_709, 161_374, 3_745, 71),
+    (361_426, 904_936, 120_906, 96_377, 151_907, 3_700, 70),
+    (365_074, 914_148, 123_122, 100_435, 162_077, 3_745, 71),
 ];
 
 fn fixture(kind: usize) -> TestResult<Selection> {
@@ -21,7 +21,7 @@ fn fixture(kind: usize) -> TestResult<Selection> {
     }
 }
 
-fn budget(amount: u64) -> TestResult<Budget> {
+fn fresh_budget(amount: u64) -> TestResult<Budget> {
     let mut budget = Budget::new(Limits {
         work: amount,
         ..Limits::default()
@@ -76,7 +76,7 @@ pub(super) fn proof(
     let cas = &mut source.source.frame.cas;
     let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
-    let mut budget = budget(work)?;
+    let mut budget = fresh_budget(work)?;
     let limits = budget.limits().clone();
     let result = cas.prove_lattice_nearest_selection(
         &source.cover,
@@ -96,7 +96,7 @@ pub(super) fn preparation(source: &mut Selection, work: u64, succeeds: bool) -> 
     let cas = &mut source.source.frame.cas;
     let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
-    let mut budget = budget(work)?;
+    let mut budget = fresh_budget(work)?;
     let limits = budget.limits().clone();
     let result = cas.prepare_lattice_nearest_selection(
         &source.cover,
@@ -124,7 +124,7 @@ pub(super) fn outputs(
     let cas = &mut source.source.frame.cas;
     let snapshot = snapshot(cas, source.expected.values.len())?;
     let before = cas.counts();
-    let mut budget = budget(work)?;
+    let mut budget = fresh_budget(work)?;
     let limits = budget.limits().clone();
     let result = cas.lattice_selection_outputs(witness, &mut budget);
     assert_eq!(budget.limits(), &limits);

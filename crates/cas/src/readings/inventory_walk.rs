@@ -13,7 +13,7 @@ use crate::model::{AtomicSort, Operator, Sort};
 impl Assembly<'_> {
     /// Compose the demanded output map before identifying inputs at each named base.
     pub(super) fn trace(&mut self, root: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
-        let count = syntax::coordinates(&self.cas.state.expression(root)?.sort)?;
+        let count = syntax::coordinates(&self.cas.state.expression(root, budget)?.sort)?;
         let mut demand = self
             .meter
             .run(budget, |budget| AffineMap::identity(count, budget))?;
@@ -25,7 +25,7 @@ impl Assembly<'_> {
                 .ok_or_else(|| invalid(InvalidCode::ReadingShape))?;
             budget.check(BudgetKind::Depth, depth, AT)?;
             budget.work(1, AT)?;
-            let value = self.cas.state.expression(current)?;
+            let value = self.cas.state.expression(current, budget)?;
             if !value.scope.is_empty() || value.space.is_some() {
                 return Err(invalid(InvalidCode::ReadingDefinition));
             }
@@ -60,18 +60,19 @@ impl Assembly<'_> {
         demand: &AffineMap,
         budget: &mut Budget,
     ) -> Result<AffineMap, Fault> {
-        if let Operator::AffineReading(map) = &self.cas.state.expression(current)?.operator {
+        if let Operator::AffineReading(map) = &self.cas.state.expression(current, budget)?.operator
+        {
             return self.meter.run(budget, |budget| demand.compose(map, budget));
         }
         self.meter.run(budget, |budget| {
             let bytes = demand.validate(budget)?;
             let previous = budget.reserve_temporary(bytes, AT)?;
             let next = (|| {
-                let count = syntax::coordinates(&self.cas.state.expression(source)?.sort)?;
+                let count = syntax::coordinates(&self.cas.state.expression(source, budget)?.sort)?;
                 let identity = AffineMap::identity(count, budget)?;
                 let empty_transpose = count == 0
                     && matches!(
-                        self.cas.state.expression(current)?.operator,
+                        self.cas.state.expression(current, budget)?.operator,
                         Operator::Transpose
                     );
                 if empty_transpose {
@@ -106,7 +107,7 @@ impl Assembly<'_> {
         budget: &mut Budget,
     ) -> Result<(), Fault> {
         let base = self.ensure_base(id, budget)?;
-        let value = self.cas.state.expression(id)?;
+        let value = self.cas.state.expression(id, budget)?;
         let scalar = matches!(value.sort, Sort::Value(AtomicSort::Scalar(_)));
         let rows = if scalar {
             1

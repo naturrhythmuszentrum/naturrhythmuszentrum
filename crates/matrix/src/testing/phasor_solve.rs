@@ -23,8 +23,8 @@ use nrz_scalar::{LiteralLimits, Scalar};
 use std::rc::Rc;
 
 #[path = "phasor_solve/policy.rs"]
-mod resources;
-pub(crate) use resources::{budget, policy};
+pub(crate) mod resources;
+pub(crate) use resources::policy;
 
 /// Complete original sources and a fresh predeclared output family.
 pub(crate) struct Case<P: Scalar> {

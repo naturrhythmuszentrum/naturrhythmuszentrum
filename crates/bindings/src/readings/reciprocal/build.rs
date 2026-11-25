@@ -35,7 +35,7 @@ pub(super) fn check(
         let (sort, operator, _, header) = support::inspect(cas, node, budget)?;
         if sort != real()
             || !matches!(operator, Operator::Free(_))
-            || header != cas.context_header(frame.context())?
+            || header != cas.context_header(frame.context(), budget)?
         {
             return Err(ReadingError::Definition);
         }
@@ -155,7 +155,7 @@ fn constant(
     value: &ExactConstant,
     budget: &mut Budget,
 ) -> Result<Handle, ReadingError> {
-    let header = cas.context_header(context)?;
+    let header = cas.context_header(context, budget)?;
     let drafts = value
         .expression_drafts(Reference::Existing(header), budget)?
         .into_iter()

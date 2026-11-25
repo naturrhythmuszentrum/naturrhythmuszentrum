@@ -5,7 +5,7 @@ use super::{Frame, admit, bound_guard, ledger};
 use crate::testing::common::TestResult;
 use nrz_cas::decision::{IntegerCellRange, IntegerFamily};
 use nrz_cas::domain::{AssumptionDraft, ContextDraft, HypothesisRef, Layer, RegionExpr};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::proof::{ApplicationDraft, Certificate, Judgment, Primitive, Statement};
 use nrz_cas::syntax::{AtomicSort, Draft, Operator, PredicateKind, Sort};
 use nrz_cas::{Cas, FaultKind, Handle, InvalidCode, Location, Rational, Reference};
@@ -187,7 +187,7 @@ fn integer_family_parameter_unbound() -> TestResult {
         };
         family.count = None;
         let before = source.frame.cas.counts();
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             work: amount,
             ..Limits::default()
         })?;
@@ -230,6 +230,8 @@ fn integer_family_parameter_cover() -> TestResult {
             .frame
             .cas
             .check_proof(&source.context, &source.steps, &mut budget)?;
+        // The resource boundary owns check_proof; schema inspection is a separate map read.
+        let proof_work = budget.usage().work;
         assert!(witness.is_discharged());
         assert!(!witness.is_unconditional());
         assert_eq!(witness.hypotheses().len(), 2);
@@ -240,8 +242,9 @@ fn integer_family_parameter_cover() -> TestResult {
             .proof_citations(witness.proof(), &mut ledger()?)?;
         let root = citations.last().ok_or("missing family citation")?;
         let schema = root
-            .auxiliary_schema(&source.frame.cas)?
+            .auxiliary_schema(&source.frame.cas, &mut budget)?
             .ok_or("missing schema")?;
+        let schema_work = budget.usage().work - proof_work;
         assert_eq!(
             (schema.name, schema.version),
             ("decision.integer-floor-family", 2)
@@ -254,7 +257,8 @@ fn integer_family_parameter_cover() -> TestResult {
         assert_eq!(receiver.export_witness(&imported, &mut ledger()?)?, bytes);
         measured.push((
             lower,
-            budget.usage().work,
+            proof_work,
+            schema_work,
             source.frame.cas.counts().payload_bytes - before.payload_bytes,
             bytes.len(),
             replay.usage().work,
@@ -264,8 +268,8 @@ fn integer_family_parameter_cover() -> TestResult {
     assert_eq!(
         measured,
         [
-            (2, 204_627, 3_479, 1_896, 327_845, 22_810),
-            (-2, 204_531, 3_479, 1_896, 327_749, 22_810),
+            (2, 204_661, 0, 3_479, 1_896, 328_118, 22_810),
+            (-2, 204_565, 0, 3_479, 1_896, 328_022, 22_810),
         ]
     );
     Ok(())
@@ -292,7 +296,7 @@ fn resource_attempt(replay: bool, kind: BudgetKind, amount: u64, prior: u64) -> 
     let before = cas.counts();
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
     let limits = super::resource_limits(kind, amount)?;
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(prior, Location::new("prior parameter family work"))?;
     let result = if let Some(bytes) = bytes {
         cas.inspect(&bytes, &mut budget)
@@ -317,8 +321,8 @@ fn resource_attempt(replay: bool, kind: BudgetKind, amount: u64, prior: u64) -> 
 #[test]
 fn integer_family_parameter_resource_boundaries() -> TestResult {
     for (replay, work, staged, payload) in [
-        (false, 204_627, 110_680, 22_810),
-        (true, 327_845, 109_976, 22_810),
+        (false, 204_661, 110_680, 22_810),
+        (true, 328_118, 109_976, 22_810),
     ] {
         for (kind, amount) in [
             (BudgetKind::Work, work),

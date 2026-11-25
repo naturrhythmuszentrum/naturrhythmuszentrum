@@ -40,7 +40,9 @@ fn attempt(consume: bool, amount: u64) -> TestResult<(bool, u64)> {
 fn endpoint_closure_work_boundaries() -> TestResult {
     // Checking charges its actual prefix; it does not prepay the complete operation.
     // Totals include 37 prior Work and retain 19 caller payload bytes throughout.
-    for (consume, total, prefix) in [(false, 47_364, 47_360), (true, 95_356, 95_352)] {
+    // Unchanged operation Work totals: 47364/95356. Local entries add 8+2+12+12 = 34,
+    // respectively 14+2+18+18 = 52. The final charge is 4 Work.
+    for (consume, total, prefix) in [(false, 47_398, 47_394), (true, 95_408, 95_404)] {
         assert_eq!(attempt(consume, total)?, (true, total));
         assert_eq!(attempt(consume, total - 1)?, (false, prefix));
     }

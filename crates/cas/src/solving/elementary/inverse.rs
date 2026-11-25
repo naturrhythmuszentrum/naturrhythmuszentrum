@@ -53,18 +53,18 @@ fn equality<'a>(
     for endpoint in <[_; 2]>::from(endpoints) {
         budget.work(1, AT)?;
         if !matches!(
-            evaluation.cas.state.node(endpoint.logical_id())?,
+            evaluation.cas.state.node(endpoint.logical_id(), budget)?,
             Vertex::Expression(_)
         ) {
             return Ok(None);
         }
     }
     let SolveDraft::CoefficientMap(map) =
-        crate::solving::graph::object(&evaluation.cas.state, identity.map.logical_id())?
+        crate::solving::graph::object(&evaluation.cas.state, identity.map.logical_id(), budget)?
     else {
         return Err(invalid());
     };
-    let frame = evaluation.cas.state.context(context.logical_id())?;
+    let frame = evaluation.cas.state.context(context.logical_id(), budget)?;
     let MapTarget::ScalarAmbient { header, .. } = &map.target else {
         return Ok(None);
     };
@@ -127,7 +127,7 @@ fn product(
     right: &Handle,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let expression = evaluation.cas.state.expression(left.logical_id())?;
+    let expression = evaluation.cas.state.expression(left.logical_id(), budget)?;
     let (Operator::Mul, [first, second]) = (&expression.operator, expression.operands.as_slice())
     else {
         return Ok(false);

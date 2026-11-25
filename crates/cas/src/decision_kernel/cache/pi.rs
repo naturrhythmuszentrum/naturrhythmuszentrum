@@ -40,11 +40,11 @@ fn lookup(
     let bytes = certificate.key_bytes(budget)?;
     if cas.state.pi_judgments.current(cas) {
         let count = size(cas.state.pi_judgments.len(), AT)?;
-        budget.work(bytes.saturating_mul(u64::from(count.bit_width())), AT)?;
-        if let Some((id, key)) = cas.state.pi_judgments.entry(certificate)?
-            && let Some(bytes) = cas.pi_judgment(id)?
+        let floor = bytes.saturating_mul(u64::from(count.bit_width()));
+        if let Some((id, key)) = cas.state.pi_judgments.entry(certificate, floor, budget)?
+            && let Some(bytes) = cas.pi_judgment(id, budget)?
         {
-            let inventory = cas.pi_inventory(id)?;
+            let inventory = cas.pi_inventory(id, budget)?;
             if !Arc::ptr_eq(key, &inventory.certificate) {
                 return Err(Fault::invalid(crate::error::InvalidCode::Reference, AT));
             }
@@ -66,7 +66,7 @@ fn lookup(
     for entry in &cache.pending {
         let inventory = match entry {
             PendingJudgment::NewPi(inventory) => inventory,
-            PendingJudgment::RecheckedPi(id) => cas.pi_inventory(*id)?,
+            PendingJudgment::RecheckedPi(id) => cas.pi_inventory(*id, budget)?,
             PendingJudgment::NewScalar(_)
             | PendingJudgment::RecheckedScalar(_)
             | PendingJudgment::NewEnclosure(_)
@@ -93,10 +93,10 @@ fn retain(
     bytes: u64,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    cas.state.expression(original)?;
+    cas.state.expression(original, budget)?;
     let _validated = certificate.canonical_key()?;
-    if let Some((id, key)) = cas.state.pi_judgments.entry(certificate)? {
-        let inventory = cas.pi_inventory(id)?;
+    if let Some((id, key)) = cas.state.pi_judgments.entry(certificate, 0, budget)? {
+        let inventory = cas.pi_inventory(id, budget)?;
         if !Arc::ptr_eq(key, &inventory.certificate) {
             return Err(Fault::invalid(crate::error::InvalidCode::Reference, AT));
         }

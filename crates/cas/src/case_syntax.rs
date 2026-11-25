@@ -28,7 +28,7 @@ pub(crate) fn region(
     expression: RegionExpr,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let value = cas.state.region(basis)?;
+    let value = cas.state.region(basis, budget)?;
     let draft = RegionDraft {
         header: Reference::Existing(cas.handle(value.header)),
         scope: value.scope.clone(),
@@ -73,7 +73,7 @@ pub(crate) fn predicate(
     kind: PredicateKind,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let value = cas.state.expression(term)?;
+    let value = cas.state.expression(term, budget)?;
     let draft = Draft::Condition {
         header: Reference::Existing(cas.handle(value.header)),
         scope: value.scope.clone(),
@@ -103,8 +103,8 @@ pub(crate) fn guard_expression(
     id: LogicalId,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let Vertex::Condition(value) = cas.state.node(id)? else {
-        cas.state.expression(id)?;
+    let Vertex::Condition(value) = cas.state.node(id, budget)? else {
+        cas.state.expression(id, budget)?;
         return Ok(id);
     };
     let draft = crate::graph::ExpressionDraft {
@@ -137,7 +137,7 @@ pub(crate) fn order(
         if seen.contains(&id) {
             continue;
         }
-        let value = cas.state.expression(id)?;
+        let value = cas.state.expression(id, budget)?;
         if expanded {
             seen.insert(id);
             result.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
@@ -159,7 +159,7 @@ pub(crate) fn order(
             .map_err(|_| Fault::allocation(AT))?;
         pending.push((id, true));
         for arm in canonical(cas, &value.arms, budget)?.iter().rev() {
-            pending.push((cas.state.arm(*arm)?.value, false));
+            pending.push((cas.state.arm(*arm, budget)?.value, false));
         }
         pending.extend(value.operands.iter().rev().map(|id| (*id, false)));
     }
@@ -177,7 +177,7 @@ pub(crate) fn domains(
     for id in order {
         budget.condition(1, AT)?;
         crate::named_case::check(cas, *id, budget)?;
-        let value = cas.state.expression(*id)?.clone();
+        let value = cas.state.expression(*id, budget)?.clone();
         let domain = if let Some(domain) = value.domain {
             case_domain(cas, domain, &value.arms, within, &result, budget)?
         } else {
@@ -202,7 +202,7 @@ fn case_domain(
         .try_reserve_exact(arms.len())
         .map_err(|_| Fault::allocation(AT))?;
     for arm in arms {
-        let value = cas.state.arm(*arm)?.clone();
+        let value = cas.state.arm(*arm, budget)?.clone();
         let defined = *known.get(&value.value).ok_or_else(invalid)?;
         let reached = meet(cas, within, &[within, domain, value.region], budget)?;
         pieces.push(crate::case_reach::masked_meet(
@@ -223,7 +223,7 @@ fn scalar_domain(
     known: &Domains,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let value = cas.state.expression(id)?.clone();
+    let value = cas.state.expression(id, budget)?.clone();
     let mut members = vec![within];
     members
         .try_reserve(value.operands.len().saturating_add(1))
@@ -296,13 +296,13 @@ fn nonzero(
     let mut pieces = Vec::new();
     while let Some((id, region)) = pending.pop() {
         budget.condition(1, AT)?;
-        let value = cas.state.expression(id)?.clone();
+        let value = cas.state.expression(id, budget)?.clone();
         if let Some(domain) = value.domain {
             pending
                 .try_reserve(value.arms.len())
                 .map_err(|_| Fault::allocation(AT))?;
             for arm in value.arms {
-                let arm = cas.state.arm(arm)?.clone();
+                let arm = cas.state.arm(arm, budget)?.clone();
                 let reached = meet(cas, within, &[region, domain, arm.region], budget)?;
                 pending.push((arm.value, reached));
             }

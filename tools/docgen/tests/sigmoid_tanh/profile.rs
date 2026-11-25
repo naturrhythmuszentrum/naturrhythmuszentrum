@@ -140,7 +140,11 @@ pub fn search() -> TestResult {
 
 pub(super) fn reproduction_minimum() -> Limits {
     Limits {
-        work: 151_316_399_978,
+        // power-normal-next-near-one, fine: previous Work 151_316_399_978
+        // + one scalar-key insertion (2) + one identity-index insertion (2)
+        // + retained-kind count replacement (2) - displaced charges (0).
+        // Exact 151_316_399_984 passes; 151_316_399_983 refuses.
+        work: 151_316_399_984,
         arithmetic_steps: 351_478,
         component_bits: 42_586,
         intermediate_bits: 42_639,
@@ -152,7 +156,7 @@ pub(super) fn reproduction_minimum() -> Limits {
 
 pub(super) fn reproduction_limits() -> Limits {
     Limits {
-        work: 302_632_799_956,
+        work: 302_632_799_968,
         arithmetic_steps: 702_956,
         component_bits: 85_172,
         intermediate_bits: 85_278,

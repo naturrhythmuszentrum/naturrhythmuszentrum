@@ -43,7 +43,12 @@ const fn layout<P: Scalar>() -> [usize; 8] {
 }
 /// Measure one complete native publication without counting any original exact definition twice.
 fn measurement<P: Scalar + 'static>() -> TestResult<[usize; 8]> {
-    let mut case = fixture::case(-P::from_u8(75), P::ZERO, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -P::from_u8(75),
+        P::ZERO,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let publication = case.publication(&mut ledger()?)?;
     let result =
         case.heap
@@ -80,7 +85,12 @@ fn measurement<P: Scalar + 'static>() -> TestResult<[usize; 8]> {
 /// ´test:unit:phasor-inventory-refuses-unplanned-allocation´
 #[test]
 fn phasor_inventory_refuses_unplanned_allocation() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,
@@ -121,7 +131,12 @@ fn phasor_inventory_refuses_unplanned_allocation() -> TestResult {
 /// ´test:unit:phasor-inventory-requires-complete-original-owners´
 #[test]
 fn phasor_inventory_requires_complete_original_owners() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,
@@ -153,7 +168,12 @@ fn phasor_inventory_requires_complete_original_owners() -> TestResult {
 /// ´test:unit:phasor-inventory-clones-share-final-owners´
 #[test]
 fn phasor_inventory_clones_share_final_owners() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,
@@ -192,7 +212,12 @@ fn phasor_inventory_metadata_boundaries() -> TestResult {
 }
 /// Both scalar formats admit exactly their observed aligned metadata and refuse one byte less.
 fn metadata_boundaries<P: Scalar + 'static>() -> TestResult {
-    let case = fixture::case(-P::from_u8(75), P::ZERO, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -P::from_u8(75),
+        P::ZERO,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,
@@ -220,7 +245,12 @@ fn metadata_boundaries<P: Scalar + 'static>() -> TestResult {
 /// ´test:unit:phasor-inventory-refuses-substituted-ticket´
 #[test]
 fn phasor_inventory_refuses_substituted_ticket() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(
         false,
         PhasorResidualNorm::ComponentEuclidean,

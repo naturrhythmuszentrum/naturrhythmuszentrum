@@ -85,7 +85,7 @@ pub(crate) fn propose(
     let crate::task::Task::Solve(specification) = &request.task else {
         return Err(crate::solving::coefficients::storage::invalid().into());
     };
-    let original = problem(cas, &specification.problem)?;
+    let original = problem(cas, &specification.problem, budget)?;
     if original.ambient == crate::model::Field::Real {
         let form = if specification.form == SolveForm::AnyExact {
             SolveForm::RealExact
@@ -119,11 +119,15 @@ pub(crate) fn propose(
     let polynomial = read::polynomial(cas, original, budget)?;
     let region = if cas
         .state
-        .region(original.region.logical_id())?
+        .region(original.region.logical_id(), budget)?
         .lies_over
         .is_some()
     {
-        let current = cas.handle(cas.state.context(request.context.logical_id())?.admissible);
+        let current = cas.handle(
+            cas.state
+                .context(request.context.logical_id(), budget)?
+                .admissible,
+        );
         if !crate::solving::family::region::subset(
             cas,
             current.logical_id(),
@@ -143,7 +147,7 @@ pub(crate) fn propose(
         steps: Vec::new(),
     };
     let reuse_coverage = matches!(
-        crate::solving::coefficients::storage::domain(&cas.state, &polynomial.domain)?,
+        crate::solving::coefficients::storage::domain(&cas.state, &polynomial.domain, budget)?,
         super::CoefficientDomainData::Fraction { .. }
     );
     let (proposal, presentations) = {
@@ -221,14 +225,16 @@ fn execute(
     }
     let mut reason = None;
     let mut audit = Audit::default();
-    let result = crate::solving::radicals::staged(cas, generation, |candidate, budget| {
-        produce(candidate, request, &mut audit, budget, checker).map_err(|failure| match failure {
-            CoefficientFailure::Fault(error) => error,
-            CoefficientFailure::Unsupported(missing) => {
-                reason = Some(missing);
-                crate::solving::coefficients::storage::invalid()
-            }
-        })
+    let result = crate::solving::radicals::staged(cas, generation, |candidate, generation| {
+        produce(candidate, request, &mut audit, generation, checker).map_err(
+            |failure| match failure {
+                CoefficientFailure::Fault(error) => error,
+                CoefficientFailure::Unsupported(missing) => {
+                    reason = Some(missing);
+                    crate::solving::coefficients::storage::invalid()
+                }
+            },
+        )
     });
     Some(match result {
         Ok(crate::solving::radicals::proof::Produced {
@@ -250,7 +256,7 @@ fn execute(
             let reason = if answer.facts.is_empty() {
                 if let crate::task::Task::Solve(specification) = &request.task
                     && specification.form == SolveForm::Radicals
-                    && problem(cas, &specification.problem)
+                    && problem(cas, &specification.problem, generation)
                         .is_ok_and(|problem| problem.ambient == crate::model::Field::Real)
                 {
                     SolveReason::RequestedRealRadicalsUnavailable
@@ -307,9 +313,9 @@ pub(crate) fn coefficient_images(
 ) -> Result<Vec<Handle>, Fault> {
     let mut keys = crate::solving::coefficients::storage::vector(0, budget)?;
     if let crate::solving::CoefficientDomainData::Fraction { coordinates, .. } =
-        crate::solving::coefficients::storage::domain(&cas.state, domain)?
+        crate::solving::coefficients::storage::domain(&cas.state, domain, budget)?
     {
-        let frame = crate::solving::elementary::proof::coordinates(cas, coordinates)?;
+        let frame = crate::solving::elementary::proof::coordinates(cas, coordinates, budget)?;
         crate::solving::coefficients::storage::reserve(&mut keys, frame.coordinates.len(), budget)?;
         for coordinate in &frame.coordinates {
             budget.work(crate::graph::size(coordinate.key.len(), AT)?, AT)?;

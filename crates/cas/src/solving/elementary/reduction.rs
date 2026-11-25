@@ -290,7 +290,7 @@ mod tests {
             state: &fixture.cas.state,
             domain: &fixture.algebra,
         };
-        assert_eq!(engine.fraction_shape()?.1, 1);
+        assert_eq!(engine.fraction_shape(&mut budget)?.1, 1);
         let small = Rational::from_ratio(50_031_545_098_999_707, 4096, &mut budget)?;
         let coefficient = Rational::from_ratio(729, 4, &mut budget)?;
         let overflow = small

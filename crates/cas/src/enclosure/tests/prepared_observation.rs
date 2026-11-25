@@ -257,7 +257,7 @@ fn check_identity(
 ) -> TestResult {
     assert_eq!(
         f.cas
-            .checked(stale)
+            .checked(stale, budget)
             .err()
             .ok_or("discarded schedule survived")?
             .kind,
@@ -275,7 +275,7 @@ fn check_identity(
     assert!(replacement.logical_id().serial > stale.logical_id().serial);
     assert_eq!(
         f.cas
-            .checked(stale)
+            .checked(stale, budget)
             .err()
             .ok_or("schedule reincarnated")?
             .kind,
@@ -291,6 +291,6 @@ fn check_identity(
     )?;
     assert_eq!(schedule(&f.cas)?, replacement);
     assert_eq!(f.cas.counts(), counts);
-    f.cas.checked(&f.context)?;
+    f.cas.checked(&f.context, budget)?;
     Ok(())
 }

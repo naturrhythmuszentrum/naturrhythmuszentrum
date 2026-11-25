@@ -40,19 +40,19 @@ fn build(
         &Draft::Solve(SolveDraft::FamilyExpression(value.clone())),
         budget,
     )?;
-    let resolved = super::body(cas, body.logical_id())?
+    let resolved = super::body(cas, body.logical_id(), budget)?
         .ok_or_else(invalid)?
         .clone();
-    let region = cas.state.region(resolved.region.logical_id())?;
+    let region = cas.state.region(resolved.region.logical_id(), budget)?;
     let header = cas.handle(region.header);
     let scope = region.scope.clone();
     let operands = crate::solving::sorts::placement_operands(&cas.state, &resolved, budget)?;
     let mut placements = crate::solving::coefficients::storage::vector(operands.len(), budget)?;
     for (operand, ambient) in operands {
-        let source = if let Some(local) = super::body(cas, operand)? {
+        let source = if let Some(local) = super::body(cas, operand, budget)? {
             local.ambient.clone()
         } else {
-            cas.scalar_ambient(&cas.handle(operand))?
+            cas.scalar_ambient(&cas.handle(operand), budget)?
                 .ok_or_else(invalid)?
         };
         let placement = admit(

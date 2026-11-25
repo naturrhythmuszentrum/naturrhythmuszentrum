@@ -82,7 +82,10 @@ pub(crate) fn conditioned(residual: bool, reordered: bool) -> TestResult<Fixture
         .admit(&[Draft::Context(draft)], &mut default_budget()?)?
         .pop()
         .ok_or("frame")?;
-    let region = f.base.cas.admissible_region(&frame)?;
+    let region = f
+        .base
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
     let fact = Statement::PredicateFact {
         region: region.clone(),
         predicate: predicate.clone(),

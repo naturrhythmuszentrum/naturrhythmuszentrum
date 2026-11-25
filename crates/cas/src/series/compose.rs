@@ -57,7 +57,7 @@ pub(super) fn workspace(order: u32, bits: u64) -> Result<u64, Fault> {
 
 /// Mathematical admission precedes inspection of a caller's claimed zero witness.
 fn zero(cas: &Cas, inner: &Handle, budget: &mut Budget) -> Result<(), Fault> {
-    let object = cas.series_object(inner)?;
+    let object = cas.series_object(inner, budget)?;
     let number = coefficient(cas, object, 0, budget)?;
     if number.compare(&Rational::zero(), budget)? != std::cmp::Ordering::Equal {
         let (a, b) = number.component_bits();
@@ -134,8 +134,8 @@ pub(super) fn check(
     else {
         return Err(invalid());
     };
-    let outer_order = cas.series_object(left)?.order;
-    let inner_order = cas.series_object(right)?.order;
+    let outer_order = cas.series_object(left, budget)?.order;
+    let inner_order = cas.series_object(right, budget)?.order;
     if *order == 0 || *order > outer_order.min(inner_order) {
         return Err(precision(outer_order, inner_order, *order, budget)?);
     }
@@ -240,7 +240,11 @@ pub(super) fn produce(
     budget: &mut Budget,
 ) -> Result<(S, C), Fault> {
     use super::produce::{copied, entry, literal, output};
-    super::check::compatible(cas.series_object(left)?, cas.series_object(right)?, budget)?;
+    super::check::compatible(
+        cas.series_object(left, budget)?,
+        cas.series_object(right, budget)?,
+        budget,
+    )?;
     zero(cas, right, budget)?;
     let n = u64::from(order);
     let count = entries(order)?;
@@ -269,7 +273,7 @@ pub(super) fn produce(
                             + usize::try_from(index).map_err(|_| invalid())?,
                     )
                     .ok_or_else(invalid)?;
-                let b = entry(cas, right, degree - index)?;
+                let b = entry(cas, right, degree - index, budget)?;
                 let product = a.mul(b, budget)?;
                 sum = sum.add(&product, budget)?;
                 powers.push(SeriesPowerRow {
@@ -294,7 +298,7 @@ pub(super) fn produce(
         let mut total = Rational::zero();
         for exponent in 0..order {
             budget.specialized(BudgetKind::JetEntries, 1, true, AT)?;
-            let a = entry(cas, left, exponent)?;
+            let a = entry(cas, left, exponent, budget)?;
             let b = table
                 .get(
                     usize::try_from(exponent).map_err(|_| invalid())? * width

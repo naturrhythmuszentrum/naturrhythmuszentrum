@@ -6,7 +6,7 @@ use nrz_cas::lattice::{
     LatticeAttemptPolicy, LatticeEnclosure, LatticePendingObligation, LatticeSelectionOutcome,
     LatticeUndecidedReason,
 };
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::{Cas, FaultKind, InvalidCode, Location, Rational};
 
 /// A valid torus or phase preparation retains its Machin judgment even when the later cut is undecided.
@@ -80,14 +80,14 @@ fn exhausted(work: u64) -> TestResult {
         work,
         ..Limits::default()
     };
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(37, Location::new("spent before lattice decision"))?;
-    let LatticeSelectionOutcome::Undecided(outcome) = source
+    let decision = source
         .source
         .frame
         .cas
-        .select_lattice_attempt(&attempt, &mut budget)?
-    else {
+        .select_lattice_attempt(&attempt, &mut budget)?;
+    let LatticeSelectionOutcome::Undecided(outcome) = decision else {
         return Err("exhaustion returned a tuple".into());
     };
     assert_eq!(
@@ -129,7 +129,7 @@ fn exhausted(work: u64) -> TestResult {
 #[test]
 fn lattice_tuple_undecided_budget() -> TestResult {
     exhausted(37)?;
-    exhausted(386_818)?;
+    exhausted(386_941)?;
     let mut source = prepared(1)?;
     let attempt = source.source.frame.cas.prepare_lattice_selection(
         &source.cover,
@@ -137,8 +137,8 @@ fn lattice_tuple_undecided_budget() -> TestResult {
         &source.enclosure,
         &mut ledger()?,
     )?;
-    let mut budget = Budget::new(Limits {
-        work: 386_819,
+    let mut budget = nrz_cas::limits::Budget::new(Limits {
+        work: 386_942,
         ..Limits::default()
     })?;
     budget.work(37, Location::new("spent before lattice decision"))?;
@@ -151,7 +151,7 @@ fn lattice_tuple_undecided_budget() -> TestResult {
         panic!("prepared selection must succeed at its measured warm Work boundary");
     };
     assert!(witness.is_discharged());
-    assert_eq!(budget.usage().work, 386_819);
+    assert_eq!(budget.usage().work, 386_942);
     Ok(())
 }
 
@@ -161,12 +161,12 @@ fn lattice_tuple_undecided_budget() -> TestResult {
 #[test]
 fn lattice_tuple_attempt_work() -> TestResult {
     for (kind, work) in [
-        (0, 144_697),
-        (1, 144_407),
-        (2, 132_292),
-        (3, 131_366),
-        (4, 96_932),
-        (5, 95_395),
+        (0, 144_811),
+        (1, 144_521),
+        (2, 132_422),
+        (3, 131_496),
+        (4, 97_027),
+        (5, 95_490),
     ] {
         for succeeds in [false, true] {
             let mut source = prepared(kind)?;
@@ -177,7 +177,7 @@ fn lattice_tuple_attempt_work() -> TestResult {
                 work: amount,
                 ..Limits::default()
             };
-            let mut budget = Budget::new(limits.clone())?;
+            let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
             budget.work(37, Location::new("prior lattice preparation"))?;
             let result = source.source.frame.cas.prepare_lattice_selection(
                 &source.cover,

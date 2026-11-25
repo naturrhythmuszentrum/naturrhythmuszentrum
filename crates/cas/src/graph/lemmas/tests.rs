@@ -5,7 +5,7 @@ mod fixture;
 mod identity;
 mod retained_graph;
 
-use crate::budget::{Budget, BudgetKind, Limits};
+use crate::budget::{BudgetKind, Limits};
 use crate::decision_kernel::cache::retained;
 use crate::graph::Vertex;
 use crate::lemma_cache::AnonymousLemmaCache;
@@ -84,7 +84,7 @@ fn mixed_reservation(short: u64) -> TestResult {
     let before = fixture.cas.counts();
     assert_eq!(fixture.cas.retained_judgment_bytes(), 4_600);
     assert_eq!(cache.retained_bytes(), 5_672);
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         staged_payload_bytes: 10_367 - short,
         work: 11,
         ..Limits::default()
@@ -167,7 +167,7 @@ fn retained_judgment_enclosure_reservation() -> TestResult {
             }
         })
         .ok_or("enclosure key")?;
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         staged_payload_bytes: 10_367,
         ..Limits::default()
     })?;
@@ -202,7 +202,7 @@ fn retained_judgment_mixed_warm_callers() -> TestResult {
 #[test]
 fn retained_judgment_multiple_owners() -> TestResult {
     let mut fixtures = [Fixture::new()?, Fixture::new()?];
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         staged_payload_bytes: 9_359,
         ..Limits::default()
     })?;
@@ -230,7 +230,7 @@ fn retained_judgment_late_refusal() -> TestResult {
     let mut fixture = Fixture::new()?;
     let mut budget = ledger()?;
     fixture.retain_graph(&mut budget)?;
-    let header = fixture.cas.expression_header(&fixture.one)?;
+    let header = fixture.cas.expression_header(&fixture.one, &mut budget)?;
     let two = crate::testing::native::term(
         &mut fixture.cas,
         &header,

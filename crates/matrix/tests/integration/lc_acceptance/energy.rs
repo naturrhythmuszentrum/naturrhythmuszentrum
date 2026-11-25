@@ -102,7 +102,7 @@ fn lc_energy_is_independent_of_driven_experiment() -> TestResult {
         let components = select(&mut heap, &plan, state.bindings())?;
         let elements = super::invariants::selections(&mut heap, &sources)?;
         let evaluated = evaluate(&mut heap, &operations, &components, &elements)?;
-        let mut resources = crate::phasor_solve_testing::budget()?;
+        let mut resources = crate::phasor_solve_testing::resources::fresh_budget()?;
         let mut driven =
             crate::phasor_solve_testing::case_in_heap(-75.0_f64, 0.0, false, heap, &mut resources)?;
         let publication = driven.publication(&mut resources)?;

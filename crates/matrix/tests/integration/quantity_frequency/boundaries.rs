@@ -9,20 +9,20 @@ use nrz_scalar::Scalar;
 /// ´test:integration:quantity-frequency-resource-boundaries´
 #[test]
 fn quantity_frequency_resource_boundaries() -> TestResult {
-    boundaries::<f32>(82_168, 176, 96_412)?;
+    boundaries::<f32>(82_168, 176, 96_596)?;
     boundaries::<f64>(82_232, 184, 3)
 }
 
 fn boundaries<P: Scalar + 'static>(staged: u64, output: u64, output_prefix: u64) -> TestResult {
     for (kind, required, prefix) in [
-        (0, 96_412, 96_411),
+        (0, 96_596, 96_595),
         (1, staged, 3),
         (2, output, output_prefix),
     ] {
-        attempt::<P>(kind, required, 0, (true, 96_412))?;
+        attempt::<P>(kind, required, 0, (true, 96_596))?;
         attempt::<P>(kind, required - 1, 0, (false, prefix))?;
     }
-    attempt::<P>(0, 96_412, 1, (false, 96_412))
+    attempt::<P>(0, 96_596, 1, (false, 96_596))
 }
 
 /// Every candidate owns a fresh schema; refusal leaves values and graph accounting unchanged.
@@ -54,7 +54,7 @@ fn attempt<P: Scalar + 'static>(
         assert_eq!(case.heap.provenance_usage(), before);
         let mut retry = Budget::new(Limits::default())?;
         convert(&mut case, &mut retry)?;
-        assert_eq!(retry.usage().work, 96_412);
+        assert_eq!(retry.usage().work, 96_596);
     }
     assert_eq!(case.input.view(&case.heap)?.stamp(), stamp);
     Ok(())
@@ -84,7 +84,7 @@ fn provenance<P: Scalar + 'static>() -> TestResult {
         let mut budget = Budget::new(Limits::default())?;
         let result = convert(&mut case, &mut budget);
         assert_eq!(result.is_ok(), admitted, "{result:?}");
-        assert_eq!(budget.usage().work, 96_412);
+        assert_eq!(budget.usage().work, 96_596);
         if admitted {
             result?;
             assert_eq!(case.heap.provenance_usage().bytes(), 1_433);

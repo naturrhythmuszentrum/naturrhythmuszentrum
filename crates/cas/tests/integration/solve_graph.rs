@@ -34,13 +34,18 @@ fn solve_original_request_zero_family() -> TestResult {
             .ok_or("identity coverage")?
             .is_discharged()
     );
-    let nrz_cas::solving::SolveView::SolutionSet(set) = fixture.cas.solve_view(&answer.set)? else {
+    let nrz_cas::solving::SolveView::SolutionSet(set) = fixture
+        .cas
+        .solve_view(&answer.set, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("identity set".into());
     };
     let [branch] = set.branches.as_slice() else {
         return Err("identity family branch".into());
     };
-    let nrz_cas::solving::SolveView::SolutionBranch(branch) = fixture.cas.solve_view(branch)?
+    let nrz_cas::solving::SolveView::SolutionBranch(branch) = fixture
+        .cas
+        .solve_view(branch, &mut crate::testing::budgets::graph_budget()?)?
     else {
         return Err("identity branch".into());
     };

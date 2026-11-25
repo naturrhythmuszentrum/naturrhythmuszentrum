@@ -318,9 +318,9 @@ fn enclosure_tanh_work_pins() -> TestResult {
     )?;
     assert_eq!(
         (cold.work, warm.work, replay.work),
-        (874_566, 18_833, 466_836)
+        (874_571, 18_833, 466_841)
     );
-    for (is_warm, pin) in [(false, 874_566), (true, 18_833)] {
+    for (is_warm, pin) in [(false, 874_571), (true, 18_833)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut store, request) = tanh_case(1, 2)?;
             if is_warm {
@@ -348,7 +348,7 @@ fn enclosure_tanh_work_pins() -> TestResult {
             }
         }
     }
-    for (available, passes) in [(466_836, true), (466_835, false)] {
+    for (available, passes) in [(466_841, true), (466_840, false)] {
         let (mut store, request) = tanh_case(1, 2)?;
         let before = store.cas.canonical_snapshot(&mut ledger()?)?;
         let report = store.cas.check_enclosure(
@@ -378,8 +378,12 @@ fn enclosure_tanh_work_pins() -> TestResult {
 /// ´claim:cas:enclosure-tanh-phase-pins´
 #[test]
 fn enclosure_tanh_phase_pins() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (f, request) = tanh_case(1, 2)?;
-    let target = f.cas.state.expression(f.cas.checked(&request.target)?)?;
+    let target = f
+        .cas
+        .state
+        .expression(f.cas.checked(&request.target, &mut budget)?, &mut budget)?;
     let plans = planning::Plans::new(target, tanh_policy()).ok_or("plan")?;
     let grid = plans.grid(12);
     let scope = scope::key(&f.cas, &request, &mut ledger()?)?;
@@ -454,12 +458,13 @@ fn enclosure_tanh_size_pins() -> TestResult {
         };
         assert_eq!(
             certificate
-                .to_bytes(&mut Budget::new(limits.clone())?)
+                .to_bytes(&mut crate::budget::Budget::new(limits.clone())?)
                 .is_ok(),
             passes
         );
         assert_eq!(
-            EnclosureCertificate::from_bytes(&bytes, &mut Budget::new(limits)?).is_ok(),
+            EnclosureCertificate::from_bytes(&bytes, &mut crate::budget::Budget::new(limits)?)
+                .is_ok(),
             passes
         );
     }
@@ -482,11 +487,11 @@ fn enclosure_tanh_size_pins() -> TestResult {
                     ..Limits::default()
                 },
                 _ => Limits {
-                    work: available + 7,
+                    work: available + 10,
                     ..Limits::default()
                 },
             };
-            let mut budget = Budget::new(limits)?;
+            let mut budget = crate::budget::Budget::new(limits)?;
             budget.work(7, AT)?;
             let before = f.cas.canonical_snapshot(&mut ledger()?)?;
             assert_eq!(
@@ -527,7 +532,7 @@ fn enclosure_tanh_size_pins() -> TestResult {
 
 /// Seven earlier units remain charged while testing the new operation's allowance.
 fn precharged(available: u64) -> Result<Budget, Fault> {
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         work: available + 7,
         ..Limits::default()
     })?;

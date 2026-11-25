@@ -19,19 +19,21 @@ pub(super) fn inventory(
     witness: &VerifiedWitness,
     budget: &mut Budget,
 ) -> Result<Option<Vec<usize>>, Fault> {
-    cas.checked(witness.proof())?;
+    cas.checked(witness.proof(), budget)?;
     if !witness.is_discharged() {
         return Err(invalid());
     }
     let Statement::Cover { domain, members } = &witness.judgment().statement else {
         return Err(invalid());
     };
-    let parent = cas.state.context(cas.checked(&request.context)?)?;
-    let total = cas.state.region(parent.admissible)?;
+    let parent = cas
+        .state
+        .context(cas.checked(&request.context, budget)?, budget)?;
+    let total = cas.state.region(parent.admissible, budget)?;
     let over = total.lies_over.as_ref().ok_or_else(invalid)?;
     let family =
-        crate::solving::family::mapping::family_data(&cas.state, &cas.handle(over.family))?;
-    let base = crate::solving::family::mapping::base_data(&cas.state, &family.base)?;
+        crate::solving::family::mapping::family_data(&cas.state, &cas.handle(over.family), budget)?;
+    let base = crate::solving::family::mapping::base_data(&cas.state, &family.base, budget)?;
     if *domain != base.domain || over.stratum != base.domain.logical_id() {
         return Err(invalid());
     }
@@ -43,8 +45,10 @@ pub(super) fn inventory(
         let mut found = None;
         for (index, group) in request.groups.iter().enumerate() {
             budget.work(1, crate::solving::family::AT)?;
-            let frame = cas.state.context(cas.checked(&group.context)?)?;
-            let shape = cas.state.region(frame.admissible)?;
+            let frame = cas
+                .state
+                .context(cas.checked(&group.context, budget)?, budget)?;
+            let shape = cas.state.region(frame.admissible, budget)?;
             if shape.lies_over.as_ref().is_some_and(|value| {
                 value.family == over.family && value.stratum == member.logical_id()
             }) {
@@ -80,7 +84,10 @@ impl Runner<'_, '_> {
         let mut proof = witness.proof().clone();
         let mut context = witness.judgment().context.clone();
         while context != *target {
-            let frame = self.cas.state.context(context.logical_id())?;
+            let frame = self
+                .cas
+                .state
+                .context(context.logical_id(), self.generation)?;
             let parent = self.cas.handle(frame.parent.ok_or_else(invalid)?);
             let region = self.cas.handle(frame.admissible);
             let constructor = self.plan.push(
@@ -126,8 +133,11 @@ impl Runner<'_, '_> {
             if claim.problem != *problem {
                 return Err(invalid());
             }
-            let SolveDraft::SolutionSet(set) =
-                crate::solving::graph::object(&self.cas.state, claim.set.logical_id())?
+            let SolveDraft::SolutionSet(set) = crate::solving::graph::object(
+                &self.cas.state,
+                claim.set.logical_id(),
+                self.generation,
+            )?
             else {
                 return Err(invalid());
             };
@@ -166,9 +176,12 @@ impl Runner<'_, '_> {
         }
         let ordered = self.order(&members, proofs)?;
         let set = self.set(problem, &ordered)?;
-        let header = self
-            .cas
-            .handle(self.cas.state.region(domain.logical_id())?.header);
+        let header = self.cas.handle(
+            self.cas
+                .state
+                .region(domain.logical_id(), self.generation)?
+                .header,
+        );
         let expression = crate::solving::family::build::expression(
             self.cas,
             &header,
@@ -253,7 +266,7 @@ impl Runner<'_, '_> {
         let total = self.cas.handle(
             self.cas
                 .state
-                .context(request.context.logical_id())?
+                .context(request.context.logical_id(), self.generation)?
                 .admissible,
         );
         let lifted = crate::solving::family::recipes::pullback(self.cas, &total, self.generation)?;
@@ -306,7 +319,10 @@ pub(super) fn run(
     let mut members = Vec::new();
     for index in order {
         let group = request.groups.get(*index).ok_or_else(invalid)?;
-        let frame = runner.cas.state.context(group.context.logical_id())?;
+        let frame = runner
+            .cas
+            .state
+            .context(group.context.logical_id(), runner.generation)?;
         if frame.parent != Some(request.context.logical_id()) {
             return Err(invalid());
         }

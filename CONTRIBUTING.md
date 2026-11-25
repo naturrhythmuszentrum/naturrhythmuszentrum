@@ -68,7 +68,7 @@ Use the existing label and citation form (`rule:nrz:stable-labels-and-citations`
 
 |Document|Place|
 |--------|-----|
-|None currently|No repository document mints an `inv` statement.|
+|`docs/design/cas-design.md`|Retained-index target coverage (`inv:nrz:cas-backend-target-coverage`).|
 
 A property cited under another kind, such as a rule, decision or requirement, is already written authority and needs no entry here. Stable collection order is such a rule (`rule:nrz:stable-collection-order`).
 

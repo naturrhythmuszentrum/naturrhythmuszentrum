@@ -17,7 +17,11 @@ const fn invalid() -> Fault {
 }
 
 /// Ordered roots defining the exact rows of a region decision certificate.
-pub(crate) fn roots(cas: &Cas, statement: &Statement) -> Result<Vec<LogicalId>, Fault> {
+pub(crate) fn roots(
+    cas: &Cas,
+    statement: &Statement,
+    budget: &mut crate::budget::Budget,
+) -> Result<Vec<LogicalId>, Fault> {
     let handles: Vec<&Handle> = match statement {
         Statement::Subset { subset, superset } => vec![subset, superset],
         Statement::Disjoint { left, right } => vec![left, right],
@@ -42,8 +46,8 @@ pub(crate) fn roots(cas: &Cas, statement: &Statement) -> Result<Vec<LogicalId>, 
         .try_reserve_exact(handles.len())
         .map_err(|_| Fault::allocation(AT))?;
     for handle in handles {
-        let id = cas.checked(handle)?;
-        cas.state.region(id)?;
+        let id = cas.checked(handle, budget)?;
+        cas.state.region(id, budget)?;
         result.push(id);
     }
     Ok(result)
@@ -122,7 +126,7 @@ pub(crate) fn evidence(
     statement: &Statement,
     budget: &mut Budget,
 ) -> Result<RegionCertificate, Fault> {
-    let mut roots = roots(cas, statement)?;
+    let mut roots = roots(cas, statement, budget)?;
     if let Statement::PredicateFact { region, predicate } = statement {
         let empty = crate::region_cache::partition(cas, &roots, budget)?;
         if empty
@@ -134,15 +138,15 @@ pub(crate) fn evidence(
         {
             return Ok(empty);
         }
-        let region = cas.checked(region)?;
-        let predicate = cas.checked(predicate)?;
+        let region = cas.checked(region, budget)?;
+        let predicate = cas.checked(predicate, budget)?;
         let truth = crate::case_syntax::guarded(cas, region, predicate, budget)?;
         roots.push(truth);
     }
     let boundary = match statement {
         Statement::Incidence { boundary, .. } => Some(crate::region::boundary_point(
             &cas.state,
-            cas.checked(boundary)?,
+            cas.checked(boundary, budget)?,
             budget,
         )?),
         _ => None,
@@ -195,14 +199,14 @@ pub(crate) fn construct(
                 region,
                 law: ConstructorLaw::Membership,
             } => {
-                cas.state.region(cas.checked(region)?)?;
+                cas.state.region(cas.checked(region, budget)?, budget)?;
                 Ok(())
             }
             Statement::Subset { subset, superset } => {
-                let subset = cas.checked(subset)?;
-                let superset = cas.checked(superset)?;
-                let smaller = cas.state.region(subset)?;
-                let larger = cas.state.region(superset)?;
+                let subset = cas.checked(subset, budget)?;
+                let superset = cas.checked(superset, budget)?;
+                let smaller = cas.state.region(subset, budget)?;
+                let larger = cas.state.region(superset, budget)?;
                 if smaller.ambient != larger.ambient || smaller.scope != larger.scope {
                     return Err(invalid());
                 }
@@ -229,7 +233,10 @@ pub(crate) fn construct(
                 }
             }
             Statement::Empty { region } => {
-                let expression = &cas.state.region(cas.checked(region)?)?.expression;
+                let expression = &cas
+                    .state
+                    .region(cas.checked(region, budget)?, budget)?
+                    .expression;
                 if matches!(expression, RegionExpr::Empty)
                     || matches!(expression, RegionExpr::Union(members) if members.is_empty())
                 {
@@ -240,8 +247,14 @@ pub(crate) fn construct(
             }
             Statement::Cover { domain, members } => construct_cover(cas, domain, members, budget),
             Statement::Disjoint { left, right } => {
-                let first = &cas.state.region(cas.checked(left)?)?.expression;
-                let second = &cas.state.region(cas.checked(right)?)?.expression;
+                let first = &cas
+                    .state
+                    .region(cas.checked(left, budget)?, budget)?
+                    .expression;
+                let second = &cas
+                    .state
+                    .region(cas.checked(right, budget)?, budget)?
+                    .expression;
                 if matches!(first, RegionExpr::Empty) || matches!(second, RegionExpr::Empty) {
                     return Ok(());
                 }
@@ -276,12 +289,16 @@ fn construct_cover(
     members: &[crate::graph::Handle],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    if cas.state.region(domain.logical_id())?.lies_over.is_some()
+    if cas
+        .state
+        .region(domain.logical_id(), budget)?
+        .lies_over
+        .is_some()
         && crate::solving::family::region::identity_cover(cas, domain, members, budget)?
     {
         return Ok(());
     }
-    let domain = cas.state.region(cas.checked(domain)?)?;
+    let domain = cas.state.region(cas.checked(domain, budget)?, budget)?;
     let RegionExpr::Union(expected) = &domain.expression else {
         return Err(invalid());
     };
@@ -290,7 +307,7 @@ fn construct_cover(
         .try_reserve_exact(members.len())
         .map_err(|_| Fault::allocation(AT))?;
     for member in members {
-        actual.push(cas.checked(member)?);
+        actual.push(cas.checked(member, budget)?);
     }
     actual.sort_unstable();
     actual.dedup();
@@ -317,13 +334,13 @@ fn incidence(
     else {
         return Err(invalid());
     };
-    let region = cas.state.region(cas.checked(region)?)?;
-    let boundary_id = cas.checked(boundary)?;
-    let location = cas.state.boundary(boundary_id)?;
+    let region = cas.state.region(cas.checked(region, budget)?, budget)?;
+    let boundary_id = cas.checked(boundary, budget)?;
+    let location = cas.state.boundary(boundary_id, budget)?;
     if region.ambient != location.ambient || region.scope != location.scope {
         return Err(invalid());
     }
-    crate::region_cache::open_interval(cas, cas.checked(neighborhood)?, budget)?;
+    crate::region_cache::open_interval(cas, cas.checked(neighborhood, budget)?, budget)?;
     let point = crate::region::boundary_point(&cas.state, boundary_id, budget)?;
     let position = value
         .cuts

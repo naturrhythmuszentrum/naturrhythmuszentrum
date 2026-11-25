@@ -82,11 +82,11 @@ fn drafts(header: HeaderDraft) -> Vec<Draft> {
 
 /// Freeze and admission retain literal boundaries even with thirty unused declarations.
 /// ´test:unit:frozen-environment-work-boundaries´
-/// ´claim:cas:frozen-environment-work´ Three and thirty-three declarations freeze at 3046 and 67240 Work and admit fresh graphs at 7870 and 13192, preserving canonical bytes.
+/// ´claim:cas:frozen-environment-work´ Three and thirty-three declarations freeze at 3046 and 67240 Work and admit fresh graphs at 7915 and 13237, preserving canonical bytes.
 #[test]
 fn frozen_environment_work_boundaries() -> TestResult {
     for (count, freeze_work, admission_work, complete_work) in
-        [(3, 3_046, 7_870, 10_916), (33, 67_240, 13_192, 80_432)]
+        [(3, 3_046, 7_915, 10_961), (33, 67_240, 13_237, 80_477)]
     {
         let original = environment(count);
         for limit in [freeze_work, freeze_work - 1] {
@@ -104,7 +104,10 @@ fn frozen_environment_work_boundaries() -> TestResult {
             assert!(budget.usage().work > 0);
             assert!(budget.usage().work <= limit);
         }
-        let frozen = FrozenEnvironment::freeze(&original, &mut Budget::new(Limits::default())?)?;
+        let frozen = FrozenEnvironment::freeze(
+            &original,
+            &mut crate::budget::Budget::new(Limits::default())?,
+        )?;
         for limit in [admission_work, admission_work - 1] {
             let mut cas = Cas::new(Limits::default())?;
             let before = cas.counts();
@@ -116,14 +119,16 @@ fn frozen_environment_work_boundaries() -> TestResult {
                 let mut ordinary = Cas::new(Limits::default())?;
                 let expected = ordinary.admit(
                     &drafts(HeaderDraft::Core(original.clone())),
-                    &mut Budget::new(Limits::default())?,
+                    &mut crate::budget::Budget::new(Limits::default())?,
                 )?;
                 assert_ne!(actual[1], expected[1]);
                 assert_eq!(
-                    cas.canonical_snapshot(&mut Budget::new(Limits::default())?)?,
-                    ordinary.canonical_snapshot(&mut Budget::new(Limits::default())?)?,
+                    cas.canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?,
+                    ordinary
+                        .canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?,
                 );
-                let header = cas.state.header(cas.checked(&actual[0])?)?;
+                let actual_id = cas.checked(&actual[0], &mut budget)?;
+                let header = cas.state.header(actual_id, &mut budget)?;
                 assert!(std::sync::Arc::ptr_eq(&header.environment.0, &frozen.0));
             } else {
                 let Err(fault) = result else {
@@ -160,7 +165,7 @@ fn frozen_environment_work_boundaries() -> TestResult {
 
 /// A new ledger changes only its explicit Work allowance.
 fn allowance(work: u64) -> Result<Budget, crate::Fault> {
-    Budget::new(Limits {
+    crate::budget::Budget::new(Limits {
         work,
         ..Limits::default()
     })
@@ -187,7 +192,10 @@ fn exhausted(fault: &crate::Fault, limit: u64, needed: u64) {
 #[test]
 fn frozen_header_keys_preserve_mixed_interning() -> TestResult {
     let original = environment(3);
-    let frozen = FrozenEnvironment::freeze(&original, &mut Budget::new(Limits::default())?)?;
+    let frozen = FrozenEnvironment::freeze(
+        &original,
+        &mut crate::budget::Budget::new(Limits::default())?,
+    )?;
     for (shared_first, complex_first) in
         [(false, false), (true, false), (false, true), (true, true)]
     {
@@ -199,7 +207,7 @@ fn frozen_header_keys_preserve_mixed_interning() -> TestResult {
             }));
             cas.admit(
                 std::slice::from_ref(&space),
-                &mut Budget::new(Limits::default())?,
+                &mut crate::budget::Budget::new(Limits::default())?,
             )?;
         }
         let headers = [
@@ -209,18 +217,18 @@ fn frozen_header_keys_preserve_mixed_interning() -> TestResult {
         let first = usize::from(shared_first);
         let expected = cas.admit(
             &drafts(headers[first].clone()),
-            &mut Budget::new(Limits::default())?,
+            &mut crate::budget::Budget::new(Limits::default())?,
         )?;
-        let before = cas.canonical_snapshot(&mut Budget::new(Limits::default())?)?;
+        let before = cas.canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?;
         let counts = cas.counts();
         let actual = cas.admit(
             &drafts(headers[1 - first].clone()),
-            &mut Budget::new(Limits::default())?,
+            &mut crate::budget::Budget::new(Limits::default())?,
         )?;
         assert_eq!(actual, expected);
         assert_eq!(cas.counts(), counts);
         assert_eq!(
-            cas.canonical_snapshot(&mut Budget::new(Limits::default())?)?,
+            cas.canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?,
             before
         );
     }
@@ -242,22 +250,28 @@ fn frozen_header_replaced_environment_refuses_stale_drafts() -> TestResult {
     for declaration in &mut replacement.declarations {
         declaration.sort = changed_sort.clone();
     }
-    let frozen = FrozenEnvironment::freeze(&replacement, &mut Budget::new(Limits::default())?)?;
+    let frozen = FrozenEnvironment::freeze(
+        &replacement,
+        &mut crate::budget::Budget::new(Limits::default())?,
+    )?;
     let mut snapshots = Vec::new();
     for header in [HeaderDraft::Core(replacement), HeaderDraft::Frozen(frozen)] {
         let mut cas = Cas::new(Limits::default())?;
         let prior = if matches!(header, HeaderDraft::Frozen(_)) {
             HeaderDraft::Frozen(FrozenEnvironment::freeze(
                 &original,
-                &mut Budget::new(Limits::default())?,
+                &mut crate::budget::Budget::new(Limits::default())?,
             )?)
         } else {
             HeaderDraft::Core(original.clone())
         };
-        let old = cas.admit(&drafts(prior), &mut Budget::new(Limits::default())?)?;
-        let before = cas.canonical_snapshot(&mut Budget::new(Limits::default())?)?;
+        let old = cas.admit(
+            &drafts(prior),
+            &mut crate::budget::Budget::new(Limits::default())?,
+        )?;
+        let before = cas.canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?;
         let counts = cas.counts();
-        let mut budget = Budget::new(Limits::default())?;
+        let mut budget = crate::budget::Budget::new(Limits::default())?;
         let Err(fault) = cas.admit(&drafts(header.clone()), &mut budget) else {
             panic!("replacement environment must refuse stale Free sorts");
         };
@@ -268,7 +282,7 @@ fn frozen_header_replaced_environment_refuses_stale_drafts() -> TestResult {
         assert!(budget.usage().work > 0);
         assert_eq!(cas.counts(), counts);
         assert_eq!(
-            cas.canonical_snapshot(&mut Budget::new(Limits::default())?)?,
+            cas.canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?,
             before
         );
         let mut matching = drafts(header);
@@ -279,10 +293,14 @@ fn frozen_header_replaced_environment_refuses_stale_drafts() -> TestResult {
                 value.sort = changed_sort.clone();
             }
         }
-        let fresh = cas.admit(&matching, &mut Budget::new(Limits::default())?)?;
+        let fresh = cas.admit(
+            &matching,
+            &mut crate::budget::Budget::new(Limits::default())?,
+        )?;
         assert_ne!(fresh[0], old[0]);
         assert_ne!(fresh[1], old[1]);
-        snapshots.push(cas.canonical_snapshot(&mut Budget::new(Limits::default())?)?);
+        snapshots
+            .push(cas.canonical_snapshot(&mut crate::budget::Budget::new(Limits::default())?)?);
     }
     assert_eq!(snapshots[0], snapshots[1]);
     Ok(())

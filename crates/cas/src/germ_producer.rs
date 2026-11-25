@@ -80,6 +80,7 @@ fn produce(runner: &mut Runner<'_>, mut claim: GermValue) -> Result<Handle, Faul
         &claim.function,
         &claim.at.point,
         &claim.at.coordinate,
+        runner.generation,
     )?;
     let order = match claim.mode {
         GermMode::Limit => 0,
@@ -90,11 +91,14 @@ fn produce(runner: &mut Runner<'_>, mut claim: GermValue) -> Result<Handle, Faul
         u64::from(order),
         crate::germ_check::AT,
     )?;
+    let context_id = runner
+        .cas
+        .checked(&runner.request.context, runner.generation)?;
     let domain = runner.cas.handle(
         runner
             .cas
             .state
-            .context(runner.cas.checked(&runner.request.context)?)?
+            .context(context_id, runner.generation)?
             .admissible,
     );
     let mut premises = Vec::new();
@@ -177,17 +181,15 @@ fn coefficients(runner: &mut Runner<'_>, proof: &Handle) -> Result<Vec<Rational>
         .map_err(|_| Fault::allocation(crate::germ_check::AT))?;
     for (index, value) in values.iter().enumerate() {
         if index > 0 {
-            factorial = factorial.mul(
-                &Rational::from_ratio(
-                    i64::try_from(index).map_err(|_| invalid())?,
-                    1,
-                    runner.generation,
-                )?,
+            let factor = Rational::from_ratio(
+                i64::try_from(index).map_err(|_| invalid())?,
+                1,
                 runner.generation,
             )?;
+            factorial = factorial.mul(&factor, runner.generation)?;
         }
         result.push(
-            crate::boundary_check::rational(runner.cas, value)?
+            crate::boundary_check::rational(runner.cas, value, runner.generation)?
                 .div(&factorial, runner.generation)?,
         );
     }
@@ -196,8 +198,8 @@ fn coefficients(runner: &mut Runner<'_>, proof: &Handle) -> Result<Vec<Rational>
 
 /// Extract a finite exact remainder by shifting the local polynomial into the increment variable.
 fn tail(runner: &mut Runner<'_>, proof: &Handle, order: u32) -> Result<Vec<Rational>, Fault> {
-    let previous =
-        crate::proof_view::application(runner.cas, runner.cas.checked(proof)?, runner.generation)?;
+    let proof_id = runner.cas.checked(proof, runner.generation)?;
+    let previous = crate::proof_view::application(runner.cas, proof_id, runner.generation)?;
     let (Statement::Jet { boundary, .. }, Certificate::Boundary(mode)) =
         (&previous.judgment.statement, &previous.certificate)
     else {
@@ -206,11 +208,8 @@ fn tail(runner: &mut Runner<'_>, proof: &Handle, order: u32) -> Result<Vec<Ratio
     let BoundaryCertificate::Polynomial { coefficients, .. } = mode.as_ref() else {
         return Err(invalid());
     };
-    let centre = crate::region::boundary_point(
-        &runner.cas.state,
-        runner.cas.checked(boundary)?,
-        runner.generation,
-    )?;
+    let boundary_id = runner.cas.checked(boundary, runner.generation)?;
+    let centre = crate::region::boundary_point(&runner.cas.state, boundary_id, runner.generation)?;
     let shifted = crate::germ_polynomial::shift(coefficients, &centre, runner.generation)?;
     let first = usize::try_from(order)
         .map_err(|_| invalid())?
@@ -229,7 +228,13 @@ fn owned(runner: &mut Runner<'_>, claim: &GermValue) -> Result<Handle, Fault> {
     else {
         return Err(pending());
     };
-    if claim.coefficients.first() != Some(crate::boundary_check::rational(runner.cas, &value)?) {
+    if claim.coefficients.first()
+        != Some(crate::boundary_check::rational(
+            runner.cas,
+            &value,
+            runner.generation,
+        )?)
+    {
         return Err(disagreement());
     }
     Ok(proof)

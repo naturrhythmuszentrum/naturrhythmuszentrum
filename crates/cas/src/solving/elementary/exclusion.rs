@@ -39,6 +39,7 @@ pub(crate) fn subject(
     cas: &Cas,
     base: &Handle,
     statement: &Statement,
+    budget: &mut Budget,
 ) -> Result<Option<LogicalId>, Fault> {
     let Statement::Empty { region } = statement else {
         return Ok(None);
@@ -46,18 +47,23 @@ pub(crate) fn subject(
     let RegionExpr::GuardTrue {
         base: ancestor,
         predicate,
-    } = &cas.state.region(cas.checked(region)?)?.expression
+    } = &cas
+        .state
+        .region(cas.checked(region, budget)?, budget)?
+        .expression
     else {
         return Ok(None);
     };
-    if *ancestor != cas.checked(base)? {
+    if *ancestor != cas.checked(base, budget)? {
         return Ok(None);
     }
-    let (PredicateKind::Equal, [left, right]) = super::evidence::predicate(cas, *predicate)? else {
+    let (PredicateKind::Equal, [left, right]) =
+        super::evidence::predicate(cas, *predicate, budget)?
+    else {
         return Ok(None);
     };
     for (subject, zero) in [(*left, *right), (*right, *left)] {
-        if matches!(&cas.state.expression(zero)?.operator, Operator::Rational(value) if value.is_zero())
+        if matches!(&cas.state.expression(zero, budget)?.operator, Operator::Rational(value) if value.is_zero())
         {
             return Ok(Some(subject));
         }
@@ -90,7 +96,7 @@ pub(crate) fn values(
             if let Statement::PredicateFact { predicate, region } = &premise.judgment.statement
                 && region == evaluation.region
                 && let (PredicateKind::Positive | PredicateKind::NonZero, [subject]) =
-                    super::evidence::predicate(evaluation.cas, predicate.logical_id())?
+                    super::evidence::predicate(evaluation.cas, predicate.logical_id(), budget)?
             {
                 let fact = crate::proof::EmptyFact::Premise(
                     u32::try_from(*slot).map_err(|_| super::proof::invalid())?,
@@ -100,6 +106,7 @@ pub(crate) fn values(
                 evaluation.cas,
                 evaluation.region,
                 &premise.judgment.statement,
+                budget,
             )? {
                 let value = budget.with_retained_payload(result.bytes, AT, |budget| {
                     evaluation.unbound().expression(subject, true, budget)
@@ -145,10 +152,10 @@ fn guards(
         pending.push(evaluation.region.logical_id());
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            match &evaluation.cas.state.region(id)?.expression {
+            match &evaluation.cas.state.region(id, budget)?.expression {
                 RegionExpr::GuardTrue { base, predicate } => {
                     if let (PredicateKind::Positive | PredicateKind::NonZero, [subject]) =
-                        super::evidence::predicate(evaluation.cas, *predicate)?
+                        super::evidence::predicate(evaluation.cas, *predicate, budget)?
                     {
                         sign(
                             evaluation,

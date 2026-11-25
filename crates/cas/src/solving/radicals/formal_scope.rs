@@ -230,8 +230,11 @@ impl Formal {
                 }),
             });
         }
-        let SolveDraft::CoefficientMap(map) =
-            crate::solving::graph::object(&cas.state, cas.checked(&self.rendering.map)?)?
+        let SolveDraft::CoefficientMap(map) = crate::solving::graph::object(
+            &cas.state,
+            cas.checked(&self.rendering.map, budget)?,
+            budget,
+        )?
         else {
             return Err(invalid());
         };

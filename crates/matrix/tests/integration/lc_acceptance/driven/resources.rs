@@ -16,7 +16,10 @@ fn lc_driven_continuation_cumulative_resource_stop() -> TestResult {
 /// An already consumed caller prefix leaves no Work for the first decision after the root.
 fn refusal<P: Scalar + 'static>() -> TestResult {
     let mut original = setup::<P>(false)?;
-    execute(&mut original, &mut crate::phasor_solve_testing::budget()?)?;
+    execute(
+        &mut original,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
+    )?;
     let invariant_work = original
         .batch
         .usage(Stratum::Invariant)
@@ -40,7 +43,13 @@ fn refusal<P: Scalar + 'static>() -> TestResult {
     case.batch
         .invariants()
         .result(0, &case.heap, &case.context, &mut ledger()?)?;
-    assert!(execute(&mut case, &mut crate::phasor_solve_testing::budget()?).is_err());
+    assert!(
+        execute(
+            &mut case,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?
+        )
+        .is_err()
+    );
     let inventory = case.batch.inventory();
     assert_eq!(inventory.points, 3);
     assert!(inventory.observed_capacity_bytes >= inventory.logical_payload_bytes);

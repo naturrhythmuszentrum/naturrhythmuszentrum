@@ -21,11 +21,11 @@ pub(super) fn check(
     region: LogicalId,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let frame = cas.state.context(context)?;
+    let frame = cas.state.context(context, budget)?;
     if region == frame.admissible {
         return Ok(());
     }
-    cas.state.region(region)?;
+    cas.state.region(region, budget)?;
     budget.check(BudgetKind::HypothesisDepth, frame.depth, AT)?;
     let previous = budget.limits().clone();
     let result = inspect(cas, context, region, budget);
@@ -57,8 +57,8 @@ fn inspect(
     region: LogicalId,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let admissible = cas.state.context(context)?.admissible;
-    if cas.state.region(admissible)?.lies_over.is_some() {
+    let admissible = cas.state.context(context, budget)?.admissible;
+    if cas.state.region(admissible, budget)?.lies_over.is_some() {
         return Err(unsupported());
     }
     let mut pending = Vec::new();
@@ -74,7 +74,7 @@ fn inspect(
         if ancestor_region(cas, context, id, budget)? {
             continue;
         }
-        let value = cas.state.region(id)?;
+        let value = cas.state.region(id, budget)?;
         let RegionExpr::Meet(members) = &value.expression else {
             return Err(unsupported());
         };
@@ -114,9 +114,9 @@ fn ancestor_region(
         let Some(restriction) = child.restriction else {
             return Ok(false);
         };
-        let local = cas.state.region(child.admissible)?;
-        let outer = cas.state.region(parent.admissible)?;
-        let restricted = cas.state.region(restriction)?;
+        let local = cas.state.region(child.admissible, budget)?;
+        let outer = cas.state.region(parent.admissible, budget)?;
+        let restricted = cas.state.region(restriction, budget)?;
         for value in [local, outer, restricted] {
             if value.lies_over.is_some() {
                 return Ok(false);
@@ -161,7 +161,7 @@ fn visit<'a>(
     budget: &mut Budget,
 ) -> Result<&'a crate::graph::Context, Fault> {
     budget.condition(1, AT)?;
-    let frame = cas.state.context(context)?;
+    let frame = cas.state.context(context, budget)?;
     budget.check(BudgetKind::HypothesisDepth, frame.depth, AT)?;
     Ok(frame)
 }

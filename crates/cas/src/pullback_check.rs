@@ -22,13 +22,16 @@ impl Cas {
     pub fn pullback_certificate(
         &self,
         witness: &crate::proof_model::VerifiedWitness,
+        budget: &mut Budget,
     ) -> Result<&PullbackCertificate, Fault> {
-        let crate::graph::Vertex::Proof(application) =
-            self.state.node(self.checked(witness.proof())?)?
+        let crate::graph::Vertex::Proof(application) = self
+            .state
+            .node(self.checked(witness.proof(), budget)?, budget)?
         else {
             return Err(invalid());
         };
-        let crate::graph::Vertex::ScopedApplication(application) = self.state.node(*application)?
+        let crate::graph::Vertex::ScopedApplication(application) =
+            self.state.node(*application, budget)?
         else {
             return Err(invalid());
         };
@@ -98,19 +101,21 @@ pub(crate) fn source(
 ) -> Result<Rational, Fault> {
     crate::distribution_check::membership(
         cas,
-        cas.checked(&claim.source)?,
+        cas.checked(&claim.source, budget)?,
         &claim.source_space,
         &[],
         budget,
     )?;
-    let input = cas.state.expression(cas.checked(&claim.source)?)?;
+    let input = cas
+        .state
+        .expression(cas.checked(&claim.source, budget)?, budget)?;
     if input.operator != (Operator::Delta { order: 0 }) {
         return Err(invalid());
     }
     let [point] = input.operands.as_slice() else {
         return Err(invalid());
     };
-    Ok(crate::distribution_check::rational(cas, *point)?.clone())
+    Ok(crate::distribution_check::rational(cas, *point, budget)?.clone())
 }
 
 /// Each listed point is a simple preimage and its positive Jacobian is the reciprocal absolute slope.

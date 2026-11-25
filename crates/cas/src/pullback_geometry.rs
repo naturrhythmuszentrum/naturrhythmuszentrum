@@ -22,7 +22,7 @@ pub(crate) const AT: Location = Location::new("delta pullback map");
 
 /// Reconstruct the connected open interval without trusting the space constructor alone.
 pub(crate) fn interval(cas: &Cas, space: &Handle, budget: &mut Budget) -> Result<Interval, Fault> {
-    let domain = cas.state.space(cas.checked(space)?)?.domain;
+    let domain = cas.state.space(cas.checked(space, budget)?, budget)?.domain;
     let cells = crate::region_cache::partition(cas, &[domain], budget)?;
     crate::region::check_open(&cells)?;
     let row = cells.membership.first().ok_or_else(invalid)?;

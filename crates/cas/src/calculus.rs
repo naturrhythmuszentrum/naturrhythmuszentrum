@@ -47,8 +47,8 @@ impl Deriver {
             if self.memo.contains_key(&key) {
                 continue;
             }
-            let expression = cas.state.expression(id)?;
-            crate::rule_check::scalar(&cas.state, context, id)?;
+            let expression = cas.state.expression(id, budget)?;
+            crate::rule_check::scalar(&cas.state, context, id, budget)?;
             let primitive = primitive(&expression.operator).map_err(|mut fault| {
                 fault.location.logical_id = Some(id.serial);
                 fault
@@ -141,8 +141,8 @@ impl Deriver {
         budget: &mut Budget,
     ) -> Result<u32, Fault> {
         let previous = self.plan.get(proof)?;
-        let input = cas.checked(&previous.left)?;
-        let raw = cas.checked(&previous.right)?;
+        let input = cas.checked(&previous.left, budget)?;
+        let raw = cas.checked(&previous.right, budget)?;
         if result == raw {
             return Ok(proof);
         }
@@ -250,7 +250,7 @@ fn formula(
     derivatives: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let expression = cas.state.expression(input)?;
+    let expression = cas.state.expression(input, budget)?;
     let operator = expression.operator.clone();
     let operands = expression.operands.clone();
     let operand = |position| {

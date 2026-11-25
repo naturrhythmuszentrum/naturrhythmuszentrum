@@ -25,7 +25,7 @@ fn read(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<Dense, Fault> {
-    if storage::polynomial(&cas.state, handle)?.variables != [Field::Real] {
+    if storage::polynomial(&cas.state, handle, budget)?.variables != [Field::Real] {
         return Err(invalid());
     }
     proof::defined(cas, handle, &certificate.region, premises, budget)?;
@@ -131,7 +131,7 @@ fn unit(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(1, AT)?;
-    let polynomial = storage::polynomial(&cas.state, handle)?;
+    let polynomial = storage::polynomial(&cas.state, handle, budget)?;
     let leading = &polynomial.terms.first().ok_or_else(invalid)?.coefficient;
     let Statement::Solve(statement) = &premise(premises, slot)?.judgment.statement else {
         return Err(invalid());

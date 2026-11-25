@@ -57,7 +57,7 @@ impl ReciprocalJacobianCache {
         key: &ReciprocalJacobianKey,
         budget: &mut Budget,
     ) -> Result<ReciprocalJacobian, ReadingError> {
-        cas.context_header(key.definition().frame().context())?;
+        cas.context_header(key.definition().frame().context(), budget)?;
         budget.check(BudgetKind::StagedPayloadBytes, self.bytes, support::AT)?;
         budget.check(BudgetKind::OutputBytes, self.bytes, support::AT)?;
         for entry in &self.entries {

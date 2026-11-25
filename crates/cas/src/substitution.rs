@@ -94,9 +94,11 @@ impl Cas {
         substitutions: &[Substitution],
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let root = self.checked(root)?;
+        let root = self.checked(root, budget)?;
         let mut workspace = self.prepay_transform(root, None, 0, budget)?;
-        let initial = crate::descriptor::metadata(&self.state, root)?.1.clone();
+        let initial = crate::descriptor::metadata(&self.state, root, budget)?
+            .1
+            .clone();
         let replacements = self.free_replacements(root, substitutions, &mut workspace, budget)?;
         self.transform_root(
             root,
@@ -119,7 +121,7 @@ impl Cas {
         replacements: &[Handle],
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let root = self.checked(root)?;
+        let root = self.checked(root, budget)?;
         let mut workspace = self.prepay_transform(root, None, 0, budget)?;
         let (outer, replacements) =
             self.bound_replacements(root, replacements, &mut workspace, budget)?;
@@ -157,7 +159,7 @@ impl Cas {
         scope: Option<&Scope>,
         budget: &mut Budget,
     ) -> Result<u64, Fault> {
-        let vertex = self.state.node(id)?;
+        let vertex = self.state.node(id, budget)?;
         let (_, key) = crate::graph::vertex_key(vertex, &self.state, budget)?;
         let payload = crate::graph::vertex_payload(vertex, key.len(), 0, budget)?;
         drop(key);
@@ -215,7 +217,7 @@ impl Cas {
             budget.work(size(mapped.len(), AT)?.saturating_add(1), AT)?;
             plan.bytes =
                 self.prepay_transform(id, Some(mode.copied_scope()), plan.bytes, budget)?;
-            let key = memo_key(self, id, mode)?;
+            let key = memo_key(self, id, mode, budget)?;
             if mapped.contains_key(&key) {
                 continue;
             }
@@ -232,18 +234,26 @@ impl Cas {
                 pending.extend(children.into_iter().rev().map(|(_, child)| (child, false)));
                 continue;
             }
-            let scope = mode.scope(crate::descriptor::metadata(&self.state, id)?.1)?;
-            let operator = self.transformed_operator(id, mode)?;
+            let (header, original_scope) = crate::descriptor::metadata(&self.state, id, budget)?;
+            let scope = mode.scope(original_scope)?;
+            let operator = self.transformed_operator(id, mode, budget)?;
+            let vertex = self.state.node(id, budget)?;
             let mut resolve = |child| {
                 mapped
-                    .get(&memo_key(self, child, mode)?)
+                    .get(&memo_key(self, child, mode, budget)?)
                     .cloned()
                     .ok_or_else(invalid)
             };
-            let draft =
-                crate::substitution_draft::rebuild(self, id, scope, operator, &mut resolve)?;
+            let draft = crate::substitution_draft::rebuild(
+                self,
+                vertex,
+                header,
+                scope,
+                operator,
+                &mut resolve,
+            )?;
             let output = plan.push(draft, budget)?;
-            if matches!(self.state.node(id)?, Vertex::Space(_)) {
+            if matches!(self.state.node(id, budget)?, Vertex::Space(_)) {
                 plan.spaces
                     .try_reserve(1)
                     .map_err(|_| Fault::allocation(AT))?;
@@ -252,7 +262,7 @@ impl Cas {
             mapped.insert(key, output);
         }
         mapped
-            .get(&memo_key(self, root, mode)?)
+            .get(&memo_key(self, root, mode, budget)?)
             .cloned()
             .ok_or_else(invalid)
     }
@@ -265,28 +275,30 @@ impl Cas {
         plan: &mut Plan,
         budget: &mut Budget,
     ) -> Result<Option<Reference>, Fault> {
-        if crate::descriptor::fixed_axis(&self.state, id)? {
+        if crate::descriptor::fixed_axis(&self.state, id, budget)? {
             return Ok(Some(Reference::Existing(self.handle(id))));
         }
-        let (_, scope) = crate::descriptor::metadata(&self.state, id)?;
+        let (_, scope) = crate::descriptor::metadata(&self.state, id, budget)?;
         if let (Vertex::Space(space), Mode::Free { replacements, .. }) =
-            (self.state.node(id)?, mode)
+            (self.state.node(id, budget)?, mode)
             && let Some(replacement) = replacements.get(&space.coordinate)
-            && self.state.expression(*replacement)?.operator
+            && self.state.expression(*replacement, budget)?.operator
                 != Operator::Free(space.coordinate.clone())
         {
             return Err(invalid());
         }
-        if matches!(self.state.node(id)?, Vertex::Space(_)) && !matches!(mode, Mode::Free { .. }) {
+        if matches!(self.state.node(id, budget)?, Vertex::Space(_))
+            && !matches!(mode, Mode::Free { .. })
+        {
             return Ok(Some(Reference::Existing(self.handle(id))));
         }
-        let Vertex::Expression(value) = self.state.node(id)? else {
+        let Vertex::Expression(value) = self.state.node(id, budget)? else {
             return Ok(None);
         };
         if let (Operator::NamedCase(name), Mode::Free { replacements, .. }) =
             (&value.operator, mode)
             && let Some(replacement) = replacements.get(&name.coordinate)
-            && self.state.expression(*replacement)?.operator
+            && self.state.expression(*replacement, budget)?.operator
                 != Operator::Free(name.coordinate.clone())
         {
             return Err(invalid());
@@ -329,8 +341,13 @@ impl Cas {
     }
 
     /// Shift only references outside the preserved nested binder suffix.
-    fn transformed_operator(&self, id: LogicalId, mode: &Mode) -> Result<Option<Operator>, Fault> {
-        let Vertex::Expression(value) = self.state.node(id)? else {
+    fn transformed_operator(
+        &self,
+        id: LogicalId,
+        mode: &Mode,
+        budget: &mut Budget,
+    ) -> Result<Option<Operator>, Fault> {
+        let Vertex::Expression(value) = self.state.node(id, budget)? else {
             return Ok(None);
         };
         let mut operator = value.operator.clone();
@@ -363,14 +380,14 @@ impl Cas {
         workspace: &mut u64,
         budget: &mut Budget,
     ) -> Result<BTreeMap<String, LogicalId>, Fault> {
-        let (header_id, scope) = crate::descriptor::metadata(&self.state, root)?;
-        let header = self.state.header(header_id)?;
+        let (header_id, scope) = crate::descriptor::metadata(&self.state, root, budget)?;
+        let header = self.state.header(header_id, budget)?;
         let mut result = BTreeMap::new();
         for substitution in substitutions {
             budget.work(size(header.environment.canonical_bytes().len(), AT)?, AT)?;
-            let id = self.checked(&substitution.replacement)?;
+            let id = self.checked(&substitution.replacement, budget)?;
             *workspace = self.prepay_transform(id, None, *workspace, budget)?;
-            let value = self.state.expression(id)?;
+            let value = self.state.expression(id, budget)?;
             let declared = header
                 .environment
                 .declarations
@@ -406,23 +423,27 @@ impl Cas {
         workspace: &mut u64,
         budget: &mut Budget,
     ) -> Result<(Scope, Vec<LogicalId>), Fault> {
-        let (header, scope) = crate::descriptor::metadata(&self.state, root)?;
+        let (header, scope) = crate::descriptor::metadata(&self.state, root, budget)?;
         let frame = scope.last().ok_or_else(invalid)?;
         if frame.len() != replacements.len() {
             return Err(invalid());
         }
         let length = scope.len().checked_sub(1).ok_or_else(invalid)?;
         let outer = scope.get(..length).ok_or_else(invalid)?.to_vec();
-        let header_bytes = self.state.header(header)?.environment.canonical_bytes();
+        let header_bytes = self
+            .state
+            .header(header, budget)?
+            .environment
+            .canonical_bytes();
         let mut result = Vec::new();
         result
             .try_reserve_exact(replacements.len())
             .map_err(|_| Fault::allocation(AT))?;
         for (handle, sort) in replacements.iter().zip(frame) {
             budget.work(size(header_bytes.len(), AT)?, AT)?;
-            let id = self.checked(handle)?;
+            let id = self.checked(handle, budget)?;
             *workspace = self.prepay_transform(id, None, *workspace, budget)?;
-            let value = self.state.expression(id)?;
+            let value = self.state.expression(id, budget)?;
             if value.scope != outer
                 || value.sort != Sort::Value(sort.clone())
                 || value.header != header
@@ -481,17 +502,18 @@ impl Mode {
 }
 
 /// Memoize kind, original scope and lifting depth under one immutable environment.
-fn memo_key(cas: &Cas, id: LogicalId, mode: &Mode) -> Result<MemoKey, Fault> {
-    if crate::descriptor::fixed_axis(&cas.state, id)? {
+fn memo_key(cas: &Cas, id: LogicalId, mode: &Mode, budget: &mut Budget) -> Result<MemoKey, Fault> {
+    if crate::descriptor::fixed_axis(&cas.state, id, budget)? {
         return Ok((id, Vec::new(), 0));
     }
-    let scope = crate::descriptor::metadata(&cas.state, id)?.1;
-    let depth =
-        if matches!(cas.state.node(id)?, Vertex::Space(_)) || matches!(mode, Mode::Free { .. }) {
-            0
-        } else {
-            mode.depth(scope)?
-        };
+    let scope = crate::descriptor::metadata(&cas.state, id, budget)?.1;
+    let depth = if matches!(cas.state.node(id, budget)?, Vertex::Space(_))
+        || matches!(mode, Mode::Free { .. })
+    {
+        0
+    } else {
+        mode.depth(scope)?
+    };
     Ok((id, scope.clone(), depth))
 }
 

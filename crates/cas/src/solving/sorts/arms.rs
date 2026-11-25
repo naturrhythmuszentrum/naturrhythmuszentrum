@@ -20,8 +20,8 @@ pub(crate) fn arm(
     budget: &mut Budget,
 ) -> Result<CaseArm, Fault> {
     let (header, region, value) = ids;
-    let (actual, scope) = crate::descriptor::metadata(state, value)?;
-    let region_data = state.region(region)?;
+    let (actual, scope) = crate::descriptor::metadata(state, value, budget)?;
+    let region_data = state.region(region, budget)?;
     if scope != &draft.scope
         || region_data.scope != draft.scope
         || !crate::header::embeds(state, actual, header, budget)?
@@ -35,11 +35,11 @@ pub(crate) fn arm(
         .map_err(|_| Fault::allocation(super::admission::AT))?;
     for pair in &draft.placements {
         placements.push(PlacementUse {
-            operand: cas.resolve(state, &pair.operand, locals)?,
-            piece: cas.resolve(state, &pair.piece, locals)?,
+            operand: cas.resolve(state, &pair.operand, locals, budget)?,
+            piece: cas.resolve(state, &pair.piece, locals, budget)?,
         });
     }
-    let sort = match state.node(value)? {
+    let sort = match state.node(value, budget)? {
         Vertex::Expression(term)
             if matches!(
                 term.sort,
@@ -87,15 +87,15 @@ fn check_placements(
             return Err(invalid());
         }
         let handle = cas.handle(pair.piece);
-        let SolveDraft::ScalarPiece(piece) = object(state, &handle)? else {
+        let SolveDraft::ScalarPiece(piece) = object(state, &handle, budget)? else {
             return Err(invalid());
         };
-        let SolveDraft::SpacePlacement(placement) = object(state, &piece.placement)? else {
+        let SolveDraft::SpacePlacement(placement) = object(state, &piece.placement, budget)? else {
             return Err(invalid());
         };
         if piece.region != body.region
             || placement.ambient.logical_id() != *ambient
-            || operand_ambient(state, pair.operand)? != placement.source.logical_id()
+            || operand_ambient(state, pair.operand, budget)? != placement.source.logical_id()
         {
             return Err(invalid());
         }
@@ -104,8 +104,8 @@ fn check_placements(
 }
 
 /// Borrow a scalar or local family result's independently checked own ambient.
-fn operand_ambient(state: &State, id: LogicalId) -> Result<LogicalId, Fault> {
-    match state.node(id)? {
+fn operand_ambient(state: &State, id: LogicalId, budget: &mut Budget) -> Result<LogicalId, Fault> {
+    match state.node(id, budget)? {
         Vertex::Expression(value) => value.ambient.ok_or_else(invalid),
         Vertex::Solve(value) => match value.as_ref() {
             SolveDraft::FamilyExpression(value) => Ok(value.ambient.logical_id()),
@@ -139,14 +139,15 @@ pub(crate) fn placement_operands(
                 super::admission::AT,
             )?;
             let required = (value.logical_id(), ambient);
-            if operand_ambient(state, required.0)? != ambient && associated.insert(required) {
+            if operand_ambient(state, required.0, budget)? != ambient && associated.insert(required)
+            {
                 result
                     .try_reserve(1)
                     .map_err(|_| Fault::allocation(super::admission::AT))?;
                 result.push(required);
             }
             if role == FamilyArgumentRole::Family && expanded.insert(value.logical_id()) {
-                let SolveDraft::FamilyExpression(previous) = object(state, &value)? else {
+                let SolveDraft::FamilyExpression(previous) = object(state, &value, budget)? else {
                     return Err(invalid());
                 };
                 push_arguments(
@@ -171,7 +172,7 @@ fn push_arguments(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, super::admission::AT, {
-        let shape = super::admission::family(state, &body.family)?;
+        let shape = super::admission::family(state, &body.family, budget)?;
         let ambient = shape.fibre_space.logical_id();
         let count = crate::graph::size(
             pending.len().saturating_add(body.arguments.len()),

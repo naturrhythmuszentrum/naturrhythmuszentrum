@@ -8,7 +8,7 @@ use crate::error::{Fault, InvalidCode};
 use crate::graph::{Cas, Handle, size};
 use crate::number::Rational;
 use crate::proof_model::CheckedApplication;
-
+#[cfg(test)]
 #[cfg(test)]
 thread_local! {
     static VISITS: std::cell::Cell<[u64; 3]> = const { std::cell::Cell::new([0; 3]) };
@@ -47,6 +47,7 @@ fn read<'a>(
             .coefficients
             .get(usize::try_from(index).map_err(|_| invalid())?)
             .ok_or_else(invalid)?,
+        budget,
     )
 }
 
@@ -110,7 +111,7 @@ pub(super) fn workspace(order: u32, budget: &Budget) -> Result<u64, Fault> {
 
 /// Observe the admitted constant before reading any claimed inverse or allocating rows.
 pub(super) fn nonunit(cas: &Cas, input: &Handle, budget: &mut Budget) -> Result<(), Fault> {
-    let object = cas.series_object(input)?;
+    let object = cas.series_object(input, budget)?;
     let number = coefficient(cas, object, 0, budget)?;
     if number.is_zero() {
         let bytes = 257 + 2 * std::mem::size_of::<usize>() as u64;
@@ -157,8 +158,8 @@ pub(super) fn check(
     else {
         return Err(invalid());
     };
-    let p = cas.series_object(input)?;
-    let q = cas.series_object(output)?;
+    let p = cas.series_object(input, budget)?;
+    let q = cas.series_object(output, budget)?;
     compatible(p, q, budget)?;
     if !premises.is_empty()
         || p.order == 0
@@ -220,7 +221,7 @@ pub(super) fn produce(
     budget: &mut Budget,
 ) -> Result<(S, C), Fault> {
     use super::produce::{copied, literal, output};
-    let p = cas.series_object(input)?;
+    let p = cas.series_object(input, budget)?;
     let order = p.order;
     let count = entries(order)?;
     let constant = copied(coefficient(cas, p, 0, budget)?, budget)?;
@@ -327,7 +328,7 @@ mod tests {
         // For order one A=18*cell+256. The last case fits the product but not
         // the addition: cell=floor(MAX/18), with cell=bits/4+128 here.
         for bits in [u64::MAX, u64::MAX - 7, (u64::MAX / 18 - 128) * 4] {
-            let budget = Budget::new(Limits {
+            let budget = crate::budget::Budget::new(Limits {
                 intermediate_bits: bits,
                 ..Limits::default()
             })?;
@@ -342,7 +343,7 @@ mod tests {
             );
         }
         for supplied in [false, true] {
-            let mut budget = Budget::new(Limits {
+            let mut budget = crate::budget::Budget::new(Limits {
                 intermediate_bits: u64::MAX,
                 ..Limits::default()
             })?;
@@ -412,7 +413,7 @@ mod tests {
             intermediate_bits: bits,
             ..Limits::default()
         };
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = crate::budget::Budget::new(limits.clone())?;
         let bytes = workspace(1, &budget)?;
         assert_eq!(bytes, u64::MAX - remaining);
         let crate::proof_model::Certificate::Series(certificate) = &step.certificate else {
@@ -438,7 +439,7 @@ mod tests {
             .check_proof(
                 &f.context,
                 std::slice::from_ref(step),
-                &mut Budget::new(limits)?,
+                &mut crate::budget::Budget::new(limits)?,
             )
             .expect_err("checker reservation capacity");
         assert_eq!(
@@ -528,13 +529,14 @@ mod tests {
     /// ´test:unit:series-reciprocal-ordered-coefficient-visits´
     #[test]
     fn ordered_coefficient_visits() -> TestResult {
+        let mut budget = crate::testing::common::default_budget()?;
         let mut f = Fixture::new(&["2"], "0", false, false)?;
         let input = f.object(&[Rational::parse("2", &mut default_budget()?)?])?;
-        let object = f.cas.series_object(&input)?;
+        let object = f.cas.series_object(&input, &mut budget)?;
         for phase in [1, 2] {
             for work in [0, 1] {
                 VISITS.with(|cell| cell.set([0; 3]));
-                let mut budget = Budget::new(Limits {
+                let mut budget = crate::budget::Budget::new(Limits {
                     work,
                     ..Limits::default()
                 })?;
@@ -582,7 +584,7 @@ mod tests {
         rows.last_mut().ok_or("last row")?.degree = 9;
         for work in [9, 10] {
             VISITS.with(|cell| cell.set([0; 3]));
-            let mut budget = Budget::new(Limits {
+            let mut budget = crate::budget::Budget::new(Limits {
                 work,
                 ..Limits::default()
             })?;

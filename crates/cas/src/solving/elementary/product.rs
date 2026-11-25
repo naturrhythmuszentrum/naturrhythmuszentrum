@@ -41,7 +41,7 @@ pub(crate) fn equation(
     let _attribution = crate::work_observation::Scope::phase("exclusion.equation");
     crate::work_observation::observe!(budget, crate::error::Location::new(""), {
         let (PredicateKind::Equal, [left, right]) =
-            super::evidence::predicate(evaluation.cas, original.predicate.logical_id())?
+            super::evidence::predicate(evaluation.cas, original.predicate.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -104,9 +104,9 @@ pub(crate) fn entries(
 ) -> Result<Vec<Handle>, Fault> {
     let _attribution = crate::work_observation::Scope::phase("inventory");
     crate::work_observation::observe!(budget, AT, {
-        let original = problem(cas, &coverage.problem)?;
+        let original = problem(cas, &coverage.problem, budget)?;
         let SolveDraft::SolutionSet(set) =
-            crate::solving::graph::object(&cas.state, cas.checked(&coverage.set)?)?
+            crate::solving::graph::object(&cas.state, cas.checked(&coverage.set, budget)?, budget)?
         else {
             return Err(invalid());
         };
@@ -117,7 +117,7 @@ pub(crate) fn entries(
         for branch in &set.branches {
             budget.work(1, AT)?;
             let SolveDraft::SolutionBranch(branch) =
-                crate::solving::graph::object(&cas.state, cas.checked(branch)?)?
+                crate::solving::graph::object(&cas.state, cas.checked(branch, budget)?, budget)?
             else {
                 return Err(invalid());
             };
@@ -131,7 +131,7 @@ pub(crate) fn entries(
                 SolutionBranchKind::Finite { tuples } => {
                     reserve(&mut result, tuples.len(), budget)?;
                     for handle in tuples {
-                        let [entry] = tuple(cas, handle)?.entries.as_slice() else {
+                        let [entry] = tuple(cas, handle, budget)?.entries.as_slice() else {
                             return Err(invalid());
                         };
                         result.push(entry.clone());
@@ -153,7 +153,7 @@ pub(crate) fn membership(
 ) -> Result<(), Fault> {
     let _attribution = crate::work_observation::Scope::phase("existence.membership");
     crate::work_observation::observe!(budget, crate::error::Location::new(""), {
-        let unknowns = coordinates(evaluation.cas, &original.unknowns)?;
+        let unknowns = coordinates(evaluation.cas, &original.unknowns, budget)?;
         let [coordinate] = unknowns.coordinates.as_slice() else {
             return Err(invalid());
         };
@@ -184,7 +184,7 @@ fn inclusion(
             return Ok(());
         }
     }
-    let unknowns = coordinates(evaluation.cas, &original.unknowns)?;
+    let unknowns = coordinates(evaluation.cas, &original.unknowns, budget)?;
     let [coordinate] = unknowns.coordinates.as_slice() else {
         return Err(invalid());
     };
@@ -266,8 +266,8 @@ pub(crate) fn check(
     {
         return Err(invalid());
     }
-    let original = problem(cas, &certificate.problem)?;
-    super::proof::region(cas, &draft.context, original, &certificate.region)?;
+    let original = problem(cas, &certificate.problem, budget)?;
+    super::proof::region(cas, &draft.context, original, &certificate.region, budget)?;
     super::member::contained(cas, &certificate.region, &original.region, budget)?;
     if !matches!(
         original.ambient,

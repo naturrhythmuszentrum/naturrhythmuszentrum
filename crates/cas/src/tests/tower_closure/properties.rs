@@ -14,7 +14,8 @@ use crate::solving::{
 use crate::{Reference, syntax::Draft};
 
 fn root_selection(cas: &Cas, root: &Handle) -> TestResult<Handle> {
-    let expression = cas.state.expression(root.logical_id())?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let expression = cas.state.expression(root.logical_id(), &mut budget)?;
     let Some(crate::graph::ExpressionAttachment::SelectedRoot(selection)) = &expression.attachment
     else {
         return Err("selected root attachment".into());
@@ -78,11 +79,12 @@ fn root_closure_false_equation() -> TestResult {
 
 /// Build the same four-node parent-map chain; its single changed image would close a cycle.
 fn cyclic_drafts(fixture: &Fixture) -> TestResult<Vec<Draft>> {
+    let mut budget = crate::testing::common::default_budget()?;
     let selected = root_selection(&fixture.cas, &fixture.roots[1])?;
-    let selection = super::selected::selection(&fixture.cas, &selected)?;
-    let relation = super::selected::relation(&fixture.cas, &selection.relations[0])?;
+    let selection = super::selected::selection(&fixture.cas, &selected, &mut budget)?;
+    let relation = super::selected::relation(&fixture.cas, &selection.relations[0], &mut budget)?;
     let SolveDraft::CoefficientMap(parent) =
-        crate::solving::graph::object(&fixture.cas.state, relation.map.logical_id())?
+        crate::solving::graph::object(&fixture.cas.state, relation.map.logical_id(), &mut budget)?
     else {
         return Err("outer parent map".into());
     };
@@ -295,9 +297,10 @@ fn root_closure_selected_component_twins() -> TestResult {
 /// ´test:crate:root-closure-missing-defining-relation´
 #[test]
 fn root_closure_missing_defining_relation() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut fixture = supplied(&[-2, 0, 0, 1], true)?;
     let selected = root_selection(&fixture.cas, &fixture.roots[0])?;
-    let original = super::selected::selection(&fixture.cas, &selected)?;
+    let original = super::selected::selection(&fixture.cas, &selected, &mut budget)?;
     let SolveDraft::RootSelection(mut changed) = SolveDraft::RootSelection(original.clone())
         .resolve(&mut |handle| Ok(Reference::Existing(handle.clone())))?
     else {
@@ -328,9 +331,13 @@ fn root_closure_missing_defining_relation() -> TestResult {
 /// ´test:crate:root-closure-sibling-region-refused´
 #[test]
 fn root_closure_sibling_region_refused() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::domain_model::{RegionDraft, RegionExpr};
     let mut fixture = supplied(&[-2, 0, 0, 1], true)?;
-    let original = fixture.cas.state.region(fixture.region.logical_id())?;
+    let original = fixture
+        .cas
+        .state
+        .region(fixture.region.logical_id(), &mut budget)?;
     let RegionExpr::GuardFalse { base, predicate } = original.expression else {
         return Err("original nonzero cell".into());
     };
@@ -373,10 +380,11 @@ fn expression(
     operator: crate::model::Operator,
     operands: &[Handle],
 ) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let root = fixture
         .cas
         .state
-        .expression(fixture.roots[0].logical_id())?;
+        .expression(fixture.roots[0].logical_id(), &mut budget)?;
     let draft = crate::testing::solve_graph::expression(
         Reference::Existing(fixture.cas.handle(root.header)),
         operator,
@@ -390,6 +398,7 @@ fn expression(
 /// ´test:crate:root-closure-strict-denominator-mutation´
 #[test]
 fn root_closure_strict_denominator_mutation() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::model::Operator;
     let mut fixture = fixture()?;
     let roots = fixture.roots.clone();
@@ -410,7 +419,10 @@ fn root_closure_strict_denominator_mutation() -> TestResult {
     let unit = expression(&mut fixture, Operator::Rational(Rational::one()), &[])?;
     let zero = expression(&mut fixture, Operator::Rational(Rational::zero()), &[])?;
     assert_ne!(unit, zero);
-    let root = fixture.cas.state.expression(numerator.logical_id())?;
+    let root = fixture
+        .cas
+        .state
+        .expression(numerator.logical_id(), &mut budget)?;
     let Draft::Expression(mut quotient) = crate::testing::solve_graph::expression(
         Reference::Existing(fixture.cas.handle(root.header)),
         Operator::Div,

@@ -59,7 +59,7 @@ impl CompanionReading {
         let rows = u32::try_from(targets[0].entries().len()).map_err(|_| ReadingError::Shape)?;
         let columns = u32::try_from(targets.get(1).map_or(1, |target| target.entries().len()))
             .map_err(|_| ReadingError::Shape)?;
-        if header != cas.context_header(&parameters.context)?
+        if header != cas.context_header(&parameters.context, budget)?
             || support::shape(&sort)? != [rows, columns]
         {
             return Err(ReadingError::Shape.into());

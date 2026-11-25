@@ -151,7 +151,7 @@ pub(in crate::loan) fn populate(
     budget: &mut Budget,
 ) -> TestResult {
     cas.prepare_expm1(request, Policy::default(), budget, &mut Counts::default())?;
-    let ambient = cas.admissible_region(&request.original.context)?;
+    let ambient = cas.admissible_region(&request.original.context, budget)?;
     let step = ApplicationDraft {
         rule: Primitive::RegionDecide,
         context: request.original.context.clone(),

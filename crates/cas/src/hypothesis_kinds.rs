@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Formal kinds classify retained evidence without asserting that an assumed fact is proved.
 
+use crate::budget::Budget;
 use crate::domain_model::HypothesisRef;
 use crate::emptiness::LemmaSchema;
 use crate::error::Fault;
@@ -741,8 +742,10 @@ impl HypothesisRef {
     /// The returned handle shares ownership without allocation. No wire field or proof authority is added.
     /// # Errors
     /// Refuses foreign frames, non-context handles, absent slots and invalid predicate references.
-    pub fn qualified(&self, cas: &Cas) -> Result<QualifiedHypothesis, Fault> {
-        let frame = cas.state.context(cas.checked(&self.context)?)?;
+    pub fn qualified(&self, cas: &Cas, budget: &mut Budget) -> Result<QualifiedHypothesis, Fault> {
+        let frame = cas
+            .state
+            .context(cas.checked(&self.context, budget)?, budget)?;
         let kind = if frame.parent.is_some() && self.slot == 0 {
             if frame.introduction.is_some() {
                 HypothesisKind::CertifiedRegionMembership
@@ -750,8 +753,8 @@ impl HypothesisRef {
                 HypothesisKind::RegionMembership
             }
         } else {
-            let predicate = crate::context_check::predicate(cas, self)?;
-            cas.predicate_hypothesis_kind(&predicate)?
+            let predicate = crate::context_check::predicate(cas, self, budget)?;
+            cas.predicate_hypothesis_kind(&predicate, budget)?
         };
         Ok(QualifiedHypothesis {
             context: self.context.clone(),

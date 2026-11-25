@@ -24,15 +24,17 @@ fn retarget(
     request: &Request,
     set: &crate::Handle,
 ) -> TestResult<crate::Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let crate::request::Task::Solve(specification) = &request.task else {
         return Err("LC target request".into());
     };
     let problem = specification.problem.clone();
-    let original = crate::solving::graph::problem(&receiver.cas.state, problem.logical_id())?;
+    let original =
+        crate::solving::graph::problem(&receiver.cas.state, problem.logical_id(), &mut budget)?;
     let region = original.region.clone();
     let domain = original.domain.clone();
     let SolveDraft::SolutionSet(original) =
-        crate::solving::graph::object(&receiver.cas.state, set.logical_id())?
+        crate::solving::graph::object(&receiver.cas.state, set.logical_id(), &mut budget)?
     else {
         return Err("LC imported set".into());
     };
@@ -40,7 +42,7 @@ fn retarget(
         return Err("LC imported branch".into());
     };
     let SolveDraft::SolutionBranch(branch) =
-        crate::solving::graph::object(&receiver.cas.state, branch.logical_id())?
+        crate::solving::graph::object(&receiver.cas.state, branch.logical_id(), &mut budget)?
     else {
         return Err("LC imported finite branch".into());
     };
@@ -135,32 +137,32 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
             (
                 [0, 1],
                 true,
-                1_636_037,
-                [221_241, 75_578, 75_952, 1_263_266]
+                1_636_449,
+                [221_241, 75_578, 75_952, 1_263_678]
             ),
             (
                 [1, 0],
                 true,
-                1_634_421,
-                [221_241, 75_578, 75_961, 1_261_641]
+                1_634_833,
+                [221_241, 75_578, 75_961, 1_262_053]
             ),
             (
                 [-1, 1],
                 true,
-                1_640_210,
-                [221_241, 75_578, 75_952, 1_267_439]
+                1_640_622,
+                [221_241, 75_578, 75_952, 1_267_851]
             ),
             (
                 [1, -1],
                 true,
-                1_638_586,
-                [221_241, 75_578, 75_956, 1_265_811]
+                1_638_998,
+                [221_241, 75_578, 75_956, 1_266_223]
             ),
             (
                 [1, 1],
                 false,
-                1_630_797,
-                [221_241, 75_578, 75_977, 1_258_001]
+                1_631_203,
+                [221_241, 75_578, 75_977, 1_258_407]
             ),
         ]
     );
@@ -168,8 +170,9 @@ fn lc_root_replay_retains_original_premises() -> TestResult {
 }
 
 fn incomplete(source: &mut Fixture, set: &crate::Handle) -> TestResult<crate::Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let SolveDraft::SolutionSet(original) =
-        crate::solving::graph::object(&source.cas.state, set.logical_id())?
+        crate::solving::graph::object(&source.cas.state, set.logical_id(), &mut budget)?
     else {
         return Err("LC solution set".into());
     };
@@ -178,7 +181,7 @@ fn incomplete(source: &mut Fixture, set: &crate::Handle) -> TestResult<crate::Ha
         return Err("LC solution branch".into());
     };
     let SolveDraft::SolutionBranch(branch) =
-        crate::solving::graph::object(&source.cas.state, branch.logical_id())?
+        crate::solving::graph::object(&source.cas.state, branch.logical_id(), &mut budget)?
     else {
         return Err("LC finite branch".into());
     };

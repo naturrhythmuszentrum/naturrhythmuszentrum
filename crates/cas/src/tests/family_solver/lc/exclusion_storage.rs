@@ -11,6 +11,7 @@ use crate::testing::common::TestResult;
 /// ´test:crate:lc-inline-sign-leaf-boundaries´
 #[test]
 fn lc_inline_sign_leaf_boundaries() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut source, request) = super::fixture::request([1, 1], true)?;
     let Outcome::Solved { answer, .. } = source.cas.run(&request) else {
         return Err("LC coverage".into());
@@ -32,7 +33,11 @@ fn lc_inline_sign_leaf_boundaries() -> TestResult {
     let Task::Solve(specification) = &request.task else {
         return Err("LC solve request".into());
     };
-    let original = crate::solving::elementary::proof::problem(&source.cas, &specification.problem)?;
+    let original = crate::solving::elementary::proof::problem(
+        &source.cas,
+        &specification.problem,
+        &mut budget,
+    )?;
     let evaluation = Evaluation {
         exclusions: &[],
         cas: &source.cas,

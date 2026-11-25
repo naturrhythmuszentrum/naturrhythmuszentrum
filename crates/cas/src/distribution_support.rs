@@ -20,13 +20,14 @@ pub(crate) fn support(
     let mut result: Vec<Rational> = Vec::new();
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let value = cas.state.expression(id)?;
+        let value = cas.state.expression(id, budget)?;
         match value.operator {
             Operator::DistributionZero => {}
             Operator::Delta { .. } => {
                 let point = crate::distribution_check::rational(
                     cas,
                     *value.operands.first().ok_or_else(invalid)?,
+                    budget,
                 )?;
                 let mut index = 0;
                 while let Some(previous) = result.get(index) {
@@ -89,7 +90,7 @@ pub(crate) fn check(
     crate::case_check::subset(
         cas,
         neighborhood.logical_id(),
-        cas.state.space(space.logical_id())?.domain,
+        cas.state.space(space.logical_id(), budget)?.domain,
         budget,
     )?;
     for point in &points {

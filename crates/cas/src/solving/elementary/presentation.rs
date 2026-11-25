@@ -28,18 +28,20 @@ fn root(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     evaluation.existence(selected, budget)?;
-    let selected = super::selected::selection(evaluation.cas, &evaluation.cas.handle(selected))?;
+    let selected =
+        super::selected::selection(evaluation.cas, &evaluation.cas.handle(selected), budget)?;
     let relation = super::selected::relation(
         evaluation.cas,
         selected
             .relations
             .get(usize::try_from(slot).map_err(|_| invalid())?)
             .ok_or_else(invalid)?,
+        budget,
     )?;
     if form == SolveForm::Radicals && selected.cell.is_some() {
         return Err(invalid());
     }
-    let polynomial = polynomial(&evaluation.cas.state, &relation.polynomial)?;
+    let polynomial = polynomial(&evaluation.cas.state, &relation.polynomial, budget)?;
     let order_proved = evaluation.premises.iter().any(|premise| matches!(&premise.judgment.statement, Statement::Solve(statement) if matches!(statement.as_ref(), SolveStatement::RootOrder(value) if value.value.logical_id() == id && &value.region == evaluation.region)));
     if form == SolveForm::Radicals && !order_proved {
         let degree = &polynomial.terms.first().ok_or_else(invalid)?.exponents;
@@ -53,7 +55,7 @@ fn root(
         }
     }
     let SolveDraft::CoefficientMap(map) =
-        crate::solving::graph::object(&evaluation.cas.state, relation.map.logical_id())?
+        crate::solving::graph::object(&evaluation.cas.state, relation.map.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -83,16 +85,16 @@ fn expression(
     let region = evaluation
         .cas
         .state
-        .region(evaluation.region.logical_id())?;
+        .region(evaluation.region.logical_id(), budget)?;
     let crate::domain_model::AmbientDomain::Product { coordinates } = &region.ambient else {
         return Err(invalid());
     };
-    let allowed = super::proof::coordinates(evaluation.cas, coordinates)?;
+    let allowed = super::proof::coordinates(evaluation.cas, coordinates, budget)?;
     let mut pending = vector(1, budget)?;
     pending.push(handle.logical_id());
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let value = evaluation.cas.state.expression(id)?;
+        let value = evaluation.cas.state.expression(id, budget)?;
         match (&value.operator, &value.attachment) {
             (Operator::Free(key), None)
                 if allowed.coordinates.iter().any(|entry| &entry.key == key) => {}
@@ -115,7 +117,7 @@ fn expression(
                 Some(ExpressionAttachment::ExactCoefficient { value, map }),
             ) => {
                 let SolveDraft::CoefficientMap(map) =
-                    crate::solving::graph::object(&evaluation.cas.state, *map)?
+                    crate::solving::graph::object(&evaluation.cas.state, *map, budget)?
                 else {
                     return Err(invalid());
                 };
@@ -155,8 +157,8 @@ fn family(
     if !proved {
         return Err(invalid());
     }
-    let map = super::proof::family(evaluation.cas, handle)?;
-    for entry in &tuple(evaluation.cas, &map.body)?.entries {
+    let map = super::proof::family(evaluation.cas, handle, budget)?;
+    for entry in &tuple(evaluation.cas, &map.body, budget)?.entries {
         expression(evaluation, entry, form, true, budget)?;
     }
     Ok(())
@@ -172,7 +174,7 @@ fn branches(
     for handle in &set.branches {
         budget.work(1, AT)?;
         let SolveDraft::SolutionBranch(branch) =
-            crate::solving::graph::object(&evaluation.cas.state, handle.logical_id())?
+            crate::solving::graph::object(&evaluation.cas.state, handle.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -185,7 +187,7 @@ fn branches(
                     return Err(invalid());
                 }
                 for handle in tuples {
-                    for entry in &tuple(evaluation.cas, handle)?.entries {
+                    for entry in &tuple(evaluation.cas, handle, budget)?.entries {
                         evaluation.expression(entry.logical_id(), true, budget)?;
                         expression(evaluation, entry, form, false, budget)?;
                     }
@@ -231,18 +233,18 @@ pub(crate) fn check(
         return Err(invalid());
     }
     let SolveDraft::SolutionSet(set) =
-        crate::solving::graph::object(&cas.state, claim.set.logical_id())?
+        crate::solving::graph::object(&cas.state, claim.set.logical_id(), budget)?
     else {
         return Err(invalid());
     };
-    let original = problem(cas, &set.problem)?;
+    let original = problem(cas, &set.problem, budget)?;
     if claim.form == SolveForm::RealExact {
         if original.ambient != crate::model::Field::Real {
             return Err(invalid());
         }
         crate::solving::real::closure::evidence(cas, &claim.set, premises, budget)?;
     }
-    super::proof::region(cas, &draft.context, original, &claim.region)?;
+    super::proof::region(cas, &draft.context, original, &claim.region, budget)?;
     let evaluation = Evaluation {
         exclusions: &[],
         cas,

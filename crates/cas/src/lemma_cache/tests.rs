@@ -10,7 +10,7 @@ use crate::proof_model::{
 };
 use crate::rule::Primitive;
 use crate::testing::common::{TestResult, real};
-use crate::testing::native::{admit, budget, predicate, term};
+use crate::testing::native::{admit, fresh_budget, predicate, term};
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum Change {
@@ -141,16 +141,21 @@ fn proof(cas: &mut Cas, change: Change) -> TestResult<VerifiedWitness> {
         last.premises.push(0);
         steps.push(last);
     }
-    Ok(cas.check_proof(&context, &steps, &mut budget()?)?)
+    Ok(cas.check_proof(&context, &steps, &mut fresh_budget()?)?)
 }
 
 fn distinct(change: Change) -> TestResult {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     let first = proof(&mut cas, Change::None)?;
     let changed = proof(&mut cas, change)?;
     let mut cache = AnonymousLemmaCache::new();
-    cache.replay(&mut cas, &first.bytes, first.judgment(), &mut budget()?)?;
-    let mut ledger = budget()?;
+    cache.replay(
+        &mut cas,
+        &first.bytes,
+        first.judgment(),
+        &mut fresh_budget()?,
+    )?;
+    let mut ledger = fresh_budget()?;
     let (result, rows) = crate::testing::work_trace::measured(|| {
         cache.replay(&mut cas, &changed.bytes, changed.judgment(), &mut ledger)
     })?;
@@ -206,10 +211,15 @@ fn lemma_cache_representation_is_stale() -> TestResult {
 /// ´test:unit:lemma-cache-revision-is-stale´
 #[test]
 fn lemma_cache_revision_is_stale() -> TestResult {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     let witness = proof(&mut cas, Change::None)?;
     let mut cache = AnonymousLemmaCache::new();
-    cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut budget()?)?;
+    cache.replay(
+        &mut cas,
+        &witness.bytes,
+        witness.judgment(),
+        &mut fresh_budget()?,
+    )?;
     let mut bytes = witness.bytes.clone();
     let name_length = u32::from_le_bytes(
         bytes
@@ -224,7 +234,7 @@ fn lemma_cache_revision_is_stale() -> TestResult {
         .copy_from_slice(&99_u32.to_le_bytes());
     let before = cas.counts();
     let error = cache
-        .replay(&mut cas, &bytes, witness.judgment(), &mut budget()?)
+        .replay(&mut cas, &bytes, witness.judgment(), &mut fresh_budget()?)
         .err()
         .ok_or("stale revision hit")?;
     assert_eq!(
@@ -240,12 +250,12 @@ fn lemma_cache_revision_is_stale() -> TestResult {
 /// ´test:unit:lemma-cache-checks-once-across-retries´
 #[test]
 fn lemma_cache_checks_once_across_retries() -> TestResult {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     let witness = proof(&mut cas, Change::None)?;
     let mut cache = AnonymousLemmaCache::new();
     for warm in [false, true, true] {
         let before = cas.counts();
-        let mut ledger = budget()?;
+        let mut ledger = fresh_budget()?;
         let (result, rows) = crate::testing::work_trace::measured(|| {
             cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut ledger)
         })?;
@@ -263,8 +273,9 @@ fn lemma_cache_checks_once_across_retries() -> TestResult {
 /// ´test:unit:lemma-cache-authenticates-receiving-store´
 #[test]
 fn lemma_cache_authenticates_receiving_store() -> TestResult {
-    let mut first = Cas::new(budget()?.limits().clone())?;
-    let mut second = Cas::new(budget()?.limits().clone())?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let mut first = Cas::new(fresh_budget()?.limits().clone())?;
+    let mut second = Cas::new(fresh_budget()?.limits().clone())?;
     let original = proof(&mut first, Change::None)?;
     let imported = proof(&mut second, Change::None)?;
     assert_eq!(original.bytes, imported.bytes);
@@ -273,16 +284,16 @@ fn lemma_cache_authenticates_receiving_store() -> TestResult {
         &mut first,
         &original.bytes,
         original.judgment(),
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let result = cache.replay(
         &mut second,
         &original.bytes,
         imported.judgment(),
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
-    second.checked(result.proof())?;
-    assert!(first.checked(result.proof()).is_err());
+    second.checked(result.proof(), &mut budget)?;
+    assert!(first.checked(result.proof(), &mut budget).is_err());
     assert_eq!(cache.len(), 2);
     Ok(())
 }
@@ -314,12 +325,13 @@ fn lemma_cache_schema_is_documented() {
 /// ´test:unit:lemma-cache-recycled-proof-refusal´
 #[test]
 fn lemma_cache_recycled_proof_refusal() -> TestResult {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     frame(&mut cas, Change::None)?;
     let mut cache = AnonymousLemmaCache::new();
     let mut original = None;
     let mut retained = None;
-    let result: Result<(), crate::Fault> = cas.transaction(&mut budget()?, |cas, ledger| {
+    let result: Result<(), crate::Fault> = cas.transaction(&mut fresh_budget()?, |cas, ledger| {
         let witness = proof(cas, Change::None).expect("fixture proof");
         retained = Some(
             cache
@@ -344,7 +356,7 @@ fn lemma_cache_recycled_proof_refusal() -> TestResult {
     let retained = retained.ok_or("cached root")?;
     for stale in [&retained, original.proof()] {
         assert_eq!(
-            cas.checked(stale)
+            cas.checked(stale, &mut budget)
                 .err()
                 .ok_or("discarded proof accepted")?
                 .kind,
@@ -357,7 +369,7 @@ fn lemma_cache_recycled_proof_refusal() -> TestResult {
         assert_ne!(stale, changed.proof());
         assert!(changed.proof().logical_id().serial > stale.logical_id().serial);
         assert_eq!(
-            cas.checked(stale)
+            cas.checked(stale, &mut budget)
                 .err()
                 .ok_or("stale proof authenticated replacement")?
                 .kind,
@@ -365,7 +377,7 @@ fn lemma_cache_recycled_proof_refusal() -> TestResult {
         );
     }
     assert_eq!(
-        cas.export_witness(&original, &mut budget()?)
+        cas.export_witness(&original, &mut fresh_budget()?)
             .err()
             .ok_or("discarded witness wrapper accepted")?
             .kind,
@@ -377,7 +389,7 @@ fn lemma_cache_recycled_proof_refusal() -> TestResult {
                 &mut cas,
                 &original.bytes,
                 original.judgment(),
-                &mut budget().expect("ledger"),
+                &mut fresh_budget().expect("ledger"),
             )
             .map(|witness| witness.proof().clone())
     })?;
@@ -398,15 +410,17 @@ mod literals;
 /// ´test:unit:logical-identity-portable-histories´
 #[test]
 fn logical_identity_portable_histories() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut baseline = None;
     for history in 0..3 {
-        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
         if history > 0 {
             let fault = crate::Fault::invalid(crate::InvalidCode::Rule, super::AT);
-            let result: Result<(), crate::Fault> = cas.transaction(&mut budget()?, |cas, _| {
-                proof(cas, Change::Declarations).expect("discarded proof fixture");
-                Err(fault.clone())
-            });
+            let result: Result<(), crate::Fault> =
+                cas.transaction(&mut fresh_budget()?, |cas, _| {
+                    proof(cas, Change::Declarations).expect("discarded proof fixture");
+                    Err(fault.clone())
+                });
             assert_eq!(result.as_ref(), Err(&fault));
         }
         if history > 1 {
@@ -417,13 +431,23 @@ fn logical_identity_portable_histories() -> TestResult {
         let Statement::Equality { left, .. } = &witness.judgment().statement else {
             return Err("equality fixture".into());
         };
-        let syntax = crate::wire_build::syntax_key(&cas, cas.checked(left)?, &mut budget()?)?;
-        let theorem = cas.export_witness(&witness, &mut budget()?)?;
-        let reuse = cas.witness_reuse_key(&witness, &mut budget()?)?;
-        let mut fresh = Cas::new(budget()?.limits().clone())?;
-        let imported = fresh.inspect(&theorem, &mut budget()?)?;
-        assert_eq!(fresh.export_witness(&imported, &mut budget()?)?, theorem);
-        assert_eq!(fresh.witness_reuse_key(&imported, &mut budget()?)?, reuse);
+        let syntax = crate::wire_build::syntax_key(
+            &cas,
+            cas.checked(left, &mut budget)?,
+            &mut fresh_budget()?,
+        )?;
+        let theorem = cas.export_witness(&witness, &mut fresh_budget()?)?;
+        let reuse = cas.witness_reuse_key(&witness, &mut fresh_budget()?)?;
+        let mut fresh = Cas::new(fresh_budget()?.limits().clone())?;
+        let imported = fresh.inspect(&theorem, &mut fresh_budget()?)?;
+        assert_eq!(
+            fresh.export_witness(&imported, &mut fresh_budget()?)?,
+            theorem
+        );
+        assert_eq!(
+            fresh.witness_reuse_key(&imported, &mut fresh_budget()?)?,
+            reuse
+        );
         let contents = (syntax, theorem, reuse);
         if let Some(expected) = &baseline {
             assert_eq!(&contents, expected);

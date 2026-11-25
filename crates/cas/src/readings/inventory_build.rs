@@ -65,8 +65,11 @@ pub(super) fn build(
         },
     };
     assembly.describe(budget)?;
-    if matches!(cas.state.node(cas.checked(owner)?)?, Vertex::Expression(_)) {
-        assembly.root(cas.checked(owner)?, budget)?;
+    if matches!(
+        cas.state.node(cas.checked(owner, budget)?, budget)?,
+        Vertex::Expression(_)
+    ) {
+        assembly.root(cas.checked(owner, budget)?, budget)?;
     }
     let roots = std::mem::take(&mut assembly.roots);
     for root in roots {
@@ -102,7 +105,7 @@ impl Assembly<'_> {
     /// Record the actual retained declarations, selections, equations and exact premises.
     fn object(&mut self, node: u32, id: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
         budget.work(1, AT)?;
-        match self.cas.state.node(id)? {
+        match self.cas.state.node(id, budget)? {
             Vertex::Header(value) => {
                 for declaration in &value.environment.declarations {
                     let bytes = self.meter.run(budget, |budget| {
@@ -200,7 +203,10 @@ impl Assembly<'_> {
         })?;
         let endpoints =
             if let Statement::Equality { left, right, .. } = &application.judgment.statement {
-                Some([self.cas.checked(left)?, self.cas.checked(right)?])
+                Some([
+                    self.cas.checked(left, budget)?,
+                    self.cas.checked(right, budget)?,
+                ])
             } else {
                 None
             };
@@ -248,7 +254,7 @@ impl Assembly<'_> {
         if let Some(position) = self.bases.iter().position(|base| base.id == id) {
             return Ok(position);
         }
-        let declaration = bases::declaration(self.cas, id)?;
+        let declaration = bases::declaration(self.cas, id, budget)?;
         let Operator::Free(symbol) = &declaration.operator else {
             return Err(invalid(InvalidCode::ReadingDefinition));
         };
@@ -283,7 +289,7 @@ impl Assembly<'_> {
     fn snapshot(&self, header: LogicalId, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
         for base in &self.bases {
             budget.work(1, AT)?;
-            if bases::declaration(self.cas, base.id)?.header == header {
+            if bases::declaration(self.cas, base.id, budget)?.header == header {
                 return self.meter.run(budget, |budget| {
                     let mut out = Encoder::witness(budget, AT);
                     out.raw(&base.value.snapshot)?;

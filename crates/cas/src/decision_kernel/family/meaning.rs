@@ -28,7 +28,7 @@ pub(super) fn check(
         .ok_or_else(invalid)?;
     budget.work(32, AT)?;
     budget.check(BudgetKind::StagedPayloadBytes, 32, AT)?;
-    let mut pending = vec![(cas.checked(&certificate.expression)?, last)];
+    let mut pending = vec![(cas.checked(&certificate.expression, budget)?, last)];
     while let Some((original, index)) = pending.pop() {
         budget.work(3, AT)?;
         let bytes = size(pending.len().saturating_add(3), AT)?.saturating_mul(32);
@@ -51,7 +51,7 @@ fn step(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let record = certificate.records.get(index).ok_or_else(invalid)?;
-    let expression = cas.state.expression(original)?;
+    let expression = cas.state.expression(original, budget)?;
     let child = |slot: u32| -> Result<usize, Fault> {
         let slot = usize::try_from(slot).map_err(|_| invalid())?;
         if slot >= index {
@@ -61,12 +61,12 @@ fn step(
     };
     match &record.law {
         ScalarKernelLaw::Family(input) => {
-            if cas.checked(&input.family.source)? != original {
+            if cas.checked(&input.family.source, budget)? != original {
                 return Err(invalid());
             }
         }
         ScalarKernelLaw::Reading(value) => {
-            if cas.checked(&value.definition)? != original {
+            if cas.checked(&value.definition, budget)? != original {
                 return Err(invalid());
             }
             let [_, selected] = expression.operands.as_slice() else {

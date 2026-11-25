@@ -386,7 +386,9 @@ fn blind_staged_root_objects() -> TestResult {
         steps: Vec::new(),
     };
     let map = construction.mapping(&mut fixture.cas, &fixture.algebra, &[], &mut budget)?;
-    let crate::solving::SolveView::CoefficientMap(mapping) = fixture.cas.solve_view(&map)? else {
+    let crate::solving::SolveView::CoefficientMap(mapping) =
+        fixture.cas.solve_view(&map, &mut budget)?
+    else {
         return Err("staged scalar map".into());
     };
     assert_eq!(mapping.mode, crate::solving::MapMode::Specialization);
@@ -399,17 +401,17 @@ fn blind_staged_root_objects() -> TestResult {
         .adjoin(&mut fixture.cas, &defining, &map, Some(3), &mut budget)
         .map_err(|error| format!("staged adjunction: {error:?}"))?;
     assert!(matches!(
-        fixture.cas.solve_view(&extension.domain)?,
+        fixture.cas.solve_view(&extension.domain, &mut budget)?,
         crate::solving::SolveView::CoefficientDomain(
             crate::solving::CoefficientDomainData::Quotient { .. }
         )
     ));
     assert!(matches!(
-        fixture.cas.solve_view(&extension.selection)?,
+        fixture.cas.solve_view(&extension.selection, &mut budget)?,
         crate::solving::SolveView::RootSelection(_)
     ));
     assert!(matches!(
-        fixture.cas.expression(&extension.root)?.0,
+        fixture.cas.expression(&extension.root, &mut budget)?.0,
         crate::syntax::Operator::RootValue { .. }
     ));
     Ok(())
@@ -588,6 +590,7 @@ fn blind_constructive_real_choice() -> TestResult {
 
 /// One Complex parameter and its zero cell retain the original immutable declaration frame.
 fn complex_zero_scope() -> TestResult<(crate::Cas, crate::Handle, crate::Handle, crate::Handle)> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::domain::{AmbientDomain, ContextDraft, RegionDraft, RegionExpr};
     use crate::graph::{Draft, Reference};
     use crate::testing::solve_graph::admit;
@@ -595,7 +598,7 @@ fn complex_zero_scope() -> TestResult<(crate::Cas, crate::Handle, crate::Handle,
     let environment = &fixture
         .cas
         .state
-        .header(fixture.header.logical_id())?
+        .header(fixture.header.logical_id(), &mut budget)?
         .environment;
     assert!(environment.declarations.iter().all(|declaration| {
         declaration.sort
@@ -642,7 +645,7 @@ fn complex_parameter(
         polynomial::{Polynomial, Term},
         scalar::Scalar,
     };
-    let (ground, width, _) = engine.fraction_shape()?;
+    let (ground, width, _) = engine.fraction_shape(budget)?;
     assert_eq!(width, 1);
     let numerator = Polynomial::new(
         width,
@@ -837,7 +840,7 @@ fn blind_regional_unit_consequence() -> TestResult {
             state: &cas.state,
             domain: &domain,
         };
-        let (ground, width, _) = engine.fraction_shape()?;
+        let (ground, width, _) = engine.fraction_shape(&mut budget)?;
         assert_eq!(width, 2);
         let numerator = Polynomial::new(
             width,
@@ -866,7 +869,11 @@ fn blind_regional_unit_consequence() -> TestResult {
             return Err("uncertified consequence was used".into());
         };
         let mut construction = crate::solving::radicals::construction::Construction {
-            header: cas.handle(cas.state.context(context.logical_id())?.header_id),
+            header: cas.handle(
+                cas.state
+                    .context(context.logical_id(), &mut budget)?
+                    .header_id,
+            ),
             context: context.clone(),
             region: region.clone(),
             steps: Vec::new(),
@@ -1009,7 +1016,7 @@ fn blind_unrelated_fraction_is_not_ground() -> TestResult {
     };
     let parameter = complex_parameter(&engine, &mut budget)?;
     let crate::solving::CoefficientDomainData::Fraction { base, .. } =
-        crate::solving::coefficients::storage::domain(&cas.state, &domain)?
+        crate::solving::coefficients::storage::domain(&cas.state, &domain, &mut budget)?
     else {
         return Err("fraction source".into());
     };
@@ -1023,6 +1030,7 @@ fn blind_unrelated_fraction_is_not_ground() -> TestResult {
 /// ´test:crate:blind-complex-parameter-real-part-refused´
 #[test]
 fn blind_complex_parameter_real_part_refused() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::Reference;
     use crate::solving::{CoefficientMapData, MapTarget, SolveView};
     use crate::syntax::{AtomicSort, Draft, ExpressionDraft, Field, Operator, Sort};
@@ -1034,7 +1042,8 @@ fn blind_complex_parameter_real_part_refused() -> TestResult {
     else {
         return Err("map source identity".into());
     };
-    let SolveView::CoefficientMap(original) = fixture.cas.solve_view(&identity.map)? else {
+    let SolveView::CoefficientMap(original) = fixture.cas.solve_view(&identity.map, &mut budget)?
+    else {
         return Err("map source".into());
     };
     let original = original.clone();
@@ -1048,7 +1057,7 @@ fn blind_complex_parameter_real_part_refused() -> TestResult {
         return Err("map parameter inventory".into());
     };
     assert_eq!(
-        fixture.cas.expression(parameter)?.0,
+        fixture.cas.expression(parameter, &mut budget)?.0,
         &Operator::Free("a".into())
     );
     let projected = crate::testing::solve_graph::admit(
@@ -1118,7 +1127,7 @@ fn mapped_denominator(nonzero: bool) -> TestResult<MappedDenominator> {
         state: &cas.state,
         domain: &domain,
     };
-    let (ground, width, base) = engine.fraction_shape()?;
+    let (ground, width, base) = engine.fraction_shape(&mut budget)?;
     assert_eq!(width, 2);
     let base = base.clone();
     let denominator = Polynomial::new(
@@ -1138,7 +1147,11 @@ fn mapped_denominator(nonzero: bool) -> TestResult<MappedDenominator> {
     )?));
     let stored = crate::solving::towers::materialize::value(&mut cas, &element, &mut budget)?;
     let construction = crate::solving::radicals::construction::Construction {
-        header: cas.handle(cas.state.context(context.logical_id())?.header_id),
+        header: cas.handle(
+            cas.state
+                .context(context.logical_id(), &mut budget)?
+                .header_id,
+        ),
         context,
         region: region.clone(),
         steps: Vec::new(),
@@ -1157,6 +1170,7 @@ fn mapped_denominator(nonzero: bool) -> TestResult<MappedDenominator> {
 /// ´test:crate:blind-mapped-parameter-denominator´
 #[test]
 fn blind_mapped_parameter_denominator() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::solving::{
         SolveDraft,
         coefficients::{arithmetic::Engine, forms::Variable},
@@ -1164,21 +1178,25 @@ fn blind_mapped_parameter_denominator() -> TestResult {
     for nonzero in [true, false] {
         let (cas, region, base, stored, map) = mapped_denominator(nonzero)?;
         let SolveDraft::CoefficientMap(mapping) =
-            crate::solving::graph::object(&cas.state, map.logical_id())?
+            crate::solving::graph::object(&cas.state, map.logical_id(), &mut budget)?
         else {
             return Err("parameter map".into());
         };
         for (image, name) in mapping.images.iter().zip(["q", "p"]) {
-            let crate::model::Operator::Free(key) =
-                &cas.state.expression(image.logical_id())?.operator
+            let crate::model::Operator::Free(key) = &cas
+                .state
+                .expression(image.logical_id(), &mut budget)?
+                .operator
             else {
                 return Err("free parameter image".into());
             };
             assert_eq!(key, name);
         }
         assert_eq!(mapping.images.len(), 2);
-        let parameter = cas.state.expression(mapping.images[1].logical_id())?;
-        let header = cas.state.header(parameter.header)?;
+        let parameter = cas
+            .state
+            .expression(mapping.images[1].logical_id(), &mut budget)?;
+        let header = cas.state.header(parameter.header, &mut budget)?;
         let slot = u32::try_from(
             header
                 .environment
@@ -1244,6 +1262,7 @@ fn mapped_provenance(
 /// ´test:crate:blind-mapped-parameter-field-denominator´
 #[test]
 fn blind_mapped_parameter_field_denominator() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::solving::{
         SolveDraft,
         coefficients::{arithmetic::Engine, model::Value},
@@ -1251,7 +1270,7 @@ fn blind_mapped_parameter_field_denominator() -> TestResult {
     for nonzero in [true, false] {
         let (cas, region, _, stored, map) = mapped_denominator(nonzero)?;
         let SolveDraft::CoefficientMap(mapping) =
-            crate::solving::graph::object(&cas.state, map.logical_id())?
+            crate::solving::graph::object(&cas.state, map.logical_id(), &mut budget)?
         else {
             return Err("parameter map".into());
         };
@@ -1327,7 +1346,7 @@ fn blind_parameter_fraction_cell_zero() -> TestResult {
             state: &cas.state,
             domain: &domain,
         };
-        let (ground, width, _) = engine.fraction_shape()?;
+        let (ground, width, _) = engine.fraction_shape(&mut budget)?;
         assert_eq!(width, 2);
         let numerator = Polynomial::new(
             width,

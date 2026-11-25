@@ -163,13 +163,18 @@ fn reciprocal_derivative_refuses_invalid_operating_points() -> TestResult {
 }
 
 /// Exact construction, derivative lowering, live import and evaluation share a single monotone allowance.
+/// The exact preparation on this supplied ledger is unchanged operation Work 6,151,562 +650
+/// retained-kind replacements +16 first-kind insertions +682 identity-index
+/// insertions +682 vertex admissions = 6,153,592. The old graph interning
+/// floor and retained-map lookup floor are equal. Numerical import/evaluation
+/// remain 254,943 +213, so total unchanged operation Work 6,406,718 +2,030 = 6,408,748.
 /// ´test:integration:reciprocal-derivative-cumulative-pipeline-boundary´
 #[test]
 fn reciprocal_derivative_cumulative_pipeline_boundary() -> TestResult {
     let mut measured = Budget::new(policy())?;
     let costs = pipeline(&mut measured)?;
     let required = measured.usage().work;
-    assert_eq!((required, costs), (6_406_718, [6_151_562, 254_943, 213]));
+    assert_eq!((required, costs), (6_408_748, [6_153_592, 254_943, 213]));
     for work in [required, required - 1] {
         let mut budget = Budget::new(Limits { work, ..policy() })?;
         let result = pipeline(&mut budget);

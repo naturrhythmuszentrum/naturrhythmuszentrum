@@ -54,7 +54,7 @@ fn prepared(prime: Option<i64>, scale: i64) -> TestResult<(QuantityContext, Heap
 /// ´claim:matrix:quantity-root-reuse-work-boundaries´ Nonunit roots preserve literal cold, same-scale warm and different-scale miss Work boundaries while refusals preserve the cache, source and heap.
 #[test]
 fn quantity_root_reuse_work_boundaries() -> TestResult {
-    for (prime, scale, required) in [(None, 4, 29_618), (Some(4), 4, 9_519), (Some(4), 9, 29_746)] {
+    for (prime, scale, required) in [(None, 4, 29_694), (Some(4), 4, 9_564), (Some(4), 9, 29_822)] {
         for admitted in [false, true] {
             let (context, mut heap, input) = prepared(prime, scale)?;
             let before = heap.provenance_usage();

@@ -63,7 +63,7 @@ pub(super) fn validate(
         &certificate.context,
         &certificate.input_family,
     ] {
-        cas.checked(handle)?;
+        cas.checked(handle, budget)?;
     }
     let same_target = certificate.expression == contract.target;
     let same_context = certificate.context == contract.context;
@@ -71,7 +71,7 @@ pub(super) fn validate(
     if !(same_target && same_context && same_family) {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
-    crate::decision_enclosure::identities(cas, contract)?;
+    crate::decision_enclosure::identities(cas, contract, budget)?;
     if certificate.records.is_empty() {
         return Err(unsupported());
     }
@@ -118,7 +118,9 @@ fn checked_records(
     let copying = certificate.records.iter().fold(0_u64, |total, record| {
         total.saturating_add(record_bytes(record))
     });
-    budget.work(copying.saturating_sub(budget.usage().work - before), AT)?;
+    // The old complete-record copy allowance covers encoding and pending scans.
+    let old_copy_coverage = budget.usage().work - before;
+    budget.work(copying.saturating_sub(old_copy_coverage), AT)?;
     let values = budget.with_retained_payload(size(key.len(), AT)?, AT, |budget| {
         replay(
             cas,
@@ -164,7 +166,7 @@ fn replay(
             }
             relations::check(
                 cas,
-                cas.checked(&certificate.expression)?,
+                cas.checked(&certificate.expression, budget)?,
                 record,
                 &certificate.records[..index],
                 budget,

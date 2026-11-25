@@ -12,8 +12,14 @@ use nrz_cas::{
 /// The declared family requires positive inductance and capacitance before reciprocal normalization.
 pub(crate) fn family() -> TestResult<Fixture> {
     let mut case = Fixture::new(&[("L", real()), ("C", real())])?;
-    let header = case.cas.context_header(&case.context)?;
-    let domain = case.cas.admissible_region(&case.context)?;
+    let header = case.cas.context_header(
+        &case.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
+    let domain = case.cas.admissible_region(
+        &case.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let mut assumptions = Vec::new();
     for key in ["L", "C"] {
         let term = case.symbol(key)?;
@@ -56,7 +62,10 @@ pub(crate) fn term(
     operator: Operator,
     operands: &[Handle],
 ) -> TestResult<Handle> {
-    let header = case.cas.context_header(&case.context)?;
+    let header = case.cas.context_header(
+        &case.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     Ok(case
         .cas
         .admit(

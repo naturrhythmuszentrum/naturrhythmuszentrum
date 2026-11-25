@@ -29,7 +29,13 @@ pub(crate) fn sides(value: &GermValue) -> Vec<Side> {
 
 /// Validate roles and coefficient counts before copying the statement.
 pub(crate) fn validate(cas: &Cas, value: &GermValue, budget: &mut Budget) -> Result<(), Fault> {
-    crate::boundary_roles::point(cas, &value.function, &value.at.point, &value.at.coordinate)?;
+    crate::boundary_roles::point(
+        cas,
+        &value.function,
+        &value.at.point,
+        &value.at.coordinate,
+        budget,
+    )?;
     let order = match value.mode {
         GermMode::Limit => 0,
         GermMode::Series { order, .. } => order,
@@ -62,7 +68,7 @@ pub(crate) fn check(
     }
     match (draft.rule, value.mode) {
         (Primitive::LimitCaseRestrict, GermMode::Limit) => {
-            limit(cas, value, &draft.certificate, premises)?;
+            limit(cas, value, &draft.certificate, premises, budget)?;
         }
         (Primitive::SeriesCaseRestrict, GermMode::Series { .. }) => {
             series(cas, value, &draft.certificate, premises, budget)?;
@@ -85,6 +91,7 @@ fn limit(
     value: &GermValue,
     certificate: &Certificate,
     premises: &[CheckedApplication],
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let approaches = sides(value);
     if *certificate != Certificate::None || premises.len() != approaches.len() {
@@ -98,7 +105,7 @@ fn limit(
             || trace.boundary != value.at.point
             || trace.side != *side
             || trace.order != 0
-            || value.coefficients.first() != Some(rational(cas, &trace.value)?)
+            || value.coefficients.first() != Some(rational(cas, &trace.value, budget)?)
         {
             return Err(invalid());
         }
@@ -124,7 +131,8 @@ fn series(
     {
         return Err(invalid());
     }
-    let centre = crate::region::boundary_point(&cas.state, cas.checked(&value.at.point)?, budget)?;
+    let centre =
+        crate::region::boundary_point(&cas.state, cas.checked(&value.at.point, budget)?, budget)?;
     for (index, side) in approaches.iter().enumerate() {
         let previous = premises.get(index).ok_or_else(invalid)?;
         jet(cas, value, *side, previous, budget)?;
@@ -148,7 +156,7 @@ fn series(
         return Err(invalid());
     }
     if owned {
-        ownership(cas, value, premise(premises, approaches.len())?)?;
+        ownership(cas, value, premise(premises, approaches.len())?, budget)?;
     }
     Ok(())
 }
@@ -186,7 +194,7 @@ fn jet(
                 budget,
             )?;
         }
-        if *rational(cas, actual)? != proposed.mul(&factorial, budget)? {
+        if *rational(cas, actual, budget)? != proposed.mul(&factorial, budget)? {
             return Err(invalid());
         }
     }
@@ -194,7 +202,12 @@ fn jet(
 }
 
 /// Ordinary Taylor and analytic claims include the actual centre, unlike punctured side claims.
-fn ownership(cas: &Cas, value: &GermValue, previous: &Statement) -> Result<(), Fault> {
+fn ownership(
+    cas: &Cas,
+    value: &GermValue,
+    previous: &Statement,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     let Statement::Ownership {
         function,
         boundary,
@@ -205,7 +218,7 @@ fn ownership(cas: &Cas, value: &GermValue, previous: &Statement) -> Result<(), F
     };
     if *function != value.function
         || *boundary != value.at.point
-        || value.coefficients.first() != Some(rational(cas, actual)?)
+        || value.coefficients.first() != Some(rational(cas, actual, budget)?)
     {
         return Err(invalid());
     }

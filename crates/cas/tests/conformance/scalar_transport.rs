@@ -10,7 +10,10 @@ use crate::testing::scalar_transport::{chain, meet};
 #[test]
 fn scalar_transport_subset_premise() -> TestResult {
     let mut f = chain(false, 1)?;
-    let domain = f.fixture.cas.admissible_region(&f.frames[1])?;
+    let domain = f
+        .fixture
+        .cas
+        .admissible_region(&f.frames[1], &mut crate::testing::budgets::graph_budget()?)?;
     let original = f.fixture.domain.clone();
     assert_eq!(
         meet(&mut f.fixture, &[original, f.restriction.clone()])?,
@@ -46,29 +49,29 @@ fn scalar_transport_checking_nonwork_boundaries() -> TestResult {
     for (depth, work, rows) in [
         (
             1,
-            68_430,
+            68_476,
             [
-                (StagedPayloadBytes, 24_435, 62_557),
-                (Depth, 3, 24_211),
-                (ConditionSteps, 62, 27_411),
+                (StagedPayloadBytes, 24_435, 62_603),
+                (Depth, 3, 24_245),
+                (ConditionSteps, 62, 27_445),
             ],
         ),
         (
             2,
-            91_665,
+            91_735,
             [
-                (StagedPayloadBytes, 32_227, 82_317),
-                (Depth, 4, 34_214),
-                (ConditionSteps, 97, 37_416),
+                (StagedPayloadBytes, 32_227, 82_387),
+                (Depth, 4, 34_272),
+                (ConditionSteps, 97, 37_474),
             ],
         ),
         (
             3,
-            116_254,
+            116_348,
             [
-                (StagedPayloadBytes, 40_019, 102_652),
-                (Depth, 5, 44_792),
-                (ConditionSteps, 141, 47_996),
+                (StagedPayloadBytes, 40_019, 102_746),
+                (Depth, 5, 44_874),
+                (ConditionSteps, 141, 48_078),
             ],
         ),
     ] {
@@ -93,9 +96,9 @@ fn scalar_transport_checking_resource_boundaries() -> TestResult {
     use crate::testing::scalar_transport_work::{Operation, attempt};
     // The complete check is not prepaid; these totals include 37 prior Work and 19 live bytes.
     for (depth, total, prefix) in [
-        (0, 33_628, 33_620),
-        (1, 68_430, 68_426),
-        (3, 116_254, 116_250),
+        (0, 33_650, 33_642),
+        (1, 68_476, 68_472),
+        (3, 116_348, 116_344),
     ] {
         assert_eq!(attempt(depth, Operation::Check, total)?, (true, total));
         assert_eq!(

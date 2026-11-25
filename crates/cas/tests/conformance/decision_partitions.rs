@@ -8,7 +8,7 @@ use crate::testing::readings::ledger;
 use nrz_cas::Location;
 use nrz_cas::decision::{CaseCut, CasePartition, CoordinateInterval, IntegerCellRange};
 use nrz_cas::domain::{CaseArmDraft, CasesDraft, RegionExpr};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Draft, Operator, PredicateKind};
 use nrz_cas::{FaultKind, Handle, InvalidCode, Rational, Reference};
 
@@ -516,7 +516,7 @@ fn admission_boundary(
     prior: u64,
 ) -> TestResult<bool> {
     let limits = allowance(kind, needed);
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(prior, Location::new("prior partition work"))?;
     let before = fixture.source.cas.counts();
     let result = fixture
@@ -560,7 +560,7 @@ fn decision_partition_resource_boundaries() -> TestResult {
         }
         assert!(!admission_boundary(&fixture, BudgetKind::Work, work, 1)?);
         let limits = allowance(BudgetKind::StagedPayloadBytes, staged);
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
         let before = fixture.source.cas.counts();
         let result =
             budget.with_retained_payload(1, Location::new("retained partition input"), |budget| {
@@ -589,7 +589,7 @@ fn reuse_boundary(
         .check_case_partition(&fixture.question, &mut ledger()?)?;
     let question = cut(fixture, example)?;
     let limits = allowance(kind, needed);
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     let before = fixture.source.cas.counts();
     let result = fixture
         .source
@@ -624,7 +624,7 @@ fn decision_partition_reuse_boundaries() -> TestResult {
             .cas
             .check_case_partition(&fixture.question, &mut ledger()?)?;
         let question = cut(&fixture, example)?;
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             output_bytes: 0,
             payload_bytes: 0,
             work: 2 * work,
@@ -660,7 +660,7 @@ fn decision_partition_reuse_boundaries() -> TestResult {
 fn decision_partition_atomic_lifecycle() -> TestResult {
     for (example, work, _, _, _, reuse, _) in PARTITION_COSTS {
         let fixture = prepared(example)?;
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             payload_bytes: 0,
             work: work + reuse,
             ..Limits::default()
@@ -694,7 +694,7 @@ fn decision_partition_atomic_lifecycle() -> TestResult {
             .cas
             .check_partition_cut(&checked, &question, &mut failed)?;
         assert_eq!(fixture.source.cas.counts(), before);
-        let mut short = Budget::new(Limits {
+        let mut short = nrz_cas::limits::Budget::new(Limits {
             work: work + reuse - 1,
             ..Limits::default()
         })?;

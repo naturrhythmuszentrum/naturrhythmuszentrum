@@ -244,7 +244,11 @@ impl Runner<'_> {
 
     /// Preserve the exact region for each actual derivative association.
     fn derivative_arm(&mut self, region: &Handle, value: &Handle) -> Result<Handle, Fault> {
-        let metadata = self.cas.state.region(region.logical_id())?.clone();
+        let metadata = self
+            .cas
+            .state
+            .region(region.logical_id(), self.generation)?
+            .clone();
         crate::case_ordered::arm(
             self.cas,
             metadata.header,
@@ -257,7 +261,11 @@ impl Runner<'_> {
 
     /// Build derivative syntax from the witnessed association family.
     fn derivative_cases(&mut self, domain: &Handle, arms: &[Handle]) -> Result<Handle, Fault> {
-        let metadata = self.cas.state.region(domain.logical_id())?.clone();
+        let metadata = self
+            .cas
+            .state
+            .region(domain.logical_id(), self.generation)?
+            .clone();
         case_syntax::admit(
             self.cas,
             Draft::Cases(CasesDraft {

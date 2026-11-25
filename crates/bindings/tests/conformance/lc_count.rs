@@ -127,9 +127,9 @@ fn bindings_lc_count_complete() -> TestResult {
         graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
         before
     );
-    assert_eq!(model_work, 34_713);
-    assert_eq!(physical_work, 81_363);
-    assert_eq!(budget.usage().work, 317_182);
+    assert_eq!(model_work, 34_756);
+    assert_eq!(physical_work, 81_453);
+    assert_eq!(budget.usage().work, 317_462);
     Ok(())
 }
 
@@ -140,10 +140,10 @@ fn bindings_lc_count_physical_boundaries() -> TestResult {
     let owner = physical_source("1")?;
     let before = owner.cas()?.counts();
     for (name, work, accepted) in [
-        ("model", 34_713, true),
-        ("model", 34_712, false),
-        ("quotient", 81_363, true),
-        ("quotient", 81_362, false),
+        ("model", 34_756, true),
+        ("model", 34_755, false),
+        ("quotient", 81_453, true),
+        ("quotient", 81_452, false),
     ] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
@@ -164,7 +164,7 @@ fn bindings_lc_count_physical_boundaries() -> TestResult {
 #[test]
 fn bindings_lc_count_cumulative_boundary() -> TestResult {
     let owner = physical_source("1")?;
-    for (work, accepted) in [(317_199, true), (317_198, false)] {
+    for (work, accepted) in [(317_479, true), (317_478, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()

@@ -12,12 +12,14 @@ use crate::solving::{CoefficientDomainData, ExtensionLevelData, SolveDraft};
 /// Borrow an earlier monic extension level, without claiming irreducibility or reducedness.
 pub(crate) fn level<'a>(
     engine: &Engine<'a>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(&'a Handle, &'a ExtensionLevelData<Handle>), CoefficientFailure> {
-    let CoefficientDomainData::Quotient { level } = domain(engine.state, engine.domain)? else {
+    let CoefficientDomainData::Quotient { level } = domain(engine.state, engine.domain, budget)?
+    else {
         return Err(invalid().into());
     };
     let SolveDraft::ExtensionLevel(data) =
-        crate::solving::graph::object(engine.state, level.logical_id())?
+        crate::solving::graph::object(engine.state, level.logical_id(), budget)?
     else {
         return Err(invalid().into());
     };
@@ -31,7 +33,7 @@ pub(crate) fn constant(
     budget: &mut Budget,
 ) -> Result<Element, CoefficientFailure> {
     begin(budget)?;
-    let (_, extension) = level(engine)?;
+    let (_, extension) = level(engine, budget)?;
     let parent = Engine {
         state: engine.state,
         domain: &extension.parent,
@@ -50,7 +52,7 @@ pub(crate) fn read(
     budget: &mut Budget,
 ) -> Result<Element, CoefficientFailure> {
     begin(budget)?;
-    let (_, extension) = level(engine)?;
+    let (_, extension) = level(engine, budget)?;
     let parent = Engine {
         state: engine.state,
         domain: &extension.parent,
@@ -75,7 +77,7 @@ pub(crate) fn dense(
     let Value::Tower(entries) = &operand.value else {
         return Err(invalid().into());
     };
-    let (_, extension) = level(engine)?;
+    let (_, extension) = level(engine, budget)?;
     let parent = Engine {
         state: engine.state,
         domain: &extension.parent,
@@ -141,7 +143,7 @@ pub(crate) fn reduced(
     budget: &mut Budget,
 ) -> Result<Element, CoefficientFailure> {
     begin(budget)?;
-    let (_, extension) = level(engine)?;
+    let (_, extension) = level(engine, budget)?;
     let modulus = Dense::read(engine.state, &extension.polynomial, budget)?;
     let result = remainder(value, &modulus, engine, budget)?;
     Ok(engine.element(Value::Tower(result.coefficients)))

@@ -198,7 +198,10 @@ impl ScopedFixture {
                 hypotheses: assumptions,
             }),
         )?;
-        self.base.region = self.base.cas.admissible_region(&self.base.context)?;
+        self.base.region = self.base.cas.admissible_region(
+            &self.base.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?;
         for (index, predicate) in self.predicates.iter().enumerate() {
             self.hypotheses.push(ApplicationDraft {
                 rule: Primitive::ContextHypothesis,
@@ -648,7 +651,10 @@ impl ScopedFixture {
             slot: 1,
         });
         if let Statement::PredicateFact { region, .. } = &mut premise.conclusion {
-            *region = self.base.cas.admissible_region(&sibling)?;
+            *region = self
+                .base
+                .cas
+                .admissible_region(&sibling, &mut crate::testing::budgets::graph_budget()?)?;
         }
         Ok(())
     }
@@ -1040,7 +1046,10 @@ pub(crate) enum FormalMutation {
 /// Introduce the formal roots directly above the actual original unscoped context.
 fn formal_fixture() -> TestResult<ScopedFixture> {
     let mut fixture = ScopedFixture::new(ScopedMutation::Valid)?;
-    fixture.base.region = fixture.base.cas.admissible_region(&fixture.parent)?;
+    fixture.base.region = fixture.base.cas.admissible_region(
+        &fixture.parent,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let unscoped = admit(
         &mut fixture.base.cas,
         &Draft::Region(RegionDraft {
@@ -1110,7 +1119,10 @@ fn formal_target(
 ) -> TestResult<ApplicationDraft> {
     let child = fixture.base.context.clone();
     fixture.base.context = fixture.parent.clone();
-    fixture.base.region = fixture.base.cas.admissible_region(&fixture.parent)?;
+    fixture.base.region = fixture.base.cas.admissible_region(
+        &fixture.parent,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let scope = std::mem::take(&mut fixture.scope);
     let left = fixture.scalar(if mutation == FormalMutation::Endpoint {
         37

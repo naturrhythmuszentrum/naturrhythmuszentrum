@@ -135,7 +135,10 @@ fn lattice_cover_domains() -> TestResult {
             .ok_or("missing cover citation")?;
         assert_eq!(root.premises.len(), 3 + source.question.families.len());
         let schema = root
-            .auxiliary_schema(&source.frame.cas)?
+            .auxiliary_schema(
+                &source.frame.cas,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?
             .ok_or("missing cover schema")?;
         assert_eq!(schema.name, "decision.lattice-floor-cover");
         assert_eq!(schema.version, 1);
@@ -259,12 +262,12 @@ fn lattice_cover_missing_premises() -> TestResult {
 
 /// Kind, composition Work, witness bytes, added graph bytes and fresh inspection Work.
 const COSTS: [(u32, u64, usize, u64, u64); 6] = [
-    (0, 123_728, 2_332, 2_251, 459_387), // Identity basis, unrestricted Z².
-    (1, 195_228, 3_664, 2_487, 752_940), // Identity basis, signed Integer box.
-    (2, 154_294, 3_005, 2_135, 560_524), // Identity basis, parameter/count intersection.
-    (3, 150_179, 2_910, 2_251, 697_655), // Translated determinant-one basis.
-    (4, 157_503, 3_110, 2_251, 723_769), // Translated negative-determinant skew basis.
-    (5, 182_930, 3_577, 2_266, 741_811), // Exact 2Pi phase, Pi offset, parameter range.
+    (0, 123_740, 2_332, 2_251, 459_702), // Identity basis, unrestricted Z².
+    (1, 195_240, 3_664, 2_487, 753_465), // Identity basis, signed Integer box.
+    (2, 154_306, 3_005, 2_135, 560_941), // Identity basis, parameter/count intersection.
+    (3, 150_191, 2_910, 2_251, 698_030), // Translated determinant-one basis.
+    (4, 157_515, 3_110, 2_251, 724_168), // Translated negative-determinant skew basis.
+    (5, 182_942, 3_577, 2_266, 742_300), // Exact 2Pi phase, Pi offset, parameter range.
 ];
 
 /// Measured finite composition and fresh replay costs name every fixture and preserve all old pins.

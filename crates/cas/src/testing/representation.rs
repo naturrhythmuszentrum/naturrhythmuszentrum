@@ -57,7 +57,9 @@ impl Fixture {
         binding: Option<Binding>,
         operands: &[Handle],
     ) -> TestResult<Handle> {
-        let header = self.cas.context_header(&self.context)?;
+        let header = self
+            .cas
+            .context_header(&self.context, &mut crate::testing::budgets::graph_budget()?)?;
         builders::admit(
             &mut self.cas,
             builders::expression_draft(

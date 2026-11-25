@@ -24,7 +24,7 @@ pub(super) fn ordered(
         return Err(Error::Conditional);
     }
     let context = operator.frame().context();
-    let region = cas.admissible_region(context)?;
+    let region = cas.admissible_region(context, budget)?;
     let last = cas.describe_syntax(&region, budget)?;
     let first = cas.describe_syntax(edge(&last, SyntaxRole::Base)?, budget)?;
     let predicates = [

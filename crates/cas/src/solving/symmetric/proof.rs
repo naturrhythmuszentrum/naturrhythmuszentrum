@@ -92,7 +92,7 @@ fn identity(
 /// Denominator obligations are copied exactly, without cancellation or inferred regional units.
 fn map_denominators(cas: &Cas, map: &Handle, budget: &mut Budget) -> Result<Vec<Handle>, Fault> {
     let crate::solving::SolveDraft::CoefficientMap(data) =
-        crate::solving::graph::object(&cas.state, cas.checked(map)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(map, budget)?, budget)?
     else {
         return Err(invalid());
     };

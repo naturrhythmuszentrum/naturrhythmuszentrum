@@ -22,7 +22,7 @@ fn driven_entries_parameter_isolation() -> TestResult {
 }
 
 fn parameter_isolation(policy: nrz_matrix::DependencyPolicy, changed: usize) -> TestResult {
-    let mut case = fixture::lifecycle_case(policy, &mut super::budget()?)?;
+    let mut case = fixture::lifecycle_case(policy, &mut super::fresh_budget()?)?;
     let means = case.means(&mut ledger()?)?;
     let executions = case.executions(&means, &mut ledger()?)?;
     let context = ArithmeticContext::new()?;
@@ -242,7 +242,7 @@ fn closures(
     let written = case.bindings[changed].reading().family().root();
     for mean in means {
         for reading in mean.readings().bindings() {
-            let mut resources = super::budget()?;
+            let mut resources = super::fresh_budget()?;
             let exact = case
                 .graph
                 .reading_dependencies(reading.reading().node(), &mut resources)?;
@@ -252,7 +252,7 @@ fn closures(
                 &[EntryIndex { row: 0, column: 0 }],
                 &mut resources,
             )?);
-            let mut resources = super::budget()?;
+            let mut resources = super::fresh_budget()?;
             let exact = case.graph.witness_dependencies(
                 reading.adapter().representation().witness(),
                 &mut resources,

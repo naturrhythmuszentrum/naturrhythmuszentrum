@@ -114,7 +114,7 @@ pub(crate) fn proof() -> TestResult<Theorem> {
     let Outcome::Solved { answer, usage, .. } = outcome else {
         return Err(format!("LC generation: {outcome:?}").into());
     };
-    assert_eq!(usage.work, 822_665);
+    assert_eq!(usage.work, 823_148);
     let witness = answer.coverage.ok_or("LC coverage")?;
     let bytes = fixture.cas.export_witness(&witness, &mut ledger()?)?;
     assert_eq!(bytes.len(), 6_140);

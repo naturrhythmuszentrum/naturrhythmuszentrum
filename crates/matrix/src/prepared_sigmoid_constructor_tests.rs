@@ -186,7 +186,7 @@ fn prepared_sigmoid_constructor_finalization() -> TestResult {
         let limit = needed - below;
         let mut budget = Budget::new(Limits {
             output_bytes: limit,
-            work: 14_209,
+            work: 14_227,
             ..Limits::default()
         })?;
         budget.work(7, Location::new("caller"))?;
@@ -215,7 +215,7 @@ fn prepared_sigmoid_constructor_finalization() -> TestResult {
         );
         assert_eq!(
             budget.usage().work,
-            14_209,
+            14_227,
             "seven prior Work plus original transformation and policy Work"
         );
         if below == 0 {

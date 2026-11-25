@@ -3,7 +3,7 @@
 
 use crate::testing::common::{TestResult, default_budget};
 use crate::testing::trig::{Fixture, operators};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Draft, Operator};
 use nrz_cas::{FaultKind, Location};
 
@@ -31,7 +31,7 @@ fn boundary(
     let (mut f, draft) = fixture(operator, projected, warm)?;
     let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
     let counts = f.cas.counts();
-    let mut budget = Budget::new(Limits {
+    let mut budget = nrz_cas::limits::Budget::new(Limits {
         work,
         ..Limits::default()
     })?;
@@ -66,9 +66,9 @@ fn boundary(
 fn trig_admission_work() -> TestResult {
     for (operator, _) in operators() {
         for projected in [false, true] {
-            for (warm, work) in [(false, 992), (true, 891)] {
-                boundary(operator.clone(), projected, warm, work + 36, false)?;
-                boundary(operator.clone(), projected, warm, work + 37, true)?;
+            for (warm, work) in [(false, 1_035), (true, 928)] {
+                boundary(operator.clone(), projected, warm, work - 1, false)?;
+                boundary(operator.clone(), projected, warm, work, true)?;
             }
         }
     }

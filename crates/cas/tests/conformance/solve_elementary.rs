@@ -160,7 +160,10 @@ fn transport_denominator_removal_refused() -> TestResult {
         CertificateSolutionTransport, SolveSchema, SolveStatement, SolveView, StatementEquivalent,
     };
     let (mut fixture, source) = hole()?;
-    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&source)? else {
+    let SolveView::SolveProblem(problem) = fixture
+        .cas
+        .solve_view(&source, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing problem".into());
     };
     let predicate = problem.predicate.clone();

@@ -463,8 +463,18 @@ fn sigmoid_request(
     };
     let mut r = broad(f, 40)?.original;
     let argument = r.coordinates[0].coordinate.clone();
-    let header = f.cas.expression_header(&argument)?;
-    let sort = f.cas.expression(&argument)?.1.clone();
+    let header = f.cas.expression_header(
+        &argument,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
+    let sort = f
+        .cas
+        .expression(
+            &argument,
+            &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+        )?
+        .1
+        .clone();
     let draft = Draft::Expression(ExpressionDraft {
         space: None,
         operator: Operator::Sigmoid,
@@ -697,8 +707,18 @@ fn tanh_request(
     };
     let mut r = broad(f, 40)?.original;
     let argument = r.coordinates[0].coordinate.clone();
-    let header = f.cas.expression_header(&argument)?;
-    let sort = f.cas.expression(&argument)?.1.clone();
+    let header = f.cas.expression_header(
+        &argument,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
+    let sort = f
+        .cas
+        .expression(
+            &argument,
+            &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+        )?
+        .1
+        .clone();
     let draft = Draft::Expression(ExpressionDraft {
         space: None,
         operator: Operator::Tanh,

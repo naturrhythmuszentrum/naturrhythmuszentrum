@@ -30,8 +30,13 @@ fn crossing(conditional: bool) -> TestResult {
     let coordinate = f.partition.question.coordinates[0].clone();
     let source = &mut f.partition.source;
     let frame = admit(&mut source.cas, draft, &mut ledger()?)?;
-    let domain = source.cas.admissible_region(&frame)?;
-    let original = source.cas.admissible_region(&source.context)?;
+    let domain = source
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
+    let original = source.cas.admissible_region(
+        &source.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let one = source.number(1, 1)?;
     let two = source.number(2, 1)?;
     let (quotient, half, rule) = if conditional {

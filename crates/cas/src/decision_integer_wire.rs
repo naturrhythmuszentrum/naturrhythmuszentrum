@@ -95,7 +95,7 @@ pub(crate) fn measure(
 ) -> Result<(), Fault> {
     let mut out = Encoder::new(budget, AT);
     certificate(value, &mut out, &mut |handle, out| {
-        cas.checked(handle)?;
+        cas.checked(handle, out.budget())?;
         crate::statement::handle(handle, out)
     })?;
     let bytes = size(out.finish().len(), AT)?.saturating_mul(32);
@@ -124,14 +124,17 @@ pub(crate) fn dependencies(
         .try_reserve_exact(4)
         .map_err(|_| Fault::allocation(AT))?;
     for handle in [&value.target, &value.context, &value.input_family] {
-        edges.push((cas.checked(handle)?, Edge::DependsOn));
+        edges.push((cas.checked(handle, budget)?, Edge::DependsOn));
     }
     if let EnclosureOrigin::ExactRational { expression, .. }
     | EnclosureOrigin::PiBound { expression, .. } = &value.origin
     {
-        edges.push((cas.checked(expression)?, Edge::DependsOn));
+        edges.push((cas.checked(expression, budget)?, Edge::DependsOn));
     } else if let EnclosureOrigin::ScalarKernel(certificate) = &value.origin {
-        edges.push((cas.checked(&certificate.expression)?, Edge::DependsOn));
+        edges.push((
+            cas.checked(&certificate.expression, budget)?,
+            Edge::DependsOn,
+        ));
     }
     crate::decision_kernel::family::dependencies(cas, value, edges, budget)?;
     Ok(())

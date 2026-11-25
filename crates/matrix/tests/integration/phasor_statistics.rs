@@ -12,7 +12,7 @@ mod lifecycle_costs;
 mod parameters;
 mod publication_costs;
 mod refusals;
-use crate::phasor_solve_testing::{budget, policy};
+use crate::phasor_solve_testing::{policy, resources::fresh_budget};
 use crate::phasor_testing::{components, tickets};
 use crate::reading_testing;
 use crate::reading_testing::{TestResult, ledger};

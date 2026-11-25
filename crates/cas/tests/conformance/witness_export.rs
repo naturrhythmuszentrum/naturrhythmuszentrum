@@ -22,7 +22,10 @@ fn empty() -> TestResult<(Cas, VerifiedWitness)> {
         matrix(0, u32::MAX),
         &[],
     )?;
-    let domain = fixture.cas.admissible_region(&fixture.context)?;
+    let domain = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let step = equality(
         &fixture.context,
         &domain,
@@ -82,10 +85,10 @@ fn restricted(kind: BudgetKind, limit: u64) -> Result<Budget, Fault> {
         BudgetKind::OutputBytes => limits.output_bytes = limit,
         _ => return Err(Fault::invalid(nrz_cas::InvalidCode::Policy, AT)),
     }
-    Budget::new(limits)
+    nrz_cas::limits::Budget::new(limits)
 }
 
-/// Every export ceiling has an exact N boundary; refusals precede allocation and ledger changes.
+/// Every export ceiling has an exact N boundary; refusal retains its lookup prefix.
 /// ´test:integration:witness-export-exact-boundaries´
 #[test]
 fn witness_export_exact_boundaries() -> TestResult {
@@ -97,12 +100,13 @@ fn witness_export_exact_boundaries() -> TestResult {
         BudgetKind::WitnessBytes,
         BudgetKind::OutputBytes,
     ] {
-        let mut exact = restricted(kind, count)?;
+        let required = count;
+        let mut exact = restricted(kind, required)?;
         assert_eq!(
             cas.export_witness(&witness, &mut exact)?.len(),
             witness.exported_byte_len()
         );
-        let mut short = restricted(kind, count - 1)?;
+        let mut short = restricted(kind, required - 1)?;
         let limits = short.limits().clone();
         let usage = short.usage();
         let fault = cas
@@ -110,7 +114,7 @@ fn witness_export_exact_boundaries() -> TestResult {
             .err()
             .ok_or("short export accepted")?;
         assert!(
-            matches!(fault.kind, FaultKind::Exhausted { budget, needed, .. } if budget == kind && needed == count)
+            matches!(fault.kind, FaultKind::Exhausted { budget, needed, .. } if budget == kind && needed == required)
         );
         assert_eq!(short.usage(), usage);
         assert_eq!(short.limits(), &limits);

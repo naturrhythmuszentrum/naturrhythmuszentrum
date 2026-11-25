@@ -113,7 +113,7 @@ macro_rules! coefficient_domain {
                 budget: &mut Budget,
             ) -> Result<Self, CoefficientFailure> {
                 begin(budget)?;
-                if !matches!(domain(state, handle)?, $pattern) {
+                if !matches!(domain(state, handle, budget)?, $pattern) {
                     return Err(invalid().into());
                 }
                 Ok(Self(Engine {

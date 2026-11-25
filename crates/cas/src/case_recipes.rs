@@ -27,7 +27,11 @@ pub(crate) fn merge(
 ) -> Result<Handle, Fault> {
     let (left, _) = case_producer::domain(plan, cas, context, function, generation, checker)?;
     let (right, _) = case_producer::domain(plan, cas, context, proposed, generation, checker)?;
-    let domain = cas.handle(cas.state.context(cas.checked(context)?)?.admissible);
+    let domain = cas.handle(
+        cas.state
+            .context(cas.checked(context, generation)?, generation)?
+            .admissible,
+    );
     let conclusion = Statement::Equality {
         left: function.clone(),
         right: proposed.clone(),
@@ -121,7 +125,11 @@ fn local(
         }),
         generation,
     )?;
-    let local = cas.handle(cas.state.context(frame.logical_id())?.admissible);
+    let local = cas.handle(
+        cas.state
+            .context(frame.logical_id(), generation)?
+            .admissible,
+    );
     let conclusion = crate::context_check::restricted(conclusion, &local);
     let child = plan.push(
         cas,
@@ -170,8 +178,8 @@ pub(crate) fn ownership(
 ) -> Result<Handle, Fault> {
     let (domain_proof, domain) =
         case_producer::domain(plan, cas, context, function, generation, checker)?;
-    let context_id = cas.checked(context)?;
-    let boundary_id = cas.checked(boundary)?;
+    let context_id = cas.checked(context, generation)?;
+    let boundary_id = cas.checked(boundary, generation)?;
     let singleton = crate::case_select::singleton(cas, context_id, boundary_id, generation)?;
     if crate::case_obligations::empty(cas, singleton, generation)? {
         return Err(invalid());

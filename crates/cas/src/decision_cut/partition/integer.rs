@@ -31,7 +31,9 @@ pub(super) fn prepare(
     let Some(range) = &contract.integer else {
         return Ok(None);
     };
-    let function = cas.state.expression(cas.checked(&contract.function)?)?;
+    let function = cas
+        .state
+        .expression(cas.checked(&contract.function, budget)?, budget)?;
     let scratch = super::super::temporary(0, budget)?
         .saturating_add(size(function.arms.len(), AT)?.saturating_mul(32));
     budget.with_retained_payload(scratch, AT, |budget| {
@@ -44,7 +46,7 @@ pub(super) fn prepare(
             budget.work(1, AT)?;
             let retained = program.payload(budget)?;
             budget.with_retained_payload(retained, AT, |budget| {
-                let index = option(cas, *id)?;
+                let index = option(cas, *id, budget)?;
                 super::super::check_range(index, range, budget)?;
                 program.insert(0, index, budget)?;
                 program.insert(0, &index.add(&Rational::one(), budget)?, budget)
@@ -71,7 +73,7 @@ fn positions(
         .try_reserve_exact(arms.len())
         .map_err(|_| Fault::allocation(AT))?;
     for id in arms {
-        let index = option(cas, *id)?;
+        let index = option(cas, *id, budget)?;
         let end = index.add(&Rational::one(), budget)?;
         members.push(program.position(0, index, budget)?..program.position(0, &end, budget)?);
     }
@@ -106,8 +108,14 @@ fn endpoints<'a>(
 }
 
 /// Accept only the original association's Integer-sorted rational literal.
-fn option(cas: &Cas, association: LogicalId) -> Result<&Rational, Fault> {
-    let value = cas.state.expression(cas.state.arm(association)?.value)?;
+fn option<'a>(
+    cas: &'a Cas,
+    association: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Rational, Fault> {
+    let value = cas
+        .state
+        .expression(cas.state.arm(association, budget)?.value, budget)?;
     let Operator::Rational(index) = &value.operator else {
         return Err(invalid(InvalidCode::DecisionIntegerRange));
     };

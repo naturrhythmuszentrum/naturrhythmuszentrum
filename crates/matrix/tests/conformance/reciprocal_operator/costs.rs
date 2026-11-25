@@ -11,11 +11,14 @@ use nrz_matrix::OperationDraft;
 use nrz_scalar::LiteralLimits;
 
 /// Both public operations pin cumulative work and independent staged/output byte ceilings.
+/// The proving Work is unchanged operation Work 812,436 + 24 retained-kind counts + 24 identity-index
+/// insertions + 24 vertex admissions = 812,508; replaced graph lookup floors
+/// equal the new retained-map lookup floors.
 /// ´test:integration:reciprocal-operator-resource-boundaries´
 #[test]
 fn reciprocal_operator_resource_boundaries() -> TestResult {
     for (operation, profile) in [
-        (0, [812_436, 134_652, 46_225]),
+        (0, [812_508, 134_652, 46_225]),
         (1, [110_153, 72_921, 52_674]),
     ] {
         boundaries(operation, profile)?;

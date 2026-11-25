@@ -126,11 +126,11 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    cas.checked(expression)?;
+    cas.checked(expression, budget)?;
     if expression != &contract.target {
         return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
     }
-    crate::decision_enclosure::identities(cas, contract)?;
+    crate::decision_enclosure::identities(cas, contract, budget)?;
     for endpoint in [&contract.lower, &contract.upper] {
         endpoint.check(budget, AT)?;
     }
@@ -140,7 +140,7 @@ pub(super) fn validate(
     let bytes = 384_u64
         .saturating_add(crate::decision_kernel::cache::validate_pi(
             cas,
-            cas.checked(expression)?,
+            cas.checked(expression, budget)?,
             certificate,
             budget,
         )?)
@@ -177,12 +177,12 @@ fn enclose(
         return Ok(Interval::point(value));
     }
     let (cas, root) = constant.graph().ok_or_else(unsupported)?;
-    let root = cas.checked(root)?;
+    let root = cas.checked(root, budget)?;
     let order = crate::exact_constant::graph::order(&cas.state, root, budget)?;
     let mut retained = crate::graph::size(order.len(), AT)?.saturating_mul(64);
     let mut facts = BTreeMap::new();
     for id in order {
-        let term = cas.state.expression(id)?;
+        let term = cas.state.expression(id, budget)?;
         let interval = budget.with_retained_payload(retained, AT, |budget| {
             evaluate(&term.operator, &term.operands, &facts, certificate, budget)
         })?;

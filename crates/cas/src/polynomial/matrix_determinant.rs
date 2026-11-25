@@ -16,7 +16,7 @@ pub(super) fn determinant(
     root: LogicalId,
     budget: &mut Budget,
 ) -> Result<Fraction, Fault> {
-    let (count, columns) = shape(state, root)?;
+    let (count, columns) = shape(state, root, budget)?;
     if count != columns {
         return Err(fragment());
     }

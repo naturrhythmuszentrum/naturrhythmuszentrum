@@ -9,7 +9,8 @@ use crate::testing::common::TestResult;
 
 /// Evaluate original scalar syntax without any coefficient normalizer or branch planner.
 fn expression(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResult<Complex> {
-    let value = cas.state.expression(id)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let value = cas.state.expression(id, &mut budget)?;
     let argument = |index: usize| -> TestResult<Complex> {
         expression(
             cas,
@@ -39,7 +40,8 @@ fn expression(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestRes
 
 /// A guard is evaluated from its original predicate operands, without asking regional arithmetic.
 fn predicate(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResult<bool> {
-    let (kind, arguments) = match cas.state.node(id)? {
+    let mut budget = crate::testing::common::default_budget()?;
+    let (kind, arguments) = match cas.state.node(id, &mut budget)? {
         Vertex::Condition(value) => (&value.kind, &value.arguments),
         Vertex::Expression(value) => {
             let Operator::Predicate(kind) = &value.operator else {
@@ -67,8 +69,9 @@ fn predicate(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResu
 
 /// Recursive containment tests every exact zero/nonzero ancestor, including local-context meets.
 pub(super) fn region(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> TestResult<bool> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::domain_model::RegionExpr;
-    match &cas.state.region(id)?.expression {
+    match &cas.state.region(id, &mut budget)?.expression {
         RegionExpr::Ambient => Ok(true),
         RegionExpr::GuardTrue {
             base,
@@ -92,7 +95,8 @@ pub(super) fn region(cas: &Cas, id: LogicalId, bindings: &[(&str, Complex)]) -> 
 
 /// Preserve the returned exact coefficient and all of its true quotient parents during substitution.
 fn coefficient(cas: &Cas, handle: &Handle) -> TestResult<Handle> {
-    let value = cas.state.expression(handle.logical_id())?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let value = cas.state.expression(handle.logical_id(), &mut budget)?;
     let Some(ExpressionAttachment::ExactCoefficient { value, .. }) = &value.attachment else {
         return Err("sample exact coefficient".into());
     };
@@ -106,11 +110,13 @@ fn product(
     bindings: &[(&str, Complex)],
     original: &[(i64, i64)],
 ) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let scalar = coefficient(cas, &certificate.scalar)?;
-    let SolveView::CoefficientValue(value) = cas.solve_view(&scalar)? else {
+    let SolveView::CoefficientValue(value) = cas.solve_view(&scalar, &mut budget)? else {
         return Err("sample leading scalar".into());
     };
-    let SolveView::SolveProblem(problem) = cas.solve_view(&certificate.problem)? else {
+    let SolveView::SolveProblem(problem) = cas.solve_view(&certificate.problem, &mut budget)?
+    else {
         return Err("sample original problem".into());
     };
     let ring = Ring::specialized(cas, &value.domain, bindings, &problem.coefficient_domain)?;
@@ -126,21 +132,26 @@ fn product(
 
 /// The zero family independently exposes its whole-coordinate identity map.
 pub(super) fn identity_family(cas: &Cas, family: &Handle) -> TestResult {
-    let SolveView::FamilyMap(map) = cas.solve_view(family)? else {
+    let mut budget = crate::testing::common::default_budget()?;
+    let SolveView::FamilyMap(map) = cas.solve_view(family, &mut budget)? else {
         return Err("sample identity family".into());
     };
-    let SolveView::Tuple(tuple) = cas.solve_view(&map.body)? else {
+    let SolveView::Tuple(tuple) = cas.solve_view(&map.body, &mut budget)? else {
         return Err("sample identity tuple".into());
     };
     let [entry] = tuple.entries.as_slice() else {
         return Err("sample identity extent".into());
     };
     assert_eq!(
-        cas.state.expression(entry.logical_id())?.operator,
+        cas.state
+            .expression(entry.logical_id(), &mut budget)?
+            .operator,
         Operator::Bound { depth: 0, slot: 0 }
     );
     assert!(matches!(
-        cas.state.region(map.region.logical_id())?.expression,
+        cas.state
+            .region(map.region.logical_id(), &mut budget)?
+            .expression,
         crate::domain_model::RegionExpr::Ambient
     ));
     Ok(())
@@ -153,13 +164,14 @@ fn branch(
     bindings: &[(&str, Complex)],
     degree: Option<usize>,
 ) -> TestResult<usize> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::solving::SolutionBranchKind;
-    let SolveView::SolutionSet(set) = cas.solve_view(set)? else {
+    let SolveView::SolutionSet(set) = cas.solve_view(set, &mut budget)? else {
         return Err("sample set".into());
     };
     let mut selected = Vec::new();
     for (index, handle) in set.branches.iter().enumerate() {
-        let SolveView::SolutionBranch(value) = cas.solve_view(handle)? else {
+        let SolveView::SolutionBranch(value) = cas.solve_view(handle, &mut budget)? else {
             return Err("sample branch".into());
         };
         if region(cas, value.region.logical_id(), bindings)? {
@@ -268,7 +280,8 @@ pub(crate) fn samples(
 
 /// Undo the independently supplied declaration bijection in the actual split expressions.
 fn renamed_expression(cas: &Cas, id: LogicalId, keys: &[&str]) -> TestResult<String> {
-    let value = cas.state.expression(id)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let value = cas.state.expression(id, &mut budget)?;
     let head = match &value.operator {
         Operator::Rational(value) => format!("{:?}", number(value)?),
         Operator::Free(key) => format!(

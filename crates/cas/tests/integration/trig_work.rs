@@ -28,18 +28,18 @@ const COSTS: [(Operation, bool, [u64; 9]); 10] = [
     (
         Operation::Node,
         false,
-        [992, 3, 3_942, 3_373, 0, 0, 0, 0, 0],
+        [998, 3, 3_942, 3_373, 0, 0, 0, 0, 0],
     ),
     (
         Operation::Source,
         false,
-        [641, 0, 3_215, 2_688, 0, 0, 8, 0, 0],
+        [648, 0, 3_215, 2_688, 0, 0, 8, 0, 0],
     ),
     (Operation::Source, true, [606, 0, 3_279, 20, 0, 0, 8, 0, 0]),
     (
         Operation::Substitute,
         false,
-        [9_972, 2, 8_545, 3_831, 0, 0, 0, 0, 0],
+        [9_978, 2, 8_545, 3_831, 0, 0, 0, 0, 0],
     ),
     (
         Operation::Substitute,
@@ -49,7 +49,7 @@ const COSTS: [(Operation, bool, [u64; 9]); 10] = [
     (
         Operation::Construct,
         false,
-        [8_168, 4, 10_336, 7_477, 0, 0, 0, 7, 0],
+        [8_207, 4, 10_336, 7_477, 0, 0, 0, 7, 0],
     ),
     (
         Operation::Walk,
@@ -64,7 +64,7 @@ const COSTS: [(Operation, bool, [u64; 9]); 10] = [
     (
         Operation::Replay,
         false,
-        [53_235, 4, 14_931, 7_666, 661, 0, 0, 0, 53_235],
+        [53_245, 4, 14_931, 7_666, 661, 0, 0, 0, 53_245],
     ),
     (
         Operation::Replay,
@@ -179,7 +179,7 @@ fn attempt(
     let before = cas.canonical_snapshot(&mut default_budget()?)?;
     let counts = cas.counts();
     let ceilings = limits(kind, amount)?;
-    let mut budget = Budget::new(ceilings.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(ceilings.clone())?;
     budget.work(37, Location::new("prior trig lifecycle Work"))?;
     let result =
         budget.with_retained_payload(19, Location::new("prior trig retained payload"), |budget| {

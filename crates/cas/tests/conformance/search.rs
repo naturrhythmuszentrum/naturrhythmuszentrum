@@ -68,7 +68,7 @@ fn generated_calculus_laws() -> TestResult {
     )?;
     let result = completed(fixture.cas.run(&request))?;
     assert!(matches!(
-            fixture.cas.expression(crate::testing::witness::right(result.witness.judgment())?)?.0,
+            fixture.cas.expression(crate::testing::witness::right(result.witness.judgment())?, &mut crate::testing::budgets::graph_budget()?)?.0,
         Operator::Rational(value) if value.is_zero()));
     Ok(())
 }
@@ -164,7 +164,9 @@ fn generated_jacobian_order() -> TestResult {
         &mut budget()?,
     )?;
     for (cell, expected) in cells.iter().zip([0, 1, 1, 0]) {
-        let (operator, _) = fixture.cas.expression(cell)?;
+        let (operator, _) = fixture
+            .cas
+            .expression(cell, &mut crate::testing::budgets::graph_budget()?)?;
         assert_eq!(
             *operator,
             Operator::Rational(Rational::from_ratio(expected, 1, &mut budget()?)?),
@@ -500,7 +502,10 @@ fn generated_function_remains_pending() -> TestResult {
         &mut budget()?,
     )?;
     fixture.context = at(&handles, 2)?;
-    fixture.domain = fixture.cas.admissible_region(&fixture.context)?;
+    fixture.domain = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let variable = fixture.variable("x")?;
     let call = fixture.term(Operator::Call("f".into()), &[variable])?;
     let request = fixture.request(

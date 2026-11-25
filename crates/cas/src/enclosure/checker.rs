@@ -35,7 +35,7 @@ pub(super) fn check(
         .map_err(|_| Fault::allocation(AT))?;
     for (index, id) in schedule.iter().copied().enumerate() {
         boundary(budget, interrupt)?;
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         let record = &certificate.records[index];
         record.lower().check(budget, AT)?;
         record.upper().check(budget, AT)?;
@@ -112,7 +112,7 @@ impl Replay<'_> {
     ) -> Result<(), Fault> {
         let (id, index, schedule) = position;
         let (left, right) = inputs;
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         let record = &self.certificate.records[index];
         let (lower, upper, rounded) = match &expression.operator {
             Operator::Rational(value) => (
@@ -160,7 +160,7 @@ impl Replay<'_> {
             }
             Operator::GeneralPower(crate::model::Branch::StrictReal) => {
                 let exponent = expression.operands.get(1).ok_or_else(invalid)?;
-                super::roots::exponent(&cas.state.expression(*exponent)?.operator)?;
+                super::roots::exponent(&cas.state.expression(*exponent, budget)?.operator)?;
                 super::roots::check(
                     &self.certificate.records[left.ok_or_else(invalid)?],
                     record,
@@ -259,7 +259,10 @@ impl Replay<'_> {
         if usize::try_from(evidence.record).ok() != Some(index) {
             return Err(invalid());
         }
-        let Operator::Rational(exponent) = &cas.state.expression(expression.operands[1])?.operator
+        let Operator::Rational(exponent) = &cas
+            .state
+            .expression(expression.operands[1], budget)?
+            .operator
         else {
             return Err(invalid());
         };
@@ -309,8 +312,12 @@ impl Replay<'_> {
         {
             return Err(invalid());
         }
-        let count = usize::try_from(cas.state.expression(expression.operands[0])?.unfolded)
-            .map_err(|_| invalid())?;
+        let count = usize::try_from(
+            cas.state
+                .expression(expression.operands[0], budget)?
+                .unfolded,
+        )
+        .map_err(|_| invalid())?;
         let first = index.checked_sub(count).ok_or_else(invalid)?;
         let evidence = self.derivatives.next().ok_or_else(invalid)?;
         if usize::try_from(evidence.record).ok() != Some(index)
@@ -341,58 +348,59 @@ fn schema(
     cas: &Cas,
     request: &EnclosureRequest,
     certificate: &EnclosureCertificate,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let expected_law = if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_clamp
         != crate::enclosure::ClampShape::Smooth
     {
         super::EnclosureLaw::ClampGeneralized
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_derivative
         != 0
     {
         super::EnclosureLaw::SmoothDerivative
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_power
         .present
     {
         super::EnclosureLaw::PositivePower
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_saturation
         == 2
     {
         super::EnclosureLaw::TanhCompose
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_saturation
         == 1
     {
         super::EnclosureLaw::SigmoidCompose
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_exp
         .present
     {
         super::EnclosureLaw::ExpTaylor
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_logs
     {
         super::EnclosureLaw::LogAtanh
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_roots
     {
         super::EnclosureLaw::RootGrid
@@ -547,7 +555,7 @@ fn prepare(
     budget: &mut Budget,
 ) -> Result<Vec<crate::graph::LogicalId>, Fault> {
     super::interval::scratch(budget)?;
-    schema(cas, request, certificate)?;
+    schema(cas, request, certificate, budget)?;
     budget.check(
         BudgetKind::WitnessBytes,
         crate::graph::size(certificate.scope.len(), AT)?,

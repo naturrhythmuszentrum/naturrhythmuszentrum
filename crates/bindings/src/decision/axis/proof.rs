@@ -55,7 +55,7 @@ impl AxisPhaseCase {
         let spec = self.specification();
         if proposed.target != spec.target
             || proposed.context != spec.context
-            || proposed.input_family != cas.admissible_region(&spec.context)?
+            || proposed.input_family != cas.admissible_region(&spec.context, budget)?
         {
             return Err(DecisionError::Case);
         }
@@ -179,7 +179,7 @@ fn discharge(
         }),
         budget,
     )?;
-    let domain = builder.cas.admissible_region(&frame)?;
+    let domain = builder.cas.admissible_region(&frame, budget)?;
     let slot = HypothesisRef {
         context: frame.clone(),
         slot: 0,

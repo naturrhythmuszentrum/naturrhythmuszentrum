@@ -128,7 +128,7 @@ impl Cas {
             at,
         )?;
         let mut physical = BTreeMap::new();
-        for (id, index) in &self.state.indices {
+        for (id, index) in self.state.indices.iter() {
             physical.insert(*index, *id);
         }
         let mut edges = Vec::new();
@@ -153,7 +153,7 @@ impl Cas {
             .map_err(|_| Fault::allocation(at))?;
         let mut total = 0_u64;
         for id in self.state.indices.keys() {
-            let (_, key) = vertex_key(self.state.node(*id)?, &self.state, budget)?;
+            let (_, key) = vertex_key(self.state.node(*id, budget)?, &self.state, budget)?;
             total = total
                 .checked_add(size(key.len(), at)?)
                 .ok_or_else(|| Fault::capacity(BudgetKind::OutputBytes, at))?;

@@ -130,8 +130,8 @@ fn pi_conversion_owner_costs() -> TestResult {
     assert_eq!(
         observed,
         [
-            (Precision::F32, 669, 96, 84_572, 128, 2, 0),
-            (Precision::F64, 2055, 128, 84_572, 160, 2, 0)
+            (Precision::F32, 669, 96, 84_711, 128, 2, 0),
+            (Precision::F64, 2055, 128, 84_711, 160, 2, 0)
         ]
     );
     Ok(())

@@ -17,7 +17,7 @@ pub(crate) fn term(
     operands: &[Handle],
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let region = cas.state.region(cas.checked(domain)?)?;
+    let region = cas.state.region(cas.checked(domain, budget)?, budget)?;
     let draft = ExpressionDraft {
         space: None,
         header: Reference::Existing(cas.handle(region.header)),
@@ -38,7 +38,7 @@ pub(crate) fn boundary(
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
     let location = term(cas, domain, Operator::Rational(value.clone()), &[], budget)?;
-    let region = cas.state.region(cas.checked(domain)?)?;
+    let region = cas.state.region(cas.checked(domain, budget)?, budget)?;
     let draft = BoundaryDraft {
         header: Reference::Existing(cas.handle(region.header)),
         scope: region.scope.clone(),
@@ -101,7 +101,7 @@ pub(crate) fn guard(
     arguments: &[Handle],
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let region = cas.state.region(cas.checked(domain)?)?;
+    let region = cas.state.region(cas.checked(domain, budget)?, budget)?;
     let draft = Draft::Condition {
         header: Reference::Existing(cas.handle(region.header)),
         scope: region.scope.clone(),

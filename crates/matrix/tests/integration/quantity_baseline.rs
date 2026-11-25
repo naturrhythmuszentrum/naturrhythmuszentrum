@@ -56,25 +56,25 @@ fn quantity_declaration_baseline_measurement() -> TestResult {
             counts.edges,
             counts.payload_bytes
         ),
-        (10_916, 8, 11, 4_299)
+        (10_961, 8, 11, 4_299)
     );
     Ok(())
 }
 
 /// Fresh declaration stores enforce the measured cumulative Work boundary.
 /// ´test:integration:quantity-declaration-work-boundary´
-/// ´claim:matrix:quantity-declaration-work´ The scalar declaration succeeds at 10916 Work and refuses at 10915 without refunding work.
+/// ´claim:matrix:quantity-declaration-work´ The scalar declaration succeeds at 10961 Work and refuses at 10960 without refunding work.
 #[test]
 fn quantity_declaration_work_boundary() -> TestResult {
     use nrz_bindings::readings::algebra::{FaultKind, limits::BudgetKind};
     let mut exact = Budget::new(Limits {
-        work: 10_916,
+        work: 10_961,
         ..Limits::default()
     })?;
     BindingSymbols::declare(&Descriptor::ratio(), [1, 1], [true, true], &mut exact)?;
-    assert_eq!(exact.usage().work, 10_916);
+    assert_eq!(exact.usage().work, 10_961);
     let mut short = Budget::new(Limits {
-        work: 10_915,
+        work: 10_960,
         ..Limits::default()
     })?;
     let Err(nrz_bindings::AdmissionError::Algebra(fault)) =
@@ -86,7 +86,7 @@ fn quantity_declaration_work_boundary() -> TestResult {
         fault.kind,
         FaultKind::Exhausted {
             budget: BudgetKind::Work,
-            limit: 10_915,
+            limit: 10_960,
             ..
         }
     ));
@@ -232,7 +232,7 @@ fn quantity_declaration_byte_boundaries() -> TestResult {
                 BindingSymbols::declare(&Descriptor::ratio(), [1, 1], [true, true], &mut budget);
             if position == 0 {
                 result?;
-                assert_eq!(budget.usage().work, 10_916);
+                assert_eq!(budget.usage().work, 10_961);
             } else {
                 let Err(nrz_bindings::AdmissionError::Algebra(fault)) = result else {
                     panic!("one-below declaration allocation must refuse");
@@ -345,7 +345,7 @@ fn quantity_array_baseline_measurement() -> TestResult {
         Extent::new(2, 2)?
     );
     let counts = symbols.value().cas()?.counts();
-    assert_eq!((budget.usage().work, counts.payload_bytes), (10_916, 4_299));
+    assert_eq!((budget.usage().work, counts.payload_bytes), (10_961, 4_299));
     let view = heap.value_by_symbol(value.symbol(), &value)?;
     assert_eq!(view.region().export()?, [1.0, 2.0, 3.0, 4.0]);
     assert_eq!(view.region().get(1, 1)?, 4.0);

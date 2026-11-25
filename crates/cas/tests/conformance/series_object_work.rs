@@ -11,8 +11,8 @@ fn series_object_resource_boundaries() -> TestResult {
     for (warm, ceilings, prefixes) in [
         (
             false,
-            [1498, 6684, 5170, 12, 20, 12, 20, 2, 2, 3, 0],
-            [1420, 1498, 1498, 1498, 1498, 1498, 1498, 1335, 37, 37, 0],
+            [1503, 6684, 5170, 12, 20, 12, 20, 2, 2, 3, 0],
+            [1502, 1498, 1498, 1498, 1498, 1498, 1498, 1335, 37, 37, 0],
         ),
         (
             true,
@@ -23,7 +23,7 @@ fn series_object_resource_boundaries() -> TestResult {
         for ((kind, ceiling), prefix) in KINDS.into_iter().zip(ceilings).zip(prefixes) {
             assert_eq!(
                 attempt(warm, kind, ceiling)?,
-                (true, 1498),
+                (true, if warm { 1498 } else { 1503 }),
                 "{warm} {kind:?}"
             );
             if ceiling > 0 {
@@ -46,8 +46,8 @@ fn series_calculus_object_resource_boundaries() -> TestResult {
     for (warm, ceilings, prefixes) in [
         (
             false,
-            [1622, 7313, 5705, 13, 23, 13, 23, 2, 3, 4, 0],
-            [1535, 1622, 1622, 1622, 1622, 1622, 1622, 1438, 37, 37, 0],
+            [1627, 7313, 5705, 13, 23, 13, 23, 2, 3, 4, 0],
+            [1626, 1622, 1622, 1622, 1622, 1622, 1622, 1438, 37, 37, 0],
         ),
         (
             true,

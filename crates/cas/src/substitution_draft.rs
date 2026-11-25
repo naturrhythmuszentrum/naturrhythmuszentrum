@@ -12,13 +12,14 @@ use crate::source_model::{SourceClauseDraft, SourceFormDraft};
 /// Rebuild one completed node; all child references are already staged.
 pub(crate) fn rebuild(
     cas: &Cas,
-    id: LogicalId,
+    value: &Vertex,
+    header: LogicalId,
     scope: Scope,
     operator: Option<Operator>,
     resolve: &mut impl FnMut(LogicalId) -> Result<Reference, Fault>,
 ) -> Result<Draft, Fault> {
-    let header = Reference::Existing(cas.handle(crate::descriptor::metadata(&cas.state, id)?.0));
-    match cas.state.node(id)? {
+    let header = Reference::Existing(cas.handle(header));
+    match value {
         Vertex::SeriesObject(value) => {
             let mut value = value.resolve(&mut |handle| resolve(handle.logical_id()))?;
             value.scope = scope;

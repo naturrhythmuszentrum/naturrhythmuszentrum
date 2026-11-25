@@ -99,11 +99,11 @@ fn receipt_reservation(
     cas: &crate::Cas,
     request: &EnclosureRequest,
     scope_len: usize,
-    budget: &crate::budget::Budget,
+    budget: &mut crate::budget::Budget,
 ) -> Result<u64, crate::Fault> {
     let count = cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .unfolded;
     let endpoint = budget
         .limits()
@@ -113,7 +113,9 @@ fn receipt_reservation(
         .saturating_add(128);
     // A log record adds twelve series intervals and four rational reduction fields;
     // sixteen interval slots also cover their fixed metadata and the result record.
-    let power_slots = cas.state.expression(cas.checked(&request.target)?)?;
+    let power_slots = cas
+        .state
+        .expression(cas.checked(&request.target, budget)?, budget)?;
     if power_slots.enclosure_power.present || power_slots.enclosure_derivative != 0 {
         return Ok(power_slots
             .enclosure_power
@@ -126,14 +128,14 @@ fn receipt_reservation(
     }
     let multiplier = if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_exp
         .present
     {
         24
     } else if cas
         .state
-        .expression(cas.checked(&request.target)?)?
+        .expression(cas.checked(&request.target, budget)?, budget)?
         .enclosure_logs
     {
         16
@@ -339,13 +341,14 @@ pub(crate) fn supported_shape(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, crate::Fault> {
     use crate::model::Operator;
     let arity = match operator {
         Operator::Rational(_) | Operator::Free(_) => 0,
         Operator::GeneralPower(crate::model::Branch::StrictReal)
             if operands.len() == 2
-                && matches!(&state.expression(operands[1])?.operator, Operator::Rational(value) if value.is_half()) =>
+                && matches!(&state.expression(operands[1], budget)?.operator, Operator::Rational(value) if value.is_half()) =>
         {
             2
         }
@@ -356,24 +359,24 @@ pub(crate) fn supported_shape(
         | Operator::Tanh => 1,
         Operator::Derivative(_)
             if operands.len() == 1
-                && state.expression(operands[0])?.enclosure_derivative == 0
-                && state.expression(operands[0])?.enclosure_clamp
+                && state.expression(operands[0], budget)?.enclosure_derivative == 0
+                && state.expression(operands[0], budget)?.enclosure_clamp
                     == crate::enclosure::ClampShape::Smooth =>
         {
             1
         }
         Operator::GeneralizedDerivative(_)
             if operands.len() == 1
-                && state.expression(operands[0])?.enclosure_derivative == 0
-                && state.expression(operands[0])?.enclosure_clamp
+                && state.expression(operands[0], budget)?.enclosure_derivative == 0
+                && state.expression(operands[0], budget)?.enclosure_clamp
                     == crate::enclosure::ClampShape::Value =>
         {
             1
         }
-        Operator::ClampFloor if clamp::shape(state, operands)? => 2,
+        Operator::ClampFloor if clamp::shape(state, operands, budget)? => 2,
         Operator::PositivePower
             if operands.len() == 2
-                && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if r.component_bits().0 <= 63 && r.component_bits().1 <= 64) =>
+                && matches!(&state.expression(operands[1], budget)?.operator, Operator::Rational(r) if r.component_bits().0 <= 63 && r.component_bits().1 <= 64) =>
         {
             2
         }
@@ -384,8 +387,9 @@ pub(crate) fn supported_shape(
         return Ok(false);
     }
     for id in operands {
-        if !state.expression(*id)?.supported_enclosure
-            || state.expression(*id)?.enclosure_clamp == crate::enclosure::ClampShape::Generalized
+        if !state.expression(*id, budget)?.supported_enclosure
+            || state.expression(*id, budget)?.enclosure_clamp
+                == crate::enclosure::ClampShape::Generalized
         {
             return Ok(false);
         }
@@ -398,12 +402,13 @@ pub(crate) fn has_roots(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, crate::Fault> {
-    if !supported_shape(state, operator, operands)? {
+    if !supported_shape(state, operator, operands, budget)? {
         return Ok(false);
     }
     if matches!(operator, crate::model::Operator::PositivePower)
-        && matches!(&state.expression(operands[1])?.operator, crate::model::Operator::Rational(r) if r.is_bounded_dyadic() && !r.is_integer())
+        && matches!(&state.expression(operands[1], budget)?.operator, crate::model::Operator::Rational(r) if r.is_bounded_dyadic() && !r.is_integer())
     {
         return Ok(true);
     }
@@ -411,7 +416,7 @@ pub(crate) fn has_roots(
         return Ok(true);
     }
     for id in operands {
-        if state.expression(*id)?.enclosure_roots {
+        if state.expression(*id, budget)?.enclosure_roots {
             return Ok(true);
         }
     }
@@ -423,18 +428,19 @@ pub(crate) fn log_metadata(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<(bool, Option<u32>), crate::Fault> {
     use crate::model::Operator;
-    if !supported_shape(state, operator, operands)? {
+    if !supported_shape(state, operator, operands, budget)? {
         return Ok((false, None));
     }
     if matches!(operator, Operator::PositivePower)
-        && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if !r.is_bounded_dyadic())
+        && matches!(&state.expression(operands[1], budget)?.operator, Operator::Rational(r) if !r.is_bounded_dyadic())
     {
         return Ok((true, None));
     }
     if matches!(operator, Operator::NaturalLog) {
-        let child = state.expression(operands[0])?;
+        let child = state.expression(operands[0], budget)?;
         let bound = if let Operator::Rational(value) = &child.operator {
             let (n, d) = value.component_bits();
             u32::try_from(n.abs_diff(d))
@@ -448,7 +454,7 @@ pub(crate) fn log_metadata(
     let mut found = false;
     let mut bound = Some(0);
     for id in operands {
-        let child = state.expression(*id)?;
+        let child = state.expression(*id, budget)?;
         if child.enclosure_logs {
             found = true;
             bound = bound.zip(child.enclosure_log_bound).map(|(a, b)| a.max(b));
@@ -471,13 +477,14 @@ pub(crate) fn exp_metadata(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<AnalyticShape, crate::Fault> {
     use crate::model::Operator;
-    if !supported_shape(state, operator, operands)? {
+    if !supported_shape(state, operator, operands, budget)? {
         return Ok(AnalyticShape::default());
     }
     if matches!(operator, Operator::PositivePower)
-        && matches!(&state.expression(operands[1])?.operator, Operator::Rational(r) if !r.is_bounded_dyadic())
+        && matches!(&state.expression(operands[1], budget)?.operator, Operator::Rational(r) if !r.is_bounded_dyadic())
     {
         return Ok(AnalyticShape {
             present: true,
@@ -488,7 +495,7 @@ pub(crate) fn exp_metadata(
         operator,
         Operator::Exponential | Operator::Sigmoid | Operator::Tanh
     ) {
-        let child = state.expression(operands[0])?;
+        let child = state.expression(operands[0], budget)?;
         let bound = if let Operator::Rational(value) = &child.operator {
             let (n, d) = value.component_bits();
             u32::try_from(
@@ -511,7 +518,7 @@ pub(crate) fn exp_metadata(
     let mut found = false;
     let mut bound = Some(0);
     for id in operands {
-        let child = state.expression(*id)?;
+        let child = state.expression(*id, budget)?;
         if child.enclosure_exp.present {
             found = true;
             bound = bound
@@ -530,6 +537,7 @@ pub(crate) fn saturation_metadata(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<u8, crate::Fault> {
     let mut family = match operator {
         crate::model::Operator::Sigmoid => 1,
@@ -537,7 +545,7 @@ pub(crate) fn saturation_metadata(
         _ => 0,
     };
     for id in operands {
-        family = family.max(state.expression(*id)?.enclosure_saturation);
+        family = family.max(state.expression(*id, budget)?.enclosure_saturation);
     }
     Ok(family)
 }
@@ -547,12 +555,13 @@ pub(crate) fn has_powers(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, crate::Fault> {
     if matches!(operator, crate::model::Operator::PositivePower) {
         return Ok(true);
     }
     for id in operands {
-        if state.expression(*id)?.enclosure_power.present {
+        if state.expression(*id, budget)?.enclosure_power.present {
             return Ok(true);
         }
     }
@@ -564,13 +573,14 @@ pub(crate) fn receipt_slots(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<u64, crate::Fault> {
     use crate::model::Operator;
     let mut slots: u64 = match operator {
         Operator::NaturalLog => 16,
         Operator::Exponential | Operator::Sigmoid | Operator::Tanh => 24,
         Operator::PositivePower if operands.len() == 2 => {
-            match &state.expression(operands[1])?.operator {
+            match &state.expression(operands[1], budget)?.operator {
                 Operator::Rational(exponent) => exponent
                     .bounded_power_roots()
                     .map_or(43, |roots| u64::from(roots) + 2),
@@ -578,12 +588,15 @@ pub(crate) fn receipt_slots(
             }
         }
         Operator::Derivative(_) | Operator::GeneralizedDerivative(_) if operands.len() == 1 => {
-            state.expression(operands[0])?.unfolded.saturating_add(1)
+            state
+                .expression(operands[0], budget)?
+                .unfolded
+                .saturating_add(1)
         }
         _ => 1,
     };
     for id in operands {
-        slots = slots.saturating_add(state.expression(*id)?.enclosure_power.slots);
+        slots = slots.saturating_add(state.expression(*id, budget)?.enclosure_power.slots);
     }
     Ok(slots)
 }
@@ -602,10 +615,11 @@ pub(crate) fn power_metadata(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<PowerShape, crate::Fault> {
     Ok(PowerShape {
-        present: has_powers(state, operator, operands)?,
-        slots: receipt_slots(state, operator, operands)?,
+        present: has_powers(state, operator, operands, budget)?,
+        slots: receipt_slots(state, operator, operands, budget)?,
     })
 }
 
@@ -614,10 +628,11 @@ pub(crate) fn derivative_depth(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<u8, crate::Fault> {
     let mut depth = 0;
     for id in operands {
-        depth = depth.max(state.expression(*id)?.enclosure_derivative);
+        depth = depth.max(state.expression(*id, budget)?.enclosure_derivative);
     }
     Ok(depth.saturating_add(u8::from(matches!(
         operator,
@@ -641,6 +656,7 @@ pub(crate) fn clamp_metadata(
     state: &crate::graph::State,
     operator: &crate::model::Operator,
     operands: &[crate::graph::LogicalId],
+    budget: &mut crate::budget::Budget,
 ) -> Result<ClampShape, crate::Fault> {
     let mut kind = match operator {
         crate::model::Operator::ClampFloor => ClampShape::Value,
@@ -648,7 +664,7 @@ pub(crate) fn clamp_metadata(
         _ => ClampShape::Smooth,
     };
     for id in operands {
-        kind = kind.max(state.expression(*id)?.enclosure_clamp);
+        kind = kind.max(state.expression(*id, budget)?.enclosure_clamp);
     }
     Ok(kind)
 }

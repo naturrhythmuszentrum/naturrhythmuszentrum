@@ -138,7 +138,7 @@ impl LatticeDecisionCase {
                 .tuple()
                 .get(position)
                 .ok_or(DecisionError::LatticeShape)?;
-            let (operator, sort) = graph.expression(node)?;
+            let (operator, sort) = graph.expression(node, budget)?;
             let Operator::Rational(value) = operator else {
                 return Err(DecisionError::Case);
             };

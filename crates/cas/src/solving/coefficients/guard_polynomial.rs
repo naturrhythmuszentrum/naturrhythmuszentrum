@@ -30,7 +30,7 @@ impl Parameters<'_> {
     /// Constants and declared coordinates are total on this exact parameter frame.
     fn atom(&self, id: LogicalId, budget: &mut Budget) -> Result<Option<Polynomial>, Fault> {
         crate::work_observation::observe!(budget, AT, {
-            let expression = self.state.expression(id)?;
+            let expression = self.state.expression(id, budget)?;
             let count = self.product.coordinates.len();
             let scalar = match (&expression.operator, &expression.attachment) {
                 (Operator::Rational(value), None) => match self.ground {
@@ -81,7 +81,8 @@ impl Parameters<'_> {
         map: LogicalId,
         budget: &mut Budget,
     ) -> Result<Option<Polynomial>, Fault> {
-        let SolveDraft::CoefficientMap(mapping) = crate::solving::graph::object(self.state, map)?
+        let SolveDraft::CoefficientMap(mapping) =
+            crate::solving::graph::object(self.state, map, budget)?
         else {
             return Err(invalid());
         };
@@ -100,7 +101,7 @@ impl Parameters<'_> {
             return Ok(None);
         }
         let SolveDraft::CoefficientValue(stored) =
-            crate::solving::graph::object(self.state, value)?
+            crate::solving::graph::object(self.state, value, budget)?
         else {
             return Err(invalid());
         };
@@ -133,7 +134,7 @@ impl Parameters<'_> {
         operands: &[Polynomial],
         budget: &mut Budget,
     ) -> Result<Option<Polynomial>, Fault> {
-        let expression = self.state.expression(id)?;
+        let expression = self.state.expression(id, budget)?;
         let value = match (&expression.operator, operands) {
             (Operator::Neg, [value]) => value.neg(budget)?,
             (Operator::Add, [left, right]) => left.add(right, budget)?,
@@ -158,10 +159,10 @@ impl Parameters<'_> {
             let mut pending = vector(1, budget)?;
             pending.push((root, false));
             let mut values = vector(1, budget)?;
-            let region = self.state.region(self.region)?;
+            let region = self.state.region(self.region, budget)?;
             while let Some((id, ready)) = pending.pop() {
                 budget.work(1, AT)?;
-                let expression = self.state.expression(id)?;
+                let expression = self.state.expression(id, budget)?;
                 budget.check(BudgetKind::Depth, expression.depth, AT)?;
                 if (expression.header, &expression.scope, expression.space)
                     != (self.product.header.logical_id(), &region.scope, None)
@@ -217,15 +218,16 @@ pub(crate) fn read(
     expression: LogicalId,
     budget: &mut Budget,
 ) -> Result<Option<Polynomial>, Fault> {
-    let CoefficientDomainData::Fraction { base, coordinates } = domain(state, source)? else {
+    let CoefficientDomainData::Fraction { base, coordinates } = domain(state, source, budget)?
+    else {
         return Ok(None);
     };
     let SolveDraft::CoordinateSpace(product) =
-        crate::solving::graph::object(state, coordinates.logical_id())?
+        crate::solving::graph::object(state, coordinates.logical_id(), budget)?
     else {
         return Err(invalid());
     };
-    let scope = state.region(region)?;
+    let scope = state.region(region, budget)?;
     if scope.header != product.header.logical_id() {
         return Ok(None);
     }
@@ -233,7 +235,7 @@ pub(crate) fn read(
         state,
         source,
         product,
-        ground: super::read::ground(state, base)?,
+        ground: super::read::ground(state, base, budget)?,
         region,
     }
     .expression(expression, budget)

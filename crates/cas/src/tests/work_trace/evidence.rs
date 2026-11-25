@@ -94,6 +94,36 @@ fn work_tracing_ledgerless_remainder() -> TestResult {
         (ledger.last, ledger.classified, ledger.remainder),
         (12, 8, 4)
     );
+    assert_eq!(report.rows.iter().map(|row| row.work).sum::<u64>(), 8);
+    Ok(())
+}
+
+/// A purpose-bearing interval is classified even without a helper location.
+#[test]
+fn work_tracing_operationless_phase() -> TestResult {
+    let (result, report) = observed(64, || -> Result<(), Fault> {
+        let mut ledger = Budget::new(Limits::default())?;
+        ledger.work(1, Location::new("root"))?;
+        let _rule = Scope::rule(|| "phase.rule");
+        let _purpose = Scope::phase("proof");
+        observe!(ledger, Location::new(""), {
+            ledger.work(3, Location::new("phase work"))?;
+            observe!(ledger, Location::new("child"), {
+                ledger.work(2, Location::new("child"))
+            })
+        })
+    });
+    result?;
+    let ledger = report.ledgers.values().next().ok_or("ledger")?;
+    assert_eq!((ledger.classified, ledger.remainder), (5, 1));
+    assert_eq!(
+        report
+            .rows
+            .iter()
+            .find(|row| row.rule == "phase.rule" && row.location == "phase boundary")
+            .map(|row| row.work),
+        Some(3)
+    );
     Ok(())
 }
 

@@ -71,8 +71,8 @@ fn product(
     number: i64,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let header = cas.checked(header)?;
-    let pi = cas.checked(pi)?;
+    let header = cas.checked(header, budget)?;
+    let pi = cas.checked(pi, budget)?;
     let sort = Sort::Value(AtomicSort::Scalar(Field::Real));
     let rational = Rational::from_ratio(number, 1, budget)?;
     let factor = cas.generated(
@@ -91,6 +91,7 @@ fn product(
 /// ´claim:cas:constant-cache-rollback-generation´
 #[test]
 fn constant_cache_rollback_generation() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut case = fixture()?;
     let snapshot = case.cas.canonical_snapshot(&mut ledger()?)?;
     let mut stale = None;
@@ -114,7 +115,7 @@ fn constant_cache_rollback_generation() -> TestResult {
     let stale = stale.ok_or("transient original")?;
     assert_eq!(
         case.cas
-            .checked(&stale)
+            .checked(&stale, &mut budget)
             .err()
             .ok_or("discarded handle accepted")?
             .kind,
@@ -137,7 +138,8 @@ fn constant_cache_rollback_generation() -> TestResult {
         .cas
         .prepare_constant(&case.context, &changed, &mut measured)?;
     assert_eq!(prepared.value(), &expected);
-    assert_eq!(measured.usage().work, direct.usage().work);
+    assert_eq!(direct.usage().work, 27_992);
+    assert_eq!(measured.usage().work, direct.usage().work + 3);
     assert!(measured.usage().work > 1);
     assert_eq!(case.cas.retained_judgment_count(), 1);
     Ok(())
@@ -150,11 +152,11 @@ fn constant_cache_rollback_generation() -> TestResult {
 fn constant_cache_saturated_generation() -> TestResult {
     let mut case = fixture()?;
     case.cas.memo_epoch = u64::MAX;
-    for _ in 0..2 {
+    for expected in [10_929, 10_926] {
         let mut budget = ledger()?;
         case.cas
             .prepare_constant(&case.context, &case.pi, &mut budget)?;
-        assert_eq!(budget.usage().work, 10_888);
+        assert_eq!(budget.usage().work, expected);
         assert_eq!(case.cas.retained_judgment_count(), 1);
     }
     Ok(())
@@ -238,7 +240,7 @@ fn constant_graph_enclosing_refusal() -> TestResult {
     let mut refreshed = ledger()?;
     case.cas
         .prepare_constant(&case.context, &case.pi, &mut refreshed)?;
-    assert_eq!(refreshed.usage().work, 10_888);
+    assert_eq!(refreshed.usage().work, 10_926);
     assert_eq!(case.cas.retained_judgment_count(), 1);
     Ok(())
 }
@@ -254,7 +256,7 @@ fn constant_graph_owner_separation() -> TestResult {
     let mut other = case.cas.full_copy_for_test();
     let mut budget = ledger()?;
     other.prepare_constant(&case.context, &case.pi, &mut budget)?;
-    assert_eq!(budget.usage().work, 10_888);
+    assert_eq!(budget.usage().work, 10_926);
     assert_eq!(other.retained_judgment_count(), 1);
     Ok(())
 }

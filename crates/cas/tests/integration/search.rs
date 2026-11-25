@@ -146,7 +146,10 @@ fn pendulum_shared_jacobian() -> TestResult {
     assert_eq!(
         *fixture
             .cas
-            .expression(crate::testing::witness::right(result.witness.judgment())?)?
+            .expression(
+                crate::testing::witness::right(result.witness.judgment())?,
+                &mut crate::testing::budgets::graph_budget()?
+            )?
             .0,
         Operator::Matrix {
             rows: 3,
@@ -157,17 +160,20 @@ fn pendulum_shared_jacobian() -> TestResult {
         result.witness.judgment().residuals,
         [] as [nrz_cas::proof::GuardedObligation; 0]
     );
-    assert!(result.witness.judgment().residuals.iter().all(|guard| {
-        fixture
+    let mut read_budget = crate::testing::budgets::graph_budget()?;
+    for guard in &result.witness.judgment().residuals {
+        let kind = fixture
             .cas
-            .predicate_kind(&guard.predicate)
-            .is_ok_and(|kind| *kind == nrz_cas::syntax::PredicateKind::NonZero)
-            && guard.home == fixture.context
-            && guard.region == fixture.domain
-            && guard.scope.is_empty()
-            && guard.layer == nrz_cas::domain::Layer::Pointwise
-            && guard.space.is_none()
-    }));
+            .predicate_kind(&guard.predicate, &mut read_budget)?;
+        assert!(
+            *kind == nrz_cas::syntax::PredicateKind::NonZero
+                && guard.home == fixture.context
+                && guard.region == fixture.domain
+                && guard.scope.is_empty()
+                && guard.layer == nrz_cas::domain::Layer::Pointwise
+                && guard.space.is_none()
+        );
+    }
     replay(&fixture, &result)?;
     let cells = fixture.cas.operands(
         crate::testing::witness::right(result.witness.judgment())?,

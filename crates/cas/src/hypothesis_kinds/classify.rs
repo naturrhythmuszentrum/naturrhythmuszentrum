@@ -2,6 +2,7 @@
 //! Exact borrowed classification of retained predicate and statement syntax.
 
 use super::HypothesisKind;
+use crate::budget::Budget;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, Handle, LogicalId, Vertex};
 use crate::model::{AtomicSort, Operator, PredicateKind, Sort};
@@ -13,12 +14,12 @@ const fn invalid() -> Fault {
 }
 
 /// Check only the two equality operands; no expression traversal or simplification occurs.
-fn equality_zero(cas: &Cas, arguments: &[LogicalId]) -> Result<bool, Fault> {
+fn equality_zero(cas: &Cas, arguments: &[LogicalId], budget: &mut Budget) -> Result<bool, Fault> {
     let [left, right] = arguments else {
         return Ok(false);
     };
     for id in [left, right] {
-        if matches!(&cas.state.expression(*id)?.operator, Operator::Rational(value) if value.is_zero())
+        if matches!(&cas.state.expression(*id, budget)?.operator, Operator::Rational(value) if value.is_zero())
         {
             return Ok(true);
         }
@@ -31,8 +32,9 @@ fn predicate(
     cas: &Cas,
     kind: &PredicateKind,
     arguments: &[LogicalId],
+    budget: &mut Budget,
 ) -> Result<HypothesisKind, Fault> {
-    if *kind == PredicateKind::Equal && equality_zero(cas, arguments)? {
+    if *kind == PredicateKind::Equal && equality_zero(cas, arguments, budget)? {
         Ok(HypothesisKind::DeclaredZero)
     } else {
         Ok(kind.hypothesis_kind())
@@ -40,7 +42,11 @@ fn predicate(
 }
 
 /// Distinguish strict, weak and zero Real sign conclusions without evaluating the subject.
-fn sign(cas: &Cas, value: &crate::solving::StatementRealSign) -> Result<HypothesisKind, Fault> {
+fn sign(
+    cas: &Cas,
+    value: &crate::solving::StatementRealSign,
+    budget: &mut Budget,
+) -> Result<HypothesisKind, Fault> {
     use crate::solving::RealSignConclusion;
     Ok(match value.conclusion {
         RealSignConclusion::Positive | RealSignConclusion::Negative => HypothesisKind::StrictSign,
@@ -48,9 +54,11 @@ fn sign(cas: &Cas, value: &crate::solving::StatementRealSign) -> Result<Hypothes
         RealSignConclusion::NonPositive => HypothesisKind::NonPositive,
         RealSignConclusion::NonZero => HypothesisKind::NonZero,
         RealSignConclusion::Zero => {
-            let subject = cas.state.expression(cas.checked(&value.subject)?)?;
+            let subject = cas
+                .state
+                .expression(cas.checked(&value.subject, budget)?, budget)?;
             if subject.sort == Sort::Value(AtomicSort::Boolean) {
-                cas.predicate_hypothesis_kind(&value.subject)?
+                cas.predicate_hypothesis_kind(&value.subject, budget)?
             } else {
                 HypothesisKind::DeclaredZero
             }
@@ -64,12 +72,16 @@ impl Cas {
     /// Inspection examines at most its two equality operands and allocates no payload.
     /// # Errors
     /// Refuses foreign handles, non-predicate records and invalid equality operands.
-    pub fn predicate_hypothesis_kind(&self, value: &Handle) -> Result<HypothesisKind, Fault> {
-        match self.state.node(self.checked(value)?)? {
-            Vertex::Condition(value) => predicate(self, &value.kind, &value.arguments),
+    pub fn predicate_hypothesis_kind(
+        &self,
+        value: &Handle,
+        budget: &mut Budget,
+    ) -> Result<HypothesisKind, Fault> {
+        match self.state.node(self.checked(value, budget)?, budget)? {
+            Vertex::Condition(value) => predicate(self, &value.kind, &value.arguments, budget),
             Vertex::Expression(value) if value.sort == Sort::Value(AtomicSort::Boolean) => {
                 if let Operator::Predicate(kind) = &value.operator {
-                    predicate(self, kind, &value.operands)
+                    predicate(self, kind, &value.operands, budget)
                 } else {
                     Ok(HypothesisKind::Boolean)
                 }
@@ -81,16 +93,20 @@ impl Cas {
     /// Name a typed statement's premise kind; classification alone supplies no proof.
     /// # Errors
     /// Refuses a predicate or zero-sign subject whose referenced syntax is foreign or malformed.
-    pub fn statement_hypothesis_kind(&self, value: &Statement) -> Result<HypothesisKind, Fault> {
+    pub fn statement_hypothesis_kind(
+        &self,
+        value: &Statement,
+        budget: &mut Budget,
+    ) -> Result<HypothesisKind, Fault> {
         Ok(match value {
             Statement::Series(_) => HypothesisKind::SeriesEvidence,
             Statement::HalfPiWitness { .. } => HypothesisKind::HalfPiWitness,
             Statement::PredicateFact {
                 predicate: condition,
                 ..
-            } => self.predicate_hypothesis_kind(condition)?,
+            } => self.predicate_hypothesis_kind(condition, budget)?,
             Statement::Solve(value) => match value.as_ref() {
-                crate::solving::SolveStatement::RealSign(value) => sign(self, value)?,
+                crate::solving::SolveStatement::RealSign(value) => sign(self, value, budget)?,
                 _ => HypothesisKind::SolveEvidence,
             },
             Statement::Germ(_) => HypothesisKind::GermEvidence,

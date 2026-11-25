@@ -22,8 +22,10 @@ fn trig_parity_original_operands() -> TestResult {
                     &mut default_budget()?,
                 )?;
                 assert_eq!(
-                    f.cas
-                        .statement_hypothesis_kind(&guard.judgment().statement)?,
+                    f.cas.statement_hypothesis_kind(
+                        &guard.judgment().statement,
+                        &mut crate::testing::budgets::graph_budget()?
+                    )?,
                     HypothesisKind::DomainGuard
                 );
                 let checked = f

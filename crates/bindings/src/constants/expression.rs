@@ -106,7 +106,7 @@ fn admit(
         || ExpressionEnclosureError::Unsupported(UnitError::UnsupportedExactConstantExport);
     if !request.coordinates.is_empty()
         || request.goal != EnclosureGoal::Width
-        || !matches!(cas.expression(&request.target)?.0, Operator::Mul)
+        || !matches!(cas.expression(&request.target, b)?.0, Operator::Mul)
     {
         return Err(unsupported());
     }
@@ -115,8 +115,8 @@ fn admit(
         return Err(unsupported());
     };
     let two = Rational::from_ratio(2, 1, b)?;
-    if !matches!(cas.expression(factor)?.0, Operator::Rational(q) if q == &two)
-        || !matches!(cas.expression(log)?.0, Operator::NaturalLog)
+    if !matches!(cas.expression(factor, b)?.0, Operator::Rational(q) if q == &two)
+        || !matches!(cas.expression(log, b)?.0, Operator::NaturalLog)
     {
         return Err(unsupported());
     }
@@ -124,7 +124,7 @@ fn admit(
     let [argument] = arguments.as_slice() else {
         return Err(unsupported());
     };
-    if !matches!(cas.expression(argument)?.0, Operator::Rational(q) if q == &two) {
+    if !matches!(cas.expression(argument, b)?.0, Operator::Rational(q) if q == &two) {
         return Err(unsupported());
     }
     Ok(())

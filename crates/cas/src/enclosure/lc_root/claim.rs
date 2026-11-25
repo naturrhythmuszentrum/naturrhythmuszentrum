@@ -156,9 +156,16 @@ pub(super) fn validate(
         return Err(Fault::invalid(InvalidCode::UnsupportedVersion, AT));
     }
     event(budget, events, Event::Original)?;
-    let context = cas.state.context(cas.checked(&request.context)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&request.context, budget)?, budget)?;
     event(budget, events, Event::Original)?;
-    if !cas.state.region(context.admissible)?.scope.is_empty() {
+    if !cas
+        .state
+        .region(context.admissible, budget)?
+        .scope
+        .is_empty()
+    {
         return Err(invalid());
     }
     let header = context.header_id;
@@ -170,7 +177,7 @@ pub(super) fn validate(
         return Err(invalid());
     }
     for input in request.inputs.iter().chain(&request.endpoints) {
-        let record = node(cas, cas.checked(input)?, header, budget, events)?;
+        let record = node(cas, cas.checked(input, budget)?, header, budget, events)?;
         if !matches!(record.operator, Operator::Free(_)) {
             return Err(invalid());
         }
@@ -185,7 +192,9 @@ pub(super) fn validate(
     }
     for constraint in &request.constraints {
         event(budget, events, Event::Original)?;
-        let value = cas.state.expression(cas.checked(constraint)?)?;
+        let value = cas
+            .state
+            .expression(cas.checked(constraint, budget)?, budget)?;
         if value.header != header
             || !value.scope.is_empty()
             || value.sort != Sort::Value(AtomicSort::Boolean)
@@ -205,7 +214,7 @@ fn node<'a>(
     events: &mut Events,
 ) -> Result<&'a Expression, Fault> {
     event(budget, events, Event::Original)?;
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     if value.header != header
         || !value.scope.is_empty()
         || value.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
@@ -223,11 +232,12 @@ fn targets(
     budget: &mut Budget,
     events: &mut Events,
 ) -> Result<(), Fault> {
-    let [product, root, reciprocal, reverse] = request.targets.each_ref().map(|h| cas.checked(h));
+    let [product, root, reciprocal, reverse] =
+        request.targets.each_ref().map(|h| cas.checked(h, budget));
     let (product, root, reciprocal, reverse) = (product?, root?, reciprocal?, reverse?);
     let value = node(cas, product, header, budget, events)?;
-    let l = cas.checked(&request.inputs[request.positions[0]])?;
-    let c = cas.checked(&request.inputs[request.positions[1]])?;
+    let l = cas.checked(&request.inputs[request.positions[0]], budget)?;
+    let c = cas.checked(&request.inputs[request.positions[1]], budget)?;
     if value.operator != Operator::Mul || value.operands != [l, c] {
         return Err(invalid());
     }

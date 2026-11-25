@@ -20,8 +20,9 @@ use crate::solving::{
 pub(crate) fn selection<'a>(
     cas: &'a crate::graph::Cas,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a RootSelectionData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::RootSelection(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -31,8 +32,9 @@ pub(crate) fn selection<'a>(
 pub(crate) fn relation<'a>(
     cas: &'a crate::graph::Cas,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a RootRelationData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::RootRelation(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -42,18 +44,29 @@ impl Evaluation<'_> {
     /// Match only the actual coefficient declaration frame; ground and unrelated declarations keep formal slots.
     fn parameter_frame(
         &self,
+        budget: &mut crate::budget::Budget,
     ) -> Result<Option<&crate::solving::CoordinateSpaceData<Handle>>, Fault> {
         let crate::solving::CoefficientDomainData::Fraction { coordinates, .. } =
-            crate::solving::coefficients::storage::domain(&self.cas.state, self.engine.domain)?
+            crate::solving::coefficients::storage::domain(
+                &self.cas.state,
+                self.engine.domain,
+                budget,
+            )?
         else {
             return Ok(None);
         };
         let SolveDraft::CoordinateSpace(frame) =
-            crate::solving::graph::object(&self.cas.state, coordinates.logical_id())?
+            crate::solving::graph::object(&self.cas.state, coordinates.logical_id(), budget)?
         else {
             return Err(invalid());
         };
-        if frame.header.logical_id() != self.cas.state.region(self.region.logical_id())?.header {
+        if frame.header.logical_id()
+            != self
+                .cas
+                .state
+                .region(self.region.logical_id(), budget)?
+                .header
+        {
             return Ok(None);
         }
         Ok(Some(frame))
@@ -69,16 +82,16 @@ impl Evaluation<'_> {
             if self
                 .cas
                 .state
-                .region(self.region.logical_id())?
+                .region(self.region.logical_id(), budget)?
                 .lies_over
                 .is_some()
             {
                 return crate::solving::family::parameters::read(self, id, budget);
             }
-            let Some(frame) = self.parameter_frame()? else {
+            let Some(frame) = self.parameter_frame(budget)? else {
                 return Ok(None);
             };
-            let expression = self.cas.state.expression(id)?;
+            let expression = self.cas.state.expression(id, budget)?;
             let (Operator::Free(key), None) = (&expression.operator, &expression.attachment) else {
                 return Ok(None);
             };
@@ -143,13 +156,13 @@ impl Evaluation<'_> {
         if self
             .cas
             .state
-            .region(self.region.logical_id())?
+            .region(self.region.logical_id(), budget)?
             .lies_over
             .is_some()
         {
             return crate::solving::family::parameters::zero(self, coefficient, budget);
         }
-        let Some(frame) = self.parameter_frame()? else {
+        let Some(frame) = self.parameter_frame(budget)? else {
             return Ok(false);
         };
         budget.work(crate::graph::size(frame.coordinates.len(), AT)?.max(1), AT)?;
@@ -270,7 +283,7 @@ impl Evaluation<'_> {
     fn unchanged_parameter(&self, image: &Handle, budget: &mut Budget) -> Result<bool, Fault> {
         crate::work_observation::observe!(budget, AT, {
             budget.work(1, AT)?;
-            let expression = self.cas.state.expression(image.logical_id())?;
+            let expression = self.cas.state.expression(image.logical_id(), budget)?;
             let (Operator::Free(key), None) = (&expression.operator, &expression.attachment) else {
                 return Ok(false);
             };
@@ -291,14 +304,17 @@ impl Evaluation<'_> {
         map: &CoefficientMapData<Handle>,
         budget: &mut Budget,
     ) -> Result<Value, Fault> {
-        let stored = polynomial(&self.cas.state, handle)?;
+        let stored = polynomial(&self.cas.state, handle, budget)?;
         if stored.variables.len() != map.images.len() {
             return Err(invalid());
         }
         let mut result = None;
         for term in &stored.terms {
-            let coefficient =
-                crate::solving::coefficients::storage::value(&self.cas.state, &term.coefficient)?;
+            let coefficient = crate::solving::coefficients::storage::value(
+                &self.cas.state,
+                &term.coefficient,
+                budget,
+            )?;
             let mut product = self.ground(coefficient, budget)?;
             for (exponent, image) in term.exponents.iter().zip(&map.images) {
                 // The full map was checked first; an unreplaced free image is already known total.
@@ -335,7 +351,7 @@ impl Evaluation<'_> {
             if map.source != *self.engine.domain {
                 return Ok(None);
             }
-            let Some(frame) = self.parameter_frame()? else {
+            let Some(frame) = self.parameter_frame(budget)? else {
                 return Ok(None);
             };
             budget.work(crate::graph::size(frame.coordinates.len(), AT)?.max(1), AT)?;
@@ -373,7 +389,7 @@ impl Evaluation<'_> {
         map: &CoefficientMapData<Handle>,
         budget: &mut Budget,
     ) -> Result<Value, Fault> {
-        let stored = crate::solving::coefficients::storage::value(&self.cas.state, handle)?;
+        let stored = crate::solving::coefficients::storage::value(&self.cas.state, handle, budget)?;
         if stored.domain != map.source {
             return Err(invalid());
         }
@@ -428,28 +444,29 @@ impl Evaluation<'_> {
         let [image] = map.images.as_slice() else {
             return Err(invalid());
         };
-        let expression = self.cas.state.expression(image.logical_id())?;
+        let expression = self.cas.state.expression(image.logical_id(), budget)?;
         let (Operator::RootValue { slot }, Some(ExpressionAttachment::SelectedRoot(selected))) =
             (&expression.operator, &expression.attachment)
         else {
             return Err(invalid());
         };
-        let selection = selection(self.cas, &self.cas.handle(*selected))?;
+        let selection = selection(self.cas, &self.cas.handle(*selected), budget)?;
         let relation = relation(
             self.cas,
             selection
                 .relations
                 .get(usize::try_from(*slot).map_err(|_| invalid())?)
                 .ok_or_else(invalid)?,
+            budget,
         )?;
         let SolveDraft::CoefficientMap(parent) =
-            crate::solving::graph::object(&self.cas.state, relation.map.logical_id())?
+            crate::solving::graph::object(&self.cas.state, relation.map.logical_id(), budget)?
         else {
             return Err(invalid());
         };
         let generator = self.expression(image.logical_id(), true, budget)?;
         let parameter = matches!(
-            crate::solving::coefficients::storage::domain(&self.cas.state, &parent.source)?,
+            crate::solving::coefficients::storage::domain(&self.cas.state, &parent.source, budget)?,
             crate::solving::CoefficientDomainData::Fraction { .. }
         );
         let unmarked = generator.maps.is_empty();
@@ -482,9 +499,9 @@ impl Evaluation<'_> {
         if relation.region != *self.region {
             return Err(invalid());
         }
-        let stored = polynomial(&self.cas.state, &relation.polynomial)?;
+        let stored = polynomial(&self.cas.state, &relation.polynomial, budget)?;
         let SolveDraft::CoefficientMap(map) =
-            crate::solving::graph::object(&self.cas.state, relation.map.logical_id())?
+            crate::solving::graph::object(&self.cas.state, relation.map.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -492,7 +509,7 @@ impl Evaluation<'_> {
             return Err(invalid());
         }
         if matches!(
-            crate::solving::coefficients::storage::domain(&self.cas.state, &map.source)?,
+            crate::solving::coefficients::storage::domain(&self.cas.state, &map.source, budget)?,
             crate::solving::CoefficientDomainData::Fraction { .. }
         ) {
             return self.parameter_equation(root, stored, map, budget);
@@ -570,13 +587,13 @@ impl Evaluation<'_> {
     /// Preserve exact selection, existence, map, region and strict denominator checks at every level.
     fn selected_equation(&self, id: LogicalId, budget: &mut Budget) -> Result<Option<Form>, Fault> {
         crate::work_observation::observe!(budget, AT, {
-            let value = self.cas.state.expression(id)?;
+            let value = self.cas.state.expression(id, budget)?;
             let (Operator::RootValue { slot }, Some(ExpressionAttachment::SelectedRoot(selected))) =
                 (&value.operator, &value.attachment)
             else {
                 return Ok(None);
             };
-            let selected = selection(self.cas, &self.cas.handle(*selected))?;
+            let selected = selection(self.cas, &self.cas.handle(*selected), budget)?;
             budget.solving(
                 BudgetKind::SelectionSlots,
                 crate::graph::size(selected.relations.len(), AT)?,
@@ -587,7 +604,8 @@ impl Evaluation<'_> {
                 .get(usize::try_from(*slot).map_err(|_| invalid())?)
                 .ok_or_else(invalid)?;
             let root = self.expression(id, true, budget)?;
-            let equation = self.root_equation(&root, relation(self.cas, handle)?, budget)?;
+            let equation =
+                self.root_equation(&root, relation(self.cas, handle, budget)?, budget)?;
             Ok(Some(equation.numerator))
         })
     }
@@ -629,7 +647,7 @@ pub(crate) fn occurrence(
     pending.extend(roots.iter().map(Handle::logical_id));
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         if matches!((&expression.operator, &expression.attachment), (Operator::RootValue { slot: 0 }, Some(ExpressionAttachment::SelectedRoot(handle))) if *handle == selected.logical_id())
         {
             return Ok(id);
@@ -638,7 +656,7 @@ pub(crate) fn occurrence(
         pending.extend(&expression.operands);
         if let Some(ExpressionAttachment::ExactCoefficient { map, .. }) = &expression.attachment
             && let SolveDraft::CoefficientMap(mapping) =
-                crate::solving::graph::object(&cas.state, *map)?
+                crate::solving::graph::object(&cas.state, *map, budget)?
         {
             reserve(&mut pending, mapping.images.len(), budget)?;
             pending.extend(mapping.images.iter().map(Handle::logical_id));
@@ -696,7 +714,7 @@ mod tests {
             state: &source.cas.state,
             domain: &source.algebra,
         };
-        let (_, _, base) = engine.fraction_shape()?;
+        let (_, _, base) = engine.fraction_shape(&mut budget)?;
         let base = base.clone();
         let one = engine.constant(true, &mut budget)?;
         let mut coefficients = Vec::new();
@@ -770,8 +788,9 @@ mod tests {
             }
         }
         fn mapping(&self, handle: &Handle) -> TestResult<&CoefficientMapData<Handle>> {
+            let mut budget = crate::testing::common::default_budget()?;
             let SolveDraft::CoefficientMap(map) =
-                crate::solving::graph::object(&self.cas.state, handle.logical_id())?
+                crate::solving::graph::object(&self.cas.state, handle.logical_id(), &mut budget)?
             else {
                 return Err("canonical map".into());
             };
@@ -815,7 +834,7 @@ mod tests {
             let mut changed = map.clone();
             assert_eq!(changed.images.len(), 1);
             assert_eq!(
-                fixture.cas.expression(&changed.images[0])?.0,
+                fixture.cas.expression(&changed.images[0], &mut budget)?.0,
                 &crate::model::Operator::Free("p".into())
             );
             assert_ne!(*image, changed.images[0]);

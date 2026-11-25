@@ -34,6 +34,7 @@ const fn invalid() -> Fault {
 fn subjects<'a>(
     cas: &'a Cas,
     draft: &'a ApplicationDraft,
+    budget: &mut crate::budget::Budget,
 ) -> Result<
     (
         &'a CertificateCoefficientEvaluation,
@@ -66,13 +67,20 @@ fn subjects<'a>(
     ) {
         return Err(invalid());
     }
-    let SolveDraft::CoefficientEvaluation(evaluation) =
-        crate::solving::graph::object(&cas.state, cas.checked(&certificate.evaluation)?)?
+    let SolveDraft::CoefficientEvaluation(evaluation) = crate::solving::graph::object(
+        &cas.state,
+        cas.checked(&certificate.evaluation, budget)?,
+        budget,
+    )?
     else {
         return Err(invalid());
     };
-    let context = cas.state.context(cas.checked(&draft.context)?)?;
-    let region = cas.state.region(cas.checked(&certificate.region)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
+    let region = cas
+        .state
+        .region(cas.checked(&certificate.region, budget)?, budget)?;
     if evaluation.region != certificate.region
         || context.admissible != certificate.region.logical_id()
         || context.header_id != region.header
@@ -93,12 +101,13 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<ScopedConditions, Fault> {
-    let (certificate, mapping) = subjects(cas, draft)?;
+    let (certificate, mapping) = subjects(cas, draft, budget)?;
     let inherited = crate::solving::coefficients::proof::conditions(cas, draft, premises, budget)?;
     let polynomial =
-        crate::solving::coefficients::storage::polynomial(&cas.state, &certificate.left)?;
-    ground_target(cas, mapping, &polynomial.domain)?;
-    let source = crate::solving::graph::coordinates(&cas.state, mapping.source.logical_id())?;
+        crate::solving::coefficients::storage::polynomial(&cas.state, &certificate.left, budget)?;
+    ground_target(cas, mapping, &polynomial.domain, budget)?;
+    let source =
+        crate::solving::graph::coordinates(&cas.state, mapping.source.logical_id(), budget)?;
     budget.work(
         crate::graph::size(
             polynomial
@@ -155,17 +164,18 @@ fn ground_target(
     cas: &Cas,
     mapping: &CoefficientEvaluationData<Handle>,
     domain: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     use crate::solving::CoefficientDomainData;
     let SolveDraft::CoefficientDomain(domain) =
-        crate::solving::graph::object(&cas.state, domain.logical_id())?
+        crate::solving::graph::object(&cas.state, domain.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     match domain {
         CoefficientDomainData::Rational => Ok(()),
         CoefficientDomainData::Gaussian => {
-            if target_field(cas, &mapping.target)? != crate::model::Field::Complex {
+            if target_field(cas, &mapping.target, budget)? != crate::model::Field::Complex {
                 return Err(invalid());
             }
             Ok(())
@@ -181,18 +191,19 @@ fn ground_target(
 fn target_field(
     cas: &Cas,
     target: &crate::solving::EvaluationTarget<Handle>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<crate::model::Field, Fault> {
     use crate::solving::EvaluationTarget;
     let space = match target {
         EvaluationTarget::Scalar { space, .. } => space,
         EvaluationTarget::Family { family } => {
             let SolveDraft::SpaceFamily(shape) =
-                crate::solving::graph::object(&cas.state, family.logical_id())?
+                crate::solving::graph::object(&cas.state, family.logical_id(), budget)?
             else {
                 return Err(invalid());
             };
             &shape.fibre_space
         }
     };
-    crate::solving::sorts::field(&cas.state, space)
+    crate::solving::sorts::field(&cas.state, space, budget)
 }

@@ -57,7 +57,7 @@ fn split(
     }
     budget.solving(BudgetKind::ComponentSplits, 1, AT)?;
     budget.solving(BudgetKind::SolutionBranches, 2, AT)?;
-    let (level, _) = super::arithmetic::level(engine)?;
+    let (level, _) = super::arithmetic::level(engine, budget)?;
     budget.check(
         BudgetKind::StagedPayloadBytes,
         crate::graph::size(std::mem::size_of::<super::SplitCertificate>(), AT)?,
@@ -80,7 +80,7 @@ pub(crate) fn inverse(
     budget: &mut Budget,
 ) -> Result<UnitDecision<Element>, CoefficientFailure> {
     begin(budget)?;
-    let (_, extension) = super::arithmetic::level(engine)?;
+    let (_, extension) = super::arithmetic::level(engine, budget)?;
     let value = super::arithmetic::dense(engine, element, budget)?;
     if value.coefficients.is_empty() {
         return Ok(UnitDecision::Zero(CoefficientCertificate::FormalZero));
@@ -99,7 +99,10 @@ pub(crate) fn inverse(
         .equals(&Dense::one(&parent, budget)?, engine.state, budget)?
     {
         let certificate = if matches!(
-            engine.state.region(scope.region.logical_id())?.expression,
+            engine
+                .state
+                .region(scope.region.logical_id(), budget)?
+                .expression,
             crate::domain_model::RegionExpr::Ambient
         ) {
             CoefficientCertificate::FormalIdentity

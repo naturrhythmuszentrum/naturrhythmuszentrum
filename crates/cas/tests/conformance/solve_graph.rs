@@ -25,7 +25,10 @@ fn solve_set_is_syntax_only() -> TestResult {
     let before = fixture.cas.counts();
     assert_eq!(admit(&mut fixture.cas, &draft)?, set);
     assert_eq!(fixture.cas.counts(), before);
-    let SolveView::SolutionSet(value) = fixture.cas.solve_view(&set)? else {
+    let SolveView::SolutionSet(value) = fixture
+        .cas
+        .solve_view(&set, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("wrong view".into());
     };
     assert_eq!(value.branches, []);
@@ -96,7 +99,10 @@ fn solve_product_and_empty_tuple() -> TestResult {
             entries: Vec::new(),
         })),
     )?;
-    let SolveView::Tuple(value) = fixture.cas.solve_view(&tuple)? else {
+    let SolveView::Tuple(value) = fixture
+        .cas
+        .solve_view(&tuple, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("wrong tuple view".into());
     };
     assert_eq!(value.entries, []);
@@ -358,7 +364,11 @@ fn solve_unavailable_schemas() -> TestResult {
 fn solve_staged_branch_rollback_usage() -> TestResult {
     use nrz_cas::solving::{SolutionBranchData, SolutionBranchKind};
     let mut fixture = Fixture::new()?;
-    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem)? else {
+    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(
+        &fixture.problem,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?
+    else {
         return Err("problem missing".into());
     };
     let draft = Draft::Solve(SolveDraft::SolutionBranch(SolutionBranchData {
@@ -391,7 +401,9 @@ fn solve_family_capture_refusal() -> TestResult {
     let valid = crate::testing::solve_graph::family_draft(&mut fixture, false)?;
     let family = admit(&mut fixture.cas, &valid)?;
     assert!(matches!(
-        fixture.cas.solve_view(&family)?,
+        fixture
+            .cas
+            .solve_view(&family, &mut crate::testing::budgets::graph_budget()?)?,
         SolveView::FamilyMap(_)
     ));
     let escaped = crate::testing::solve_graph::family_draft(&mut fixture, true)?;
@@ -662,7 +674,7 @@ fn solve_monic_nested_towers() -> TestResult {
         )?;
     }
     assert!(matches!(
-        cas.solve_view(&one)?,
+        cas.solve_view(&one, &mut crate::testing::budgets::graph_budget()?)?,
         SolveView::CoefficientValue(_)
     ));
     Ok(())
@@ -675,7 +687,11 @@ fn solve_finite_branch_capture_refusal() -> TestResult {
     use nrz_cas::solving::{SolutionBranchData, SolutionBranchKind};
     use nrz_cas::syntax::{AtomicSort, Operator, Sort};
     let mut fixture = Fixture::new()?;
-    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem)? else {
+    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(
+        &fixture.problem,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?
+    else {
         return Err("problem missing".into());
     };
     let coordinates = Reference::Existing(problem.unknowns.clone());

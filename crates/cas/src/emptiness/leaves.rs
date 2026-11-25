@@ -35,9 +35,9 @@ fn identity(
 
 /// Exact syntax reconstructs every ordered product factor; no polynomial search is invoked.
 fn product(cas: &Cas, value: &EmptyFactorIdentity, budget: &mut Budget) -> Result<(), Fault> {
-    let mut cursor = cas.checked(&value.product)?;
+    let mut cursor = cas.checked(&value.product, budget)?;
     if !matches!(
-        cas.state.expression(cursor)?.sort,
+        cas.state.expression(cursor, budget)?.sort,
         Sort::Value(AtomicSort::Scalar(
             Field::Rational | Field::Real | Field::Complex
         ))
@@ -46,30 +46,36 @@ fn product(cas: &Cas, value: &EmptyFactorIdentity, budget: &mut Budget) -> Resul
     }
     for factor in value.factors.iter().rev() {
         budget.work(1, AT)?;
-        let expression = cas.state.expression(cursor)?;
+        let expression = cas.state.expression(cursor, budget)?;
         let (Operator::Mul, [left, right]) = (&expression.operator, expression.operands.as_slice())
         else {
             return Err(invalid());
         };
-        power(cas, *right, &factor.subject, factor.multiplicity)?;
+        power(cas, *right, &factor.subject, factor.multiplicity, budget)?;
         cursor = *left;
     }
-    if cursor != cas.checked(&value.scalar)? {
+    if cursor != cas.checked(&value.scalar, budget)? {
         return Err(invalid());
     }
     Ok(())
 }
 
 /// A positive literal multiplicity means a full factor power, never a dropped occurrence.
-fn power(cas: &Cas, id: LogicalId, subject: &Handle, multiplicity: u32) -> Result<(), Fault> {
+fn power(
+    cas: &Cas,
+    id: LogicalId,
+    subject: &Handle,
+    multiplicity: u32,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     if multiplicity == 0 {
         return Err(invalid());
     }
-    let subject = cas.checked(subject)?;
+    let subject = cas.checked(subject, budget)?;
     if multiplicity == 1 && id == subject {
         return Ok(());
     }
-    let expression = cas.state.expression(id)?;
+    let expression = cas.state.expression(id, budget)?;
     if expression.operator == Operator::IntegerPower(i64::from(multiplicity))
         && expression.operands == [subject]
     {

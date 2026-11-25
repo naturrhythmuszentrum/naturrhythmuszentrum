@@ -153,11 +153,11 @@ fn lattice_direct_coordinate_costs() -> TestResult {
     assert_eq!(
         rows,
         [
-            (0, 201_690, 3_440),
-            (1, 201_690, 3_440),
-            (2, 60_913, 1_560),
-            (3, 59_633, 1_560),
-            (4, 83_132, 2_104),
+            (0, 201_869, 3_440),
+            (1, 201_869, 3_440),
+            (2, 60_964, 1_560),
+            (3, 59_684, 1_560),
+            (4, 83_205, 2_104),
         ]
     );
     Ok(())
@@ -168,7 +168,7 @@ fn lattice_direct_coordinate_costs() -> TestResult {
 /// ´claim:cas:lattice-direct-coordinate-work´
 #[test]
 fn lattice_direct_coordinate_work() -> TestResult {
-    for (kind, work) in [(0, 201_690), (2, 60_913), (3, 59_633), (4, 83_132)] {
+    for (kind, work) in [(0, 201_869), (2, 60_964), (3, 59_684), (4, 83_205)] {
         for short in [0, 1] {
             let (mut case, basis, request) = direct(kind)?;
             let before = case.cas.counts();

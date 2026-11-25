@@ -114,8 +114,12 @@ pub(crate) fn rational_case(kind: u32) -> TestResult<(Fixture, ExactAffineMap, E
 
 /// Add a named exact positivity premise to a fresh context over the same declarations.
 pub(crate) fn positive(case: &mut Fixture, term: &Handle, key: &str) -> TestResult {
-    let header = case.cas.context_header(&case.context)?;
-    let domain = case.cas.admissible_region(&case.context)?;
+    let header = case
+        .cas
+        .context_header(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
+    let domain = case
+        .cas
+        .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
     let predicate = builders::admit(
         &mut case.cas,
         Draft::Condition {
@@ -205,7 +209,9 @@ pub(crate) fn expected(
         statement: crate::test_api::proof::Statement::Equality {
             left: product.expression().clone(),
             right: identity.expression().clone(),
-            domain: case.cas.admissible_region(&case.context)?,
+            domain: case
+                .cas
+                .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?,
             domain_contract: crate::test_api::proof::DomainContract::DefinedAndEqual,
         },
         residuals: Vec::new(),
@@ -231,7 +237,9 @@ pub(crate) fn determinant_oracle(case: &mut Fixture, kind: u32) -> TestResult<Ha
         };
         Rational::parse(text, &mut ledger()?)?.into()
     };
-    let header = case.cas.context_header(&case.context)?;
+    let header = case
+        .cas
+        .context_header(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
     let drafts = value.expression_drafts(Reference::Existing(header), &mut ledger()?)?;
     let drafts: Vec<_> = drafts.into_iter().map(Draft::Expression).collect();
     case.cas
@@ -260,7 +268,9 @@ pub(crate) fn determinant_expected(
         statement: crate::test_api::proof::Statement::Equality {
             left,
             right,
-            domain: case.cas.admissible_region(&case.context)?,
+            domain: case
+                .cas
+                .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?,
             domain_contract: crate::test_api::proof::DomainContract::DefinedAndEqual,
         },
         residuals: Vec::new(),

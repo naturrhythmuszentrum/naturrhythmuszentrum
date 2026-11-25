@@ -11,20 +11,24 @@ use crate::solving::elementary::{evidence, proof::premise, selected};
 use crate::solving::{CertificateRealCellExists, RealEndpoint, SelectionMode, SolveStatement};
 
 /// The cell itself is the isolating constraint; no additional unproved predicate is admitted.
-fn predicate(cas: &Cas, certificate: &CertificateRealCellExists) -> Result<(), Fault> {
-    let relation = selected::relation(cas, &certificate.relation)?;
+fn predicate(
+    cas: &Cas,
+    certificate: &CertificateRealCellExists,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let relation = selected::relation(cas, &certificate.relation, budget)?;
     if relation.ambient != Field::Real || relation.region != certificate.region {
         return Err(invalid());
     }
     let (PredicateKind::Equal, [left, right]) =
-        evidence::predicate(cas, certificate.predicate.logical_id())?
+        evidence::predicate(cas, certificate.predicate.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     if left != right {
         return Err(invalid());
     }
-    let expression = cas.state.expression(*left)?;
+    let expression = cas.state.expression(*left, budget)?;
     let outer = expression.scope.get(..relation.scope.len());
     let binder = expression.scope.last();
     if expression.operator != (Operator::Bound { depth: 0, slot: 0 })
@@ -75,7 +79,7 @@ fn endpoints(
     certificate: &CertificateRealCellExists,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let cell = super::count::cell(cas, &certificate.cell)?;
+    let cell = super::count::cell(cas, &certificate.cell, budget)?;
     if cell.region != certificate.region {
         return Err(invalid());
     }
@@ -109,6 +113,7 @@ fn conclusion(
     cas: &Cas,
     draft: &ApplicationDraft,
     certificate: &CertificateRealCellExists,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     let Statement::Solve(statement) = &draft.conclusion else {
         return Err(invalid());
@@ -132,7 +137,7 @@ fn conclusion(
         }
         _ => return Err(invalid()),
     };
-    selection_matches(cas, selection, certificate)
+    selection_matches(cas, selection, certificate, budget)
 }
 
 /// A differently constrained selection cannot borrow this cell's inhabitedness.
@@ -140,8 +145,9 @@ fn selection_matches(
     cas: &Cas,
     handle: &Handle,
     certificate: &CertificateRealCellExists,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
-    let selection = selected::selection(cas, handle)?;
+    let selection = selected::selection(cas, handle, budget)?;
     if selection.mode != SelectionMode::Isolated
         || selection.cell.as_ref() != Some(&certificate.cell)
         || selection.relations != std::slice::from_ref(&certificate.relation)
@@ -163,9 +169,9 @@ pub(super) fn check(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(1, AT)?;
-    super::region(cas, &draft.context, &certificate.region)?;
+    super::region(cas, &draft.context, &certificate.region, budget)?;
     count(certificate, premises)?;
-    predicate(cas, certificate)?;
+    predicate(cas, certificate, budget)?;
     endpoints(cas, certificate, budget)?;
-    conclusion(cas, draft, certificate)
+    conclusion(cas, draft, certificate, budget)
 }

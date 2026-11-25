@@ -184,18 +184,19 @@ fn select(
 ) -> Result<usize, SensitivityError> {
     let syntax = &original.original().syntax;
     let operands = graph.cas.operands(syntax, &mut graph.budget)?;
-    let (operator, _) = graph.cas.expression(syntax)?;
+    let (operator, _) = graph.cas.expression(syntax, &mut graph.budget)?;
     let operand = match (recipe, operator, operands.as_slice()) {
         (SensitivityRecipe::Square, Operator::IntegerPower(2), [input])
         | (SensitivityRecipe::Reciprocal, Operator::IntegerPower(-1), [input]) => input,
         (SensitivityRecipe::Reciprocal, Operator::Div, [numerator, input])
-            if graph.cas.expression(numerator)?.0 == &Operator::Rational(Rational::one()) =>
+            if graph.cas.expression(numerator, &mut graph.budget)?.0
+                == &Operator::Rational(Rational::one()) =>
         {
             input
         }
         _ => return Err(SensitivityError::UnsupportedRecipe),
     };
-    let (Operator::Free(key), _) = graph.cas.expression(operand)? else {
+    let (Operator::Free(key), _) = graph.cas.expression(operand, &mut graph.budget)? else {
         return Err(SensitivityError::UnsupportedRecipe);
     };
     coordinates

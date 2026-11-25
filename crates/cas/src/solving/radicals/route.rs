@@ -638,7 +638,11 @@ impl Route<'_, '_> {
     fn pending<T>(&mut self, obligation: GuardedObligation) -> Result<T, CoefficientFailure> {
         use crate::solving::coefficients::model::Value;
         if matches!(
-            crate::solving::coefficients::storage::domain(&self.cas.state, &obligation.domain)?,
+            crate::solving::coefficients::storage::domain(
+                &self.cas.state,
+                &obligation.domain,
+                self.budget
+            )?,
             crate::solving::CoefficientDomainData::Fraction { .. }
         ) {
             let numerator = obligation.polynomial;
@@ -750,7 +754,7 @@ impl Route<'_, '_> {
                 CoefficientFailure::Unsupported(SolveReason::GenericRadicalRouteUnavailable),
             ),
             Recipe::General(recipe) => {
-                if crate::solving::family::algebraic::applies(self.cas, map)? {
+                if crate::solving::family::algebraic::applies(self.cas, map, self.budget)? {
                     return crate::solving::family::algebraic::roots(
                         self.cas,
                         self.construction,

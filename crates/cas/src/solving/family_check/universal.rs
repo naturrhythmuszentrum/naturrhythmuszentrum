@@ -22,6 +22,7 @@ fn shape(
     cas: &Cas,
     map: &FamilyMapData<Handle>,
     original: &SolveProblemData<Handle>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     if (&map.header, &map.coefficients, &map.target, &map.scope)
         != (
@@ -33,7 +34,7 @@ fn shape(
     {
         return Err(invalid());
     }
-    if coordinates(cas, &map.family)?
+    if coordinates(cas, &map.family, budget)?
         .coordinates
         .iter()
         .any(|entry| entry.role != CoordinateRole::Family)
@@ -52,11 +53,11 @@ fn parameters(
     let first = evaluation
         .cas
         .state
-        .header(map.header.logical_id())?
+        .header(map.header.logical_id(), budget)?
         .environment
         .declarations
         .len();
-    let source = coordinates(evaluation.cas, &map.family)?;
+    let source = coordinates(evaluation.cas, &map.family, budget)?;
     let mut values = vector(source.coordinates.len(), budget)?;
     for index in 0..source.coordinates.len() {
         let slot =
@@ -85,7 +86,7 @@ fn membership(
     let mut source = Constraints::new();
     source.domain(&lifted, map.region.logical_id(), budget)?;
     let output = apply(evaluation, map, &input, budget)?;
-    let target = coordinates(evaluation.cas, &original.unknowns)?;
+    let target = coordinates(evaluation.cas, &original.unknowns, budget)?;
     let mut replacements = vector(output.len(), budget)?;
     for (coordinate, value) in target.coordinates.iter().zip(&output) {
         replacements.push((
@@ -168,16 +169,22 @@ pub(crate) fn check(
     coverage: bool,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let original = problem(cas, &certificate.problem)?;
-    crate::solving::elementary::proof::region(cas, &draft.context, original, &certificate.region)?;
+    let original = problem(cas, &certificate.problem, budget)?;
+    crate::solving::elementary::proof::region(
+        cas,
+        &draft.context,
+        original,
+        &certificate.region,
+        budget,
+    )?;
     crate::solving::elementary::member::contained(
         cas,
         &certificate.region,
         &original.region,
         budget,
     )?;
-    let map = family(cas, &certificate.family)?;
-    shape(cas, map, original)?;
+    let map = family(cas, &certificate.family, budget)?;
+    shape(cas, map, original, budget)?;
     let evaluation = Evaluation {
         exclusions: &[],
         cas,
@@ -195,7 +202,11 @@ pub(crate) fn check(
         recover(
             &evaluation,
             map,
-            family(cas, certificate.recovery.as_ref().ok_or_else(invalid)?)?,
+            family(
+                cas,
+                certificate.recovery.as_ref().ok_or_else(invalid)?,
+                budget,
+            )?,
             original,
             budget,
         )?;

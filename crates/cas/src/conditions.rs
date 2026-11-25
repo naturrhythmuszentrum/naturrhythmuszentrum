@@ -144,7 +144,7 @@ impl Conditions {
                 if !visited.insert(id) {
                     continue;
                 }
-                let term = state.expression(id)?;
+                let term = state.expression(id, budget)?;
                 pending
                     .try_reserve(term.operands.len())
                     .map_err(|_| Fault::allocation(AT))?;
@@ -221,7 +221,7 @@ impl Conditions {
                 Some(false) => return Err(Fault::invalid(InvalidCode::RefutedDomain, AT)),
                 None => {
                     if required.kind == GuardKind::NonZero {
-                        let term = state.expression(required.term)?;
+                        let term = state.expression(required.term, budget)?;
                         if matches!(
                             term.operator,
                             Operator::Neg
@@ -271,8 +271,8 @@ fn assumption(
     obligation: Obligation,
     budget: &mut Budget,
 ) -> Result<Evidence, Fault> {
-    for (key, id) in &state.context(context)?.assumptions {
-        let Vertex::Condition(condition) = state.node(*id)? else {
+    for (key, id) in &state.context(context, budget)?.assumptions {
+        let Vertex::Condition(condition) = state.node(*id, budget)? else {
             return Err(Fault::invalid(InvalidCode::Reference, AT));
         };
         let mut pending = vec![(&condition.kind, condition.arguments.as_slice(), false)];
@@ -283,14 +283,14 @@ fn assumption(
                     .try_reserve(arguments.len())
                     .map_err(|_| Fault::allocation(AT))?;
                 for argument in arguments.iter().rev() {
-                    let term = state.expression(*argument)?;
+                    let term = state.expression(*argument, budget)?;
                     if let Operator::Predicate(kind) = &term.operator {
                         pending.push((kind, &term.operands, false));
                     }
                 }
             } else if *kind == PredicateKind::Not {
                 if let Some(id) = arguments.first() {
-                    let term = state.expression(*id)?;
+                    let term = state.expression(*id, budget)?;
                     if let Operator::Predicate(kind) = &term.operator {
                         pending.push((kind, &term.operands, !negative));
                     }
@@ -320,15 +320,15 @@ fn local_assumption(
     obligation: Obligation,
     budget: &mut Budget,
 ) -> Result<Evidence, Fault> {
-    let header = state.context(context)?.header_id;
+    let header = state.context(context, budget)?.header_id;
     let mut current = context;
-    while let Some(parent) = state.context(current)?.parent {
+    while let Some(parent) = state.context(current, budget)?.parent {
         budget.condition(1, AT)?;
-        let frame = state.context(current)?;
+        let frame = state.context(current, budget)?;
         budget.check(BudgetKind::HypothesisDepth, frame.depth, AT)?;
         for (index, (_, id)) in frame.frame.iter().enumerate() {
             budget.condition(1, AT)?;
-            let Vertex::Condition(predicate) = state.node(*id)? else {
+            let Vertex::Condition(predicate) = state.node(*id, budget)? else {
                 return Err(Fault::invalid(InvalidCode::Reference, AT));
             };
             if predicate.header == header
@@ -373,7 +373,7 @@ fn nonzero(
         if facts.contains_key(&id) {
             continue;
         }
-        let term = state.expression(id)?;
+        let term = state.expression(id, budget)?;
         if !expanded {
             pending
                 .try_reserve(

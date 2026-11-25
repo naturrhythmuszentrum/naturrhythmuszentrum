@@ -18,16 +18,17 @@ fn subject(
     modulus: &Handle,
     budget: &mut Budget,
 ) -> Result<Dense, Fault> {
-    let stored = value(&cas.state, element)?;
+    let stored = value(&cas.state, element, budget)?;
     let engine = Engine {
         state: &cas.state,
         domain: &stored.domain,
     };
     if matches!(
-        domain(&cas.state, &stored.domain)?,
+        domain(&cas.state, &stored.domain, budget)?,
         CoefficientDomainData::Quotient { .. }
     ) {
-        let (_, extension) = super::arithmetic::level(&engine).map_err(|error| fault(&error))?;
+        let (_, extension) =
+            super::arithmetic::level(&engine, budget).map_err(|error| fault(&error))?;
         if extension.polynomial != *modulus {
             return Err(invalid());
         }
@@ -154,7 +155,7 @@ fn unit(
     let SolveStatement::Unit(unit) = statement.as_ref() else {
         return Err(invalid());
     };
-    let stored = value(&cas.state, &certificate.element)?;
+    let stored = value(&cas.state, &certificate.element, budget)?;
     if (&unit.value, &unit.region, &unit.domain)
         != (&certificate.element, &certificate.region, &stored.domain)
     {
@@ -276,8 +277,10 @@ pub(crate) fn check(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         budget.work(1, AT)?;
-        let frame = cas.state.context(cas.checked(&draft.context)?)?;
-        if frame.admissible != cas.checked(&certificate.region)? {
+        let frame = cas
+            .state
+            .context(cas.checked(&draft.context, budget)?, budget)?;
+        if frame.admissible != cas.checked(&certificate.region, budget)? {
             return Err(invalid());
         }
         for handle in [&certificate.element, &certificate.modulus, &certificate.gcd]

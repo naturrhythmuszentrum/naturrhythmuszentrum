@@ -110,7 +110,8 @@ pub(crate) fn check(
         }
         for (index, node) in dag.nodes.iter().enumerate() {
             budget.work(1, AT)?;
-            cas.state.region(cas.checked(&node.region)?)?;
+            cas.state
+                .region(cas.checked(&node.region, budget)?, budget)?;
             match &node.evidence {
                 EmptyEvidence::Split { cover, children } => {
                     split(premises, dag, index, *cover, children, budget)?;

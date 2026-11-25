@@ -57,21 +57,25 @@ pub(crate) fn check(
     if *premise(premises, 1)? != incidence {
         return Err(invalid());
     }
-    let location = cas.state.boundary(cas.checked(boundary)?)?;
+    let location = cas.state.boundary(cas.checked(boundary, budget)?, budget)?;
     let AmbientDomain::Real(coordinate) = &location.ambient else {
         return Err(invalid());
     };
-    crate::boundary_roles::point(cas, function, boundary, coordinate)?;
-    crate::boundary_roles::region(cas, function, region, coordinate)?;
-    let actual =
-        crate::polynomial::univariate(&cas.state, cas.checked(polynomial)?, coordinate, budget)?;
+    crate::boundary_roles::point(cas, function, boundary, coordinate, budget)?;
+    crate::boundary_roles::region(cas, function, region, coordinate, budget)?;
+    let actual = crate::polynomial::univariate(
+        &cas.state,
+        cas.checked(polynomial, budget)?,
+        coordinate,
+        budget,
+    )?;
     crate::univariate::validate(coefficients, budget)?;
     if actual != *coefficients {
         return Err(invalid());
     }
     let point = crate::region::boundary_point(&cas.state, boundary.logical_id(), budget)?;
     for (order, value) in values.iter().enumerate() {
-        if *rational(cas, value)? != trace(coefficients, &point, order, budget)? {
+        if *rational(cas, value, budget)? != trace(coefficients, &point, order, budget)? {
             return Err(invalid());
         }
     }
@@ -173,11 +177,13 @@ pub(crate) fn jump(
         }
         traces.push(&trace.value);
     }
-    subtraction(cas, premise(premises, 2)?, &traces, value)?;
+    subtraction(cas, premise(premises, 2)?, &traces, value, budget)?;
     let [left, right] = traces.as_slice() else {
         return Err(invalid());
     };
-    if *rational(cas, value)? != rational(cas, right)?.sub(rational(cas, left)?, budget)? {
+    if *rational(cas, value, budget)?
+        != rational(cas, right, budget)?.sub(rational(cas, left, budget)?, budget)?
+    {
         return Err(invalid());
     }
     Ok(())
@@ -189,6 +195,7 @@ fn subtraction(
     statement: &Statement,
     traces: &[&Handle],
     value: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let Statement::Equality {
         left,
@@ -199,7 +206,7 @@ fn subtraction(
     else {
         return Err(invalid());
     };
-    let expression = cas.state.expression(cas.checked(left)?)?;
+    let expression = cas.state.expression(cas.checked(left, budget)?, budget)?;
     let [below, above] = traces else {
         return Err(invalid());
     };

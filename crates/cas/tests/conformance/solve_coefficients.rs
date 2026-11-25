@@ -20,7 +20,10 @@ fn fraction_coprime_variables() -> TestResult {
         &mut Budget::new(Limits::blind_cubic())?,
     )?;
     let value = values.first().ok_or("missing fraction")?;
-    let SolveView::CoefficientValue(data) = fixture.cas.solve_view(value)? else {
+    let SolveView::CoefficientValue(data) = fixture
+        .cas
+        .solve_view(value, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("wrong fraction view".into());
     };
     assert_eq!(
@@ -540,7 +543,11 @@ fn real_root_zero_and_principal_refusal() -> TestResult {
         &[unit.clone(), root],
         &mut Budget::new(Limits::blind_cubic())?,
     )?;
-    let SolveView::RootSelection(data) = fixture.base.cas.solve_view(&selected)? else {
+    let SolveView::RootSelection(data) = fixture
+        .base
+        .cas
+        .solve_view(&selected, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("wrong selection".into());
     };
     let draft = Draft::Solve(SolveDraft::RootSelection(RootSelectionData {
@@ -646,7 +653,12 @@ fn tower_constrained_selection_transport() -> TestResult {
     let mut selected = Vec::new();
     let original = fixture.selections()?.to_vec();
     for handle in &original {
-        let SolveView::RootSelection(selection) = fixture.unit.base.cas.solve_view(handle)? else {
+        let SolveView::RootSelection(selection) = fixture
+            .unit
+            .base
+            .cas
+            .solve_view(handle, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("wrong selection".into());
         };
         let relation = selection
@@ -1508,7 +1520,10 @@ fn coefficient_scoped_premise_refusal() -> TestResult {
         rule: Primitive::RegionConstruct,
         context: request.context.clone(),
         conclusion: Statement::Constructor {
-            region: fixture.cas.admissible_region(&request.context)?,
+            region: fixture.cas.admissible_region(
+                &request.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             law: ConstructorLaw::Membership,
         },
         premises: vec![previous],

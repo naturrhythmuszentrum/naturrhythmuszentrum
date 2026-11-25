@@ -93,7 +93,7 @@ impl Importer<'_> {
             return Ok(target.clone());
         }
         let graph = self.source;
-        let draft = if let Ok(view) = graph.solve_view(source) {
+        let draft = if let Ok(view) = graph.solve_view(source, self.budget) {
             Draft::Solve(self.solving(view)?)
         } else {
             self.expression(source)?

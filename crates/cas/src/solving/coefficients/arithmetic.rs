@@ -45,7 +45,7 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<Element, CoefficientFailure> {
         begin(budget)?;
-        let data = value(self.state, handle)?;
+        let data = value(self.state, handle, budget)?;
         if data.domain != *self.domain {
             return Err(invalid().into());
         }
@@ -70,19 +70,22 @@ impl Engine<'_> {
     }
 
     /// Identify the admitted ground and variable count of a fraction domain.
-    pub(crate) fn fraction_shape(&self) -> Result<(Ground, usize, &Handle), Fault> {
+    pub(crate) fn fraction_shape(
+        &self,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<(Ground, usize, &Handle), Fault> {
         let CoefficientDomainData::Fraction { base, coordinates } =
-            domain(self.state, self.domain)?
+            domain(self.state, self.domain, budget)?
         else {
             return Err(invalid());
         };
         let SolveDraft::CoordinateSpace(product) =
-            super::super::graph::object(self.state, coordinates.logical_id())?
+            super::super::graph::object(self.state, coordinates.logical_id(), budget)?
         else {
             return Err(invalid());
         };
         Ok((
-            super::read::ground(self.state, base)?,
+            super::read::ground(self.state, base, budget)?,
             product.coordinates.len(),
             base,
         ))
@@ -95,7 +98,7 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<Element, CoefficientFailure> {
         begin(budget)?;
-        let result = match domain(self.state, self.domain)? {
+        let result = match domain(self.state, self.domain, budget)? {
             CoefficientDomainData::Rational => {
                 Value::Scalar(Scalar::constant(Ground::Rational, nonzero, budget)?)
             }
@@ -103,7 +106,7 @@ impl Engine<'_> {
                 Value::Scalar(Scalar::constant(Ground::Gaussian, nonzero, budget)?)
             }
             CoefficientDomainData::Fraction { .. } => {
-                let (ground, variables, _) = self.fraction_shape()?;
+                let (ground, variables, _) = self.fraction_shape(budget)?;
                 let numerator = Polynomial::constant(
                     variables,
                     Scalar::constant(ground, nonzero, budget)?,
@@ -266,7 +269,7 @@ impl Engine<'_> {
             Value::Scalar(value) => Ok(value.zero(budget)?),
             Value::Fraction(value) => Ok(value.numerator.zero(budget)?),
             Value::Tower(values) => {
-                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let (_, extension) = crate::solving::towers::arithmetic::level(self, budget)?;
                 let parent = Engine {
                     state: self.state,
                     domain: &extension.parent,
@@ -301,7 +304,7 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<Element, CoefficientFailure> {
         begin(budget)?;
-        match domain(self.state, self.domain)? {
+        match domain(self.state, self.domain, budget)? {
             CoefficientDomainData::Rational => Ok(self.element(Value::Scalar(Scalar::Rational(
                 super::scalar::rational_copy(scalar, budget)?,
             )))),
@@ -324,7 +327,7 @@ impl Engine<'_> {
                 )
             }
             CoefficientDomainData::Quotient { .. } => {
-                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let (_, extension) = crate::solving::towers::arithmetic::level(self, budget)?;
                 let parent = Self {
                     state: self.state,
                     domain: &extension.parent,
@@ -346,7 +349,7 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<Element, CoefficientFailure> {
         begin(budget)?;
-        let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+        let (_, extension) = crate::solving::towers::arithmetic::level(self, budget)?;
         if value.domain != extension.parent {
             return Err(invalid().into());
         }

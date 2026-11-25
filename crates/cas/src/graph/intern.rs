@@ -3,12 +3,14 @@
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering as AtomicOrdering};
 
 use super::LogicalId;
+use super::retained_map::RetainedMap;
+use crate::budget::{Budget, BudgetKind};
+use crate::error::{Fault, Location};
 
 mod key;
 pub(crate) use key::StoredKey;
@@ -148,12 +150,12 @@ impl PartialEq for Key<'_> {
 
 impl Eq for Key<'_> {}
 
-/// The production ordered index; all probes use the same instrumented total order.
+/// The production sorted index; all probes use the same instrumented total order.
 #[derive(Default)]
 #[cfg_attr(test, derive(Clone))]
 pub(crate) struct InternIndex {
-    /// Retained keys are always owned; borrowing the map can shorten the probe lifetime.
-    entries: BTreeMap<Key<'static>, LogicalId>,
+    /// Retained keys are always owned; borrowed probes use the same complete order.
+    entries: RetainedMap<Key<'static>, LogicalId>,
 }
 
 impl fmt::Debug for InternIndex {
@@ -163,6 +165,12 @@ impl fmt::Debug for InternIndex {
 }
 
 impl InternIndex {
+    /// Count retained complete keys without probing the map.
+    #[cfg(test)]
+    pub(crate) const fn len(&self) -> usize {
+        self.entries.len()
+    }
+
     /// Test the actual retained allocation, not an equivalent local reconstruction.
     #[cfg(test)]
     pub(crate) fn shares_key(&self, id: LogicalId, bytes: &[u8]) -> bool {
@@ -171,30 +179,150 @@ impl InternIndex {
             .any(|(key, value)| *value == id && std::ptr::eq(key.bytes.parts()[0], bytes))
     }
 
+    /// Locate a complete retained key using its prepaid comparison floor.
+    fn search(
+        &self,
+        probe: &Key<'_>,
+        floor: u64,
+        budget: &mut Budget,
+        at: Location,
+    ) -> Result<Result<usize, usize>, Fault> {
+        self.entries
+            .find_by(|candidate| candidate.cmp(probe), floor, budget, at)
+    }
+
     /// Probe without copying key bytes or allocating a diagnostic owner.
-    pub(crate) fn get<'a>(&'a self, bytes: &'a [u8]) -> Option<&'a LogicalId> {
-        self.entries.get(&Key {
+    pub(crate) fn get<'a>(
+        &'a self,
+        bytes: &'a [u8],
+        floor: u64,
+        budget: &mut Budget,
+        at: Location,
+    ) -> Result<Option<&'a LogicalId>, Fault> {
+        let probe = Key {
             bytes: KeyBytes::Flat(Cow::Borrowed(bytes)),
             owner: None,
-        })
+        };
+        Ok(self
+            .search(&probe, floor, budget, at)?
+            .ok()
+            .and_then(|position| self.entries.at(position).map(|(_, value)| value)))
     }
 
-    /// Probe an already prepared key without acquiring or copying its retained segments.
-    pub(crate) fn get_key<'a>(&'a self, bytes: &'a StoredKey) -> Option<&'a LogicalId> {
-        self.entries.get(&Key {
+    /// Return the first search position so admission can insert without comparing again.
+    pub(crate) fn find_key(
+        &self,
+        bytes: &StoredKey,
+        floor: u64,
+        budget: &mut Budget,
+        at: Location,
+    ) -> Result<Result<usize, usize>, Fault> {
+        let probe = Key {
             bytes: KeyBytes::Retained(Cow::Borrowed(bytes)),
             owner: None,
-        })
+        };
+        self.search(&probe, floor, budget, at)
     }
 
-    /// Move the existing key buffer into the map and share the existing token allocation.
-    pub(crate) fn insert(&mut self, bytes: Vec<u8>, id: LogicalId, owner: &Arc<StoreToken>) {
-        self.insert_key(bytes.into(), id, owner);
+    /// Return the retained logical id at a searched position.
+    pub(crate) fn value_at(&self, position: usize) -> Option<LogicalId> {
+        self.entries.at(position).map(|(_, id)| *id)
     }
 
-    /// Retain the same segmented key used by preflight and the rollback journal.
-    pub(crate) fn insert_key(&mut self, bytes: StoredKey, id: LogicalId, owner: &Arc<StoreToken>) {
-        self.entries.insert(
+    /// Reserve insertion and any journaled inverse at a known position.
+    pub(crate) fn prepare_insert_at(
+        &mut self,
+        position: usize,
+        journaled: bool,
+        budget: &mut Budget,
+        at: Location,
+    ) -> Result<u64, Fault> {
+        self.entries.prepare_insert(position, journaled, budget, at)
+    }
+
+    /// Reserve the former lookup floor and local entry and inverse Work before graph publication.
+    pub(crate) fn prepare_insert_key(
+        &mut self,
+        bytes: &StoredKey,
+        journaled: bool,
+        budget: &mut Budget,
+        at: Location,
+    ) -> Result<(usize, u64), Fault> {
+        let probe = Key {
+            bytes: KeyBytes::Retained(Cow::Borrowed(bytes)),
+            owner: None,
+        };
+        let Err(position) = self.search(&probe, 0, budget, at)? else {
+            return Err(Fault::invalid(crate::error::InvalidCode::Reference, at));
+        };
+        let inverse = self.prepare_insert_at(position, journaled, budget, at)?;
+        Ok((position, inverse))
+    }
+
+    /// Plan a staged contiguous key after earlier keys in the same unpublished batch.
+    pub(crate) fn prepare_virtual_insert_bytes<'a>(
+        &mut self,
+        bytes: &[u8],
+        earlier: impl Iterator<Item = &'a [u8]>,
+        journaled: bool,
+        budget: &mut Budget,
+        at: Location,
+    ) -> Result<usize, Fault> {
+        let probe = Key {
+            bytes: KeyBytes::Flat(Cow::Borrowed(bytes)),
+            owner: None,
+        };
+        let Err(base) = self.search(&probe, 0, budget, at)? else {
+            return Err(Fault::invalid(crate::error::InvalidCode::Reference, at));
+        };
+        let mut before = 0_usize;
+        let mut prior = 0_usize;
+        for key in earlier {
+            prior = prior
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+            let staged = Key {
+                bytes: KeyBytes::Flat(Cow::Borrowed(key)),
+                owner: None,
+            };
+            match staged.cmp(&probe) {
+                Ordering::Less => {
+                    before = before
+                        .checked_add(1)
+                        .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+                }
+                Ordering::Equal => {
+                    return Err(Fault::invalid(crate::error::InvalidCode::Reference, at));
+                }
+                Ordering::Greater => {}
+            }
+        }
+        let position = base
+            .checked_add(before)
+            .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, at))?;
+        self.entries.prepare_virtual_insert(
+            self.entries
+                .len()
+                .checked_add(prior)
+                .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, at))?,
+            position,
+            journaled,
+            budget,
+            at,
+        )?;
+        Ok(position)
+    }
+
+    /// Move the preflighted key into its prepared sorted slot without another comparison.
+    pub(crate) fn insert_prepared_key(
+        &mut self,
+        position: usize,
+        bytes: StoredKey,
+        id: LogicalId,
+        owner: &Arc<StoreToken>,
+    ) {
+        self.entries.insert_prepared(
+            position,
             Key {
                 bytes: KeyBytes::Retained(Cow::Owned(bytes)),
                 owner: Some(Arc::clone(owner)),
@@ -203,12 +331,15 @@ impl InternIndex {
         );
     }
 
-    /// Consume the journal's existing key; removal compares the complete canonical sequence.
-    pub(crate) fn remove(&mut self, bytes: StoredKey) {
-        self.entries.remove(&Key {
+    /// Consume the journal's existing key using its prepaid inverse entry credit.
+    pub(crate) fn remove_prepaid(&mut self, bytes: StoredKey) {
+        let probe = Key {
             bytes: KeyBytes::Retained(Cow::Owned(bytes)),
             owner: None,
-        });
+        };
+        let _removed = self
+            .entries
+            .remove_by_prepaid(|candidate| candidate.cmp(&probe));
     }
 }
 

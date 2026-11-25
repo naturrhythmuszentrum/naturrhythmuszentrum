@@ -4,6 +4,10 @@
 use nrz_cas as test_api;
 
 #[path = "../src/testing/public.rs"]
+#[expect(
+    clippy::items_after_statements,
+    reason = "legacy fixture-local imports stay next to public test setup"
+)]
 mod testing;
 
 mod conformance;

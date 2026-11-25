@@ -550,6 +550,7 @@ fn residual_supplied_inventory() -> TestResult {
     reason = "independent malformed problem and fresh replay stay together"
 )]
 fn residual_derived_zero_frame() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::graph::{Draft, ExpressionDraft, Reference};
     use crate::model::PredicateKind;
     use crate::series::SeriesStatement;
@@ -560,7 +561,7 @@ fn residual_derived_zero_frame() -> TestResult {
         let parent = f
             .cas
             .state
-            .header(f.header.logical_id())?
+            .header(f.header.logical_id(), &mut budget)?
             .parent
             .ok_or("extension")?;
         let ancestor = f.cas.handle(parent);
@@ -602,12 +603,16 @@ fn residual_derived_zero_frame() -> TestResult {
             return Err("residual".into());
         };
         let SolveDraft::SolveProblem(original) =
-            crate::solving::graph::object(&f.cas.state, problem.logical_id())?
+            crate::solving::graph::object(&f.cas.state, problem.logical_id(), &mut budget)?
         else {
             return Err("problem".into());
         };
         let mut original = original.clone();
-        let coefficients = f.cas.series_object(output)?.coefficients.clone();
+        let coefficients = f
+            .cas
+            .series_object(output, &mut budget)?
+            .coefficients
+            .clone();
         let (kind, arguments) = if values.len() == 1 {
             (PredicateKind::Equal, vec![coefficients[0].clone(), zero])
         } else {
@@ -876,9 +881,9 @@ fn residual_complete_owned_payload() -> TestResult {
                 Ok((result, budget.usage().work))
             };
             let (ceiling, needed, success_work, failure_work) = [
-                (122_450, 24_603, 459_590, 319_949),
-                (108_920, 22_887, 648_923, 507_672),
-                (110_306, 23_441, 849_050, 507_008),
+                (122_450, 24_603, 459_638, 319_991),
+                (108_920, 22_887, 649_125, 507_868),
+                (110_306, 23_441, 849_109, 507_061),
             ][mode];
             let (failure, work) = attempt(ceiling - 1)?;
             assert_eq!(
@@ -1092,7 +1097,7 @@ fn supplied_inventory_replay(
                 reason: crate::error::Exhaustion::Limit,
                 budget: BudgetKind::Work,
                 limit: 100_000,
-                needed: if paired { 16_872_540 } else { 16_872_230 },
+                needed: if paired { 16_872_550 } else { 16_872_240 },
             }
         );
         assert_eq!(

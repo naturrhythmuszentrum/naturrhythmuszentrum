@@ -3,7 +3,7 @@
 
 use super::reading_testing::{Fixture, TestResult, ledger, meaning};
 use super::{blocks, parameters};
-use super::{budget, policy};
+use super::{fresh_budget, policy};
 use nrz_bindings::{
     BinaryOp, Budget, ExponentPolicy, Registry,
     readings::{
@@ -78,7 +78,7 @@ impl<P: Scalar + 'static> Case<P> {
 
 /// Fixed `-75i,+75i` impedances and one shared real voltage amplitude define both exact affine solves.
 pub(super) fn case<P: Scalar + 'static>() -> TestResult<Case<P>> {
-    case_with_budget(&mut budget()?)
+    case_with_budget(&mut fresh_budget()?)
 }
 
 /// One caller ledger covers both equations, all covariance laws and complete source/publication admission.
@@ -89,7 +89,7 @@ pub(super) fn case_with_budget<P: Scalar + 'static>(resources: &mut Budget) -> T
 /// Add complete real-copy radius coverage for the original axis consumer without changing old fixtures.
 pub(super) fn axis_case<P: Scalar + 'static>() -> TestResult<Case<P>> {
     build(
-        &mut budget()?,
+        &mut fresh_budget()?,
         false,
         DependencyPolicy::WholeBase,
         None,
@@ -99,7 +99,7 @@ pub(super) fn axis_case<P: Scalar + 'static>() -> TestResult<Case<P>> {
 
 /// Full two-coordinate targets exercise both covariance axes without a scalar statistics facade.
 pub(super) fn vector_case<P: Scalar + 'static>() -> TestResult<Case<P>> {
-    vector_case_with_budget(&mut budget()?)
+    vector_case_with_budget(&mut fresh_budget()?)
 }
 
 /// Measure the complete vector-target construction on the caller's cumulative ledger.
@@ -111,7 +111,7 @@ pub(super) fn vector_case_with_budget<P: Scalar + 'static>(
 
 /// Isolate fine admission on its unchanged caller policy before numerical lifecycle requests.
 pub(super) fn entries_case() -> TestResult<Case<f64>> {
-    lifecycle_case(DependencyPolicy::Entries, &mut budget()?)
+    lifecycle_case(DependencyPolicy::Entries, &mut fresh_budget()?)
 }
 
 /// Keep one intended storage admission on its own supplied cumulative ledger.
@@ -119,7 +119,13 @@ pub(super) fn lifecycle_case(
     dependencies: DependencyPolicy,
     admission: &mut Budget,
 ) -> TestResult<Case<f64>> {
-    build(&mut budget()?, false, dependencies, Some(admission), false)
+    build(
+        &mut fresh_budget()?,
+        false,
+        dependencies,
+        Some(admission),
+        false,
+    )
 }
 
 /// Scalar and vector requests retain their complete inventories before importing any values.
@@ -472,7 +478,7 @@ fn driven_entries_admission_work_boundary() -> TestResult {
     for (work, success) in [(16_000_000, true), (needed, true), (needed - 1, false)] {
         let mut admission = Budget::new(nrz_bindings::Limits { work, ..policy() })?;
         let result = build::<f64>(
-            &mut budget()?,
+            &mut fresh_budget()?,
             false,
             DependencyPolicy::Entries,
             Some(&mut admission),

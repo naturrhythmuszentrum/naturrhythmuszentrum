@@ -14,8 +14,12 @@ use crate::solving::{
 };
 
 /// Borrow a structural cell; admission supplies neither endpoint order nor existence.
-pub(super) fn cell<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a RealCellData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+pub(super) fn cell<'a>(
+    cas: &'a Cas,
+    handle: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a RealCellData<Handle>, Fault> {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::RealCell(cell) => Ok(cell),
         _ => Err(invalid()),
     }
@@ -32,7 +36,7 @@ pub(super) fn independent(
     let RealEndpoint::RealExpression(handle) = endpoint else {
         return Ok(());
     };
-    super::sign::scalar(cas, handle, region)?;
+    super::sign::scalar(cas, handle, region, budget)?;
     super::closure::check(cas, std::iter::once(handle), Some(relation), budget)
 }
 
@@ -75,9 +79,9 @@ pub(super) fn check(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     subject(draft, certificate)?;
-    super::region(cas, &draft.context, &certificate.region)?;
+    super::region(cas, &draft.context, &certificate.region, budget)?;
     super::closure::check(cas, std::iter::once(&certificate.relation), None, budget)?;
-    let relation = selected::relation(cas, &certificate.relation)?;
+    let relation = selected::relation(cas, &certificate.relation, budget)?;
     if relation.ambient != Field::Real || relation.region != certificate.region {
         return Err(invalid());
     }
@@ -95,7 +99,7 @@ pub(super) fn check(
     }
     proof::identity_map(cas, map, premises, budget)?;
     let _chain = super::sturm::check(cas, &relation.polynomial, certificate, premises, budget)?;
-    let stored = storage::polynomial(&cas.state, &relation.polynomial)?;
+    let stored = storage::polynomial(&cas.state, &relation.polynomial, budget)?;
     let evaluation = Evaluation {
         exclusions: &[],
         cas,
@@ -158,7 +162,7 @@ fn inventory(
         .zip(&certificate.counts)
         .enumerate()
     {
-        let cell = cell(signs.evaluation.cas, handle)?;
+        let cell = cell(signs.evaluation.cas, handle, budget)?;
         if cell.region != certificate.region {
             return Err(invalid());
         }

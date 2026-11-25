@@ -9,10 +9,15 @@ use crate::model::Operator;
 use crate::number::Rational;
 
 /// A constant-size syntax dispatch does not traverse or charge older scalar paths.
-pub(crate) fn applicable(state: &State, left: LogicalId, right: LogicalId) -> Result<bool, Fault> {
+pub(crate) fn applicable(
+    state: &State,
+    left: LogicalId,
+    right: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     for root in [left, right] {
         if matches!(
-            state.expression(root)?.operator,
+            state.expression(root, budget)?.operator,
             Operator::Select(_)
                 | Operator::AffineReading(_)
                 | Operator::RealPart
@@ -62,7 +67,7 @@ fn normalize(
     budget: &mut Budget,
 ) -> Result<(LogicalId, AffineMap), Fault> {
     let (family, chain) = source_chain(state, root, budget)?;
-    let count = super::syntax::coordinates(&state.expression(family)?.sort)?;
+    let count = super::syntax::coordinates(&state.expression(family, budget)?.sort)?;
     budget.check(BudgetKind::FamilyParameters, u64::from(count), AT)?;
     let mut map = AffineMap::identity(count, budget)?;
     let chain_bytes = size(chain.len(), AT)?
@@ -88,7 +93,7 @@ fn source_chain(
     let mut chain = Vec::new();
     loop {
         budget.work(1, AT)?;
-        let value = state.expression(current)?;
+        let value = state.expression(current, budget)?;
         if !value.scope.is_empty() || value.space.is_some() {
             return Err(invalid(InvalidCode::ReadingDefinition));
         }
@@ -133,7 +138,7 @@ pub(super) fn apply(
     source: &AffineMap,
     budget: &mut Budget,
 ) -> Result<AffineMap, Fault> {
-    let value = state.expression(node)?;
+    let value = state.expression(node, budget)?;
     match &value.operator {
         Operator::AffineReading(map) => map.compose(source, budget),
         Operator::Select(selection) => selection.compose(source, budget),
@@ -169,13 +174,13 @@ fn transpose(
     source: &AffineMap,
     budget: &mut Budget,
 ) -> Result<AffineMap, Fault> {
-    let value = state.expression(node)?;
+    let value = state.expression(node, budget)?;
     let input = value
         .operands
         .first()
         .copied()
         .ok_or_else(|| invalid(InvalidCode::ReadingDefinition))?;
-    let (_, rows, columns) = super::selection::rectangle(&state.expression(input)?.sort)?;
+    let (_, rows, columns) = super::selection::rectangle(&state.expression(input, budget)?.sort)?;
     let mut order = reserve(super::affine::length(rows, columns)?, budget)?;
     for column in 0..rows {
         for row in 0..columns {

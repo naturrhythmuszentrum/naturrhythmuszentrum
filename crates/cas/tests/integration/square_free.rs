@@ -17,7 +17,10 @@ fn square_free_degree_five() -> TestResult {
     let mut fixture = Fixture::new(Field::Rational)?;
     let input = fixture.polynomial(&[-4, 8, -1, -5, 1, 1])?;
     let result = fixture.decompose(&input)?;
-    let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+    let certificate = fixture.cas.square_free_certificate(
+        &result.witness,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     assert_eq!(certificate.scalar, Rational::one());
     assert_eq!(certificate.initial_gcd.gcd, rationals(&[2, -3, 0, 1])?);
     assert_eq!(
@@ -64,7 +67,7 @@ fn square_free_degree_five() -> TestResult {
     assert!(
         matches!(&result.witness.judgment().statement, Statement::SquareFree { variable, field,
         domain, .. } if variable == "x" && *field == Field::Rational && *domain ==
-        fixture.cas.admissible_region(&fixture.context)?)
+        fixture.cas.admissible_region(&fixture.context, &mut crate::testing::budgets::graph_budget()?)?)
     );
     let bytes = fixture
         .cas
@@ -72,8 +75,18 @@ fn square_free_degree_five() -> TestResult {
     let mut fresh = Cas::new(budget()?.limits().clone())?;
     let witness = fresh.inspect(&bytes, &mut budget()?)?;
     assert_eq!(fresh.export_witness(&witness, &mut budget()?)?, bytes);
-    assert_eq!(fresh.square_free_certificate(&witness)?, certificate);
-    assert!(fresh.square_free_certificate(&result.witness).is_err());
+    assert_eq!(
+        fresh.square_free_certificate(&witness, &mut crate::testing::budgets::graph_budget()?)?,
+        certificate
+    );
+    assert!(
+        fresh
+            .square_free_certificate(
+                &result.witness,
+                &mut crate::testing::budgets::graph_budget()?
+            )
+            .is_err()
+    );
     Ok(())
 }
 
@@ -120,7 +133,10 @@ fn square_free_independent_certificate() -> TestResult {
             output,
             variable: "x".into(),
             field: Field::Rational,
-            domain: fixture.cas.admissible_region(&fixture.context)?,
+            domain: fixture.cas.admissible_region(
+                &fixture.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
         },
         premises: Vec::new(),
         substitutions: Vec::new(),
@@ -130,10 +146,18 @@ fn square_free_independent_certificate() -> TestResult {
     let witness = fixture
         .cas
         .check_proof(&fixture.context, &[step], &mut budget()?)?;
-    assert_eq!(fixture.cas.square_free_certificate(&witness)?, &certificate);
+    assert_eq!(
+        fixture
+            .cas
+            .square_free_certificate(&witness, &mut crate::testing::budgets::graph_budget()?)?,
+        &certificate
+    );
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
     let mut fresh = Cas::new(budget()?.limits().clone())?;
     let replayed = fresh.inspect(&bytes, &mut budget()?)?;
-    assert_eq!(fresh.square_free_certificate(&replayed)?, &certificate);
+    assert_eq!(
+        fresh.square_free_certificate(&replayed, &mut crate::testing::budgets::graph_budget()?)?,
+        &certificate
+    );
     Ok(())
 }

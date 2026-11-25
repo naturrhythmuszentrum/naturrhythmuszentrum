@@ -44,8 +44,9 @@ impl Fixture {
         let mut cas = Cas::new(budget()?.limits().clone())?;
         let context =
             builders::core_context(&mut cas, environment.clone(), Vec::new(), &mut budget()?)?;
-        let domain = cas.admissible_region(&context)?;
-        let header = cas.context_header(&context)?;
+        let domain =
+            cas.admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?;
+        let header = cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
         let mut drafts = Vec::new();
         for operator in [
             Operator::Free("x".into()),
@@ -91,7 +92,9 @@ impl Fixture {
 
     /// Add one explicitly named hypothesis while preserving the semantic header.
     pub(crate) fn assume(&mut self, key: &str, kind: PredicateKind, term: &Handle) -> TestResult {
-        let header = self.cas.context_header(&self.context)?;
+        let header = self
+            .cas
+            .context_header(&self.context, &mut crate::testing::budgets::graph_budget()?)?;
         let predicate = builders::admit(
             &mut self.cas,
             Draft::Condition {
@@ -111,7 +114,9 @@ impl Fixture {
             }],
             &mut budget()?,
         )?;
-        self.domain = self.cas.admissible_region(&self.context)?;
+        self.domain = self
+            .cas
+            .admissible_region(&self.context, &mut crate::testing::budgets::graph_budget()?)?;
         Ok(())
     }
 }

@@ -148,7 +148,8 @@ pub(crate) fn inspect(
             };
             let space = optional(&mut part, &records)?;
             if let Some(space) = &space {
-                cas.state.space(cas.checked(space)?)?;
+                let id = cas.checked(space, part.budget)?;
+                cas.state.space(id, part.budget)?;
             }
             let record = decode(cas, tag, layer, space, &mut part, &records, &manifest)?;
             part.finished()?;
@@ -246,7 +247,7 @@ fn application(
             .map_err(|_| Fault::allocation(AT))?;
         for _ in 0..count {
             let proof = crate::series::portable::proof(reader, records)?;
-            ids.push(cas.checked(proof)?);
+            ids.push(cas.checked(proof, reader.budget)?);
         }
         let bytes = crate::proof_view::premises_bytes(cas, &ids, reader.budget, AT)?;
         let substitutions = crate::wire_statement::substitutions(reader, records)?;

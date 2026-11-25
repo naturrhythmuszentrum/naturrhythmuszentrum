@@ -29,8 +29,8 @@ impl Cas {
     ) -> Result<SourceJacobian, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                let context = cas.checked(&key.context)?;
-                let original = cas.checked(&key.original)?;
+                let context = cas.checked(&key.context, budget)?;
+                let original = cas.checked(&key.original, budget)?;
                 storage::retaining(key.payload(), budget, |budget| {
                     let (entries, representation) = cas.jacobian_entries(key, original, budget)?;
                     let retained = size(entries.len(), AT)?.saturating_mul(128).saturating_add(
@@ -86,11 +86,18 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Expansion, Fault> {
         let mut conditions = crate::conditions::Conditions::default();
-        conditions.endpoint(&self.state, self.checked(&key.context)?, original, budget)?;
+        conditions.endpoint(
+            &self.state,
+            self.checked(&key.context, budget)?,
+            original,
+            budget,
+        )?;
         if !conditions.residuals.is_empty() {
             return Err(invalid(InvalidCode::JacobianDomain));
         }
-        if self.state.expression(original)?.sort == Sort::Value(AtomicSort::Scalar(Field::Real)) {
+        if self.state.expression(original, budget)?.sort
+            == Sort::Value(AtomicSort::Scalar(Field::Real))
+        {
             let mut result = storage::reserve(1, budget)?;
             result.push(original);
             return Ok((result, None));
@@ -105,7 +112,7 @@ impl Cas {
         original: LogicalId,
         budget: &mut Budget,
     ) -> Result<Expansion, Fault> {
-        let (rows, columns) = crate::polynomial::matrix::shape(&self.state, original)?;
+        let (rows, columns) = crate::polynomial::matrix::shape(&self.state, original, budget)?;
         let mut entries = crate::readings::exact_expand::expand(self, original, budget)?;
         for entry in &mut entries {
             *entry = crate::polynomial::normalize(self, *entry, budget)?;
@@ -173,7 +180,10 @@ impl Cas {
         entries: &[LogicalId],
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let header = self.state.context(self.checked(context)?)?.header_id;
+        let header = self
+            .state
+            .context(self.checked(context, budget)?, budget)?
+            .header_id;
         let id = self.generated(
             header,
             Operator::Matrix { rows, columns },

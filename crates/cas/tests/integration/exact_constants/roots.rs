@@ -153,6 +153,8 @@ fn constant_square_root_refusals() -> TestResult {
 }
 
 /// Other powers and unsupported named radicands remain explicit fragment refusals.
+/// Both rejecting branches spend unchanged operation Work 1,047 +2 retained-kind counts +2 first-kind
+/// entries +6 identity entries +6 vertex admissions = 1,063; lookup floors cancel.
 /// ´test:integration:constant-square-root-fragment´
 /// ´claim:cas:constant-square-root-fragment´
 #[test]
@@ -164,7 +166,10 @@ fn constant_square_root_fragment() -> TestResult {
         InvalidCode::UnsupportedFragment,
         "finite coefficient jets",
     )?;
-    for (branch, denominator) in [(Branch::PrincipalComplex, 2), (Branch::StrictReal, 3)] {
+    for (branch, denominator, expected_work) in [
+        (Branch::PrincipalComplex, 2, 1_063),
+        (Branch::StrictReal, 3, 1_063),
+    ] {
         let (cas, expression) = original(
             &[
                 (Operator::Rational(Rational::one()), vec![]),
@@ -182,7 +187,7 @@ fn constant_square_root_fragment() -> TestResult {
             InvalidCode::UnsupportedFragment,
             "exact constant expression",
         )?;
-        assert_eq!(spent, 1_047);
+        assert_eq!(spent, expected_work);
     }
     Ok(())
 }
@@ -226,7 +231,7 @@ fn enclosure() -> TestResult<(Cas, RationalEnclosure)> {
 
 /// Bind the exact original expression to its actual family before checking a closed box.
 fn enclosure_for(mut cas: Cas, target: Handle) -> TestResult<(Cas, RationalEnclosure)> {
-    let header = cas.expression_header(&target)?;
+    let header = cas.expression_header(&target, &mut crate::testing::budgets::graph_budget()?)?;
     let drafts = [
         Draft::Region(RegionDraft {
             header: Reference::Existing(header.clone()),
@@ -288,7 +293,7 @@ fn pin_with<T>(
     work: u64,
 ) -> TestResult {
     for ceiling in [work, work - 1] {
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             work: ceiling,
             ..Limits::default()
         })?;
@@ -310,7 +315,7 @@ fn pin_with<T>(
             assert!(budget.usage().work > 0);
         }
     }
-    let mut prior = Budget::new(Limits {
+    let mut prior = nrz_cas::limits::Budget::new(Limits {
         work: work + 7,
         ..Limits::default()
     })?;
@@ -340,6 +345,12 @@ struct Costs {
 }
 
 /// Exact root admission and certified enclosures preserve literal costs and atomic Work refusals.
+/// Rational admission: unchanged operation Work 57,657 +12 retained-kind counts +6 first-kind
+/// entries +18 identity entries +24 vertex admissions -6 unjournaled inverses = 57,711. Its enclosure
+/// adds a further retained-kind entry and 3 checked-record entries: 82,954 +64
+/// -7 unjournaled inverses = 83,011. LC admission/enclosure: 31,324/33,668 +12 counts +3 kind
+/// entries +12 identity entries +18 admissions -6 unjournaled inverses = 31,363/33,707. In each
+/// operation the prior graph lookup floor equals the new retained-map floor.
 /// ´test:integration:constant-square-root-costs´
 /// ´claim:cas:constant-square-root-costs´
 #[test]
@@ -348,15 +359,15 @@ fn constant_square_root_costs() -> TestResult {
         (
             enclosure as fn() -> TestResult<(Cas, RationalEnclosure)>,
             Costs {
-                admission: 57_657,
-                enclosure: 82_954,
+                admission: 57_711,
+                enclosure: 83_011,
             },
         ),
         (
             lc_enclosure,
             Costs {
-                admission: 31_324,
-                enclosure: 33_668,
+                admission: 31_363,
+                enclosure: 33_707,
             },
         ),
     ];
@@ -386,7 +397,7 @@ fn constant_square_root_breakdown() -> TestResult {
     assert_eq!(checked.retained_bytes(), 680);
     let validation = budget.usage().work - checked.retained_bytes();
     assert_eq!(validation, 17_499);
-    assert_eq!(82_954 - 57_657 - validation, 7_798);
+    assert_eq!(83_011 - 57_711 - validation, 7_801);
     Ok(())
 }
 
@@ -560,6 +571,8 @@ fn pin_enclosure(
 }
 
 /// A repeated rational-radicand `PiBound` enclosure cites the retained full Machin theorem.
+/// Unchanged operation Work warm 65,525 +12 counts +6 kind entries +18 identity entries
+/// +24 admissions -6 unjournaled inverses = 65,579; the existing Machin lookup floor is unchanged.
 /// ´test:integration:constant-square-root-warm-cost´
 /// ´claim:cas:constant-square-root-warm-cost´
 #[test]
@@ -568,9 +581,9 @@ fn constant_square_root_warm_cost() -> TestResult {
     cas.check_rational_enclosure(&contract, &mut ledger()?)?;
     let mut warm = ledger()?;
     cas.check_rational_enclosure(&contract, &mut warm)?;
-    assert_eq!(warm.usage().work, 65_525);
+    assert_eq!(warm.usage().work, 65_579);
     pin(
         |budget| cas.check_rational_enclosure(&contract, budget),
-        65_525,
+        65_579,
     )
 }

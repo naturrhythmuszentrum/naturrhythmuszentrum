@@ -10,7 +10,7 @@ use crate::testing::common::TestResult;
 fn capped(work: u64) -> TestResult<Budget> {
     let mut limits = super::ledger()?.limits().clone();
     limits.work = work;
-    Ok(Budget::new(limits)?)
+    Ok(crate::budget::Budget::new(limits)?)
 }
 
 /// An exact cap completes; one below fails specifically for the missing final Work.
@@ -32,7 +32,7 @@ fn checked(result: TestResult, used: u64, required: u64, short: u64) -> TestResu
 /// ´test:crate:stable-collection-lc-request-work-boundaries´
 #[test]
 fn request_work_boundaries() -> TestResult {
-    for (signs, required) in [([1, 1], 823_329), ([0, 1], 458_420), ([1, 0], 456_008)] {
+    for (signs, required) in [([1, 1], 823_812), ([0, 1], 458_432), ([1, 0], 456_020)] {
         for short in [0, 1] {
             let (mut source, mut request) = super::fixture::request(signs, true)?;
             request.limits.work = Some(required - short);
@@ -59,10 +59,10 @@ fn identity_work_boundaries() -> TestResult {
     for short in [0, 1] {
         let (mut source, request) = super::fixture::request([1, 1], true)?;
         let claim = super::expected::identity(&mut source, &request)?;
-        let mut checking = capped(749_125 - short)?;
+        let mut checking = capped(749_474 - short)?;
         let result =
             super::identity::prove(&mut source, &claim, &mut super::ledger()?, &mut checking);
-        checked(result.map(|_| ()), checking.usage().work, 749_125, short)?;
+        checked(result.map(|_| ()), checking.usage().work, 749_474, short)?;
     }
     let (mut source, request) = super::fixture::request([1, 1], true)?;
     let claim = super::expected::identity(&mut source, &request)?;
@@ -76,12 +76,12 @@ fn identity_work_boundaries() -> TestResult {
     for short in [0, 1] {
         let (mut target, request) = super::fixture::request([1, 1], true)?;
         let claim = super::expected::identity(&mut target, &request)?;
-        let mut budget = capped(375_190 - short)?;
+        let mut budget = capped(375_236 - short)?;
         let result = target.cas.replay(&bytes, &claim, &mut budget);
         checked(
             result.map(|_| ()).map_err(Into::into),
             budget.usage().work,
-            375_190,
+            375_236,
             short,
         )?;
     }
@@ -105,12 +105,12 @@ fn cold_cache_work_boundary() -> TestResult {
             crate::testing::replay_answer::proposal(&source.cas, &answer.set, &mut target.cas)?;
         let expected = super::replay::expected(&target, &request, &set)?;
         let mut cache = crate::proof::AnonymousLemmaCache::new();
-        let mut budget = capped(1_598_992 - short)?;
+        let mut budget = capped(1_599_398 - short)?;
         let result = cache.replay(&mut target.cas, &bytes, &expected, &mut budget);
         checked(
             result.map(|_| ()).map_err(Into::into),
             budget.usage().work,
-            1_598_992,
+            1_599_398,
             short,
         )?;
     }
@@ -122,7 +122,7 @@ fn cold_cache_work_boundary() -> TestResult {
 fn checker_work_boundary() -> TestResult {
     for short in [0, 1] {
         let (mut source, request) = super::fixture::request([1, 1], true)?;
-        let mut checking = capped(1_079_764 - short)?;
+        let mut checking = capped(1_079_918 - short)?;
         let result = crate::solving::solve_search::produce(
             &mut source.cas,
             &request,
@@ -137,7 +137,7 @@ fn checker_work_boundary() -> TestResult {
             }
             Err(other) => Err(other.into()),
         };
-        checked(result, checking.usage().work, 1_079_764, short)?;
+        checked(result, checking.usage().work, 1_079_918, short)?;
     }
     Ok(())
 }

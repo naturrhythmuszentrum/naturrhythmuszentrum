@@ -99,15 +99,15 @@ fn original_order<'a>(
     };
     let graph = owner.cas()?;
     budget.work(4, storage::AT)?;
-    if graph.expression(&observable.expression.syntax)?.0 != &Operator::Div {
+    if graph.expression(&observable.expression.syntax, budget)?.0 != &Operator::Div {
         return Err(DecisionError::Source);
     }
     let operands = graph.operands(&observable.expression.syntax, budget)?;
     let [first, second] = operands.as_slice() else {
         return Err(DecisionError::Source);
     };
-    let name = |operand: &Handle| -> Result<&'a str, DecisionError> {
-        let (Operator::Free(name), _) = graph.expression(operand)? else {
+    let mut name = |operand: &Handle| -> Result<&'a str, DecisionError> {
+        let (Operator::Free(name), _) = graph.expression(operand, budget)? else {
             return Err(DecisionError::Source);
         };
         let Some((key, Declaration::Input { .. } | Declaration::Constant { .. })) =
@@ -137,7 +137,7 @@ pub(super) fn correspondence(
         return Err(DecisionError::Case);
     }
     let names = original_order(source.owner(), source.name(), budget)?;
-    if cas.expression(&spec.target)?.0 != &Operator::Div {
+    if cas.expression(&spec.target, budget)?.0 != &Operator::Div {
         return Err(DecisionError::Target);
     }
     let operands = cas.operands(&spec.target, budget)?;

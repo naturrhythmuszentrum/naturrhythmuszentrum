@@ -110,7 +110,10 @@ pub(super) fn reciprocal(
 /// The sole original association retains its exact region and placement-bearing body.
 fn body(cas: &Cas, node: &Handle, region: &Handle, budget: &mut Budget) -> Result<Handle, Error> {
     budget.work(1, AT)?;
-    if matches!(cas.solve_view(node), Ok(SolveView::FamilyExpression(_))) {
+    if matches!(
+        cas.solve_view(node, budget),
+        Ok(SolveView::FamilyExpression(_))
+    ) {
         return Ok(node.clone());
     }
     let syntax = cas.describe_syntax(node, budget)?;
@@ -142,7 +145,7 @@ pub(super) fn local(
 ) -> Result<[Handle; 2], Error> {
     let node = body(cas, node, scope.1, budget)?;
     budget.work(1, AT)?;
-    let SolveView::FamilyExpression(data) = cas.solve_view(&node)? else {
+    let SolveView::FamilyExpression(data) = cas.solve_view(&node, budget)? else {
         return Err(Error::Structure);
     };
     let [left, right] = data.arguments.as_slice() else {

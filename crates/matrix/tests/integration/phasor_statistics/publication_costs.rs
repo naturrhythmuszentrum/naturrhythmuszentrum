@@ -23,7 +23,7 @@ fn driven_mean_publication_owner_boundaries() -> TestResult {
 }
 
 fn boundary(dependencies: DependencyPolicy, output: usize, profile: [u64; 3]) -> TestResult {
-    let mut case = fixture::lifecycle_case(dependencies, &mut super::budget()?)?;
+    let mut case = fixture::lifecycle_case(dependencies, &mut super::fresh_budget()?)?;
     let context = ArithmeticContext::new()?;
     let previous = if output == 1 {
         Some(

@@ -64,35 +64,35 @@ fn fixture(name: &str) -> Result<(Cas, Handle), Fault> {
 const BASELINES: [Measurement; 5] = [
     Measurement {
         name: "two-pi",
-        admission: 27_938,
+        admission: 27_992,
         normalization: 6_509,
-        multiplication: 37_111,
-        addition: 38_270,
+        multiplication: 37_173,
+        addition: 38_332,
     },
     Measurement {
         name: "pi",
-        admission: 10_888,
+        admission: 10_926,
         normalization: 3_343,
-        multiplication: 18_633,
-        addition: 19_792,
+        multiplication: 18_679,
+        addition: 19_838,
     },
     Measurement {
         name: "rational",
-        admission: 6_741,
+        admission: 6_760,
         normalization: 2_570,
         multiplication: 544,
         addition: 448,
     },
     Measurement {
         name: "unit-scale",
-        admission: 6_453,
+        admission: 6_472,
         normalization: 2_474,
         multiplication: 448,
         addition: 384,
     },
     Measurement {
         name: "zero-origin",
-        admission: 3_956,
+        admission: 3_975,
         normalization: 1_532,
         multiplication: 448,
         addition: 384,
@@ -130,10 +130,11 @@ fn pin<T>(
 /// ´claim:cas:constant-preparation-costs´
 #[test]
 fn constant_preparation_costs() -> Result<(), Fault> {
+    let mut budget = crate::testing::common::default_budget()?;
     for expected in BASELINES {
         let (mut cas, root) = fixture(expected.name)?;
         let value = admit(&cas, &root, &mut ledger()?)?;
-        let id = cas.checked(&root)?;
+        let id = cas.checked(&root, &mut budget)?;
         pin(|budget| admit(&cas, &root, budget), expected.admission)?;
         pin(
             |budget| crate::polynomial::normalize(&mut cas, id, budget),
@@ -185,7 +186,7 @@ fn constant_square_root_admission_costs() -> Result<(), Fault> {
         result,
         ExactConstant::from(Rational::from_ratio(1, 2_000, &mut ledger()?)?)
     );
-    assert_eq!(measured.usage().work, 20_490);
-    pin(|budget| admit(&cas, &cas.handle(root), budget), 20_490)?;
+    assert_eq!(measured.usage().work, 20_521);
+    pin(|budget| admit(&cas, &cas.handle(root), budget), 20_521)?;
     Ok(())
 }

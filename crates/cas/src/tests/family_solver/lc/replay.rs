@@ -13,6 +13,7 @@ pub(super) fn expected(
     request: &crate::request::Request,
     set: &crate::Handle,
 ) -> TestResult<Judgment> {
+    let mut budget = crate::testing::common::default_budget()?;
     let Task::Solve(original) = &request.task else {
         return Err("LC original solve request".into());
     };
@@ -24,7 +25,9 @@ pub(super) fn expected(
         statement: Statement::Solve(Box::new(SolveStatement::Coverage(StatementCoverage {
             problem: original.problem.clone(),
             set: set.clone(),
-            region: receiver.cas.admissible_region(&request.context)?,
+            region: receiver
+                .cas
+                .admissible_region(&request.context, &mut budget)?,
         }))),
     })
 }

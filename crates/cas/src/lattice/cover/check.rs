@@ -15,7 +15,7 @@ use crate::rule::Primitive;
 /// An exact literal is required for the homogeneous row and identity diagonal.
 fn literal(cas: &Cas, id: LogicalId, one: bool, budget: &mut Budget) -> Result<(), Fault> {
     budget.work(1, AT)?;
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     let Operator::Rational(number) = &value.operator else {
         return Err(invalid());
     };
@@ -38,14 +38,16 @@ fn literal(cas: &Cas, id: LogicalId, one: bool, budget: &mut Budget) -> Result<(
 )]
 pub(crate) fn roles(cas: &Cas, value: &LatticeCover, budget: &mut Budget) -> Result<u32, Fault> {
     let question = &value.index.basis;
-    let home = cas.state.context(cas.checked(&question.context)?)?;
-    let basis = cas.checked(&question.basis)?;
-    let offset = cas.checked(&question.offset)?;
-    let (rows, columns) = cas.lattice_rectangle(basis, home.header_id)?;
+    let home = cas
+        .state
+        .context(cas.checked(&question.context, budget)?, budget)?;
+    let basis = cas.checked(&question.basis, budget)?;
+    let offset = cas.checked(&question.offset, budget)?;
+    let (rows, columns) = cas.lattice_rectangle(basis, home.header_id, budget)?;
     let dimension = rows.checked_add(1).ok_or_else(invalid)?;
     if rows == 0
         || rows != columns
-        || cas.lattice_rectangle(offset, home.header_id)? != (rows, 1)
+        || cas.lattice_rectangle(offset, home.header_id, budget)? != (rows, 1)
         || size(value.index.families.len(), AT)? != u64::from(rows)
     {
         return Err(invalid());
@@ -56,19 +58,22 @@ pub(crate) fn roles(cas: &Cas, value: &LatticeCover, budget: &mut Budget) -> Res
         AT,
     )?;
     for handle in [&value.forward, &value.inverse] {
-        let id = cas.checked(handle)?;
-        if cas.lattice_rectangle(id, home.header_id)? != (dimension, dimension) {
+        let id = cas.checked(handle, budget)?;
+        if cas.lattice_rectangle(id, home.header_id, budget)? != (dimension, dimension) {
             return Err(invalid());
         }
-        let entries = &cas.state.expression(id)?.operands;
+        let entries = &cas.state.expression(id, budget)?.operands;
         let width = usize::try_from(dimension).map_err(|_| invalid())?;
         for (column, entry) in entries.iter().skip(width * (width - 1)).enumerate() {
             literal(cas, *entry, column == width - 1, budget)?;
         }
     }
-    let forward = &cas.state.expression(cas.checked(&value.forward)?)?.operands;
-    let coefficients = &cas.state.expression(basis)?.operands;
-    let offsets = &cas.state.expression(offset)?.operands;
+    let forward = &cas
+        .state
+        .expression(cas.checked(&value.forward, budget)?, budget)?
+        .operands;
+    let coefficients = &cas.state.expression(basis, budget)?.operands;
+    let offsets = &cas.state.expression(offset, budget)?.operands;
     let width = usize::try_from(rows).map_err(|_| invalid())?;
     for row in 0..width {
         for column in 0..width {
@@ -83,7 +88,7 @@ pub(crate) fn roles(cas: &Cas, value: &LatticeCover, budget: &mut Budget) -> Res
         }
     }
     for family in &value.index.families {
-        crate::decision_cut::family::roles(cas, family)?;
+        crate::decision_cut::family::roles(cas, family, budget)?;
     }
     cas.lattice_range_product(&value.index, budget)?;
     Ok(rows)
@@ -95,6 +100,7 @@ fn equality<'a>(
     value: &LatticeCover,
     premise: &'a CheckedApplication,
     primitive: Primitive,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(&'a crate::graph::Handle, &'a crate::graph::Handle), Fault> {
     let Statement::Equality {
         left,
@@ -107,10 +113,10 @@ fn equality<'a>(
     };
     let home = cas
         .state
-        .context(cas.checked(&value.index.basis.context)?)?;
+        .context(cas.checked(&value.index.basis.context, budget)?, budget)?;
     if premise.rule != primitive
         || premise.judgment.context != value.index.basis.context
-        || cas.checked(domain)? != home.admissible
+        || cas.checked(domain, budget)? != home.admissible
         || !premise.conditions.residuals.is_empty()
     {
         return Err(invalid());
@@ -126,18 +132,26 @@ fn affine(
     dimension: u32,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let (left, right) = equality(cas, value, &premises[0], Primitive::RationalIdentity)?;
-    literal(cas, cas.checked(right)?, true, budget)?;
-    let quotient = cas.state.expression(cas.checked(left)?)?;
+    let (left, right) = equality(
+        cas,
+        value,
+        &premises[0],
+        Primitive::RationalIdentity,
+        budget,
+    )?;
+    literal(cas, cas.checked(right, budget)?, true, budget)?;
+    let quotient = cas.state.expression(cas.checked(left, budget)?, budget)?;
     let [numerator, denominator] = quotient.operands.as_slice() else {
         return Err(invalid());
     };
-    if quotient.operator != Operator::Div || *denominator != cas.checked(&value.determinant)? {
+    if quotient.operator != Operator::Div
+        || *denominator != cas.checked(&value.determinant, budget)?
+    {
         return Err(invalid());
     }
-    let determinant = cas.state.expression(*numerator)?;
+    let determinant = cas.state.expression(*numerator, budget)?;
     if determinant.operator != Operator::MatrixMap(MatrixOperation::Determinant)
-        || determinant.operands != [cas.checked(&value.forward)?]
+        || determinant.operands != [cas.checked(&value.forward, budget)?]
     {
         return Err(invalid());
     }
@@ -145,25 +159,25 @@ fn affine(
         (&premises[1], &value.forward, &value.inverse),
         (&premises[2], &value.inverse, &value.forward),
     ] {
-        let (left, right) = equality(cas, value, premise, Primitive::Jets)?;
-        let product = cas.state.expression(cas.checked(left)?)?;
+        let (left, right) = equality(cas, value, premise, Primitive::Jets, budget)?;
+        let product = cas.state.expression(cas.checked(left, budget)?, budget)?;
         if product.operator != Operator::MatrixMultiply
-            || product.operands != [cas.checked(outer)?, cas.checked(inner)?]
+            || product.operands != [cas.checked(outer, budget)?, cas.checked(inner, budget)?]
         {
             return Err(invalid());
         }
         let header = cas
             .state
-            .context(cas.checked(&value.index.basis.context)?)?
+            .context(cas.checked(&value.index.basis.context, budget)?, budget)?
             .header_id;
         let width = dimension.checked_add(1).ok_or_else(invalid)?;
-        if cas.lattice_rectangle(cas.checked(right)?, header)? != (width, width) {
+        if cas.lattice_rectangle(cas.checked(right, budget)?, header, budget)? != (width, width) {
             return Err(invalid());
         }
         let width = usize::try_from(width).map_err(|_| invalid())?;
         for (position, entry) in cas
             .state
-            .expression(cas.checked(right)?)?
+            .expression(cas.checked(right, budget)?, budget)?
             .operands
             .iter()
             .enumerate()
@@ -200,7 +214,7 @@ pub(crate) fn check(
     budget.with_retained_payload(bytes, AT, |budget| {
         let dimension = roles(cas, value, budget)?;
         affine(cas, value, premises, dimension, budget)?;
-        let home = cas.checked(&draft.context)?;
+        let home = cas.checked(&draft.context, budget)?;
         cas.lattice_range_frame(home, budget)?;
         let mut axes = Vec::new();
         axes.try_reserve_exact(value.index.families.len().saturating_mul(2))
@@ -208,7 +222,10 @@ pub(crate) fn check(
         for (family, premise) in value.index.families.iter().zip(&premises[3..]) {
             cas.lattice_scalar_application(home, family, premise, budget)?;
             for handle in [&family.coordinate, &family.index] {
-                let Operator::Free(name) = &cas.state.expression(cas.checked(handle)?)?.operator
+                let Operator::Free(name) = &cas
+                    .state
+                    .expression(cas.checked(handle, budget)?, budget)?
+                    .operator
                 else {
                     return Err(invalid());
                 };

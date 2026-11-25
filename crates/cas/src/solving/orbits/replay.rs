@@ -54,7 +54,7 @@ fn members<'a>(
     budget: &mut Budget,
 ) -> Result<Vec<&'a PolynomialData<Handle>>, Fault> {
     budget.solving(BudgetKind::OrbitMembers, size(data.members.len(), AT)?, AT)?;
-    let seed = polynomial(&cas.state, &data.seed)?;
+    let seed = polynomial(&cas.state, &data.seed, budget)?;
     if (
         usize::try_from(data.degree).map_err(|_| invalid())?,
         data.members.is_empty(),
@@ -73,8 +73,8 @@ fn members<'a>(
     }
     let mut result: Vec<&PolynomialData<Handle>> = vector(data.members.len(), budget)?;
     for handle in &data.members {
-        cas.checked(handle)?;
-        let member = polynomial(&cas.state, handle)?;
+        cas.checked(handle, budget)?;
+        let member = polynomial(&cas.state, handle, budget)?;
         budget.work(size(member.variables.len(), AT)?.max(1), AT)?;
         if (&member.domain, &member.variables) != (&seed.domain, &seed.variables) {
             return Err(invalid());
@@ -120,7 +120,7 @@ fn reachability(
     orbit: &[&PolynomialData<Handle>],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let seed = polynomial(&cas.state, &data.seed)?;
+    let seed = polynomial(&cas.state, &data.seed, budget)?;
     let mut start = None;
     for (index, member) in orbit.iter().enumerate() {
         if equals(&cas.state, seed, member, None, budget)? {
@@ -163,7 +163,7 @@ pub(crate) fn check(
     if draft.rule != crate::rule::Primitive::Solve(SolveSchema::PermutationOrbitCoverage) {
         return Err(invalid());
     }
-    cas.checked(&data.seed)?;
+    cas.checked(&data.seed, budget)?;
     conclusion(draft, data, budget)?;
     let orbit = members(cas, data, budget)?;
     closure(cas, data, &orbit, budget)?;

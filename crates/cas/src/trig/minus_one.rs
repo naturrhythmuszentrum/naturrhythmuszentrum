@@ -57,10 +57,11 @@ impl Route<'_> {
     ) -> Result<Handle, Fault> {
         let mut bytes = 0_u64;
         for proof in premises {
+            let proof_id = self.cas.checked(proof, self.budget)?;
             bytes = bytes
                 .checked_add(crate::proof_view::application_bytes(
                     self.cas,
-                    self.cas.checked(proof)?,
+                    proof_id,
                     self.budget,
                 )?)
                 .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
@@ -73,7 +74,7 @@ impl Route<'_> {
             for proof in premises {
                 earlier.push(crate::proof_view::application(
                     self.cas,
-                    self.cas.checked(proof)?,
+                    self.cas.checked(proof, budget)?,
                     budget,
                 )?);
             }
@@ -244,9 +245,9 @@ impl Route<'_> {
         output: Handle,
     ) -> Result<VerifiedWitness, Fault> {
         let parent = self.context.clone();
-        let region = self.cas.admissible_region(local)?;
+        let region = self.cas.admissible_region(local, self.budget)?;
         let empty = self.local(Vec::new())?;
-        if self.cas.admissible_region(&empty)? != region {
+        if self.cas.admissible_region(&empty, self.budget)? != region {
             return Err(invalid());
         }
         let construction = self.push(
@@ -357,7 +358,7 @@ impl Route<'_> {
                 one.clone(),
             ],
         )?;
-        let region = self.cas.admissible_region(&local)?;
+        let region = self.cas.admissible_region(&local, self.budget)?;
         let subset = self.push(
             &local,
             Primitive::RegionConstruct,
@@ -520,27 +521,40 @@ impl Cas {
         let result = self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
                 budget.work(1, AT)?;
-                if cas.state.expression(cas.checked(function)?)?.operator != Operator::Arctangent {
+                if cas
+                    .state
+                    .expression(cas.checked(function, budget)?, budget)?
+                    .operator
+                    != Operator::Arctangent
+                {
                     return Ok(None);
                 }
                 let original = defined::operand(cas, function, budget)?;
                 for premise in [guard, equality] {
                     budget.work(1, AT)?;
-                    if !matches!(cas.state.node(cas.checked(premise)?)?, Vertex::Proof(_)) {
+                    if !matches!(
+                        cas.state.node(cas.checked(premise, budget)?, budget)?,
+                        Vertex::Proof(_)
+                    ) {
                         return Err(Fault::invalid(InvalidCode::Reference, AT));
                     }
                 }
-                let bytes = crate::proof_view::application_bytes(cas, cas.checked(guard)?, budget)?
-                    .checked_add(crate::proof_view::application_bytes(
-                        cas,
-                        cas.checked(equality)?,
-                        budget,
-                    )?)
-                    .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
+                let bytes =
+                    crate::proof_view::application_bytes(cas, cas.checked(guard, budget)?, budget)?
+                        .checked_add(crate::proof_view::application_bytes(
+                            cas,
+                            cas.checked(equality, budget)?,
+                            budget,
+                        )?)
+                        .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
                 let candidate = budget.with_retained_payload(bytes, AT, |budget| {
-                    let guard = crate::proof_view::application(cas, cas.checked(guard)?, budget)?;
-                    let equality =
-                        crate::proof_view::application(cas, cas.checked(equality)?, budget)?;
+                    let guard =
+                        crate::proof_view::application(cas, cas.checked(guard, budget)?, budget)?;
+                    let equality = crate::proof_view::application(
+                        cas,
+                        cas.checked(equality, budget)?,
+                        budget,
+                    )?;
                     let Statement::Equality {
                         left,
                         right,
@@ -553,9 +567,11 @@ impl Cas {
                     if *left != original || guard.judgment.context != equality.judgment.context {
                         return Err(invalid());
                     }
-                    definedness(cas, &original, domain, &guard.judgment.statement)?;
-                    let Operator::Rational(value) =
-                        &cas.state.expression(cas.checked(right)?)?.operator
+                    definedness(cas, &original, domain, &guard.judgment.statement, budget)?;
+                    let Operator::Rational(value) = &cas
+                        .state
+                        .expression(cas.checked(right, budget)?, budget)?
+                        .operator
                     else {
                         return Ok(None);
                     };

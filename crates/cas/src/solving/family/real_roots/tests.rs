@@ -131,7 +131,11 @@ fn positive(
         },
         budget,
     )?;
-    let ambient = cas.state.region(region.logical_id())?.ambient.clone();
+    let ambient = cas
+        .state
+        .region(region.logical_id(), budget)?
+        .ambient
+        .clone();
     admit(
         cas,
         Draft::Region(RegionDraft {

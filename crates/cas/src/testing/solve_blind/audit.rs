@@ -15,13 +15,14 @@ fn visit(
     indices: &mut BTreeMap<LogicalId, u32>,
     steps: &mut Vec<ApplicationDraft>,
 ) -> TestResult<u32> {
+    let mut budget = crate::testing::common::default_budget()?;
     if let Some(index) = indices.get(&proof) {
         return Ok(*index);
     }
-    let Vertex::Proof(application) = cas.state.node(proof)? else {
+    let Vertex::Proof(application) = cas.state.node(proof, &mut budget)? else {
         return Err("audit proof root".into());
     };
-    let Vertex::ScopedApplication(application) = cas.state.node(*application)? else {
+    let Vertex::ScopedApplication(application) = cas.state.node(*application, &mut budget)? else {
         return Err("audit scoped application".into());
     };
     let mut premises = Vec::new();
@@ -113,15 +114,20 @@ fn declaration_record(
     request: &crate::request_model::Request,
     expected: &crate::model::Field,
 ) -> TestResult<String> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::model::{AtomicSort, Sort};
     let crate::task::Task::Solve(specification) = &request.task else {
         return Err("boundary is not a solve request".into());
     };
-    let problem = crate::solving::elementary::proof::problem(&fixture.cas, &specification.problem)?;
+    let problem = crate::solving::elementary::proof::problem(
+        &fixture.cas,
+        &specification.problem,
+        &mut budget,
+    )?;
     let environment = &fixture
         .cas
         .state
-        .header(problem.header.logical_id())?
+        .header(problem.header.logical_id(), &mut budget)?
         .environment;
     assert_eq!(environment.declarations.len(), 5);
     assert!(
@@ -129,7 +135,11 @@ fn declaration_record(
             |declaration| declaration.sort == Sort::Value(AtomicSort::Scalar(expected.clone()))
         )
     );
-    let unknowns = crate::solving::elementary::proof::coordinates(&fixture.cas, &problem.unknowns)?;
+    let unknowns = crate::solving::elementary::proof::coordinates(
+        &fixture.cas,
+        &problem.unknowns,
+        &mut budget,
+    )?;
     assert_eq!(unknowns.coordinates.len(), 1);
     assert!(
         unknowns
@@ -137,8 +147,11 @@ fn declaration_record(
             .iter()
             .all(|coordinate| coordinate.field == *expected)
     );
-    let parameters =
-        crate::solving::elementary::proof::coordinates(&fixture.cas, &problem.coefficients)?;
+    let parameters = crate::solving::elementary::proof::coordinates(
+        &fixture.cas,
+        &problem.coefficients,
+        &mut budget,
+    )?;
     assert_eq!(parameters.coordinates.len(), 4);
     assert!(
         parameters
@@ -157,17 +170,23 @@ fn declaration_record(
 
 /// Reconstruct the producer's initial map from the actual ordered fraction frame, before search.
 fn initial_map(fixture: &mut super::source::Fixture) -> TestResult<String> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::solving::{CoefficientDomainData, MapMode, MapTarget, SolveView};
     let CoefficientDomainData::Fraction { base, coordinates } =
-        crate::solving::coefficients::storage::domain(&fixture.cas.state, &fixture.algebra)?
+        crate::solving::coefficients::storage::domain(
+            &fixture.cas.state,
+            &fixture.algebra,
+            &mut budget,
+        )?
     else {
         return Err("boundary coefficient domain is not a fraction field".into());
     };
     assert!(matches!(
-        crate::solving::coefficients::storage::domain(&fixture.cas.state, base)?,
+        crate::solving::coefficients::storage::domain(&fixture.cas.state, base, &mut budget)?,
         CoefficientDomainData::Rational
     ));
-    let frame = crate::solving::elementary::proof::coordinates(&fixture.cas, coordinates)?;
+    let frame =
+        crate::solving::elementary::proof::coordinates(&fixture.cas, coordinates, &mut budget)?;
     let keys: Vec<_> = frame
         .coordinates
         .iter()
@@ -215,7 +234,7 @@ fn initial_map(fixture: &mut super::source::Fixture) -> TestResult<String> {
     } else {
         construction.mapping(&mut fixture.cas, &fixture.algebra, &images, &mut budget)?
     };
-    let SolveView::CoefficientMap(mapping) = fixture.cas.solve_view(&map)? else {
+    let SolveView::CoefficientMap(mapping) = fixture.cas.solve_view(&map, &mut budget)? else {
         return Err("initial map missing".into());
     };
     crate::solving::coefficients::homomorphism::check(

@@ -33,7 +33,8 @@ impl Fixture {
             Vec::new(),
             &mut budget()?,
         )?;
-        let domain = cas.admissible_region(&context)?;
+        let domain =
+            cas.admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?;
         Ok(Self {
             cas,
             context,

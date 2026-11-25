@@ -3,7 +3,7 @@
 
 use crate::testing::common::{TestResult, real};
 use crate::testing::jacobians::{coordinates, integer, lc, lc_coordinates, product, rectangle};
-use crate::testing::map_inverses::{fixture, ledger};
+use crate::testing::map_inverses::{fixture, ledger, limits};
 use crate::testing::readings::matrix;
 use nrz_cas::Handle;
 use nrz_cas::jacobians::SourceCoordinates;
@@ -140,6 +140,9 @@ fn source_jacobian_lc_operator_replays() -> TestResult {
 }
 
 /// A matrix with no entries does not traverse its unused literal axis.
+/// Zero columns: unchanged operation Work 131,773 +16 retained counts +14 first-kind entries
+/// +44 identity entries +44 admissions = 131,891. Two or maximal unused
+/// columns: unchanged operation Work 131,906 +18 +14 +46 +46 = 132,030. Lookup floors match.
 /// ´test:integration:source-jacobian-empty-matrix-axis-is-bounded´
 #[test]
 fn source_jacobian_empty_matrix_axis_is_bounded() -> TestResult {
@@ -159,12 +162,32 @@ fn source_jacobian_empty_matrix_axis_is_bounded() -> TestResult {
             case.cas.operands(result.matrix(), &mut ledger()?)?,
             [] as [Handle; 0]
         );
-        costs.push(budget.usage().work);
+        let work = budget.usage().work;
+        costs.push(work);
+        for cap in [work, work - 1] {
+            let (mut fresh, _, _) = product()?;
+            let empty = rectangle(&mut fresh, 0, columns, &[])?;
+            let key = fresh.cas.source_jacobian_key(
+                &fresh.context,
+                &empty,
+                &SourceCoordinates::default(),
+                &mut ledger()?,
+            )?;
+            let mut bounded = nrz_cas::limits::Budget::new(nrz_cas::limits::Limits {
+                work: cap,
+                ..limits()
+            })?;
+            assert_eq!(
+                fresh.cas.source_jacobian(&key, &mut bounded).is_ok(),
+                cap == work,
+                "empty axis {columns} Work {cap}"
+            );
+        }
     }
     // Definedness, empty expansion, representation checking/replay and empty
     // Jacobian checking/replay dominate these fixed costs. Coincident zero
     // rectangles skip 133 Work through canonical sharing; unused extent does not.
-    assert_eq!(costs, [131_773, 131_906, 131_906]);
+    assert_eq!(costs, [131_891, 132_030, 132_030]);
     Ok(())
 }
 

@@ -73,24 +73,31 @@ pub enum LatticeEnclosure {
 )]
 pub(crate) fn roles(cas: &Cas, value: &LatticeSelection, budget: &mut Budget) -> Result<(), Fault> {
     let dimension = super::cover::check::roles(cas, &value.cover, budget)?;
-    let home = cas
-        .state
-        .context(cas.checked(&value.cover.index.basis.context)?)?;
-    if cas.lattice_rectangle(cas.checked(&value.target)?, home.header_id)? != (dimension, 1)
+    let home = cas.state.context(
+        cas.checked(&value.cover.index.basis.context, budget)?,
+        budget,
+    )?;
+    if cas.lattice_rectangle(cas.checked(&value.target, budget)?, home.header_id, budget)?
+        != (dimension, 1)
         || size(value.values.len(), AT)? != u64::from(dimension)
     {
         return Err(invalid());
     }
     for selected in &value.values {
-        literal(cas, selected, &value.cover.index.basis.context)?;
+        literal(cas, selected, &value.cover.index.basis.context, budget)?;
     }
     Ok(())
 }
 
 /// A tuple entry retains mathematical Integer sort independently of executable capacity.
-fn literal<'a>(cas: &'a Cas, value: &Handle, context: &Handle) -> Result<&'a Rational, Fault> {
-    let expression = cas.state.expression(cas.checked(value)?)?;
-    let home = cas.state.context(cas.checked(context)?)?;
+fn literal<'a>(
+    cas: &'a Cas,
+    value: &Handle,
+    context: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Rational, Fault> {
+    let expression = cas.state.expression(cas.checked(value, budget)?, budget)?;
+    let home = cas.state.context(cas.checked(context, budget)?, budget)?;
     if expression.sort != Sort::Value(AtomicSort::Integer)
         || expression.header != home.header_id
         || !expression.scope.is_empty()
@@ -189,9 +196,9 @@ fn ranges(
         .zip(&selection.cover.index.families)
         .enumerate()
     {
-        let value = literal(cas, selected, &selection.cover.index.basis.context)?;
+        let value = literal(cas, selected, &selection.cover.index.basis.context, budget)?;
         value.check(budget, AT)?;
-        let scalar = scalar_cover(cas, cover, index)?;
+        let scalar = scalar_cover(cas, cover, index, budget)?;
         let range = ApplicationDraft {
             rule: Primitive::RegionDecide,
             context: scalar.judgment.context.clone(),
@@ -213,7 +220,7 @@ fn cuts(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     for (index, selected) in selection.values.iter().enumerate() {
-        let value = literal(cas, selected, &selection.cover.index.basis.context)?;
+        let value = literal(cas, selected, &selection.cover.index.basis.context, budget)?;
         let (lower, upper) = bounds(enclosure, index)?;
         cell(value, lower, upper, budget)?;
     }
@@ -273,15 +280,16 @@ fn scalar_cover<'a>(
     cas: &'a Cas,
     cover: &CheckedApplication,
     coordinate: usize,
+    budget: &mut Budget,
 ) -> Result<&'a CheckedApplication, Fault> {
     let proof = *cover
         .premises
         .get(coordinate.saturating_add(3))
         .ok_or_else(invalid)?;
-    let Vertex::Proof(application) = cas.state.node(proof)? else {
+    let Vertex::Proof(application) = cas.state.node(proof, budget)? else {
         return Err(invalid());
     };
-    let Vertex::ScopedApplication(application) = cas.state.node(*application)? else {
+    let Vertex::ScopedApplication(application) = cas.state.node(*application, budget)? else {
         return Err(invalid());
     };
     Ok(application)
@@ -391,7 +399,7 @@ impl Cas {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
                 let bytes = wire::payload(cas, expected, enclosure, budget)?;
-                let proof = cas.checked(cover)?;
+                let proof = cas.checked(cover, budget)?;
                 let retained =
                     crate::proof_view::application_bytes(cas, proof, budget)?.saturating_add(bytes);
                 budget.with_retained_payload(retained, AT, |budget| {

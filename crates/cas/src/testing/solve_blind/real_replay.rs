@@ -103,7 +103,8 @@ fn empty_base(fixture: &mut super::source::Fixture) -> TestResult<Handle> {
 
 /// An additional original divisor changes the problem even though its covered polynomial is unchanged.
 fn denominator(fixture: &mut super::source::Fixture, original: &Handle) -> TestResult<Handle> {
-    let problem = crate::solving::elementary::proof::problem(&fixture.cas, original)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let problem = crate::solving::elementary::proof::problem(&fixture.cas, original, &mut budget)?;
     assert_eq!(problem.denominators, [] as [Handle; 0]);
     let predicate = problem.predicate.clone();
     let divisor = fixture.free("a")?;

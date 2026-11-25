@@ -113,7 +113,7 @@ fn collect(
     result: &mut Terms,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     match &value.operator {
         Operator::DistributionZero => {}
         Operator::Rational(number) => accumulate(
@@ -141,9 +141,10 @@ fn collect(
             depth.saturating_add(1),
         )),
         Operator::DistributionScale | Operator::Mul
-            if rational_factor(cas, &value.operands).is_some() =>
+            if rational_factor(cas, &value.operands, budget).is_some() =>
         {
-            let (factor, term) = rational_factor(cas, &value.operands).ok_or_else(invalid)?;
+            let (factor, term) =
+                rational_factor(cas, &value.operands, budget).ok_or_else(invalid)?;
             pending.push((
                 term,
                 coefficient.mul(factor, budget)?,
@@ -174,13 +175,17 @@ fn replacement(id: LogicalId, premises: &[CheckedApplication]) -> Option<Logical
 }
 
 /// Only rational literals act as scalar coefficients; arbitrary functions stay structural.
-fn rational_factor<'a>(cas: &'a Cas, operands: &[LogicalId]) -> Option<(&'a Rational, LogicalId)> {
+fn rational_factor<'a>(
+    cas: &'a Cas,
+    operands: &[LogicalId],
+    budget: &mut crate::budget::Budget,
+) -> Option<(&'a Rational, LogicalId)> {
     let [first, second] = operands else {
         return None;
     };
-    crate::distribution_check::rational(cas, *first).map_or_else(
+    crate::distribution_check::rational(cas, *first, budget).map_or_else(
         |_| {
-            crate::distribution_check::rational(cas, *second)
+            crate::distribution_check::rational(cas, *second, budget)
                 .ok()
                 .map(|value| (value, *first))
         },

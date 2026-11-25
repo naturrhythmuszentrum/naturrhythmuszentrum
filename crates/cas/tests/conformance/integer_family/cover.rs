@@ -12,7 +12,7 @@ use super::{Frame, admit, ledger, real};
 use crate::testing::common::TestResult;
 use nrz_cas::decision::IntegerFamily;
 use nrz_cas::domain::{ContextDraft, Layer, RegionExpr};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::proof::{ApplicationDraft, Certificate, Judgment, Primitive, Statement};
 use nrz_cas::syntax::{AtomicSort, Draft, Operator, PredicateKind, Sort};
 use nrz_cas::{Cas, FaultKind, Handle, InvalidCode, Location, Rational, Reference};
@@ -79,6 +79,8 @@ fn integer_family_cover() -> TestResult {
                 .frame
                 .cas
                 .check_proof(&source.context, &[source.application], &mut budget)?;
+        // The resource boundary owns check_proof; schema inspection is a separate map read.
+        let proof_work = budget.usage().work;
         let bytes = source.frame.cas.export_witness(&witness, &mut ledger()?)?;
         let mut receiver = Cas::new(Limits::default())?;
         let mut replay = ledger()?;
@@ -91,13 +93,15 @@ fn integer_family_cover() -> TestResult {
             .proof_citations(witness.proof(), &mut ledger()?)?;
         assert_eq!(citations.len(), 1);
         let schema = citations[0]
-            .auxiliary_schema(&source.frame.cas)?
+            .auxiliary_schema(&source.frame.cas, &mut budget)?
             .ok_or("missing floor schema")?;
+        let schema_work = budget.usage().work - proof_work;
         assert_eq!(schema.name, "decision.integer-floor-family");
         assert_eq!(schema.version, 2);
         measured.push((
             bounded,
-            budget.usage().work,
+            proof_work,
+            schema_work,
             source.frame.cas.counts().payload_bytes - before.payload_bytes,
             bytes.len(),
             replay.usage().work,
@@ -107,8 +111,8 @@ fn integer_family_cover() -> TestResult {
     assert_eq!(
         measured,
         [
-            (false, 67_141, 1_087, 1_010, 124_524, 11_939),
-            (true, 98_253, 1_146, 1_256, 172_358, 14_897),
+            (false, 67_151, 0, 1_087, 1_010, 124_671, 11_939),
+            (true, 98_263, 0, 1_146, 1_256, 172_541, 14_897),
         ]
     );
     Ok(())
@@ -377,7 +381,7 @@ fn resource_attempt(
     };
     let before = cas.counts();
     let limits = resource_limits(kind, amount)?;
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(prior, Location::new("prior floor proof work"))?;
     let result = if let Some(bytes) = bytes {
         cas.inspect(&bytes, &mut budget)
@@ -401,10 +405,10 @@ fn resource_attempt(
 #[test]
 fn integer_family_resource_boundaries() -> TestResult {
     for (bounded, replay, work, staged, payload) in [
-        (false, false, 67_141, 79_744, 11_939),
-        (false, true, 124_524, 79_040, 11_939),
-        (true, false, 98_253, 87_616, 14_897),
-        (true, true, 172_358, 86_912, 14_897),
+        (false, false, 67_151, 79_744, 11_939),
+        (false, true, 124_671, 79_040, 11_939),
+        (true, false, 98_263, 87_616, 14_897),
+        (true, true, 172_541, 86_912, 14_897),
     ] {
         for (kind, amount) in [
             (BudgetKind::Work, work),
@@ -557,9 +561,9 @@ fn lattice_scalar_baseline() -> TestResult {
     assert_eq!(
         measured,
         [
-            (0, 50_969, 1_028, 868, 98_096, 10_039),
-            (1, 67_141, 1_087, 1_010, 124_524, 11_939),
-            (2, 98_253, 1_146, 1_256, 172_358, 14_897),
+            (0, 50_979, 1_028, 868, 98_219, 10_039),
+            (1, 67_151, 1_087, 1_010, 124_671, 11_939),
+            (2, 98_263, 1_146, 1_256, 172_541, 14_897),
         ]
     );
     Ok(())
@@ -569,7 +573,7 @@ fn lattice_scalar_baseline() -> TestResult {
 /// ´test:integration:lattice-scalar-baseline-work´
 #[test]
 fn lattice_scalar_baseline_work() -> TestResult {
-    for (replay, needed) in [(false, 50_969), (true, 98_096)] {
+    for (replay, needed) in [(false, 50_979), (true, 98_219)] {
         for (allowance, prior, succeeds) in [
             (needed, 0, true),
             (needed - 1, 0, false),
@@ -598,7 +602,7 @@ fn lattice_scalar_baseline_work() -> TestResult {
                 work: allowance,
                 ..Limits::default()
             };
-            let mut budget = Budget::new(limits.clone())?;
+            let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
             budget.work(prior, Location::new("prior lattice baseline work"))?;
             let result = if let Some(bytes) = bytes {
                 cas.inspect(&bytes, &mut budget)

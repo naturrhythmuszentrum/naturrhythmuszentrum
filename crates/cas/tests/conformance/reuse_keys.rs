@@ -39,8 +39,12 @@ fn reciprocal(case: &mut Fixture, denominator: &str) -> TestResult<Handle> {
 }
 
 fn premise(case: &mut Fixture, kind: PredicateKind, symbol: &str, domain: bool) -> TestResult {
-    let header = case.cas.context_header(&case.context)?;
-    let source = case.cas.admissible_region(&case.context)?;
+    let header = case
+        .cas
+        .context_header(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
+    let source = case
+        .cas
+        .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
     let term = case.symbol(symbol)?;
     let predicate = admit(
         &mut case.cas,
@@ -196,7 +200,9 @@ fn reuse_key_excludes_proof_allocation_order() -> TestResult {
     use nrz_cas::proof::{Certificate, Primitive};
     let mut case = fixture("capacitance", false)?;
     let original = reciprocal(&mut case, "C")?;
-    let domain = case.cas.admissible_region(&case.context)?;
+    let domain = case
+        .cas
+        .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
     let first = crate::testing::witness::equality(
         &case.context,
         &domain,

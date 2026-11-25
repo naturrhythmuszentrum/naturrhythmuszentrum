@@ -27,18 +27,28 @@ const fn invalid() -> Fault {
     clippy::redundant_pub_crate,
     reason = "statement validation and the closed checker share these roles"
 )]
-pub(crate) fn roles(cas: &Cas, selection: &IntegerSelection) -> Result<(), Fault> {
-    crate::decision_cut::family::roles(cas, &selection.family)?;
-    literal(cas, selection)?;
+pub(crate) fn roles(
+    cas: &Cas,
+    selection: &IntegerSelection,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    crate::decision_cut::family::roles(cas, &selection.family, budget)?;
+    literal(cas, selection, budget)?;
     Ok(())
 }
 
 /// The selected result is an exact Integer literal under the original declaration header.
-fn literal<'a>(cas: &'a Cas, selection: &IntegerSelection) -> Result<&'a Rational, Fault> {
-    let value = cas.state.expression(cas.checked(&selection.value)?)?;
+fn literal<'a>(
+    cas: &'a Cas,
+    selection: &IntegerSelection,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Rational, Fault> {
+    let value = cas
+        .state
+        .expression(cas.checked(&selection.value, budget)?, budget)?;
     let function = cas
         .state
-        .expression(cas.checked(&selection.family.function)?)?;
+        .expression(cas.checked(&selection.family.function, budget)?, budget)?;
     if value.sort != Sort::Value(AtomicSort::Integer)
         || value.header != function.header
         || !value.scope.is_empty()
@@ -81,9 +91,9 @@ pub(crate) fn check(
     if !draft.substitutions.is_empty() {
         return Err(invalid());
     }
-    roles(cas, selection)?;
-    family(cas, draft, selection, cover)?;
-    coordinate(cas, draft, selection, enclosure, correspondence)?;
+    roles(cas, selection, budget)?;
+    family(cas, draft, selection, cover, budget)?;
+    coordinate(cas, draft, selection, enclosure, correspondence, budget)?;
     crate::decision_enclosure::validate(cas, enclosure, budget)?;
     let scratch = budget
         .limits()
@@ -92,7 +102,7 @@ pub(crate) fn check(
         .saturating_mul(32)
         .saturating_add(4_096);
     budget.with_retained_payload(scratch, AT, |budget| {
-        let value = literal(cas, selection)?;
+        let value = literal(cas, selection, budget)?;
         value.check(budget, AT)?;
         crate::decision_cut::family::contains(cas, draft, &selection.family, cover, value, budget)?;
         cell(value, enclosure, budget)
@@ -111,6 +121,7 @@ fn family(
     draft: &ApplicationDraft,
     selection: &IntegerSelection,
     cover: &CheckedApplication,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let Statement::IntegerFamily(family) = &cover.judgment.statement else {
         return Err(invalid());
@@ -120,8 +131,11 @@ fn family(
         || cover.judgment.context != draft.context
         || !cover.conditions.residuals.is_empty()
         || family.as_ref() != &selection.family
-        || cas.state.context(cas.checked(&draft.context)?)?.admissible
-            != cas.checked(&selection.family.domain)?
+        || cas
+            .state
+            .context(cas.checked(&draft.context, budget)?, budget)?
+            .admissible
+            != cas.checked(&selection.family.domain, budget)?
     {
         return Err(invalid());
     }
@@ -135,6 +149,7 @@ fn coordinate(
     selection: &IntegerSelection,
     enclosure: &RationalEnclosure,
     premise: &CheckedApplication,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     let family = &selection.family;
     let different_context = enclosure.context != draft.context;
@@ -159,14 +174,16 @@ fn coordinate(
             Ok(())
         }
         Statement::PredicateFact { region, predicate } if *region == family.domain => {
-            let Vertex::Condition(predicate) = cas.state.node(cas.checked(predicate)?)? else {
+            let Vertex::Condition(predicate) =
+                cas.state.node(cas.checked(predicate, budget)?, budget)?
+            else {
                 return Err(invalid());
             };
             if predicate.kind != PredicateKind::Equal
                 || predicate.arguments
                     != [
-                        cas.checked(&family.coordinate)?,
-                        cas.checked(&enclosure.target)?,
+                        cas.checked(&family.coordinate, budget)?,
+                        cas.checked(&enclosure.target, budget)?,
                     ]
             {
                 return Err(invalid());
@@ -209,10 +226,13 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<(&'a IntegerSelection, &'a RationalEnclosure), Fault> {
         budget.work(4, AT)?;
-        let Vertex::Proof(application) = self.state.node(self.checked(witness.proof())?)? else {
+        let Vertex::Proof(application) = self
+            .state
+            .node(self.checked(witness.proof(), budget)?, budget)?
+        else {
             return Err(invalid());
         };
-        let Vertex::ScopedApplication(proof) = self.state.node(*application)? else {
+        let Vertex::ScopedApplication(proof) = self.state.node(*application, budget)? else {
             return Err(invalid());
         };
         let Statement::IntegerSelection(selection) = &proof.judgment.statement else {
@@ -238,10 +258,13 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<u64, Fault> {
         budget.work(4, AT)?;
-        let Vertex::Proof(application) = self.state.node(self.checked(witness.proof())?)? else {
+        let Vertex::Proof(application) = self
+            .state
+            .node(self.checked(witness.proof(), budget)?, budget)?
+        else {
             return Err(invalid());
         };
-        let Vertex::ScopedApplication(proof) = self.state.node(*application)? else {
+        let Vertex::ScopedApplication(proof) = self.state.node(*application, budget)? else {
             return Err(invalid());
         };
         let Statement::IntegerSelection(selection) = &proof.judgment.statement else {
@@ -253,6 +276,6 @@ impl Cas {
         {
             return Err(invalid());
         }
-        literal(self, selection)?.materialize_count(capacity, budget)
+        literal(self, selection, budget)?.materialize_count(capacity, budget)
     }
 }

@@ -57,7 +57,7 @@ fn set(
     entries: &[Handle],
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let original = crate::solving::elementary::proof::problem(cas, problem)?;
+    let original = crate::solving::elementary::proof::problem(cas, problem, budget)?;
     let (coordinates, domain) = (original.unknowns.clone(), original.domain.clone());
     let mut tuples = vector(entries.len(), budget)?;
     for entry in entries {
@@ -171,9 +171,9 @@ pub(crate) fn coverage(
     values: &Values,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let original_problem = crate::solving::elementary::proof::problem(cas, problem)?;
+    let original_problem = crate::solving::elementary::proof::problem(cas, problem, budget)?;
     let coordinates =
-        crate::solving::elementary::proof::coordinates(cas, &original_problem.unknowns)?;
+        crate::solving::elementary::proof::coordinates(cas, &original_problem.unknowns, budget)?;
     let [coordinate] = coordinates.coordinates.as_slice() else {
         return Err(invalid());
     };
@@ -185,7 +185,7 @@ pub(crate) fn coverage(
     let (entries, product) = factors(cas, construction, values, &scalar, &unknown, budget)?;
     let input = original(cas, construction, polynomial, values, &unknown, budget)?;
     // Regional replay independently matches the original equation and every factor to this shared input.
-    let original_region = &crate::solving::elementary::proof::problem(cas, problem)?.region;
+    let original_region = &crate::solving::elementary::proof::problem(cas, problem, budget)?.region;
     let right = if *original_region == construction.region {
         &product
     } else {

@@ -33,7 +33,9 @@ fn from_fixture(
     let receipt = source.cas.walk_derived(&root, &mut ledger()?)?.receipt;
     let request = Request {
         task: Task::Select {
-            region: source.cas.admissible_region(&frame)?,
+            region: source
+                .cas
+                .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?,
         },
         context: frame,
         inputs: vec![CoveredInput { root, receipt }],
@@ -57,9 +59,17 @@ fn decision_certified_selection_costs() -> TestResult {
             else {
                 return Err("selected equality".into());
             };
-            assert_eq!(*domain, source.cas.admissible_region(&request.context)?);
+            assert_eq!(
+                *domain,
+                source.cas.admissible_region(
+                    &request.context,
+                    &mut crate::testing::budgets::graph_budget()?
+                )?
+            );
             if matches!(example, Example::Integer) {
-                let (operator, sort) = source.cas.expression(right)?;
+                let (operator, sort) = source
+                    .cas
+                    .expression(right, &mut crate::testing::budgets::graph_budget()?)?;
                 assert_eq!(
                     *sort,
                     nrz_cas::syntax::Sort::Value(nrz_cas::syntax::AtomicSort::Integer)
@@ -70,13 +80,22 @@ fn decision_certified_selection_costs() -> TestResult {
                         super::super::decision_partitions::rational(3, 1)?
                     )
                 );
-                assert_eq!(source.cas.scalar_ambient(right)?, None);
+                assert_eq!(
+                    source
+                        .cas
+                        .scalar_ambient(right, &mut crate::testing::budgets::graph_budget()?)?,
+                    None
+                );
             }
+            let mut read_budget = crate::testing::budgets::graph_budget()?;
             let kinds = result
                 .witness
                 .hypotheses()
                 .iter()
-                .map(|used| used.qualified(&source.cas).map(|view| view.kind))
+                .map(|used| {
+                    used.qualified(&source.cas, &mut read_budget)
+                        .map(|view| view.kind)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             assert!(kinds.contains(&HypothesisKind::CertifiedRegionMembership));
             assert!(kinds.contains(&HypothesisKind::Equality));
@@ -88,10 +107,10 @@ fn decision_certified_selection_costs() -> TestResult {
         [
             (
                 "Integer".into(),
-                ("proved".into(), 385_253, 1_438_620, 3_186)
+                ("proved".into(), 385_277, 1_439_080, 3_186)
             ),
-            ("Sign".into(), ("proved".into(), 126_185, 614_642, 1_844)),
-            ("Phase".into(), ("pending".into(), 128_836, 0, 0)),
+            ("Sign".into(), ("proved".into(), 126_209, 614_936, 1_844)),
+            ("Phase".into(), ("pending".into(), 128_860, 0, 0)),
         ]
     );
     Ok(())
@@ -257,7 +276,9 @@ fn bounded_attempt(
     use nrz_cas::limits::BudgetKind;
     let (mut fixture, mut supplied) = request(example)?;
     match kind {
-        BudgetKind::Work => supplied.limits.work = Some(amount),
+        BudgetKind::Work => {
+            supplied.limits.work = Some(amount);
+        }
         BudgetKind::ReplayWork => supplied.limits.replay_work = Some(amount),
         BudgetKind::StagedPayloadBytes => supplied.limits.staged_payload_bytes = Some(amount),
         BudgetKind::PayloadBytes => supplied.limits.payload_bytes = Some(amount),
@@ -292,10 +313,10 @@ fn decision_certified_selection_boundaries() -> TestResult {
     for (example, amounts) in [
         (
             Example::Integer,
-            [377_774, 1_438_620, 166_333, 94_315, 3_186],
+            [377_798, 1_439_080, 166_333, 94_315, 3_186],
         ),
-        (Example::Sign, [120_048, 614_642, 161_277, 47_229, 1_844]),
-        (Example::Phase, [128_836, 0, 92_320, 89_739, 0]),
+        (Example::Sign, [120_072, 614_936, 161_277, 47_229, 1_844]),
+        (Example::Phase, [128_860, 0, 92_320, 89_739, 0]),
     ] {
         for (kind, amount) in [
             BudgetKind::Work,
@@ -328,7 +349,10 @@ fn decision_certified_selection_boundaries() -> TestResult {
 fn decision_certified_selection_no_elimination_cover() -> TestResult {
     let (mut fixture, mut supplied) = request(Example::Sign)?;
     let source = &mut fixture.partition.source;
-    let domain = source.cas.admissible_region(&supplied.context)?;
+    let domain = source.cas.admissible_region(
+        &supplied.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let value = source.number(0, 1)?;
     supplied.inputs.clear();
     supplied.task = Task::Eliminate {
@@ -371,7 +395,10 @@ fn integer_expected(
         statement: Statement::Equality {
             left: fixture.partition.question.function.clone(),
             right: three,
-            domain: source.cas.admissible_region(&supplied.context)?,
+            domain: source.cas.admissible_region(
+                &supplied.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual,
         },
     })

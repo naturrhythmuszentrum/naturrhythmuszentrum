@@ -31,6 +31,7 @@ impl Components<'_, '_> {
                     self.evaluation.cas,
                     self.evaluation.region,
                     &premise.judgment.statement,
+                    budget,
                 )? {
                     self.empty_leaves = true;
                     self.import_empty(subject, budget)?;
@@ -76,7 +77,8 @@ impl Components<'_, '_> {
                         if matches!(
                             super::super::evidence::predicate(
                                 self.evaluation.cas,
-                                predicate.logical_id()
+                                predicate.logical_id(),
+                                budget,
                             )?,
                             (PredicateKind::Positive | PredicateKind::NonZero, [_])
                         ) {
@@ -84,7 +86,7 @@ impl Components<'_, '_> {
                                 .evaluation
                                 .cas
                                 .state
-                                .region(self.evaluation.region.logical_id())?
+                                .region(self.evaluation.region.logical_id(), budget)?
                                 .lies_over
                                 .is_some();
                         }
@@ -121,7 +123,7 @@ impl Components<'_, '_> {
             pending.push(self.evaluation.region.logical_id());
             while let Some(id) = pending.pop() {
                 budget.work(1, AT)?;
-                match &self.evaluation.cas.state.region(id)?.expression {
+                match &self.evaluation.cas.state.region(id, budget)?.expression {
                     RegionExpr::GuardTrue { base, predicate } => {
                         self.record_predicate(*predicate, &[], budget)?;
                         reserve(&mut pending, 1, budget)?;
@@ -199,7 +201,8 @@ impl Components<'_, '_> {
             pending.push(root);
             while let Some(id) = pending.pop() {
                 budget.work(1, AT)?;
-                let (kind, arguments) = super::super::evidence::predicate(self.evaluation.cas, id)?;
+                let (kind, arguments) =
+                    super::super::evidence::predicate(self.evaluation.cas, id, budget)?;
                 match (kind, arguments) {
                     (PredicateKind::And, _) => {
                         reserve(&mut pending, arguments.len(), budget)?;
@@ -370,7 +373,8 @@ impl Components<'_, '_> {
             pending.push(root);
             while let Some(id) = pending.pop() {
                 budget.work(1, AT)?;
-                let (kind, arguments) = super::super::evidence::predicate(self.evaluation.cas, id)?;
+                let (kind, arguments) =
+                    super::super::evidence::predicate(self.evaluation.cas, id, budget)?;
                 match (kind, arguments) {
                     (PredicateKind::And, _) => {
                         reserve(&mut pending, arguments.len(), budget)?;

@@ -25,7 +25,7 @@ fn containment<P: Scalar + 'static>() -> TestResult {
             Rational::new(frequency, 40)?.subtract(Rational::new(100_000, frequency)?)?;
         let current = Rational::new(-3, 1)?.divide(reactance)?;
         for rounded in [false, true] {
-            let mut budget = fixture::budget()?;
+            let mut budget = fixture::resources::fresh_budget()?;
             let nominal = if sign < 0 {
                 -P::from_u8(75)
             } else {
@@ -159,7 +159,12 @@ fn lc_phasor_solve_refuses_zero_and_straddling_reactance() -> TestResult {
         (-0.125, 0.25, false),
         (0.125, 0.125, false),
     ] {
-        let mut case = fixture::case(reactance, radius, false, &mut fixture::budget()?)?;
+        let mut case = fixture::case(
+            reactance,
+            radius,
+            false,
+            &mut fixture::resources::fresh_budget()?,
+        )?;
         let publication = case.publication(&mut ledger()?)?;
         let values = case.heap.reading_entries(&case.bindings[0])?;
         if pole {
@@ -186,7 +191,12 @@ fn lc_phasor_solve_refuses_zero_and_straddling_reactance() -> TestResult {
 /// ´test:integration:lc-phasor-transfer-distinguishes-metrics-and-block-norms´
 #[test]
 fn lc_phasor_transfer_distinguishes_metrics_and_block_norms() -> TestResult {
-    let case = fixture::case(75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let context = ArithmeticContext::new()?;
     let mut factors = Vec::new();
     for (changed, norm) in [
@@ -218,7 +228,12 @@ fn lc_phasor_transfer_distinguishes_metrics_and_block_norms() -> TestResult {
 #[test]
 fn lc_phasor_solve_invalidates_all_restored_readers() -> TestResult {
     for index in [0, 5] {
-        let mut case = fixture::case(-75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+        let mut case = fixture::case(
+            -75.0_f64,
+            0.0,
+            false,
+            &mut fixture::resources::fresh_budget()?,
+        )?;
         let publication = case.publication(&mut ledger()?)?;
         let context = ArithmeticContext::new()?;
         let published = case
@@ -291,7 +306,12 @@ fn complete(limits: nrz_bindings::Limits, prior: u64) -> TestResult<u64> {
 /// ´test:integration:lc-phasor-solve-encloses-a-declared-reactance-family´
 #[test]
 fn lc_phasor_solve_encloses_a_declared_reactance_family() -> TestResult {
-    let case = fixture::case(-75.0_f64, 0.125, true, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        -75.0_f64,
+        0.125,
+        true,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let plan = case.solve(false, PhasorResidualNorm::BlockFrobenius, &mut ledger()?)?;
     let context = ArithmeticContext::new()?;
     let result = case
@@ -311,7 +331,12 @@ fn lc_phasor_solve_encloses_a_declared_reactance_family() -> TestResult {
 /// ´test:integration:lc-phasor-solve-refuses-swapped-sources-and-metrics´
 #[test]
 fn lc_phasor_solve_refuses_swapped_sources_and_metrics() -> TestResult {
-    let case = fixture::case(75.0_f64, 0.0, false, &mut fixture::budget()?)?;
+    let case = fixture::case(
+        75.0_f64,
+        0.0,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     assert!(
         nrz_bindings::readings::PhasorResidualTransfer::new(
             case.definition.clone(),
@@ -372,7 +397,12 @@ fn lc_phasor_inventory_retains_original_selections() -> TestResult {
 
 /// Source roles distinguish repeated and negated storage copies and their own-target parameters.
 fn inventory_sources<P: Scalar + 'static>() -> TestResult {
-    let mut case = fixture::case(-P::from_u8(75), P::ZERO, false, &mut fixture::budget()?)?;
+    let mut case = fixture::case(
+        -P::from_u8(75),
+        P::ZERO,
+        false,
+        &mut fixture::resources::fresh_budget()?,
+    )?;
     let publication = case.publication(&mut ledger()?)?;
     let context = ArithmeticContext::new()?;
     let result = case

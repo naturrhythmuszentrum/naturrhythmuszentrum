@@ -59,14 +59,15 @@ impl Cas {
     ) -> Result<ReuseKey, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                cas.state.expression(cas.checked(expression)?)?;
+                cas.state
+                    .expression(cas.checked(expression, budget)?, budget)?;
                 let step = ApplicationDraft {
                     rule: Primitive::Reflexivity,
                     context: context.clone(),
                     conclusion: Statement::Equality {
                         left: expression.clone(),
                         right: expression.clone(),
-                        domain: cas.admissible_region(context)?,
+                        domain: cas.admissible_region(context, budget)?,
                         domain_contract: DomainContract::DefinedAndEqual,
                     },
                     premises: Vec::new(),
@@ -92,7 +93,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<ReuseKey, Fault> {
         self.inventory_limits(budget, |budget| {
-            let id = self.checked(witness.proof())?;
+            let id = self.checked(witness.proof(), budget)?;
             let application = crate::proof_view::application(self, id, budget)?;
             authenticate(self, witness, &application, budget)?;
             self.reuse_application(witness.proof(), &application, budget)
@@ -107,7 +108,7 @@ impl Cas {
     /// Refuses foreign owners, changed key contents and exhausted cumulative resources.
     pub fn validate_reuse_key(&self, key: &ReuseKey, budget: &mut Budget) -> Result<(), Fault> {
         self.inventory_limits(budget, |budget| {
-            let id = self.checked(&key.owner)?;
+            let id = self.checked(&key.owner, budget)?;
             let retained = size(key.bytes.len(), AT)?.saturating_add(64);
             let previous = budget.reserve_temporary(retained, AT)?;
             let result = (|| {
@@ -206,7 +207,7 @@ fn authenticate(
     if !same_judgment || !same_hypotheses {
         return Err(invalid(InvalidCode::DependencyWitness));
     }
-    let actual = crate::wire_build::encode(cas, cas.checked(witness.proof())?, budget)?;
+    let actual = crate::wire_build::encode(cas, cas.checked(witness.proof(), budget)?, budget)?;
     budget.work(size(actual.len().max(witness.bytes.len()), AT)?, AT)?;
     if actual != witness.bytes {
         return Err(invalid(InvalidCode::DependencyWitness));

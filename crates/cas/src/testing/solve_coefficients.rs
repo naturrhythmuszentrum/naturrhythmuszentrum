@@ -405,8 +405,9 @@ impl Fixture {
         polynomial: &Handle,
         ambient: &Field,
     ) -> TestResult<(Handle, Handle)> {
+        let mut budget = crate::testing::common::default_budget()?;
         use crate::test_api::solving::{CoefficientMapData, MapMode, MapTarget, SolveView};
-        let SolveView::Polynomial(stored) = self.cas.solve_view(polynomial)? else {
+        let SolveView::Polynomial(stored) = self.cas.solve_view(polynomial, &mut budget)? else {
             return Err("wrong root polynomial".into());
         };
         let source = stored.domain.clone();
@@ -645,9 +646,10 @@ impl Fixture {
 
     /// Admit an exact product region without assuming any general region decision.
     pub(crate) fn region_expression(&mut self, expression: RegionExpr) -> TestResult<Handle> {
+        let mut budget = crate::testing::common::default_budget()?;
         use crate::test_api::solving::SolveView;
         let SolveView::CoefficientDomain(CoefficientDomainData::Fraction { coordinates, .. }) =
-            self.cas.solve_view(&self.fractions)?
+            self.cas.solve_view(&self.fractions, &mut budget)?
         else {
             return Err("missing parameter frame".into());
         };

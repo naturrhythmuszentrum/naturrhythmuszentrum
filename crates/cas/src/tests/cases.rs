@@ -10,7 +10,7 @@ use crate::rule::Primitive;
 use crate::search::SearchPolicy;
 use crate::source_model::{SourceClauseDraft, SourceFormDraft, SourceFormKind};
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture, admit, budget, predicate, term};
+use crate::testing::native::{Fixture, admit, fresh_budget, predicate, term};
 
 /// Certificates cannot omit a row, flip a cell or insert an unused syntax role.
 /// ´test:crate:case-certificate-tamper-atomicity´
@@ -32,10 +32,11 @@ fn case_certificate_tamper_atomicity() -> TestResult {
         conclusion.clone(),
         &[],
         Certificate::None,
-        &mut budget()?,
-        &mut budget()?,
+        &mut fresh_budget()?,
+        &mut fresh_budget()?,
     )?;
-    let original = crate::proof_view::application(&f.cas, proof.logical_id(), &mut budget()?)?;
+    let original =
+        crate::proof_view::application(&f.cas, proof.logical_id(), &mut fresh_budget()?)?;
     for mutation in 0..3 {
         let mut certificate = original.certificate.clone();
         let Certificate::Cases(value) = &mut certificate else {
@@ -64,13 +65,13 @@ fn case_certificate_tamper_atomicity() -> TestResult {
             substitutions: Vec::new(),
             certificate,
         };
-        let before = f.cas.canonical_snapshot(&mut budget()?)?;
+        let before = f.cas.canonical_snapshot(&mut fresh_budget()?)?;
         assert!(
             f.cas
-                .check_proof(&f.context, &[draft], &mut budget()?)
+                .check_proof(&f.context, &[draft], &mut fresh_budget()?)
                 .is_err()
         );
-        assert_eq!(f.cas.canonical_snapshot(&mut budget()?)?, before);
+        assert_eq!(f.cas.canonical_snapshot(&mut fresh_budget()?)?, before);
     }
     Ok(())
 }
@@ -112,17 +113,20 @@ fn case_reached_nonzero_requirement() -> TestResult {
         context,
         source.logical_id(),
         &[],
-        &mut budget()?,
+        &mut fresh_budget()?,
     )?;
     let no_residuals: &[crate::proof_model::GuardedObligation] = &[];
     assert_eq!(built.conditions.residuals.as_slice(), no_residuals);
     let mut found = 0;
     for required in &built.conditions.requirements {
-        if f.cas.predicate_kind(&required.predicate)? == &PredicateKind::NonZero {
+        if f.cas
+            .predicate_kind(&required.predicate, &mut fresh_budget()?)?
+            == &PredicateKind::NonZero
+        {
             let cells = crate::region::partition(
                 &f.cas.state,
                 &[required.region.logical_id()],
-                &mut budget()?,
+                &mut fresh_budget()?,
             )?;
             assert_eq!(cells.cuts, vec![crate::number::Rational::zero()]);
             assert_eq!(cells.membership, vec![vec![true, false, true]]);
@@ -148,12 +152,12 @@ fn case_elimination_frame_identity() -> TestResult {
         &f.cases,
         &f.zero,
         &[f.domain.clone()],
-        &mut budget()?,
-        &mut budget()?,
+        &mut fresh_budget()?,
+        &mut fresh_budget()?,
     )?;
-    let root = crate::proof_view::application(&f.cas, root.logical_id(), &mut budget()?)?;
+    let root = crate::proof_view::application(&f.cas, root.logical_id(), &mut fresh_budget()?)?;
     let id = *root.premises.get(2).ok_or("missing elimination")?;
-    let mut elimination = crate::proof_view::application(&f.cas, id, &mut budget()?)?;
+    let mut elimination = crate::proof_view::application(&f.cas, id, &mut fresh_budget()?)?;
     let assumption = predicate(
         &mut f.cas,
         &f.header,
@@ -177,7 +181,11 @@ fn case_elimination_frame_identity() -> TestResult {
     *certificate.frames.first_mut().ok_or("missing frame")? = sibling;
     let mut earlier = Vec::new();
     for id in &elimination.premises {
-        earlier.push(crate::proof_view::application(&f.cas, *id, &mut budget()?)?);
+        earlier.push(crate::proof_view::application(
+            &f.cas,
+            *id,
+            &mut fresh_budget()?,
+        )?);
     }
     let draft = ApplicationDraft {
         context: f.context,
@@ -189,8 +197,13 @@ fn case_elimination_frame_identity() -> TestResult {
     };
     let mut candidate = f.cas.full_copy_for_test();
     assert!(
-        crate::scoped_check::check_application(&mut candidate, &draft, &earlier, &mut budget()?)
-            .is_err()
+        crate::scoped_check::check_application(
+            &mut candidate,
+            &draft,
+            &earlier,
+            &mut fresh_budget()?
+        )
+        .is_err()
     );
     Ok(())
 }
@@ -234,7 +247,7 @@ fn region_predicate_fact_defined() -> TestResult {
     };
     assert!(
         f.cas
-            .check_proof(&f.context, &[draft], &mut budget()?)?
+            .check_proof(&f.context, &[draft], &mut fresh_budget()?)?
             .is_discharged()
     );
     Ok(())
@@ -277,7 +290,7 @@ fn region_predicate_fact_vacuous() -> TestResult {
     };
     assert!(
         f.cas
-            .check_proof(&f.context, &[draft], &mut budget()?)?
+            .check_proof(&f.context, &[draft], &mut fresh_budget()?)?
             .is_discharged()
     );
     Ok(())
@@ -291,36 +304,44 @@ fn case_bound_instantiation_typed_dependencies() -> TestResult {
     let (cases, boundary) = crate::testing::native::scoped_cases(&mut f)?;
     let output = f
         .cas
-        .instantiate_bound(&cases, &[f.one.clone()], &mut budget()?)?;
-    let expression = f.cas.state.expression(output.logical_id())?;
-    let no_frames: &[Vec<crate::model::AtomicSort>] = &[];
-    assert_eq!(expression.scope.as_slice(), no_frames);
-    let arm = f
+        .instantiate_bound(&cases, &[f.one.clone()], &mut fresh_budget()?)?;
+    let expression = f
         .cas
         .state
-        .arm(*expression.arms.first().ok_or("missing instantiated arm")?)?;
+        .expression(output.logical_id(), &mut fresh_budget()?)?;
+    let no_frames: &[Vec<crate::model::AtomicSort>] = &[];
+    assert_eq!(expression.scope.as_slice(), no_frames);
+    let arm = f.cas.state.arm(
+        *expression.arms.first().ok_or("missing instantiated arm")?,
+        &mut fresh_budget()?,
+    )?;
     assert_eq!(arm.value, f.one.logical_id());
-    let region = f.cas.state.region(arm.region)?;
+    let region = f.cas.state.region(arm.region, &mut fresh_budget()?)?;
     assert_eq!(region.scope.as_slice(), no_frames);
     let RegionExpr::GuardTrue { predicate, .. } = region.expression else {
         return Err("missing predicate".into());
     };
     assert_eq!(
         f.cas
-            .predicate_arguments(&f.cas.handle(predicate), &mut budget()?)?,
+            .predicate_arguments(&f.cas.handle(predicate), &mut fresh_budget()?)?,
         vec![f.one.clone()]
     );
     let point = f
         .cas
-        .instantiate_bound(&boundary, &[f.one.clone()], &mut budget()?)?;
+        .instantiate_bound(&boundary, &[f.one.clone()], &mut fresh_budget()?)?;
     assert_eq!(
-        f.cas.state.boundary(point.logical_id())?.location,
+        f.cas
+            .state
+            .boundary(point.logical_id(), &mut fresh_budget()?)?
+            .location,
         f.one.logical_id()
     );
-    let root = f.cas.materialize_derived(&output, &cases, &mut budget()?)?;
+    let root = f
+        .cas
+        .materialize_derived(&output, &cases, &mut fresh_budget()?)?;
     assert!(
         !f.cas
-            .walk_derived(&root, &mut budget()?)?
+            .walk_derived(&root, &mut fresh_budget()?)?
             .receipt
             .is_original()
     );

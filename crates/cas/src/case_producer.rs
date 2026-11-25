@@ -71,8 +71,14 @@ impl<'a> Plan<'a> {
                 .ok_or_else(invalid)?;
             self.attempt(budget)?;
             self.visit()?;
-            let before = cas.state.expression(step.left.logical_id())?.unfolded;
-            let after = cas.state.expression(step.right.logical_id())?.unfolded;
+            let before = cas
+                .state
+                .expression(step.left.logical_id(), budget)?
+                .unfolded;
+            let after = cas
+                .state
+                .expression(step.right.logical_id(), budget)?
+                .unfolded;
             self.expansion(before, after, budget)?;
         }
         Ok(())
@@ -213,7 +219,7 @@ impl<'a> Plan<'a> {
         replay(cas, &witness, checker)?;
         let peak = trace
             .iter()
-            .filter_map(|handle| cas.state.expression(handle.logical_id()).ok())
+            .filter_map(|handle| cas.state.expression(handle.logical_id(), checker).ok())
             .map(|value| value.unfolded)
             .max()
             .unwrap_or(1);
@@ -259,7 +265,7 @@ fn proposal(
     for (index, proof) in premises.iter().enumerate() {
         earlier.push(crate::proof_view::application(
             cas,
-            cas.checked(proof)?,
+            cas.checked(proof, generation)?,
             generation,
         )?);
         indices.push(u32::try_from(index).map_err(|_| invalid())?);
@@ -322,8 +328,11 @@ pub(crate) fn domain(
     generation: &mut Budget,
     checker: &mut Budget,
 ) -> Result<(Handle, Handle), Fault> {
-    let within = cas.state.context(cas.checked(context)?)?.admissible;
-    let root = cas.checked(function)?;
+    let within = cas
+        .state
+        .context(cas.checked(context, generation)?, generation)?
+        .admissible;
+    let root = cas.checked(function, generation)?;
     let order = crate::case_syntax::order(cas, &[root], generation)?;
     let domains = crate::case_syntax::domains(cas, &order, within, generation)?;
     let domain = cas.handle(*domains.get(&root).ok_or_else(invalid)?);

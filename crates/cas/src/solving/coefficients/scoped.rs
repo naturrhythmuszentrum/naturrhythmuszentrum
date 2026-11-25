@@ -35,7 +35,7 @@ pub(crate) fn interpreted(
     roots: &[Handle],
     budget: &mut Budget,
 ) -> Result<Form, Fault> {
-    let stored = polynomial(&interpreter.cas.state, handle)?;
+    let stored = polynomial(&interpreter.cas.state, handle, budget)?;
     if stored.variables.len() != roots.len() {
         return Err(invalid());
     }
@@ -44,7 +44,7 @@ pub(crate) fn interpreted(
         let expression = interpreter
             .cas
             .state
-            .expression(interpreter.cas.checked(root)?)?;
+            .expression(interpreter.cas.checked(root, budget)?, budget)?;
         if expression.sort != Sort::Value(AtomicSort::Scalar(field.clone())) {
             return Err(invalid());
         }
@@ -104,7 +104,7 @@ fn endpoints(
     for reference in &premise.conditions.hypotheses {
         budget.work(1, AT)?;
         if reference.context == *context
-            && crate::context_check::predicate(interpreter.cas, reference)? == *predicate
+            && crate::context_check::predicate(interpreter.cas, reference, budget)? == *predicate
         {
             exact = true;
         }
@@ -115,7 +115,7 @@ fn endpoints(
     let Vertex::Condition(condition) = interpreter
         .cas
         .state
-        .node(interpreter.cas.checked(predicate)?)?
+        .node(interpreter.cas.checked(predicate, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -141,12 +141,12 @@ pub(crate) fn relation(
 ) -> Result<(), Fault> {
     budget.work(1, AT)?;
     let predicates = endpoints(interpreter, context, evidence, budget)?;
-    let frame = polynomial(&interpreter.cas.state, &multiple.relation)?;
+    let frame = polynomial(&interpreter.cas.state, &multiple.relation, budget)?;
     for (handle, predicate) in [&evidence.left, &evidence.right]
         .into_iter()
         .zip(&predicates)
     {
-        let endpoint = polynomial(&interpreter.cas.state, handle)?;
+        let endpoint = polynomial(&interpreter.cas.state, handle, budget)?;
         budget.work(crate::graph::size(endpoint.variables.len(), AT)?, AT)?;
         if (&endpoint.domain, &endpoint.variables) != (&frame.domain, &frame.variables) {
             return Err(invalid());

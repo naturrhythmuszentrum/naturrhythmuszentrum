@@ -16,14 +16,16 @@ fn scalar_witness(
     value: &VerifiedWitness,
     budget: &mut Budget,
 ) -> Result<crate::scalar_model::VerifiedWitness, Fault> {
-    cas.checked(value.proof())?;
+    cas.checked(value.proof(), budget)?;
     let claim = crate::proof_view::scalar_claim(cas, value.judgment(), budget)?;
     let mut hypotheses = Vec::new();
     hypotheses
         .try_reserve_exact(value.hypotheses.len())
         .map_err(|_| Fault::allocation(AT))?;
     for reference in &value.hypotheses {
-        let frame = cas.state.context(cas.checked(&reference.context)?)?;
+        let frame = cas
+            .state
+            .context(cas.checked(&reference.context, budget)?, budget)?;
         if frame.parent.is_some() {
             return Err(Fault::invalid(InvalidCode::UnsupportedFragment, AT));
         }

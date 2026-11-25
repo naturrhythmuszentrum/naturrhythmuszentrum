@@ -84,8 +84,14 @@ fn prepare(mut case: Fixture) -> TestResult<FixturePlan> {
 
 /// Explicit model positivity is retained by CAS; runtime still has to prove its whole-box counterpart.
 fn positive(case: &mut Fixture) -> TestResult {
-    let header = case.cas.context_header(&case.context)?;
-    let domain = case.cas.admissible_region(&case.context)?;
+    let header = case.cas.context_header(
+        &case.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
+    let domain = case.cas.admissible_region(
+        &case.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     let mut assumptions = Vec::new();
     for key in ["L", "C"] {
         let term = case.symbol(key)?;
@@ -188,7 +194,10 @@ pub(crate) fn meaning(name: &str, dimensions: [i64; 7], value: &str) -> TestResu
 /// Exact terms use the same original header and never inspect heap data.
 fn term(case: &mut Fixture, operator: Operator, operands: &[Handle]) -> TestResult<Handle> {
     use nrz_bindings::readings::algebra::syntax::ExpressionDraft;
-    let header = case.cas.context_header(&case.context)?;
+    let header = case.cas.context_header(
+        &case.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     Ok(case
         .cas
         .admit(

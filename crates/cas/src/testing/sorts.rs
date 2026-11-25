@@ -51,6 +51,7 @@ impl Fixture {
 
     /// Mixed solving shares the unchanged acceptance profile.
     pub(crate) fn with_limits(limits: Limits) -> TestResult<Self> {
+        let mut budget = crate::testing::common::default_budget()?;
         let mut cas = Cas::new(limits)?;
         let declarations = [
             ("r", Field::Real),
@@ -88,9 +89,11 @@ impl Fixture {
             Vec::new(),
             Vec::new(),
         )?;
-        let real_space = cas.scalar_ambient(&real)?.ok_or("missing Real ambient")?;
+        let real_space = cas
+            .scalar_ambient(&real, &mut budget)?
+            .ok_or("missing Real ambient")?;
         let complex_space = cas
-            .scalar_ambient(&complex)?
+            .scalar_ambient(&complex, &mut budget)?
             .ok_or("missing Complex ambient")?;
         Ok(Self {
             cas,

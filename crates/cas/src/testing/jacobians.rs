@@ -65,7 +65,9 @@ pub(crate) fn expected(
             input,
             output: oracle.clone(),
             variables: coordinates().sources,
-            domain: case.cas.admissible_region(&case.context)?,
+            domain: case
+                .cas
+                .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?,
         },
         residuals: Vec::new(),
     })
@@ -76,8 +78,12 @@ pub(crate) fn positive_family(case: &mut Fixture, keys: &[&str]) -> TestResult {
     use crate::test_api::Reference;
     use crate::test_api::domain::{AssumptionDraft, ContextDraft};
     use crate::test_api::syntax::{Draft, PredicateKind};
-    let header = case.cas.context_header(&case.context)?;
-    let domain = case.cas.admissible_region(&case.context)?;
+    let header = case
+        .cas
+        .context_header(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
+    let domain = case
+        .cas
+        .admissible_region(&case.context, &mut crate::testing::budgets::graph_budget()?)?;
     let mut assumptions = Vec::new();
     for key in keys {
         let term = case.symbol(key)?;

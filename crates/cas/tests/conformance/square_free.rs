@@ -21,7 +21,10 @@ fn square_free_constants_and_zero() -> TestResult {
         let mut fixture = Fixture::new(Field::Rational)?;
         let input = fixture.number(text)?;
         let result = fixture.decompose(&input)?;
-        let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+        let certificate = fixture.cas.square_free_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?;
         assert_eq!(certificate.scalar, Rational::parse(text, &mut budget()?)?);
         assert_eq!(
             certificate.layers,
@@ -52,7 +55,10 @@ fn square_free_unsplit_quadratic() -> TestResult {
     let mut fixture = Fixture::new(Field::Real)?;
     let input = fixture.polynomial(&[1, 0, 1])?;
     let result = fixture.decompose(&input)?;
-    let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+    let certificate = fixture.cas.square_free_certificate(
+        &result.witness,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     assert_eq!(certificate.layers.len(), 1);
     let layer = certificate.layers.first().ok_or("quadratic layer")?;
     assert_eq!(layer.multiplicity, 1);
@@ -67,7 +73,10 @@ fn square_free_single_repeated_factor() -> TestResult {
     let mut fixture = Fixture::new(Field::Rational)?;
     let input = fixture.polynomial(&[-162, 216, -108, 24, -2])?;
     let result = fixture.decompose(&input)?;
-    let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+    let certificate = fixture.cas.square_free_certificate(
+        &result.witness,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     assert_eq!(
         certificate.scalar,
         Rational::from_ratio(-2, 1, &mut budget()?)?
@@ -91,7 +100,10 @@ fn square_free_rational_coefficients() -> TestResult {
     let third = fixture.number("3")?;
     let input = fixture.term(Operator::Div, &[square, third])?;
     let result = fixture.decompose(&input)?;
-    let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+    let certificate = fixture.cas.square_free_certificate(
+        &result.witness,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     assert_eq!(certificate.scalar, Rational::parse("1/3", &mut budget()?)?);
     let layer = certificate.layers.first().ok_or("rational layer")?;
     assert_eq!(layer.multiplicity, 2);
@@ -161,7 +173,10 @@ fn square_free_certificate_tampering() -> TestResult {
     let result = fixture.decompose(&input)?;
     let original = fixture
         .cas
-        .square_free_certificate(&result.witness)?
+        .square_free_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         .clone();
     for mutation in 0..10 {
         let mut certificate = original.clone();
@@ -220,7 +235,10 @@ fn square_free_claim_tampering() -> TestResult {
     let result = fixture.decompose(&input)?;
     let certificate = fixture
         .cas
-        .square_free_certificate(&result.witness)?
+        .square_free_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         .clone();
     let different = fixture.number("1")?;
     for mutation in 0..4 {
@@ -236,7 +254,10 @@ fn square_free_claim_tampering() -> TestResult {
                 step.conclusion = Statement::SquareFree {
                     input: crate::testing::witness::left(result.witness.judgment())?.clone(),
                     output: crate::testing::witness::right(result.witness.judgment())?.clone(),
-                    domain: fixture.cas.admissible_region(&fixture.context)?,
+                    domain: fixture.cas.admissible_region(
+                        &fixture.context,
+                        &mut crate::testing::budgets::graph_budget()?,
+                    )?,
                     variable: "y".into(),
                     field: Field::Rational,
                 }
@@ -245,7 +266,10 @@ fn square_free_claim_tampering() -> TestResult {
                 step.conclusion = Statement::SquareFree {
                     input: crate::testing::witness::left(result.witness.judgment())?.clone(),
                     output: crate::testing::witness::right(result.witness.judgment())?.clone(),
-                    domain: fixture.cas.admissible_region(&fixture.context)?,
+                    domain: fixture.cas.admissible_region(
+                        &fixture.context,
+                        &mut crate::testing::budgets::graph_budget()?,
+                    )?,
                     variable: "x".into(),
                     field: Field::Real,
                 }
@@ -362,7 +386,10 @@ fn square_free_small_binomial_family() -> TestResult {
         let mut fixture = Fixture::new(Field::Rational)?;
         let input = fixture.polynomial(&coefficients)?;
         let result = fixture.decompose(&input)?;
-        let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+        let certificate = fixture.cas.square_free_certificate(
+            &result.witness,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?;
         assert_eq!(certificate.layers.len(), 1);
         let layer = certificate.layers.first().ok_or("binomial layer")?;
         assert_eq!(layer.coefficients, rationals(&[shift, 1])?);
@@ -437,7 +464,10 @@ fn square_free_sparse_term_boundary() -> TestResult {
     let Outcome::Proved { result, .. } = fixture.cas.run(&request) else {
         return Err("dense padding spent the nonzero term allowance".into());
     };
-    let certificate = fixture.cas.square_free_certificate(&result.witness)?;
+    let certificate = fixture.cas.square_free_certificate(
+        &result.witness,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let layer = certificate.layers.first().ok_or("monomial layer")?;
     assert_eq!(layer.coefficients, rationals(&[0, 1])?);
     assert_eq!(layer.multiplicity, 3);

@@ -463,7 +463,10 @@ fn branches(
     let mut branches = Vec::new();
     for root in roots {
         let set = base.finite(problem, std::slice::from_ref(root))?;
-        let SolveView::SolutionSet(set) = base.cas.solve_view(&set)? else {
+        let SolveView::SolutionSet(set) = base
+            .cas
+            .solve_view(&set, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing set".into());
         };
         branches.push(set.branches.first().ok_or("missing branch")?.clone());
@@ -586,7 +589,10 @@ pub(crate) fn fraction_realness(guarded: bool) -> TestResult<BinomialFixture> {
     }
     let parameter = base.free("a")?;
     let (polynomial, map) = base.parameter_binomial(&parameter)?;
-    let SolveView::Polynomial(polynomial) = base.cas.solve_view(&polynomial)? else {
+    let SolveView::Polynomial(polynomial) = base
+        .cas
+        .solve_view(&polynomial, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing polynomial".into());
     };
     let source = polynomial
@@ -595,7 +601,10 @@ pub(crate) fn fraction_realness(guarded: bool) -> TestResult<BinomialFixture> {
         .ok_or("missing coefficient")?
         .coefficient
         .clone();
-    let SolveView::CoefficientValue(value) = base.cas.solve_view(&source)? else {
+    let SolveView::CoefficientValue(value) = base
+        .cas
+        .solve_view(&source, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing fraction".into());
     };
     let CoefficientValueData::Fraction {

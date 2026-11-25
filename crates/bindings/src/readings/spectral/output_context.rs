@@ -17,9 +17,9 @@ pub(super) fn check(
     budget: &mut Budget,
 ) -> Result<(), Error> {
     budget.work(3, AT)?;
-    cas.context_header(law.operator().frame().context())?;
-    cas.context_header(context)?;
-    let region = cas.admissible_region(context)?;
+    cas.context_header(law.operator().frame().context(), budget)?;
+    cas.context_header(context, budget)?;
+    let region = cas.admissible_region(context, budget)?;
     let syntax = cas.describe_syntax(&region, budget)?;
     if !matches!(
         syntax.node,
@@ -33,7 +33,7 @@ pub(super) fn check(
         context: context.clone(),
         slot: 0,
     };
-    match cas.hypothesis_name(&first) {
+    match cas.hypothesis_name(&first, budget) {
         Err(error) if error.kind == FaultKind::Invalid(InvalidCode::Reference) => Ok(()),
         Err(error) => Err(error.into()),
         Ok(_) => Err(Error::Conditional),

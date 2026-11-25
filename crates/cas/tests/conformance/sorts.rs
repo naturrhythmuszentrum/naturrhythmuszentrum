@@ -19,7 +19,9 @@ use nrz_cas::{FaultKind, InvalidCode, Reference};
 fn scalar_own_space_is_real() -> TestResult {
     let fixture = Fixture::new()?;
     assert_eq!(
-        fixture.cas.scalar_ambient(&fixture.real)?,
+        fixture
+            .cas
+            .scalar_ambient(&fixture.real, &mut crate::testing::budgets::graph_budget()?)?,
         Some(fixture.real_space)
     );
     let descriptor = fixture
@@ -48,7 +50,10 @@ fn scalar_slot_references_are_exact() -> TestResult {
         ("r", Field::Real, CoordinateRole::Coefficient),
         ("c", Field::Complex, CoordinateRole::Coefficient),
     ])?;
-    let SolveView::CoordinateSpace(value) = fixture.cas.solve_view(&frame)? else {
+    let SolveView::CoordinateSpace(value) = fixture
+        .cas
+        .solve_view(&frame, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("wrong frame".into());
     };
     assert_eq!(
@@ -170,11 +175,16 @@ fn scalar_family_arm_retains_original_operands() -> TestResult {
         }),
     )?;
     assert_eq!(
-        fixture.cas.scalar_ambient(&cases)?,
+        fixture
+            .cas
+            .scalar_ambient(&cases, &mut crate::testing::budgets::graph_budget()?)?,
         Some(fixture.complex_space)
     );
     assert_eq!(piece.logical_id().kind, VertexKind::ScalarPiece);
-    let SolveView::FamilyExpression(value) = fixture.cas.solve_view(&body)? else {
+    let SolveView::FamilyExpression(value) = fixture
+        .cas
+        .solve_view(&body, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("body missing".into());
     };
     assert_eq!(value.arguments[0].value, fixture.real);
@@ -551,7 +561,12 @@ fn scalar_unregistered_declaration_has_no_ambient() -> TestResult {
         Vec::new(),
         Vec::new(),
     )?;
-    assert_eq!(fixture.cas.scalar_ambient(&value)?, None);
+    assert_eq!(
+        fixture
+            .cas
+            .scalar_ambient(&value, &mut crate::testing::budgets::graph_budget()?)?,
+        None
+    );
     let draft = Draft::Solve(SolveDraft::CoordinateSpace(CoordinateSpaceData {
         scalar_spaces: vec![Some(reference(&fixture.real_space))],
         header: reference(&header),
@@ -601,7 +616,9 @@ fn scalar_header_extension_is_conservative() -> TestResult {
         Vec::new(),
     )?;
     assert_eq!(
-        fixture.cas.scalar_ambient(&inherited)?,
+        fixture
+            .cas
+            .scalar_ambient(&inherited, &mut crate::testing::budgets::graph_budget()?)?,
         Some(fixture.real_space)
     );
     let changed = Declaration {
@@ -667,13 +684,19 @@ fn scalar_family_renaming_preserves_roles() -> TestResult {
     let renamed = fixture
         .cas
         .rename_axes(&body, &map, &mut Budget::new(Limits::default())?)?;
-    let SolveView::FamilyExpression(value) = fixture.cas.solve_view(&renamed)? else {
+    let SolveView::FamilyExpression(value) = fixture
+        .cas
+        .solve_view(&renamed, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing renamed body".into());
     };
     assert_eq!(value.ambient, fixture.complex_space);
     assert_eq!(value.arguments[0].role, FamilyArgumentRole::Base);
     assert_eq!(
-        fixture.cas.scalar_ambient(&value.arguments[0].value)?,
+        fixture.cas.scalar_ambient(
+            &value.arguments[0].value,
+            &mut crate::testing::budgets::graph_budget()?
+        )?,
         Some(fixture.real_space)
     );
     Ok(())

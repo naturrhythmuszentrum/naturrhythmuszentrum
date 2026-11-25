@@ -34,7 +34,12 @@ fn assumed_cancellation() -> TestResult {
         .hypotheses()
         .first()
         .ok_or("missing root hypothesis")?;
-    assert_eq!(fixture.cas.hypothesis_name(reference)?, Some("positive-x"));
+    assert_eq!(
+        fixture
+            .cas
+            .hypothesis_name(reference, &mut crate::testing::budgets::graph_budget()?)?,
+        Some("positive-x")
+    );
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
     let (mut fresh, quotient, _) = cancellation()?;
     fresh.assume("positive-x", PredicateKind::Positive, &fresh.x.clone())?;

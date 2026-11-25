@@ -209,7 +209,7 @@ pub(crate) fn leading(
         return Ok(construction.unit(cas, &source.domain, budget)?);
     }
     if matches!(
-        crate::solving::coefficients::storage::domain(&cas.state, &source.domain)?,
+        crate::solving::coefficients::storage::domain(&cas.state, &source.domain, budget)?,
         CoefficientDomainData::Quotient { .. }
     ) {
         return Err(CoefficientFailure::Unsupported(

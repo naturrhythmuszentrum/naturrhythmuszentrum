@@ -101,7 +101,10 @@ fn predicate(
     kind: PredicateKind,
     arguments: &[Handle],
 ) -> TestResult<Handle> {
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     admit(
         &mut fixture.cas,
         Draft::Condition {
@@ -128,7 +131,10 @@ fn frame(fixture: &mut Fixture, condition: &Handle, local: bool) -> TestResult<H
         }
     } else {
         ContextDraft::Root {
-            header: Reference::Existing(fixture.cas.context_header(&fixture.context)?),
+            header: Reference::Existing(fixture.cas.context_header(
+                &fixture.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?),
             admissible: Reference::Existing(fixture.domain.clone()),
             assumptions,
         }
@@ -165,13 +171,17 @@ fn qualified_hypothesis_kinds_retain_slots() -> TestResult {
             context: context.clone(),
             slot,
         };
-        let qualified = reference.qualified(&fixture.cas)?;
+        let qualified =
+            reference.qualified(&fixture.cas, &mut crate::testing::budgets::graph_budget()?)?;
         assert_eq!(qualified.context, *context);
         assert_eq!(qualified.slot, slot);
         assert_eq!(qualified.kind, kind);
         assert!(
             reference
-                .qualified(&Cas::new(budget()?.limits().clone())?)
+                .qualified(
+                    &Cas::new(budget()?.limits().clone())?,
+                    &mut crate::testing::budgets::graph_budget()?
+                )
                 .is_err()
         );
     }
@@ -182,11 +192,16 @@ fn qualified_hypothesis_kinds_retain_slots() -> TestResult {
                 context,
                 slot: u32::MAX
             }
-            .qualified(&fixture.cas)
+            .qualified(&fixture.cas, &mut crate::testing::budgets::graph_budget()?)
             .is_err()
         );
     }
-    assert!(fixture.cas.predicate_hypothesis_kind(&subject).is_err());
+    assert!(
+        fixture
+            .cas
+            .predicate_hypothesis_kind(&subject, &mut crate::testing::budgets::graph_budget()?)
+            .is_err()
+    );
     Ok(())
 }
 
@@ -207,15 +222,21 @@ fn hypothesis_kinds_inspect_exact_zero() -> TestResult {
     let reverse = predicate(&mut fixture, PredicateKind::Equal, &[zero, left])?;
     let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
     assert_eq!(
-        fixture.cas.predicate_hypothesis_kind(&equality)?,
+        fixture
+            .cas
+            .predicate_hypothesis_kind(&equality, &mut crate::testing::budgets::graph_budget()?)?,
         HypothesisKind::Equality
     );
     assert_eq!(
-        fixture.cas.predicate_hypothesis_kind(&forward)?,
+        fixture
+            .cas
+            .predicate_hypothesis_kind(&forward, &mut crate::testing::budgets::graph_budget()?)?,
         HypothesisKind::DeclaredZero
     );
     assert_eq!(
-        fixture.cas.predicate_hypothesis_kind(&reverse)?,
+        fixture
+            .cas
+            .predicate_hypothesis_kind(&reverse, &mut crate::testing::budgets::graph_budget()?)?,
         HypothesisKind::DeclaredZero
     );
     assert_eq!(fixture.cas.canonical_snapshot(&mut budget()?)?, before);
@@ -243,7 +264,13 @@ fn hypothesis_kinds_distinguish_real_signs() -> TestResult {
             region: fixture.domain.clone(),
             conclusion,
         })));
-        assert_eq!(fixture.cas.statement_hypothesis_kind(&statement)?, expected);
+        assert_eq!(
+            fixture.cas.statement_hypothesis_kind(
+                &statement,
+                &mut crate::testing::budgets::graph_budget()?
+            )?,
+            expected
+        );
     }
     Ok(())
 }

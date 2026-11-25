@@ -70,6 +70,7 @@ fn fixture(reordered: bool) -> TestResult<(Cas, Handle)> {
 /// ´test:crate:series-object-wire-admission´
 #[test]
 fn series_object_wire_admission() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (sender, source) = fixture(false)?;
     let record = crate::wire_records::describe(
         &sender,
@@ -84,7 +85,7 @@ fn series_object_wire_admission() -> TestResult {
     for reordered in [false, true] {
         let (mut receiver, expected) = fixture(reordered)?;
         let objects: Vec<_> = receiver
-            .series_object(&expected)?
+            .series_object(&expected, &mut budget)?
             .references()
             .cloned()
             .map(crate::wire_decode::Decoded::Object)

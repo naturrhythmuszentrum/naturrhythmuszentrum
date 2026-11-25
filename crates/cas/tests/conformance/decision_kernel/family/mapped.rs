@@ -162,6 +162,6 @@ fn forgery(offset: bool) -> TestResult {
     );
     assert_eq!(fault.location, Location::new("scalar kernel reading map"));
     assert_eq!(source.cas.counts(), before);
-    assert_eq!(budget.usage().work, 4688);
+    assert_eq!(budget.usage().work, 4_688);
     Ok(())
 }

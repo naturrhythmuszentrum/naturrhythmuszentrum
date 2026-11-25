@@ -39,7 +39,7 @@ fn lattice_shared_widened_attempt() -> TestResult {
     let witness = cas.export_witness(archived.witness(), &mut ledger()?)?;
     let mut budget = ledger()?;
     let attempt = cas.prepare_lattice_selection(&cover, &expected, &wide, &mut budget)?;
-    assert_eq!(budget.usage().work, 129_218);
+    assert_eq!(budget.usage().work, 129_329);
     let LatticeSelectionOutcome::Undecided(undecided) =
         cas.select_lattice_attempt(&attempt, &mut budget)?
     else {
@@ -50,8 +50,8 @@ fn lattice_shared_widened_attempt() -> TestResult {
         LatticeUndecidedReason::BoundaryIntersection
     );
     assert!(std::ptr::eq(undecided.evidence, &raw const attempt));
-    assert_eq!(undecided.spent_work, 298_242);
-    assert_eq!(budget.usage().work, 298_242);
+    assert_eq!(undecided.spent_work, 298_464);
+    assert_eq!(budget.usage().work, 298_464);
     assert_eq!(cas.counts(), before);
     assert_eq!(bytes.len(), 22_862);
     assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, bytes);

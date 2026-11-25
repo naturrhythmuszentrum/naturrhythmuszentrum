@@ -18,13 +18,14 @@ fn maps(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let SolveDraft::CoefficientMap(map) =
-        crate::solving::graph::object(&evaluation.cas.state, certificate.map.logical_id())?
+        crate::solving::graph::object(&evaluation.cas.state, certificate.map.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     let SolveDraft::CoefficientMap(conjugate) = crate::solving::graph::object(
         &evaluation.cas.state,
         certificate.conjugate_map.logical_id(),
+        budget,
     )?
     else {
         return Err(invalid());

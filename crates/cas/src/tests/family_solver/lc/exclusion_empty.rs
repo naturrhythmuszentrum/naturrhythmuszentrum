@@ -9,7 +9,7 @@ use crate::proof::{
     Statement,
 };
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture, admit, budget, predicate};
+use crate::testing::native::{Fixture, admit, fresh_budget, predicate};
 
 fn guarded(fixture: &mut Fixture, base: &Handle, condition: Handle) -> TestResult<Handle> {
     admit(
@@ -78,14 +78,16 @@ fn setup() -> TestResult<(Fixture, Handle, Handle, ApplicationDraft)> {
 fn empty_zero_set_keeps_original_base() -> TestResult {
     let (mut fixture, base, ambient, mut step) = setup()?;
     let context = step.context.clone();
-    let witness = fixture
-        .cas
-        .check_proof(&context, std::slice::from_ref(&step), &mut budget()?)?;
+    let witness =
+        fixture
+            .cas
+            .check_proof(&context, std::slice::from_ref(&step), &mut fresh_budget()?)?;
     assert_eq!(
         crate::solving::elementary::exclusion::subject(
             &fixture.cas,
             &base,
-            &witness.judgment().statement
+            &witness.judgment().statement,
+            &mut fresh_budget()?,
         )?,
         Some(fixture.x.logical_id())
     );
@@ -93,7 +95,8 @@ fn empty_zero_set_keeps_original_base() -> TestResult {
         crate::solving::elementary::exclusion::subject(
             &fixture.cas,
             &ambient,
-            &witness.judgment().statement
+            &witness.judgment().statement,
+            &mut fresh_budget()?,
         )?,
         None
     );
@@ -111,7 +114,7 @@ fn empty_zero_set_keeps_original_base() -> TestResult {
     assert!(
         fixture
             .cas
-            .check_proof(&context, &[step], &mut budget()?)
+            .check_proof(&context, &[step], &mut fresh_budget()?)
             .is_err()
     );
     assert_eq!(fixture.cas.counts(), before);

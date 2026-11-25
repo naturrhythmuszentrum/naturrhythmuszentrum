@@ -168,7 +168,10 @@ fn local(
 fn union(base: &mut Fixture, problem: &Handle, nodes: &[Node]) -> TestResult<Handle> {
     let mut branches = Vec::new();
     for node in nodes {
-        let SolveView::SolutionSet(set) = base.cas.solve_view(&node.set)? else {
+        let SolveView::SolutionSet(set) = base
+            .cas
+            .solve_view(&node.set, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing child set".into());
         };
         branches.extend(set.branches.iter().cloned().map(Reference::Existing));
@@ -277,7 +280,11 @@ fn widen(fixture: &mut BinomialFixture, draft: &mut ApplicationDraft) -> TestRes
     let SolveStatement::Presentation(claim) = statement.as_mut() else {
         return Err("wrong claim".into());
     };
-    let SolveView::SolutionSet(set) = fixture.base.cas.solve_view(&claim.set)? else {
+    let SolveView::SolutionSet(set) = fixture
+        .base
+        .cas
+        .solve_view(&claim.set, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing set".into());
     };
     let problem = set.problem.clone();

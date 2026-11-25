@@ -63,7 +63,7 @@ impl IntegerDecisionCase {
             return Err(DecisionError::Case);
         }
         super::family::authenticate(self.source(), enclosure, budget)?;
-        let (operator, sort) = authority.expression(&selection.value)?;
+        let (operator, sort) = authority.expression(&selection.value, budget)?;
         let Operator::Rational(value) = operator else {
             return Err(DecisionError::Case);
         };

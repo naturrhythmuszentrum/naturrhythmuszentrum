@@ -33,14 +33,14 @@ pub(crate) fn handles(
         } => {
             if *order > 1
                 || matches!(
-                    cas.state.region(domain.logical_id())?.ambient,
+                    cas.state.region(domain.logical_id(), budget)?.ambient,
                     AmbientDomain::Real(_)
                 )
             {
                 return Ok(true);
             }
             for id in crate::case_syntax::order(cas, inputs, budget)? {
-                if cas.state.expression(id)?.domain.is_some() {
+                if cas.state.expression(id, budget)?.domain.is_some() {
                     return Ok(true);
                 }
             }
@@ -124,7 +124,13 @@ impl Runner<'_> {
                 layer: Layer::Pointwise,
             } => {
                 self.order(*order, true)?;
-                crate::boundary_roles::region(self.cas, function, domain, coordinate)?;
+                crate::boundary_roles::region(
+                    self.cas,
+                    function,
+                    domain,
+                    coordinate,
+                    self.generation,
+                )?;
                 if crate::case_obligations::empty(self.cas, domain.logical_id(), self.generation)? {
                     return Err(Fault::invalid(
                         crate::error::InvalidCode::EmptyDomain,
@@ -144,11 +150,17 @@ impl Runner<'_> {
                 coordinate,
                 requested_facts,
             } => {
-                crate::boundary_roles::point(self.cas, function, point, coordinate)?;
+                crate::boundary_roles::point(
+                    self.cas,
+                    function,
+                    point,
+                    coordinate,
+                    self.generation,
+                )?;
                 let domain = self.cas.handle(
                     self.cas
                         .state
-                        .context(self.request.context.logical_id())?
+                        .context(self.request.context.logical_id(), self.generation)?
                         .admissible,
                 );
                 let job = DerivativeJob {

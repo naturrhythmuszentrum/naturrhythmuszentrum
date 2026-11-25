@@ -69,7 +69,9 @@ impl CompanionParameters {
             checked.push(parameter_target(kind, target, budget)?);
         }
         let (sort, operator, _, header) = support::inspect(cas, symbol, budget)?;
-        if !matches!(operator, Operator::Free(_)) || header != cas.context_header(context)? {
+        if !matches!(operator, Operator::Free(_))
+            || header != cas.context_header(context, budget)?
+        {
             return Err(ReadingError::Definition.into());
         }
         if support::shape(&sort)? != parameter_shape(&checked)? {

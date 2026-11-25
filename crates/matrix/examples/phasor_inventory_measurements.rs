@@ -59,7 +59,7 @@ fn measure<P: Scalar + 'static>(publish: bool) -> reading_testing::TestResult {
         -P::from_u8(75),
         P::ZERO,
         false,
-        &mut phasor_solve_testing::budget()?,
+        &mut phasor_solve_testing::resources::fresh_budget()?,
     )?;
     let plan = case.publication(&mut reading_testing::ledger()?)?;
     let context = ArithmeticContext::new()?;

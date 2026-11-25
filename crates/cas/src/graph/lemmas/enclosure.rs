@@ -61,7 +61,7 @@ impl Cas {
         let Some(id) = existing else {
             return Ok(None);
         };
-        let node = self.enclosure_lemma(id)?;
+        let node = self.enclosure_lemma(id, budget)?;
         if node.epoch != self.memo_epoch
             || self.memo_epoch == u64::MAX
             || !Arc::ptr_eq(&node.owner, &self.memo_owner)
@@ -81,8 +81,8 @@ impl Cas {
     ) -> Result<PendingJudgment, Fault> {
         let bytes = crate::enclosure::footprint(&value).saturating_add(size(key.len(), AT)?);
         budget.work(bytes, AT)?;
-        if let Some(id) = self.state.intern.get(&key).copied() {
-            let old = self.enclosure_inventory(id)?;
+        if let Some(id) = self.state.intern.get(&key, 0, budget, AT)?.copied() {
+            let old = self.enclosure_inventory(id, budget)?;
             if old.value.certificate() != value.certificate()
                 || old.value.request() != value.request()
             {
@@ -92,8 +92,8 @@ impl Cas {
             return Ok(PendingJudgment::RecheckedEnclosure(id));
         }
         let scope = [
-            self.checked(&value.request().target)?,
-            self.checked(&value.request().context)?,
+            self.checked(&value.request().target, budget)?,
+            self.checked(&value.request().context, budget)?,
         ];
         Ok(PendingJudgment::NewEnclosure(EnclosureInventory {
             key,
@@ -116,20 +116,28 @@ impl Cas {
     }
 
     /// The shared preflight authenticates existing receipts before refreshing their namespace.
-    pub(super) fn enclosure_inventory(&self, id: LogicalId) -> Result<&EnclosureInventory, Fault> {
-        Ok(&self.enclosure_lemma(id)?.inventory)
+    pub(super) fn enclosure_inventory(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&EnclosureInventory, Fault> {
+        Ok(&self.enclosure_lemma(id, budget)?.inventory)
     }
 
     /// A canonical index never substitutes for its graph payload or actual checked edge.
-    fn enclosure_lemma(&self, id: LogicalId) -> Result<&EnclosureLemma, Fault> {
-        let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+    fn enclosure_lemma(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&EnclosureLemma, Fault> {
+        let Vertex::AnonymousLemma(node) = self.state.node(id, budget)? else {
             return Err(invalid());
         };
         let AnonymousLemma::Enclosure(node) = node.as_ref() else {
             return Err(invalid());
         };
-        let source = self.state.indices[&node.inventory.scope[0]];
-        let target = self.state.indices[&id];
+        let source = self.state.index(node.inventory.scope[0], budget)?;
+        let target = self.state.index(id, budget)?;
         if self.state.graph.edge_endpoints(node.citation) != Some((source, target))
             || !matches!(
                 self.state.graph.edge_weight(node.citation),
@@ -142,8 +150,7 @@ impl Cas {
     }
 
     /// Refresh only after complete replay, receipt copying and shared publication preflight.
-    pub(super) fn refresh_enclosure(&mut self, id: LogicalId) {
-        let index = self.state.indices[&id];
+    pub(super) fn refresh_enclosure(&mut self, index: crate::graph::NodeIndex<u32>) {
         if let Vertex::AnonymousLemma(node) = &mut self.state.graph[index]
             && let AnonymousLemma::Enclosure(node) = node.as_mut()
         {
@@ -154,10 +161,12 @@ impl Cas {
 }
 
 /// Move the already preflighted payload into the common graph and rollback journal.
-pub(super) fn append(cas: &mut Cas, id: LogicalId, inventory: EnclosureInventory) {
+pub(super) fn append(cas: &mut Cas, inventory: EnclosureInventory, plan: super::scalar::NewPlan) {
     let state = &mut cas.state;
-    let [original, context] = inventory.scope.map(|id| state.indices[&id]);
-    let key = inventory.key.clone();
+    let [Some(original), Some(context), _] = plan.sources else {
+        unreachable!("preflight resolved enclosure scope")
+    };
+    let key = plan.intern_key.expect("preflighted enclosure key");
     let bytes = inventory.bytes;
     let citation = EdgeIndex::new(state.graph.edge_count() + 2);
     let index = state
@@ -173,9 +182,17 @@ pub(super) fn append(cas: &mut Cas, id: LogicalId, inventory: EnclosureInventory
     state.graph.add_edge(index, original, Edge::Input(0));
     state.graph.add_edge(index, context, Edge::InContext);
     state.graph.add_edge(original, index, Edge::CheckedEvidence);
-    state.indices.insert(id, index);
-    state.intern.insert(key, id, &cas.token);
-    state.retain(VertexKind::AnonymousLemma);
+    state
+        .indices
+        .insert_prepared(plan.index_position, plan.id, index);
+    state
+        .intern
+        .insert_prepared_key(plan.key_position, key, plan.id, &cas.token);
+    state.retain_prepared(
+        VertexKind::AnonymousLemma,
+        plan.retained_position,
+        plan.retained_next,
+    );
     state.payload = state.payload.saturating_add(bytes);
     state.judgment_bytes = state.judgment_bytes.saturating_add(bytes);
     state.judgment_count += 1;

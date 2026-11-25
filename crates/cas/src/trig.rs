@@ -71,7 +71,7 @@ fn candidate(
             let Statement::Equality { right, domain, .. } = &equality.judgment.statement else {
                 return Ok(None);
             };
-            let constant = cas.state.expression(cas.checked(right)?)?;
+            let constant = cas.state.expression(cas.checked(right, budget)?, budget)?;
             let Operator::Rational(value) = &constant.operator else {
                 return Ok(None);
             };
@@ -109,7 +109,9 @@ impl Cas {
     ) -> Result<Option<crate::proof_model::VerifiedWitness>, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                let expression = cas.state.expression(cas.checked(function)?)?;
+                let expression = cas
+                    .state
+                    .expression(cas.checked(function, budget)?, budget)?;
                 budget.work(1, AT)?;
                 if proofs.len() > 2 {
                     return Err(invalid());
@@ -124,7 +126,7 @@ impl Cas {
                 for proof in proofs {
                     premises.push(crate::proof_view::application(
                         cas,
-                        cas.checked(proof)?,
+                        cas.checked(proof, budget)?,
                         budget,
                     )?);
                 }
@@ -181,7 +183,9 @@ fn value_term(
     operands: Vec<Handle>,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let expression = cas.state.expression(cas.checked(function)?)?;
+    let expression = cas
+        .state
+        .expression(cas.checked(function, budget)?, budget)?;
     let header = cas.handle(expression.header);
     let bytes = if expression.scope.is_empty() {
         // An empty scope owns no buffer and needs no copy or temporary workspace.
@@ -195,7 +199,10 @@ fn value_term(
         bytes
     };
     budget.with_retained_payload(bytes, AT, |budget| {
-        let source = &cas.state.expression(cas.checked(function)?)?.scope;
+        let source = &cas
+            .state
+            .expression(cas.checked(function, budget)?, budget)?
+            .scope;
         let mut scope = Vec::new();
         scope
             .try_reserve_exact(source.len())
@@ -258,11 +265,12 @@ pub(crate) fn value_check(
     };
     let u = cas.handle(crate::rule_check::unary(
         &cas.state,
-        cas.checked(left)?,
+        cas.checked(left, budget)?,
         &operator,
+        budget,
     )?);
-    let operand = cas.state.expression(cas.checked(&u)?)?;
-    let output = cas.state.expression(cas.checked(right)?)?;
+    let operand = cas.state.expression(cas.checked(&u, budget)?, budget)?;
+    let output = cas.state.expression(cas.checked(right, budget)?, budget)?;
     if operand.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || output.sort != operand.sort
         || output.scope != operand.scope
@@ -302,7 +310,7 @@ pub(crate) fn value_check(
             let [guard, equality] = premises else {
                 return Err(invalid());
             };
-            definedness(cas, &u, domain, &guard.judgment.statement)?;
+            definedness(cas, &u, domain, &guard.judgment.statement, budget)?;
             let Statement::Equality {
                 left: original,
                 right: constant,
@@ -317,7 +325,7 @@ pub(crate) fn value_check(
                 || region != domain
                 || !crate::rule_check::literal(
                     &cas.state,
-                    cas.checked(constant)?,
+                    cas.checked(constant, budget)?,
                     i64::from(one),
                     budget,
                 )?
@@ -338,15 +346,19 @@ pub(crate) fn value_check(
 /// Reconstruct the exact arctangent endpoint without a transcendental evaluation.
 fn atan_output(cas: &Cas, right: &Handle, one: bool, budget: &mut Budget) -> Result<(), Fault> {
     if one {
-        let (pi, quarter) =
-            crate::rule_check::binary(&cas.state, cas.checked(right)?, &Operator::Mul)?;
-        if cas.state.expression(pi)?.operator != Operator::Constant(Constant::Pi)
-            || cas.state.expression(quarter)?.operator
+        let (pi, quarter) = crate::rule_check::binary(
+            &cas.state,
+            cas.checked(right, budget)?,
+            &Operator::Mul,
+            budget,
+        )?;
+        if cas.state.expression(pi, budget)?.operator != Operator::Constant(Constant::Pi)
+            || cas.state.expression(quarter, budget)?.operator
                 != Operator::Rational(Rational::from_ratio(1, 4, budget)?)
         {
             return Err(invalid());
         }
-    } else if !crate::rule_check::literal(&cas.state, cas.checked(right)?, 0, budget)? {
+    } else if !crate::rule_check::literal(&cas.state, cas.checked(right, budget)?, 0, budget)? {
         return Err(invalid());
     }
     Ok(())
@@ -374,9 +386,9 @@ pub(crate) fn roles(
     if !k.is_integer() {
         return Err(invalid());
     }
-    let operand = cas.state.expression(cas.checked(u)?)?;
-    let frame = cas.state.context(cas.checked(context)?)?;
-    let region = cas.state.region(cas.checked(domain)?)?;
+    let operand = cas.state.expression(cas.checked(u, budget)?, budget)?;
+    let frame = cas.state.context(cas.checked(context, budget)?, budget)?;
+    let region = cas.state.region(cas.checked(domain, budget)?, budget)?;
     if operand.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || operand.space.is_some()
         || (!region.scope.is_empty() && region.scope != operand.scope)
@@ -436,7 +448,7 @@ pub(crate) fn check(
             return Err(invalid());
         }
     }
-    definedness(cas, u, domain, &guard.judgment.statement)?;
+    definedness(cas, u, domain, &guard.judgment.statement, budget)?;
     let Statement::Equality {
         left,
         right,
@@ -458,17 +470,26 @@ pub(crate) fn check(
 }
 
 /// Only the original domain or the exact Defined predicate supplies the first slot.
-fn definedness(cas: &Cas, u: &Handle, domain: &Handle, statement: &Statement) -> Result<(), Fault> {
+fn definedness(
+    cas: &Cas,
+    u: &Handle,
+    domain: &Handle,
+    statement: &Statement,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     match statement {
         Statement::DefinedDomain {
             function,
             domain: region,
         } if function == u && region == domain => Ok(()),
         Statement::PredicateFact { region, predicate } if region == domain => {
-            let Vertex::Condition(value) = cas.state.node(cas.checked(predicate)?)? else {
+            let Vertex::Condition(value) =
+                cas.state.node(cas.checked(predicate, budget)?, budget)?
+            else {
                 return Err(invalid());
             };
-            if value.kind != PredicateKind::Defined || value.arguments != [cas.checked(u)?] {
+            if value.kind != PredicateKind::Defined || value.arguments != [cas.checked(u, budget)?]
+            {
                 return Err(invalid());
             }
             Ok(())
@@ -485,8 +506,8 @@ fn coefficient(
     k: &Rational,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let operand = cas.state.expression(cas.checked(u)?)?;
-    let endpoint = cas.state.expression(cas.checked(right)?)?;
+    let operand = cas.state.expression(cas.checked(u, budget)?, budget)?;
+    let endpoint = cas.state.expression(cas.checked(right, budget)?, budget)?;
     if endpoint.sort != operand.sort
         || endpoint.scope != operand.scope
         || endpoint.ambient != operand.ambient
@@ -495,10 +516,14 @@ fn coefficient(
     }
     let two = Rational::from_ratio(2, 1, budget)?;
     let half = k.div(&two, budget)?;
-    let (pi, rational) =
-        crate::rule_check::binary(&cas.state, cas.checked(right)?, &Operator::Mul)?;
-    let pi = cas.state.expression(pi)?;
-    let rational = cas.state.expression(rational)?;
+    let (pi, rational) = crate::rule_check::binary(
+        &cas.state,
+        cas.checked(right, budget)?,
+        &Operator::Mul,
+        budget,
+    )?;
+    let pi = cas.state.expression(pi, budget)?;
+    let rational = cas.state.expression(rational, budget)?;
     let Operator::Rational(q) = &rational.operator else {
         return Err(invalid());
     };
@@ -617,7 +642,12 @@ mod tests {
             });
         assert_eq!(budget.limits(), &limits);
         match &result {
-            Ok(handle) => assert_eq!(cas.state.expression(cas.checked(handle)?)?.scope, scope),
+            Ok(handle) => assert_eq!(
+                cas.state
+                    .expression({ cas.checked(handle, &mut budget)? }, &mut budget)?
+                    .scope,
+                scope
+            ),
             Err(fault) => {
                 assert!(
                     matches!(fault.kind,FaultKind::Exhausted {budget,..} if budget==kind),
@@ -637,11 +667,11 @@ mod tests {
     #[test]
     fn trig_value_scope_boundaries() -> Result<(), Box<dyn std::error::Error>> {
         for (kind, cost, prefix) in [
-            (BudgetKind::Work, 260_817, 247_132),
+            (BudgetKind::Work, 260_823, 260_821),
             (BudgetKind::StagedPayloadBytes, 138_908, 260_817),
         ] {
             let prior = if kind == BudgetKind::Work { 7 } else { 0 };
-            assert_eq!(scope_attempt(kind, cost + prior)?, (true, 260_817));
+            assert_eq!(scope_attempt(kind, cost + prior)?, (true, 260_823));
             assert_eq!(scope_attempt(kind, cost + prior - 1)?, (false, prefix));
         }
         // The metered measuring buffer fits; prepayment refuses before any scope clone.

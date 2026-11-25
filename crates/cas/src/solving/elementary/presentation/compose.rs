@@ -55,8 +55,11 @@ fn child<'a>(
     if (&proof.judgment.context, claim.form) != (context, form) {
         return Err(invalid());
     }
-    let SolveDraft::SolutionSet(set) =
-        crate::solving::graph::object(&evaluation.cas.state, evaluation.cas.checked(&claim.set)?)?
+    let SolveDraft::SolutionSet(set) = crate::solving::graph::object(
+        &evaluation.cas.state,
+        evaluation.cas.checked(&claim.set, budget)?,
+        budget,
+    )?
     else {
         return Err(invalid());
     };
@@ -66,8 +69,11 @@ fn child<'a>(
     super::super::member::contained(evaluation.cas, &claim.region, evaluation.region, budget)?;
     for handle in &set.branches {
         budget.work(1, AT)?;
-        let SolveDraft::SolutionBranch(branch) =
-            crate::solving::graph::object(&evaluation.cas.state, evaluation.cas.checked(handle)?)?
+        let SolveDraft::SolutionBranch(branch) = crate::solving::graph::object(
+            &evaluation.cas.state,
+            evaluation.cas.checked(handle, budget)?,
+            budget,
+        )?
         else {
             return Err(invalid());
         };

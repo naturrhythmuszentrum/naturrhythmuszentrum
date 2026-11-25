@@ -26,7 +26,10 @@ fn trig_defined_original_guard() -> TestResult {
                 .check_proof(&f.context, &f.steps, &mut default_budget()?)?;
             assert_eq!(witness.judgment(), &f.expected);
             assert_eq!(
-                f.cas.statement_hypothesis_kind(&f.expected.statement)?,
+                f.cas.statement_hypothesis_kind(
+                    &f.expected.statement,
+                    &mut crate::testing::budgets::graph_budget()?
+                )?,
                 HypothesisKind::DomainGuard
             );
             let guard = f
@@ -166,8 +169,10 @@ fn trig_defined_valid_guard_joins() -> TestResult {
             .cas
             .check_proof(&f.context, &f.steps[..1], &mut default_budget()?)?;
         assert_eq!(
-            f.cas
-                .statement_hypothesis_kind(&guard.judgment().statement)?,
+            f.cas.statement_hypothesis_kind(
+                &guard.judgment().statement,
+                &mut crate::testing::budgets::graph_budget()?
+            )?,
             HypothesisKind::DomainGuard
         );
         let mut changed = f.steps.clone();

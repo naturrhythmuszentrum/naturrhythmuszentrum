@@ -28,7 +28,7 @@ pub(super) fn check(
         _ => return Err(DecisionError::LatticeMetric),
     }
     let dimension = value.basis.dimension();
-    let header = cas.context_header(&basis.context)?;
+    let header = cas.context_header(&basis.context, budget)?;
     let targets = entries(cas, &value.target, &header, [dimension, 1], budget)?;
     let offsets = entries(cas, &basis.offset, &header, [dimension, 1], budget)?;
     let coefficients = entries(cas, &basis.basis, &header, [dimension, dimension], budget)?;

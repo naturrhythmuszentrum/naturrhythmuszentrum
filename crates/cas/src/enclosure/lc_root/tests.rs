@@ -367,6 +367,7 @@ fn lc_root_family_mutations() -> TestResult {
 /// ´claim:cas:lc-root-family-original-refusals´
 #[test]
 fn lc_root_family_original_refusals() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = fixture()?;
     let p = proposed(&f)?;
     let wrong = term(
@@ -412,9 +413,15 @@ fn lc_root_family_original_refusals() -> TestResult {
     let foreign = fixture()?;
     refused(&f, &foreign.request, &proposed(&foreign)?)?;
     // Corrupt original exponent metadata in place: replay must not trust a cached shape flag.
-    let root = f.cas.checked(&f.request.targets[1])?;
-    let exponent = f.cas.state.expression(root)?.operands[1];
-    let index = f.cas.state.indices[&exponent];
+    let root = f.cas.checked(&f.request.targets[1], &mut budget)?;
+    let exponent = f.cas.state.expression(root, &mut budget)?.operands[1];
+    let index = f
+        .cas
+        .state
+        .indices
+        .peek(&exponent)
+        .copied()
+        .ok_or("index missing")?;
     if let crate::graph::Vertex::Expression(value) = &mut f.cas.state.graph[index] {
         value.operator = Operator::Rational(Rational::from_ratio(1, 3, &mut ledger()?)?);
     } else {

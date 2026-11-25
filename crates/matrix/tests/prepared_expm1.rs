@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Public native admission, independent endpoint oracles and finite resource controls.
+
 use nrz_bindings::readings::algebra::domain::{
     AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr,
 };

@@ -39,7 +39,13 @@ fn scalar_vocabulary() -> TestResult {
             None,
             std::slice::from_ref(&x),
         )?;
-        assert_eq!(fixture.cas.expression(&node)?.0, &operator);
+        assert_eq!(
+            fixture
+                .cas
+                .expression(&node, &mut crate::testing::budgets::graph_budget()?)?
+                .0,
+            &operator
+        );
     }
     for constant in [Constant::Pi, Constant::E] {
         fixture.node(Operator::Constant(constant), real(), Vec::new(), None, &[])?;

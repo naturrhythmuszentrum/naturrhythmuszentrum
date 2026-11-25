@@ -82,7 +82,7 @@ fn at_root(
         evaluation
             .root_equation(
                 unknown,
-                super::selected::relation(evaluation.cas, relation)?,
+                super::selected::relation(evaluation.cas, relation, budget)?,
                 budget,
             )?
             .numerator,
@@ -135,8 +135,8 @@ pub(crate) fn check(
     ) {
         return Err(invalid());
     }
-    let original = problem(cas, &certificate.problem)?;
-    super::proof::region(cas, &draft.context, original, &certificate.region)?;
+    let original = problem(cas, &certificate.problem, budget)?;
+    super::proof::region(cas, &draft.context, original, &certificate.region, budget)?;
     let Statement::Solve(product) = &premise(premises, certificate.product)?.judgment.statement
     else {
         return Err(invalid());
@@ -145,7 +145,7 @@ pub(crate) fn check(
     {
         return Err(invalid());
     }
-    let selected = super::selected::selection(cas, &certificate.selection)?;
+    let selected = super::selected::selection(cas, &certificate.selection, budget)?;
     if selected.relations.len() != certificate.multiplicities.len() {
         return Err(invalid());
     }

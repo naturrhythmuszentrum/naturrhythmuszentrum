@@ -57,7 +57,7 @@ fn bindings_lattice_coordinate_cache_identity() -> TestResult {
         let before = owner.cas()?.counts();
         let foreign_before = other.0.cas()?.counts();
         let requests = [(Rc::clone(&owner), "period0"), other];
-        for (work, accepted) in [(78_385, true), (78_384, false)] {
+        for (work, accepted) in [(78_509, true), (78_508, false)] {
             let mut budget = prior(work)?;
             let result = DecisionCoordinate::declared_many(&requests, &mut budget);
             if accepted {
@@ -70,7 +70,7 @@ fn bindings_lattice_coordinate_cache_identity() -> TestResult {
                     .graph()
                     .ok_or("missing independent graph")?;
                 assert!(!std::ptr::eq(first, second));
-                assert_eq!(budget.usage().work, 78_385);
+                assert_eq!(budget.usage().work, 78_509);
             } else {
                 exhausted(
                     &result

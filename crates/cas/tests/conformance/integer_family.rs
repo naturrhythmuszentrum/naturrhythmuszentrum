@@ -193,7 +193,8 @@ impl Frame {
             premises: Vec::new(),
             limits: LimitsOverride::default(),
         };
-        let Outcome::PendingPremise { blocker, usage, .. } = self.cas.run(&supplied) else {
+        let outcome = self.cas.run(&supplied);
+        let Outcome::PendingPremise { blocker, usage, .. } = outcome else {
             return Err("unproved floor selection escaped the partition boundary".into());
         };
         assert_eq!(
@@ -210,8 +211,8 @@ impl Frame {
 #[test]
 fn integer_case_family_boundary() -> TestResult {
     for (bounded, declaration, admission, partition, selection) in [
-        (false, 16_227, 6_913, 530, 647_632),
-        (true, 18_427, 7_549, 1_390, 703_195),
+        (false, 16_330, 6_924, 530, 647_680),
+        (true, 18_542, 7_560, 1_390, 703_243),
     ] {
         let mut frame = Frame::new()?;
         let (region, [coordinate, value]) = frame.relation(bounded)?;
@@ -221,7 +222,10 @@ fn integer_case_family_boundary() -> TestResult {
         assert_eq!(frame.budget.usage().work, declaration + admission);
         assert_eq!(frame.cas.counts().payload_bytes - before.payload_bytes, 965);
         assert_eq!(
-            frame.cas.expression(&function)?.1,
+            frame
+                .cas
+                .expression(&function, &mut crate::testing::budgets::graph_budget()?)?
+                .1,
             &Sort::Value(AtomicSort::Integer)
         );
         let contract = nrz_cas::decision::CasePartition {

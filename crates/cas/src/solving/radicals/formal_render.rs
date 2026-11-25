@@ -130,7 +130,7 @@ pub(crate) fn lift(
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
     let mut pending = vector(1, budget)?;
-    pending.push((cas.checked(root)?, false));
+    pending.push((cas.checked(root, budget)?, false));
     let mut known = std::collections::BTreeMap::new();
     while let Some((id, expanded)) = pending.pop() {
         budget.work(
@@ -140,11 +140,11 @@ pub(crate) fn lift(
         if known.contains_key(&id) {
             continue;
         }
-        let (_, original) = crate::descriptor::metadata(&cas.state, id)?;
+        let (header, original) = crate::descriptor::metadata(&cas.state, id, budget)?;
         if !original.is_empty() {
             return Err(invalid());
         }
-        let operator = match cas.state.node(id)? {
+        let operator = match cas.state.node(id, budget)? {
             Vertex::Expression(value) if value.attachment.is_none() && value.binding.is_none() => {
                 Some(value.operator.clone())
             }
@@ -155,7 +155,8 @@ pub(crate) fn lift(
         if expanded {
             let draft = crate::substitution_draft::rebuild(
                 cas,
-                id,
+                cas.state.node(id, budget)?,
+                header,
                 scope.clone(),
                 operator,
                 &mut |child| {
@@ -189,7 +190,7 @@ pub(crate) fn mapping(
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
     let SolveDraft::CoefficientMap(data) =
-        crate::solving::graph::object(&cas.state, cas.checked(source)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(source, budget)?, budget)?
     else {
         return Err(invalid());
     };

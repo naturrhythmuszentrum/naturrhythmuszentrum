@@ -7,20 +7,20 @@ use nrz_cas::{Cas, FaultKind, Location};
 
 /// Kind, output construction Work, fresh identity inspection Work and identity witness bytes.
 const COSTS: [(u32, u64, u64, usize); 4] = [
-    (1, 117_834, 182_069, 1_426),
-    (2, 78_955, 140_033, 1_255),
-    (4, 76_255, 135_242, 1_208),
-    (5, 99_607, 161_213, 1_389),
+    (1, 117_936, 182_236, 1_426),
+    (2, 79_003, 140_181, 1_255),
+    (4, 76_315, 135_390, 1_208),
+    (5, 99_709, 161_374, 1_389),
 ];
 
-fn budget(owner: BudgetKind, amount: u64) -> TestResult<Budget> {
+fn fresh_budget(owner: BudgetKind, amount: u64) -> TestResult<Budget> {
     let mut limits = Limits::default();
     match owner {
         BudgetKind::Work => limits.work = amount,
         BudgetKind::OutputBytes => limits.output_bytes = amount,
         _ => return Err("unsupported output boundary fixture".into()),
     }
-    let mut budget = Budget::new(limits)?;
+    let mut budget = nrz_cas::limits::Budget::new(limits)?;
     budget.work(37, Location::new("prior lattice output Work"))?;
     Ok(budget)
 }
@@ -37,7 +37,7 @@ fn construction(
     let before = cas.counts();
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
     let original = cas.export_witness(&witness, &mut ledger()?)?;
-    let mut budget = budget(owner, amount)?;
+    let mut budget = fresh_budget(owner, amount)?;
     let limits = budget.limits().clone();
     let result = cas.lattice_selection_outputs(&witness, &mut budget);
     assert_eq!(budget.limits(), &limits);
@@ -67,7 +67,7 @@ fn replay(bytes: &[u8], amount: u64, succeeds: bool) -> TestResult {
     let mut receiver = Cas::new(Limits::default())?;
     let before = receiver.counts();
     let snapshot = receiver.canonical_snapshot(&mut ledger()?)?;
-    let mut budget = budget(BudgetKind::Work, amount)?;
+    let mut budget = fresh_budget(BudgetKind::Work, amount)?;
     let limits = budget.limits().clone();
     let result = receiver.inspect(bytes, &mut budget);
     assert_eq!(budget.limits(), &limits);
@@ -133,7 +133,7 @@ fn lattice_output_conversion_work() -> TestResult {
         let work = if signed { 37 } else { 38 };
         for succeeds in [false, true] {
             let amount = work + 36 + u64::from(succeeds);
-            let mut budget = budget(BudgetKind::Work, amount)?;
+            let mut budget = fresh_budget(BudgetKind::Work, amount)?;
             let limits = budget.limits().clone();
             let result = if signed {
                 cas.materialize_lattice_index(&witness, 0, (-2, 2), &mut budget)

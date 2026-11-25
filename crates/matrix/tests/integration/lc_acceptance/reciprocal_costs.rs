@@ -11,7 +11,7 @@ use nrz_matrix::{Binding, ExecutionLimits};
 /// ´test:integration:lc-native-reciprocal-cumulative-work-boundary´
 #[test]
 fn lc_native_reciprocal_cumulative_work_boundary() -> TestResult {
-    const REQUIRED: u64 = 5_610_984;
+    const REQUIRED: u64 = 5_612_916;
     for (work, prior, success) in [
         (REQUIRED, 0, true),
         (REQUIRED - 1, 0, false),
@@ -39,11 +39,11 @@ fn pipeline(budget: &mut Budget) -> TestResult {
     let contract = transport::derivative(&mut fixture, budget)?;
     assert_eq!(
         contract.exact().key().usage().after.work - contract.exact().key().usage().before.work,
-        416_530
+        416_542
     );
     assert_eq!(
         contract.exact().usage().after.work - contract.exact().usage().before.work,
-        5_182_028
+        5_183_948
     );
     assert_eq!(
         contract.usage().after.work - contract.usage().before.work,

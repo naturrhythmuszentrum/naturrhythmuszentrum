@@ -108,7 +108,7 @@ impl SeriesOperation {
 
     /// Requested precision cannot invent coefficients beyond the admitted objects.
     fn order(&self, cas: &Cas, budget: &mut Budget) -> Result<u32, Fault> {
-        let available = cas.series_object(self.input())?.order;
+        let available = cas.series_object(self.input(), budget)?.order;
         let order = match self {
             Self::Derive { .. } => available
                 .checked_sub(1)
@@ -119,13 +119,13 @@ impl SeriesOperation {
             Self::Add { right, order, .. }
             | Self::Mul { right, order, .. }
             | Self::Compose { right, order, .. } => {
-                let common = available.min(cas.series_object(right)?.order);
+                let common = available.min(cas.series_object(right, budget)?.order);
                 let chosen = order.unwrap_or(common);
                 if chosen > common {
                     if matches!(self, Self::Compose { .. }) {
                         return Err(super::compose::precision(
                             available,
-                            cas.series_object(right)?.order,
+                            cas.series_object(right, budget)?.order,
                             chosen,
                             budget,
                         )?);
@@ -146,7 +146,7 @@ impl SeriesOperation {
             if let Self::Compose { right, .. } = self {
                 return Err(super::compose::precision(
                     available,
-                    cas.series_object(right)?.order,
+                    cas.series_object(right, budget)?.order,
                     order,
                     budget,
                 )?);
@@ -167,7 +167,7 @@ fn workspace(
     let mut bits = 1_u64;
     let mut metadata = 0_u64;
     for handle in std::iter::once(operation.input()).chain(operation.right()) {
-        let object = cas.series_object(handle)?;
+        let object = cas.series_object(handle, budget)?;
         object.preflight(budget)?;
         let mut out = crate::encoding::Encoder::new(budget, AT);
         crate::encoding::scope(&object.scope, &mut out)?;
@@ -176,7 +176,7 @@ fn workspace(
             .ok_or_else(invalid)?;
         for coefficient in &object.coefficients {
             budget.work(1, AT)?;
-            let (a, b) = number(cas, coefficient)?.component_bits();
+            let (a, b) = number(cas, coefficient, budget)?.component_bits();
             bits = bits.max(a).max(b);
         }
     }
@@ -195,12 +195,12 @@ fn workspace(
     }
     if let SeriesOperation::Scale { scalar, .. } = operation {
         budget.work(1, AT)?;
-        let (a, b) = number(cas, scalar)?.component_bits();
+        let (a, b) = number(cas, scalar, budget)?.component_bits();
         bits = bits.max(a).max(b);
     }
     if let SeriesOperation::Integrate { constant, .. } = operation {
         budget.work(1, AT)?;
-        let (a, b) = number(cas, constant)?.component_bits();
+        let (a, b) = number(cas, constant, budget)?.component_bits();
         bits = bits.max(a).max(b);
     }
     if matches!(
@@ -268,8 +268,11 @@ pub(super) fn literal(
     value: Rational,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let object = cas.series_object(input)?;
-    let header = cas.state.context(cas.checked(&object.context)?)?.header_id;
+    let object = cas.series_object(input, budget)?;
+    let header = cas
+        .state
+        .context(cas.checked(&object.context, budget)?, budget)?
+        .header_id;
     #[cfg(test)]
     SCOPE_COPIES.with(|copies| copies.set(copies.get() + 1));
     let scope = object.scope.clone();
@@ -296,7 +299,7 @@ pub(super) fn output(
     coefficients: Vec<Handle>,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let basis = cas.series_object(input)?;
+    let basis = cas.series_object(input, budget)?;
     #[cfg(test)]
     SCOPE_COPIES.with(|copies| copies.set(copies.get() + 1));
     let value = SeriesObject {
@@ -451,12 +454,12 @@ fn candidate(
 /// Extraction copies only the exact requested rational under the prepaid candidate workspace.
 fn extracted(cas: &Cas, input: &Handle, index: u32, budget: &mut Budget) -> Result<(S, C), Fault> {
     let handle = cas
-        .series_object(input)?
+        .series_object(input, budget)?
         .coefficients
         .get(usize::try_from(index).map_err(|_| invalid())?)
         .ok_or_else(invalid)?
         .clone();
-    let value = copied(number(cas, &handle)?, budget)?;
+    let value = copied(number(cas, &handle, budget)?, budget)?;
     Ok((
         S::Coefficient {
             input: input.clone(),
@@ -472,13 +475,19 @@ fn extracted(cas: &Cas, input: &Handle, index: u32, budget: &mut Budget) -> Resu
 }
 
 /// Borrow an original coefficient within the already validated positive truncation.
-pub(super) fn entry<'a>(cas: &'a Cas, input: &Handle, index: u32) -> Result<&'a Rational, Fault> {
+pub(super) fn entry<'a>(
+    cas: &'a Cas,
+    input: &Handle,
+    index: u32,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Rational, Fault> {
     number(
         cas,
-        cas.series_object(input)?
+        cas.series_object(input, budget)?
             .coefficients
             .get(usize::try_from(index).map_err(|_| invalid())?)
             .ok_or_else(invalid)?,
+        budget,
     )
 }
 
@@ -492,10 +501,12 @@ fn row(
     budget: &mut Budget,
 ) -> Result<Rational, Fault> {
     match operation {
-        SeriesOperation::Truncate { input, .. } => copied(entry(cas, input, degree)?, budget),
+        SeriesOperation::Truncate { input, .. } => {
+            copied(entry(cas, input, degree, budget)?, budget)
+        }
         SeriesOperation::Scale { input, scalar } => {
-            let a = number(cas, scalar)?;
-            let b = entry(cas, input, degree)?;
+            let a = number(cas, scalar, budget)?;
+            let b = entry(cas, input, degree, budget)?;
             let result = a.mul(b, budget)?;
             binary.push(SeriesBinaryRow {
                 index: degree,
@@ -506,8 +517,8 @@ fn row(
             Ok(result)
         }
         SeriesOperation::Add { left, right, .. } => {
-            let a = entry(cas, left, degree)?;
-            let b = entry(cas, right, degree)?;
+            let a = entry(cas, left, degree, budget)?;
+            let b = entry(cas, right, degree, budget)?;
             let result = a.add(b, budget)?;
             binary.push(SeriesBinaryRow {
                 index: degree,
@@ -521,8 +532,8 @@ fn row(
             let mut sum = Rational::zero();
             for i in 0..=degree {
                 let j = degree - i;
-                let a = entry(cas, left, i)?;
-                let b = entry(cas, right, j)?;
+                let a = entry(cas, left, i, budget)?;
+                let b = entry(cas, right, j, budget)?;
                 let product = a.mul(b, budget)?;
                 sum = sum.add(&product, budget)?;
                 products.push(SeriesProductRow {
@@ -573,8 +584,8 @@ impl Cas {
                     SeriesOperation::Add { left, right, .. }
                     | SeriesOperation::Compose { left, right, .. }
                     | SeriesOperation::Mul { left, right, .. } => {
-                        usize::from(cas.series_object(left)?.order != order)
-                            + usize::from(cas.series_object(right)?.order != order)
+                        usize::from(cas.series_object(left, budget)?.order != order)
+                            + usize::from(cas.series_object(right, budget)?.order != order)
                     }
                 };
                 if proofs.len() != count {
@@ -588,7 +599,12 @@ impl Cas {
                     budget.check(BudgetKind::JetEntries, u64::from(order), AT)?;
                 }
                 if let SeriesOperation::Integrate { input, constant } = operation {
-                    super::check::constant(cas, cas.series_object(input)?, constant, budget)?;
+                    super::check::constant(
+                        cas,
+                        cas.series_object(input, budget)?,
+                        constant,
+                        budget,
+                    )?;
                 }
                 if let SeriesOperation::Reciprocal { input } = operation {
                     super::reciprocal::nonunit(cas, input, budget)?;
@@ -598,7 +614,7 @@ impl Cas {
                     bytes = bytes
                         .checked_add(crate::proof_view::application_bytes(
                             cas,
-                            cas.checked(proof)?,
+                            cas.checked(proof, budget)?,
                             budget,
                         )?)
                         .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
@@ -610,7 +626,7 @@ impl Cas {
                     for proof in proofs {
                         premises.push(crate::proof_view::application(
                             cas,
-                            cas.checked(proof)?,
+                            cas.checked(proof, budget)?,
                             budget,
                         )?);
                     }
@@ -622,7 +638,10 @@ impl Cas {
                         })?;
                     let draft = ApplicationDraft {
                         rule: statement.primitive(),
-                        context: cas.series_object(operation.input())?.context.clone(),
+                        context: cas
+                            .series_object(operation.input(), budget)?
+                            .context
+                            .clone(),
                         conclusion: crate::proof_model::Statement::Series(Box::new(statement)),
                         premises: Vec::new(),
                         substitutions: Vec::new(),

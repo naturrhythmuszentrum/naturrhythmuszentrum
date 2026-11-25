@@ -10,6 +10,11 @@ use nrz_bindings::readings::{
 use nrz_bindings::{Budget, Limits};
 
 /// One exact operator key serves repeated uses without graph growth or proof reconstruction.
+/// Local-entry increments on this caller ledger are prove +72 = 24 retained-kind
+/// counts +24 identity-index insertions +24 vertex admissions; key +12 = 4+4+4;
+/// derivative +1,886 = 602 retained-kind counts +16 first-kind insertions
+/// +634 identity-index insertions +634 vertex admissions. The old graph lookup
+/// floors and new retained-map lookup floors are equal. The cache hit adds zero.
 /// ´test:integration:reciprocal-source-jacobian-reuses-original-graph´
 #[test]
 fn reciprocal_source_jacobian_reuses_original_graph() -> TestResult {
@@ -58,18 +63,23 @@ fn reciprocal_source_jacobian_reuses_original_graph() -> TestResult {
             budget.usage().work - first.usage().after.work,
             first.retained_payload_bytes()
         ),
-        (812_453, 328_792, 4_814_942, 8_505, 110_473)
+        (812_525, 328_804, 4_816_828, 8_505, 110_473)
     );
     Ok(())
 }
 
 /// Fixed declarations remain original positive denominators and introduce no derivative column.
+/// First fixed derivative: unchanged operation Work 3,845,341 +478 retained counts +16 first-kind
+/// insertions +510 identity insertions +510 vertex admissions = 3,846,855.
+/// Second: unchanged operation Work 2,917,358 +86 +16 +118 +118 = 2,917,696.
+/// The cumulative unchanged operation Work 8,123,364 adds prove +72 and those +1,514/+338
+/// to reach 8,125,288; old/new lookup floors match.
 /// ´test:integration:reciprocal-source-jacobian-keeps-fixed-input-domains´
 #[test]
 fn reciprocal_source_jacobian_keeps_fixed_input_domains() -> TestResult {
     let limits = Limits {
-        work: 8_123_364,
-        replay_work: 8_123_364,
+        work: 8_125_288,
+        replay_work: 8_125_288,
         ..Limits::default()
     };
     let mut prepared = plan_with_policy(limits.clone(), false)?;
@@ -115,19 +125,20 @@ fn reciprocal_source_jacobian_keeps_fixed_input_domains() -> TestResult {
     assert_eq!(cache.len(), 2);
     assert_eq!(
         (costs, budget.usage().work),
-        (vec![3_845_341, 2_917_358], 8_123_364)
+        (vec![3_846_855, 2_917_696], 8_125_288)
     );
     Ok(())
 }
 
 /// Complete construction, derivation and reuse consume one allowance across requests and retries.
+/// Unchanged operation Work 5,964,692 +72 prove +12 key +1,886 derivative = 5,966,662.
 /// ´test:integration:reciprocal-source-jacobian-cumulative-boundary´
 #[test]
 fn reciprocal_source_jacobian_cumulative_boundary() -> TestResult {
     let mut measured = Budget::new(policy())?;
     pipeline(&mut measured)?;
     let required = measured.usage().work;
-    assert_eq!(required, 5_964_692);
+    assert_eq!(required, 5_966_662);
     for ceiling in [required, required - 1] {
         let mut budget = Budget::new(Limits {
             work: ceiling,
@@ -164,13 +175,17 @@ fn pipeline(budget: &mut Budget) -> TestResult {
 /// Exact measured recipe, key, native derivative and one cache hit, including 17 prior Work.
 fn policy() -> Limits {
     Limits {
-        work: 5_964_692,
-        replay_work: 5_964_692,
+        work: 5_966_662,
+        replay_work: 5_966_662,
         ..Limits::default()
     }
 }
 
 /// Exported representation and derivative witnesses replay independently under one explicit audit ledger.
+/// Representation replay: unchanged operation Work 695,696 +54 retained counts +8 first-kind
+/// insertions +70 identity insertions +70 admissions = 695,898. Derivative
+/// replay: unchanged operation Work 947,622 +166 +8 +182 +182 = 948,160. Old/new lookup
+/// floors match; wire lengths remain 1,981 and 3,796 bytes.
 /// ´test:integration:reciprocal-source-jacobian-fresh-witness-costs´
 #[test]
 fn reciprocal_source_jacobian_fresh_witness_costs() -> TestResult {
@@ -204,6 +219,6 @@ fn reciprocal_source_jacobian_fresh_witness_costs() -> TestResult {
         assert_eq!(expected.as_bytes(), actual.as_bytes());
         costs.push((bytes.len(), cost));
     }
-    assert_eq!(costs, vec![(1_981, 695_696), (3_796, 947_622)]);
+    assert_eq!(costs, vec![(1_981, 695_898), (3_796, 948_160)]);
     Ok(())
 }

@@ -74,7 +74,7 @@ fn setup<P: Scalar + 'static>(uncertain: bool) -> TestResult<Case<P>> {
         let row = fixture::Row::new(
             &mut heap,
             reactance,
-            &mut crate::phasor_solve_testing::budget()?,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
         )
         .map_err(|cause| format!("row {frequency} original declaration setup: {cause:?}"))?;
         let original = axis::fixture(frequency)?;
@@ -193,7 +193,7 @@ fn lc_original_driven_impedance_table() -> TestResult {
 /// Independent reactance/current oracles cover all rows; the exact resonant block remains successful.
 fn nominal<P: Scalar + 'static>() -> TestResult {
     let mut case = setup::<P>(false)?;
-    let mut budget = crate::phasor_solve_testing::budget()?;
+    let mut budget = crate::phasor_solve_testing::resources::fresh_budget()?;
     let impedance = produce(&mut case, &mut budget)?;
     let mut decisions = Vec::new();
     for (row, ((output, expected), bounds)) in impedance

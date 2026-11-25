@@ -76,7 +76,7 @@ fn lattice_nearest_convention() -> TestResult {
     let schema = citations
         .last()
         .ok_or("missing nearest citation")?
-        .auxiliary_schema(&receiver)?
+        .auxiliary_schema(&receiver, &mut crate::testing::budgets::graph_budget()?)?
         .ok_or("missing nearest schema")?;
     assert_eq!(
         (schema.name, schema.version),

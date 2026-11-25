@@ -152,13 +152,14 @@ impl Runner<'_> {
         let [(left, left_slope), (right, right_slope)] = values.as_slice() else {
             return Err(invalid());
         };
-        let actual = crate::boundary_check::rational(self.cas, &actual)?;
-        let reason = if actual != crate::boundary_check::rational(self.cas, left)? {
+        let actual = crate::boundary_check::rational(self.cas, &actual, self.generation)?;
+        let reason = if actual != crate::boundary_check::rational(self.cas, left, self.generation)?
+        {
             Some(NonexistenceReason::Discontinuous(Side::Below))
-        } else if actual != crate::boundary_check::rational(self.cas, right)? {
+        } else if actual != crate::boundary_check::rational(self.cas, right, self.generation)? {
             Some(NonexistenceReason::Discontinuous(Side::Above))
-        } else if crate::boundary_check::rational(self.cas, left_slope)?
-            != crate::boundary_check::rational(self.cas, right_slope)?
+        } else if crate::boundary_check::rational(self.cas, left_slope, self.generation)?
+            != crate::boundary_check::rational(self.cas, right_slope, self.generation)?
         {
             Some(NonexistenceReason::UnequalSlopes)
         } else {
@@ -186,8 +187,8 @@ impl Runner<'_> {
         let [left, right] = values.as_slice() else {
             return Err(invalid());
         };
-        let difference = crate::boundary_check::rational(self.cas, right)?.sub(
-            crate::boundary_check::rational(self.cas, left)?,
+        let difference = crate::boundary_check::rational(self.cas, right, self.generation)?.sub(
+            crate::boundary_check::rational(self.cas, left, self.generation)?,
             self.generation,
         )?;
         let value = crate::boundary_regions::term(
@@ -207,7 +208,7 @@ impl Runner<'_> {
         let domain = self.cas.handle(
             self.cas
                 .state
-                .context(self.request.context.logical_id())?
+                .context(self.request.context.logical_id(), self.generation)?
                 .admissible,
         );
         let exact = self.push(

@@ -69,7 +69,7 @@ fn select(
         return Err(SensitivityError::Coordinates);
     }
     let syntax = &original.original().syntax;
-    if graph.cas.expression(syntax)?.0 != &Operator::Mul {
+    if graph.cas.expression(syntax, &mut graph.budget)?.0 != &Operator::Mul {
         return Err(SensitivityError::UnsupportedRecipe);
     }
     let operands = graph.cas.operands(syntax, &mut graph.budget)?;
@@ -77,7 +77,7 @@ fn select(
         return Err(SensitivityError::UnsupportedRecipe);
     }
     for (operand, key) in operands.iter().zip(coordinates) {
-        if graph.cas.expression(operand)?.0 != &Operator::Free(key.clone()) {
+        if graph.cas.expression(operand, &mut graph.budget)?.0 != &Operator::Free(key.clone()) {
             return Err(SensitivityError::Coordinates);
         }
     }

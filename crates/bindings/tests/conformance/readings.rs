@@ -294,7 +294,10 @@ fn physical_reading_replay_refuses_changed_domain() -> TestResult {
         .project(&mut case.fixture.cas, &[0], &mut ledger()?)?;
     let relation = ReadingRelation::prove(&mut case.fixture.cas, left, right, &mut ledger()?)?;
     let bytes = relation.export(&case.fixture.cas, &mut ledger()?)?;
-    let header = case.fixture.cas.context_header(&case.fixture.context)?;
+    let header = case.fixture.cas.context_header(
+        &case.fixture.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let nodes = case.fixture.cas.admit(
         &[
             Draft::Region(RegionDraft {

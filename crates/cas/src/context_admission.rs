@@ -76,9 +76,9 @@ impl Cas {
                 region,
                 introduction,
             } => {
-                let parent = self.resolve(state, parent, locals)?;
-                let region = self.resolve(state, region, locals)?;
-                let introduction = self.resolve(state, introduction, locals)?;
+                let parent = self.resolve(state, parent, locals, budget)?;
+                let region = self.resolve(state, region, locals, budget)?;
+                let introduction = self.resolve(state, introduction, locals, budget)?;
                 crate::decision_introduction::frame(state, parent, region, introduction, budget)?;
                 let mut context =
                     self.local_context(state, parent, region, &[], locals, pending, budget)?;
@@ -90,9 +90,9 @@ impl Cas {
                 admissible,
                 assumptions,
             } => {
-                let header_id = self.resolve(state, header, locals)?;
-                let admissible = self.resolve(state, admissible, locals)?;
-                let region = state.region(admissible)?;
+                let header_id = self.resolve(state, header, locals, budget)?;
+                let admissible = self.resolve(state, admissible, locals, budget)?;
+                let region = state.region(admissible, budget)?;
                 if !crate::header::embeds(state, region.header, header_id, budget)? {
                     return Err(Fault::invalid(InvalidCode::Context, AT));
                 }
@@ -111,7 +111,7 @@ impl Cas {
                     .collect();
                 let canonical_assumptions =
                     crate::context::canonical(state, &region.scope, &assumptions, budget)?;
-                let header = state.header(header_id)?;
+                let header = state.header(header_id, budget)?;
                 Context {
                     introduction: None,
                     header_id,
@@ -131,8 +131,8 @@ impl Cas {
                 region,
                 hypotheses,
             } => {
-                let parent = self.resolve(state, parent, locals)?;
-                let region = self.resolve(state, region, locals)?;
+                let parent = self.resolve(state, parent, locals, budget)?;
+                let region = self.resolve(state, region, locals, budget)?;
                 self.local_context(state, parent, region, hypotheses, locals, pending, budget)?
             }
         })
@@ -160,8 +160,8 @@ impl Cas {
                 if draft.key.is_empty() || !names.insert(draft.key.clone()) {
                     return Err(Fault::invalid(InvalidCode::Context, AT));
                 }
-                let id = self.resolve(state, &draft.condition, locals)?;
-                let Vertex::Condition(value) = state.node(id)? else {
+                let id = self.resolve(state, &draft.condition, locals, budget)?;
+                let Vertex::Condition(value) = state.node(id, budget)? else {
                     return Err(Fault::invalid(InvalidCode::Reference, AT));
                 };
                 if value.scope != *scope
@@ -190,13 +190,13 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<Context, Fault> {
-        let enclosing = state.context(parent)?.clone();
+        let enclosing = state.context(parent, budget)?.clone();
         let depth = enclosing
             .depth
             .checked_add(1)
             .ok_or_else(|| Fault::capacity(BudgetKind::HypothesisDepth, AT))?;
         budget.specialized(BudgetKind::HypothesisDepth, depth, false, AT)?;
-        let base = state.region(enclosing.admissible)?.clone();
+        let base = state.region(enclosing.admissible, budget)?.clone();
         if crate::solving::coefficients::formal_close::introduction(
             state,
             enclosing.admissible,
@@ -225,7 +225,7 @@ impl Cas {
         let mut ancestor = Some(parent);
         while let Some(id) = ancestor {
             budget.condition(1, AT)?;
-            let context = state.context(id)?;
+            let context = state.context(id, budget)?;
             hypotheses
                 .try_reserve(context.frame.len())
                 .map_err(|_| Fault::allocation(AT))?;
@@ -278,6 +278,7 @@ impl Cas {
                 enclosing.admissible,
                 restriction,
                 &mut edges,
+                budget,
             )?
         } else {
             base.lies_over
@@ -307,8 +308,8 @@ impl Cas {
         locals: &[LogicalId],
         budget: &mut Budget,
     ) -> Result<Context, Fault> {
-        let enclosing = state.context(parent)?;
-        let scope = &state.region(region)?.scope;
+        let enclosing = state.context(parent, budget)?;
+        let scope = &state.region(region, budget)?.scope;
         let frame =
             self.frame_predicates(state, enclosing.header_id, scope, drafts, locals, budget)?;
         // Ancestor assumptions retain their original qualified identities through the parent edge.
@@ -338,8 +339,13 @@ impl Cas {
     pub fn admissible_region(
         &self,
         context: &crate::graph::Handle,
+        budget: &mut crate::budget::Budget,
     ) -> Result<crate::graph::Handle, Fault> {
-        Ok(self.handle(self.state.context(self.checked(context)?)?.admissible))
+        Ok(self.handle(
+            self.state
+                .context(self.checked(context, budget)?, budget)?
+                .admissible,
+        ))
     }
 }
 
@@ -353,8 +359,11 @@ impl Cas {
     pub fn hypothesis_name(
         &self,
         reference: &crate::domain_model::HypothesisRef,
+        budget: &mut crate::budget::Budget,
     ) -> Result<Option<&str>, Fault> {
-        let frame = self.state.context(self.checked(&reference.context)?)?;
+        let frame = self
+            .state
+            .context(self.checked(&reference.context, budget)?, budget)?;
         let slot = usize::try_from(reference.slot)
             .map_err(|_| Fault::invalid(InvalidCode::Reference, AT))?;
         let (entries, slot) = if frame.parent.is_some() {

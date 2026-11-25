@@ -128,7 +128,7 @@ fn expected(
         statement: Statement::Equality {
             left: left.node().clone(),
             right: right.node().clone(),
-            domain: cas.admissible_region(&context)?,
+            domain: cas.admissible_region(&context, budget)?,
             domain_contract: DomainContract::DefinedAndEqual,
         },
         residuals: Vec::new(),

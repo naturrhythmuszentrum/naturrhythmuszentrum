@@ -78,7 +78,10 @@ fn original(fixture: &LatticeFixture, kind: u8, wide: bool) -> TestResult<Ration
         .cas
         .operands(&fixture.target, &mut ledger()?)?;
     let context = fixture.frame.context.clone();
-    let input_family = fixture.frame.cas.admissible_region(&context)?;
+    let input_family = fixture.frame.cas.admissible_region(
+        &context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     let mut coordinates = Vec::new();
     for (axis, target) in targets.into_iter().enumerate() {
         let (lower, upper) = if kind == 0 {

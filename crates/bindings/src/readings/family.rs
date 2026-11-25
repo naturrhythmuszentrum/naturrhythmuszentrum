@@ -35,7 +35,9 @@ impl CoordinateFamily {
     ) -> Result<Self, ReadingError> {
         meaning::validate(&entries, budget)?;
         let (sort, operator, _, header) = support::inspect(cas, symbol, budget)?;
-        if !matches!(operator, Operator::Free(_)) || header != cas.context_header(context)? {
+        if !matches!(operator, Operator::Free(_))
+            || header != cas.context_header(context, budget)?
+        {
             return Err(ReadingError::Definition);
         }
         if support::coordinates(&sort)? != entries.len() {
@@ -65,7 +67,7 @@ impl CoordinateFamily {
     ) -> Result<Self, ReadingError> {
         meaning::map_meanings(map, &self.entries, &entries, budget)?;
         let (sort, _, _, header) = support::inspect(cas, symbol, budget)?;
-        if header != cas.context_header(&self.context)?
+        if header != cas.context_header(&self.context, budget)?
             || support::coordinates(&sort)? != entries.len()
         {
             return Err(ReadingError::Definition);

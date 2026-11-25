@@ -226,7 +226,11 @@ fn real_parameter_keeps_complex_sort() -> TestResult {
         &mut budget,
     )?;
     assert_eq!(
-        fixture.cas.state.expression(complex.logical_id())?.sort,
+        fixture
+            .cas
+            .state
+            .expression(complex.logical_id(), &mut budget)?
+            .sort,
         sort
     );
     assert_ne!(parameter, complex);

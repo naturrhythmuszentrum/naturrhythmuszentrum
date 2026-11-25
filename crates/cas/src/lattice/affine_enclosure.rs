@@ -97,7 +97,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeBoxEnclosure, Fault> {
         self.validate_lattice_basis(&contract.basis, basis, budget)?;
-        self.checked(&contract.inverse)?;
+        self.checked(&contract.inverse, budget)?;
         if contract.inverse != *basis.inverse().map().expression() {
             return Err(mismatch());
         }
@@ -125,7 +125,7 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    cas.checked(&contract.inverse)?;
+    cas.checked(&contract.inverse, budget)?;
     if contract.original.context != contract.basis.context
         || size(contract.original.coordinates.len(), AT)? != u64::from(dimension)
         || contract.bounds.len() != contract.original.coordinates.len()
@@ -138,7 +138,7 @@ pub(super) fn validate(
     let width = count.saturating_add(1);
     let entries = &cas
         .state
-        .expression(cas.checked(&contract.inverse)?)?
+        .expression(cas.checked(&contract.inverse, budget)?, budget)?
         .operands;
     let coefficient_count = count.saturating_mul(width);
     if contract.coefficients.len() != coefficient_count {
@@ -177,7 +177,7 @@ fn coefficients(
     let mut keys = 0_u64;
     for (index, coefficient) in contract.coefficients.iter().enumerate() {
         budget.work(3, AT)?;
-        if entries.get(index) != Some(&cas.checked(&coefficient.target)?)
+        if entries.get(index) != Some(&cas.checked(&coefficient.target, budget)?)
             || coefficient.context != contract.original.context
             || coefficient.input_family != contract.original.input_family
         {
@@ -195,7 +195,7 @@ fn coefficients(
         let key = budget.with_retained_payload(bytes.saturating_add(keys), AT, |budget| {
             let mut out = Encoder::new(budget, AT);
             crate::decision_wire::encode_enclosure(coefficient, &mut out, &mut |handle, out| {
-                cas.checked(handle)?;
+                cas.checked(handle, out.budget())?;
                 crate::statement::handle(handle, out)
             })?;
             Ok(out.finish())

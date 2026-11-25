@@ -109,26 +109,37 @@ impl Cas {
     ) -> Result<LogicalId, Fault> {
         policy.validate(budget)?;
         let key_bytes = size(policy.key.len(), AT)?;
-        budget.work(
-            key_bytes
-                .checked_add(1)
-                .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?,
-            AT,
-        )?;
+        let old_floor = key_bytes
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
         let identity = (policy.key.clone(), policy.version);
-        if let Some(id) = self.state.policies.get(&identity) {
-            let Vertex::Policy(previous) = self.state.node(*id)? else {
+        let position = match self.state.policies.find(&identity, old_floor, budget, AT)? {
+            Ok(position) => {
+                let id = *self
+                    .state
+                    .policies
+                    .at(position)
+                    .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?
+                    .1;
+                let Vertex::Policy(previous) = self.state.node(id, budget)? else {
+                    return Err(Fault::invalid(InvalidCode::Policy, AT));
+                };
+                if *previous == *policy {
+                    return Ok(id);
+                }
                 return Err(Fault::invalid(InvalidCode::Policy, AT));
-            };
-            if *previous == *policy {
-                return Ok(*id);
             }
-            return Err(Fault::invalid(InvalidCode::Policy, AT));
-        }
+            Err(position) => position,
+        };
+        let journaled = self.state.is_journaled();
+        let _inverse_credit = self
+            .state
+            .policies
+            .prepare_insert(position, journaled, budget, AT)?;
         let mut state = std::mem::replace(&mut self.state, State::new());
         let result = self.insert(&mut state, Vertex::Policy(policy.clone()), &[], 0, budget);
         if let Ok(id) = &result {
-            state.policies.insert(identity, *id);
+            state.policies.insert_prepared(position, identity, *id);
         }
         self.state = state;
         result

@@ -56,7 +56,10 @@ fn retained_law_identity_exhaustion_prefixes() -> TestResult {
         ));
         assert_eq!(crate::loan::fault::Injection::attempts(), 0);
         assert_eq!(heap.loans.debits.len(), 0);
-        returned.expression(&request.original.target)?;
+        returned.expression(
+            &request.original.target,
+            &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+        )?;
         drop((guard, allocations));
     }
     let mut heap = Heap::new(HeapLimits::default())?;

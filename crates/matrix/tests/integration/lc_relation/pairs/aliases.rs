@@ -177,7 +177,10 @@ fn contains_exact<P: Scalar>(enclosure: Enclosure<P>, value: &Rational) -> TestR
 /// ´test:integration:lc-relation-alias-witness-work´
 #[test]
 fn lc_relation_alias_witness_work() -> TestResult {
-    const ROWS: [(i64, u64); 3] = [(0, 571_950), (1, 917_934), (17, 918_824)];
+    // Unchanged operation Work 571950/917934/918824 plus local-entry terms respectively:
+    // 206+69 kinds + 241 identity + 344 vertices = 860;
+    // 336+102 + 372 + 540 = 1350; 340+102 + 374 + 544 = 1360.
+    const ROWS: [(i64, u64); 3] = [(0, 572_707), (1, 919_116), (17, 920_014)];
     let exact = cover(false)?;
     let parameters = LcPairParameters {
         rate: number("2000")?,

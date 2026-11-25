@@ -17,6 +17,7 @@ use crate::testing::sorts::{Family, Fixture, admit, expression, reference};
 use crate::{Cas, Handle, Rational};
 
 fn store() -> TestResult<Fixture> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut cas = Cas::new(Limits::blind_cubic())?;
     let declarations = [
         ("L", Field::Real),
@@ -54,8 +55,12 @@ fn store() -> TestResult<Fixture> {
         Vec::new(),
         Vec::new(),
     )?;
-    let real_space = cas.scalar_ambient(&real)?.ok_or("Real ambient")?;
-    let complex_space = cas.scalar_ambient(&complex)?.ok_or("Complex ambient")?;
+    let real_space = cas
+        .scalar_ambient(&real, &mut budget)?
+        .ok_or("Real ambient")?;
+    let complex_space = cas
+        .scalar_ambient(&complex, &mut budget)?
+        .ok_or("Complex ambient")?;
     Ok(Fixture {
         cas,
         header,
@@ -81,6 +86,7 @@ fn region(fixture: &mut Fixture, coordinates: &Handle) -> TestResult<Handle> {
 }
 
 fn guard(fixture: &mut Fixture, base: &Handle, key: &str, sign: i8) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     if sign == 0 {
         return Ok(base.clone());
     }
@@ -111,7 +117,12 @@ fn guard(fixture: &mut Fixture, base: &Handle, key: &str, sign: i8) -> TestResul
             arguments: vec![reference(&subject)],
         },
     )?;
-    let ambient = fixture.cas.state.region(base.logical_id())?.ambient.clone();
+    let ambient = fixture
+        .cas
+        .state
+        .region(base.logical_id(), &mut budget)?
+        .ambient
+        .clone();
     admit(
         &mut fixture.cas,
         Draft::Region(RegionDraft {
@@ -127,6 +138,7 @@ fn guard(fixture: &mut Fixture, base: &Handle, key: &str, sign: i8) -> TestResul
 }
 
 fn family(fixture: &mut Fixture, signs: [i8; 2]) -> TestResult<Family> {
+    let mut budget = crate::testing::common::default_budget()?;
     let parameters = fixture.coordinates(&[
         ("L", Field::Real, CoordinateRole::Coefficient),
         ("C", Field::Real, CoordinateRole::Coefficient),
@@ -154,7 +166,11 @@ fn family(fixture: &mut Fixture, signs: [i8; 2]) -> TestResult<Family> {
     )?;
     let base_region = guard(fixture, &base_region, "L", signs[0])?;
     let base_region = guard(fixture, &base_region, "C", signs[1])?;
-    let descriptor = fixture.cas.state.region(base_region.logical_id())?.clone();
+    let descriptor = fixture
+        .cas
+        .state
+        .region(base_region.logical_id(), &mut budget)?
+        .clone();
     let expression = match descriptor.expression {
         RegionExpr::GuardTrue { base, predicate } => RegionExpr::GuardTrue {
             base: reference(&fixture.cas.handle(base)),
@@ -193,15 +209,21 @@ fn local(
     operator: Operator,
     inputs: &[(Handle, FamilyArgumentRole)],
 ) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     let arguments = inputs
         .iter()
         .map(|(value, role)| {
             let original = if *role == FamilyArgumentRole::Family {
-                let view = fixture.cas.state.expression(value.logical_id())?;
+                let view = fixture
+                    .cas
+                    .state
+                    .expression(value.logical_id(), &mut budget)?;
                 let [arm] = view.arms.as_slice() else {
                     return Err("LC family view".into());
                 };
-                fixture.cas.handle(fixture.cas.state.arm(*arm)?.value)
+                fixture
+                    .cas
+                    .handle(fixture.cas.state.arm(*arm, &mut budget)?.value)
             } else {
                 value.clone()
             };
@@ -320,13 +342,16 @@ fn denominators(
     input: &CoveredInput,
     retain: bool,
 ) -> TestResult<Handle> {
-    let data = crate::solving::graph::problem(&fixture.cas.state, original.logical_id())?.clone();
+    let mut budget = crate::testing::common::default_budget()?;
+    let data =
+        crate::solving::graph::problem(&fixture.cas.state, original.logical_id(), &mut budget)?
+            .clone();
     let mut pending = vec![input.root.logical_id()];
     let mut divisors = Vec::new();
     while let Some(id) = pending.pop() {
-        let occurrence = fixture.cas.state.occurrence(id)?;
+        let occurrence = fixture.cas.state.occurrence(id, &mut budget)?;
         if let crate::graph::Vertex::Expression(value) =
-            fixture.cas.state.node(occurrence.expression)?
+            fixture.cas.state.node(occurrence.expression, &mut budget)?
             && value.operator == Operator::Div
         {
             divisors.push(reference(

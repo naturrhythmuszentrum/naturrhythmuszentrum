@@ -27,8 +27,14 @@ fn guard(fixture: &mut Fixture) -> TestResult {
         &SelectionSpec::Entry(EntryIndex { row: 1, column: 0 }),
         &mut ledger()?,
     )?;
-    let header = fixture.cas.context_header(&fixture.context)?;
-    let domain = fixture.cas.admissible_region(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
+    let domain = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     let predicate = admit(
         &mut fixture.cas,
         Draft::Condition {

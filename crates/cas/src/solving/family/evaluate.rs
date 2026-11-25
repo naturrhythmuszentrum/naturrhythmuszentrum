@@ -16,7 +16,7 @@ pub(crate) fn read(
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
     crate::work_observation::observe!(budget, AT, {
-        if let Some(value) = body(evaluation.cas, root)? {
+        if let Some(value) = body(evaluation.cas, root, budget)? {
             if region::family(evaluation.cas, evaluation.region.logical_id(), budget)?
                 != value.family.logical_id()
                 || !region::subset(
@@ -37,11 +37,11 @@ pub(crate) fn read(
             }
             return operation(evaluation, &value.operator, &values, checked, budget);
         }
-        let expression = evaluation.cas.state.expression(root)?;
+        let expression = evaluation.cas.state.expression(root, budget)?;
         let [id] = expression.arms.as_slice() else {
             return Err(invalid());
         };
-        let arm = evaluation.cas.state.arm(*id)?;
+        let arm = evaluation.cas.state.arm(*id, budget)?;
         if !region::subset(
             evaluation.cas,
             evaluation.region.logical_id(),

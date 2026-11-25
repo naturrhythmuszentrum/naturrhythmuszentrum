@@ -173,8 +173,10 @@ fn linked_component_domains(
         let SolveStatement::RootExistence(existence) = statement.as_ref() else {
             continue;
         };
-        let SolveView::RootSelection(selection) =
-            fixture.unit.base.cas.solve_view(&existence.relation)?
+        let SolveView::RootSelection(selection) = fixture.unit.base.cas.solve_view(
+            &existence.relation,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         else {
             return Err("missing exact root selection".into());
         };
@@ -182,11 +184,18 @@ fn linked_component_domains(
             .relations
             .first()
             .ok_or("missing linked relation")?;
-        let SolveView::RootRelation(relation) = fixture.unit.base.cas.solve_view(relation)? else {
+        let SolveView::RootRelation(relation) = fixture
+            .unit
+            .base
+            .cas
+            .solve_view(relation, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("wrong linked relation".into());
         };
-        let SolveView::Polynomial(polynomial) =
-            fixture.unit.base.cas.solve_view(&relation.polynomial)?
+        let SolveView::Polynomial(polynomial) = fixture.unit.base.cas.solve_view(
+            &relation.polynomial,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         else {
             return Err("wrong linked polynomial".into());
         };

@@ -103,7 +103,10 @@ fn retained_law_public_constructor_ledger_composition_boundary() -> TestResult {
                     needed: 2 * registration + u64::try_from(managed)?
                 }
             );
-            returned.expression(&request.original.target)?;
+            returned.expression(
+                &request.original.target,
+                &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+            )?;
             assert_eq!(crate::loan::fault::Injection::attempts(), 0);
             assert_eq!(heap.resource_bytes()?, before);
         }

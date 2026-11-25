@@ -44,8 +44,8 @@ impl Evaluation<'_> {
             if let Some(value) = self.parameter(id, budget)? {
                 return Ok(value);
             }
-            let expression = self.cas.state.expression(id)?;
-            let header = self.cas.state.header(expression.header)?;
+            let expression = self.cas.state.expression(id, budget)?;
+            let header = self.cas.state.header(expression.header, budget)?;
             for (index, declaration) in header.environment.declarations.iter().enumerate() {
                 budget.work(1, AT)?;
                 if declaration.key == key {
@@ -62,7 +62,7 @@ impl Evaluation<'_> {
 
     /// Constants and root atoms never acquire a branch identity from their spelling.
     fn atom(&self, id: LogicalId, budget: &mut Budget) -> Result<Value, Fault> {
-        let expression = self.cas.state.expression(id)?;
+        let expression = self.cas.state.expression(id, budget)?;
         match (&expression.operator, &expression.attachment) {
             (Operator::Rational(value), None) => {
                 let coefficient = self.engine.rational(value, budget).map_err(|e| fault(&e))?;
@@ -102,7 +102,7 @@ impl Evaluation<'_> {
     ) -> Result<Value, Fault> {
         crate::work_observation::observe!(budget, AT, {
             let crate::solving::SolveDraft::CoefficientMap(mapping) =
-                crate::solving::graph::object(&self.cas.state, map)?
+                crate::solving::graph::object(&self.cas.state, map, budget)?
             else {
                 return Err(invalid());
             };
@@ -140,7 +140,7 @@ impl Evaluation<'_> {
         checked: bool,
         budget: &mut Budget,
     ) -> Result<Value, Fault> {
-        match (&self.cas.state.expression(id)?.operator, operands) {
+        match (&self.cas.state.expression(id, budget)?.operator, operands) {
             (Operator::Neg, [value]) => value.neg(&self.engine, budget),
             (Operator::Add, [left, right]) => left.add(right, &self.engine, budget),
             (Operator::Sub, [left, right]) => left.sub(right, &self.engine, budget),
@@ -169,23 +169,23 @@ impl Evaluation<'_> {
         budget: &mut Budget,
     ) -> Result<Value, Fault> {
         crate::work_observation::observe!(budget, AT, {
-            if crate::solving::family::local(self.cas, id)? {
+            if crate::solving::family::local(self.cas, id, budget)? {
                 return crate::solving::family::evaluate::read(self, id, checked, budget);
             }
             let mut pending = vector(1, budget)?;
             pending.push((id, false));
             let mut values = vector(1, budget)?;
-            let region = self.cas.state.region(self.region.logical_id())?;
+            let region = self.cas.state.region(self.region.logical_id(), budget)?;
             while let Some((current, ready)) = pending.pop() {
                 budget.work(1, AT)?;
-                if crate::solving::family::local(self.cas, current)? {
+                if crate::solving::family::local(self.cas, current, budget)? {
                     let result =
                         crate::solving::family::evaluate::read(self, current, checked, budget)?;
                     reserve(&mut values, 1, budget)?;
                     values.push(result);
                     continue;
                 }
-                let expression = self.cas.state.expression(current)?;
+                let expression = self.cas.state.expression(current, budget)?;
                 budget.check(BudgetKind::Depth, expression.depth, AT)?;
                 if expression.header != region.header || expression.space.is_some() {
                     return Err(invalid());

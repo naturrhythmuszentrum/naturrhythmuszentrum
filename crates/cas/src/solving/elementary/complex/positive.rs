@@ -68,8 +68,16 @@ impl Components<'_, '_> {
     }
 
     /// Zero is actual literal syntax, rather than a proposed equality or a reducible partial expression.
-    fn literal_zero(&self, handle: &Handle) -> Result<bool, Fault> {
-        let expression = self.evaluation.cas.state.expression(handle.logical_id())?;
+    fn literal_zero(
+        &self,
+        handle: &Handle,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<bool, Fault> {
+        let expression = self
+            .evaluation
+            .cas
+            .state
+            .expression(handle.logical_id(), budget)?;
         Ok(
             matches!(&expression.operator, Operator::Rational(value) if value.is_zero())
                 && expression.attachment.is_none()
@@ -83,22 +91,32 @@ impl Components<'_, '_> {
         expression: &Handle,
         first: &Handle,
         second: &Handle,
+        budget: &mut Budget,
     ) -> Result<bool, Fault> {
-        if expression == first && self.literal_zero(second)? {
+        if expression == first && self.literal_zero(second, budget)? {
             return Ok(true);
         }
         let value = self
             .evaluation
             .cas
             .state
-            .expression(expression.logical_id())?;
+            .expression(expression.logical_id(), budget)?;
         Ok(value.operator == Operator::Sub
             && value.operands.as_slice() == [first.logical_id(), second.logical_id()])
     }
 
     /// The desired factor is the exact left operand of the earlier checked factorization.
-    fn cofactor(&self, product: &Handle, factor: &Handle) -> Result<Option<LogicalId>, Fault> {
-        let expression = self.evaluation.cas.state.expression(product.logical_id())?;
+    fn cofactor(
+        &self,
+        product: &Handle,
+        factor: &Handle,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<Option<LogicalId>, Fault> {
+        let expression = self
+            .evaluation
+            .cas
+            .state
+            .expression(product.logical_id(), budget)?;
         let [left, right] = expression.operands.as_slice() else {
             return Ok(None);
         };
@@ -125,9 +143,9 @@ impl Components<'_, '_> {
         };
         for (difference, product) in [(left, right), (right, left)] {
             budget.work(1, AT)?;
-            if (self.difference(difference, first, second)?
-                || self.difference(difference, second, first)?)
-                && let Some(cofactor) = self.cofactor(product, &claim.left)?
+            if (self.difference(difference, first, second, budget)?
+                || self.difference(difference, second, first, budget)?)
+                && let Some(cofactor) = self.cofactor(product, &claim.left, budget)?
             {
                 return Ok(Some(cofactor));
             }
@@ -143,7 +161,7 @@ impl Components<'_, '_> {
         claim: &StatementCoefficientEquality,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        if !self.literal_zero(&claim.right)? {
+        if !self.literal_zero(&claim.right, budget)? {
             return Err(invalid());
         }
         for source in &certificate.relations {

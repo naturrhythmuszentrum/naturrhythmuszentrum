@@ -23,7 +23,7 @@ pub(crate) fn region_context(
     ambient: &AmbientDomain,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let value = state.region(id)?;
+    let value = state.region(id, budget)?;
     if value.scope != *scope
         || value.ambient != *ambient
         || !crate::header::embeds(state, value.header, header, budget)?
@@ -34,11 +34,12 @@ pub(crate) fn region_context(
 }
 
 /// Read the header and scope of an admitted Boolean expression or condition.
-pub(crate) fn predicate_context(
-    state: &State,
+pub(crate) fn predicate_context<'a>(
+    state: &'a State,
     id: LogicalId,
-) -> Result<(LogicalId, &Scope), Fault> {
-    match state.node(id)? {
+    budget: &mut Budget,
+) -> Result<(LogicalId, &'a Scope), Fault> {
+    match state.node(id, budget)? {
         Vertex::Condition(value) => Ok((value.header, &value.scope)),
         Vertex::Expression(value) if value.sort == Sort::Value(AtomicSort::Boolean) => {
             Ok((value.header, &value.scope))
@@ -52,11 +53,13 @@ pub(crate) fn ambient_header(
     state: &State,
     header: LogicalId,
     ambient: &AmbientDomain,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
-    let environment = &state.header(header)?.environment;
+    let environment = &state.header(header, budget)?.environment;
     let (key, expected) = match ambient {
         AmbientDomain::Product { coordinates } => {
-            let product = crate::solving::graph::coordinates(state, coordinates.logical_id())?;
+            let product =
+                crate::solving::graph::coordinates(state, coordinates.logical_id(), budget)?;
             return if product.header.logical_id() == header {
                 Ok(())
             } else {
@@ -90,15 +93,16 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
         crate::validation::scope_limit(&draft.scope, budget)?;
-        let header = self.resolve(state, &draft.header, locals)?;
+        let header = self.resolve(state, &draft.header, locals, budget)?;
         if let AmbientDomain::Product { coordinates } = &draft.ambient {
             self.resolve(
                 state,
                 &crate::graph::Reference::Existing(coordinates.clone()),
                 locals,
+                budget,
             )?;
         }
-        ambient_header(state, header, &draft.ambient)?;
+        ambient_header(state, header, &draft.ambient, budget)?;
         let mut edges = vec![(header, Edge::InHeader)];
         if let AmbientDomain::Product { coordinates } = &draft.ambient {
             edges.push((coordinates.logical_id(), Edge::Coordinates));
@@ -108,10 +112,10 @@ impl Cas {
             RegionExpr::Empty => RegionExpr::Empty,
             RegionExpr::GuardTrue { base, predicate }
             | RegionExpr::GuardFalse { base, predicate } => {
-                let base = self.resolve(state, base, locals)?;
+                let base = self.resolve(state, base, locals, budget)?;
                 region_context(state, base, header, &draft.scope, &draft.ambient, budget)?;
-                let predicate = self.resolve(state, predicate, locals)?;
-                let (actual, scope) = predicate_context(state, predicate)?;
+                let predicate = self.resolve(state, predicate, locals, budget)?;
+                let (actual, scope) = predicate_context(state, predicate, budget)?;
                 if scope != &draft.scope || !crate::header::embeds(state, actual, header, budget)? {
                     return Err(Fault::invalid(InvalidCode::Scope, AT));
                 }
@@ -145,8 +149,8 @@ impl Cas {
                 }
             }
             RegionExpr::Difference { base, excluded } => {
-                let base = self.resolve(state, base, locals)?;
-                let excluded = self.resolve(state, excluded, locals)?;
+                let base = self.resolve(state, base, locals, budget)?;
+                let excluded = self.resolve(state, excluded, locals, budget)?;
                 for id in [base, excluded] {
                     region_context(state, id, header, &draft.scope, &draft.ambient, budget)?;
                 }
@@ -203,8 +207,8 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(state, &draft.header, locals)?;
-        let domain = self.resolve(state, &draft.domain, locals)?;
+        let header = self.resolve(state, &draft.header, locals, budget)?;
+        let domain = self.resolve(state, &draft.domain, locals, budget)?;
         region_context(
             state,
             domain,
@@ -213,7 +217,7 @@ impl Cas {
             &AmbientDomain::Real(draft.coordinate.clone()),
             budget,
         )?;
-        if state.header(header)?.parent.is_some()
+        if state.header(header, budget)?.parent.is_some()
             || draft.field != Field::Real
             || draft.test_family != "CompactSmooth"
         {
@@ -245,9 +249,9 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(state, &draft.header, locals)?;
-        let region = self.resolve(state, &draft.region, locals)?;
-        let value = self.resolve(state, &draft.value, locals)?;
+        let header = self.resolve(state, &draft.header, locals, budget)?;
+        let region = self.resolve(state, &draft.region, locals, budget)?;
+        let value = self.resolve(state, &draft.value, locals, budget)?;
         let arm = crate::solving::sorts::arm(
             self,
             state,
@@ -284,10 +288,10 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let header = self.resolve(state, &draft.header, locals)?;
-        ambient_header(state, header, &draft.ambient)?;
-        let location = self.resolve(state, &draft.location, locals)?;
-        let point = state.expression(location)?;
+        let header = self.resolve(state, &draft.header, locals, budget)?;
+        ambient_header(state, header, &draft.ambient, budget)?;
+        let location = self.resolve(state, &draft.location, locals, budget)?;
+        let point = state.expression(location, budget)?;
         let expected = match &draft.ambient {
             AmbientDomain::Real(_) => Sort::Value(AtomicSort::Scalar(Field::Real)),
             AmbientDomain::Integer(_) => Sort::Value(AtomicSort::Integer),
@@ -334,9 +338,9 @@ impl Cas {
             false,
             AT,
         )?;
-        let header = self.resolve(state, &draft.header, locals)?;
-        let domain = self.resolve(state, &draft.domain, locals)?;
-        let region = state.region(domain)?;
+        let header = self.resolve(state, &draft.header, locals, budget)?;
+        let domain = self.resolve(state, &draft.domain, locals, budget)?;
+        let region = state.region(domain, budget)?;
         region_context(state, domain, header, &draft.scope, &region.ambient, budget)?;
         let mut clauses = Vec::new();
         clauses
@@ -345,10 +349,10 @@ impl Cas {
         let mut values = Vec::new();
         let mut edges = vec![(header, Edge::InHeader), (domain, Edge::CaseDomain)];
         for clause in &draft.clauses {
-            let selector = self.resolve(state, &clause.selector, locals)?;
-            let value = self.resolve(state, &clause.value, locals)?;
+            let selector = self.resolve(state, &clause.selector, locals, budget)?;
+            let value = self.resolve(state, &clause.value, locals, budget)?;
             if draft.kind == SourceFormKind::OrderedCases {
-                let (actual, scope) = predicate_context(state, selector)?;
+                let (actual, scope) = predicate_context(state, selector, budget)?;
                 if scope != &draft.scope || !crate::header::embeds(state, actual, header, budget)? {
                     return Err(Fault::invalid(InvalidCode::Scope, AT));
                 }
@@ -375,7 +379,7 @@ impl Cas {
         let otherwise = draft
             .otherwise
             .as_ref()
-            .map(|item| self.resolve(state, item, locals))
+            .map(|item| self.resolve(state, item, locals, budget))
             .transpose()?;
         if let Some(value) = otherwise {
             if draft.kind == SourceFormKind::CaseLiteral {
@@ -418,12 +422,12 @@ fn check_values(
         .first()
         .copied()
         .ok_or_else(|| Fault::invalid(InvalidCode::Sort, AT))?;
-    let sort = &state.expression(first)?.sort;
+    let sort = &state.expression(first, budget)?.sort;
     if !matches!(sort, Sort::Value(AtomicSort::Scalar(_))) {
         return Err(Fault::invalid(InvalidCode::Sort, AT));
     }
     for id in values {
-        let term = state.expression(*id)?;
+        let term = state.expression(*id, budget)?;
         if &term.sort != sort
             || &term.scope != scope
             || !crate::header::embeds(state, term.header, header, budget)?
@@ -470,11 +474,11 @@ impl Cas {
         let at = Location::new("native case admission");
         crate::work_observation::observe!(budget, at, {
             budget.specialized(BudgetKind::CaseArms, size(draft.arms.len(), at)?, false, at)?;
-            let header = self.resolve(state, &draft.header, locals)?;
-            state.header(header)?;
+            let header = self.resolve(state, &draft.header, locals, budget)?;
+            state.header(header, budget)?;
             crate::validation::scope_limit(&draft.scope, budget)?;
-            let domain = self.resolve(state, &draft.domain, locals)?;
-            let region = state.region(domain)?;
+            let domain = self.resolve(state, &draft.domain, locals, budget)?;
+            let region = state.region(domain, budget)?;
             region_context(state, domain, header, &draft.scope, &region.ambient, budget)?;
             let arms = self.case_arms(state, draft, locals, budget)?;
             if arms.is_empty() {
@@ -493,7 +497,7 @@ impl Cas {
                 .try_reserve(arms.len())
                 .map_err(|_| Fault::allocation(at))?;
             for (position, arm) in arms.iter().enumerate() {
-                let value = state.arm(*arm)?;
+                let value = state.arm(*arm, budget)?;
                 if value.sort != sort {
                     return Err(Fault::invalid(InvalidCode::SymbolSortMismatch, at));
                 }
@@ -529,7 +533,7 @@ impl Cas {
             }
             budget.check(BudgetKind::Depth, depth, at)?;
             budget.check(BudgetKind::PeakExpressionSize, unfolded, at)?;
-            let ambient = crate::solving::sorts::ambient(state, header, &sort)?;
+            let ambient = crate::solving::sorts::ambient(state, header, &sort, budget)?;
             case_ambient_edge(&mut edges, ambient);
             self.insert(
                 state,

@@ -2,7 +2,7 @@
 //! Complete canonical-index lookup Work is independent of hit or miss outcome.
 
 use crate::graph::{LogicalId, Vertex, vertex_key};
-use crate::limits::{Budget, BudgetKind, Limits};
+use crate::limits::{BudgetKind, Limits};
 use crate::syntax::Operator;
 use crate::testing::common::{TestResult, default_budget};
 use crate::testing::trig::{Fixture, operators};
@@ -13,6 +13,7 @@ fn fixture(
     projected: bool,
     hit: bool,
 ) -> TestResult<(Fixture, Vec<u8>, Option<LogicalId>)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = Fixture::new()?;
     let operand = if projected {
         f.term(Operator::RealPart, &[f.z.clone()])?
@@ -21,7 +22,7 @@ fn fixture(
     };
     let stored = if hit { operator.clone() } else { Operator::Neg };
     let node = f.term(stored, &[operand])?;
-    let mut vertex = f.cas.state.node(node.logical_id())?.clone();
+    let mut vertex = f.cas.state.node(node.logical_id(), &mut budget)?.clone();
     let Vertex::Expression(expression) = &mut vertex else {
         return Err("expression".into());
     };
@@ -41,7 +42,7 @@ fn boundary(
     let before = f.cas.canonical_snapshot(&mut default_budget()?)?;
     let counts = f.cas.counts();
     let comparisons = f.cas.interning_snapshot();
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         work,
         ..Limits::default()
     })?;

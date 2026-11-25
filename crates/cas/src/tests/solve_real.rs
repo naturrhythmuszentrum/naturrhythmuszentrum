@@ -19,6 +19,7 @@ fn real_independent_acceptance() -> crate::testing::common::TestResult {
 /// ´test:crate:real-ground-degree-ladder´
 #[test]
 fn real_ground_degree_ladder() -> crate::testing::common::TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::solving::{SolutionBranchKind, SolveForm, SolveView};
     for (coefficients, count) in [
         ([1, -3, 0, 1], Some(3)),
@@ -37,11 +38,13 @@ fn real_ground_degree_ladder() -> crate::testing::common::TestResult {
             return Err(format!("{coefficients:?}: {outcome:?}").into());
         };
         assert_eq!(answer.form, SolveForm::RealExact);
-        let SolveView::SolutionSet(set) = fixture.cas.solve_view(&answer.set)? else {
+        let SolveView::SolutionSet(set) = fixture.cas.solve_view(&answer.set, &mut budget)? else {
             return Err("Real ground set".into());
         };
         assert_eq!(set.branches.len(), 1);
-        let SolveView::SolutionBranch(branch) = fixture.cas.solve_view(&set.branches[0])? else {
+        let SolveView::SolutionBranch(branch) =
+            fixture.cas.solve_view(&set.branches[0], &mut budget)?
+        else {
             return Err("Real ground branch".into());
         };
         match (&branch.kind, count) {

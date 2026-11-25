@@ -124,7 +124,7 @@ fn machin_cache_reuses_certificate() -> TestResult {
     assert_eq!(cas.counts().edges, before.edges + 2);
     assert_eq!(cas.counts().payload_bytes, before.payload_bytes + 936);
     assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, committed);
-    assert_eq!(cold.usage().work, 17_499);
+    assert_eq!(cold.usage().work, 17_502);
     assert_eq!(warm.usage().work, 70);
     assert_eq!(cas.state.pi_judgments.len(), 1);
     assert_eq!(cas.retained_judgment_bytes(), 936);
@@ -231,7 +231,7 @@ fn machin_cache_owner_and_rollback() -> TestResult {
 #[test]
 fn machin_cache_work_boundaries() -> TestResult {
     let certificate = certificate()?;
-    for (warm, needed) in [(false, 17_516), (true, 87)] {
+    for (warm, needed) in [(false, 17_519), (true, 87)] {
         for work in [needed, needed - 1] {
             let mut cas = store()?;
             if warm {
@@ -274,7 +274,7 @@ fn machin_cache_dyadic_citation() -> TestResult {
     certificate.upper = Rational::from_ratio(1609, 512, &mut ledger()?)?;
     let mut cold = ledger()?;
     assert_eq!(check(&mut cas, &certificate, &mut cold)?, 692);
-    assert_eq!(cold.usage().work, 18_019);
+    assert_eq!(cold.usage().work, 18_022);
     for work in [90, 89] {
         let mut budget = Budget::new(Limits {
             work,
@@ -423,19 +423,31 @@ fn machin_cache_storage_boundaries() -> TestResult {
 /// ´claim:cas:machin-graph-evidence-authentication´
 #[test]
 fn machin_graph_evidence_authentication() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut cas = store()?;
     let certificate = certificate()?;
     check(&mut cas, &certificate, &mut ledger()?)?;
     let id = cas
         .state
         .pi_judgments
-        .get(&certificate)?
+        .get(&certificate, &mut budget)?
         .ok_or("Machin node")?;
-    let source = cas.pi_inventory(id)?.original;
+    let source = cas.pi_inventory(id, &mut ledger()?)?.original;
     let edge = cas
         .state
         .graph
-        .find_edge(cas.state.indices[&source], cas.state.indices[&id])
+        .find_edge(
+            cas.state
+                .indices
+                .peek(&source)
+                .copied()
+                .ok_or("index missing")?,
+            cas.state
+                .indices
+                .peek(&id)
+                .copied()
+                .ok_or("index missing")?,
+        )
         .ok_or("checked evidence edge")?;
     cas.state.graph.remove_edge(edge);
     let before = cas.canonical_snapshot(&mut ledger()?)?;

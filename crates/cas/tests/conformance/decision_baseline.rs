@@ -232,7 +232,7 @@ impl Fixture {
             context: local.clone(),
             rule: Primitive::ContextHypothesis,
             conclusion: Statement::Subset {
-                subset: self.cas.admissible_region(&local)?,
+                subset: self.cas.admissible_region(&local, budget)?,
                 superset: enclosure.clone(),
             },
             certificate: Certificate::Hypothesis(HypothesisRef {
@@ -260,7 +260,9 @@ impl Fixture {
         let receipt = self.cas.walk_derived(&root, &mut ledger()?)?.receipt;
         Ok(Request {
             task: Task::Select {
-                region: self.cas.admissible_region(&local)?,
+                region: self
+                    .cas
+                    .admissible_region(&local, &mut crate::testing::budgets::graph_budget()?)?,
             },
             context: local,
             inputs: vec![CoveredInput { root, receipt }],
@@ -277,6 +279,7 @@ struct Costs {
     admission: u64,
     generation: u64,
     checking: u64,
+    selection_replay: u64,
     staged: [u64; 2],
     payload: [u64; 2],
     added: [u64; 2],
@@ -286,9 +289,10 @@ struct Costs {
 const COSTS: [Costs; 3] = [
     Costs {
         example: Example::Integer,
-        admission: 29_300,
-        generation: 958_363,
-        checking: 1_715_691,
+        admission: 29_322,
+        generation: 958_417,
+        checking: 1_715_916,
+        selection_replay: 1_715_916,
         staged: [20_816, 169_741],
         payload: [14_095, 38_348],
         added: [2_055, 16_339],
@@ -296,9 +300,10 @@ const COSTS: [Costs; 3] = [
     },
     Costs {
         example: Example::Sign,
-        admission: 29_340,
-        generation: 744_468,
-        checking: 1_336_868,
+        admission: 29_362,
+        generation: 744_522,
+        checking: 1_337_063,
+        selection_replay: 1_337_063,
         staged: [20_848, 168_496],
         payload: [11_645, 32_092],
         added: [2_055, 16_285],
@@ -306,9 +311,10 @@ const COSTS: [Costs; 3] = [
     },
     Costs {
         example: Example::Phase,
-        admission: 43_786,
-        generation: 209_947,
+        admission: 43_808,
+        generation: 209_959,
         checking: 0,
+        selection_replay: 0,
         staged: [33_120, 39_710],
         payload: [18_188, 36_250],
         added: [2_079, 11_555],
@@ -406,7 +412,7 @@ fn bounded(kind: BudgetKind, limit: u64) -> Limits {
 /// A failed public admission call rolls back its own graph changes; earlier calls remain committed.
 fn admission_attempt(costs: &Costs, kind: BudgetKind, limit: u64, prior: u64) -> TestResult<bool> {
     let (mut fixture, enclosure, _) = prepared(costs.example)?;
-    let mut budget = Budget::new(bounded(kind, limit))?;
+    let mut budget = nrz_cas::limits::Budget::new(bounded(kind, limit))?;
     budget.work(prior, Location::new("prior ordinary membership work"))?;
     let result = fixture.membership(&enclosure, &mut budget);
     if let Err(error) = &result {
@@ -446,7 +452,9 @@ fn selection_attempt(costs: &Costs, kind: BudgetKind, limit: u64) -> TestResult<
     let (local, member) = fixture.membership(&enclosure, &mut ledger()?)?;
     let mut request = fixture.request(&cases, local, member)?;
     match kind {
-        BudgetKind::Work => request.limits.work = Some(limit),
+        BudgetKind::Work => {
+            request.limits.work = Some(limit);
+        }
         BudgetKind::ReplayWork => request.limits.replay_work = Some(limit),
         BudgetKind::StagedPayloadBytes => request.limits.staged_payload_bytes = Some(limit),
         BudgetKind::PayloadBytes => request.limits.payload_bytes = Some(limit),
@@ -477,16 +485,16 @@ fn decision_baseline_selection_boundaries() -> TestResult {
             assert!(selection_attempt(&costs, kind, needed)?);
             assert!(!selection_attempt(&costs, kind, needed - 1)?);
         }
-        if costs.checking != 0 {
+        if costs.selection_replay != 0 {
             assert!(selection_attempt(
                 &costs,
                 BudgetKind::ReplayWork,
-                costs.checking
+                costs.selection_replay
             )?);
             assert!(!selection_attempt(
                 &costs,
                 BudgetKind::ReplayWork,
-                costs.checking - 1
+                costs.selection_replay - 1
             )?);
         }
     }
@@ -502,7 +510,7 @@ fn decision_baseline_export_boundaries() -> TestResult {
         let (_, member) = fixture.membership(&enclosure, &mut ledger()?)?;
         let count = u64::try_from(costs.witness[0])?;
         let before = fixture.cas.counts();
-        let mut exact = Budget::new(Limits {
+        let mut exact = nrz_cas::limits::Budget::new(Limits {
             output_bytes: count,
             ..Limits::default()
         })?;
@@ -510,7 +518,7 @@ fn decision_baseline_export_boundaries() -> TestResult {
             fixture.cas.export_witness(&member, &mut exact)?.len(),
             costs.witness[0]
         );
-        let mut short = Budget::new(Limits {
+        let mut short = nrz_cas::limits::Budget::new(Limits {
             output_bytes: count - 1,
             ..Limits::default()
         })?;

@@ -116,7 +116,7 @@ impl Dense {
         budget: &mut Budget,
     ) -> Result<Self, CoefficientFailure> {
         begin(budget)?;
-        let stored = polynomial(state, handle)?;
+        let stored = polynomial(state, handle, budget)?;
         if stored.variables.len() != 1 {
             return Err(invalid().into());
         }

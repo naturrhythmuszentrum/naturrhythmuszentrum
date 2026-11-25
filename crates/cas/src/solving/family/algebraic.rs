@@ -16,9 +16,13 @@ use crate::solving::radicals::{construction::Construction, roots::Values};
 use crate::solving::towers::dense::Dense;
 
 /// Only an explicit family map may use this separate discovery route.
-pub(crate) fn applies(cas: &Cas, map: &Handle) -> Result<bool, Fault> {
+pub(crate) fn applies(
+    cas: &Cas,
+    map: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     let crate::solving::SolveDraft::CoefficientMap(value) =
-        crate::solving::graph::object(&cas.state, cas.checked(map)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(map, budget)?, budget)?
     else {
         return Err(invalid());
     };

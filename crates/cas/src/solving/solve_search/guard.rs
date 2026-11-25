@@ -79,7 +79,7 @@ pub(crate) fn expression(
     }
     if cas
         .state
-        .region(construction.region.logical_id())?
+        .region(construction.region.logical_id(), budget)?
         .lies_over
         .is_some()
     {

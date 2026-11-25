@@ -398,7 +398,9 @@ fn qualified_local_closure() -> TestResult {
         }),
         &mut budget()?,
     )?;
-    let domain = fixture.cas.admissible_region(&local)?;
+    let domain = fixture
+        .cas
+        .admissible_region(&local, &mut crate::testing::budgets::graph_budget()?)?;
     let fact = Statement::PredicateFact {
         region: domain.clone(),
         predicate: predicate.clone(),
@@ -554,7 +556,9 @@ fn local_context_resource_boundaries() -> TestResult {
         &nested,
         Primitive::ContextHypothesis,
         Statement::Subset {
-            subset: fixture.cas.admissible_region(&nested)?,
+            subset: fixture
+                .cas
+                .admissible_region(&nested, &mut crate::testing::budgets::graph_budget()?)?,
             superset: fixture.ambient.clone(),
         },
         Certificate::Hypothesis(HypothesisRef {
@@ -648,7 +652,13 @@ fn native_case_admission_boundary() -> TestResult {
             ..budget()?.limits().clone()
         })?,
     )?;
-    assert_eq!(*fixture.cas.expression(&cases)?.0, Operator::Cases);
+    assert_eq!(
+        *fixture
+            .cas
+            .expression(&cases, &mut crate::testing::budgets::graph_budget()?)?
+            .0,
+        Operator::Cases
+    );
     let root = fixture
         .cas
         .materialize_derived(&cases, &cases, &mut budget()?)?;
@@ -866,7 +876,12 @@ fn header_space_acyclicity() -> TestResult {
         }),
         &mut budget()?,
     )?;
-    assert_eq!(fixture.cas.expression_header(&test)?, extended);
+    assert_eq!(
+        fixture
+            .cas
+            .expression_header(&test, &mut crate::testing::budgets::graph_budget()?)?,
+        extended
+    );
     let before = fixture.cas.canonical_snapshot(&mut budget()?)?;
     assert!(
         fixture
@@ -921,7 +936,9 @@ fn explicit_context_restriction() -> TestResult {
         }),
         &mut budget()?,
     )?;
-    let restricted = fixture.cas.admissible_region(&local)?;
+    let restricted = fixture
+        .cas
+        .admissible_region(&local, &mut crate::testing::budgets::graph_budget()?)?;
     let original = Statement::Equality {
         left: fixture.x.clone(),
         right: fixture.x.clone(),
@@ -962,7 +979,12 @@ fn explicit_context_restriction() -> TestResult {
     ];
     let witness = fixture.cas.check_proof(&local, &steps, &mut budget()?)?;
     assert_eq!(witness.judgment().statement, expected);
-    assert_eq!(fixture.cas.expression_header(&fixture.x)?, fixture.header);
+    assert_eq!(
+        fixture
+            .cas
+            .expression_header(&fixture.x, &mut crate::testing::budgets::graph_budget()?)?,
+        fixture.header
+    );
     assert!(witness.is_discharged());
     let bytes = fixture.cas.export_witness(&witness, &mut budget()?)?;
     let mut fresh = Cas::new(budget()?.limits().clone())?;

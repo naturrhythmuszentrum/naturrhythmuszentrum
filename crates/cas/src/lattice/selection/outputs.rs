@@ -76,10 +76,13 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<(&'a LatticeSelection, &'a LatticeEnclosure), Fault> {
         budget.work(4, AT)?;
-        let Vertex::Proof(application) = self.state.node(self.checked(witness.proof())?)? else {
+        let Vertex::Proof(application) = self
+            .state
+            .node(self.checked(witness.proof(), budget)?, budget)?
+        else {
             return Err(invalid());
         };
-        let Vertex::ScopedApplication(proof) = self.state.node(*application)? else {
+        let Vertex::ScopedApplication(proof) = self.state.node(*application, budget)? else {
             return Err(invalid());
         };
         let (selection, _) = super::question(&proof.judgment.statement).map_err(|_| invalid())?;
@@ -201,7 +204,7 @@ impl Cas {
             .values
             .get(coordinate)
             .ok_or_else(|| Fault::invalid(InvalidCode::SelectionOutOfRange, AT))?;
-        super::literal(self, value, &selection.cover.index.basis.context)
+        super::literal(self, value, &selection.cover.index.basis.context, budget)
     }
 
     /// Expand exact ordered products into explicit Real columns without normalization.
@@ -210,15 +213,15 @@ impl Cas {
         question: &LatticeSelection,
         budget: &mut Budget,
     ) -> Result<(Handle, Handle), Fault> {
-        let home = self.checked(&question.cover.index.basis.context)?;
-        let basis = self.checked(&question.cover.index.basis.basis)?;
-        let target = self.checked(&question.target)?;
+        let home = self.checked(&question.cover.index.basis.context, budget)?;
+        let basis = self.checked(&question.cover.index.basis.basis, budget)?;
+        let target = self.checked(&question.target, budget)?;
         let count = question.values.len();
         let mut embedded = reserve(count, budget)?;
         let mut residuals = reserve(count, budget)?;
         let mut restored = reserve(count, budget)?;
         for value in &question.values {
-            let number = super::literal(self, value, &question.cover.index.basis.context)?;
+            let number = super::literal(self, value, &question.cover.index.basis.context, budget)?;
             let (numerator, denominator) = number.component_bits();
             let bytes = numerator
                 .div_ceil(8)
@@ -239,11 +242,12 @@ impl Cas {
             )?;
             for (column, value) in embedded.iter().enumerate() {
                 budget.work(1, AT)?;
-                let coefficient = self.state.expression(basis)?.operands[row * count + column];
+                let coefficient =
+                    self.state.expression(basis, budget)?.operands[row * count + column];
                 let term = scalar(self, home, Operator::Mul, &[coefficient, *value], budget)?;
                 product = scalar(self, home, Operator::Add, &[product, term], budget)?;
             }
-            let original = self.state.expression(target)?.operands[row];
+            let original = self.state.expression(target, budget)?.operands[row];
             let remainder = scalar(self, home, Operator::Sub, &[original, product], budget)?;
             residuals.push(remainder);
             restored.push(scalar(

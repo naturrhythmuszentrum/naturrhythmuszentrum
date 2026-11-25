@@ -40,7 +40,7 @@ pub(crate) fn snapshot(
     let mut retained = 0_u64;
     for id in cas.state.indices.keys() {
         budget.work(1, AT)?;
-        let Some((proof, shortcut)) = candidate(cas, *id, policy)? else {
+        let Some((proof, shortcut)) = candidate(cas, *id, policy, budget)? else {
             continue;
         };
         let application = crate::proof_view::application(cas, proof, budget)?;
@@ -90,8 +90,9 @@ fn candidate(
     cas: &Cas,
     id: LogicalId,
     policy: &CostPolicy,
+    budget: &mut Budget,
 ) -> Result<Option<(LogicalId, Option<u64>)>, Fault> {
-    Ok(match cas.state.node(id)? {
+    Ok(match cas.state.node(id, budget)? {
         Vertex::Proof(_) => Some((id, None)),
         Vertex::Shortcut { proof, cost } if *policy == CostPolicy::default() => {
             Some((*proof, Some(*cost)))
@@ -102,7 +103,7 @@ fn candidate(
             policy: identity,
             ..
         } => {
-            let Vertex::Policy(actual) = cas.state.node(*identity)? else {
+            let Vertex::Policy(actual) = cas.state.node(*identity, budget)? else {
                 return Err(invalid());
             };
             if actual == policy {

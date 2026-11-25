@@ -19,7 +19,7 @@ impl Components<'_, '_> {
         budget: &mut Budget,
     ) -> Result<Parts, Fault> {
         let SolveDraft::CoefficientMap(mapping) =
-            crate::solving::graph::object(&self.evaluation.cas.state, map)?
+            crate::solving::graph::object(&self.evaluation.cas.state, map, budget)?
         else {
             return Err(invalid());
         };
@@ -37,7 +37,7 @@ impl Components<'_, '_> {
             budget.work(1, AT)?;
             self.depth = self.depth.checked_add(1).ok_or_else(invalid)?;
             budget.check(BudgetKind::Depth, self.depth, AT)?;
-            let stored = value(&self.evaluation.cas.state, handle)?;
+            let stored = value(&self.evaluation.cas.state, handle, budget)?;
             if stored.domain != map.source {
                 return Err(invalid());
             }
@@ -79,7 +79,7 @@ impl Components<'_, '_> {
 
     /// Ground coefficients of a fraction polynomial use the canonical real/Gaussian embedding.
     fn ground(&self, handle: &Handle, budget: &mut Budget) -> Result<Parts, Fault> {
-        match &value(&self.evaluation.cas.state, handle)?.value {
+        match &value(&self.evaluation.cas.state, handle, budget)?.value {
             CoefficientValueData::Rational { value } => Parts::rational(
                 self.evaluation,
                 value,
@@ -100,7 +100,7 @@ impl Components<'_, '_> {
         map: &CoefficientMapData<Handle>,
         budget: &mut Budget,
     ) -> Result<Parts, Fault> {
-        let stored = polynomial(&self.evaluation.cas.state, handle)?;
+        let stored = polynomial(&self.evaluation.cas.state, handle, budget)?;
         if stored.variables.len() != map.images.len() {
             return Err(invalid());
         }
@@ -130,7 +130,11 @@ impl Components<'_, '_> {
         let [image] = map.images.as_slice() else {
             return Err(invalid());
         };
-        let expression = self.evaluation.cas.state.expression(image.logical_id())?;
+        let expression = self
+            .evaluation
+            .cas
+            .state
+            .expression(image.logical_id(), budget)?;
         let (Operator::RootValue { slot }, Some(ExpressionAttachment::SelectedRoot(selected))) =
             (&expression.operator, &expression.attachment)
         else {
@@ -139,6 +143,7 @@ impl Components<'_, '_> {
         let selection = super::super::selected::selection(
             self.evaluation.cas,
             &self.evaluation.cas.handle(*selected),
+            budget,
         )?;
         let relation = super::super::selected::relation(
             self.evaluation.cas,
@@ -146,9 +151,13 @@ impl Components<'_, '_> {
                 .relations
                 .get(usize::try_from(*slot).map_err(|_| invalid())?)
                 .ok_or_else(invalid)?,
+            budget,
         )?;
-        let SolveDraft::CoefficientMap(parent) =
-            crate::solving::graph::object(&self.evaluation.cas.state, relation.map.logical_id())?
+        let SolveDraft::CoefficientMap(parent) = crate::solving::graph::object(
+            &self.evaluation.cas.state,
+            relation.map.logical_id(),
+            budget,
+        )?
         else {
             return Err(invalid());
         };

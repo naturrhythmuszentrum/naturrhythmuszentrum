@@ -43,8 +43,8 @@ pub(crate) fn precision(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(),
         left, right, order, ..
     } = value
     {
-        let outer = cas.series_object(left)?.order;
-        let inner = cas.series_object(right)?.order;
+        let outer = cas.series_object(left, budget)?.order;
+        let inner = cas.series_object(right, budget)?.order;
         if *order == 0 || *order > outer.min(inner) {
             return Err(super::compose::precision(outer, inner, *order, budget)?);
         }
@@ -53,8 +53,12 @@ pub(crate) fn precision(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(),
 }
 
 /// Borrow an exact admitted coefficient without any input-sized copy.
-pub(crate) fn number<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a Rational, Fault> {
-    let expression = cas.state.expression(cas.checked(handle)?)?;
+pub(crate) fn number<'a>(
+    cas: &'a Cas,
+    handle: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Rational, Fault> {
+    let expression = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     let Operator::Rational(value) = &expression.operator else {
         return Err(unsupported());
     };
@@ -65,7 +69,11 @@ pub(crate) fn number<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a Rational, 
 }
 
 /// The statement determines the complete ordered arity before any proof payload is copied.
-pub(crate) fn premise_count(cas: &Cas, value: &S) -> Result<usize, Fault> {
+pub(crate) fn premise_count(
+    cas: &Cas,
+    value: &S,
+    budget: &mut crate::budget::Budget,
+) -> Result<usize, Fault> {
     match value {
         S::Source(value) => Ok(value.clause.arity()),
         S::Reciprocal { .. } | S::Truncate { .. } | S::Coefficient { .. } | S::Derive { .. } => {
@@ -80,8 +88,10 @@ pub(crate) fn premise_count(cas: &Cas, value: &S) -> Result<usize, Fault> {
         }
         | S::Mul {
             left, right, order, ..
-        } => Ok(usize::from(cas.series_object(left)?.order != *order)
-            + usize::from(cas.series_object(right)?.order != *order)),
+        } => Ok(
+            usize::from(cas.series_object(left, budget)?.order != *order)
+                + usize::from(cas.series_object(right, budget)?.order != *order),
+        ),
     }
 }
 
@@ -114,8 +124,10 @@ fn scalar(
     handle: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let expression = cas.state.expression(cas.checked(handle)?)?;
-    let context = cas.state.context(cas.checked(&basis.context)?)?;
+    let expression = cas.state.expression(cas.checked(handle, budget)?, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&basis.context, budget)?, budget)?;
     let mut out = crate::encoding::Encoder::new(budget, AT);
     crate::encoding::scope(&expression.scope, &mut out)?;
     let bytes = size(out.finish().len(), AT)?;
@@ -124,7 +136,7 @@ fn scalar(
     if expression.header != header || expression.scope != basis.scope {
         return Err(invalid());
     }
-    number(cas, handle)?.check(budget, AT)
+    number(cas, handle, budget)?.check(budget, AT)
 }
 
 /// Constant independence precedes rational capability, preserving the malformed-scope split.
@@ -136,8 +148,8 @@ pub(super) fn constant(
 ) -> Result<(), Fault> {
     super::independent(
         &cas.state,
-        cas.checked(handle)?,
-        cas.checked(&basis.variable)?,
+        cas.checked(handle, budget)?,
+        cas.checked(&basis.variable, budget)?,
         budget,
     )?;
     scalar(cas, basis, handle, budget)
@@ -152,12 +164,12 @@ pub(crate) fn roles(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(), Fau
     if matches!(value, S::EvaluatedResidual { .. }) {
         return super::residual::roles(cas, value, budget);
     }
-    let input = cas.series_object(value.input())?;
+    let input = cas.series_object(value.input(), budget)?;
     input.preflight(budget)?;
     match value {
         S::Source(_) | S::EvaluatedResidual { .. } => return Err(invalid()),
         S::Reciprocal { output, .. } | S::Truncate { output, .. } | S::Derive { output, .. } => {
-            compatible(input, cas.series_object(output)?, budget)?;
+            compatible(input, cas.series_object(output, budget)?, budget)?;
         }
         S::Integrate {
             constant: value,
@@ -165,13 +177,13 @@ pub(crate) fn roles(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(), Fau
             ..
         } => {
             constant(cas, input, value, budget)?;
-            compatible(input, cas.series_object(output)?, budget)?;
+            compatible(input, cas.series_object(output, budget)?, budget)?;
         }
         S::Compose { right, output, .. }
         | S::Add { right, output, .. }
         | S::Mul { right, output, .. } => {
-            compatible(input, cas.series_object(right)?, budget)?;
-            compatible(input, cas.series_object(output)?, budget)?;
+            compatible(input, cas.series_object(right, budget)?, budget)?;
+            compatible(input, cas.series_object(output, budget)?, budget)?;
         }
         S::Scale {
             scalar: factor,
@@ -179,7 +191,7 @@ pub(crate) fn roles(cas: &Cas, value: &S, budget: &mut Budget) -> Result<(), Fau
             ..
         } => {
             scalar(cas, input, factor, budget)?;
-            compatible(input, cas.series_object(output)?, budget)?;
+            compatible(input, cas.series_object(output, budget)?, budget)?;
         }
         S::Coefficient { value, .. } => scalar(cas, input, value, budget)?,
     }
@@ -211,6 +223,7 @@ pub(super) fn coefficient<'a>(
             .coefficients
             .get(usize::try_from(index).map_err(|_| invalid())?)
             .ok_or_else(invalid)?,
+        budget,
     )
 }
 
@@ -221,8 +234,9 @@ fn restriction<'a>(
     order: u32,
     premises: &[CheckedApplication],
     slot: &mut usize,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a SeriesObject<Handle>, Fault> {
-    let object = cas.series_object(original)?;
+    let object = cas.series_object(original, budget)?;
     if object.order == order {
         return Ok(object);
     }
@@ -237,7 +251,7 @@ fn restriction<'a>(
     if input != original || premise.rule != crate::rule::Primitive::SeriesTruncate {
         return Err(invalid());
     }
-    let restricted = cas.series_object(output)?;
+    let restricted = cas.series_object(output, budget)?;
     if restricted.order != order {
         return Err(invalid());
     }
@@ -250,6 +264,7 @@ pub(super) fn defined(
     factor: &Handle,
     basis: &SeriesObject<Handle>,
     premises: &[CheckedApplication],
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     let [premise] = premises else {
         return Err(invalid());
@@ -257,13 +272,16 @@ pub(super) fn defined(
     let Statement::PredicateFact { region, predicate } = &premise.judgment.statement else {
         return Err(invalid());
     };
-    let context = cas.state.context(cas.checked(&basis.context)?)?;
-    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate)?)? else {
+    let context = cas
+        .state
+        .context(cas.checked(&basis.context, budget)?, budget)?;
+    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     if region.logical_id() != context.admissible
         || condition.kind != PredicateKind::Defined
-        || condition.arguments.as_slice() != [cas.checked(factor)?]
+        || condition.arguments.as_slice() != [cas.checked(factor, budget)?]
         || condition.header != context.header_id
         || condition.scope != basis.scope
     {
@@ -299,7 +317,7 @@ pub(crate) fn check(
         return Err(unsupported());
     }
     roles(cas, value, budget)?;
-    let input = cas.series_object(value.input())?;
+    let input = cas.series_object(value.input(), budget)?;
     if draft.context != input.context
         || premises.iter().any(|p| p.judgment.context != draft.context)
     {
@@ -329,7 +347,7 @@ pub(crate) fn check(
 
 /// Bound unreduced products and partial sums from actual admitted coefficient extents.
 fn arithmetic_workspace(cas: &Cas, value: &S, budget: &mut Budget) -> Result<u64, Fault> {
-    let input = cas.series_object(value.input())?;
+    let input = cas.series_object(value.input(), budget)?;
     if matches!(value, S::Reciprocal { .. }) {
         return super::reciprocal::workspace(input.order, budget);
     }
@@ -339,20 +357,20 @@ fn arithmetic_workspace(cas: &Cas, value: &S, budget: &mut Budget) -> Result<u64
         _ => None,
     };
     for handle in std::iter::once(value.input()).chain(other) {
-        for coefficient in &cas.series_object(handle)?.coefficients {
+        for coefficient in &cas.series_object(handle, budget)?.coefficients {
             budget.work(1, AT)?;
-            let (a, b) = number(cas, coefficient)?.component_bits();
+            let (a, b) = number(cas, coefficient, budget)?.component_bits();
             bits = bits.max(a).max(b);
         }
     }
     if let S::Scale { scalar, .. } = value {
         budget.work(1, AT)?;
-        let (a, b) = number(cas, scalar)?.component_bits();
+        let (a, b) = number(cas, scalar, budget)?.component_bits();
         bits = bits.max(a).max(b);
     }
     if let S::Integrate { constant, .. } = value {
         budget.work(1, AT)?;
-        let (a, b) = number(cas, constant)?.component_bits();
+        let (a, b) = number(cas, constant, budget)?.component_bits();
         bits = bits.max(a).max(b);
     }
     if matches!(value, S::Derive { .. } | S::Integrate { .. }) {
@@ -375,7 +393,7 @@ fn arithmetic(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let input = cas.series_object(value.input())?;
+    let input = cas.series_object(value.input(), budget)?;
     match (value, certificate) {
         (S::Reciprocal { .. }, _) => {
             return super::reciprocal::check(cas, value, certificate, premises, budget);
@@ -390,7 +408,7 @@ fn arithmetic(
             if !premises.is_empty() {
                 return Err(invalid());
             }
-            let output = cas.series_object(output)?;
+            let output = cas.series_object(output, budget)?;
             if output.order > input.order {
                 return Err(unsupported());
             }
@@ -415,11 +433,11 @@ fn arithmetic(
                 return Err(invalid());
             }
             equal(coefficient(cas, input, *index, budget)?, expected, budget)?;
-            equal(expected, number(cas, value)?, budget)?;
+            equal(expected, number(cas, value, budget)?, budget)?;
         }
         (S::Scale { scalar, output, .. }, C::Scale { rows, .. }) => {
-            defined(cas, scalar, input, premises)?;
-            let output = cas.series_object(output)?;
+            defined(cas, scalar, input, premises, budget)?;
+            let output = cas.series_object(output, budget)?;
             if output.order != input.order || size(rows.len(), AT)? != u64::from(input.order) {
                 return Err(invalid());
             }
@@ -428,7 +446,7 @@ fn arithmetic(
                 if row.index != index {
                     return Err(invalid());
                 }
-                let a = number(cas, scalar)?;
+                let a = number(cas, scalar, budget)?;
                 let b = coefficient(cas, input, index, budget)?;
                 equal(&row.left, a, budget)?;
                 equal(&row.right, b, budget)?;
@@ -579,9 +597,9 @@ pub(super) fn binary<'a>(
     budget: &mut Budget,
 ) -> Result<BinaryObjects<'a>, Fault> {
     let [a, b, out] = objects;
-    let left = cas.series_object(a)?;
-    let right = cas.series_object(b)?;
-    let output = cas.series_object(out)?;
+    let left = cas.series_object(a, budget)?;
+    let right = cas.series_object(b, budget)?;
+    let output = cas.series_object(out, budget)?;
     if order == 0 || order > left.order.min(right.order) {
         return Err(unsupported());
     }
@@ -590,8 +608,8 @@ pub(super) fn binary<'a>(
         return Err(invalid());
     }
     let mut slot = 0;
-    let left = restriction(cas, a, order, premises, &mut slot)?;
-    let right = restriction(cas, b, order, premises, &mut slot)?;
+    let left = restriction(cas, a, order, premises, &mut slot, budget)?;
+    let right = restriction(cas, b, order, premises, &mut slot, budget)?;
     if slot != premises.len() {
         return Err(invalid());
     }

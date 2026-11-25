@@ -133,7 +133,7 @@ pub(crate) fn measure(
 ) -> Result<(), Fault> {
     let mut out = Encoder::new(budget, AT);
     encode(value, &mut out, &mut |handle, out| {
-        cas.checked(handle)?;
+        cas.checked(handle, out.budget())?;
         crate::statement::handle(handle, out)
     })?;
     let bytes = size(out.finish().len(), AT)?.saturating_mul(32);

@@ -31,9 +31,14 @@ const fn invalid() -> Fault {
 }
 
 /// Require the exact local coefficient region and original declaration header.
-fn region(cas: &Cas, context: &Handle, domain: &Handle) -> Result<(), Fault> {
-    let frame = cas.state.context(cas.checked(context)?)?;
-    let shape = cas.state.region(cas.checked(domain)?)?;
+fn region(
+    cas: &Cas,
+    context: &Handle,
+    domain: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let frame = cas.state.context(cas.checked(context, budget)?, budget)?;
+    let shape = cas.state.region(cas.checked(domain, budget)?, budget)?;
     if frame.header_id != shape.header || frame.admissible != domain.logical_id() {
         return Err(invalid());
     }

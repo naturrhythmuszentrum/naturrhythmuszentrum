@@ -23,8 +23,14 @@ pub(crate) fn guarded(fixture: &mut Fixture, subject: &Handle, sign: i8) -> Test
     } else {
         subject.clone()
     };
-    let header = fixture.cas.context_header(&fixture.context)?;
-    let base = fixture.cas.admissible_region(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
+    let base = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let predicate = admit(
         &mut fixture.cas,
         Draft::Condition {
@@ -97,7 +103,10 @@ pub(crate) fn expected(
         space: None,
         statement: Statement::Solve(Box::new(SolveStatement::RealSign(StatementRealSign {
             subject: subject.clone(),
-            region: fixture.cas.admissible_region(&fixture.context)?,
+            region: fixture.cas.admissible_region(
+                &fixture.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             conclusion: if positive {
                 RealSignConclusion::Positive
             } else {

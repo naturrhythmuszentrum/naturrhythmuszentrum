@@ -633,12 +633,17 @@ fn projection_laws(
     let SolveCertificate::ComponentSplit(certificate) = certificate.as_ref() else {
         return Err("wrong split".into());
     };
-    let SolveView::ComponentSplit(split) = fixture.unit.base.cas.solve_view(&certificate.split)?
+    let SolveView::ComponentSplit(split) = fixture
+        .unit
+        .base
+        .cas
+        .solve_view(&certificate.split, budget)?
     else {
         return Err("wrong split view".into());
     };
     for (handle, expected) in [&split.left_map, &split.right_map].into_iter().zip([1, -1]) {
-        let SolveView::CoefficientMap(projection) = fixture.unit.base.cas.solve_view(handle)?
+        let SolveView::CoefficientMap(projection) =
+            fixture.unit.base.cas.solve_view(handle, budget)?
         else {
             return Err("wrong map".into());
         };
@@ -1380,6 +1385,7 @@ fn coefficient_power_localization() -> TestResult {
 /// ´test:crate:coefficient-formal-erasure-work-boundary´
 #[test]
 fn coefficient_formal_erasure_work_boundary() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::domain_model::{RegionDraft, RegionExpr};
     use crate::graph::{Draft, Reference};
     use crate::model::{AtomicSort, Field};
@@ -1389,7 +1395,7 @@ fn coefficient_formal_erasure_work_boundary() -> TestResult {
     let ambient = fixture
         .cas
         .state
-        .region(fixture.region.logical_id())?
+        .region(fixture.region.logical_id(), &mut budget)?
         .ambient
         .clone();
     let source = crate::testing::solve_graph::admit(

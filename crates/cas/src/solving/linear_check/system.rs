@@ -23,7 +23,7 @@ fn equations(
     let mut result = vector(0, budget)?;
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        match crate::solving::elementary::evidence::predicate(evaluation.cas, id)? {
+        match crate::solving::elementary::evidence::predicate(evaluation.cas, id, budget)? {
             (PredicateKind::And, arguments) => {
                 reserve(&mut pending, arguments.len(), budget)?;
                 pending.extend(arguments.iter().rev());
@@ -45,7 +45,7 @@ pub(crate) fn reconstruct(
     matrix: &Matrix,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let original = problem(evaluation.cas, handle)?;
+    let original = problem(evaluation.cas, handle, budget)?;
     let values = unknowns(evaluation, original, budget)?;
     if values.len().checked_add(1) != Some(matrix.columns) {
         return Err(invalid());
@@ -93,7 +93,7 @@ pub(crate) fn check(
     {
         return Err(invalid());
     }
-    let original = problem(evaluation.cas, &claim.problem)?;
+    let original = problem(evaluation.cas, &claim.problem, budget)?;
     crate::solving::elementary::member::contained(
         evaluation.cas,
         &claim.region,
@@ -101,7 +101,7 @@ pub(crate) fn check(
         budget,
     )?;
     let count = u32::try_from(
-        coordinates(evaluation.cas, &original.unknowns)?
+        coordinates(evaluation.cas, &original.unknowns, budget)?
             .coordinates
             .len(),
     )

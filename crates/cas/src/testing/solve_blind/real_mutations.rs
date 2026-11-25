@@ -9,10 +9,11 @@ use crate::testing::common::TestResult;
 
 /// The cubic discriminant guard uses all four original coefficients; quadratic and p guards do not.
 fn keys(cas: &Cas, expression: LogicalId) -> TestResult<std::collections::BTreeSet<String>> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut result = std::collections::BTreeSet::new();
     let mut pending = vec![expression];
     while let Some(id) = pending.pop() {
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, &mut budget)?;
         if let crate::model::Operator::Free(key) = &expression.operator {
             result.insert(key.clone());
         }

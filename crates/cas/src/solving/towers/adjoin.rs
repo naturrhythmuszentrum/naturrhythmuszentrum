@@ -22,7 +22,7 @@ fn leading(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let stored = polynomial(&cas.state, &relation.polynomial)?;
+    let stored = polynomial(&cas.state, &relation.polynomial, budget)?;
     let first = stored.terms.first().ok_or_else(invalid)?;
     if stored.variables.len() != 1 || first.exponents.first().is_none_or(|degree| *degree == 0) {
         return Err(invalid());
@@ -62,7 +62,7 @@ fn selection<'a>(
         };
         budget.solving(BudgetKind::SelectionSlots, 1, AT)?;
         let SolveDraft::RootSelection(value) =
-            crate::solving::graph::object(&cas.state, cas.checked(handle)?)?
+            crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)?
         else {
             return Err(invalid());
         };
@@ -98,7 +98,7 @@ fn unity(
     if relation.ambient != Field::Complex {
         return Err(invalid());
     }
-    let stored = polynomial(&cas.state, &relation.polynomial)?;
+    let stored = polynomial(&cas.state, &relation.polynomial, budget)?;
     let engine = Engine {
         state: &cas.state,
         domain: &stored.domain,
@@ -187,8 +187,11 @@ pub(crate) fn check(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         budget.work(1, AT)?;
-        let SolveDraft::RootRelation(relation) =
-            crate::solving::graph::object(&cas.state, cas.checked(&certificate.relation)?)?
+        let SolveDraft::RootRelation(relation) = crate::solving::graph::object(
+            &cas.state,
+            cas.checked(&certificate.relation, budget)?,
+            budget,
+        )?
         else {
             return Err(invalid());
         };
@@ -204,7 +207,10 @@ pub(crate) fn check(
             .unwrap_or(&certificate.relation);
         if existence.relation != *target
             || existence.region != relation.region
-            || cas.state.context(cas.checked(&draft.context)?)?.admissible
+            || cas
+                .state
+                .context(cas.checked(&draft.context, budget)?, budget)?
+                .admissible
                 != relation.region.logical_id()
         {
             return Err(invalid());

@@ -71,7 +71,7 @@ impl Ready {
 }
 
 /// Every test starts with caller Work already spent.
-fn budget(limits: Limits) -> TestResult<Budget> {
+fn fresh_budget(limits: Limits) -> TestResult<Budget> {
     let mut budget = Budget::new(limits)?;
     budget.work(17, Location::new("prior lattice owner"))?;
     Ok(budget)
@@ -96,7 +96,7 @@ fn exhausted(error: &LiveDecisionError, expected: BudgetKind) -> TestResult {
 /// ´claim:matrix:lattice-enclosure-work-boundaries´
 #[test]
 fn lattice_enclosure_work_boundaries() -> TestResult {
-    for (kind, limits) in [(0, [42_052, 42_051]), (1, [21_299, 21_298])] {
+    for (kind, limits) in [(0, [42_106, 42_105]), (1, [21_337, 21_336])] {
         let ready = Ready::new(kind)?;
         let graph = ready.selected.cas()?.counts();
         let records = ready.heap.provenance_usage();
@@ -106,7 +106,7 @@ fn lattice_enclosure_work_boundaries() -> TestResult {
                 &ready.inputs,
                 &mut ledger()?,
             )?;
-            let mut budget = budget(Limits {
+            let mut budget = fresh_budget(Limits {
                 work,
                 ..Limits::default()
             })?;
@@ -150,7 +150,7 @@ fn lattice_preparation_work_boundaries() -> TestResult {
         let records = ready.heap.provenance_usage();
         for (position, work) in limits.into_iter().enumerate() {
             let enclosed = ready.enclose(&mut ledger()?)?;
-            let mut budget = budget(Limits {
+            let mut budget = fresh_budget(Limits {
                 work,
                 ..Limits::default()
             })?;
@@ -213,7 +213,7 @@ fn lattice_publication_boundaries() -> TestResult {
             ),
         ] {
             let prepared = ready.prepared()?;
-            let mut budget = budget(Limits {
+            let mut budget = fresh_budget(Limits {
                 work,
                 staged_payload_bytes,
                 output_bytes,
@@ -282,7 +282,7 @@ fn lattice_access_work_boundaries() -> TestResult {
         };
         for (access, limits) in limits {
             for (position, work) in limits.into_iter().enumerate() {
-                let mut budget = budget(Limits {
+                let mut budget = fresh_budget(Limits {
                     work,
                     ..Limits::default()
                 })?;
@@ -331,7 +331,7 @@ fn lattice_enclosure_output_boundaries() -> TestResult {
                 &ready.inputs,
                 &mut ledger()?,
             )?;
-            let mut budget = budget(Limits {
+            let mut budget = fresh_budget(Limits {
                 output_bytes,
                 ..Limits::default()
             })?;

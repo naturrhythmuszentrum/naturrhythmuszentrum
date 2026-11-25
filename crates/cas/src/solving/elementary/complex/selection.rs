@@ -24,6 +24,7 @@ impl Components<'_, '_> {
             let selection = super::super::selected::selection(
                 self.evaluation.cas,
                 &self.evaluation.cas.handle(selected),
+                budget,
             )?;
             let relation = super::super::selected::relation(
                 self.evaluation.cas,
@@ -31,6 +32,7 @@ impl Components<'_, '_> {
                     .relations
                     .get(usize::try_from(slot).map_err(|_| invalid())?)
                     .ok_or_else(invalid)?,
+                budget,
             )?;
             if relation.region != *self.evaluation.region {
                 crate::solving::family::restriction::relation_region(
@@ -68,7 +70,8 @@ impl Components<'_, '_> {
             )?;
             let mut roots = vector(selection.relations.len(), budget)?;
             for (index, handle) in selection.relations.iter().enumerate() {
-                let relation = super::super::selected::relation(self.evaluation.cas, handle)?;
+                let relation =
+                    super::super::selected::relation(self.evaluation.cas, handle, budget)?;
                 if relation.region != *self.evaluation.region {
                     crate::solving::family::restriction::relation_region(
                         self.evaluation,
@@ -85,7 +88,8 @@ impl Components<'_, '_> {
             }
             self.record_predicate(selection.predicate.logical_id(), &roots, budget)?;
             for (root, handle) in roots.iter().zip(&selection.relations) {
-                let relation = super::super::selected::relation(self.evaluation.cas, handle)?;
+                let relation =
+                    super::super::selected::relation(self.evaluation.cas, handle, budget)?;
                 let equation = self.root_equation(root, relation, budget)?;
                 self.equation(&equation, budget)?;
             }
@@ -107,9 +111,12 @@ impl Components<'_, '_> {
                 budget,
             )?;
         }
-        let stored = polynomial(&self.evaluation.cas.state, &relation.polynomial)?;
-        let SolveDraft::CoefficientMap(map) =
-            crate::solving::graph::object(&self.evaluation.cas.state, relation.map.logical_id())?
+        let stored = polynomial(&self.evaluation.cas.state, &relation.polynomial, budget)?;
+        let SolveDraft::CoefficientMap(map) = crate::solving::graph::object(
+            &self.evaluation.cas.state,
+            relation.map.logical_id(),
+            budget,
+        )?
         else {
             return Err(invalid());
         };
@@ -172,7 +179,7 @@ fn rational(
     let mut current = handle;
     loop {
         budget.work(1, AT)?;
-        match &value(&cas.state, current)?.value {
+        match &value(&cas.state, current, budget)?.value {
             CoefficientValueData::Rational { value } => {
                 return Ok(Some(crate::solving::coefficients::scalar::rational_copy(
                     value, budget,
@@ -200,7 +207,7 @@ fn quadratic(
     relation: &RootRelationData<Handle>,
     budget: &mut Budget,
 ) -> Result<Option<(Rational, Rational)>, Fault> {
-    let stored = polynomial(&cas.state, &relation.polynomial)?;
+    let stored = polynomial(&cas.state, &relation.polynomial, budget)?;
     if stored
         .terms
         .first()
@@ -327,8 +334,13 @@ impl Components<'_, '_> {
             let mut values = vector(witnesses.len(), budget)?;
             for (witness, handle) in witnesses.iter().zip(&selection.relations) {
                 let value = self.expression(witness.logical_id(), &[], budget)?;
-                let relation = super::super::selected::relation(self.evaluation.cas, handle)?;
-                let expression = self.evaluation.cas.state.expression(witness.logical_id())?;
+                let relation =
+                    super::super::selected::relation(self.evaluation.cas, handle, budget)?;
+                let expression = self
+                    .evaluation
+                    .cas
+                    .state
+                    .expression(witness.logical_id(), budget)?;
                 let expected = crate::model::Sort::Value(crate::model::AtomicSort::Scalar(
                     relation.ambient.clone(),
                 ));

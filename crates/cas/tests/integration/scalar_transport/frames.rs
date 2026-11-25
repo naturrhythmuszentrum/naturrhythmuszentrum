@@ -142,14 +142,14 @@ fn scalar_transport_wire_frames() -> TestResult {
         for reordered in [false, true] {
             let (mut receiver, predicate) = fixture(reordered)?;
             let a = receiver.fixture.domain.clone();
-            let d = receiver
-                .fixture
-                .cas
-                .admissible_region(&receiver.frames[2])?;
-            let first = receiver
-                .fixture
-                .cas
-                .admissible_region(&receiver.frames[1])?;
+            let d = receiver.fixture.cas.admissible_region(
+                &receiver.frames[2],
+                &mut crate::testing::budgets::graph_budget()?,
+            )?;
+            let first = receiver.fixture.cas.admissible_region(
+                &receiver.frames[1],
+                &mut crate::testing::budgets::graph_budget()?,
+            )?;
             let transported = meet(&mut receiver.fixture, &[a, first])?;
             let expected_domain = if restriction {
                 meet(&mut receiver.fixture, &[transported.clone(), d])?
@@ -176,7 +176,10 @@ fn scalar_transport_wire_frames() -> TestResult {
                 &mut budget()?,
             )?;
             assert_eq!(
-                receiver.fixture.cas.admissible_region(&alternate)?,
+                receiver
+                    .fixture
+                    .cas
+                    .admissible_region(&alternate, &mut crate::testing::budgets::graph_budget()?)?,
                 expected_domain
             );
             let before = receiver.fixture.cas.canonical_snapshot(&mut budget()?)?;

@@ -34,8 +34,8 @@ struct Costs {
 const COSTS: [Costs; 3] = [
     Costs {
         kind: 0,
-        question: 67_825,
-        association: 33_300,
+        question: 67_952,
+        association: 33_435,
         authentication: 11,
         question_bytes: 7_025,
         input_bytes: 13_426,
@@ -43,8 +43,8 @@ const COSTS: [Costs; 3] = [
     },
     Costs {
         kind: 1,
-        question: 53_780,
-        association: 55_436,
+        question: 53_891,
+        association: 55_661,
         authentication: 17,
         question_bytes: 5_711,
         input_bytes: 22_293,
@@ -52,8 +52,8 @@ const COSTS: [Costs; 3] = [
     },
     Costs {
         kind: 2,
-        question: 34_395,
-        association: 55_436,
+        question: 34_490,
+        association: 55_661,
         authentication: 17,
         question_bytes: 3_297,
         input_bytes: 22_293,
@@ -62,7 +62,7 @@ const COSTS: [Costs; 3] = [
 ];
 
 /// Original physical questions and their associations retain exact figures and add zero CAS records.
-/// ´claim:bindings:lattice-question-costs´ Frozen input environments reduce association Work to 33300 or 55436 while physical question costs and retained bytes stay fixed.
+/// ´claim:bindings:lattice-question-costs´ Frozen input environments retain association Work of 33435 or 55661, with unchanged retained bytes.
 /// ´test:integration:bindings-lattice-question-costs´
 #[test]
 fn bindings_lattice_question_costs() -> TestResult {

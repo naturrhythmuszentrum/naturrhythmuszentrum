@@ -58,11 +58,11 @@ pub(crate) fn reconstruct(
     {
         return Err(invalid());
     }
-    if crate::solving::family::native::handles(cas, &draft.conclusion)? {
+    if crate::solving::family::native::handles(cas, &draft.conclusion, budget)? {
         return crate::solving::family::native::reconstruct(cas, draft, premises, budget);
     }
-    let context = cas.checked(&draft.context)?;
-    let within = cas.state.context(context)?.admissible;
+    let context = cas.checked(&draft.context, budget)?;
+    let within = cas.state.context(context, budget)?.admissible;
     let certificate = match draft.rule {
         Primitive::CaseOrdered => {
             let Statement::Elaboration {
@@ -73,11 +73,11 @@ pub(crate) fn reconstruct(
             else {
                 return Err(invalid());
             };
-            let source = cas.checked(source)?;
-            if cas.state.source_form(source)?.domain != cas.checked(domain)? {
+            let source = cas.checked(source, budget)?;
+            if cas.state.source_form(source, budget)?.domain != cas.checked(domain, budget)? {
                 return Err(invalid());
             }
-            subset(cas, cas.checked(domain)?, within, budget)?;
+            subset(cas, cas.checked(domain, budget)?, within, budget)?;
             let built = crate::case_ordered::construct(cas, context, source, premises, budget)?;
             if built.result != *result {
                 return Err(invalid());
@@ -103,7 +103,8 @@ fn domain(
     budget: &mut Budget,
 ) -> Result<CaseCertificate, Fault> {
     if let Statement::PredicateFact { region, predicate } = statement {
-        let crate::graph::Vertex::Condition(predicate) = cas.state.node(cas.checked(predicate)?)?
+        let crate::graph::Vertex::Condition(predicate) =
+            cas.state.node(cas.checked(predicate, budget)?, budget)?
         else {
             return Err(invalid());
         };
@@ -112,7 +113,7 @@ fn domain(
             return Err(invalid());
         }
         let function = *predicate.arguments.first().ok_or_else(invalid)?;
-        let region = cas.checked(region)?;
+        let region = cas.checked(region, budget)?;
         subset(cas, region, within, budget)?;
         let analysis = crate::case_cells::analyze(cas, function, function, region, budget)?;
         analysis.check(
@@ -128,8 +129,8 @@ fn domain(
     let Statement::DefinedDomain { function, domain } = statement else {
         return Err(invalid());
     };
-    let function = cas.checked(function)?;
-    let claimed = cas.checked(domain)?;
+    let function = cas.checked(function, budget)?;
+    let claimed = cas.checked(domain, budget)?;
     let analysis = crate::case_cells::analyze(cas, function, function, within, budget)?;
     analysis.check(
         cas,
@@ -167,9 +168,9 @@ fn agreement(
             domain,
             domain_contract,
         } => (
-            cas.checked(left)?,
-            cas.checked(right)?,
-            cas.checked(domain)?,
+            cas.checked(left, budget)?,
+            cas.checked(right, budget)?,
+            cas.checked(domain, budget)?,
             *domain_contract,
         ),
         Statement::Compatibility {
@@ -177,9 +178,9 @@ fn agreement(
             right,
             region,
         } => {
-            let first = cas.state.arm(cas.checked(left)?)?.clone();
-            let second = cas.state.arm(cas.checked(right)?)?.clone();
-            let region = cas.checked(region)?;
+            let first = cas.state.arm(cas.checked(left, budget)?, budget)?.clone();
+            let second = cas.state.arm(cas.checked(right, budget)?, budget)?.clone();
+            let region = cas.checked(region, budget)?;
             subset(cas, region, first.region, budget)?;
             subset(cas, region, second.region, budget)?;
             (
@@ -197,7 +198,8 @@ fn agreement(
     analysis.check(cas, left, right, region, contract, budget)?;
     let mut certificate = from_analysis(cas, &analysis);
     for endpoint in [left, right] {
-        let arms = case_syntax::canonical(cas, &cas.state.expression(endpoint)?.arms, budget)?;
+        let arms =
+            case_syntax::canonical(cas, &cas.state.expression(endpoint, budget)?.arms, budget)?;
         certificate
             .arms
             .extend(arms.into_iter().map(|id| cas.handle(id)));
@@ -213,8 +215,8 @@ fn refinement_cover(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let before = cas.state.expression(left)?;
-    let after = cas.state.expression(right)?;
+    let before = cas.state.expression(left, budget)?;
+    let after = cas.state.expression(right, budget)?;
     let Some(domain) = after.domain else {
         return Ok(());
     };
@@ -226,7 +228,7 @@ fn refinement_cover(
     }
     let mut native = false;
     for id in case_syntax::order(cas, &before.operands, budget)? {
-        native |= cas.state.expression(id)?.domain.is_some();
+        native |= cas.state.expression(id, budget)?.domain.is_some();
     }
     if !native {
         return Ok(());
@@ -234,7 +236,7 @@ fn refinement_cover(
     let members = after
         .arms
         .iter()
-        .map(|id| cas.state.arm(*id).map(|arm| arm.region))
+        .map(|id| cas.state.arm(*id, budget).map(|arm| arm.region))
         .collect::<Result<Vec<_>, _>>()?;
     let members = case_syntax::canonical(cas, &members, budget)?;
     for premise in premises {

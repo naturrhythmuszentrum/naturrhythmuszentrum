@@ -237,7 +237,7 @@ pub enum FaultKind {
 ///
 /// ```compile_fail,E0308
 /// fn lookup(cas: &nrz_cas::Cas, identity: &nrz_cas::SeriesDiagnosticIdentity) {
-///     let _ = cas.series_object(identity);
+///     let _ = cas.series_object(identity, budget);
 /// }
 /// ```
 #[derive(Clone, Debug)]

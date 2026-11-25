@@ -79,6 +79,7 @@ pub(crate) mod recipes;
 )]
 pub(crate) mod restriction;
 
+use crate::budget::Budget;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::graph::{Cas, LogicalId, Vertex};
 use crate::solving::{FamilyExpressionData, SolveDraft};
@@ -92,11 +93,12 @@ pub(crate) const fn invalid() -> Fault {
 }
 
 /// Borrow only the new local body shape.
-pub(crate) fn body(
-    cas: &Cas,
+pub(crate) fn body<'a>(
+    cas: &'a Cas,
     id: LogicalId,
-) -> Result<Option<&FamilyExpressionData<crate::graph::Handle>>, Fault> {
-    match cas.state.node(id)? {
+    budget: &mut Budget,
+) -> Result<Option<&'a FamilyExpressionData<crate::graph::Handle>>, Fault> {
+    match cas.state.node(id, budget)? {
         Vertex::Solve(value) => match value.as_ref() {
             SolveDraft::FamilyExpression(value) => Ok(Some(value)),
             _ => Ok(None),
@@ -106,14 +108,14 @@ pub(crate) fn body(
 }
 
 /// Native family cases have family bodies in every association.
-pub(crate) fn local(cas: &Cas, id: LogicalId) -> Result<bool, Fault> {
-    if body(cas, id)?.is_some() {
+pub(crate) fn local(cas: &Cas, id: LogicalId, budget: &mut Budget) -> Result<bool, Fault> {
+    if body(cas, id, budget)?.is_some() {
         return Ok(true);
     }
-    if let Vertex::Expression(value) = cas.state.node(id)?
+    if let Vertex::Expression(value) = cas.state.node(id, budget)?
         && let Some(first) = value.arms.first()
     {
-        return Ok(body(cas, cas.state.arm(*first)?.value)?.is_some());
+        return Ok(body(cas, cas.state.arm(*first, budget)?.value, budget)?.is_some());
     }
     Ok(false)
 }

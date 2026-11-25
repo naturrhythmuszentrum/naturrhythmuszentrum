@@ -2,7 +2,7 @@
 //! Internal distribution routes expose exact proposals only for adversarial checking.
 
 use super::common::TestResult;
-use super::native::{self, budget};
+use super::native::{self, fresh_budget};
 use crate::boundary_model::{CaseName, NamedCase};
 use crate::domain_model::SpaceDraft;
 use crate::graph::{Draft, Handle, Reference};
@@ -45,7 +45,7 @@ impl Fixture {
             &self.space,
             operator,
             operands,
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?)
     }
 
@@ -58,7 +58,7 @@ impl Fixture {
                 coordinate: "x".into(),
                 parameter: None,
             },
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?;
         self.node(Operator::RegularEmbed, &[function])
     }
@@ -90,8 +90,8 @@ impl Fixture {
             &SearchPolicy::default(),
             named,
             &[],
-            &mut budget()?,
-            &mut budget()?,
+            &mut fresh_budget()?,
+            &mut fresh_budget()?,
         )?)
     }
 }
@@ -101,14 +101,17 @@ pub(crate) fn evidence(
     fixture: &Fixture,
     proof: &Handle,
 ) -> TestResult<(ApplicationDraft, Vec<CheckedApplication>)> {
-    let application =
-        crate::proof_view::application(&fixture.base.cas, proof.logical_id(), &mut budget()?)?;
+    let application = crate::proof_view::application(
+        &fixture.base.cas,
+        proof.logical_id(),
+        &mut fresh_budget()?,
+    )?;
     let mut premises = Vec::new();
     for id in application.premises {
         premises.push(crate::proof_view::application(
             &fixture.base.cas,
             id,
-            &mut budget()?,
+            &mut fresh_budget()?,
         )?);
     }
     let draft = ApplicationDraft {

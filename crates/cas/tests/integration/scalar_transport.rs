@@ -9,6 +9,10 @@ use crate::testing::scalar_transport::chain;
 mod frames;
 
 /// Replay separately budgets live storage, traversal depth and condition visits through nested transport.
+/// Replay depth 1/2/3 adds 12+2+16+16=46, 20+2+24+24=70,
+/// and 28+2+32+32=94 local-entry Work above unchanged operation Work. Refusal prefixes
+/// account only for entries reached before their typed limit; the commit
+/// ledger expands each row. Old/new interning lookup floors match.
 /// ´test:integration:scalar-transport-replay-nonwork-boundaries´
 #[test]
 fn scalar_transport_replay_nonwork_boundaries() -> TestResult {
@@ -18,29 +22,29 @@ fn scalar_transport_replay_nonwork_boundaries() -> TestResult {
     for (depth, work, rows) in [
         (
             1,
-            104_949,
+            104_995,
             [
-                (StagedPayloadBytes, 24_435, 98_683),
-                (Depth, 3, 58_440),
-                (ConditionSteps, 65, 104_659),
+                (StagedPayloadBytes, 24_435, 98_729),
+                (Depth, 3, 58_474),
+                (ConditionSteps, 65, 104_705),
             ],
         ),
         (
             2,
-            140_733,
+            140_803,
             [
-                (StagedPayloadBytes, 32_227, 130_992),
-                (Depth, 4, 80_775),
-                (ConditionSteps, 102, 140_443),
+                (StagedPayloadBytes, 32_227, 131_062),
+                (Depth, 4, 80_833),
+                (ConditionSteps, 102, 140_513),
             ],
         ),
         (
             3,
-            179_145,
+            179_239,
             [
-                (StagedPayloadBytes, 40_019, 165_150),
-                (Depth, 5, 104_959),
-                (ConditionSteps, 149, 178_855),
+                (StagedPayloadBytes, 40_019, 165_244),
+                (Depth, 5, 105_041),
+                (ConditionSteps, 149, 178_949),
             ],
         ),
     ] {
@@ -205,18 +209,23 @@ fn scalar_transport_wire_links() -> TestResult {
 }
 
 /// Export prepays its byte copy; replay consumes the measured prefix before atomic refusal.
+/// Export performs no receiving-store map edit and stays at unchanged operation Work. Replay depth
+/// 0/1/3 adds 4+2+8+8=22, 12+2+16+16=46, 28+2+32+32=94 Work.
 /// ´test:integration:scalar-transport-portable-resource-boundaries´
 #[test]
 fn scalar_transport_portable_resource_boundaries() -> TestResult {
     use crate::testing::scalar_transport_work::{Operation, attempt};
     // Totals include 37 prior Work and retain 19 caller payload bytes throughout.
-    for (depth, export, replay, prefix) in [
-        (0, 596, 63_835, 63_758),
-        (1, 932, 104_949, 104_839),
-        (3, 1_388, 179_145, 179_035),
+    for (depth, export, export_prefix, replay, prefix) in [
+        (0, 596, 37, 63_857, 63_780),
+        (1, 932, 37, 104_995, 104_885),
+        (3, 1_388, 37, 179_239, 179_129),
     ] {
         assert_eq!(attempt(depth, Operation::Export, export)?, (true, export));
-        assert_eq!(attempt(depth, Operation::Export, export - 1)?, (false, 37));
+        assert_eq!(
+            attempt(depth, Operation::Export, export - 1)?,
+            (false, export_prefix)
+        );
         assert_eq!(attempt(depth, Operation::Replay, replay)?, (true, replay));
         assert_eq!(
             attempt(depth, Operation::Replay, replay - 1)?,

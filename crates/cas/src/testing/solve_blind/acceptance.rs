@@ -100,7 +100,7 @@ fn free_keys(cas: &Cas, root: &Handle) -> TestResult<BTreeSet<String>> {
     let mut pending = vec![
         *cas.state
             .indices
-            .get(&root.logical_id())
+            .peek(&root.logical_id())
             .ok_or("source index")?,
     ];
     let mut seen = BTreeSet::new();
@@ -127,6 +127,7 @@ fn changed(
     keys: &[&str],
     position: usize,
 ) -> TestResult<Handle> {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::model::Operator;
     let unknown = fixture.free("x")?;
     let mut expression = fixture.integer(0, false)?;
@@ -135,7 +136,7 @@ fn changed(
         let mut coefficient = fixture.free(key)?;
         if index == position {
             assert_eq!(
-                fixture.cas.expression(&coefficient)?.0,
+                fixture.cas.expression(&coefficient, &mut budget)?.0,
                 &Operator::Free((*key).into())
             );
             let one = fixture.integer(1, false)?;

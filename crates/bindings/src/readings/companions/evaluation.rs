@@ -41,7 +41,7 @@ impl ParameterErrorReading {
         let declared = matches!(operator, Operator::Free(_));
         if !declared
             || source_sort != input_sort
-            || header != cas.context_header(context)?
+            || header != cas.context_header(context, budget)?
             || source == target.parameters().node()
         {
             return Err(CompanionReadingError::Target);
@@ -49,7 +49,7 @@ impl ParameterErrorReading {
         let (output_sort, _, _, _) = support::inspect(cas, target.node(), budget)?;
         let (sort, _, _, header) = support::inspect(cas, symbol, budget)?;
         if sort != output_sort
-            || header != cas.context_header(context)?
+            || header != cas.context_header(context, budget)?
             || symbol == target.symbol()
             || symbol == source
             || symbol == target.parameters().node()

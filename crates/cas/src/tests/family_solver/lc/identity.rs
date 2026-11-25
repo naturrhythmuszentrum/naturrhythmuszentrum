@@ -17,6 +17,7 @@ fn premise(
     generation: &mut Budget,
     checking: &mut Budget,
 ) -> TestResult<VerifiedWitness> {
+    let mut budget = crate::testing::common::default_budget()?;
     let capacitance = expression(
         &mut fixture.cas,
         &fixture.header,
@@ -33,7 +34,7 @@ fn premise(
         Vec::new(),
         vec![reference(&fixture.real), reference(&capacitance)],
     )?;
-    let region = fixture.cas.admissible_region(&claim.context)?;
+    let region = fixture.cas.admissible_region(&claim.context, &mut budget)?;
     let predicate = admit(
         &mut fixture.cas,
         Draft::Condition {

@@ -104,7 +104,7 @@ impl Cas {
         budget.check(BudgetKind::OutputBytes, bytes, AT)?;
         budget.work(bytes, AT)?;
         budget.with_retained_payload(bytes, AT, |budget| {
-            let home = self.checked(&question.basis.context)?;
+            let home = self.checked(&question.basis.context, budget)?;
             self.lattice_range_frame(home, budget)?;
             let mut axes = Vec::new();
             axes.try_reserve_exact(question.families.len().saturating_mul(2))
@@ -116,7 +116,7 @@ impl Cas {
             for (family, cover) in question.families.iter().zip(covers) {
                 self.lattice_scalar_range(home, family, cover, budget)?;
                 for axis in [&family.coordinate, &family.index] {
-                    let expression = self.state.expression(self.checked(axis)?)?;
+                    let expression = self.state.expression(self.checked(axis, budget)?, budget)?;
                     let Operator::Free(name) = &expression.operator else {
                         return Err(invalid());
                     };
@@ -145,15 +145,15 @@ impl Cas {
         home: LogicalId,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        let frame = self.state.context(home)?;
-        let domain = self.state.region(frame.admissible)?;
+        let frame = self.state.context(home, budget)?;
+        let domain = self.state.region(frame.admissible, budget)?;
         if domain.ambient != AmbientDomain::Assignments || !domain.scope.is_empty() {
             return Err(invalid());
         }
         let order = crate::decision_cut::plan::order(self, &[frame.admissible], budget)?;
         for id in order {
             budget.work(1, AT)?;
-            if !matches!(self.state.node(id)?, Vertex::Region(region) if matches!(region.expression, RegionExpr::Ambient | RegionExpr::Meet(_)))
+            if !matches!(self.state.node(id, budget)?, Vertex::Region(region) if matches!(region.expression, RegionExpr::Ambient | RegionExpr::Meet(_)))
             {
                 return Err(Fault::invalid(InvalidCode::UnsupportedCertificate, AT));
             }
@@ -170,10 +170,13 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<(), Fault> {
         budget.work(4, AT)?;
-        let Vertex::Proof(id) = self.state.node(self.checked(witness.proof())?)? else {
+        let Vertex::Proof(id) = self
+            .state
+            .node(self.checked(witness.proof(), budget)?, budget)?
+        else {
             return Err(invalid());
         };
-        let Vertex::ScopedApplication(proof) = self.state.node(*id)? else {
+        let Vertex::ScopedApplication(proof) = self.state.node(*id, budget)? else {
             return Err(invalid());
         };
         self.lattice_scalar_application(home, family, proof, budget)
@@ -197,10 +200,10 @@ impl Cas {
         {
             return Err(invalid());
         }
-        let context = self.checked(&proof.judgment.context)?;
-        let frame = self.state.context(context)?;
-        if frame.header_id != self.state.context(home)?.header_id
-            || frame.admissible != self.checked(&family.domain)?
+        let context = self.checked(&proof.judgment.context, budget)?;
+        let frame = self.state.context(context, budget)?;
+        if frame.header_id != self.state.context(home, budget)?.header_id
+            || frame.admissible != self.checked(&family.domain, budget)?
             || (context != home && (frame.parent != Some(home) || !frame.frame.is_empty()))
         {
             return Err(invalid());
@@ -208,7 +211,7 @@ impl Cas {
         for hypothesis in &proof.conditions.hypotheses {
             if !crate::context_check::ancestor(
                 self,
-                self.checked(&hypothesis.context)?,
+                self.checked(&hypothesis.context, budget)?,
                 home,
                 budget,
             )? {
@@ -226,13 +229,13 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<(), Fault> {
         let mut roots = vec![
-            self.checked(&question.basis.basis)?,
-            self.checked(&question.basis.offset)?,
+            self.checked(&question.basis.basis, budget)?,
+            self.checked(&question.basis.offset, budget)?,
         ];
-        let mut context = Some(self.checked(&question.basis.context)?);
+        let mut context = Some(self.checked(&question.basis.context, budget)?);
         while let Some(id) = context {
             budget.work(1, AT)?;
-            let frame = self.state.context(id)?;
+            let frame = self.state.context(id, budget)?;
             let conditions = if frame.parent.is_some() {
                 &frame.frame
             } else {
@@ -257,7 +260,7 @@ impl Cas {
             )?;
             roots.try_reserve(2).map_err(|_| Fault::allocation(AT))?;
             for endpoint in [&family.lower, &family.upper].into_iter().flatten() {
-                roots.push(self.checked(endpoint)?);
+                roots.push(self.checked(endpoint, budget)?);
             }
         }
         let order = budget.with_retained_payload(
@@ -266,7 +269,7 @@ impl Cas {
             |budget| crate::decision_cut::plan::order(self, &roots, budget),
         )?;
         for id in order {
-            if let Vertex::Expression(value) = self.state.node(id)?
+            if let Vertex::Expression(value) = self.state.node(id, budget)?
                 && let Operator::Free(name) = &value.operator
             {
                 for axis in axes {
@@ -288,8 +291,10 @@ impl Cas {
     ) -> Result<(), Fault> {
         let region = self
             .state
-            .region(self.checked(&question.coordinate_domain)?)?;
-        let home = self.state.context(self.checked(&question.basis.context)?)?;
+            .region(self.checked(&question.coordinate_domain, budget)?, budget)?;
+        let home = self
+            .state
+            .context(self.checked(&question.basis.context, budget)?, budget)?;
         if region.header != home.header_id
             || !region.scope.is_empty()
             || region.ambient != AmbientDomain::Assignments
@@ -311,7 +316,7 @@ impl Cas {
             .try_reserve_exact(question.families.len())
             .map_err(|_| Fault::allocation(AT))?;
         for family in &question.families {
-            expected.push(self.checked(&family.domain)?);
+            expected.push(self.checked(&family.domain, budget)?);
         }
         expected.sort_unstable();
         expected.dedup();

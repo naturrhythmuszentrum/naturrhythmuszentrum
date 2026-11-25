@@ -68,13 +68,15 @@ fn identities(
     cut: &CaseCut,
     budget: &mut Budget,
 ) -> Result<(LogicalId, [LogicalId; 2]), Fault> {
-    let function = cas.state.expression(cas.checked(&cut.function)?)?;
-    let association = cas.checked(&cut.association)?;
+    let function = cas
+        .state
+        .expression(cas.checked(&cut.function, budget)?, budget)?;
+    let association = cas.checked(&cut.association, budget)?;
     budget.work(size(function.arms.len(), AT)?.saturating_add(1), AT)?;
     if !function.arms.contains(&association) {
         return Err(Fault::invalid(InvalidCode::DecisionOptionMismatch, AT));
     }
-    let arm = cas.state.arm(association)?;
+    let arm = cas.state.arm(association, budget)?;
     if !arm.placements.is_empty() {
         return Err(unsupported());
     }
@@ -82,7 +84,7 @@ fn identities(
     if !function.scope.is_empty() || !arm.scope.is_empty() || function.header != arm.header {
         return Err(Fault::invalid(InvalidCode::Scope, AT));
     }
-    let ambient = &cas.state.region(domain)?.ambient;
+    let ambient = &cas.state.region(domain, budget)?.ambient;
     if !matches!(ambient, AmbientDomain::Real(_) | AmbientDomain::Assignments) {
         return Err(unsupported());
     }
@@ -126,8 +128,8 @@ fn validate_box(
 ) -> Result<(), Fault> {
     for (index, interval) in cut.bounds.iter().enumerate() {
         budget.work(size(index, AT)?.saturating_add(1), AT)?;
-        let coordinate = cas.checked(&interval.coordinate)?;
-        let value = cas.state.expression(coordinate)?;
+        let coordinate = cas.checked(&interval.coordinate, budget)?;
+        let value = cas.state.expression(coordinate, budget)?;
         let real = value.sort == Sort::Value(AtomicSort::Scalar(Field::Real));
         let integer = matches!(coordinates, Coordinates::Mixed)
             && value.sort == Sort::Value(AtomicSort::Integer);
@@ -198,8 +200,10 @@ fn integer(
     range: &IntegerCellRange,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let arm = cas.state.arm(cas.checked(&cut.association)?)?;
-    let value = cas.state.expression(arm.value)?;
+    let arm = cas
+        .state
+        .arm(cas.checked(&cut.association, budget)?, budget)?;
+    let value = cas.state.expression(arm.value, budget)?;
     let Operator::Rational(integer) = &value.operator else {
         return Err(unsupported());
     };
@@ -287,7 +291,7 @@ fn axes(
     coordinates: Coordinates,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let region = cas.state.region(domain)?;
+    let region = cas.state.region(domain, budget)?;
     match &region.ambient {
         AmbientDomain::Real(key) => {
             if cut.bounds.len() != 1 || !contains_axis(cas, cut, key, budget)? {
@@ -295,7 +299,7 @@ fn axes(
             }
         }
         AmbientDomain::Assignments => {
-            let declarations = &cas.state.header(header)?.environment.declarations;
+            let declarations = &cas.state.header(header, budget)?.environment.declarations;
             for declaration in declarations {
                 budget.work(1, AT)?;
                 let real = declaration.sort == Sort::Value(AtomicSort::Scalar(Field::Real));
@@ -315,7 +319,9 @@ fn axes(
 fn contains_axis(cas: &Cas, cut: &CaseCut, key: &str, budget: &mut Budget) -> Result<bool, Fault> {
     for interval in &cut.bounds {
         budget.work(size(key.len(), AT)?.saturating_add(1), AT)?;
-        let expression = cas.state.expression(cas.checked(&interval.coordinate)?)?;
+        let expression = cas
+            .state
+            .expression(cas.checked(&interval.coordinate, budget)?, budget)?;
         if matches!(&expression.operator, Operator::Free(name) if name == key) {
             return Ok(true);
         }

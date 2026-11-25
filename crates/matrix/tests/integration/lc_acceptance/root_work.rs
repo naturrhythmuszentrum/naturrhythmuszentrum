@@ -16,7 +16,7 @@ use std::rc::Rc;
 /// ´test:integration:lc-root-preparation-cumulative-work-boundary´
 #[test]
 fn lc_root_preparation_cumulative_work_boundary() -> TestResult {
-    const REQUIRED: u64 = 5_619_289;
+    const REQUIRED: u64 = 5_621_221;
     for (available, prior, success) in [
         (REQUIRED, 0, true),
         (REQUIRED - 1, 0, false),
@@ -40,12 +40,12 @@ fn preparation(budget: &mut Budget) -> TestResult {
     let mut fixture = Fixture::with_store_limits(["5", "1/10", "1/2000"], budget.limits().clone())?;
     let graph = Rc::get_mut(&mut fixture.graph).ok_or("original graph")?;
     let key = ReciprocalJacobianKey::new(graph, fixture.law.operator(), &[], budget)?;
-    assert_eq!(key.usage().after.work - key.usage().before.work, 416_530);
+    assert_eq!(key.usage().after.work - key.usage().before.work, 416_542);
     let mut cache = ReciprocalJacobianCache::new();
     let exact = cache.get_or_derive(graph, &key, budget)?;
     assert_eq!(
         exact.usage().after.work - exact.usage().before.work,
-        5_182_028
+        5_183_948
     );
     let before = budget.usage().work;
     let cached = cache.get_or_derive(graph, &key, budget)?;
@@ -148,7 +148,7 @@ pub(super) fn policy(kind: usize, available: u64, prior: u64) -> TestResult<Budg
 /// ´test:integration:lc-root-publication-cumulative-work-boundary´
 #[test]
 fn lc_root_publication_cumulative_work_boundary() -> TestResult {
-    const REQUIRED: u64 = 5_750_008;
+    const REQUIRED: u64 = 5_751_940;
     for (available, prior, success) in [
         (REQUIRED, 0, true),
         (REQUIRED - 1, 0, false),

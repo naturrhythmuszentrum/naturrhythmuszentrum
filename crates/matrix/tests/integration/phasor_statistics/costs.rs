@@ -32,9 +32,13 @@ fn shared_voltage_phasor_statistics_have_payload_boundaries() -> TestResult {
 
 /// Measured construction, mean publication and covariance phases pin cumulative Work and payload.
 /// ´test:integration:shared-voltage-phasor-costs-are-pinned´
+/// The construction total gains 437 receiving-store Work over unchanged operation Work: 144
+/// retained-kind counts, 146 identity insertions, one retained-kind insertion,
+/// and 146 vertex admissions. The new lookup floors replace equal old graph
+/// lookup floors; numerical and payload charges are unchanged.
 #[test]
 fn shared_voltage_phasor_costs_are_pinned() -> TestResult {
-    let mut budget = crate::phasor_solve_testing::budget()?;
+    let mut budget = crate::phasor_solve_testing::resources::fresh_budget()?;
     let mut case = fixture::case_with_budget::<f64>(&mut budget)?;
     let prepared = budget.usage().work;
     let means = case.means(&mut budget)?;
@@ -69,13 +73,13 @@ fn shared_voltage_phasor_costs_are_pinned() -> TestResult {
             required(&case, &executions)?
         ),
         (
-            [441_084, 1_561_619, 2_541_555, 2_587_012],
+            [441_324, 1_561_895, 2_541_992, 2_587_449],
             17_092,
             2655,
             [[144, 13], [156, 13], [144, 13]],
             [192_952, 349_203, 192_982],
             426_761,
-            2_607_296,
+            2_607_733,
             [776_292, 426_761]
         )
     );

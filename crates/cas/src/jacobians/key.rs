@@ -110,8 +110,8 @@ impl Cas {
         coordinates: &SourceCoordinates,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        let home = self.checked(context)?;
-        let width = size(self.state.context(home)?.header.len(), AT)?.saturating_add(1);
+        let home = self.checked(context, budget)?;
+        let width = size(self.state.context(home, budget)?.header.len(), AT)?.saturating_add(1);
         let count = coordinates
             .sources
             .len()

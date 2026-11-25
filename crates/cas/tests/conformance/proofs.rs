@@ -777,7 +777,10 @@ fn expected_context_mismatch() -> TestResult {
 #[test]
 fn checked_jacobian_assembly() -> TestResult {
     let mut fixture = Fixture::new()?;
-    let syntax_header = fixture.cas.context_header(&fixture.context)?;
+    let syntax_header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let matrix = |rows, columns, operands: Vec<Reference>| {
         Draft::Expression(ExpressionDraft {
             space: None,
@@ -982,7 +985,10 @@ fn proof_permanent_limits() -> TestResult {
 #[test]
 fn matrix_proof_boundary() -> TestResult {
     let mut fixture = Fixture::new()?;
-    let syntax_header = fixture.cas.context_header(&fixture.context)?;
+    let syntax_header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let sort = Sort::Value(AtomicSort::Matrix {
         field: Field::Real,
         rows: nrz_cas::syntax::Extent::Literal(1),
@@ -1119,7 +1125,10 @@ fn unknown_function_derivative_refusal() -> TestResult {
     let steps = [
         derivative(
             &at(&handles, 2)?,
-            &fixture.cas.admissible_region(&at(&handles, 2)?)?,
+            &fixture.cas.admissible_region(
+                &at(&handles, 2)?,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             Primitive::DifferentiateVariable,
             &at(&handles, 3)?,
             &at(&handles, 4)?,
@@ -1127,7 +1136,10 @@ fn unknown_function_derivative_refusal() -> TestResult {
         ),
         derivative(
             &at(&handles, 2)?,
-            &fixture.cas.admissible_region(&at(&handles, 2)?)?,
+            &fixture.cas.admissible_region(
+                &at(&handles, 2)?,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             Primitive::DifferentiateConstant,
             &at(&handles, 6)?,
             &at(&handles, 5)?,
@@ -1353,7 +1365,10 @@ fn substitution_steps(
 /// Two syntactically distinct regions form an exact constructor cover in the same context.
 fn replay_cover(fixture: &mut Fixture) -> TestResult<Statement> {
     use nrz_cas::domain::{AmbientDomain, RegionDraft, RegionExpr};
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let empty = crate::testing::builders::admit(
         &mut fixture.cas,
         Draft::Region(RegionDraft {

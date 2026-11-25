@@ -117,6 +117,8 @@ fn map_inverse_replay_retains_positive_premise() -> TestResult {
 }
 
 /// Inverting a composed translated map equals composing inverses in reverse order.
+/// Proof and replay each add 4 retained-kind replacements +4 identity-index
+/// insertions +4 vertex admissions = 12 Work over unchanged operation Work; lookup floors match.
 /// ´test:integration:composed-map-inverse-order-replays´
 #[test]
 fn composed_map_inverse_order_replays() -> TestResult {
@@ -167,7 +169,7 @@ fn composed_map_inverse_order_replays() -> TestResult {
             replay.usage().work,
             u64::try_from(bytes.len())?
         ],
-        [167_424, 233_132, 1297]
+        [167_436, 233_144, 1297]
     );
     Ok(())
 }
@@ -229,6 +231,8 @@ fn witness_cost(
 }
 
 /// Capture independent kernel-check versus fresh replay costs for both inverse certificates.
+/// Generation and replay add only local receiving-store entries; the two
+/// proof checks have zero new entries. Witness byte columns stay fixed.
 /// ´test:integration:inverse-resource-measurements´
 #[test]
 fn inverse_resource_measurements() -> TestResult {
@@ -272,13 +276,13 @@ fn inverse_resource_measurements() -> TestResult {
     assert_eq!(
         rows,
         [
-            [0, 260_042, 58_403, 91_701, 721, 129_078, 174_983, 947],
-            [1, 671_084, 99_332, 137_795, 799, 295_775, 364_313, 1_281],
-            [2, 329_163, 69_858, 113_274, 921, 166_799, 229_503, 1_247],
-            [3, 251_591, 55_053, 83_466, 621, 124_848, 162_909, 797],
-            [4, 57_758, 25_348, 46_153, 490, 23_180, 41_391, 456],
-            [5, 157_319, 47_655, 77_968, 670, 75_678, 115_533, 853],
-            [6, 172_203, 53_681, 84_668, 688, 79_225, 122_629, 921],
+            [0, 260_219, 58_403, 91_716, 721, 129_078, 174_993, 947],
+            [1, 671_579, 99_332, 137_810, 799, 295_775, 364_323, 1_281],
+            [2, 329_364, 69_858, 113_289, 921, 166_799, 229_513, 1_247],
+            [3, 251_762, 55_053, 83_481, 621, 124_848, 162_919, 797],
+            [4, 57_803, 25_348, 46_168, 490, 23_180, 41_401, 456],
+            [5, 157_395, 47_655, 77_984, 670, 75_678, 115_549, 853],
+            [6, 172_290, 53_681, 84_683, 688, 79_225, 122_644, 921],
         ]
     );
     Ok(())

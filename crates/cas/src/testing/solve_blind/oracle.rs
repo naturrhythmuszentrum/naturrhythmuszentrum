@@ -195,7 +195,8 @@ impl Ring {
         bindings: &[(&str, Complex)],
         original: &Handle,
     ) -> TestResult<Self> {
-        match cas.solve_view(domain)? {
+        let mut budget = crate::testing::common::default_budget()?;
+        match cas.solve_view(domain, &mut budget)? {
             SolveView::CoefficientDomain(
                 ground @ (CoefficientDomainData::Rational | CoefficientDomainData::Gaussian),
             ) => Ok(Self {
@@ -228,11 +229,12 @@ impl Ring {
         coordinates: &Handle,
         bindings: &[(&str, Complex)],
     ) -> TestResult<Self> {
+        let mut budget = crate::testing::common::default_budget()?;
         assert!(matches!(
-            cas.solve_view(base)?,
+            cas.solve_view(base, &mut budget)?,
             SolveView::CoefficientDomain(CoefficientDomainData::Rational)
         ));
-        let SolveView::CoordinateSpace(frame) = cas.solve_view(coordinates)? else {
+        let SolveView::CoordinateSpace(frame) = cas.solve_view(coordinates, &mut budget)? else {
             return Err("oracle parameter frame".into());
         };
         let parameters = frame
@@ -263,11 +265,13 @@ impl Ring {
         bindings: &[(&str, Complex)],
         original: &Handle,
     ) -> TestResult<Self> {
-        let SolveView::ExtensionLevel(level) = cas.solve_view(level)? else {
+        let mut budget = crate::testing::common::default_budget()?;
+        let SolveView::ExtensionLevel(level) = cas.solve_view(level, &mut budget)? else {
             return Err("oracle extension".into());
         };
         let parent = Self::specialized(cas, &level.parent, bindings, original)?;
-        let SolveView::Polynomial(polynomial) = cas.solve_view(&level.polynomial)? else {
+        let SolveView::Polynomial(polynomial) = cas.solve_view(&level.polynomial, &mut budget)?
+        else {
             return Err("oracle modulus".into());
         };
         let degree = polynomial
@@ -314,7 +318,8 @@ impl Ring {
 
     /// Read canonical coefficient payloads without using their producer's arithmetic.
     fn value(&self, cas: &Cas, handle: &Handle) -> TestResult<Vec<Rational>> {
-        let SolveView::CoefficientValue(value) = cas.solve_view(handle)? else {
+        let mut budget = crate::testing::common::default_budget()?;
+        let SolveView::CoefficientValue(value) = cas.solve_view(handle, &mut budget)? else {
             return Err("oracle coefficient".into());
         };
         assert_eq!(value.domain, self.domain);
@@ -352,12 +357,14 @@ impl Ring {
 
     /// Direct monomial substitution uses only this independent small rational arithmetic.
     fn evaluate(&self, cas: &Cas, handle: &Handle) -> TestResult<Complex> {
-        let SolveView::Polynomial(polynomial) = cas.solve_view(handle)? else {
+        let mut budget = crate::testing::common::default_budget()?;
+        let SolveView::Polynomial(polynomial) = cas.solve_view(handle, &mut budget)? else {
             return Err("oracle polynomial".into());
         };
         let mut sum = Complex::integer(0);
         for term in &polynomial.terms {
-            let SolveView::CoefficientValue(coefficient) = cas.solve_view(&term.coefficient)?
+            let SolveView::CoefficientValue(coefficient) =
+                cas.solve_view(&term.coefficient, &mut budget)?
             else {
                 return Err("oracle polynomial scalar".into());
             };
@@ -453,13 +460,15 @@ pub(crate) fn gaussian_product(
     witness: &crate::proof::VerifiedWitness,
     original: &[(i64, i64)],
 ) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::graph::{ExpressionAttachment, Vertex};
     use crate::proof_model::Certificate;
     use crate::solving::SolveCertificate;
-    let Vertex::Proof(application) = cas.state.node(witness.proof.logical_id())? else {
+    let Vertex::Proof(application) = cas.state.node(witness.proof.logical_id(), &mut budget)?
+    else {
         return Err("oracle proof root".into());
     };
-    let Vertex::ScopedApplication(application) = cas.state.node(*application)? else {
+    let Vertex::ScopedApplication(application) = cas.state.node(*application, &mut budget)? else {
         return Err("oracle coverage application".into());
     };
     let Certificate::Solve(certificate) = &application.certificate else {
@@ -468,22 +477,22 @@ pub(crate) fn gaussian_product(
     let SolveCertificate::ProductCompleteness(certificate) = certificate.as_ref() else {
         return Err("oracle complete product".into());
     };
-    let coefficient = |handle: &Handle| -> TestResult<Handle> {
-        let expression = cas.state.expression(handle.logical_id())?;
+    let coefficient = |handle: &Handle, budget: &mut crate::budget::Budget| -> TestResult<Handle> {
+        let expression = cas.state.expression(handle.logical_id(), budget)?;
         let Some(ExpressionAttachment::ExactCoefficient { value, .. }) = &expression.attachment
         else {
             return Err("oracle exact factor".into());
         };
         Ok(cas.handle(*value))
     };
-    let scalar = coefficient(&certificate.scalar)?;
-    let SolveView::CoefficientValue(value) = cas.solve_view(&scalar)? else {
+    let scalar = coefficient(&certificate.scalar, &mut budget)?;
+    let SolveView::CoefficientValue(value) = cas.solve_view(&scalar, &mut budget)? else {
         return Err("oracle scalar".into());
     };
     let ring = Ring::read(cas, &value.domain)?;
     let mut polynomial = vec![ring.value(cas, &scalar)?];
     for factor in &certificate.factors {
-        let root = ring.value(cas, &coefficient(&factor.root)?)?;
+        let root = ring.value(cas, &coefficient(&factor.root, &mut budget)?)?;
         for _ in 0..factor.multiplicity {
             polynomial = multiply_factor(&ring, &polynomial, &root)?;
         }

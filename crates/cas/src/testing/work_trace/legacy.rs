@@ -55,7 +55,16 @@ pub(super) fn compare(report: &Report) -> TestResult {
             });
         }
     }
-    if !scopes || expected != report.rows {
+    // The captured fixture predates explicit rendering of operationless phase
+    // intervals. Keep its named helper pins exact; ledger reconciliation checks
+    // the additional phase rows independently.
+    let named_rows: Vec<_> = report
+        .rows
+        .iter()
+        .filter(|row| row.location != super::subscriber::PHASE_LOCATION)
+        .cloned()
+        .collect();
+    if !scopes || expected != named_rows {
         return Err(format!(
             "legacy Work attribution differs for {name} measurement {ordinal}: {:?}",
             report.rows
@@ -182,7 +191,7 @@ replay	syntax admission	draft validation	16649
 replay	syntax admission	exact coefficients	179
 replay	syntax admission	interning lookup	6879
 replay	syntax admission	local family evaluation	9
-replay	syntax admission	native case admission	4
+replay	syntax admission	native case admission	10
 replay	syntax admission	rational comparison	896
 replay	syntax admission	rational constructor	2176
 replay	syntax admission	rational division	192
@@ -192,7 +201,7 @@ replay	syntax admission	scalar family admission	3135
 replay	syntax admission	semantic header	118
 replay	syntax admission	solving object admission	14324
 replay	syntax admission	structural key	6736
-replay	syntax admission	transaction	74982
+replay	syntax admission	transaction	75240
 replay	syntax admission	typed object decoding	5
 replay	syntax admission	typed syntax descriptor	34803
 replay	syntax admission	witness decoding	20364
@@ -945,7 +954,7 @@ replay	overhead	scalar family admission	5
 replay	overhead	scalar statement view	1632
 replay	overhead	solving object admission	850
 replay	overhead	structural key	236
-replay	overhead	transaction	1863
+replay	overhead	transaction	1878
 replay	overhead	typed syntax descriptor	128
 replay	witness encoding	rational encoding	64
 replay	witness encoding	scalar statement view	3124
@@ -979,18 +988,18 @@ replay	conclusion reconstruction	scalar statement view	886
 replay	conclusion reconstruction	witness decoding	17
 replay	overhead	proof transaction	256
 replay	syntax admission	context hypotheses	4
-replay	syntax admission	domain admission	4
+replay	syntax admission	domain admission	27
 replay	syntax admission	draft references	12
 replay	syntax admission	draft validation	7995
 replay	syntax admission	interning lookup	2600
-replay	syntax admission	native case admission	2
+replay	syntax admission	native case admission	8
 replay	syntax admission	rational constructor	256
 replay	syntax admission	rational encoding	256
 replay	syntax admission	scalar family admission	1557
 replay	syntax admission	semantic header	62
 replay	syntax admission	solving object admission	3245
 replay	syntax admission	structural key	2545
-replay	syntax admission	transaction	23346
+replay	syntax admission	transaction	23522
 replay	syntax admission	typed syntax descriptor	8049
 replay	syntax admission	witness decoding	7478
 replay	wire admission	semantic header	4
@@ -1376,7 +1385,7 @@ replay	syntax admission	draft validation	16649
 replay	syntax admission	exact coefficients	179
 replay	syntax admission	interning lookup	6879
 replay	syntax admission	local family evaluation	9
-replay	syntax admission	native case admission	4
+replay	syntax admission	native case admission	10
 replay	syntax admission	rational comparison	896
 replay	syntax admission	rational constructor	2176
 replay	syntax admission	rational division	192
@@ -1386,7 +1395,7 @@ replay	syntax admission	scalar family admission	3135
 replay	syntax admission	semantic header	118
 replay	syntax admission	solving object admission	14324
 replay	syntax admission	structural key	6736
-replay	syntax admission	transaction	74982
+replay	syntax admission	transaction	75246
 replay	syntax admission	typed object decoding	5
 replay	syntax admission	typed syntax descriptor	34803
 replay	syntax admission	witness decoding	20364
@@ -1564,7 +1573,7 @@ replay	syntax admission	draft validation	16649
 replay	syntax admission	exact coefficients	179
 replay	syntax admission	interning lookup	6879
 replay	syntax admission	local family evaluation	9
-replay	syntax admission	native case admission	4
+replay	syntax admission	native case admission	10
 replay	syntax admission	rational comparison	896
 replay	syntax admission	rational constructor	2176
 replay	syntax admission	rational division	192
@@ -1574,7 +1583,7 @@ replay	syntax admission	scalar family admission	3135
 replay	syntax admission	semantic header	118
 replay	syntax admission	solving object admission	14324
 replay	syntax admission	structural key	6736
-replay	syntax admission	transaction	74982
+replay	syntax admission	transaction	75246
 replay	syntax admission	typed object decoding	5
 replay	syntax admission	typed syntax descriptor	34803
 replay	syntax admission	witness decoding	20364
@@ -1752,7 +1761,7 @@ replay	syntax admission	draft validation	16649
 replay	syntax admission	exact coefficients	179
 replay	syntax admission	interning lookup	6879
 replay	syntax admission	local family evaluation	9
-replay	syntax admission	native case admission	4
+replay	syntax admission	native case admission	10
 replay	syntax admission	rational comparison	896
 replay	syntax admission	rational constructor	2176
 replay	syntax admission	rational division	192
@@ -1762,7 +1771,7 @@ replay	syntax admission	scalar family admission	3135
 replay	syntax admission	semantic header	118
 replay	syntax admission	solving object admission	14324
 replay	syntax admission	structural key	6736
-replay	syntax admission	transaction	74982
+replay	syntax admission	transaction	75246
 replay	syntax admission	typed object decoding	5
 replay	syntax admission	typed syntax descriptor	34803
 replay	syntax admission	witness decoding	20364
@@ -1940,7 +1949,7 @@ replay	syntax admission	draft validation	16649
 replay	syntax admission	exact coefficients	179
 replay	syntax admission	interning lookup	6879
 replay	syntax admission	local family evaluation	9
-replay	syntax admission	native case admission	4
+replay	syntax admission	native case admission	10
 replay	syntax admission	rational comparison	896
 replay	syntax admission	rational constructor	2176
 replay	syntax admission	rational division	192
@@ -1950,7 +1959,7 @@ replay	syntax admission	scalar family admission	3135
 replay	syntax admission	semantic header	118
 replay	syntax admission	solving object admission	14324
 replay	syntax admission	structural key	6736
-replay	syntax admission	transaction	74982
+replay	syntax admission	transaction	75246
 replay	syntax admission	typed object decoding	5
 replay	syntax admission	typed syntax descriptor	34803
 replay	syntax admission	witness decoding	20364
@@ -2128,7 +2137,7 @@ replay	syntax admission	draft validation	16649
 replay	syntax admission	exact coefficients	179
 replay	syntax admission	interning lookup	6879
 replay	syntax admission	local family evaluation	9
-replay	syntax admission	native case admission	4
+replay	syntax admission	native case admission	10
 replay	syntax admission	rational comparison	896
 replay	syntax admission	rational constructor	2176
 replay	syntax admission	rational division	192
@@ -2138,7 +2147,7 @@ replay	syntax admission	scalar family admission	3135
 replay	syntax admission	semantic header	118
 replay	syntax admission	solving object admission	14324
 replay	syntax admission	structural key	6736
-replay	syntax admission	transaction	74982
+replay	syntax admission	transaction	75240
 replay	syntax admission	typed object decoding	5
 replay	syntax admission	typed syntax descriptor	34803
 replay	syntax admission	witness decoding	20364

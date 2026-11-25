@@ -31,11 +31,16 @@ pub(crate) fn check(
     let Certificate::Decision(evidence) = &draft.certificate else {
         return Err(invalid());
     };
-    let frame = cas.state.context(cas.checked(&draft.context)?)?;
+    let frame = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
     let function = cas
         .state
-        .expression(cas.checked(&evidence.partition.function)?)?;
-    let Vertex::CaseArm(arm) = cas.state.node(cas.checked(&evidence.cut.association)?)? else {
+        .expression(cas.checked(&evidence.partition.function, budget)?, budget)?;
+    let Vertex::CaseArm(arm) = cas
+        .state
+        .node(cas.checked(&evidence.cut.association, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     let expected = Statement::Subset {
@@ -66,7 +71,7 @@ pub(crate) fn check(
             .zip(premises)
         {
             budget.work(1, AT)?;
-            coordinate(cas, draft, bound, enclosure, premise)?;
+            coordinate(cas, draft, bound, enclosure, premise, budget)?;
             crate::decision_enclosure::check(cas, enclosure, budget)?;
             crate::statement::merge(cas, &mut conditions, &premise.conditions, budget)?;
             crate::decision_kernel::family::retain(cas, enclosure, &mut conditions, budget)?;
@@ -83,8 +88,13 @@ fn coordinate(
     bound: &CoordinateInterval,
     enclosure: &RationalEnclosure,
     premise: &CheckedApplication,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let family = cas.handle(cas.state.context(cas.checked(&draft.context)?)?.admissible);
+    let family = cas.handle(
+        cas.state
+            .context(cas.checked(&draft.context, budget)?, budget)?
+            .admissible,
+    );
     if enclosure.context != draft.context
         || enclosure.input_family != family
         || enclosure.lower != bound.lower
@@ -102,14 +112,16 @@ fn coordinate(
             domain_contract: DomainContract::DefinedAndEqual,
         } if *left == bound.coordinate && *right == enclosure.target && *domain == family => Ok(()),
         Statement::PredicateFact { region, predicate } if *region == family => {
-            let Vertex::Condition(predicate) = cas.state.node(cas.checked(predicate)?)? else {
+            let Vertex::Condition(predicate) =
+                cas.state.node(cas.checked(predicate, budget)?, budget)?
+            else {
                 return Err(invalid());
             };
             if predicate.kind != crate::model::PredicateKind::Equal
                 || predicate.arguments
                     != [
-                        cas.checked(&bound.coordinate)?,
-                        cas.checked(&enclosure.target)?,
+                        cas.checked(&bound.coordinate, budget)?,
+                        cas.checked(&enclosure.target, budget)?,
                     ]
             {
                 return Err(invalid());
@@ -133,10 +145,10 @@ pub(crate) fn frame(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(4, AT)?;
-    let Vertex::Proof(application) = state.node(introduction)? else {
+    let Vertex::Proof(application) = state.node(introduction, budget)? else {
         return Err(invalid());
     };
-    let Vertex::ScopedApplication(proof) = state.node(*application)? else {
+    let Vertex::ScopedApplication(proof) = state.node(*application, budget)? else {
         return Err(invalid());
     };
     let Certificate::Decision(_) = &proof.certificate else {
@@ -147,7 +159,7 @@ pub(crate) fn frame(
     };
     if proof.rule != crate::rule::Primitive::RegionDecide
         || proof.judgment.context.logical_id() != parent
-        || subset.logical_id() != state.context(parent)?.admissible
+        || subset.logical_id() != state.context(parent, budget)?.admissible
         || superset.logical_id() != region
         || !proof.conditions.residuals.is_empty()
     {
@@ -184,7 +196,7 @@ pub(crate) fn dependencies(
         .chain(&value.partition.coordinates)
         .chain(value.enclosures.iter().map(|enclosure| &enclosure.target))
     {
-        edges.push((cas.checked(object)?, crate::graph::Edge::DependsOn));
+        edges.push((cas.checked(object, budget)?, crate::graph::Edge::DependsOn));
     }
     for enclosure in &value.enclosures {
         crate::decision_kernel::family::dependencies(cas, enclosure, edges, budget)?;

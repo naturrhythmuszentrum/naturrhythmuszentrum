@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Production interning diagnostics across admission, lookup and transaction boundaries.
 
-use std::collections::BTreeMap;
-
 use crate::error::Location;
 use crate::graph::{InterningSnapshot, LogicalId, Source, Vertex, vertex_key};
 use crate::limits::{Budget, BudgetKind, Limits};
@@ -11,14 +9,17 @@ use crate::testing::admission::Fixture;
 use crate::testing::common::{TestResult, default_budget};
 use crate::{Cas, Fault, FaultKind, InvalidCode};
 
-/// The six-key fixture fits one ordered index leaf; enumerate its probes independently.
-/// The reference index contains only plain byte slices and no mutable diagnostic state.
-fn count_leaf_probe(
-    reference: &BTreeMap<&[u8], LogicalId>,
+/// Enumerate half-open midpoint probes over sorted plain keys, independent of the index.
+/// Equality returns immediately; an absent probe returns its insertion position.
+fn count_binary_probe(
+    reference: &[(&[u8], LogicalId)],
     probe: &[u8],
     totals: &mut InterningSnapshot,
-) -> TestResult {
-    for candidate in reference.keys() {
+) -> TestResult<(usize, bool)> {
+    let (mut low, mut high) = (0, reference.len());
+    while low < high {
+        let middle = low + (high - low) / 2;
+        let candidate = reference[middle].0;
         let prefix = probe
             .iter()
             .zip(candidate.iter())
@@ -27,11 +28,13 @@ fn count_leaf_probe(
         let compared = prefix + usize::from(prefix < probe.len().min(candidate.len()));
         totals.comparisons += 1;
         totals.compared_bytes += u64::try_from(compared)?;
-        if probe <= *candidate {
-            break;
+        match probe.cmp(candidate) {
+            std::cmp::Ordering::Less => high = middle,
+            std::cmp::Ordering::Equal => return Ok((middle, true)),
+            std::cmp::Ordering::Greater => low = middle + 1,
         }
     }
-    Ok(())
+    Ok((low, false))
 }
 
 /// Equal-length names have a long shared prefix; equal keys also examine the payload tail.
@@ -59,13 +62,12 @@ fn keys(cas: &Cas, drafts: &[Draft]) -> TestResult<Vec<Vec<u8>>> {
         .collect()
 }
 
-/// Compare results with a plain-byte index, counting every probe of the small leaf fixture.
+/// Compare results with plain sorted keys, counting each midpoint probe independently.
 fn measured_sequence(drafts: &[Draft], probes: &[usize]) -> TestResult<InterningSnapshot> {
     let mut cas = Cas::new(Limits::default())?;
     let encoded = keys(&cas, drafts)?;
     let mut totals = InterningSnapshot::default();
-    let mut reference = BTreeMap::new();
-    let single_leaf = drafts.len() <= 7;
+    let mut reference: Vec<(&[u8], LogicalId)> = Vec::new();
     for (draft, bytes) in drafts
         .iter()
         .zip(&encoded)
@@ -73,25 +75,30 @@ fn measured_sequence(drafts: &[Draft], probes: &[usize]) -> TestResult<Interning
     {
         let handles = cas.admit(std::slice::from_ref(draft), &mut default_budget()?)?;
         let id = handles.first().ok_or("missing source")?.logical_id();
-        if single_leaf {
-            count_leaf_probe(&reference, bytes, &mut totals)?;
-            count_leaf_probe(&reference, bytes, &mut totals)?;
-            assert_eq!(cas.interning_snapshot(), totals);
-        }
-        assert_eq!(reference.insert(bytes.as_slice(), id), None);
+        let (position, found) = count_binary_probe(&reference, bytes, &mut totals)?;
+        assert!(!found);
+        reference.insert(position, (bytes.as_slice(), id));
+        assert_eq!(cas.interning_snapshot(), totals);
     }
     for (position, index) in probes.iter().enumerate() {
         let bytes = encoded.get(*index).ok_or("missing probe")?;
         let actual = if position % 2 == 0 {
             cas.state.interned(bytes, &mut default_budget()?)?
         } else {
-            cas.state.intern.get(bytes).copied()
+            cas.state
+                .intern
+                .get(
+                    bytes,
+                    0,
+                    &mut default_budget()?,
+                    Location::new("interning lookup"),
+                )?
+                .copied()
         };
-        assert_eq!(actual, reference.get(bytes.as_slice()).copied());
-        if single_leaf {
-            count_leaf_probe(&reference, bytes, &mut totals)?;
-            assert_eq!(cas.interning_snapshot(), totals);
-        }
+        let (middle, found) = count_binary_probe(&reference, bytes, &mut totals)?;
+        let expected = found.then(|| reference[middle].1);
+        assert_eq!(actual, expected);
+        assert_eq!(cas.interning_snapshot(), totals);
     }
     Ok(cas.interning_snapshot())
 }
@@ -101,16 +108,18 @@ fn measured_sequence(drafts: &[Draft], probes: &[usize]) -> TestResult<Interning
 #[test]
 fn interning_comparisons_match_independent_keys() -> TestResult {
     let drafts = ["c", "a", "f", "b", "e", "d", "g"].map(source);
+    // Six admissions take 9 comparisons and four probes take 10, for 19 total.
+    // The independent byte comparator counts 472 compared byte pairs.
     let expected = InterningSnapshot {
-        comparisons: 42,
-        compared_bytes: 978,
+        comparisons: 19,
+        compared_bytes: 472,
     };
     assert_eq!(measured_sequence(&drafts, &[0, 1, 2, 6])?, expected);
     assert_eq!(measured_sequence(&drafts, &[0, 1, 2, 6])?, expected);
     Ok(())
 }
 
-/// Index splits preserve lookup results and deterministic measured comparison totals.
+/// Index growth crossings preserve lookup results and independent comparison totals.
 /// ´test:crate:interning-comparisons-across-index-splits´
 #[test]
 fn interning_comparisons_across_index_splits() -> TestResult {
@@ -134,14 +143,15 @@ fn interning_comparisons_survive_outer_rollback() -> TestResult {
     let before = cas.canonical_snapshot(&mut default_budget()?)?;
     let counts = cas.counts();
     let refusal = Fault::invalid(InvalidCode::Rule, Location::new("diagnostic rollback test"));
+    // One 22-byte admission comparison survives; inverse removal examines 40 bytes.
     let result: Result<(), Fault> = cas.transaction(&mut default_budget()?, |cas, budget| {
         let draft = source("c");
         cas.admit(std::slice::from_ref(&draft), budget)?;
         assert_eq!(
             cas.interning_snapshot(),
             InterningSnapshot {
-                comparisons: 2,
-                compared_bytes: 44,
+                comparisons: 1,
+                compared_bytes: 22,
             }
         );
         Err(refusal.clone())
@@ -150,8 +160,8 @@ fn interning_comparisons_survive_outer_rollback() -> TestResult {
     assert_eq!(
         cas.interning_snapshot(),
         InterningSnapshot {
-            comparisons: 4,
-            compared_bytes: 106,
+            comparisons: 2,
+            compared_bytes: 62,
         }
     );
     assert_eq!(cas.counts(), counts);
@@ -182,8 +192,8 @@ fn interning_comparisons_survive_invalid_batch() -> TestResult {
     assert_eq!(
         cas.interning_snapshot(),
         InterningSnapshot {
-            comparisons: 4,
-            compared_bytes: 106,
+            comparisons: 2,
+            compared_bytes: 62,
         }
     );
     assert_eq!(cas.canonical_snapshot(&mut default_budget()?)?, before);

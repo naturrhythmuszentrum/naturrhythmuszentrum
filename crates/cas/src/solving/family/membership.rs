@@ -46,15 +46,18 @@ pub(super) fn validate(
     piece: &Handle,
     location: &Handle,
     domain: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let SolveDraft::ScalarPiece(piece) =
-        crate::solving::graph::object(&cas.state, cas.checked(piece)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(piece, budget)?, budget)?
     else {
         return Err(invalid());
     };
-    let home = cas.state.region(piece.region.logical_id())?;
-    let actual = cas.state.region(cas.checked(domain)?)?;
-    let query = cas.state.expression(cas.checked(location)?)?;
+    let home = cas.state.region(piece.region.logical_id(), budget)?;
+    let actual = cas.state.region(cas.checked(domain, budget)?, budget)?;
+    let query = cas
+        .state
+        .expression(cas.checked(location, budget)?, budget)?;
     if home.header != actual.header
         || home.scope != actual.scope
         || home.ambient != actual.ambient

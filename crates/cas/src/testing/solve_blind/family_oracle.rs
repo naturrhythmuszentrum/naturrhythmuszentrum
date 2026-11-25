@@ -11,8 +11,11 @@ use crate::testing::common::TestResult;
 
 /// Read the retained coefficient payload, without invoking normalization or root discovery.
 fn coefficient(cas: &Cas, expression: &Handle) -> TestResult<Handle> {
-    let Some(ExpressionAttachment::ExactCoefficient { value, .. }) =
-        cas.state.expression(expression.logical_id())?.attachment
+    let mut budget = crate::testing::common::default_budget()?;
+    let Some(ExpressionAttachment::ExactCoefficient { value, .. }) = cas
+        .state
+        .expression(expression.logical_id(), &mut budget)?
+        .attachment
     else {
         return Err("family oracle literal".into());
     };
@@ -26,11 +29,12 @@ fn product(
     bindings: &[(&str, Complex)],
     expected: &[(i64, i64)],
 ) -> TestResult<Vec<u32>> {
+    let mut budget = crate::testing::common::default_budget()?;
     let scalar = coefficient(cas, &value.scalar)?;
-    let SolveView::CoefficientValue(leading) = cas.solve_view(&scalar)? else {
+    let SolveView::CoefficientValue(leading) = cas.solve_view(&scalar, &mut budget)? else {
         return Err("family oracle scalar".into());
     };
-    let SolveView::SolveProblem(problem) = cas.solve_view(&value.problem)? else {
+    let SolveView::SolveProblem(problem) = cas.solve_view(&value.problem, &mut budget)? else {
         return Err("family oracle problem".into());
     };
     let ring = Ring::specialized(cas, &leading.domain, bindings, &problem.coefficient_domain)?;
@@ -64,18 +68,19 @@ fn cells(
     bindings: &[(&str, Complex)],
     expected: usize,
 ) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let Statement::Solve(statement) = &witness.judgment().statement else {
         return Err("family oracle claim".into());
     };
     let SolveStatement::Coverage(claim) = statement.as_ref() else {
         return Err("family oracle coverage".into());
     };
-    let SolveView::SolutionSet(set) = cas.solve_view(&claim.set)? else {
+    let SolveView::SolutionSet(set) = cas.solve_view(&claim.set, &mut budget)? else {
         return Err("family oracle set".into());
     };
     let mut active = 0;
     for handle in &set.branches {
-        let SolveView::SolutionBranch(branch) = cas.solve_view(handle)? else {
+        let SolveView::SolutionBranch(branch) = cas.solve_view(handle, &mut budget)? else {
             return Err("family oracle branch".into());
         };
         if specialize::region(cas, branch.region.logical_id(), bindings)? {
@@ -172,11 +177,12 @@ fn lc_tuples(
     bindings: &[(&str, Complex)],
     constant: i64,
 ) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let scalar = coefficient(cas, &value.scalar)?;
-    let SolveView::CoefficientValue(leading) = cas.solve_view(&scalar)? else {
+    let SolveView::CoefficientValue(leading) = cas.solve_view(&scalar, &mut budget)? else {
         return Err("LC oracle scalar".into());
     };
-    let SolveView::SolveProblem(problem) = cas.solve_view(&value.problem)? else {
+    let SolveView::SolveProblem(problem) = cas.solve_view(&value.problem, &mut budget)? else {
         return Err("LC oracle problem".into());
     };
     let ring = Ring::specialized(cas, &leading.domain, bindings, &problem.coefficient_domain)?;
@@ -186,18 +192,18 @@ fn lc_tuples(
     let SolveStatement::Coverage(claim) = statement.as_ref() else {
         return Err("LC oracle claim".into());
     };
-    let SolveView::SolutionSet(set) = cas.solve_view(&claim.set)? else {
+    let SolveView::SolutionSet(set) = cas.solve_view(&claim.set, &mut budget)? else {
         return Err("LC oracle set".into());
     };
     for branch in &set.branches {
-        let SolveView::SolutionBranch(branch) = cas.solve_view(branch)? else {
+        let SolveView::SolutionBranch(branch) = cas.solve_view(branch, &mut budget)? else {
             return Err("LC oracle branch".into());
         };
         let SolutionBranchKind::Finite { tuples } = &branch.kind else {
             return Err("LC oracle finite branch".into());
         };
         for tuple in tuples {
-            let SolveView::Tuple(tuple) = cas.solve_view(tuple)? else {
+            let SolveView::Tuple(tuple) = cas.solve_view(tuple, &mut budget)? else {
                 return Err("LC oracle tuple".into());
             };
             let [root] = tuple.entries.as_slice() else {

@@ -10,7 +10,7 @@ use crate::test_api::proof::{ApplicationDraft, Judgment, VerifiedWitness};
 use crate::test_api::syntax::Operator;
 use crate::test_api::{Cas, Fault, FaultKind, Handle, InvalidCode, Location};
 
-/// Primitive index, operation, warmth, ceilings, successful Work and refused Work.
+/// Primitive index, operation, warmth, ceilings, and whole-call Work receipts and prefixes.
 pub(crate) type Row = (usize, Operation, bool, [u64; 20], [u64; 20], [u64; 20]);
 
 /// Zero ordinary ceilings execute; bit policies have a mandatory one-bit floor.
@@ -27,7 +27,7 @@ pub(crate) fn verify((index, operation, warm, costs, receipts, prefixes): Row) -
             if bits { cost.max(1) } else { cost } + if kind == BudgetKind::Work { 37 } else { 0 };
         assert_eq!(
             attempt(index, operation, warm, kind, amount)?,
-            (true, receipt + 37),
+            (true, receipt),
             "{index} {operation:?} {warm} {kind:?} at N"
         );
         if bits && cost <= 1 {
@@ -43,7 +43,7 @@ pub(crate) fn verify((index, operation, warm, costs, receipts, prefixes): Row) -
         } else if cost > 0 {
             assert_eq!(
                 attempt(index, operation, warm, kind, amount - 1)?,
-                (false, prefix + 37),
+                (false, prefix),
                 "{index} {operation:?} {warm} {kind:?} at N-1"
             );
         }

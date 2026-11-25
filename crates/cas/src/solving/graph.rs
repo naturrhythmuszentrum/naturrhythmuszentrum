@@ -1319,27 +1319,36 @@ impl SolveDraft<Handle> {
 }
 
 /// Read a solving object with its exact graph kind preserved.
-pub(crate) fn object(state: &State, id: LogicalId) -> Result<&SolveDraft<Handle>, Fault> {
-    match state.node(id)? {
+pub(crate) fn object<'a>(
+    state: &'a State,
+    id: LogicalId,
+    budget: &mut Budget,
+) -> Result<&'a SolveDraft<Handle>, Fault> {
+    match state.node(id, budget)? {
         Vertex::Solve(value) => Ok(value),
         _ => Err(invalid()),
     }
 }
 
 /// Product coordinates have one checked declaration per slot.
-pub(crate) fn coordinates(
-    state: &State,
+pub(crate) fn coordinates<'a>(
+    state: &'a State,
     id: LogicalId,
-) -> Result<&CoordinateSpaceData<Handle>, Fault> {
-    match object(state, id)? {
+    budget: &mut Budget,
+) -> Result<&'a CoordinateSpaceData<Handle>, Fault> {
+    match object(state, id, budget)? {
         SolveDraft::CoordinateSpace(value) => Ok(value),
         _ => Err(invalid()),
     }
 }
 
 /// Original problem data remains independent of any request or proof.
-pub(crate) fn problem(state: &State, id: LogicalId) -> Result<&SolveProblemData<Handle>, Fault> {
-    match object(state, id)? {
+pub(crate) fn problem<'a>(
+    state: &'a State,
+    id: LogicalId,
+    budget: &mut Budget,
+) -> Result<&'a SolveProblemData<Handle>, Fault> {
+    match object(state, id, budget)? {
         SolveDraft::SolveProblem(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -1349,16 +1358,21 @@ pub(crate) fn problem(state: &State, id: LogicalId) -> Result<&SolveProblemData<
 fn coefficient_domain<'a>(
     state: &'a State,
     value: &Handle,
+    budget: &mut Budget,
 ) -> Result<&'a CoefficientDomainData<Handle>, Fault> {
-    match object(state, value.logical_id())? {
+    match object(state, value.logical_id(), budget)? {
         SolveDraft::CoefficientDomain(value) => Ok(value),
         _ => Err(invalid()),
     }
 }
 
 /// Borrow a canonical polynomial independently of its intended theorem.
-fn polynomial<'a>(state: &'a State, value: &Handle) -> Result<&'a PolynomialData<Handle>, Fault> {
-    match object(state, value.logical_id())? {
+fn polynomial<'a>(
+    state: &'a State,
+    value: &Handle,
+    budget: &mut Budget,
+) -> Result<&'a PolynomialData<Handle>, Fault> {
+    match object(state, value.logical_id(), budget)? {
         SolveDraft::Polynomial(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -1368,16 +1382,21 @@ fn polynomial<'a>(state: &'a State, value: &Handle) -> Result<&'a PolynomialData
 fn coefficient<'a>(
     state: &'a State,
     value: &Handle,
+    budget: &mut Budget,
 ) -> Result<&'a CoefficientValueObject<Handle>, Fault> {
-    match object(state, value.logical_id())? {
+    match object(state, value.logical_id(), budget)? {
         SolveDraft::CoefficientValue(value) => Ok(value),
         _ => Err(invalid()),
     }
 }
 
 /// Borrow the defining relation of an earlier extension level.
-fn level<'a>(state: &'a State, value: &Handle) -> Result<&'a ExtensionLevelData<Handle>, Fault> {
-    match object(state, value.logical_id())? {
+fn level<'a>(
+    state: &'a State,
+    value: &Handle,
+    budget: &mut Budget,
+) -> Result<&'a ExtensionLevelData<Handle>, Fault> {
+    match object(state, value.logical_id(), budget)? {
         SolveDraft::ExtensionLevel(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -1398,8 +1417,9 @@ fn metadata_matches(
     value: &Handle,
     header: &Handle,
     scope: &Scope,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let (actual, frames) = crate::descriptor::metadata(state, value.logical_id())?;
+    let (actual, frames) = crate::descriptor::metadata(state, value.logical_id(), budget)?;
     if actual != header.logical_id() || frames != scope {
         return Err(invalid());
     }
@@ -1413,8 +1433,10 @@ fn product_region(
     header: &Handle,
     scope: &Scope,
     product: &Handle,
+
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let value = state.region(region.logical_id())?;
+    let value = state.region(region.logical_id(), budget)?;
     if value.header != header.logical_id()
         || value.scope != *scope
         || value.ambient
@@ -1433,8 +1455,10 @@ fn coordinate_role(
     product: &Handle,
     header: &Handle,
     role: CoordinateRole,
+
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let value = coordinates(state, product.logical_id())?;
+    let value = coordinates(state, product.logical_id(), budget)?;
     if value.header != *header || value.coordinates.iter().any(|entry| entry.role != role) {
         return Err(invalid());
     }
@@ -1448,7 +1472,7 @@ fn check_coordinates(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let environment = &state.header(value.header.logical_id())?.environment;
+        let environment = &state.header(value.header.logical_id(), budget)?.environment;
         budget.check(BudgetKind::Edges, size(value.coordinates.len(), AT)?, AT)?;
         let mut seen = std::collections::BTreeSet::new();
         for coordinate in &value.coordinates {
@@ -1481,15 +1505,15 @@ fn check_coordinates(
 fn check_tuple(state: &State, value: &TupleData<Handle>, budget: &mut Budget) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         crate::validation::scope_limit(&value.scope, budget)?;
-        let product = coordinates(state, value.coordinates.logical_id())?;
+        let product = coordinates(state, value.coordinates.logical_id(), budget)?;
         let expected_entries = product.coordinates.len();
         if product.header != value.header || value.entries.len() != expected_entries {
             return Err(invalid());
         }
         for (coordinate, entry) in product.coordinates.iter().zip(&value.entries) {
             budget.work(1, AT)?;
-            metadata_matches(state, entry, &value.header, &value.scope)?;
-            if state.expression(entry.logical_id())?.sort
+            metadata_matches(state, entry, &value.header, &value.scope, budget)?;
+            if state.expression(entry.logical_id(), budget)?.sort
                 != Sort::Value(AtomicSort::Scalar(coordinate.field.clone()))
             {
                 return Err(invalid());
@@ -1511,8 +1535,9 @@ fn check_family(
         &value.coefficients,
         &value.header,
         CoordinateRole::Coefficient,
+        budget,
     )?;
-    let source_role = coordinates(state, value.family.logical_id())?
+    let source_role = coordinates(state, value.family.logical_id(), budget)?
         .coordinates
         .first()
         .map_or(CoordinateRole::Family, |entry| entry.role);
@@ -1521,9 +1546,9 @@ fn check_family(
         CoordinateRole::Unknown => CoordinateRole::Family,
         CoordinateRole::Coefficient => return Err(invalid()),
     };
-    coordinate_role(state, &value.family, &value.header, source_role)?;
-    coordinate_role(state, &value.target, &value.header, target_role)?;
-    let family = coordinates(state, value.family.logical_id())?;
+    coordinate_role(state, &value.family, &value.header, source_role, budget)?;
+    coordinate_role(state, &value.target, &value.header, target_role, budget)?;
+    let family = coordinates(state, value.family.logical_id(), budget)?;
     budget.solving(
         BudgetKind::FamilyParameters,
         size(family.coordinates.len(), AT)?,
@@ -1537,14 +1562,21 @@ fn check_family(
             .map(|entry| AtomicSort::Scalar(entry.field.clone()))
             .collect(),
     );
-    product_region(state, &value.region, &value.header, &scope, &value.family)?;
-    let SolveDraft::Tuple(body) = object(state, value.body.logical_id())? else {
+    product_region(
+        state,
+        &value.region,
+        &value.header,
+        &scope,
+        &value.family,
+        budget,
+    )?;
+    let SolveDraft::Tuple(body) = object(state, value.body.logical_id(), budget)? else {
         return Err(invalid());
     };
     if body.header != value.header || body.scope != scope || body.coordinates != value.target {
         return Err(invalid());
     }
-    let coefficient_product = coordinates(state, value.coefficients.logical_id())?;
+    let coefficient_product = coordinates(state, value.coefficients.logical_id(), budget)?;
     let allowed: std::collections::BTreeSet<_> = coefficient_product
         .coordinates
         .iter()
@@ -1570,7 +1602,7 @@ pub(crate) fn free_keys(
             if !seen.insert(id) {
                 continue;
             }
-            if let Vertex::Expression(value) = state.node(id)?
+            if let Vertex::Expression(value) = state.node(id, budget)?
                 && let crate::model::Operator::Free(key) = &value.operator
                 && keys.contains(key.as_str()) != allow
             {
@@ -1591,11 +1623,11 @@ fn free_children(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        match state.node(id)? {
+        match state.node(id, budget)? {
             Vertex::Header(_) => {}
             Vertex::Solve(value) => {
-                let index = state.indices.get(&id).ok_or_else(invalid)?;
-                let count = state.graph.edges(*index).count();
+                let index = state.index(id, budget)?;
+                let count = state.graph.edges(index).count();
                 let bytes = size(count, AT)?
                     .checked_mul(64)
                     .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
@@ -1633,7 +1665,11 @@ fn free_children(
 }
 
 /// Fraction fields are limited to independent coordinates over Q or Q(i).
-fn check_domain(state: &State, value: &CoefficientDomainData<Handle>) -> Result<(), Fault> {
+fn check_domain(
+    state: &State,
+    value: &CoefficientDomainData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     match value {
         CoefficientDomainData::Rational | CoefficientDomainData::Gaussian => Ok(()),
         CoefficientDomainData::Fraction {
@@ -1641,12 +1677,12 @@ fn check_domain(state: &State, value: &CoefficientDomainData<Handle>) -> Result<
             coordinates: product,
         } => {
             if !matches!(
-                coefficient_domain(state, base)?,
+                coefficient_domain(state, base, budget)?,
                 CoefficientDomainData::Rational | CoefficientDomainData::Gaussian
             ) {
                 return Err(invalid());
             }
-            let product = coordinates(state, product.logical_id())?;
+            let product = coordinates(state, product.logical_id(), budget)?;
             if product
                 .coordinates
                 .iter()
@@ -1657,19 +1693,19 @@ fn check_domain(state: &State, value: &CoefficientDomainData<Handle>) -> Result<
             Ok(())
         }
         CoefficientDomainData::Quotient { level: extension } => {
-            level(state, extension)?;
+            level(state, extension, budget)?;
             Ok(())
         }
     }
 }
 
 /// Recognize formal zero without inferring specialized nonvanishing.
-fn is_zero(state: &State, value: &Handle) -> Result<bool, Fault> {
-    Ok(match &coefficient(state, value)?.value {
+fn is_zero(state: &State, value: &Handle, budget: &mut Budget) -> Result<bool, Fault> {
+    Ok(match &coefficient(state, value, budget)?.value {
         CoefficientValueData::Rational { value } => value.is_zero(),
         CoefficientValueData::Gaussian { real, imaginary } => real.is_zero() && imaginary.is_zero(),
         CoefficientValueData::Fraction { numerator, .. } => {
-            polynomial(state, numerator)?.terms.is_empty()
+            polynomial(state, numerator, budget)?.terms.is_empty()
         }
         CoefficientValueData::Tower { coefficients } => coefficients.is_empty(),
     })
@@ -1681,7 +1717,7 @@ fn is_one(state: &State, value: &Handle, budget: &mut Budget) -> Result<bool, Fa
         let mut pending = vec![value];
         while let Some(current) = pending.pop() {
             budget.work(1, AT)?;
-            match &coefficient(state, current)?.value {
+            match &coefficient(state, current, budget)?.value {
                 CoefficientValueData::Rational { value } => {
                     if *value != crate::number::Rational::one() {
                         return Ok(false);
@@ -1726,7 +1762,7 @@ fn constant_coefficient<'a>(
     budget: &mut Budget,
 ) -> Result<Option<&'a Handle>, Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let polynomial_data = polynomial(state, value)?;
+        let polynomial_data = polynomial(state, value, budget)?;
         let [term] = polynomial_data.terms.as_slice() else {
             return Ok(None);
         };
@@ -1746,7 +1782,7 @@ fn check_polynomial(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        coefficient_domain(state, &value.domain)?;
+        coefficient_domain(state, &value.domain, budget)?;
         budget.check(
             BudgetKind::PolynomialVariables,
             size(value.variables.len(), AT)?,
@@ -1766,8 +1802,8 @@ fn check_polynomial(
                 AT,
             )?;
             if term.exponents.len() != value.variables.len()
-                || coefficient(state, &term.coefficient)?.domain != value.domain
-                || is_zero(state, &term.coefficient)?
+                || coefficient(state, &term.coefficient, budget)?.domain != value.domain
+                || is_zero(state, &term.coefficient, budget)?
             {
                 return Err(invalid());
             }
@@ -1793,8 +1829,8 @@ fn check_polynomial(
 }
 
 /// A univariate degree is explicit and positive where a root theorem could apply.
-fn degree(state: &State, value: &Handle) -> Result<u32, Fault> {
-    let value = polynomial(state, value)?;
+fn degree(state: &State, value: &Handle, budget: &mut Budget) -> Result<u32, Fault> {
+    let value = polynomial(state, value, budget)?;
     if value.variables.len() != 1 {
         return Err(invalid());
     }
@@ -1812,10 +1848,10 @@ fn check_level(
     value: &ExtensionLevelData<Handle>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    coefficient_domain(state, &value.parent)?;
-    let polynomial_data = polynomial(state, &value.polynomial)?;
+    coefficient_domain(state, &value.parent, budget)?;
+    let polynomial_data = polynomial(state, &value.polynomial, budget)?;
     if polynomial_data.domain != value.parent
-        || degree(state, &value.polynomial)? == 0
+        || degree(state, &value.polynomial, budget)? == 0
         || value.generator.len() != 1
         || value.generator.first()
             != polynomial_data
@@ -1847,22 +1883,22 @@ fn tower_limits(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         let mut depth = 1_u64;
-        let mut product = u64::from(degree(state, &value.polynomial)?);
+        let mut product = u64::from(degree(state, &value.polynomial, budget)?);
         let mut parent = &value.parent;
         loop {
             budget.solving(BudgetKind::TowerLevels, depth, AT)?;
             budget.solving(BudgetKind::TowerDegree, product, AT)?;
             let CoefficientDomainData::Quotient { level: extension } =
-                coefficient_domain(state, parent)?
+                coefficient_domain(state, parent, budget)?
             else {
                 break;
             };
-            let ancestor = level(state, extension)?;
+            let ancestor = level(state, extension, budget)?;
             depth = depth
                 .checked_add(1)
                 .ok_or_else(|| Fault::capacity(BudgetKind::TowerLevels, AT))?;
             product = product
-                .checked_mul(u64::from(degree(state, &ancestor.polynomial)?))
+                .checked_mul(u64::from(degree(state, &ancestor.polynomial, budget)?))
                 .ok_or_else(|| Fault::capacity(BudgetKind::TowerDegree, AT))?;
             parent = &ancestor.parent;
         }
@@ -1876,7 +1912,10 @@ fn check_value(
     value: &CoefficientValueObject<Handle>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    match (coefficient_domain(state, &value.domain)?, &value.value) {
+    match (
+        coefficient_domain(state, &value.domain, budget)?,
+        &value.value,
+    ) {
         (CoefficientDomainData::Rational, CoefficientValueData::Rational { value }) => {
             value.check(budget, AT)
         }
@@ -1898,17 +1937,19 @@ fn check_value(
             CoefficientDomainData::Quotient { level: extension },
             CoefficientValueData::Tower { coefficients },
         ) => {
-            let extension = level(state, extension)?;
-            if size(coefficients.len(), AT)? > u64::from(degree(state, &extension.polynomial)?) {
+            let extension = level(state, extension, budget)?;
+            if size(coefficients.len(), AT)?
+                > u64::from(degree(state, &extension.polynomial, budget)?)
+            {
                 return Err(invalid());
             }
             for entry in coefficients {
-                if coefficient(state, entry)?.domain != extension.parent {
+                if coefficient(state, entry, budget)?.domain != extension.parent {
                     return Err(invalid());
                 }
             }
             if let Some(last) = coefficients.last()
-                && is_zero(state, last)?
+                && is_zero(state, last, budget)?
             {
                 return Err(invalid());
             }
@@ -1927,9 +1968,9 @@ fn check_fraction(
     denominator: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let numerator_data = polynomial(state, numerator)?;
-    let denominator_data = polynomial(state, denominator)?;
-    let product = coordinates(state, product.logical_id())?;
+    let numerator_data = polynomial(state, numerator, budget)?;
+    let denominator_data = polynomial(state, denominator, budget)?;
+    let product = coordinates(state, product.logical_id(), budget)?;
     let fields: Vec<_> = product
         .coordinates
         .iter()
@@ -1960,14 +2001,14 @@ fn check_map(
     value: &CoefficientMapData<Handle>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    coefficient_domain(state, &value.source)?;
-    let region = state.region(value.region.logical_id())?;
+    coefficient_domain(state, &value.source, budget)?;
+    let region = state.region(value.region.logical_id(), budget)?;
     match &value.target {
         MapTarget::Family { .. } => super::family::mapping::validate(state, value, budget)?,
         MapTarget::CoefficientDomain { domain } => {
-            coefficient_domain(state, domain)?;
+            coefficient_domain(state, domain, budget)?;
             for image in &value.images {
-                if coefficient(state, image)?.domain != *domain {
+                if coefficient(state, image, budget)?.domain != *domain {
                     return Err(invalid());
                 }
             }
@@ -1977,8 +2018,8 @@ fn check_map(
                 return Err(invalid());
             }
             for image in &value.images {
-                metadata_matches(state, image, header, &region.scope)?;
-                if state.expression(image.logical_id())?.sort
+                metadata_matches(state, image, header, &region.scope, budget)?;
+                if state.expression(image.logical_id(), budget)?.sort
                     != Sort::Value(AtomicSort::Scalar(field.clone()))
                 {
                     return Err(invalid());
@@ -1988,7 +2029,7 @@ fn check_map(
     }
     for denominator in &value.denominators {
         budget.work(1, AT)?;
-        match state.node(denominator.logical_id())? {
+        match state.node(denominator.logical_id(), budget)? {
             Vertex::Expression(expression)
                 if expression.header == region.header
                     && expression.scope == region.scope
@@ -2011,24 +2052,30 @@ fn check_relation(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::validation::scope_limit(&value.scope, budget)?;
-    let polynomial_data = polynomial(state, &value.polynomial)?;
+    let polynomial_data = polynomial(state, &value.polynomial, budget)?;
     if polynomial_data.variables.len() != 1
         || value.binder != vec![AtomicSort::Scalar(value.ambient.clone())]
         || value.multiplicity == Some(0)
     {
         return Err(invalid());
     }
-    let SolveDraft::CoefficientMap(map) = object(state, value.map.logical_id())? else {
+    let SolveDraft::CoefficientMap(map) = object(state, value.map.logical_id(), budget)? else {
         return Err(invalid());
     };
     if map.source != polynomial_data.domain
         || map.mode != MapMode::Specialization
         || map.region != value.region
-        || !super::family::mapping::relation_target(state, map, &value.header, &value.ambient)?
+        || !super::family::mapping::relation_target(
+            state,
+            map,
+            &value.header,
+            &value.ambient,
+            budget,
+        )?
     {
         return Err(invalid());
     }
-    metadata_matches(state, &value.region, &value.header, &value.scope)
+    metadata_matches(state, &value.region, &value.header, &value.scope, budget)
 }
 
 /// Principal/isolated metadata is relevant only to its own closed mode.
@@ -2040,7 +2087,8 @@ fn check_selection(
     crate::validation::scope_limit(&value.scope, budget)?;
     let mut binders = Vec::new();
     for relation in &value.relations {
-        let SolveDraft::RootRelation(relation) = object(state, relation.logical_id())? else {
+        let SolveDraft::RootRelation(relation) = object(state, relation.logical_id(), budget)?
+        else {
             return Err(invalid());
         };
         if relation.header != value.header || relation.scope != value.scope {
@@ -2051,8 +2099,8 @@ fn check_selection(
     let mut scope = value.scope.clone();
     scope.push(binders);
     require_kind(&value.predicate, VertexKind::Condition)?;
-    metadata_matches(state, &value.predicate, &value.header, &scope)?;
-    super::sorts::selection_cell(state, value)?;
+    metadata_matches(state, &value.predicate, &value.header, &scope, budget)?;
+    super::sorts::selection_cell(state, value, budget)?;
     let parameters = selection_parameters(state, value, budget)?;
     free_keys(state, &value.predicate, &parameters, true, budget)?;
     if (value.mode == SelectionMode::Principal) != value.convention.is_some()
@@ -2070,6 +2118,7 @@ fn check_selection(
         let SolveDraft::RootRelation(relation) = object(
             state,
             value.relations.first().ok_or_else(invalid)?.logical_id(),
+            budget,
         )?
         else {
             return Err(invalid());
@@ -2092,15 +2141,16 @@ fn selection_parameters<'a>(
     crate::work_observation::observe!(budget, AT, {
         let mut result = std::collections::BTreeSet::new();
         for relation in &value.relations {
-            let SolveDraft::RootRelation(relation) = object(state, relation.logical_id())? else {
+            let SolveDraft::RootRelation(relation) = object(state, relation.logical_id(), budget)?
+            else {
                 return Err(invalid());
             };
-            let region = state.region(relation.region.logical_id())?;
+            let region = state.region(relation.region.logical_id(), budget)?;
             if let crate::domain_model::AmbientDomain::Product {
                 coordinates: product,
             } = &region.ambient
             {
-                let product = coordinates(state, product.logical_id())?;
+                let product = coordinates(state, product.logical_id(), budget)?;
                 budget.work(size(product.coordinates.len(), AT)?, AT)?;
                 for coordinate in &product.coordinates {
                     if coordinate.role != CoordinateRole::Coefficient {
@@ -2115,29 +2165,35 @@ fn selection_parameters<'a>(
 }
 
 /// Child factors and quotient maps retain matching positions and strictly smaller degrees.
-fn check_split(state: &State, value: &ComponentSplitData<Handle>) -> Result<(), Fault> {
-    let parent = level(state, &value.parent)?;
-    let parent_degree = degree(state, &parent.polynomial)?;
-    state.region(value.region.logical_id())?;
+fn check_split(
+    state: &State,
+    value: &ComponentSplitData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    let parent = level(state, &value.parent, budget)?;
+    let parent_degree = degree(state, &parent.polynomial, budget)?;
+    state.region(value.region.logical_id(), budget)?;
     for (factor, domain, restriction) in [
         (&value.left_factor, &value.left_domain, &value.left_map),
         (&value.right_factor, &value.right_domain, &value.right_map),
     ] {
-        let child_degree = degree(state, factor)?;
+        let child_degree = degree(state, factor, budget)?;
         if child_degree == 0
             || child_degree >= parent_degree
-            || polynomial(state, factor)?.domain != parent.parent
+            || polynomial(state, factor, budget)?.domain != parent.parent
         {
             return Err(invalid());
         }
-        let CoefficientDomainData::Quotient { level: child } = coefficient_domain(state, domain)?
+        let CoefficientDomainData::Quotient { level: child } =
+            coefficient_domain(state, domain, budget)?
         else {
             return Err(invalid());
         };
-        if level(state, child)?.polynomial != *factor {
+        if level(state, child, budget)?.polynomial != *factor {
             return Err(invalid());
         }
-        let SolveDraft::CoefficientMap(map) = object(state, restriction.logical_id())? else {
+        let SolveDraft::CoefficientMap(map) = object(state, restriction.logical_id(), budget)?
+        else {
             return Err(invalid());
         };
         if map.mode != MapMode::Specialization
@@ -2149,7 +2205,7 @@ fn check_split(state: &State, value: &ComponentSplitData<Handle>) -> Result<(), 
         {
             return Err(invalid());
         }
-        if !matches!(coefficient_domain(state, &map.source)?, CoefficientDomainData::Quotient { level } if level == &value.parent)
+        if !matches!(coefficient_domain(state, &map.source, budget)?, CoefficientDomainData::Quotient { level } if level == &value.parent)
         {
             return Err(invalid());
         }
@@ -2164,20 +2220,22 @@ fn check_problem(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::validation::scope_limit(&value.scope, budget)?;
-    coefficient_domain(state, &value.coefficient_domain)?;
+    coefficient_domain(state, &value.coefficient_domain, budget)?;
     require_kind(&value.predicate, VertexKind::Condition)?;
-    metadata_matches(state, &value.predicate, &value.header, &value.scope)?;
+    metadata_matches(state, &value.predicate, &value.header, &value.scope, budget)?;
     coordinate_role(
         state,
         &value.coefficients,
         &value.header,
         CoordinateRole::Coefficient,
+        budget,
     )?;
     coordinate_role(
         state,
         &value.unknowns,
         &value.header,
         CoordinateRole::Unknown,
+        budget,
     )?;
     product_region(
         state,
@@ -2185,6 +2243,7 @@ fn check_problem(
         &value.header,
         &value.scope,
         &value.coefficients,
+        budget,
     )?;
     product_region(
         state,
@@ -2192,9 +2251,10 @@ fn check_problem(
         &value.header,
         &value.scope,
         &value.unknowns,
+        budget,
     )?;
-    let coefficients = coordinates(state, value.coefficients.logical_id())?;
-    let unknowns = coordinates(state, value.unknowns.logical_id())?;
+    let coefficients = coordinates(state, value.coefficients.logical_id(), budget)?;
+    let unknowns = coordinates(state, value.unknowns.logical_id(), budget)?;
     let parameters = coefficients
         .coordinates
         .iter()
@@ -2211,16 +2271,20 @@ fn check_problem(
         .coordinates
         .iter()
         .any(|coordinate| coordinate.field != value.ambient)
-        || state.header(value.header.logical_id())?.environment.field != value.ambient
+        || state
+            .header(value.header.logical_id(), budget)?
+            .environment
+            .field
+            != value.ambient
     {
         return Err(invalid());
     }
     free_keys(state, &value.domain, &keys, true, budget)?;
     free_keys(state, &value.predicate, &keys, true, budget)?;
     for denominator in &value.denominators {
-        metadata_matches(state, denominator, &value.header, &value.scope)?;
+        metadata_matches(state, denominator, &value.header, &value.scope, budget)?;
         if !matches!(
-            state.expression(denominator.logical_id())?.sort,
+            state.expression(denominator.logical_id(), budget)?.sort,
             Sort::Value(AtomicSort::Scalar(_))
         ) {
             return Err(invalid());
@@ -2236,13 +2300,14 @@ fn check_branch(
     value: &SolutionBranchData<Handle>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let problem_data = problem(state, value.problem.logical_id())?;
+    let problem_data = problem(state, value.problem.logical_id(), budget)?;
     product_region(
         state,
         &value.region,
         &problem_data.header,
         &problem_data.scope,
         &problem_data.coefficients,
+        budget,
     )?;
     product_region(
         state,
@@ -2250,8 +2315,9 @@ fn check_branch(
         &problem_data.header,
         &problem_data.scope,
         &problem_data.unknowns,
+        budget,
     )?;
-    let coefficients = coordinates(state, problem_data.coefficients.logical_id())?;
+    let coefficients = coordinates(state, problem_data.coefficients.logical_id(), budget)?;
     let parameters = coefficients
         .coordinates
         .iter()
@@ -2263,7 +2329,7 @@ fn check_branch(
         SolutionBranchKind::Finite { tuples } => {
             for tuple in tuples {
                 free_keys(state, tuple, &parameters, true, budget)?;
-                let SolveDraft::Tuple(tuple) = object(state, tuple.logical_id())? else {
+                let SolveDraft::Tuple(tuple) = object(state, tuple.logical_id(), budget)? else {
                     return Err(invalid());
                 };
                 if &tuple.coordinates != expected_coordinates || tuple.scope != problem_data.scope {
@@ -2272,7 +2338,7 @@ fn check_branch(
             }
         }
         SolutionBranchKind::Image { family } => {
-            let SolveDraft::FamilyMap(family) = object(state, family.logical_id())? else {
+            let SolveDraft::FamilyMap(family) = object(state, family.logical_id(), budget)? else {
                 return Err(invalid());
             };
             if &family.target != expected_coordinates
@@ -2284,7 +2350,8 @@ fn check_branch(
         }
         SolutionBranchKind::Algebraic { selection } => {
             free_keys(state, selection, &parameters, true, budget)?;
-            let SolveDraft::RootSelection(selection) = object(state, selection.logical_id())?
+            let SolveDraft::RootSelection(selection) =
+                object(state, selection.logical_id(), budget)?
             else {
                 return Err(invalid());
             };
@@ -2293,7 +2360,8 @@ fn check_branch(
             }
         }
         SolutionBranchKind::Local { branch } => {
-            let SolveDraft::LocalBranch(branch) = object(state, branch.logical_id())? else {
+            let SolveDraft::LocalBranch(branch) = object(state, branch.logical_id(), budget)?
+            else {
                 return Err(invalid());
             };
             if branch.problem != value.problem {
@@ -2306,10 +2374,14 @@ fn check_branch(
 }
 
 /// A set is a canonical proposal, with every member attached to the same problem.
-fn check_set(state: &State, value: &SolutionSetData<Handle>) -> Result<(), Fault> {
-    problem(state, value.problem.logical_id())?;
+fn check_set(
+    state: &State,
+    value: &SolutionSetData<Handle>,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
+    problem(state, value.problem.logical_id(), budget)?;
     for branch in &value.branches {
-        let SolveDraft::SolutionBranch(branch) = object(state, branch.logical_id())? else {
+        let SolveDraft::SolutionBranch(branch) = object(state, branch.logical_id(), budget)? else {
             return Err(invalid());
         };
         if branch.problem != value.problem {
@@ -2325,12 +2397,12 @@ fn check_local(
     value: &LocalBranchData<Handle>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let problem_data = problem(state, value.problem.logical_id())?;
+    let problem_data = problem(state, value.problem.logical_id(), budget)?;
     for (base, product) in [
         (&value.base_coefficients, &problem_data.coefficients),
         (&value.base_unknowns, &problem_data.unknowns),
     ] {
-        let SolveDraft::Tuple(tuple) = object(state, base.logical_id())? else {
+        let SolveDraft::Tuple(tuple) = object(state, base.logical_id(), budget)? else {
             return Err(invalid());
         };
         if tuple.coordinates != *product || tuple.scope != problem_data.scope {
@@ -2338,9 +2410,15 @@ fn check_local(
         }
     }
     for matrix in [&value.jacobian, &value.inverse] {
-        metadata_matches(state, matrix, &problem_data.header, &problem_data.scope)?;
+        metadata_matches(
+            state,
+            matrix,
+            &problem_data.header,
+            &problem_data.scope,
+            budget,
+        )?;
         if !matches!(
-            state.expression(matrix.logical_id())?.sort,
+            state.expression(matrix.logical_id(), budget)?.sort,
             Sort::Value(AtomicSort::Matrix { .. })
         ) {
             return Err(invalid());
@@ -2366,6 +2444,7 @@ fn check_local(
                 &problem_data.header,
                 &problem_data.scope,
                 &problem_data.coefficients,
+                budget,
             )?;
             product_region(
                 state,
@@ -2373,12 +2452,13 @@ fn check_local(
                 &problem_data.header,
                 &problem_data.scope,
                 &problem_data.unknowns,
+                budget,
             )?;
         }
     }
     if value.family_symbol.key.is_empty()
         || state
-            .header(problem_data.header.logical_id())?
+            .header(problem_data.header.logical_id(), budget)?
             .environment
             .declarations
             .iter()
@@ -2394,15 +2474,15 @@ fn validate(state: &State, value: &SolveDraft<Handle>, budget: &mut Budget) -> R
     match value {
         SolveDraft::CoordinateSpace(value) => check_coordinates(state, value, budget),
         SolveDraft::Tuple(value) => check_tuple(state, value, budget),
-        SolveDraft::SolutionSet(value) => check_set(state, value),
+        SolveDraft::SolutionSet(value) => check_set(state, value, budget),
         SolveDraft::FamilyMap(value) => check_family(state, value, budget),
-        SolveDraft::CoefficientDomain(value) => check_domain(state, value),
+        SolveDraft::CoefficientDomain(value) => check_domain(state, value, budget),
         SolveDraft::Polynomial(value) => check_polynomial(state, value, budget),
         SolveDraft::ExtensionLevel(value) => check_level(state, value, budget),
         SolveDraft::CoefficientMap(value) => check_map(state, value, budget),
         SolveDraft::RootRelation(value) => check_relation(state, value, budget),
         SolveDraft::RootSelection(value) => check_selection(state, value, budget),
-        SolveDraft::ComponentSplit(value) => check_split(state, value),
+        SolveDraft::ComponentSplit(value) => check_split(state, value, budget),
         SolveDraft::CoefficientValue(value) => check_value(state, value, budget),
         SolveDraft::SolutionBranch(value) => check_branch(state, value, budget),
         SolveDraft::SolveProblem(value) => check_problem(state, value, budget),
@@ -2449,8 +2529,12 @@ impl Cas {
     ///
     /// # Errors
     /// Refuses foreign handles and handles outside the solving object vocabulary.
-    pub fn solve_view(&self, object_handle: &Handle) -> Result<SolveView<'_>, Fault> {
-        Ok(object(&self.state, self.checked(object_handle)?)?.view())
+    pub fn solve_view(
+        &self,
+        object_handle: &Handle,
+        budget: &mut Budget,
+    ) -> Result<SolveView<'_>, Fault> {
+        Ok(object(&self.state, self.checked(object_handle, budget)?, budget)?.view())
     }
 
     /// Resolve all references and publish within the existing admission journal.
@@ -2462,9 +2546,10 @@ impl Cas {
         pending: u64,
         budget: &mut Budget,
     ) -> Result<LogicalId, Fault> {
-        let mut value = draft
-            .resolve(&mut |reference| Ok(self.handle(self.resolve(state, reference, locals)?)))?;
-        self.resolve_coordinate_spaces(state, &mut value)?;
+        let mut value = draft.resolve(&mut |reference| {
+            Ok(self.handle(self.resolve(state, reference, locals, budget)?))
+        })?;
+        self.resolve_coordinate_spaces(state, &mut value, budget)?;
         budget.check(BudgetKind::Edges, size(value.objects().len(), AT)?, AT)?;
         canonicalize(&mut value, budget)?;
         validate(state, &value, budget)?;
@@ -2807,23 +2892,25 @@ impl Cas {
                 slot,
             } => selected_literal(
                 state,
-                self.resolve(state, header, locals)?,
-                self.resolve(state, selection, locals)?,
+                self.resolve(state, header, locals, budget)?,
+                self.resolve(state, selection, locals, budget)?,
                 *slot,
+                budget,
             )?,
             crate::graph::Draft::ExactCoefficient { header, value, map } => coefficient_literal(
                 self,
                 state,
-                self.resolve(state, header, locals)?,
-                self.resolve(state, value, locals)?,
-                self.resolve(state, map, locals)?,
+                self.resolve(state, header, locals, budget)?,
+                self.resolve(state, value, locals, budget)?,
+                self.resolve(state, map, locals, budget)?,
+                budget,
             )?,
             _ => return Err(invalid()),
         };
-        state.header(literal.header)?;
+        state.header(literal.header, budget)?;
         literal.edges.push((literal.header, Edge::InHeader));
         let sort = Sort::Value(AtomicSort::Scalar(literal.field));
-        let ambient = super::sorts::ambient(state, literal.header, &sort)?;
+        let ambient = super::sorts::ambient(state, literal.header, &sort, budget)?;
         if let Some(ambient) = ambient {
             literal.edges.push((
                 ambient,
@@ -2890,8 +2977,10 @@ fn selected_literal(
     header: LogicalId,
     selection: LogicalId,
     slot: u32,
+
+    budget: &mut Budget,
 ) -> Result<ScalarLiteral, Fault> {
-    let SolveDraft::RootSelection(selected) = object(state, selection)? else {
+    let SolveDraft::RootSelection(selected) = object(state, selection, budget)? else {
         return Err(invalid());
     };
     if selected.header.logical_id() != header {
@@ -2901,7 +2990,7 @@ fn selected_literal(
         .relations
         .get(usize::try_from(slot).map_err(|_| invalid())?)
         .ok_or_else(invalid)?;
-    let SolveDraft::RootRelation(relation) = object(state, relation.logical_id())? else {
+    let SolveDraft::RootRelation(relation) = object(state, relation.logical_id(), budget)? else {
         return Err(invalid());
     };
     Ok(ScalarLiteral {
@@ -2921,13 +3010,15 @@ fn coefficient_literal(
     header: LogicalId,
     value: LogicalId,
     map: LogicalId,
+
+    budget: &mut Budget,
 ) -> Result<ScalarLiteral, Fault> {
-    let SolveDraft::CoefficientMap(mapping) = object(state, map)? else {
+    let SolveDraft::CoefficientMap(mapping) = object(state, map, budget)? else {
         return Err(invalid());
     };
-    let (target, field) = super::family::mapping::scalar_target(state, mapping)?;
+    let (target, field) = super::family::mapping::scalar_target(state, mapping, budget)?;
     if target.logical_id() != header
-        || coefficient(state, &cas.handle(value))?.domain != mapping.source
+        || coefficient(state, &cas.handle(value), budget)?.domain != mapping.source
     {
         return Err(invalid());
     }
@@ -2935,7 +3026,10 @@ fn coefficient_literal(
         header,
         operator: crate::model::Operator::ExactCoefficient,
         field,
-        scope: state.region(mapping.region.logical_id())?.scope.clone(),
+        scope: state
+            .region(mapping.region.logical_id(), budget)?
+            .scope
+            .clone(),
         attachment: crate::graph::ExpressionAttachment::ExactCoefficient { value, map },
         edges: vec![
             (value, Edge::CoefficientLiteralValue),
@@ -2948,6 +3042,7 @@ fn coefficient_literal(
 pub(crate) fn metadata<'a>(
     state: &'a State,
     value: &'a SolveDraft<Handle>,
+    budget: &mut Budget,
 ) -> Result<Option<(LogicalId, &'a Scope)>, Fault> {
     // Header-only products have no bound frames.
     static EMPTY: Scope = Vec::new();
@@ -2958,15 +3053,15 @@ pub(crate) fn metadata<'a>(
         SolveDraft::RootRelation(value) => Some((value.header.logical_id(), &value.scope)),
         SolveDraft::RootSelection(value) => Some((value.header.logical_id(), &value.scope)),
         SolveDraft::SolveProblem(value) => Some((value.header.logical_id(), &value.scope)),
-        SolveDraft::SolutionSet(value) => Some(problem_metadata(state, &value.problem)?),
-        SolveDraft::SolutionBranch(value) => Some(problem_metadata(state, &value.problem)?),
-        SolveDraft::LocalBranch(value) => Some(problem_metadata(state, &value.problem)?),
+        SolveDraft::SolutionSet(value) => Some(problem_metadata(state, &value.problem, budget)?),
+        SolveDraft::SolutionBranch(value) => Some(problem_metadata(state, &value.problem, budget)?),
+        SolveDraft::LocalBranch(value) => Some(problem_metadata(state, &value.problem, budget)?),
         SolveDraft::CoefficientMap(value) => {
-            let region = state.region(value.region.logical_id())?;
+            let region = state.region(value.region.logical_id(), budget)?;
             Some((region.header, &region.scope))
         }
         SolveDraft::ComponentSplit(value) => {
-            let region = state.region(value.region.logical_id())?;
+            let region = state.region(value.region.logical_id(), budget)?;
             Some((region.header, &region.scope))
         }
         SolveDraft::CoefficientDomain(_)
@@ -2981,13 +3076,17 @@ pub(crate) fn metadata<'a>(
         | SolveDraft::CoefficientEvaluation(_)
         | SolveDraft::ScalarSpace(_)
         | SolveDraft::SpacePlacement(_)
-        | SolveDraft::ScalarPiece(_) => super::sorts::metadata(state, value)?,
+        | SolveDraft::ScalarPiece(_) => super::sorts::metadata(state, value, budget)?,
     })
 }
 
 /// Branch objects inherit their original problem's exact mathematical scope.
-fn problem_metadata<'a>(state: &'a State, value: &Handle) -> Result<(LogicalId, &'a Scope), Fault> {
-    let value = problem(state, value.logical_id())?;
+fn problem_metadata<'a>(
+    state: &'a State,
+    value: &Handle,
+    budget: &mut Budget,
+) -> Result<(LogicalId, &'a Scope), Fault> {
+    let value = problem(state, value.logical_id(), budget)?;
     Ok((value.header.logical_id(), &value.scope))
 }
 
@@ -2999,7 +3098,7 @@ pub(crate) fn request(
     inputs: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let problem_data = problem(state, spec.problem.logical_id())?;
+    let problem_data = problem(state, spec.problem.logical_id(), budget)?;
     if problem_data.header.logical_id() != context.header_id
         || !problem_data.scope.is_empty()
         || inputs.len() != 1
@@ -3007,9 +3106,10 @@ pub(crate) fn request(
         return Err(invalid());
     }
     let root = *inputs.first().ok_or_else(invalid)?;
-    let occurrence = state.occurrence(root)?;
-    let expression = state.expression(occurrence.expression)?;
-    let Vertex::Condition(predicate) = state.node(problem_data.predicate.logical_id())? else {
+    let occurrence = state.occurrence(root, budget)?;
+    let expression = state.expression(occurrence.expression, budget)?;
+    let Vertex::Condition(predicate) = state.node(problem_data.predicate.logical_id(), budget)?
+    else {
         return Err(invalid());
     };
     if expression.operator != crate::model::Operator::Predicate(predicate.kind.clone()) {
@@ -3038,16 +3138,16 @@ pub(crate) fn statement(
         let bytes = size(encoded.finish().len(), AT)?;
         budget.work(bytes, AT)?;
         for reference in value.objects() {
-            cas.checked(reference)?;
+            cas.checked(reference, budget)?;
         }
         match value {
-            SolveStatement::Member(value) => statement_member(cas, value),
+            SolveStatement::Member(value) => statement_member(cas, value, budget),
             SolveStatement::Equivalent(value) => statement_equivalent(cas, value),
-            SolveStatement::Coverage(value) => statement_coverage(cas, value),
+            SolveStatement::Coverage(value) => statement_coverage(cas, value, budget),
             SolveStatement::FamilyMembership(value) => statement_family_membership(cas, value),
-            SolveStatement::FamilyCoverage(value) => statement_family_coverage(cas, value),
-            SolveStatement::Rank(value) => statement_rank(cas, value),
-            SolveStatement::LinearSystem(value) => statement_linear_system(cas, value),
+            SolveStatement::FamilyCoverage(value) => statement_family_coverage(cas, value, budget),
+            SolveStatement::Rank(value) => statement_rank(cas, value, budget),
+            SolveStatement::LinearSystem(value) => statement_linear_system(cas, value, budget),
             SolveStatement::LocalBranch(value) => statement_local_branch(cas, value),
             SolveStatement::LocalDerivative(value) => statement_local_derivative(cas, value),
             SolveStatement::CoefficientEquality(value) => {
@@ -3057,7 +3157,7 @@ pub(crate) fn statement(
             SolveStatement::ComponentCover(value) => statement_component_cover(cas, value),
             SolveStatement::RootExistence(value) => statement_root_existence(cas, value),
             SolveStatement::SelectionUnique(value) => statement_selection_unique(cas, value),
-            SolveStatement::RootOrder(value) => statement_root_order(cas, value),
+            SolveStatement::RootOrder(value) => statement_root_order(cas, value, budget),
             SolveStatement::Orbit(value) => statement_orbit(cas, value),
             SolveStatement::Multiplicity(value) => statement_multiplicity(cas, value),
             SolveStatement::RealValues(value) => statement_real_values(cas, value),
@@ -3072,12 +3172,12 @@ pub(crate) fn statement(
 }
 
 /// Validate the object categories of a `Member` proposition.
-fn statement_member(cas: &Cas, value: &StatementMember) -> Result<(), Fault> {
+fn statement_member(cas: &Cas, value: &StatementMember, budget: &mut Budget) -> Result<(), Fault> {
     require_kind(&value.problem, VertexKind::SolveProblem)?;
     require_kind(&value.tuple, VertexKind::Tuple)?;
     require_kind(&value.region, VertexKind::Region)?;
-    let problem_data = problem(&cas.state, value.problem.logical_id())?;
-    let SolveDraft::Tuple(tuple) = object(&cas.state, value.tuple.logical_id())? else {
+    let problem_data = problem(&cas.state, value.problem.logical_id(), budget)?;
+    let SolveDraft::Tuple(tuple) = object(&cas.state, value.tuple.logical_id(), budget)? else {
         return Err(invalid());
     };
     let expected_coordinates = &problem_data.unknowns;
@@ -3090,6 +3190,7 @@ fn statement_member(cas: &Cas, value: &StatementMember) -> Result<(), Fault> {
         &problem_data.header,
         &problem_data.scope,
         &problem_data.coefficients,
+        budget,
     )?;
     Ok(())
 }
@@ -3105,12 +3206,16 @@ fn statement_equivalent(_cas: &Cas, value: &StatementEquivalent) -> Result<(), F
 }
 
 /// Validate the object categories of a `Coverage` proposition.
-fn statement_coverage(cas: &Cas, value: &StatementCoverage) -> Result<(), Fault> {
+fn statement_coverage(
+    cas: &Cas,
+    value: &StatementCoverage,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     require_kind(&value.problem, VertexKind::SolveProblem)?;
     require_kind(&value.set, VertexKind::SolutionSet)?;
     require_kind(&value.region, VertexKind::Region)?;
-    let problem_data = problem(&cas.state, value.problem.logical_id())?;
-    let SolveDraft::SolutionSet(set) = object(&cas.state, value.set.logical_id())? else {
+    let problem_data = problem(&cas.state, value.problem.logical_id(), budget)?;
+    let SolveDraft::SolutionSet(set) = object(&cas.state, value.set.logical_id(), budget)? else {
         return Err(invalid());
     };
     if set.problem != value.problem {
@@ -3122,6 +3227,7 @@ fn statement_coverage(cas: &Cas, value: &StatementCoverage) -> Result<(), Fault>
         &problem_data.header,
         &problem_data.scope,
         &problem_data.coefficients,
+        budget,
     )?;
     Ok(())
 }
@@ -3135,16 +3241,22 @@ fn statement_family_membership(_cas: &Cas, value: &StatementFamilyMembership) ->
 }
 
 /// Validate the object categories of a `FamilyCoverage` proposition.
-fn statement_family_coverage(cas: &Cas, value: &StatementFamilyCoverage) -> Result<(), Fault> {
+fn statement_family_coverage(
+    cas: &Cas,
+    value: &StatementFamilyCoverage,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     require_kind(&value.problem, VertexKind::SolveProblem)?;
     require_kind(&value.family, VertexKind::FamilyMap)?;
     require_kind(&value.recovery, VertexKind::FamilyMap)?;
     require_kind(&value.region, VertexKind::Region)?;
-    let SolveDraft::FamilyMap(parameterization) = object(&cas.state, value.family.logical_id())?
+    let SolveDraft::FamilyMap(parameterization) =
+        object(&cas.state, value.family.logical_id(), budget)?
     else {
         return Err(invalid());
     };
-    let SolveDraft::FamilyMap(recovery) = object(&cas.state, value.recovery.logical_id())? else {
+    let SolveDraft::FamilyMap(recovery) = object(&cas.state, value.recovery.logical_id(), budget)?
+    else {
         return Err(invalid());
     };
     if (&recovery.family, &recovery.target) != (&parameterization.target, &parameterization.family)
@@ -3156,36 +3268,42 @@ fn statement_family_coverage(cas: &Cas, value: &StatementFamilyCoverage) -> Resu
         &parameterization.family,
         &parameterization.header,
         CoordinateRole::Family,
+        budget,
     )?;
     coordinate_role(
         &cas.state,
         &parameterization.target,
         &parameterization.header,
         CoordinateRole::Unknown,
+        budget,
     )?;
     coordinate_role(
         &cas.state,
         &recovery.family,
         &recovery.header,
         CoordinateRole::Unknown,
+        budget,
     )?;
     coordinate_role(
         &cas.state,
         &recovery.target,
         &recovery.header,
         CoordinateRole::Family,
+        budget,
     )?;
     Ok(())
 }
 
 /// Validate the object categories of a `Rank` proposition.
-fn statement_rank(cas: &Cas, value: &StatementRank) -> Result<(), Fault> {
+fn statement_rank(cas: &Cas, value: &StatementRank, budget: &mut Budget) -> Result<(), Fault> {
     require_kind(&value.matrix, VertexKind::Expression)?;
     require_kind(&value.domain, VertexKind::CoefficientDomain)?;
     require_kind(&value.minor, VertexKind::Expression)?;
     require_kind(&value.elimination, VertexKind::Expression)?;
     if !matches!(
-        cas.state.expression(value.matrix.logical_id())?.sort,
+        cas.state
+            .expression(value.matrix.logical_id(), budget)?
+            .sort,
         Sort::Value(AtomicSort::Matrix { .. })
     ) {
         return Err(invalid());
@@ -3194,12 +3312,18 @@ fn statement_rank(cas: &Cas, value: &StatementRank) -> Result<(), Fault> {
 }
 
 /// Validate the object categories of a `LinearSystem` proposition.
-fn statement_linear_system(cas: &Cas, value: &StatementLinearSystem) -> Result<(), Fault> {
+fn statement_linear_system(
+    cas: &Cas,
+    value: &StatementLinearSystem,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     require_kind(&value.problem, VertexKind::SolveProblem)?;
     require_kind(&value.reduced, VertexKind::Expression)?;
     require_kind(&value.region, VertexKind::Region)?;
     if !matches!(
-        cas.state.expression(value.reduced.logical_id())?.sort,
+        cas.state
+            .expression(value.reduced.logical_id(), budget)?
+            .sort,
         Sort::Value(AtomicSort::Matrix { .. })
     ) {
         return Err(invalid());
@@ -3274,12 +3398,18 @@ fn statement_selection_unique(_cas: &Cas, value: &StatementSelectionUnique) -> R
 }
 
 /// Validate the object categories of a `RootOrder` proposition.
-fn statement_root_order(cas: &Cas, value: &StatementRootOrder) -> Result<(), Fault> {
+fn statement_root_order(
+    cas: &Cas,
+    value: &StatementRootOrder,
+    budget: &mut Budget,
+) -> Result<(), Fault> {
     require_kind(&value.value, VertexKind::Expression)?;
     require_kind(&value.region, VertexKind::Region)?;
     if value.order == 0
         || !matches!(
-            cas.state.expression(value.value.logical_id())?.operator,
+            cas.state
+                .expression(value.value.logical_id(), budget)?
+                .operator,
             crate::model::Operator::RootValue { .. }
         )
     {
@@ -3424,8 +3554,8 @@ fn original_denominators(
     let mut denominators = Vec::new();
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let occurrence = state.occurrence(id)?;
-        let denominator = match state.node(occurrence.expression)? {
+        let occurrence = state.occurrence(id, budget)?;
+        let denominator = match state.node(occurrence.expression, budget)? {
             Vertex::Expression(expression) => match expression.operator {
                 crate::model::Operator::Div => expression.operands.get(1),
                 crate::model::Operator::IntegerPower(..=-1) => expression.operands.first(),

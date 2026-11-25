@@ -13,7 +13,8 @@ mod series;
 pub(crate) use scalar::{PendingJudgment, ScalarInventory};
 
 use super::{
-    Cas, Edge, EdgeIndex, LogicalId, State, Undo, Vertex, VertexKind, size, storage_check,
+    Cas, Edge, EdgeIndex, LogicalId, State, StoredKey, Undo, Vertex, VertexKind, size,
+    storage_check,
 };
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
@@ -201,16 +202,18 @@ impl Cas {
         context: &Handle,
         original: &Handle,
         budget: &mut Budget,
-    ) -> Result<LogicalId, Fault> {
-        let expression = self.checked(original)?;
-        let frame = self.checked(context)?;
-        if self.state.expression(expression)?.header != self.state.context(frame)?.header_id {
+    ) -> Result<petgraph::graph::NodeIndex<u32>, Fault> {
+        let expression = self.checked(original, budget)?;
+        let frame = self.checked(context, budget)?;
+        if self.state.expression(expression, budget)?.header
+            != self.state.context(frame, budget)?.header_id
+        {
             return Err(invalid(InvalidCode::Scope));
         }
         let key = constant_key(frame, expression);
-        let existing = self.state.intern.get(&key).copied();
+        let existing = self.state.intern.get(&key, 0, budget, AT)?.copied();
         if let Some(id) = existing {
-            let node = self.lemma(id)?;
+            let node = self.lemma(id, budget)?;
             let same_key = node.key == key;
             let same_original = node.constant.original() == original;
             let same_context = node.constant.context() == context;
@@ -225,9 +228,9 @@ impl Cas {
                     u64::from(size(self.retained_judgment_count(), AT)?.bit_width().max(1)),
                     AT,
                 )?;
-                self.constant_preparation(id)?;
+                self.constant_preparation(id, budget)?;
                 retained(self, self.state.judgment_bytes, budget)?;
-                return Ok(id);
+                return self.constant_preparation_index(&self.state, id, budget);
             }
         }
         let reserved = self.judgment_reservation(self.state.judgment_bytes, budget, AT)?;
@@ -235,9 +238,10 @@ impl Cas {
             ExactConstant::from_expression(self, original, budget)
         })?;
         if let Some(id) = existing {
-            self.constant_preparation(id)?;
+            self.constant_preparation(id, budget)?;
             retained(self, self.state.judgment_bytes, budget)?;
-            let index = self.state.indices[&id];
+            let prepared_index = self.constant_preparation_index(&self.state, id, budget)?;
+            let index = self.state.index(id, budget)?;
             let Vertex::AnonymousLemma(node) = &mut self.state.graph[index] else {
                 return Err(invalid(InvalidCode::Reference));
             };
@@ -246,7 +250,7 @@ impl Cas {
             };
             node.epoch = self.memo_epoch;
             node.owner = std::sync::Arc::clone(&self.memo_owner);
-            return Ok(id);
+            return Ok(prepared_index);
         }
         let bytes = crate::exact_constant::preparation_bytes(&value)?;
         let prepared = PreparedConstant::checked(original.clone(), context.clone(), value);
@@ -257,11 +261,46 @@ impl Cas {
         })
     }
 
+    /// Authenticate an existing preparation's checked-evidence edge before reuse.
+    fn constant_preparation_index(
+        &self,
+        state: &State,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<petgraph::graph::NodeIndex<u32>, Fault> {
+        let Vertex::AnonymousLemma(node) = state.node(id, budget)? else {
+            return Err(invalid(InvalidCode::Reference));
+        };
+        let AnonymousLemma::Constant(node) = node.as_ref() else {
+            return Err(invalid(InvalidCode::Reference));
+        };
+        let source = state.index(
+            self.checked_in(state, node.constant.original(), budget)?,
+            budget,
+        )?;
+        let target = state.index(id, budget)?;
+        let endpoints = state.graph.edge_endpoints(node.citation) == Some((source, target));
+        let checked = matches!(
+            state.graph.edge_weight(node.citation),
+            Some(Edge::CheckedEvidence)
+        );
+        if !(endpoints && checked) {
+            return Err(invalid(InvalidCode::Reference));
+        }
+        Ok(target)
+    }
+
     /// Borrow the actual graph payload only after authenticating its checked evidence edge.
-    pub(crate) fn constant_preparation(&self, id: LogicalId) -> Result<&PreparedConstant, Fault> {
-        let node = self.lemma(id)?;
-        let source = self.state.indices[&self.checked(node.constant.original())?];
-        let target = self.state.indices[&id];
+    pub(crate) fn constant_preparation(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&PreparedConstant, Fault> {
+        let node = self.lemma(id, budget)?;
+        let source = self
+            .state
+            .index(self.checked(node.constant.original(), budget)?, budget)?;
+        let target = self.state.index(id, budget)?;
         let endpoints = self.state.graph.edge_endpoints(node.citation) == Some((source, target));
         let checked = matches!(
             self.state.graph.edge_weight(node.citation),
@@ -274,8 +313,8 @@ impl Cas {
     }
 
     /// A structural index entry can refer only to the expected checked vertex kind.
-    fn lemma(&self, id: LogicalId) -> Result<&ConstantLemma, Fault> {
-        let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+    fn lemma(&self, id: LogicalId, budget: &mut Budget) -> Result<&ConstantLemma, Fault> {
+        let Vertex::AnonymousLemma(node) = self.state.node(id, budget)? else {
             return Err(invalid(InvalidCode::Reference));
         };
         let AnonymousLemma::Constant(node) = node.as_ref() else {
@@ -314,7 +353,7 @@ fn publish(
     key: Vec<u8>,
     bytes: u64,
     budget: &mut Budget,
-) -> Result<LogicalId, Fault> {
+) -> Result<petgraph::graph::NodeIndex<u32>, Fault> {
     let total = state.judgment_bytes.saturating_add(bytes);
     retained(cas, total, budget)?;
     let payload = state.payload.saturating_add(bytes);
@@ -332,8 +371,13 @@ fn publish(
     if nodes >= u64::from(u32::MAX) || edges >= u64::from(u32::MAX) {
         return Err(Fault::capacity(BudgetKind::Vertices, AT));
     }
-    let original = state.indices[&cas.checked_in(state, constant.original())?];
-    let context = state.indices[&cas.checked_in(state, constant.context())?];
+    let original = state.index(cas.checked_in(state, constant.original(), budget)?, budget)?;
+    let context = state.index(cas.checked_in(state, constant.context(), budget)?, budget)?;
+    let stored_key: StoredKey = key.clone().into();
+    let (intern_position, _inverse_credit) =
+        state
+            .intern
+            .prepare_insert_key(&stored_key, state.journal.is_some(), budget, AT)?;
     let serial = cas
         .token
         .identities
@@ -342,6 +386,8 @@ fn publish(
         kind: VertexKind::AnonymousLemma,
         serial,
     };
+    let index_position = state.prepare_index_insert(id, budget)?;
+    let (count_position, next_count) = state.prepare_retain(VertexKind::AnonymousLemma, budget)?;
     state.record(Undo::Vertex {
         id,
         key: Some(key.clone().into()),
@@ -362,13 +408,17 @@ fn publish(
     state.graph.add_edge(index, original, Edge::Input(0));
     state.graph.add_edge(index, context, Edge::InContext);
     state.graph.add_edge(original, index, Edge::CheckedEvidence);
-    state.indices.insert(id, index);
-    state.retain(VertexKind::AnonymousLemma);
-    state.intern.insert(key, id, &cas.token);
+    state.indices.insert_prepared(index_position, id, index);
+    state.retain_prepared(VertexKind::AnonymousLemma, count_position, next_count);
+    state
+        .intern
+        .insert_prepared_key(intern_position, key.into(), id, &cas.token);
     state.payload = payload;
     state.judgment_bytes = total;
     state.judgment_count += 1;
-    Ok(id)
+    // Every fallible budget and storage check preceded publication. The citation and
+    // checked-evidence edge were installed from `original` and this exact index.
+    Ok(index)
 }
 
 /// A failed namespace or evidence-edge authentication never manufactures a checked result.

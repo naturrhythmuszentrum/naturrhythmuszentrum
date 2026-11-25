@@ -59,7 +59,10 @@ impl Cas {
     ) -> Result<ExactAffineMap, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                let header = cas.state.context(cas.checked(context)?)?.header_id;
+                let header = cas
+                    .state
+                    .context(cas.checked(context, budget)?, budget)?
+                    .header_id;
                 let (inputs, outputs) = dimensions;
                 let coefficients_match = coefficients.len() == length(inputs, outputs)?;
                 let offsets_match = offsets.len() == length(outputs, 1)?;
@@ -72,11 +75,11 @@ impl Cas {
                     |budget| {
                         let mut values = reserve(coefficients.len(), budget)?;
                         for coefficient in coefficients {
-                            values.push(cas.checked(coefficient)?);
+                            values.push(cas.checked(coefficient, budget)?);
                         }
                         let mut shifts = reserve(offsets.len(), budget)?;
                         for offset in offsets {
-                            shifts.push(cas.checked(offset)?);
+                            shifts.push(cas.checked(offset, budget)?);
                         }
                         cas.map_from_entries(header, dimensions, &values, &shifts, budget)
                     },
@@ -98,7 +101,7 @@ impl Cas {
     ) -> Result<ExactAffineMap, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                let header = cas.context_header(context)?;
+                let header = cas.context_header(context, budget)?;
                 let values = cas.constant_entries(&header, coefficients, budget)?;
                 let shifts = cas.constant_entries(&header, offsets, budget)?;
                 cas.exact_reading_map(context, dimensions, &values, &shifts, budget)
@@ -140,12 +143,12 @@ impl Cas {
     ) -> Result<ExactAffineMap, Fault> {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
-                let left = cas.checked(&outer.expression)?;
-                let right = cas.checked(&inner.expression)?;
+                let left = cas.checked(&outer.expression, budget)?;
+                let right = cas.checked(&inner.expression, budget)?;
                 if outer.inputs != inner.outputs {
                     return Err(invalid(InvalidCode::ReadingShape));
                 }
-                let header = cas.state.expression(left)?.header;
+                let header = cas.state.expression(left, budget)?.header;
                 let rows = extent(outer.outputs)?;
                 let columns = extent(inner.inputs)?;
                 let id = cas.generated(

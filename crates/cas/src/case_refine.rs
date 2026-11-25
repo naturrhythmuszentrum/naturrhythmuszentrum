@@ -96,7 +96,7 @@ pub(crate) fn produce(
     let mut mapped = BTreeMap::new();
     for id in order {
         let rebuilt = scheduler.rebuild(id, &mapped)?;
-        let output = if eligible(scheduler.cas, rebuilt)? {
+        let output = if eligible(scheduler.cas, rebuilt, scheduler.generation)? {
             scheduler.run(rebuilt)?
         } else {
             rebuilt
@@ -113,11 +113,11 @@ impl Scheduler<'_, '_> {
         id: LogicalId,
         mapped: &BTreeMap<LogicalId, LogicalId>,
     ) -> Result<LogicalId, Fault> {
-        let value = self.cas.state.expression(id)?.clone();
+        let value = self.cas.state.expression(id, self.generation)?.clone();
         if let Some(domain) = value.domain {
             let mut arms = Vec::new();
             for arm in &value.arms {
-                let arm = self.cas.state.arm(*arm)?.clone();
+                let arm = self.cas.state.arm(*arm, self.generation)?.clone();
                 let child = *mapped.get(&arm.value).ok_or_else(invalid)?;
                 arms.push(Reference::Existing(crate::case_ordered::arm(
                     self.cas,
@@ -167,7 +167,7 @@ impl Scheduler<'_, '_> {
         let within = self
             .cas
             .state
-            .context(self.request.context.logical_id())?
+            .context(self.request.context.logical_id(), self.generation)?
             .admissible;
         if let Some(output) = self.completed.get(&(expression, within)) {
             return Ok(*output);
@@ -206,11 +206,15 @@ impl Scheduler<'_, '_> {
         let within = parent.map_or(
             self.cas
                 .state
-                .context(self.request.context.logical_id())?
+                .context(self.request.context.logical_id(), self.generation)?
                 .admissible,
             |(_, region)| region,
         );
-        let value = self.cas.state.expression(expression)?.clone();
+        let value = self
+            .cas
+            .state
+            .expression(expression, self.generation)?
+            .clone();
         let left = family(
             self.cas,
             *value.operands.first().ok_or_else(invalid)?,
@@ -294,7 +298,7 @@ impl Scheduler<'_, '_> {
                 .iter()
                 .map(|proof| proof.proof().logical_id()),
         );
-        let value = self.cas.state.expression(job.expression)?;
+        let value = self.cas.state.expression(job.expression, self.generation)?;
         let metrics = Metrics {
             cost: self.plan.refinement_cost()?,
             peak: value.unfolded,
@@ -350,7 +354,7 @@ impl Scheduler<'_, '_> {
             right.value,
             self.generation,
         )?;
-        if eligible(self.cas, value)? {
+        if eligible(self.cas, value, self.generation)? {
             if let Some(output) = self.completed.get(&(value, region)).copied() {
                 self.retain(id, region, output)?;
                 self.frontier.resume(id, self.generation)?;
@@ -367,7 +371,11 @@ impl Scheduler<'_, '_> {
     /// Append a completed nonempty pair without hiding any of its definedness requirements.
     fn retain(&mut self, id: usize, region: LogicalId, value: LogicalId) -> Result<(), Fault> {
         let job = self.jobs.get(id).ok_or_else(invalid)?;
-        let syntax = self.cas.state.expression(job.expression)?.clone();
+        let syntax = self
+            .cas
+            .state
+            .expression(job.expression, self.generation)?
+            .clone();
         let arm = crate::case_ordered::arm(
             self.cas,
             syntax.header,
@@ -413,7 +421,7 @@ impl Scheduler<'_, '_> {
             let within = job.parent.map_or(
                 self.cas
                     .state
-                    .context(self.request.context.logical_id())?
+                    .context(self.request.context.logical_id(), self.generation)?
                     .admissible,
                 |(_, region)| region,
             );
@@ -421,7 +429,7 @@ impl Scheduler<'_, '_> {
                 .insert((job.expression, within), job.expression);
             return Ok(job.expression);
         }
-        let value = self.cas.state.expression(job.expression)?;
+        let value = self.cas.state.expression(job.expression, self.generation)?;
         let draft = Draft::Cases(CasesDraft {
             sort: value.sort.clone(),
             header: Reference::Existing(self.cas.handle(value.header)),
@@ -433,24 +441,26 @@ impl Scheduler<'_, '_> {
         let within = job.parent.map_or(
             self.cas
                 .state
-                .context(self.request.context.logical_id())?
+                .context(self.request.context.logical_id(), self.generation)?
                 .admissible,
             |(_, region)| region,
         );
         let output = case_syntax::admit(self.cas, draft, self.generation)?.logical_id();
-        self.plan.expansion(
-            self.cas.state.expression(expression)?.unfolded,
-            self.cas.state.expression(output)?.unfolded,
-            self.generation,
-        )?;
+        let before = self
+            .cas
+            .state
+            .expression(expression, self.generation)?
+            .unfolded;
+        let after = self.cas.state.expression(output, self.generation)?.unfolded;
+        self.plan.expansion(before, after, self.generation)?;
         self.completed.insert((expression, within), output);
         Ok(output)
     }
 }
 
 /// Only strict binary arithmetic has a common-refinement producer in this lane.
-fn eligible(cas: &Cas, id: LogicalId) -> Result<bool, Fault> {
-    let value = cas.state.expression(id)?;
+fn eligible(cas: &Cas, id: LogicalId, budget: &mut crate::budget::Budget) -> Result<bool, Fault> {
+    let value = cas.state.expression(id, budget)?;
     if !matches!(
         value.operator,
         Operator::Add | Operator::Sub | Operator::Mul | Operator::Div
@@ -458,7 +468,7 @@ fn eligible(cas: &Cas, id: LogicalId) -> Result<bool, Fault> {
         return Ok(false);
     }
     for operand in &value.operands {
-        if cas.state.expression(*operand)?.domain.is_some() {
+        if cas.state.expression(*operand, budget)?.domain.is_some() {
             return Ok(true);
         }
     }
@@ -472,7 +482,7 @@ fn family(
     within: LogicalId,
     budget: &mut Budget,
 ) -> Result<Vec<Arm>, Fault> {
-    let value = cas.state.expression(id)?.clone();
+    let value = cas.state.expression(id, budget)?.clone();
     let Some(domain) = value.domain else {
         return Ok(vec![Arm {
             region: within,
@@ -481,7 +491,7 @@ fn family(
     };
     let mut result = Vec::new();
     for id in case_syntax::canonical(cas, &value.arms, budget)? {
-        let arm = cas.state.arm(id)?.clone();
+        let arm = cas.state.arm(id, budget)?.clone();
         let region = case_syntax::meet(cas, within, &[within, domain, arm.region], budget)?;
         result.push(Arm {
             region,
@@ -499,7 +509,7 @@ fn binary(
     right: LogicalId,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     let draft = Draft::Expression(ExpressionDraft {
         space: None,
         header: Reference::Existing(cas.handle(value.header)),

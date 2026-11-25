@@ -173,7 +173,10 @@ pub(super) fn enclosure(
 ) -> TestResult<RationalEnclosure> {
     let spec = fixture.case.specification();
     let cas = fixture.graph.lock().map_err(|_| "graph poisoned")?;
-    let input_family = cas.admissible_region(&spec.context)?;
+    let input_family = cas.admissible_region(
+        &spec.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     drop(cas);
     Ok(RationalEnclosure {
         target: spec.target.clone(),

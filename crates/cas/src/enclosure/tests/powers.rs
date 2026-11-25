@@ -375,7 +375,7 @@ fn enclosure_power_exponent_pins() -> TestResult {
     for (p, d, pin) in [(256, 1, 256), (1, 1_u64 << 63, 63)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut f, request) = power_case(1, 1, p, d)?;
-            let mut budget = Budget::new(Limits {
+            let mut budget = crate::budget::Budget::new(Limits {
                 integer_exponent: available,
                 ..Limits::default()
             })?;
@@ -422,9 +422,9 @@ fn enclosure_power_work_pins() -> TestResult {
     )?;
     assert_eq!(
         (cold.work, warm.work, replay.work),
-        (70_169, 20_323, 42_985)
+        (70_174, 20_323, 42_990)
     );
-    for (is_warm, pin) in [(false, 70_169), (true, 20_323)] {
+    for (is_warm, pin) in [(false, 70_174), (true, 20_323)] {
         for (available, passes) in [(pin, true), (pin - 1, false)] {
             let (mut store, request) = power_case(4, 1, 1, 2)?;
             if is_warm {
@@ -452,7 +452,7 @@ fn enclosure_power_work_pins() -> TestResult {
             }
         }
     }
-    for (available, passes) in [(42_985, true), (42_984, false)] {
+    for (available, passes) in [(42_990, true), (42_989, false)] {
         let (mut store, request) = power_case(4, 1, 1, 2)?;
         let before = store.cas.canonical_snapshot(&mut ledger()?)?;
         let report = store.cas.check_enclosure(
@@ -482,8 +482,12 @@ fn enclosure_power_work_pins() -> TestResult {
 /// ´claim:cas:enclosure-power-phase-pins´
 #[test]
 fn enclosure_power_phase_pins() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (f, request) = power_case(4, 1, 1, 2)?;
-    let target = f.cas.state.expression(f.cas.checked(&request.target)?)?;
+    let target = f
+        .cas
+        .state
+        .expression(f.cas.checked(&request.target, &mut budget)?, &mut budget)?;
     let plans = planning::Plans::new(target, power_policy()).ok_or("plan")?;
     let grid = plans.grid(12);
     let scope = scope::key(&f.cas, &request, &mut ledger()?)?;
@@ -557,12 +561,13 @@ fn enclosure_power_size_pins() -> TestResult {
         };
         assert_eq!(
             certificate
-                .to_bytes(&mut Budget::new(limits.clone())?)
+                .to_bytes(&mut crate::budget::Budget::new(limits.clone())?)
                 .is_ok(),
             passes
         );
         assert_eq!(
-            EnclosureCertificate::from_bytes(&bytes, &mut Budget::new(limits)?).is_ok(),
+            EnclosureCertificate::from_bytes(&bytes, &mut crate::budget::Budget::new(limits)?)
+                .is_ok(),
             passes
         );
     }
@@ -585,11 +590,11 @@ fn enclosure_power_size_pins() -> TestResult {
                     ..Limits::default()
                 },
                 _ => Limits {
-                    work: available + 7,
+                    work: available + 10,
                     ..Limits::default()
                 },
             };
-            let mut budget = Budget::new(limits)?;
+            let mut budget = crate::budget::Budget::new(limits)?;
             budget.work(7, AT)?;
             let before = f.cas.canonical_snapshot(&mut ledger()?)?;
             assert_eq!(
@@ -629,7 +634,7 @@ fn enclosure_power_size_pins() -> TestResult {
 
 /// Seven earlier units remain charged while testing the new operation's allowance.
 fn precharged(available: u64) -> Result<Budget, Fault> {
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         work: available + 7,
         ..Limits::default()
     })?;

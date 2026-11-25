@@ -2,7 +2,7 @@
 //! Reviewed literal costs complement the adaptive threshold properties.
 
 use super::{Change, proof};
-use crate::budget::{Budget, BudgetKind, Limits};
+use crate::budget::{BudgetKind, Limits};
 use crate::lemma_cache::{AT, AnonymousLemmaCache};
 use crate::testing::common::TestResult;
 use crate::{Cas, FaultKind};
@@ -16,7 +16,7 @@ const CALLER: u64 = 31;
 /// ´test:unit:lemma-cache-literal-work´
 #[test]
 fn lemma_cache_literal_work() -> TestResult {
-    for (warm, required) in [(false, 39_253), (true, 7_784)] {
+    for (warm, required) in [(false, 39_265), (true, 7_784)] {
         for short in [0, 1] {
             work_case(warm, required, short)?;
         }
@@ -34,11 +34,11 @@ fn work_case(warm: bool, required: u64, short: u64) -> TestResult {
             &mut cas,
             &witness.bytes,
             witness.judgment(),
-            &mut Budget::new(Limits::default())?,
+            &mut crate::budget::Budget::new(Limits::default())?,
         )?;
     }
     let before = cas.counts();
-    let mut ledger = Budget::new(Limits {
+    let mut ledger = crate::budget::Budget::new(Limits {
         work: PRIOR + required - short,
         ..Limits::default()
     })?;
@@ -94,7 +94,7 @@ fn storage_case(warm: bool, kind: BudgetKind, required: u64, short: u64) -> Test
     let key = crate::wire_build::judgment_key(
         &cas,
         witness.judgment(),
-        &mut Budget::new(Limits::default())?,
+        &mut crate::budget::Budget::new(Limits::default())?,
     )?;
     assert_eq!(key.len(), 279);
     let mut cache = AnonymousLemmaCache::new();
@@ -103,7 +103,7 @@ fn storage_case(warm: bool, kind: BudgetKind, required: u64, short: u64) -> Test
             &mut cas,
             &witness.bytes,
             witness.judgment(),
-            &mut Budget::new(Limits::default())?,
+            &mut crate::budget::Budget::new(Limits::default())?,
         )?;
     }
     let before = cas.counts();
@@ -113,7 +113,7 @@ fn storage_case(warm: bool, kind: BudgetKind, required: u64, short: u64) -> Test
         BudgetKind::StagedPayloadBytes => limits.staged_payload_bytes = required - short,
         _ => return Err("storage pin kind".into()),
     }
-    let mut ledger = Budget::new(limits)?;
+    let mut ledger = crate::budget::Budget::new(limits)?;
     ledger.work(PRIOR, AT)?;
     let result = ledger.with_retained_payload(CALLER, AT, |ledger| {
         cache
@@ -154,7 +154,7 @@ fn lemma_cache_literal_scan_growth() -> TestResult {
             cas,
             &witness.bytes,
             witness.judgment(),
-            &mut Budget::new(Limits::default())?,
+            &mut crate::budget::Budget::new(Limits::default())?,
         )?;
     }
     assert_eq!(cache.len(), 3);
@@ -166,7 +166,7 @@ fn lemma_cache_literal_scan_growth() -> TestResult {
             .zip([(7_784, 606), (8_390, 1_212), (8_996, 1_818)])
     {
         let before = cas.counts();
-        let mut ledger = Budget::new(Limits::default())?;
+        let mut ledger = crate::budget::Budget::new(Limits::default())?;
         let (result, rows) = crate::testing::work_trace::measured(|| {
             cache.replay(cas, &witness.bytes, witness.judgment(), &mut ledger)
         })?;

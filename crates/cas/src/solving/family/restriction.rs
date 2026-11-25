@@ -8,7 +8,11 @@ use crate::graph::Cas;
 use crate::proof_model::{ApplicationDraft, CheckedApplication, ScopedConditions, Statement};
 
 /// Only a new family pullback shape can enter the projection branch of context weakening.
-pub(crate) fn applies(cas: &Cas, premises: &[CheckedApplication]) -> Result<bool, Fault> {
+pub(crate) fn applies(
+    cas: &Cas,
+    premises: &[CheckedApplication],
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     let [source, subset] = premises else {
         return Ok(false);
     };
@@ -18,11 +22,11 @@ pub(crate) fn applies(cas: &Cas, premises: &[CheckedApplication]) -> Result<bool
     let Statement::Subset { superset, .. } = &subset.judgment.statement else {
         return Ok(false);
     };
-    let lifted = cas.state.region(superset.logical_id())?;
+    let lifted = cas.state.region(superset.logical_id(), budget)?;
     let Some(over) = &lifted.lies_over else {
         return Ok(false);
     };
-    let changed_frame = lifted.ambient != cas.state.region(original.logical_id())?.ambient;
+    let changed_frame = lifted.ambient != cas.state.region(original.logical_id(), budget)?.ambient;
     let exact_base = over.stratum == original.logical_id();
     Ok(changed_frame || exact_base)
 }
@@ -38,7 +42,11 @@ pub(crate) fn check(
         return Err(invalid());
     };
     let original = domain(&source.judgment.statement).ok_or_else(invalid)?;
-    let target = cas.handle(cas.state.context(cas.checked(&draft.context)?)?.admissible);
+    let target = cas.handle(
+        cas.state
+            .context(cas.checked(&draft.context, budget)?, budget)?
+            .admissible,
+    );
     let Statement::Subset {
         subset: actual,
         superset,
@@ -48,7 +56,7 @@ pub(crate) fn check(
     };
     let over = cas
         .state
-        .region(superset.logical_id())?
+        .region(superset.logical_id(), budget)?
         .lies_over
         .as_ref()
         .ok_or_else(invalid)?;
@@ -94,16 +102,17 @@ fn base_only(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         let crate::solving::SolveDraft::SpaceFamily(shape) =
-            crate::solving::graph::object(&cas.state, family)?
+            crate::solving::graph::object(&cas.state, family, budget)?
         else {
             return Err(invalid());
         };
         let crate::solving::SolveDraft::ParameterBase(base) =
-            crate::solving::graph::object(&cas.state, shape.base.logical_id())?
+            crate::solving::graph::object(&cas.state, shape.base.logical_id(), budget)?
         else {
             return Err(invalid());
         };
-        let frame = crate::solving::graph::coordinates(&cas.state, base.coordinates.logical_id())?;
+        let frame =
+            crate::solving::graph::coordinates(&cas.state, base.coordinates.logical_id(), budget)?;
         budget.work(
             crate::graph::size(frame.coordinates.len(), AT)?
                 .saturating_mul(budget.limits().name_bytes),
@@ -162,7 +171,7 @@ pub(crate) fn source(
                 && subset == target
                 && cas
                     .state
-                    .region(superset.logical_id())?
+                    .region(superset.logical_id(), budget)?
                     .lies_over
                     .as_ref()
                     .is_some_and(|over| {
@@ -219,12 +228,12 @@ fn statement_matches(
             return Ok(false);
         }
         for (original, lifted) in members.iter().zip(actual) {
-            let value = cas.state.region(lifted.logical_id())?;
+            let value = cas.state.region(lifted.logical_id(), budget)?;
             if value
                 .lies_over
                 .as_ref()
                 .is_none_or(|over| over.family != family || over.stratum != original.logical_id())
-                || value.ambient != cas.state.region(target.logical_id())?.ambient
+                || value.ambient != cas.state.region(target.logical_id(), budget)?.ambient
                 || !region::lifted(cas, original.logical_id(), lifted.logical_id(), budget)?
             {
                 return Ok(false);

@@ -42,12 +42,16 @@ impl Cas {
 
 /// Regenerate the complete definition; a name alone never grants a theorem.
 pub(crate) fn check(cas: &mut Cas, id: LogicalId, budget: &mut Budget) -> Result<(), Fault> {
-    let value = cas.state.expression(id)?.clone();
+    let value = cas.state.expression(id, budget)?.clone();
     let Operator::NamedCase(name) = value.operator else {
         return Ok(());
     };
     let child = *value.operands.first().ok_or_else(invalid)?;
-    let domain = cas.state.expression(child)?.domain.ok_or_else(invalid)?;
+    let domain = cas
+        .state
+        .expression(child, budget)?
+        .domain
+        .ok_or_else(invalid)?;
     let domain = cas.handle(domain);
     let expected = definition(cas, &domain, &name, budget)?;
     if expected.logical_id() != child || value.operands.len() != 1 {
@@ -73,9 +77,9 @@ fn definition(
         &[],
         budget,
     )?;
-    crate::boundary_roles::region(cas, &coordinate, domain, &name.coordinate)?;
+    crate::boundary_roles::region(cas, &coordinate, domain, &name.coordinate, budget)?;
     let branches = values(cas, domain, name, &coordinate, budget)?;
-    let metadata = cas.state.region(domain.logical_id())?.clone();
+    let metadata = cas.state.region(domain.logical_id(), budget)?.clone();
     let zero = Rational::zero();
     let mut arms = Vec::new();
     for (index, value) in branches.iter().enumerate() {

@@ -140,7 +140,7 @@ fn byte_boundaries<P: Scalar + 'static>() -> TestResult {
     Ok(())
 }
 
-/// Seven LC visits plus 3046 frozen-environment and 7870 graph-admission visits.
+/// Seven LC visits plus 3046 frozen-environment and 7915 graph-admission visits.
 /// ´test:unit:loan-lc-output-declaration-work-boundaries´
 #[test]
 fn loan_lc_output_declaration_work_boundaries() -> TestResult {
@@ -148,7 +148,7 @@ fn loan_lc_output_declaration_work_boundaries() -> TestResult {
     declaration_work::<f64>()
 }
 fn declaration_work<P: Scalar>() -> TestResult {
-    for remaining in [10_922, 10_923] {
+    for remaining in [10_967, 10_968] {
         let mut s = setup::<P>(Limits::default(), [2, 3, 2])?;
         let spend = s.account.limits().work - s.account.usage().work - remaining;
         s.account.ledger.work(spend, crate::loan::AT)?;
@@ -159,10 +159,10 @@ fn declaration_work<P: Scalar>() -> TestResult {
             request(&s.registry, &s.radian),
             &mut s.account,
         );
-        if remaining == 10_923 {
+        if remaining == 10_968 {
             let schema = result?;
             assert_eq!(schema.symbols().value().shape(), [12, 1]);
-            assert_eq!(s.account.usage().work - before, 10_923);
+            assert_eq!(s.account.usage().work - before, 10_968);
         } else {
             let Err(crate::LcShapeError::Declaration(nrz_bindings::AdmissionError::Algebra(fault))) =
                 result
@@ -180,11 +180,11 @@ fn declaration_work<P: Scalar>() -> TestResult {
             };
             assert_eq!(budget, BudgetKind::Work);
             assert_eq!(limit, s.account.limits().work);
-            assert_eq!(needed, before + 10_923);
-            assert_eq!(fault.location.operation, "interning lookup");
-            // Graph rollback preserves Work; the final 50-byte key lookup plus
-            // one map visit refuses with only 50 Work remaining.
-            assert_eq!(s.account.usage().work - before, 10_872);
+            assert_eq!(needed, before + 10_968);
+            assert_eq!(fault.location.operation, "retained kind count");
+            // Graph rollback preserves Work; the final two-Work count
+            // refuses with one Work remaining.
+            assert_eq!(s.account.usage().work - before, 10_966);
         }
         assert_eq!(crate::loan::fault::Injection::attempts(), 0);
         assert_eq!(s.heap.loans.elements()?, [0, 0]);

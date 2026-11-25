@@ -268,7 +268,10 @@ fn congruence_case() -> TestResult<(ReadingCase, Vec<nrz_cas::proof::Application
     use nrz_cas::proof::{Certificate, Primitive};
 
     let mut case = state_case(0)?;
-    let domain = case.fixture.cas.admissible_region(&case.fixture.context)?;
+    let domain = case.fixture.cas.admissible_region(
+        &case.fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let first = equality(
         &case.fixture.context,
         &domain,

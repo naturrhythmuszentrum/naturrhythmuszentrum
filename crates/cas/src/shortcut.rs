@@ -29,7 +29,7 @@ impl Cas {
             if cost == 0 || cost > 1_000_000 {
                 return Err(Fault::invalid(InvalidCode::Policy, at));
             }
-            let proof = cas.checked(&witness.proof)?;
+            let proof = cas.checked(&witness.proof, budget)?;
             let desired = crate::wire::claim_key(cas, expected, budget)?;
             let actual = crate::wire::claim_key(cas, &witness.claim, budget)?;
             budget.work(
@@ -44,13 +44,13 @@ impl Cas {
                 let identity = candidate.pin_policy(policy, budget)?;
                 let (arcs, baseline) =
                     crate::frozen::snapshot(candidate, expected, policy, budget)?;
-                let left = candidate.checked(&expected.left)?;
-                let right = candidate.checked(&expected.right)?;
+                let left = candidate.checked(&expected.left, budget)?;
+                let right = candidate.checked(&expected.right, budget)?;
                 let (incumbent, _) = crate::frozen::dijkstra(&arcs, left, right, budget)?;
                 if incumbent.is_some_and(|previous| cost >= previous) {
                     return Err(Fault::invalid(InvalidCode::Policy, at));
                 }
-                let context = candidate.checked(&expected.context)?;
+                let context = candidate.checked(&expected.context, budget)?;
                 candidate.with_state(|store, state| {
                     let id = store.insert(
                         state,
@@ -93,7 +93,7 @@ impl Cas {
                 return Err(Fault::invalid(InvalidCode::Policy, at));
             }
             crate::proof_view::validate_judgment(cas, expected, budget)?;
-            let proof = cas.checked(witness.proof())?;
+            let proof = cas.checked(witness.proof(), budget)?;
             let desired = crate::wire_build::judgment_key(cas, expected, budget)?;
             if desired != crate::wire_build::judgment_key(cas, witness.judgment(), budget)? {
                 return Err(Fault::invalid(InvalidCode::EndpointMismatch, at));

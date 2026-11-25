@@ -38,6 +38,7 @@ fn empty(budget: &mut Budget) -> Result<(Cas, LogicalId), Fault> {
         handles
             .first()
             .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?,
+        budget,
     )?;
     Ok((cas, header))
 }
@@ -48,7 +49,7 @@ pub(crate) fn admit(
     root: &Handle,
     budget: &mut Budget,
 ) -> Result<ExactConstant, Fault> {
-    let id = source.checked(root)?;
+    let id = source.checked(root, budget)?;
     let (mut cas, header) = empty(budget)?;
     let original = copy(&source.state, id, &mut cas, header, budget)?;
     finish(cas, original, budget)
@@ -76,7 +77,7 @@ pub(crate) fn construct(
             )?,
             Value::Expression(value) => copy(
                 &value.cas.state,
-                value.cas.checked(&value.root)?,
+                value.cas.checked(&value.root, budget)?,
                 &mut cas,
                 header,
                 budget,
@@ -96,7 +97,7 @@ fn finish(mut cas: Cas, original: LogicalId, budget: &mut Budget) -> Result<Exac
     if !crate::polynomial::equal_constants(&cas.state, original, normalized, budget)? {
         return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
     }
-    if let Operator::Rational(value) = &cas.state.expression(normalized)?.operator {
+    if let Operator::Rational(value) = &cas.state.expression(normalized, budget)?.operator {
         return Ok(value.clone().into());
     }
     let sign = sign::check(&cas.state, normalized, budget)?;
@@ -118,7 +119,7 @@ fn finish(mut cas: Cas, original: LogicalId, budget: &mut Budget) -> Result<Exac
 /// The caller must independently verify equality with the original expression before publication.
 fn cancel_equal(cas: &mut Cas, root: LogicalId, budget: &mut Budget) -> Result<LogicalId, Fault> {
     budget.work(1, AT)?;
-    let term = cas.state.expression(root)?;
+    let term = cas.state.expression(root, budget)?;
     if matches!(term.operator, Operator::Div)
         && let [numerator, denominator] = term.operands.as_slice()
         && numerator == denominator
@@ -144,7 +145,7 @@ fn copy(
 ) -> Result<LogicalId, Fault> {
     let mut mapped = BTreeMap::new();
     for id in order(state, root, budget)? {
-        let term = state.expression(id)?;
+        let term = state.expression(id, budget)?;
         let children = term
             .operands
             .iter()
@@ -190,8 +191,8 @@ pub(crate) fn order(
         if visited.contains(&id) {
             continue;
         }
-        let term = state.expression(id)?;
-        grammar(state, term)?;
+        let term = state.expression(id, budget)?;
+        grammar(state, term, budget)?;
         if expanded {
             result.try_reserve(1).map_err(|_| Fault::allocation(AT))?;
             result.push(id);
@@ -208,7 +209,11 @@ pub(crate) fn order(
 }
 
 /// Reject non-real, open or attached syntax before any simplification can hide it.
-fn grammar(state: &State, term: &crate::graph::Expression) -> Result<(), Fault> {
+fn grammar(
+    state: &State,
+    term: &crate::graph::Expression,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     let scalar = term.sort == real() || term.sort == Sort::Value(AtomicSort::Integer);
     let closed = term.scope.is_empty() && term.binding.is_none() && term.space.is_none();
     let plain = term.attachment.is_none() && term.domain.is_none() && term.arms.is_empty();
@@ -220,7 +225,7 @@ fn grammar(state: &State, term: &crate::graph::Expression) -> Result<(), Fault> 
             .operands
             .get(1)
             .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?;
-        matches!(&state.expression(*exponent)?.operator, Operator::Rational(value) if value.is_half())
+        matches!(&state.expression(*exponent, budget)?.operator, Operator::Rational(value) if value.is_half())
     } else {
         false
     };
@@ -267,8 +272,12 @@ pub(crate) fn drafts(
     let Value::Expression(graph) = &value.0 else {
         return Err(Fault::invalid(InvalidCode::Reference, AT));
     };
-    for id in order(&graph.cas.state, graph.cas.checked(&graph.root)?, budget)? {
-        let term = graph.cas.state.expression(id)?;
+    for id in order(
+        &graph.cas.state,
+        graph.cas.checked(&graph.root, budget)?,
+        budget,
+    )? {
+        let term = graph.cas.state.expression(id, budget)?;
         let operands = term
             .operands
             .iter()

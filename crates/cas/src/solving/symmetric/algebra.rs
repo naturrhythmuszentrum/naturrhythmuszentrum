@@ -339,8 +339,8 @@ impl Polynomial {
 impl Polynomial {
     /// Read only the named polynomial, retaining no authority beyond its canonical syntax.
     pub(crate) fn read(cas: &Cas, handle: &Handle, budget: &mut Budget) -> Result<Self, Fault> {
-        cas.checked(handle)?;
-        let data = crate::solving::coefficients::storage::polynomial(&cas.state, handle)?;
+        cas.checked(handle, budget)?;
+        let data = crate::solving::coefficients::storage::polynomial(&cas.state, handle, budget)?;
         let engine = Engine {
             state: &cas.state,
             domain: &data.domain,

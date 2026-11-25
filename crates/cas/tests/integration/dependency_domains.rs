@@ -20,8 +20,14 @@ fn guarded_state() -> TestResult<ReadingCase> {
         case.fixture
             .cas
             .select_entries(&base, &SelectionSpec::Entry(entry(1)), &mut ledger()?)?;
-    let header = case.fixture.cas.context_header(&case.fixture.context)?;
-    let domain = case.fixture.cas.admissible_region(&case.fixture.context)?;
+    let header = case.fixture.cas.context_header(
+        &case.fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
+    let domain = case.fixture.cas.admissible_region(
+        &case.fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let predicate = admit(
         &mut case.fixture.cas,
         Draft::Condition {

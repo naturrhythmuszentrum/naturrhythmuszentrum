@@ -57,9 +57,11 @@ fn check_source(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(5, PREMISE)?;
-    let context_id = cas.checked(context)?;
-    let source = cas.state.expression(cas.checked(&family.source)?)?;
-    if source.header != cas.state.context(context_id)?.header_id
+    let context_id = cas.checked(context, budget)?;
+    let source = cas
+        .state
+        .expression(cas.checked(&family.source, budget)?, budget)?;
+    if source.header != cas.state.context(context_id, budget)?.header_id
         || source.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || !source.scope.is_empty()
         || source.binding.is_some()
@@ -92,11 +94,17 @@ fn endpoint(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(5, PREMISE)?;
-    if !crate::context_check::ancestor(cas, cas.checked(&premise.context)?, context, budget)? {
+    if !crate::context_check::ancestor(
+        cas,
+        cas.checked(&premise.context, budget)?,
+        context,
+        budget,
+    )? {
         return Err(invalid());
     }
-    let predicate = crate::context_check::predicate(cas, premise).map_err(|_| invalid())?;
-    let Vertex::Condition(predicate) = cas.state.node(cas.checked(&predicate)?)? else {
+    let predicate = crate::context_check::predicate(cas, premise, budget).map_err(|_| invalid())?;
+    let Vertex::Condition(predicate) = cas.state.node(cas.checked(&predicate, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     if predicate.kind != PredicateKind::NonNegative {
@@ -105,7 +113,7 @@ fn endpoint(
     let [difference] = predicate.arguments.as_slice() else {
         return Err(invalid());
     };
-    let difference = cas.state.expression(*difference)?;
+    let difference = cas.state.expression(*difference, budget)?;
     let [left, right] = difference.operands.as_slice() else {
         return Err(invalid());
     };
@@ -117,10 +125,10 @@ fn endpoint(
     } else {
         (*right, *left, &family.upper)
     };
-    let Operator::Rational(actual) = &cas.state.expression(bound)?.operator else {
+    let Operator::Rational(actual) = &cas.state.expression(bound, budget)?.operator else {
         return Err(invalid());
     };
-    if source != cas.checked(&family.source)? || actual != expected {
+    if source != cas.checked(&family.source, budget)? || actual != expected {
         return Err(invalid());
     }
     Ok(())
@@ -146,7 +154,7 @@ pub(super) fn validate(
             )?;
             super::relations::check(
                 cas,
-                cas.checked(&contract.target)?,
+                cas.checked(&contract.target, budget)?,
                 record,
                 &certificate.records[..index],
                 budget,
@@ -178,7 +186,7 @@ pub(super) fn validate(
         if !matches!(record.law, ScalarKernelLaw::Family(_)) {
             super::relations::check(
                 cas,
-                cas.checked(&contract.target)?,
+                cas.checked(&contract.target, budget)?,
                 record,
                 &certificate.records[..index],
                 budget,
@@ -268,7 +276,7 @@ fn source_shape(
     let [root] = source.operands.as_slice() else {
         return Err(invalid());
     };
-    let root = cas.state.expression(*root)?;
+    let root = cas.state.expression(*root, budget)?;
     let matrix = root.sort
         == Sort::Value(AtomicSort::Matrix {
             field: Field::Real,

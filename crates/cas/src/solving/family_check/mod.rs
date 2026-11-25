@@ -32,12 +32,13 @@ fn image(
     cas: &Cas,
     claim: &crate::solving::StatementCoverage,
     certificate: &CertificateParameterImageCoverage,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     if (&claim.problem, &claim.region) != (&certificate.problem, &certificate.region) {
         return Err(invalid());
     }
     let SolveDraft::SolutionSet(set) =
-        crate::solving::graph::object(&cas.state, claim.set.logical_id())?
+        crate::solving::graph::object(&cas.state, claim.set.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -45,11 +46,11 @@ fn image(
         return Err(invalid());
     };
     let SolveDraft::SolutionBranch(branch) =
-        crate::solving::graph::object(&cas.state, handle.logical_id())?
+        crate::solving::graph::object(&cas.state, handle.logical_id(), budget)?
     else {
         return Err(invalid());
     };
-    let original = crate::solving::elementary::proof::problem(cas, &claim.problem)?;
+    let original = crate::solving::elementary::proof::problem(cas, &claim.problem, budget)?;
     if (&branch.problem, &branch.region, &branch.domain)
         != (&claim.problem, &claim.region, &original.domain)
     {
@@ -67,6 +68,7 @@ fn conclusion(
     cas: &Cas,
     draft: &ApplicationDraft,
     certificate: &CertificateParameterImageCoverage,
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, Fault> {
     let Statement::Solve(statement) = &draft.conclusion else {
         return Err(invalid());
@@ -101,7 +103,7 @@ fn conclusion(
             Ok(true)
         }
         SolveStatement::Coverage(value) => {
-            image(cas, value, certificate)?;
+            image(cas, value, certificate, budget)?;
             Ok(true)
         }
         _ => Err(invalid()),
@@ -126,7 +128,7 @@ pub(crate) fn check(
         return Err(invalid());
     };
     let (inherited, _) = conditions(cas, draft, premises, budget)?;
-    let coverage = conclusion(cas, draft, value)?;
+    let coverage = conclusion(cas, draft, value, budget)?;
     for slot in value
         .membership
         .iter()

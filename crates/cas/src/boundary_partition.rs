@@ -18,11 +18,11 @@ pub(crate) fn inventory(
     domain: &Handle,
     budget: &mut Budget,
 ) -> Result<Vec<Handle>, Fault> {
-    let order = case_syntax::order(cas, &[cas.checked(function)?], budget)?;
-    let mut regions = vec![cas.checked(domain)?];
+    let order = case_syntax::order(cas, &[cas.checked(function, budget)?], budget)?;
+    let mut regions = vec![cas.checked(domain, budget)?];
     for id in order {
         crate::named_case::check(cas, id, budget)?;
-        let value = cas.state.expression(id)?;
+        let value = cas.state.expression(id, budget)?;
         if let Some(region) = value.domain {
             budget.check(
                 BudgetKind::RegionNodes,
@@ -40,7 +40,7 @@ pub(crate) fn inventory(
                 .map_err(|_| Fault::allocation(AT))?;
             regions.push(region);
             for arm in &value.arms {
-                regions.push(cas.state.arm(*arm)?.region);
+                regions.push(cas.state.arm(*arm, budget)?.region);
             }
         }
     }
@@ -59,7 +59,7 @@ pub(crate) fn build(
     coordinate: &str,
     budget: &mut Budget,
 ) -> Result<(BoundaryPartition, BoundaryCertificate), Fault> {
-    crate::boundary_roles::region(cas, function, domain, coordinate)?;
+    crate::boundary_roles::region(cas, function, domain, coordinate, budget)?;
     let regions = inventory(cas, function, domain, budget)?;
     let roots: Vec<_> = regions.iter().map(Handle::logical_id).collect();
     let partition = crate::region_cache::partition(cas, &roots, budget).map_err(|mut fault| {
@@ -128,8 +128,11 @@ pub(crate) fn check(
     let Statement::BoundaryPartition(claim) = &draft.conclusion else {
         return Err(invalid());
     };
-    let within = cas.state.context(cas.checked(&draft.context)?)?.admissible;
-    crate::case_check::subset(cas, cas.checked(&claim.domain)?, within, budget)?;
+    let within = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?
+        .admissible;
+    crate::case_check::subset(cas, cas.checked(&claim.domain, budget)?, within, budget)?;
     let (expected, certificate) = build(
         cas,
         &claim.function,

@@ -47,7 +47,7 @@ impl Cas {
         requested: Option<&Handle>,
         budget: &mut Budget,
     ) -> Result<AmbientResolution, Fault> {
-        self.state.header(self.checked(header)?)?;
+        self.state.header(self.checked(header, budget)?, budget)?;
         signature(operator, operands.len())?;
         let mut spaces = Vec::new();
         budget.check(
@@ -60,15 +60,15 @@ impl Cas {
             .map_err(|_| Fault::allocation(AT))?;
         for operand in operands {
             budget.work(1, AT)?;
-            spaces.push(self.operand_space(operand)?);
+            spaces.push(self.operand_space(operand, budget)?);
         }
         let explicit = requested
             .map(|space| {
-                self.checked(space)?;
-                super::field(&self.state, space)
+                self.checked(space, budget)?;
+                super::field(&self.state, space, budget)
             })
             .transpose()?;
-        let Some(output) = choose(operator, &spaces, explicit.as_ref(), self)? else {
+        let Some(output) = choose(operator, &spaces, explicit.as_ref(), self, budget)? else {
             return Ok(AmbientResolution::Unresolved(
                 SolveReason::AmbientSpaceAmbiguous,
             ));
@@ -85,8 +85,8 @@ impl Cas {
     }
 
     /// Read a scalar's checked node without retagging its original payload.
-    fn operand_space(&self, operand: &Handle) -> Result<Handle, Fault> {
-        match self.state.node(self.checked(operand)?)? {
+    fn operand_space(&self, operand: &Handle, budget: &mut Budget) -> Result<Handle, Fault> {
+        match self.state.node(self.checked(operand, budget)?, budget)? {
             Vertex::Expression(value) => value
                 .ambient
                 .map(|id| self.handle(id))
@@ -107,12 +107,17 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
         let expected = super::registry::specification(field)?;
-        for id in &self.state.header(header.logical_id())?.scalar_spaces {
+        for id in &self
+            .state
+            .header(header.logical_id(), budget)?
+            .scalar_spaces
+        {
             budget.work(
                 size(expected.specification.len(), AT)?.saturating_add(1),
                 AT,
             )?;
-            if let SolveDraft::ScalarSpace(value) = crate::solving::graph::object(&self.state, *id)?
+            if let SolveDraft::ScalarSpace(value) =
+                crate::solving::graph::object(&self.state, *id, budget)?
                 && *value == expected
             {
                 return Ok(self.handle(*id));
@@ -155,7 +160,7 @@ impl Cas {
                 specification: "placement.real-in-complex".into(),
                 version: 1,
             };
-            if super::registry::placement(&self.state, &definition).is_err() {
+            if super::registry::placement(&self.state, &definition, budget).is_err() {
                 return Ok(AmbientResolution::Unresolved(
                     SolveReason::SpacePlacementUnavailable,
                 ));
@@ -178,6 +183,7 @@ fn choose(
     spaces: &[Handle],
     requested: Option<&Field>,
     cas: &Cas,
+    budget: &mut crate::budget::Budget,
 ) -> Result<Option<Field>, Fault> {
     if matches!(operator, Operator::RealPart | Operator::ImagPart) {
         return Ok(Some(Field::Real));
@@ -190,7 +196,7 @@ fn choose(
     }
     let mut selected = None;
     for space in spaces {
-        let field = super::field(&cas.state, space)?;
+        let field = super::field(&cas.state, space, budget)?;
         selected = match (selected, field) {
             (None, value) => Some(value),
             (Some(previous), value) if previous == value => Some(value),

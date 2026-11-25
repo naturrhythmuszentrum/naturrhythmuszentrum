@@ -43,7 +43,11 @@ impl Runner<'_> {
         mode: Option<BoundaryCertificate>,
     ) -> Result<Handle, Fault> {
         for object in crate::statement::objects(&claim) {
-            if let Ok(value) = self.cas.state.expression(object.logical_id()) {
+            if let Ok(value) = self
+                .cas
+                .state
+                .expression(object.logical_id(), self.generation)
+            {
                 self.plan
                     .expansion(value.unfolded, value.unfolded, self.generation)?;
             }
@@ -52,12 +56,12 @@ impl Runner<'_> {
             let before = self
                 .cas
                 .state
-                .expression(value.function.logical_id())?
+                .expression(value.function.logical_id(), self.generation)?
                 .unfolded;
             let after = self
                 .cas
                 .state
-                .expression(value.derivative.logical_id())?
+                .expression(value.derivative.logical_id(), self.generation)?
                 .unfolded;
             self.plan.expansion(before, after, self.generation)?;
         }
@@ -145,7 +149,11 @@ impl Runner<'_> {
         )?;
         let polynomial = self.cas.handle(value);
         let mut premises = Vec::new();
-        let expression = self.cas.state.expression(function.logical_id())?.clone();
+        let expression = self
+            .cas
+            .state
+            .expression(function.logical_id(), self.generation)?
+            .clone();
         if matches!(expression.operator, Operator::NamedCase(_)) {
             let definition = self
                 .cas

@@ -62,6 +62,11 @@ impl<'a> Encoder<'a> {
         }
     }
 
+    /// Share the encoder's call ledger with graph lookups during encoding.
+    pub(crate) const fn budget(&mut self) -> &mut Budget {
+        self.budget
+    }
+
     /// Append already encoded bytes after checking length and work.
     pub(crate) fn raw(&mut self, bytes: &[u8]) -> Result<(), Fault> {
         let at = self.at;

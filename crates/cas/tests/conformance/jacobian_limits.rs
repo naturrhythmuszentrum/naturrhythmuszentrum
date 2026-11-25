@@ -104,6 +104,10 @@ fn source_jacobian_work_and_payload_boundaries() -> TestResult {
 }
 
 /// Record new operation costs without relying on numerical timing as proof authority.
+/// Key: unchanged operation Work 60,048 +2 first-kind insertions +4 identity insertions +4
+/// vertex admissions = 60,058. Derivative: unchanged operation Work 621,092 +128 retained
+/// counts +7 first-kind insertions +142 identity insertions +142 admissions
+/// = 621,511. Old/new interning lookup floors match.
 /// ´test:integration:source-jacobian-resource-measurements´
 #[test]
 fn source_jacobian_resource_measurements() -> TestResult {
@@ -124,8 +128,8 @@ fn source_jacobian_resource_measurements() -> TestResult {
     assert_eq!(
         measurements,
         [
-            [0, 60_048, 0, 12, 13_937, 5_537, 2_683],
-            [1, 621_092, 780, 155, 58_820, 21_558, 18_116],
+            [0, 60_058, 0, 12, 13_937, 5_537, 2_683],
+            [1, 621_511, 780, 155, 58_820, 21_558, 18_116],
         ]
     );
     Ok(())

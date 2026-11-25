@@ -27,17 +27,25 @@ impl Cas {
         checker: &mut Budget,
     ) -> Result<PlacementOutcome, Fault> {
         self.transaction(generation, |cas, generation| {
-            let SolveDraft::ScalarPiece(value) =
-                crate::solving::graph::object(&cas.state, cas.checked(piece)?)?
+            let SolveDraft::ScalarPiece(value) = crate::solving::graph::object(
+                &cas.state,
+                cas.checked(piece, generation)?,
+                generation,
+            )?
             else {
                 return Err(invalid());
             };
             let region = value.region.clone();
-            if cas.state.context(cas.checked(context)?)?.admissible != region.logical_id() {
+            if cas
+                .state
+                .context(cas.checked(context, generation)?, generation)?
+                .admissible
+                != region.logical_id()
+            {
                 return Err(invalid());
             }
-            super::membership::validate(cas, piece, location, &region)?;
-            let data = cas.state.region(region.logical_id())?;
+            super::membership::validate(cas, piece, location, &region, generation)?;
+            let data = cas.state.region(region.logical_id(), generation)?;
             let family = cas.handle(data.lies_over.as_ref().ok_or_else(invalid)?.family);
             let header = cas.handle(data.header);
             let scope = data.scope.clone();
@@ -186,9 +194,13 @@ impl Query<'_> {
         arguments: &[FamilyArgument],
     ) -> Result<(Handle, Handle), Fault> {
         let sort = Sort::Value(AtomicSort::Scalar(field));
-        let ambient =
-            crate::solving::sorts::ambient(&self.cas.state, self.header.logical_id(), &sort)?
-                .ok_or_else(invalid)?;
+        let ambient = crate::solving::sorts::ambient(
+            &self.cas.state,
+            self.header.logical_id(),
+            &sort,
+            self.generation,
+        )?
+        .ok_or_else(invalid)?;
         let value = FamilyExpressionData {
             family: Reference::Existing(self.family.clone()),
             ambient: Reference::Existing(self.cas.handle(ambient)),
@@ -228,7 +240,8 @@ impl Query<'_> {
     /// Every required association names the caller's original registered piece.
     fn view(&mut self, body: &Handle) -> Result<Handle, Fault> {
         use crate::domain_model::{CaseArmDraft, CasesDraft};
-        let local = super::body(self.cas, body.logical_id())?.ok_or_else(invalid)?;
+        let local =
+            super::body(self.cas, body.logical_id(), self.generation)?.ok_or_else(invalid)?;
         let result = local.result.clone();
         let operands =
             crate::solving::sorts::placement_operands(&self.cas.state, local, self.generation)?;

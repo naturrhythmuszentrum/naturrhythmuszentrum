@@ -48,9 +48,11 @@ fn integrated_full_ladder_retains_symbolic_work_refusal() -> ResultOf {
         return Err("expected exhausted symbolic replay".into());
     };
     assert_eq!(fault.location.operation, "typed witness DAG");
+    // Local-entry work reaches the cap before the next typed DAG encoding charge:
+    // 2,000,000 + 36 = 2,000,036. `needed` names this earlier denied prefix.
     assert_eq!(
         format!("{:?}", fault.kind),
-        "Exhausted { reason: Limit, budget: ReplayWork, limit: 2000000, needed: 2000124 }"
+        "Exhausted { reason: Limit, budget: ReplayWork, limit: 2000000, needed: 2000036 }"
     );
     assert_eq!(heap.provenance_usage().records(), 0);
     Ok(())

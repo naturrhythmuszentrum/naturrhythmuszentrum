@@ -7,7 +7,7 @@ use crate::testing::builders::admit;
 use crate::testing::common::TestResult;
 use crate::testing::readings::ledger;
 use nrz_cas::domain::{ContextDraft, HypothesisRef};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::proof::{ApplicationDraft, Certificate, HypothesisKind, Primitive, Statement};
 use nrz_cas::syntax::{Draft, Operator, PredicateKind};
 use nrz_cas::{Cas, Fault, FaultKind, Handle, Reference};
@@ -46,7 +46,9 @@ fn from_source(mut fixture: IntroductionFixture) -> TestResult<SignFixture> {
         },
         &mut ledger()?,
     )?;
-    let domain = source.cas.admissible_region(&frame)?;
+    let domain = source
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
     let one = source.number(1, 1)?;
     let reciprocal = source.term(Operator::Div, &[one, coordinate])?;
     let original = crate::testing::witness::equality(
@@ -99,9 +101,10 @@ fn accepted(positive: bool) -> TestResult {
         .check_proof(&fixture.frame, &fixture.steps[2..3], &mut ledger()?)?;
     assert_eq!(original.judgment().residuals.len(), 1);
     assert_eq!(
-        source
-            .cas
-            .predicate_hypothesis_kind(&original.judgment().residuals[0].predicate)?,
+        source.cas.predicate_hypothesis_kind(
+            &original.judgment().residuals[0].predicate,
+            &mut crate::testing::budgets::graph_budget()?
+        )?,
         HypothesisKind::NonZero
     );
     let witness = source
@@ -114,10 +117,14 @@ fn accepted(positive: bool) -> TestResult {
     let citations = source
         .cas
         .proof_citations(witness.proof(), &mut ledger()?)?;
+    let mut read_budget = crate::testing::budgets::graph_budget()?;
     let schemas = citations
         .iter()
-        .filter_map(|row| row.auxiliary_schema(&source.cas).transpose())
-        .collect::<Result<Vec<_>, _>>()?;
+        .map(|row| row.auxiliary_schema(&source.cas, &mut read_budget))
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>();
     assert_eq!(
         schemas.iter().map(|schema| schema.name).collect::<Vec<_>>(),
         [
@@ -247,7 +254,10 @@ fn decision_certified_sign_discharge_refusals() -> TestResult {
         let mut fixture = prepared(false)?;
         let source = &mut fixture.source.partition.source;
         let coordinate = fixture.source.partition.question.coordinates[0].clone();
-        let domain = source.cas.admissible_region(&fixture.frame)?;
+        let domain = source.cas.admissible_region(
+            &fixture.frame,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?;
         let changed = crate::testing::witness::equality(
             &fixture.frame,
             &domain,
@@ -334,7 +344,7 @@ fn limits(kind: BudgetKind, amount: u64) -> Limits {
 fn attempt(positive: bool, owner: usize, kind: BudgetKind, amount: u64) -> TestResult<bool> {
     let mut fixture = prepared(positive)?;
     let source = &mut fixture.source.partition.source;
-    let mut budget = Budget::new(limits(kind, amount))?;
+    let mut budget = nrz_cas::limits::Budget::new(limits(kind, amount))?;
     let before = source.cas.counts();
     let result = if owner < 2 {
         let steps = if owner == 0 {
@@ -383,17 +393,17 @@ fn decision_certified_sign_boundaries() -> TestResult {
         (
             false,
             [
-                [74_684, 50_224, 25_265, 0],
-                [99_695, 54_960, 27_772, 0],
-                [288_913, 54_384, 22_980, 800],
+                [74_708, 50_224, 25_265, 0],
+                [99_743, 54_960, 27_772, 0],
+                [289_219, 54_384, 22_980, 800],
             ],
         ),
         (
             true,
             [
-                [76_275, 51_504, 26_885, 0],
-                [101_370, 56_240, 29_392, 0],
-                [299_149, 55_664, 23_482, 800],
+                [76_299, 51_504, 26_885, 0],
+                [101_418, 56_240, 29_392, 0],
+                [299_465, 55_664, 23_482, 800],
             ],
         ),
     ] {

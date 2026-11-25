@@ -198,7 +198,10 @@ fn source_full_polynomial_degree() -> TestResult {
         let coefficients = f
             .base
             .cas
-            .series_object(&source.output)?
+            .series_object(
+                &source.output,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?
             .coefficients
             .clone();
         let expected = f.base.number(if exponent == 0 { "1" } else { "4096" })?;

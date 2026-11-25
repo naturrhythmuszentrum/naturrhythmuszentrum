@@ -58,13 +58,14 @@ fn binary(
     step: &RealSignStep,
     arguments: &[&RealSignStep],
     multiply: bool,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let [left, right] = arguments else {
         return Err(invalid());
     };
-    let expression = cas.state.expression(step.subject.logical_id())?;
+    let expression = cas.state.expression(step.subject.logical_id(), budget)?;
     if expression.operands != [left.subject.logical_id(), right.subject.logical_id()] {
-        return inverse_binary(cas, step, arguments, multiply);
+        return inverse_binary(cas, step, arguments, multiply, budget);
     }
     let first = mask(left.conclusion);
     let mut second = mask(right.conclusion);
@@ -83,11 +84,12 @@ fn inverse_binary(
     step: &RealSignStep,
     arguments: &[&RealSignStep],
     multiply: bool,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let [whole, known] = arguments else {
         return Err(invalid());
     };
-    let expression = cas.state.expression(whole.subject.logical_id())?;
+    let expression = cas.state.expression(whole.subject.logical_id(), budget)?;
     let desired = if multiply {
         Operator::Mul
     } else {
@@ -96,7 +98,7 @@ fn inverse_binary(
     let forward = expression.operands == [step.subject.logical_id(), known.subject.logical_id()];
     let backward = expression.operands == [known.subject.logical_id(), step.subject.logical_id()];
     if expression.operator != desired || !(forward || backward) {
-        return pair(cas, step, arguments, multiply);
+        return pair(cas, step, arguments, multiply, budget);
     }
     let mut possible = 0;
     for sign in SIGNS {
@@ -119,12 +121,12 @@ fn power(
     if step.exponent == 0 || !step.exponent.is_multiple_of(2) {
         return Err(invalid());
     }
-    let expression = cas.state.expression(step.subject.logical_id())?;
+    let expression = cas.state.expression(step.subject.logical_id(), budget)?;
     if expression.operator != Operator::IntegerPower(i64::from(step.exponent)) {
         let [source] = arguments else {
             return Err(invalid());
         };
-        let powered = cas.state.expression(source.subject.logical_id())?;
+        let powered = cas.state.expression(source.subject.logical_id(), budget)?;
         if powered.operator != Operator::IntegerPower(i64::from(step.exponent))
             || powered.operands != [step.subject.logical_id()]
         {
@@ -154,20 +156,25 @@ fn power(
 }
 
 /// The real map x -> x^n is order-reflecting for a checked positive odd integer n.
-fn reflection(cas: &Cas, step: &RealSignStep, arguments: &[&RealSignStep]) -> Result<(), Fault> {
+fn reflection(
+    cas: &Cas,
+    step: &RealSignStep,
+    arguments: &[&RealSignStep],
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     let [source] = arguments else {
         return Err(invalid());
     };
     if step.exponent == 0 || step.exponent.is_multiple_of(2) {
         return Err(invalid());
     }
-    let target = cas.state.expression(step.subject.logical_id())?;
+    let target = cas.state.expression(step.subject.logical_id(), budget)?;
     if target.operator == Operator::IntegerPower(i64::from(step.exponent))
         && target.operands == [source.subject.logical_id()]
     {
         return entails(mask(source.conclusion), step.conclusion);
     }
-    let expression = cas.state.expression(source.subject.logical_id())?;
+    let expression = cas.state.expression(source.subject.logical_id(), budget)?;
     if expression.operator == Operator::IntegerPower(i64::from(step.exponent))
         && expression.operands == [step.subject.logical_id()]
     {
@@ -180,7 +187,7 @@ fn reflection(cas: &Cas, step: &RealSignStep, arguments: &[&RealSignStep]) -> Re
         return Err(invalid());
     }
     for (powered, endpoint) in expression.operands.iter().zip(&target.operands) {
-        let power = cas.state.expression(*powered)?;
+        let power = cas.state.expression(*powered, budget)?;
         if power.operator != Operator::IntegerPower(i64::from(step.exponent))
             || power.operands != [*endpoint]
         {
@@ -201,7 +208,7 @@ pub(super) fn check(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         budget.work(1, AT)?;
-        scalar(cas, &step.subject, region)?;
+        scalar(cas, &step.subject, region, budget)?;
         match step.rule {
             RealSignRule::Hypothesis => {
                 return sign_evidence::hypothesis(cas, region, step, premises, budget);
@@ -217,12 +224,12 @@ pub(super) fn check(
         }
         match step.rule {
             RealSignRule::EvenPower => power(cas, region, step, arguments, premises, budget),
-            RealSignRule::OddPowerReflection => reflection(cas, step, arguments),
+            RealSignRule::OddPowerReflection => reflection(cas, step, arguments, budget),
             _ if step.exponent != 0 => Err(invalid()),
-            RealSignRule::Sum => binary(cas, step, arguments, false),
-            RealSignRule::Product => binary(cas, step, arguments, true),
+            RealSignRule::Sum => binary(cas, step, arguments, false, budget),
+            RealSignRule::Product => binary(cas, step, arguments, true, budget),
             RealSignRule::Rational => rational(cas, step, arguments, budget),
-            RealSignRule::Negation => negation(cas, step, arguments),
+            RealSignRule::Negation => negation(cas, step, arguments, budget),
             _ => Err(invalid()),
         }
     })
@@ -238,7 +245,10 @@ fn rational(
     if !arguments.is_empty() {
         return Err(invalid());
     }
-    let Operator::Rational(value) = &cas.state.expression(step.subject.logical_id())?.operator
+    let Operator::Rational(value) = &cas
+        .state
+        .expression(step.subject.logical_id(), budget)?
+        .operator
     else {
         return Err(invalid());
     };
@@ -251,11 +261,16 @@ fn rational(
 }
 
 /// Unary negation exchanges negative and positive possibilities.
-fn negation(cas: &Cas, step: &RealSignStep, arguments: &[&RealSignStep]) -> Result<(), Fault> {
+fn negation(
+    cas: &Cas,
+    step: &RealSignStep,
+    arguments: &[&RealSignStep],
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     let [source] = arguments else {
         return Err(invalid());
     };
-    let expression = cas.state.expression(step.subject.logical_id())?;
+    let expression = cas.state.expression(step.subject.logical_id(), budget)?;
     if expression.operator != Operator::Neg || expression.operands != [source.subject.logical_id()]
     {
         return Err(invalid());
@@ -269,6 +284,7 @@ fn pair(
     step: &RealSignStep,
     arguments: &[&RealSignStep],
     multiply: bool,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
     let [sum_fact, product_fact] = arguments else {
         return Err(invalid());
@@ -276,8 +292,12 @@ fn pair(
     if multiply {
         return Err(invalid());
     }
-    let sum_expression = cas.state.expression(sum_fact.subject.logical_id())?;
-    let product_expression = cas.state.expression(product_fact.subject.logical_id())?;
+    let sum_expression = cas
+        .state
+        .expression(sum_fact.subject.logical_id(), budget)?;
+    let product_expression = cas
+        .state
+        .expression(product_fact.subject.logical_id(), budget)?;
     if sum_expression.operator != Operator::Add
         || product_expression.operator != Operator::Mul
         || sum_expression.operands != product_expression.operands

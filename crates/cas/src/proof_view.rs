@@ -28,8 +28,9 @@ pub(crate) fn scalar_statement(
     relation: &Relation,
     left: Handle,
     right: Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<Statement, Fault> {
-    let domain = cas.handle(cas.state.context(context)?.admissible);
+    let domain = cas.handle(cas.state.context(context, budget)?.admissible);
     Ok(match relation {
         Relation::EqualOnDomain => Statement::Equality {
             left,
@@ -64,6 +65,7 @@ pub(crate) fn scalar_parts(
     cas: &Cas,
     context: &Handle,
     statement: &Statement,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(Relation, Handle, Handle), Fault> {
     let (relation, left, right, domain) = match statement {
         Statement::Equality {
@@ -115,12 +117,14 @@ pub(crate) fn scalar_parts(
         ),
         _ => return Err(invalid()),
     };
-    let frame = cas.state.context(cas.checked(context)?)?;
-    if cas.checked(domain)? != frame.admissible {
+    let frame = cas.state.context(cas.checked(context, budget)?, budget)?;
+    if cas.checked(domain, budget)? != frame.admissible {
         return Err(Fault::invalid(InvalidCode::Context, AT));
     }
     for endpoint in [left, right] {
-        let value = cas.state.expression(cas.checked(endpoint)?)?;
+        let value = cas
+            .state
+            .expression(cas.checked(endpoint, budget)?, budget)?;
         if value.space.is_some() || crate::header::space_sort(&value.sort) {
             return Err(invalid());
         }
@@ -129,13 +133,17 @@ pub(crate) fn scalar_parts(
 }
 
 /// Translate a typed scalar application to the existing independent algebra matcher.
-pub(crate) fn scalar_step(cas: &Cas, value: &ApplicationDraft) -> Result<ProofStep, Fault> {
+pub(crate) fn scalar_step(
+    cas: &Cas,
+    value: &ApplicationDraft,
+    budget: &mut crate::budget::Budget,
+) -> Result<ProofStep, Fault> {
     if matches!(&value.certificate, Certificate::Congruence(_))
         && value.rule != crate::rule::Primitive::Congruence
     {
         return Err(invalid());
     }
-    let (relation, left, right) = scalar_parts(cas, &value.context, &value.conclusion)?;
+    let (relation, left, right) = scalar_parts(cas, &value.context, &value.conclusion, budget)?;
     let (path, certificate) = match &value.certificate {
         Certificate::None => (Vec::new(), None),
         Certificate::Congruence(path) => (path.clone(), None),
@@ -161,9 +169,9 @@ fn predicate(
     guard: &Guard,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let term = cas.checked(&guard.term)?;
-    let expression = cas.state.expression(term)?;
-    let header = cas.state.context(context)?.header_id;
+    let term = cas.checked(&guard.term, budget)?;
+    let expression = cas.state.expression(term, budget)?;
+    let header = cas.state.context(context, budget)?.header_id;
     if !crate::header::embeds(&cas.state, expression.header, header, budget)? {
         return Err(Fault::invalid(InvalidCode::Context, AT));
     }
@@ -174,7 +182,12 @@ fn predicate(
         arguments: vec![term],
     });
     let (_, key) = vertex_key(&value, &cas.state, budget)?;
-    let id = cas.state.intern.get(&key).copied().ok_or_else(invalid)?;
+    let id = cas
+        .state
+        .intern
+        .get(&key, 0, budget, AT)?
+        .copied()
+        .ok_or_else(invalid)?;
     Ok(cas.handle(id))
 }
 
@@ -185,13 +198,15 @@ fn guarded(
     guard: &Guard,
     budget: &mut Budget,
 ) -> Result<GuardedObligation, Fault> {
-    let term = cas.state.expression(cas.checked(&guard.term)?)?;
+    let term = cas
+        .state
+        .expression(cas.checked(&guard.term, budget)?, budget)?;
     Ok(GuardedObligation {
         home: cas.handle(context),
         scope: term.scope.clone(),
         layer: Layer::Pointwise,
         space: None,
-        region: cas.handle(cas.state.context(context)?.admissible),
+        region: cas.handle(cas.state.context(context, budget)?.admissible),
         predicate: predicate(cas, context, guard, budget)?,
     })
 }
@@ -202,7 +217,7 @@ pub(crate) fn typed_claim(
     value: &Claim,
     budget: &mut Budget,
 ) -> Result<Judgment, Fault> {
-    let context = cas.checked(&value.context)?;
+    let context = cas.checked(&value.context, budget)?;
     let mut residuals = Vec::new();
     residuals
         .try_reserve_exact(value.residuals.len())
@@ -220,6 +235,7 @@ pub(crate) fn typed_claim(
             &value.relation,
             value.left.clone(),
             value.right.clone(),
+            budget,
         )?,
         residuals: crate::statement::union(cas, &residuals, budget)?,
     })
@@ -235,11 +251,11 @@ pub(crate) fn scalar_claim(
     value: &Judgment,
     budget: &mut Budget,
 ) -> Result<Claim, Fault> {
-    crate::context::require_closed(&cas.state, cas.checked(&value.context)?)?;
+    crate::context::require_closed(&cas.state, cas.checked(&value.context, budget)?, budget)?;
     if value.layer != Layer::Pointwise || value.space.is_some() {
         return Err(invalid());
     }
-    let (relation, left, right) = scalar_parts(cas, &value.context, &value.statement)?;
+    let (relation, left, right) = scalar_parts(cas, &value.context, &value.statement, budget)?;
     let mut residuals = Vec::new();
     residuals
         .try_reserve_exact(value.residuals.len())
@@ -251,7 +267,9 @@ pub(crate) fn scalar_claim(
         {
             return Err(invalid());
         }
-        let Vertex::Condition(predicate) = cas.state.node(cas.checked(&required.predicate)?)?
+        let Vertex::Condition(predicate) = cas
+            .state
+            .node(cas.checked(&required.predicate, budget)?, budget)?
         else {
             return Err(invalid());
         };
@@ -263,9 +281,9 @@ pub(crate) fn scalar_claim(
         if predicate.arguments.len() != 1 || predicate.scope != required.scope {
             return Err(invalid());
         }
-        let context = cas.checked(&value.context)?;
-        let region = cas.checked(&required.region)?;
-        if region != cas.state.context(context)?.admissible {
+        let context = cas.checked(&value.context, budget)?;
+        let region = cas.checked(&required.region, budget)?;
+        if region != cas.state.context(context, budget)?.admissible {
             crate::statement::validate_guard(cas, required, budget)?;
         }
         transport::check(cas, context, region, budget)?;
@@ -301,12 +319,12 @@ pub(crate) fn application(
     proof: LogicalId,
     budget: &mut Budget,
 ) -> Result<CheckedApplication, Fault> {
-    let Vertex::Proof(id) = cas.state.node(proof)? else {
+    let Vertex::Proof(id) = cas.state.node(proof, budget)? else {
         return Err(invalid());
     };
-    match cas.state.node(*id)? {
+    match cas.state.node(*id, budget)? {
         Vertex::AnonymousLemma(_) => {
-            let value = cas.series_application(*id)?;
+            let value = cas.series_application(*id, budget)?;
             prepay_scoped_copy(value, budget)?;
             #[cfg(test)]
             COPIES.with(|copies| copies.set(copies.get().saturating_add(1)));
@@ -344,11 +362,11 @@ pub(crate) fn application(
                 )?);
             }
             let mut root = value.context;
-            while let Some(parent) = cas.state.context(root)?.parent {
+            while let Some(parent) = cas.state.context(root, budget)?.parent {
                 budget.condition(1, AT)?;
                 root = parent;
             }
-            let assumptions = &cas.state.context(root)?.assumptions;
+            let assumptions = &cas.state.context(root, budget)?.assumptions;
             for key in &value.conditions.hypotheses {
                 let slot = assumptions
                     .iter()
@@ -447,11 +465,13 @@ pub(crate) fn application_bytes(
     proof: LogicalId,
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
-    let Vertex::Proof(id) = cas.state.node(proof)? else {
+    let Vertex::Proof(id) = cas.state.node(proof, budget)? else {
         return Err(invalid());
     };
-    match cas.state.node(*id)? {
-        Vertex::AnonymousLemma(_) => prepay_scoped_copy(cas.series_application(*id)?, budget),
+    match cas.state.node(*id, budget)? {
+        Vertex::AnonymousLemma(_) => {
+            prepay_scoped_copy(cas.series_application(*id, budget)?, budget)
+        }
         Vertex::ScopedApplication(value) => prepay_scoped_copy(value, budget),
         Vertex::Application(value) => prepay_scalar_copy(value, budget),
         _ => Err(invalid()),
@@ -466,7 +486,7 @@ pub(crate) fn premise_arity(
     rule: crate::rule::Primitive,
     statement: &Statement,
     count: usize,
-    budget: &Budget,
+    budget: &mut Budget,
     at: Location,
 ) -> Result<(), Fault> {
     use crate::rule::PremiseShape;
@@ -479,7 +499,7 @@ pub(crate) fn premise_arity(
                 return Err(Fault::invalid(InvalidCode::Rule, at));
             };
             value.primitive() == rule
-                && count == size(crate::series::check::premise_count(cas, value)?, at)?
+                && count == size(crate::series::check::premise_count(cas, value, budget)?, at)?
         }
         PremiseShape::AtLeast(minimum) => {
             // Formal coefficient closure permits one anchored identity; the
@@ -561,7 +581,8 @@ pub(crate) fn measure(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         budget.check(BudgetKind::ProofNodes, size(value.premises.len(), AT)?, AT)?;
-        cas.state.context(cas.checked(&value.context)?)?;
+        cas.state
+            .context(cas.checked(&value.context, budget)?, budget)?;
         crate::distribution_measure::measure(cas, &value.conclusion, &value.certificate, budget)?;
         if let Certificate::Series(certificate) = &value.certificate {
             crate::series::codec::measure(certificate, budget)?;
@@ -591,7 +612,7 @@ pub(crate) fn measure(
         crate::boundary_measure::certificate(cas, &value.certificate, budget)?;
         if let Certificate::Solve(certificate) = &value.certificate {
             for object in certificate.objects() {
-                cas.checked(object)?;
+                cas.checked(object, budget)?;
             }
         }
         let objects = match &value.conclusion {
@@ -637,13 +658,13 @@ pub(crate) fn measure(
         budget.check(BudgetKind::StagedPayloadBytes, bytes, AT)?;
         budget.work(bytes, AT)?;
         for object in crate::statement::objects(&value.conclusion) {
-            cas.checked(object)?;
+            cas.checked(object, budget)?;
         }
         if let Statement::Cover { members, .. } = &value.conclusion {
             let mut unique = std::collections::BTreeSet::new();
             for member in members {
                 budget.condition(size(members.len(), AT)?, AT)?;
-                if !unique.insert(cas.checked(member)?) {
+                if !unique.insert(cas.checked(member, budget)?) {
                     return Err(Fault::invalid(InvalidCode::Rule, AT));
                 }
             }
@@ -669,16 +690,19 @@ pub(crate) fn validate_judgment(
     {
         return Err(Fault::invalid(InvalidCode::Context, AT));
     }
-    let context = cas.state.context(cas.checked(&value.context)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&value.context, budget)?, budget)?;
     if value.layer != crate::statement::layer(&value.statement)
         || value.space != crate::statement::space(&value.statement)
     {
         return Err(Fault::invalid(InvalidCode::Sort, AT));
     }
     for object in crate::statement::objects(&value.statement) {
-        let header = match cas.state.node(cas.checked(object)?)? {
+        let header = match cas.state.node(cas.checked(object, budget)?, budget)? {
             Vertex::Solve(value) => {
-                let Some((header, _)) = crate::solving::graph::metadata(&cas.state, value)? else {
+                let Some((header, _)) = crate::solving::graph::metadata(&cas.state, value, budget)?
+                else {
                     continue;
                 };
                 header
@@ -687,7 +711,9 @@ pub(crate) fn validate_judgment(
                 if object.context != value.context {
                     return Err(Fault::invalid(InvalidCode::Context, AT));
                 }
-                cas.state.context(cas.checked(&object.context)?)?.header_id
+                cas.state
+                    .context(cas.checked(&object.context, budget)?, budget)?
+                    .header_id
             }
             Vertex::Expression(value) => value.header,
             Vertex::Region(value) => value.header,
@@ -747,26 +773,28 @@ pub(crate) fn scalar_application(
                 .ok_or_else(invalid)?;
             target.insert(crate::conditions::Obligation {
                 kind: guard.kind,
-                term: cas.checked(&guard.term)?,
+                term: cas.checked(&guard.term, budget)?,
             });
         }
     }
-    let context = cas.checked(&value.judgment.context)?;
+    let context = cas.checked(&value.judgment.context, budget)?;
     for reference in &value.conditions.hypotheses {
-        let frame = cas.state.context(cas.checked(&reference.context)?)?;
+        let frame = cas
+            .state
+            .context(cas.checked(&reference.context, budget)?, budget)?;
         if frame.parent.is_none() {
             let slot = usize::try_from(reference.slot).map_err(|_| invalid())?;
             conditions
                 .hypotheses
                 .insert(frame.assumptions.get(slot).ok_or_else(invalid)?.0.clone());
         } else {
-            let introducing = cas.checked(&reference.context)?;
+            let introducing = cas.checked(&reference.context, budget)?;
             if reference.slot == 0
                 || !crate::context_check::ancestor(cas, introducing, context, budget)?
             {
                 return Err(invalid());
             }
-            crate::context_check::predicate(cas, reference)?;
+            crate::context_check::predicate(cas, reference, budget)?;
             let bytes = size(conditions.qualified.len().saturating_add(1), AT)?
                 .checked_mul(96)
                 .ok_or_else(|| Fault::capacity(BudgetKind::StagedPayloadBytes, AT))?;
@@ -780,8 +808,8 @@ pub(crate) fn scalar_application(
         primitive: value.rule,
         relation: claim.relation,
         context,
-        left: cas.checked(&claim.left)?,
-        right: cas.checked(&claim.right)?,
+        left: cas.checked(&claim.left, budget)?,
+        right: cas.checked(&claim.right, budget)?,
         premises: value.premises.clone(),
         path: match &value.certificate {
             Certificate::Congruence(path) => path.clone(),
@@ -790,7 +818,7 @@ pub(crate) fn scalar_application(
         substitutions: value
             .substitutions
             .iter()
-            .map(|item| Ok((item.key.clone(), cas.checked(&item.replacement)?)))
+            .map(|item| Ok((item.key.clone(), cas.checked(&item.replacement, budget)?)))
             .collect::<Result<_, Fault>>()?,
         certificate: match &value.certificate {
             Certificate::SquareFree(certificate) => Some(certificate.as_ref().clone()),
@@ -808,9 +836,9 @@ pub(crate) fn scalar_conditions(
     value: &crate::scalar_model::CheckedStep,
     budget: &mut Budget,
 ) -> Result<ScopedConditions, Fault> {
-    let header = cas.handle(cas.state.context(value.context)?.header_id);
+    let header = cas.handle(cas.state.context(value.context, budget)?.header_id);
     for required in &value.conditions.requirements {
-        let scope = cas.state.expression(required.term)?.scope.clone();
+        let scope = cas.state.expression(required.term, budget)?.scope.clone();
         cas.admit(
             &[crate::graph::Draft::Condition {
                 header: crate::graph::Reference::Existing(header.clone()),
@@ -843,14 +871,14 @@ pub(crate) fn scalar_conditions(
         )?);
     }
     let mut root = value.context;
-    while let Some(parent) = cas.state.context(root)?.parent {
+    while let Some(parent) = cas.state.context(root, budget)?.parent {
         budget.condition(1, AT)?;
         root = parent;
     }
     for key in &value.conditions.hypotheses {
         let slot = cas
             .state
-            .context(root)?
+            .context(root, budget)?
             .assumptions
             .iter()
             .position(|(name, _)| name == key)
@@ -891,7 +919,7 @@ fn local_hypotheses(
             context: cas.handle(*frame),
             slot: *slot,
         };
-        crate::context_check::predicate(cas, &reference)?;
+        crate::context_check::predicate(cas, &reference, budget)?;
         result.hypotheses.push(reference);
     }
     Ok(())
@@ -903,7 +931,7 @@ pub(crate) fn native_witness(
     value: crate::scalar_model::VerifiedWitness,
     budget: &mut Budget,
 ) -> Result<crate::proof_model::VerifiedWitness, Fault> {
-    let application = application(cas, cas.checked(&value.proof)?, budget)?;
+    let application = application(cas, cas.checked(&value.proof, budget)?, budget)?;
     Ok(crate::proof_model::VerifiedWitness {
         proof: value.proof,
         judgment: application.judgment,

@@ -12,13 +12,18 @@ pub(crate) fn projection(
     parent: LogicalId,
     child: LogicalId,
     edges: &mut Vec<(LogicalId, Edge)>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<Option<LiesOver<LogicalId>>, Fault> {
     let enclosing = state
-        .region(parent)?
+        .region(parent, budget)?
         .lies_over
         .as_ref()
         .ok_or_else(invalid)?;
-    let selected = state.region(child)?.lies_over.as_ref().unwrap_or(enclosing);
+    let selected = state
+        .region(child, budget)?
+        .lies_over
+        .as_ref()
+        .unwrap_or(enclosing);
     if selected.family != enclosing.family {
         return Err(invalid());
     }

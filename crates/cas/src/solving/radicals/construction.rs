@@ -110,7 +110,7 @@ impl Construction {
     ) -> Result<Handle, Fault> {
         if cas
             .state
-            .region(self.region.logical_id())?
+            .region(self.region.logical_id(), budget)?
             .lies_over
             .is_some()
             && let Some(value) = crate::solving::family::construction::expression(
@@ -154,7 +154,7 @@ impl Construction {
 
         let target = cas
             .state
-            .region(self.region.logical_id())?
+            .region(self.region.logical_id(), budget)?
             .lies_over
             .as_ref()
             .map_or_else(
@@ -312,9 +312,9 @@ impl Construction {
             domain,
         };
         let (parent, modulus) =
-            match crate::solving::coefficients::storage::domain(&cas.state, domain)? {
+            match crate::solving::coefficients::storage::domain(&cas.state, domain, budget)? {
                 CoefficientDomainData::Quotient { .. } => {
-                    let (_, level) = arithmetic::level(&engine).map_err(|e| fault(&e))?;
+                    let (_, level) = arithmetic::level(&engine, budget).map_err(|e| fault(&e))?;
                     (level.parent.clone(), Some(level.polynomial.clone()))
                 }
                 _ => (domain.clone(), None),
@@ -374,7 +374,7 @@ impl Construction {
         if order.is_none()
             && cas
                 .state
-                .region(self.region.logical_id())?
+                .region(self.region.logical_id(), budget)?
                 .lies_over
                 .is_some()
             && let Some(real) = crate::solving::family::real_roots::choose(

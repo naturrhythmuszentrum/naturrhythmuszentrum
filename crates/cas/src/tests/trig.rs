@@ -10,6 +10,7 @@ use crate::testing::trig::{Fixture, operators};
 /// ´test:crate:trig-canonical-identity´
 #[test]
 fn trig_canonical_identity() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = Fixture::new()?;
     let mut keys = Vec::new();
     let projection = f.term(Operator::RealPart, &[f.z.clone()])?;
@@ -20,12 +21,16 @@ fn trig_canonical_identity() -> TestResult {
         assert_eq!(node, again);
         let opaque = f.term(Operator::Call(name.into()), &[f.x.clone()])?;
         for handle in [&node, &opaque] {
-            let vertex = f.cas.state.node(handle.logical_id())?;
+            let vertex = f.cas.state.node(handle.logical_id(), &mut budget)?;
             let key = crate::graph::vertex_key(vertex, &f.cas.state, &mut default_budget()?)?.1;
             assert!(!keys.contains(&key));
             keys.push(key);
         }
-        let original = &f.cas.state.header(f.header.logical_id())?.environment;
+        let original = &f
+            .cas
+            .state
+            .header(f.header.logical_id(), &mut budget)?
+            .environment;
         let mut environment = crate::syntax::Environment {
             field: original.field.clone(),
             branch: original.branch.clone(),
@@ -67,6 +72,7 @@ fn trig_canonical_identity() -> TestResult {
 /// ´test:crate:trig-capture-safe-substitution´
 #[test]
 fn trig_capture_safe_substitution() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = Fixture::new()?;
     let scalar = AtomicSort::Scalar(Field::Real);
     let outer = vec![vec![scalar.clone()]];
@@ -112,14 +118,17 @@ fn trig_capture_safe_substitution() -> TestResult {
                 .pop()
                 .ok_or("body")?;
         }
-        let expression = f.cas.state.expression(current.logical_id())?;
+        let expression = f.cas.state.expression(current.logical_id(), &mut budget)?;
         assert_eq!(expression.operator, operator);
         assert_eq!(expression.scope, inner);
         assert_eq!(expression.sort, real());
         assert_eq!(expression.header, f.header.logical_id());
         assert_eq!(
             expression.ambient,
-            f.cas.state.expression(body.logical_id())?.ambient
+            f.cas
+                .state
+                .expression(body.logical_id(), &mut budget)?
+                .ambient
         );
         let child = f
             .cas
@@ -127,7 +136,7 @@ fn trig_capture_safe_substitution() -> TestResult {
             .pop()
             .ok_or("lifted operand")?;
         assert_eq!(
-            f.cas.expression(&child)?.0,
+            f.cas.expression(&child, &mut budget)?.0,
             &Operator::Bound { depth: 2, slot: 0 }
         );
         assert_eq!(f.cas.operands(&body, &mut default_budget()?)?, [x]);

@@ -64,7 +64,7 @@ impl Regional<'_> {
         if self
             .cas
             .state
-            .region(region.logical_id())?
+            .region(region.logical_id(), self.budget)?
             .lies_over
             .is_some()
         {
@@ -119,7 +119,7 @@ impl Regional<'_> {
             construction: self.construction,
             scope: &scope,
             audit: self.audit,
-            budget: self.budget,
+            budget: &mut *self.budget,
         }
         .derive(&polynomial, &map, 0)?;
         self.audit
@@ -127,7 +127,7 @@ impl Regional<'_> {
         if self
             .cas
             .state
-            .region(region.logical_id())?
+            .region(region.logical_id(), self.budget)?
             .lies_over
             .is_some()
         {
@@ -152,12 +152,13 @@ impl Regional<'_> {
 
     /// The full-coordinate identity family is offered only when no original exclusion is widened.
     fn free(&mut self) -> Result<Handle, CoefficientFailure> {
-        let original = crate::solving::elementary::proof::problem(self.cas, self.problem)?;
+        let original =
+            crate::solving::elementary::proof::problem(self.cas, self.problem, self.budget)?;
         if !original.denominators.is_empty()
             || !matches!(
                 self.cas
                     .state
-                    .region(original.domain.logical_id())?
+                    .region(original.domain.logical_id(), self.budget)?
                     .expression,
                 RegionExpr::Ambient
             )
@@ -243,9 +244,10 @@ impl Regional<'_> {
             },
             self.budget,
         )?;
-        let coefficients = crate::solving::elementary::proof::problem(self.cas, self.problem)?
-            .coefficients
-            .clone();
+        let coefficients =
+            crate::solving::elementary::proof::problem(self.cas, self.problem, self.budget)?
+                .coefficients
+                .clone();
         let mut children = vector(2, self.budget)?;
         for truth in [true, false] {
             let (base, predicate) = (
@@ -278,7 +280,7 @@ impl Regional<'_> {
         if self
             .cas
             .state
-            .region(self.construction.region.logical_id())?
+            .region(self.construction.region.logical_id(), self.budget)?
             .lies_over
             .is_some()
         {
@@ -319,8 +321,11 @@ impl Regional<'_> {
         for child in &children {
             let (proposal, proof) = self.closed(child)?;
             plans.push(proposal.plan);
-            let SolveDraft::SolutionSet(set) =
-                crate::solving::graph::object(&self.cas.state, proposal.set.logical_id())?
+            let SolveDraft::SolutionSet(set) = crate::solving::graph::object(
+                &self.cas.state,
+                proposal.set.logical_id(),
+                self.budget,
+            )?
             else {
                 return Err(invalid().into());
             };
@@ -383,9 +388,12 @@ impl Regional<'_> {
             }),
             self.budget,
         )?;
-        let region = self
-            .cas
-            .handle(self.cas.state.context(frame.logical_id())?.admissible);
+        let region = self.cas.handle(
+            self.cas
+                .state
+                .context(frame.logical_id(), self.budget)?
+                .admissible,
+        );
         self.construction.context.clone_from(&frame);
         self.construction.region.clone_from(&region);
         let result = self.solve();

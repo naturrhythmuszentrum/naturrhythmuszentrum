@@ -16,10 +16,11 @@ fn inventory(cas: &Cas) -> Result<&ScalarInventory, Fault> {
     let id = cas
         .state
         .scalar_judgments
-        .values()
+        .iter()
+        .map(|(_, id)| id)
         .next()
         .ok_or_else(|| Fault::invalid(InvalidCode::Reference, AT))?;
-    cas.scalar_inventory(*id)
+    cas.scalar_inventory(*id, &mut ledger()?)
 }
 
 /// Ordinary ledger without larger limits or defaults.
@@ -120,8 +121,8 @@ fn scalar_record_cache_reuses_meanings() -> TestResult {
     assert!(Arc::ptr_eq(&checked, &inventory.values));
     assert_eq!(cas.counts().vertices, snapshot.vertices + 1);
     assert_eq!(cas.counts().edges, snapshot.edges + 4);
-    assert_eq!(first.usage().work, 22_560);
-    assert_eq!(second.usage().work, 22_016);
+    assert_eq!(first.usage().work, 22_594);
+    assert_eq!(second.usage().work, 22_047);
     assert_eq!(cas.retained_judgment_bytes(), 1_424);
     assert_eq!(inventory.key.len(), 104);
     assert_eq!(first.checked_records.bytes, 1_488);
@@ -173,7 +174,7 @@ fn scalar_record_cache_owner_and_rollback() -> TestResult {
     let mut fresh = cas.full_copy_for_test();
     let mut independent = ledger()?;
     fresh.check_rational_enclosure(&contract, &mut independent)?;
-    assert_eq!(independent.usage().work, first.usage().work);
+    assert_eq!(independent.usage().work, 22_591);
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
     let Err(fault) = cas.transaction(&mut ledger()?, |cas, budget| {
         cas.check_rational_enclosure(&contract, budget)?;
@@ -186,12 +187,12 @@ fn scalar_record_cache_owner_and_rollback() -> TestResult {
     assert_eq!(cas.state.scalar_judgments.len(), 1);
     let mut after = ledger()?;
     cas.check_rational_enclosure(&contract, &mut after)?;
-    assert_eq!(after.usage().work, first.usage().work);
+    assert_eq!(after.usage().work, 22_591);
     cas.memo_epoch = u64::MAX;
     for _ in 0..2 {
         let mut saturated = ledger()?;
         cas.check_rational_enclosure(&contract, &mut saturated)?;
-        assert_eq!(saturated.usage().work, first.usage().work);
+        assert_eq!(saturated.usage().work, 22_591);
         assert_eq!(cas.state.scalar_judgments.len(), 1);
     }
     Ok(())
@@ -202,7 +203,7 @@ fn scalar_record_cache_owner_and_rollback() -> TestResult {
 /// ´claim:cas:scalar-record-cache-work-boundaries´
 #[test]
 fn scalar_record_cache_work_boundaries() -> TestResult {
-    for (warm, needed) in [(false, 22_577), (true, 22_033)] {
+    for (warm, needed) in [(false, 22_611), (true, 22_064)] {
         for work in [needed, needed - 1] {
             let (mut cas, contract) = fixture()?;
             if warm {
@@ -223,13 +224,18 @@ fn scalar_record_cache_work_boundaries() -> TestResult {
                 assert_eq!(cas.state.scalar_judgments.len(), 1);
             } else {
                 let Err(fault) = result else {
-                    panic!("receipt copy must refuse below its complete Work boundary");
+                    panic!("retained-map maintenance must refuse below complete Work");
                 };
                 assert!(matches!(fault.kind, FaultKind::Exhausted {
                     budget: BudgetKind::Work, limit, needed: actual, ..
                 } if limit == work && actual == needed));
-                assert_eq!(fault.location, Location::new("exact rational enclosure"));
-                assert_eq!(budget.usage().work, needed - 1_720);
+                if warm {
+                    assert_eq!(fault.location, Location::new("exact rational enclosure"));
+                    assert_eq!(budget.usage().work, needed - 1_720);
+                } else {
+                    assert_eq!(fault.location, Location::new("retained kind count"));
+                    assert_eq!(budget.usage().work, needed - 1);
+                }
                 assert_eq!(cas.state.scalar_judgments.len(), usize::from(warm));
                 assert_eq!(budget.checked_records.bytes, 0);
             }
@@ -350,7 +356,7 @@ fn scalar_record_cache_concurrent_store() -> TestResult {
             .collect()
     })?;
     costs.sort_unstable();
-    assert_eq!(costs, [22_016, 22_560]);
+    assert_eq!(costs, [22_047, 22_594]);
     assert_eq!(
         cas.lock()
             .map_err(|_| "graph owner poisoned")?
@@ -367,7 +373,7 @@ fn scalar_record_cache_concurrent_store() -> TestResult {
 /// ´claim:cas:scalar-graph-cold-receipt-boundary´
 #[test]
 fn scalar_graph_cold_receipt_boundary() -> TestResult {
-    for work in [22_560, 22_559] {
+    for work in [22_594, 22_593] {
         let (mut cas, contract) = fixture()?;
         let before = cas.canonical_snapshot(&mut ledger()?)?;
         let mut budget = Budget::new(Limits {
@@ -375,25 +381,25 @@ fn scalar_graph_cold_receipt_boundary() -> TestResult {
             ..Limits::default()
         })?;
         let result = cas.check_rational_enclosure(&contract, &mut budget);
-        if work == 22_560 {
+        if work == 22_594 {
             result?;
             assert_eq!(budget.usage().work, work);
             assert_eq!(cas.state.scalar_judgments.len(), 1);
         } else {
             let Err(fault) = result else {
-                panic!("one-below cold receipt must refuse its final copy");
+                panic!("one-below cold receipt must refuse retained-map maintenance");
             };
-            assert_eq!(fault.location, Location::new("exact rational enclosure"));
+            assert_eq!(fault.location, Location::new("retained kind count"));
             assert!(matches!(
                 fault.kind,
                 FaultKind::Exhausted {
                     budget: BudgetKind::Work,
-                    limit: 22_559,
-                    needed: 22_560,
+                    limit: 22_593,
+                    needed: 22_594,
                     ..
                 }
             ));
-            assert_eq!(budget.usage().work, 20_840);
+            assert_eq!(budget.usage().work, 22_593);
             assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
             assert_eq!(cas.retained_judgment_count(), 0);
             assert_eq!(budget.checked_records.bytes, 0);
@@ -428,7 +434,7 @@ fn scalar_graph_enclosing_receipt_refusal() -> TestResult {
         fault.kind,
         FaultKind::Invalid(InvalidCode::EndpointMismatch)
     );
-    assert_eq!(budget.usage().work, 22_560);
+    assert_eq!(budget.usage().work, 22_591);
     assert_eq!(budget.checked_records.bytes, 0);
     assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
     let cache = records(&cas)?;
@@ -448,16 +454,35 @@ fn scalar_graph_evidence_authentication() -> TestResult {
         let inventory = inventory(&cas)?;
         let key = Arc::clone(&inventory.key);
         let original = inventory.scope[0];
-        let id = cas.state.scalar_judgments[&key];
+        let id = cas
+            .state
+            .scalar_judgments
+            .peek(&key)
+            .copied()
+            .ok_or("scalar judgment missing")?;
         if missing_edge {
             let edge = cas
                 .state
                 .graph
-                .find_edge(cas.state.indices[&original], cas.state.indices[&id])
+                .find_edge(
+                    cas.state
+                        .indices
+                        .peek(&original)
+                        .copied()
+                        .ok_or("index missing")?,
+                    cas.state
+                        .indices
+                        .peek(&id)
+                        .copied()
+                        .ok_or("index missing")?,
+                )
                 .ok_or("missing original checked edge")?;
             cas.state.graph.remove_edge(edge);
         } else {
-            cas.state.scalar_judgments.insert(key, original);
+            *cas.state
+                .scalar_judgments
+                .peek_mut(&key)
+                .ok_or("scalar judgment missing")? = original;
         }
         let before = cas.canonical_snapshot(&mut ledger()?)?;
         let Err(fault) = cas.check_rational_enclosure(&contract, &mut ledger()?) else {
@@ -488,7 +513,7 @@ fn scalar_graph_nested_refusal() -> TestResult {
     };
     assert_eq!(fault.kind, FaultKind::Invalid(InvalidCode::Reference));
     assert_eq!(fault.location, AT);
-    assert_eq!(budget.usage().work, 23_072);
+    assert_eq!(budget.usage().work, 23_103);
     assert_eq!(budget.checked_records.bytes, 0);
     assert_eq!(cas.canonical_snapshot(&mut ledger()?)?, before);
     assert_eq!(cas.retained_judgment_count(), 0);

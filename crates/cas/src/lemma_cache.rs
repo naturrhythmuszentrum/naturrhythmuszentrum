@@ -143,7 +143,7 @@ impl AnonymousLemmaCache {
                 let owned = std::sync::Arc::ptr_eq(&entry.owner, &cas.memo_owner);
                 let current = entry.epoch == cas.memo_epoch;
                 let reusable = cas.memo_epoch != u64::MAX;
-                let local = cas.checked(entry.witness.proof()).is_ok();
+                let local = cas.checked(entry.witness.proof(), budget).is_ok();
                 let same_key = entry.expected == key;
                 let same_proof = entry.witness.bytes == bytes;
                 if owned && current && reusable && local && same_key && same_proof {

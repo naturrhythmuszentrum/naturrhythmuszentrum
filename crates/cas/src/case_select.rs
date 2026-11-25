@@ -19,8 +19,8 @@ pub(crate) fn reconstruct(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<CaseCertificate, Fault> {
-    let context = cas.checked(&draft.context)?;
-    let within = cas.state.context(context)?.admissible;
+    let context = cas.checked(&draft.context, budget)?;
+    let within = cas.state.context(context, budget)?.admissible;
     match &draft.conclusion {
         Statement::Equality {
             left,
@@ -29,9 +29,9 @@ pub(crate) fn reconstruct(
             domain_contract: DomainContract::DefinedAndEqual,
         } => {
             let certified = crate::decision_selection::check(cas, draft, premises, budget)?;
-            let left = cas.checked(left)?;
-            let right = cas.checked(right)?;
-            let domain = cas.checked(domain)?;
+            let left = cas.checked(left, budget)?;
+            let right = cas.checked(right, budget)?;
+            let domain = cas.checked(domain, budget)?;
             crate::case_check::subset(cas, domain, within, budget)?;
             let arm =
                 certified.map_or_else(|| selected_arm(cas, left, right, domain, budget), Ok)?;
@@ -75,12 +75,12 @@ fn selected_arm(
     region: LogicalId,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let expression = cas.state.expression(function)?;
+    let expression = cas.state.expression(function, budget)?;
     if expression.domain.is_none() {
         return Err(invalid());
     }
     for id in case_syntax::canonical(cas, &expression.arms, budget)? {
-        let arm = cas.state.arm(id)?;
+        let arm = cas.state.arm(id, budget)?;
         if arm.value == value {
             match crate::case_check::subset(cas, region, arm.region, budget) {
                 Ok(()) => return Ok(id),
@@ -115,13 +115,13 @@ fn ownership(
             _ => None,
         })
         .ok_or_else(invalid)?;
-    let context_id = cas.checked(context)?;
-    let boundary_id = cas.checked(boundary)?;
+    let context_id = cas.checked(context, budget)?;
+    let boundary_id = cas.checked(boundary, budget)?;
     let singleton = singleton(cas, context_id, boundary_id, budget)?;
     if crate::case_obligations::empty(cas, singleton, budget)? {
         return Err(invalid());
     }
-    let function = cas.checked(function)?;
+    let function = cas.checked(function, budget)?;
     let analysis = crate::case_cells::analyze(cas, function, function, singleton, budget)?;
     analysis.check(
         cas,
@@ -134,7 +134,7 @@ fn ownership(
     let mut result = crate::case_check::from_analysis(cas, &analysis);
     match value {
         Ownership::Present(value) => {
-            let value = cas.checked(value)?;
+            let value = cas.checked(value, budget)?;
             let equality = crate::case_cells::analyze(cas, function, value, singleton, budget)?;
             equality.check(
                 cas,
@@ -151,8 +151,11 @@ fn ownership(
             require_point_premise(context, singleton, &domain, true, cas, premises)?;
         }
         Ownership::Absent => {
-            let cells =
-                crate::region_cache::partition(cas, &[singleton, cas.checked(&domain)?], budget)?;
+            let cells = crate::region_cache::partition(
+                cas,
+                &[singleton, cas.checked(&domain, budget)?],
+                budget,
+            )?;
             let point = cells.membership.first().ok_or_else(invalid)?;
             let defined = cells.membership.get(1).ok_or_else(invalid)?;
             if point
@@ -206,16 +209,19 @@ pub(crate) fn singleton(
     boundary: LogicalId,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let boundary = cas.state.boundary(boundary)?.clone();
-    let within = cas.state.context(context)?.admissible;
-    let region = cas.state.region(within)?;
+    let boundary = cas.state.boundary(boundary, budget)?.clone();
+    let within = cas.state.context(context, budget)?.admissible;
+    let region = cas.state.region(within, budget)?;
     if region.ambient != boundary.ambient || region.scope != boundary.scope {
         return Err(invalid());
     }
     let (coordinate, sort) = match &boundary.ambient {
         AmbientDomain::Real(key) => (
             key.clone(),
-            cas.state.expression(boundary.location)?.sort.clone(),
+            cas.state
+                .expression(boundary.location, budget)?
+                .sort
+                .clone(),
         ),
         AmbientDomain::Integer(key) => (key.clone(), Sort::Value(AtomicSort::Integer)),
         _ => return Err(invalid()),

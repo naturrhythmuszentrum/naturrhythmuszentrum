@@ -15,28 +15,37 @@ use crate::solving::elementary::{complex::Components, evaluate::Evaluation};
 use crate::solving::{CoefficientDomainData, SolveDraft};
 
 /// The old case checker never enters this path for an ordinary scalar case.
-pub(crate) fn handles(cas: &Cas, statement: &Statement) -> Result<bool, Fault> {
+pub(crate) fn handles(
+    cas: &Cas,
+    statement: &Statement,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
     match statement {
         Statement::Equality { left, right, .. } => {
-            Ok(local(cas, left.logical_id())? || local(cas, right.logical_id())?)
+            Ok(local(cas, left.logical_id(), budget)? || local(cas, right.logical_id(), budget)?)
         }
-        Statement::DefinedDomain { function, .. } => local(cas, function.logical_id()),
+        Statement::DefinedDomain { function, .. } => local(cas, function.logical_id(), budget),
         Statement::PredicateFact {
             predicate: fact, ..
         } => {
-            let (kind, arguments) = predicate(cas, fact.logical_id())?;
+            let (kind, arguments) = predicate(cas, fact.logical_id(), budget)?;
             if kind == &crate::model::PredicateKind::Defined
                 && let [function] = arguments
             {
-                local(cas, *function)
+                local(cas, *function, budget)
             } else {
                 Ok(false)
             }
         }
         Statement::Compatibility { left, right, .. } => {
             Ok(
-                body(cas, cas.state.arm(left.logical_id())?.value)?.is_some()
-                    || body(cas, cas.state.arm(right.logical_id())?.value)?.is_some(),
+                body(cas, cas.state.arm(left.logical_id(), budget)?.value, budget)?.is_some()
+                    || body(
+                        cas,
+                        cas.state.arm(right.logical_id(), budget)?.value,
+                        budget,
+                    )?
+                    .is_some(),
             )
         }
         _ => Ok(false),
@@ -51,7 +60,10 @@ pub(crate) fn reconstruct(
     budget: &mut Budget,
 ) -> Result<(CaseCertificate, ScopedConditions), Fault> {
     let (left, right, domain) = endpoints(cas, draft, budget)?;
-    let within = cas.state.context(cas.checked(&draft.context)?)?.admissible;
+    let within = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?
+        .admissible;
     if !region::subset(cas, domain.logical_id(), within, budget)? {
         return Err(invalid());
     }
@@ -125,8 +137,8 @@ fn endpoints(
                 region: domain,
             },
         ) => {
-            let first = cas.state.arm(cas.checked(left)?)?;
-            let second = cas.state.arm(cas.checked(right)?)?;
+            let first = cas.state.arm(cas.checked(left, budget)?, budget)?;
+            let second = cas.state.arm(cas.checked(right, budget)?, budget)?;
             if !region::subset(cas, domain.logical_id(), first.region, budget)?
                 || !region::subset(cas, domain.logical_id(), second.region, budget)?
             {
@@ -141,7 +153,7 @@ fn endpoints(
                 predicate: condition,
             },
         ) => {
-            let (kind, arguments) = predicate(cas, condition.logical_id())?;
+            let (kind, arguments) = predicate(cas, condition.logical_id(), budget)?;
             let [function] = arguments else {
                 return Err(invalid());
             };
@@ -151,13 +163,15 @@ fn endpoints(
             Ok((*function, *function, domain.clone()))
         }
         (Primitive::CaseDomain, Statement::DefinedDomain { function, domain }) => {
-            let value = cas.state.expression(cas.checked(function)?)?;
+            let value = cas
+                .state
+                .expression(cas.checked(function, budget)?, budget)?;
             if value.arms.is_empty() {
                 return Err(invalid());
             }
             for arm in &value.arms {
                 budget.work(1, AT)?;
-                if cas.state.arm(*arm)?.region != domain.logical_id() {
+                if cas.state.arm(*arm, budget)?.region != domain.logical_id() {
                     return Err(invalid());
                 }
             }
@@ -175,9 +189,9 @@ fn selected(
     domain: LogicalId,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    for id in &cas.state.expression(left)?.arms {
+    for id in &cas.state.expression(left, budget)?.arms {
         budget.work(1, AT)?;
-        let arm = cas.state.arm(*id)?;
+        let arm = cas.state.arm(*id, budget)?;
         if arm.value == right && region::subset(cas, domain, arm.region, budget)? {
             return Ok(());
         }
@@ -192,13 +206,13 @@ fn inventory(
     result: &mut CaseCertificate,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    if let Some(value) = body(cas, root)? {
+    if let Some(value) = body(cas, root, budget)? {
         result.regions.push(value.region.clone());
         return Ok(());
     }
-    for id in &cas.state.expression(root)?.arms {
+    for id in &cas.state.expression(root, budget)?.arms {
         budget.work(1, AT)?;
-        let arm = cas.state.arm(*id)?;
+        let arm = cas.state.arm(*id, budget)?;
         result.arms.push(cas.handle(*id));
         result.regions.push(cas.handle(arm.region));
     }
@@ -212,10 +226,11 @@ pub(crate) fn validate_endpoints(
     right: &Handle,
     domain: &Handle,
     same_sort: bool,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let (left_scope, left_sort) = endpoint_type(cas, left.logical_id())?;
-    let (right_scope, right_sort) = endpoint_type(cas, right.logical_id())?;
-    let region = cas.state.region(cas.checked(domain)?)?;
+    let (left_scope, left_sort) = endpoint_type(cas, left.logical_id(), budget)?;
+    let (right_scope, right_sort) = endpoint_type(cas, right.logical_id(), budget)?;
+    let region = cas.state.region(cas.checked(domain, budget)?, budget)?;
     let different_sort = same_sort && left_sort != right_sort;
     let different_region = !region.scope.is_empty() && &region.scope != left_scope;
     if left_scope != right_scope || different_sort || different_region {
@@ -225,23 +240,25 @@ pub(crate) fn validate_endpoints(
 }
 
 /// Reading a local result never manufactures an ordinary scalar expression.
-fn endpoint_type(
-    cas: &Cas,
+fn endpoint_type<'a>(
+    cas: &'a Cas,
     id: LogicalId,
-) -> Result<(&crate::model::Scope, &crate::model::Sort), Fault> {
-    if let Some(value) = body(cas, id)? {
+    budget: &mut Budget,
+) -> Result<(&'a crate::model::Scope, &'a crate::model::Sort), Fault> {
+    if let Some(value) = body(cas, id, budget)? {
         return Ok((&value.scope, &value.result));
     }
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     Ok((&value.scope, &value.sort))
 }
 
 /// Definedness remains an ordinary predicate whose subject is a native family case.
-pub(crate) fn predicate(
-    cas: &Cas,
+pub(crate) fn predicate<'a>(
+    cas: &'a Cas,
     id: LogicalId,
-) -> Result<(&crate::model::PredicateKind, &[LogicalId]), Fault> {
-    match cas.state.node(id)? {
+    budget: &mut Budget,
+) -> Result<(&'a crate::model::PredicateKind, &'a [LogicalId]), Fault> {
+    match cas.state.node(id, budget)? {
         crate::graph::Vertex::Condition(value) => Ok((&value.kind, &value.arguments)),
         crate::graph::Vertex::Expression(value) => {
             let crate::model::Operator::Predicate(kind) = &value.operator else {

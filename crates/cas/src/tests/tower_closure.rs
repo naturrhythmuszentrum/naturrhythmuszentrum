@@ -43,6 +43,7 @@ fn existences(cas: &Cas, witness: &VerifiedWitness) -> TestResult<Vec<CheckedApp
 
 /// Use the original Real cubic, then discard every nonexistence fact, including the s²=D lemma.
 fn fixture() -> TestResult<Fixture> {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut source, request) =
         crate::testing::solve_blind::real_polynomial(&[1, 1, 0, 1], SolveForm::AnyExact)?;
     let crate::request::Outcome::Solved { answer, .. } = source.cas.run(&request) else {
@@ -57,13 +58,14 @@ fn fixture() -> TestResult<Fixture> {
         let SolveStatement::RootExistence(existence) = statement.as_ref() else {
             return Err("existence conclusion".into());
         };
-        let selection = selected::selection(&source.cas, &existence.relation)?;
+        let selection = selected::selection(&source.cas, &existence.relation, &mut budget)?;
         assert_eq!(selection.relations.len(), 1);
-        let relation = selected::relation(&source.cas, &selection.relations[0])?;
+        let relation = selected::relation(&source.cas, &selection.relations[0], &mut budget)?;
         assert_eq!(relation.region, source.region);
         let polynomial = crate::solving::coefficients::storage::polynomial(
             &source.cas.state,
             &relation.polynomial,
+            &mut budget,
         )?;
         let degree = polynomial.terms.iter().map(|term| term.exponents[0]).max();
         let root = crate::testing::solve_graph::admit(
@@ -239,7 +241,10 @@ fn single_root_square_lemma_inventory() -> TestResult {
         let application = crate::proof_view::application(&fixture.cas, id, &mut budget)?;
         pending.extend(&application.premises);
         if let Statement::Equality { left, right, .. } = &application.judgment.statement {
-            let expression = fixture.cas.state.expression(left.logical_id())?;
+            let expression = fixture
+                .cas
+                .state
+                .expression(left.logical_id(), &mut budget)?;
             let squared = expression.operator == crate::model::Operator::IntegerPower(2);
             let exact_root = expression.operands == [fixture.roots[0].logical_id()];
             if squared && exact_root {

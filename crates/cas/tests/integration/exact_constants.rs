@@ -156,7 +156,9 @@ fn constant_graph_ownership_and_identity() -> TestResult {
     assert_eq!(value, ExactConstant::named(Constant::Pi, &mut ledger()?)?);
     let (owner, normalized) = value.graph().ok_or("missing graph")?;
     assert_eq!(
-        owner.expression(normalized)?.0,
+        owner
+            .expression(normalized, &mut crate::testing::budgets::graph_budget()?)?
+            .0,
         &Operator::Constant(Constant::Pi)
     );
     let other = Cas::new(Limits::default())?;

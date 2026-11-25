@@ -84,7 +84,9 @@ impl Cas {
         spec: &SelectionSpec,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let value = self.state.expression(self.checked(source)?)?;
+        let value = self
+            .state
+            .expression(self.checked(source, budget)?, budget)?;
         declared(value)?;
         let selection = EntrySelection::new(&value.sort, spec, budget)?;
         let sort = selection.result_sort(&value.sort, budget)?;
@@ -112,7 +114,9 @@ impl Cas {
         map: &AffineMap,
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
-        let declaration = self.state.expression(self.checked(symbol)?)?;
+        let declaration = self
+            .state
+            .expression(self.checked(symbol, budget)?, budget)?;
         if !matches!(declaration.operator, Operator::Free(_)) {
             return Err(invalid(InvalidCode::ReadingDefinition));
         }

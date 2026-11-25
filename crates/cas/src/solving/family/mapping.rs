@@ -12,13 +12,14 @@ use crate::solving::{CoefficientDomainData, CoefficientMapData, MapTarget, Solve
 pub(crate) fn scalar_target<'a>(
     state: &'a State,
     map: &'a CoefficientMapData<Handle>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(&'a Handle, Field), Fault> {
     match &map.target {
         MapTarget::ScalarAmbient { header, field } => Ok((header, field.clone())),
         MapTarget::Family { family } => {
-            let shape = family_data(state, family)?;
-            let base = base_data(state, &shape.base)?;
-            if crate::solving::sorts::field(state, &shape.fibre_space)? != Field::Complex {
+            let shape = family_data(state, family, budget)?;
+            let base = base_data(state, &shape.base, budget)?;
+            if crate::solving::sorts::field(state, &shape.fibre_space, budget)? != Field::Complex {
                 return Err(invalid());
             }
             Ok((&base.header, Field::Complex))
@@ -33,9 +34,10 @@ pub(crate) fn relation_target(
     map: &CoefficientMapData<Handle>,
     header: &Handle,
     ambient: &Field,
+    budget: &mut Budget,
 ) -> Result<bool, Fault> {
     if let MapTarget::Family { .. } = &map.target {
-        let (actual, field) = scalar_target(state, map)?;
+        let (actual, field) = scalar_target(state, map, budget)?;
         return Ok(actual == header && &field == ambient);
     }
     Ok(map.target
@@ -46,12 +48,18 @@ pub(crate) fn relation_target(
 }
 
 /// The full original parameter frame is the base followed by the fibre coefficients.
-fn frame(state: &State, family: &Handle, coordinates: &Handle) -> Result<(), Fault> {
-    let shape = family_data(state, family)?;
-    let base = base_data(state, &shape.base)?;
-    let original = crate::solving::graph::coordinates(state, base.coordinates.logical_id())?;
-    let fibre = crate::solving::graph::coordinates(state, shape.coefficients.logical_id())?;
-    let actual = crate::solving::graph::coordinates(state, coordinates.logical_id())?;
+fn frame(
+    state: &State,
+    family: &Handle,
+    coordinates: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let shape = family_data(state, family, budget)?;
+    let base = base_data(state, &shape.base, budget)?;
+    let original =
+        crate::solving::graph::coordinates(state, base.coordinates.logical_id(), budget)?;
+    let fibre = crate::solving::graph::coordinates(state, shape.coefficients.logical_id(), budget)?;
+    let actual = crate::solving::graph::coordinates(state, coordinates.logical_id(), budget)?;
     if !actual
         .coordinates
         .iter()
@@ -72,27 +80,28 @@ pub(crate) fn validate(
         let MapTarget::Family { family } = &map.target else {
             return Err(invalid());
         };
-        let (header, _) = scalar_target(state, map)?;
-        let region = state.region(map.region.logical_id())?;
+        let (header, _) = scalar_target(state, map, budget)?;
+        let region = state.region(map.region.logical_id(), budget)?;
         if region.header != header.logical_id()
             || super::region::family_state(state, map.region.logical_id(), budget)?
                 != family.logical_id()
         {
             return Err(invalid());
         }
-        let domain = crate::solving::coefficients::storage::domain(state, &map.source)?;
+        let domain = crate::solving::coefficients::storage::domain(state, &map.source, budget)?;
         let coordinates = if let CoefficientDomainData::Fraction { coordinates, .. } = domain {
-            frame(state, family, coordinates)?;
+            frame(state, family, coordinates, budget)?;
             Some(crate::solving::graph::coordinates(
                 state,
                 coordinates.logical_id(),
+                budget,
             )?)
         } else {
             None
         };
         for (index, image) in map.images.iter().enumerate() {
             budget.work(1, AT)?;
-            let expression = state.expression(image.logical_id())?;
+            let expression = state.expression(image.logical_id(), budget)?;
             let field = coordinates
                 .and_then(|value| value.coordinates.get(index))
                 .map_or(Field::Complex, |value| value.field.clone());
@@ -126,7 +135,7 @@ pub(crate) fn parameters_state(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         validate(state, map, budget)?;
-        let product = crate::solving::graph::coordinates(state, coordinates.logical_id())?;
+        let product = crate::solving::graph::coordinates(state, coordinates.logical_id(), budget)?;
         if map.mode != crate::solving::MapMode::Specialization
             || product.coordinates.len() != map.images.len()
         {
@@ -134,7 +143,7 @@ pub(crate) fn parameters_state(
         }
         for (coordinate, image) in product.coordinates.iter().zip(&map.images) {
             budget.work(crate::graph::size(coordinate.key.len(), AT)?, AT)?;
-            if !matches!(&state.expression(image.logical_id())?.operator, Operator::Free(key) if key == &coordinate.key)
+            if !matches!(&state.expression(image.logical_id(), budget)?.operator, Operator::Free(key) if key == &coordinate.key)
             {
                 return Err(invalid());
             }
@@ -152,7 +161,7 @@ pub(crate) fn ground(
     validate(&cas.state, map, budget)?;
     if !map.images.is_empty()
         || !matches!(
-            crate::solving::coefficients::storage::domain(&cas.state, &map.source)?,
+            crate::solving::coefficients::storage::domain(&cas.state, &map.source, budget)?,
             CoefficientDomainData::Rational | CoefficientDomainData::Gaussian
         )
     {
@@ -165,8 +174,9 @@ pub(crate) fn ground(
 pub(crate) fn family_data<'a>(
     state: &'a State,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a crate::solving::SpaceFamilyData<Handle>, Fault> {
-    match crate::solving::graph::object(state, handle.logical_id())? {
+    match crate::solving::graph::object(state, handle.logical_id(), budget)? {
         SolveDraft::SpaceFamily(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -176,8 +186,9 @@ pub(crate) fn family_data<'a>(
 pub(crate) fn base_data<'a>(
     state: &'a State,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a crate::solving::ParameterBaseData<Handle>, Fault> {
-    match crate::solving::graph::object(state, handle.logical_id())? {
+    match crate::solving::graph::object(state, handle.logical_id(), budget)? {
         SolveDraft::ParameterBase(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -192,7 +203,7 @@ pub(crate) fn base_map(
     if matches!(map.target, MapTarget::Family { .. }) {
         return restrict_map(evaluation, map, budget);
     }
-    if ground_restriction(evaluation, map)? {
+    if ground_restriction(evaluation, map, budget)? {
         return Ok(());
     }
     if !matches!(
@@ -240,12 +251,16 @@ pub(crate) fn restrict_map(
 fn ground_restriction(
     evaluation: &crate::solving::elementary::evaluate::Evaluation<'_>,
     map: &CoefficientMapData<Handle>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, Fault> {
     let actual = evaluation
         .cas
         .state
-        .region(evaluation.region.logical_id())?;
-    let original = evaluation.cas.state.region(map.region.logical_id())?;
+        .region(evaluation.region.logical_id(), budget)?;
+    let original = evaluation
+        .cas
+        .state
+        .region(map.region.logical_id(), budget)?;
     let missing_family = actual.lies_over.is_none();
     let conditional_constant = original.lies_over.is_some();
     if missing_family
@@ -268,7 +283,11 @@ fn ground_restriction(
     ) && map.images.is_empty()
         && map.denominators.is_empty()
         && matches!(
-            crate::solving::coefficients::storage::domain(&evaluation.cas.state, &map.source)?,
+            crate::solving::coefficients::storage::domain(
+                &evaluation.cas.state,
+                &map.source,
+                budget
+            )?,
             CoefficientDomainData::Rational | CoefficientDomainData::Gaussian
         ))
 }

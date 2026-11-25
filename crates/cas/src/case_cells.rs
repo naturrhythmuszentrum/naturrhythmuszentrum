@@ -60,10 +60,10 @@ pub(crate) fn analyze(
     let mut roots = vec![within];
     roots.extend(domains.values().copied());
     for id in &order {
-        let value = cas.state.expression(*id)?.clone();
+        let value = cas.state.expression(*id, budget)?.clone();
         for arm in &value.arms {
             let domain = value.domain.ok_or_else(invalid)?;
-            let region = cas.state.arm(*arm)?.region;
+            let region = cas.state.arm(*arm, budget)?.region;
             let region = crate::case_reach::masked_meet(
                 cas,
                 *reaches.get(id).ok_or_else(invalid)?,
@@ -180,7 +180,7 @@ impl Analysis {
         for id in &self.order {
             budget.condition(1, Location::new("case cell specialization"))?;
             let domain = *self.domains.get(id).ok_or_else(invalid)?;
-            let value = cas.state.expression(*id)?.clone();
+            let value = cas.state.expression(*id, budget)?.clone();
             let output = if !self.contains(domain, cell)? {
                 Value::Undefined
             } else if value.domain.is_some() {
@@ -203,12 +203,12 @@ impl Analysis {
         values: &BTreeMap<LogicalId, Value>,
         budget: &mut Budget,
     ) -> Result<Value, Fault> {
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         let arms = case_syntax::canonical(cas, &expression.arms, budget)?;
         let mut selected = None;
         for arm in arms {
             let region = *self.active.get(&(id, arm)).ok_or_else(invalid)?;
-            let arm = cas.state.arm(arm)?;
+            let arm = cas.state.arm(arm, budget)?;
             if !self.contains(region, cell)? {
                 continue;
             }
@@ -322,7 +322,7 @@ impl Analysis {
                 Value::Conflict => Err(conflict()),
                 Value::Defined(value) => {
                     let point = self.cells.cuts.get(cell / 2).ok_or_else(invalid)?;
-                    let coordinate = match &cas.state.region(singleton)?.ambient {
+                    let coordinate = match &cas.state.region(singleton, budget)?.ambient {
                         AmbientDomain::Real(key) | AmbientDomain::Integer(key) => key.clone(),
                         _ => return Err(invalid()),
                     };
@@ -342,7 +342,7 @@ fn scalar_value(
     values: &BTreeMap<LogicalId, Value>,
     budget: &mut Budget,
 ) -> Result<Value, Fault> {
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     if matches!(value.operator, Operator::NamedCase(_)) {
         let child = value.operands.first().ok_or_else(invalid)?;
         return values.get(child).copied().ok_or_else(invalid);
@@ -390,7 +390,7 @@ fn equal_on_cell(
     }
     if cell & 1 == 1 {
         let point = cells.cuts.get(cell / 2).ok_or_else(invalid)?;
-        let coordinate = match &cas.state.region(within)?.ambient {
+        let coordinate = match &cas.state.region(within, budget)?.ambient {
             AmbientDomain::Real(key) | AmbientDomain::Integer(key) => key.clone(),
             _ => return Err(invalid()),
         };
@@ -400,7 +400,10 @@ fn equal_on_cell(
     let equal = crate::polynomial::equal(&cas.state, left, right, true, budget)?;
     if !equal
         && cell & 1 == 0
-        && matches!(cas.state.region(within)?.ambient, AmbientDomain::Integer(_))
+        && matches!(
+            cas.state.region(within, budget)?.ambient,
+            AmbientDomain::Integer(_)
+        )
     {
         return Err(Fault::invalid(
             InvalidCode::UnsupportedFragment,
@@ -418,10 +421,10 @@ fn at_point(
     point: &crate::number::Rational,
     budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let value = cas.state.expression(id)?;
+    let value = cas.state.expression(id, budget)?;
     let sort = cas
         .state
-        .header(value.header)?
+        .header(value.header, budget)?
         .environment
         .declarations
         .iter()

@@ -335,8 +335,16 @@ mod univariate;
 use crate as test_api;
 
 #[cfg(test)]
+#[expect(
+    clippy::items_after_statements,
+    reason = "legacy fixture-local imports remain next to their test setup"
+)]
 mod testing;
 #[cfg(test)]
+#[expect(
+    clippy::items_after_statements,
+    reason = "legacy fixture-local imports remain next to their test setup"
+)]
 mod tests;
 
 pub mod domain;

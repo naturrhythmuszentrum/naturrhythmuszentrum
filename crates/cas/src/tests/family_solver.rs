@@ -332,21 +332,29 @@ fn mixed_general_cubic_piece_replays() -> TestResult {
 
 /// Restrict the same original problem to a Real sign stratum without specializing its parameter.
 fn stratum(fixture: &mut Fixture, request: &mut Request, sign: i8) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let Task::Solve(specification) = &request.task else {
         return Err("mixed request".into());
     };
-    let original =
-        crate::solving::graph::problem(&fixture.cas.state, specification.problem.logical_id())?
-            .clone();
+    let original = crate::solving::graph::problem(
+        &fixture.cas.state,
+        specification.problem.logical_id(),
+        &mut budget,
+    )?
+    .clone();
     let region = fixture
         .cas
         .state
-        .region(original.region.logical_id())?
+        .region(original.region.logical_id(), &mut budget)?
         .clone();
     let over = region.lies_over.as_ref().ok_or("family projection")?;
     let family = fixture.cas.handle(over.family);
     let base = fixture.cas.handle(over.stratum);
-    let base_region = fixture.cas.state.region(base.logical_id())?.clone();
+    let base_region = fixture
+        .cas
+        .state
+        .region(base.logical_id(), &mut budget)?
+        .clone();
     let subject = if sign < 0 {
         expression(
             &mut fixture.cas,

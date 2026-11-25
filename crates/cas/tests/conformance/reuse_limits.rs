@@ -26,7 +26,10 @@ impl Case {
         let witness = if operation == 0 {
             None
         } else {
-            let domain = fixture.cas.admissible_region(&fixture.context)?;
+            let domain = fixture.cas.admissible_region(
+                &fixture.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?;
             let step = crate::testing::witness::equality(
                 &fixture.context,
                 &domain,
@@ -187,7 +190,8 @@ fn reuse_resource_measurements() -> TestResult {
     assert_eq!(
         rows,
         [
-            [0, 65_963, 3, 30, 12_304, 4_833, 3_179],
+            // Operation 0: 65963 Work + 3 kinds + 6 identity + 6 vertices = 65978 Work.
+            [0, 65_978, 3, 30, 12_304, 4_833, 3_179],
             [1, 43_784, 2, 8, 11_984, 110, 3_179],
             [2, 30_273, 1, 4, 14_701, 110, 3_179],
         ]

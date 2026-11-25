@@ -5,7 +5,7 @@ use super::{Frame, admit, fixture as cover_fixture, ledger};
 use crate::testing::common::TestResult;
 use nrz_cas::decision::{EnclosureOrigin, IntegerFamily, IntegerSelection, RationalEnclosure};
 use nrz_cas::domain::{AssumptionDraft, ContextDraft, HypothesisRef, Layer};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::proof::{ApplicationDraft, Certificate, Judgment, Primitive, Statement};
 use nrz_cas::syntax::{AtomicSort, Draft, Operator, PredicateKind, Sort};
 use nrz_cas::{Cas, FaultKind, Handle, InvalidCode, Location, Rational, Reference};
@@ -215,6 +215,8 @@ fn integer_family_selection() -> TestResult {
             .frame
             .cas
             .check_proof(&source.context, &source.steps, &mut budget)?;
+        // The resource boundary owns check_proof; schema inspection is a separate map read.
+        let proof_work = budget.usage().work;
         assert!(witness.is_discharged());
         assert!(!witness.is_unconditional());
         assert_eq!(witness.hypotheses().len(), 1);
@@ -244,8 +246,9 @@ fn integer_family_selection() -> TestResult {
         let schema = citations
             .last()
             .ok_or("missing selection citation")?
-            .auxiliary_schema(&source.frame.cas)?
+            .auxiliary_schema(&source.frame.cas, &mut budget)?
             .ok_or("missing selection lemma")?;
+        let schema_work = budget.usage().work - proof_work;
         assert_eq!(
             (schema.name, schema.version),
             ("decision.integer-family-selection", 1)
@@ -261,7 +264,8 @@ fn integer_family_selection() -> TestResult {
         assert_eq!(receiver.export_witness(&imported, &mut ledger()?)?, bytes);
         measured.push((
             bounded,
-            budget.usage().work,
+            proof_work,
+            schema_work,
             source.frame.cas.counts().payload_bytes - before.payload_bytes,
             bytes.len(),
             replay.usage().work,
@@ -273,8 +277,8 @@ fn integer_family_selection() -> TestResult {
     assert_eq!(
         measured,
         [
-            (false, 110_069, 3_767, 1_416, 183_670, 16_693, 16_181, 37),
-            (true, 142_894, 3_885, 1_666, 235_297, 19_710, 19_198, 37),
+            (false, 110_122, 0, 3_767, 1_416, 183_878, 16_693, 16_181, 37),
+            (true, 142_947, 0, 3_885, 1_666, 235_541, 19_710, 19_198, 37),
         ]
     );
     Ok(())
@@ -520,7 +524,7 @@ fn integer_family_materialization_work() -> TestResult {
             work,
             ..Limits::default()
         };
-        let mut budget = Budget::new(limits.clone())?;
+        let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
         budget.work(prior, Location::new("prior Integer materialization work"))?;
         let result = source
             .frame
@@ -581,7 +585,7 @@ fn resource_attempt(
     let before = cas.counts();
     let snapshot = cas.canonical_snapshot(&mut ledger()?)?;
     let limits = super::resource_limits(kind, amount)?;
-    let mut budget = Budget::new(limits.clone())?;
+    let mut budget = nrz_cas::limits::Budget::new(limits.clone())?;
     budget.work(prior, Location::new("prior Integer selection work"))?;
     let result = if let Some(bytes) = bytes {
         cas.inspect(&bytes, &mut budget)
@@ -606,10 +610,10 @@ fn resource_attempt(
 #[test]
 fn integer_family_selection_resource_boundaries() -> TestResult {
     for (bounded, replay, work, staged, payload) in [
-        (false, false, 110_069, 79_744, 16_693),
-        (false, true, 183_670, 79_040, 16_181),
-        (true, false, 142_894, 87_616, 19_710),
-        (true, true, 235_297, 86_912, 19_198),
+        (false, false, 110_122, 79_744, 16_693),
+        (false, true, 183_878, 79_040, 16_181),
+        (true, false, 142_947, 87_616, 19_710),
+        (true, true, 235_541, 86_912, 19_198),
     ] {
         for (kind, amount) in [
             (BudgetKind::Work, work),
@@ -667,9 +671,9 @@ mod pi;
 /// ´test:integration:integer-selection-evidence-view´
 #[test]
 fn integer_selection_evidence_view() -> TestResult {
-    for (selected, target) in [
-        ("3", "10/Pi"),
-        ("18446744073709551616", "18446744073709551616"),
+    for (selected, target, work) in [
+        ("3", "10/Pi", 4),
+        ("18446744073709551616", "18446744073709551616", 4),
     ] {
         let mut source = fixture(false, selected, target)?;
         let witness =
@@ -683,7 +687,7 @@ fn integer_selection_evidence_view() -> TestResult {
             .frame
             .cas
             .integer_selection_evidence(&witness, &mut budget)?;
-        assert_eq!(budget.usage().work, 4);
+        assert_eq!(budget.usage().work, work);
         assert_eq!(
             &Statement::IntegerSelection(Box::new(selection.clone())),
             &witness.judgment().statement
@@ -701,7 +705,7 @@ fn integer_selection_evidence_view() -> TestResult {
     Ok(())
 }
 
-/// Literal 4/3 Work and prior-work twins authenticate without allocating or changing the graph.
+/// Literal 4/3 Work and prior-work twins authenticate without changing the graph.
 /// ´test:integration:integer-selection-evidence-work´
 #[test]
 fn integer_selection_evidence_work() -> TestResult {
@@ -714,7 +718,7 @@ fn integer_selection_evidence_work() -> TestResult {
     for (prior, allowance, accepted) in
         [(0, 4, true), (0, 3, false), (17, 21, true), (17, 20, false)]
     {
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             work: allowance,
             ..Limits::default()
         })?;

@@ -28,7 +28,11 @@ impl Cas {
         checker: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
         self.transaction(generation, |cas, generation| {
-            let domain = cas.handle(cas.state.context(cas.checked(context)?)?.admissible);
+            let domain = cas.handle(
+                cas.state
+                    .context(cas.checked(context, generation)?, generation)?
+                    .admissible,
+            );
             let conclusion = Statement::Equality {
                 left: left.clone(),
                 right: right.clone(),
@@ -52,7 +56,11 @@ impl Cas {
         checker: &mut Budget,
     ) -> Result<VerifiedWitness, Fault> {
         self.transaction(generation, |cas, generation| {
-            let region = cas.handle(cas.state.context(cas.checked(context)?)?.admissible);
+            let region = cas.handle(
+                cas.state
+                    .context(cas.checked(context, generation)?, generation)?
+                    .admissible,
+            );
             identity(
                 cas,
                 context,
@@ -83,10 +91,14 @@ impl Cas {
             let original = super::restriction::domain(statement)
                 .ok_or_else(invalid)?
                 .clone();
-            let target = cas.handle(cas.state.context(cas.checked(context)?)?.admissible);
+            let target = cas.handle(
+                cas.state
+                    .context(cas.checked(context, generation)?, generation)?
+                    .admissible,
+            );
             super::region::family(cas, target.logical_id(), generation)?;
-            let original = if cas.state.region(original.logical_id())?.ambient
-                == cas.state.region(target.logical_id())?.ambient
+            let original = if cas.state.region(original.logical_id(), generation)?.ambient
+                == cas.state.region(target.logical_id(), generation)?.ambient
             {
                 original
             } else {
@@ -130,7 +142,7 @@ fn identity(
     generation: &mut Budget,
     checker: &mut Budget,
 ) -> Result<VerifiedWitness, Fault> {
-    if !native::handles(cas, conclusion)? {
+    if !native::handles(cas, conclusion, checker)? {
         return Err(invalid());
     }
     let policy = SearchPolicy::default();
@@ -157,12 +169,12 @@ pub(crate) fn regions(
     let mut pending = match statement {
         Statement::Equality { left, right, .. } => vec![left.logical_id(), right.logical_id()],
         Statement::Compatibility { left, right, .. } => vec![
-            cas.state.arm(left.logical_id())?.value,
-            cas.state.arm(right.logical_id())?.value,
+            cas.state.arm(left.logical_id(), budget)?.value,
+            cas.state.arm(right.logical_id(), budget)?.value,
         ],
         Statement::DefinedDomain { function, .. } => vec![function.logical_id()],
         Statement::PredicateFact { predicate, .. } => {
-            super::native::predicate(cas, predicate.logical_id())?
+            super::native::predicate(cas, predicate.logical_id(), budget)?
                 .1
                 .to_vec()
         }
@@ -175,7 +187,7 @@ pub(crate) fn regions(
         if !seen.insert(id) {
             continue;
         }
-        if let Some(value) = body(cas, id)? {
+        if let Some(value) = body(cas, id, budget)? {
             if !result.contains(&value.region) {
                 result.push(value.region.clone());
             }
@@ -186,10 +198,10 @@ pub(crate) fn regions(
                     .map(|argument| argument.value.logical_id()),
             );
         } else {
-            let expression = cas.state.expression(id)?;
+            let expression = cas.state.expression(id, budget)?;
             pending.extend(&expression.operands);
             for arm in &expression.arms {
-                pending.push(cas.state.arm(*arm)?.value);
+                pending.push(cas.state.arm(*arm, budget)?.value);
             }
         }
     }
@@ -204,7 +216,7 @@ pub(crate) fn pullback(
 ) -> Result<Handle, Fault> {
     let over = cas
         .state
-        .region(cas.checked(total)?)?
+        .region(cas.checked(total, budget)?, budget)?
         .lies_over
         .as_ref()
         .ok_or_else(invalid)?;
@@ -219,10 +231,13 @@ fn pullback_from(
     source: &Handle,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let region = cas.state.region(cas.checked(total)?)?.clone();
+    let region = cas
+        .state
+        .region(cas.checked(total, budget)?, budget)?
+        .clone();
     let family = super::region::family(cas, total.logical_id(), budget)?;
     let root = lift(cas, source.logical_id(), &region.ambient, 1, budget)?;
-    let copied = cas.state.region(root.logical_id())?.clone();
+    let copied = cas.state.region(root.logical_id(), budget)?.clone();
     admit(
         cas,
         &Draft::FamilyRegion {
@@ -251,7 +266,7 @@ fn lift(
 ) -> Result<Handle, Fault> {
     budget.work(1, AT)?;
     budget.check(BudgetKind::Depth, depth, AT)?;
-    let source = cas.state.region(root)?.clone();
+    let source = cas.state.region(root, budget)?.clone();
     let next = depth.saturating_add(1);
     let expression = match source.expression {
         RegionExpr::Ambient => RegionExpr::Ambient,

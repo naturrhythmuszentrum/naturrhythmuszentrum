@@ -56,7 +56,7 @@ pub(crate) fn execute(
             },
         };
         let certificate = produce(candidate, &mut claim, map_kind, generation)?;
-        let header = candidate.context_header(&request.context)?;
+        let header = candidate.context_header(&request.context, generation)?;
         claim.result =
             crate::pullback_output::build(candidate, &header, &claim, &certificate, generation)?;
         let result = seal(
@@ -83,8 +83,14 @@ fn seal(
     checker: &mut Budget,
 ) -> Result<SearchResult, Fault> {
     let mut plan = Plan::new(policy);
-    let before = cas.state.expression(claim.map.logical_id())?.unfolded;
-    let after = cas.state.expression(claim.result.logical_id())?.unfolded;
+    let before = cas
+        .state
+        .expression(claim.map.logical_id(), generation)?
+        .unfolded;
+    let after = cas
+        .state
+        .expression(claim.result.logical_id(), generation)?
+        .unfolded;
     plan.expansion(before, after, generation)?;
     let rule = match claim.mode {
         PullbackMode::Affine => Primitive::DistAffinePullback,
@@ -173,7 +179,10 @@ fn inverse(
     scale: &Rational,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let definition = cas.state.space(cas.checked(space)?)?.clone();
+    let definition = cas
+        .state
+        .space(cas.checked(space, budget)?, budget)?
+        .clone();
     let domain = cas.handle(definition.domain);
     let model = crate::boundary_regions::term(
         cas,

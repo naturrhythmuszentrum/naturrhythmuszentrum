@@ -155,7 +155,7 @@ impl LcOmegaCorrespondence {
         let live = self.declaration.retained_bytes()? + self.retained_bytes();
         budget.with_retained_payload(live, AT, |budget| {
             accounting::original(1, budget)?;
-            let request = self.receipt.request(&self.cas)?;
+            let request = self.receipt.request(&self.cas, budget)?;
             self.declaration.check_same(expected, budget)?;
             accounting::original(1, budget)?;
             if request.arithmetic != expected_arithmetic {
@@ -262,7 +262,7 @@ fn seal(
     budget.with_retained_payload(live, AT, |budget| {
         budget.with_retained_payload(declaration.retained_bytes()?, AT, |budget| {
             accounting::original(1, budget)?;
-            compare(receipt.request(&cas)?, expected, budget)
+            compare(receipt.request(&cas, budget)?, expected, budget)
         })?;
         let declaration = declaration.share(budget)?;
         budget.with_retained_payload(declaration.retained_bytes()?, AT, |budget| {

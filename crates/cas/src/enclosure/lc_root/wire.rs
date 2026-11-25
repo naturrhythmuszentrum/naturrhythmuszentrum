@@ -28,7 +28,7 @@ pub(super) fn scope(cas: &Cas, request: &Request, budget: &mut Budget) -> Result
     let mut live = headers;
     for handle in request.handles() {
         let blob = budget.with_retained_payload(live, AT, |budget| {
-            crate::wire_build::syntax_key(cas, cas.checked(handle)?, budget)
+            crate::wire_build::syntax_key(cas, cas.checked(handle, budget)?, budget)
         })?;
         live = live.saturating_add(blob.capacity() as u64);
         budget.check(BudgetKind::StagedPayloadBytes, live, AT)?;

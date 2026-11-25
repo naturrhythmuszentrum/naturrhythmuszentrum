@@ -29,7 +29,15 @@ pub(crate) fn check(
             space,
             order,
         } => {
-            if from_equality(cas, distribution, derivative, space, *order, premises)? {
+            if from_equality(
+                cas,
+                distribution,
+                derivative,
+                space,
+                *order,
+                premises,
+                budget,
+            )? {
                 return Ok(());
             }
             if *order > 1 {
@@ -46,7 +54,7 @@ pub(crate) fn check(
             crate::distribution_linear::equal_terms(cas, &expected, derivative, premises, budget)
         }
         DistributionStatement::Equality { left, right, space } => {
-            equation(cas, left, right, space, premises)
+            equation(cas, left, right, space, premises, budget)
         }
         DistributionStatement::Pairing {
             pairing,
@@ -64,8 +72,9 @@ fn equation(
     right: &Handle,
     space: &Handle,
     premises: &[CheckedApplication],
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
-    let formal = cas.state.expression(left.logical_id())?;
+    let formal = cas.state.expression(left.logical_id(), budget)?;
     let Operator::DistributionDerivative { order } = formal.operator else {
         return Err(invalid());
     };
@@ -86,6 +95,7 @@ fn from_equality(
     space: &Handle,
     order: u32,
     premises: &[CheckedApplication],
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, Fault> {
     for premise in premises {
         let Statement::Distribution(value) = &premise.judgment.statement else {
@@ -102,7 +112,7 @@ fn from_equality(
         if right != output || actual != space {
             continue;
         }
-        let value = cas.state.expression(left.logical_id())?;
+        let value = cas.state.expression(left.logical_id(), budget)?;
         if value.operator == (Operator::DistributionDerivative { order })
             && value.operands == [input.logical_id()]
         {
@@ -161,7 +171,7 @@ pub(crate) fn expand(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let header = cas.expression_header(input)?;
+    let header = cas.expression_header(input, budget)?;
     let terms = crate::distribution_linear::terms(cas, input.logical_id(), &[], budget)?;
     let mut result = crate::distribution_terms::node(
         cas,
@@ -203,7 +213,7 @@ fn term_derivative(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let expression = cas.state.expression(term.logical_id())?.clone();
+    let expression = cas.state.expression(term.logical_id(), budget)?.clone();
     if let Operator::Delta { order } = expression.operator {
         let order = order.checked_add(1).ok_or_else(invalid)?;
         budget.specialized(BudgetKind::DeltaOrder, u64::from(order), false, AT)?;
@@ -249,14 +259,14 @@ fn action(
 ) -> Result<(), Fault> {
     budget.specialized(BudgetKind::PairingSteps, 1, true, AT)?;
     crate::distribution_action::well_formed(cas, pairing, space, premises, budget)?;
-    let pair = cas.state.expression(pairing.logical_id())?.clone();
+    let pair = cas.state.expression(pairing.logical_id(), budget)?.clone();
     if pair.operator != Operator::Pair {
         return Err(invalid());
     }
     let [distribution, test] = pair.operands.as_slice() else {
         return Err(invalid());
     };
-    let source = cas.state.expression(*distribution)?.clone();
+    let source = cas.state.expression(*distribution, budget)?.clone();
     if source.operator != (Operator::DistributionDerivative { order: 1 }) {
         return Err(invalid());
     }

@@ -242,13 +242,14 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<(Handle, bool), Fault> {
         let at = Location::new("request preparation");
-        let context = self.checked(&request.context)?;
-        crate::context::require_closed(&self.state, context)?;
+        let context = self.checked(&request.context, budget)?;
+        crate::context::require_closed(&self.state, context, budget)?;
         for premise in &request.premises {
             budget.work(1, at)?;
             crate::context::require_closed(
                 &self.state,
-                self.checked(&premise.judgment().context)?,
+                self.checked(&premise.judgment().context, budget)?,
+                budget,
             )?;
         }
         if let Task::Pullback { map_kind, .. } = &request.task {
@@ -265,7 +266,7 @@ impl Cas {
         budget.check(BudgetKind::StagedPayloadBytes, staging, at)?;
         budget.work(staging, at)?;
         for input in &request.inputs {
-            self.checked(&input.root)?;
+            self.checked(&input.root, budget)?;
             if input.root != input.receipt.root {
                 return Err(Fault::invalid(InvalidCode::Receipt, at));
             }
@@ -281,10 +282,10 @@ impl Cas {
             .try_reserve_exact(request.premises.len())
             .map_err(|_| Fault::allocation(at))?;
         for premise in &request.premises {
-            self.checked(premise.proof())?;
+            self.checked(premise.proof(), budget)?;
             premises.push(Reference::Existing(premise.proof().clone()));
         }
-        let field = &self.state.context(context)?.environment.field;
+        let field = &self.state.context(context, budget)?.environment.field;
         let unsupported = match request.task.scalar() {
             Some(Operation::Differentiate(_) | Operation::Jacobian(_)) => *field != Field::Real,
             Some(Operation::SquareFree(_)) => !matches!(field, Field::Rational | Field::Real),
@@ -384,15 +385,18 @@ pub(crate) fn validate(
 ) -> Result<(), Fault> {
     let at = Location::new("request validation");
     limits.validate()?;
-    let context = state.context(context)?;
+    let context = state.context(context, budget)?;
     let mut encoded = Encoder::new(budget, at);
     crate::task::encode(task, &mut encoded)?;
     let length = size(encoded.finish().len(), at)?;
     budget.work(length, at)?;
     validate_task(state, task, context, budget)?;
     for input in inputs {
-        let (header, scope) =
-            crate::descriptor::metadata(state, state.occurrence(*input)?.expression)?;
+        let (header, scope) = crate::descriptor::metadata(
+            state,
+            state.occurrence(*input, budget)?.expression,
+            budget,
+        )?;
         if !scope.is_empty() || !crate::header::embeds(state, header, context.header_id, budget)? {
             return Err(Fault::invalid(InvalidCode::Scope, at));
         }
@@ -401,7 +405,7 @@ pub(crate) fn validate(
         return crate::solving::graph::request(state, spec, context, inputs, budget);
     }
     let Some(operation) = task.scalar() else {
-        validate_native_inputs(state, task, inputs)?;
+        validate_native_inputs(state, task, inputs, budget)?;
         return Ok(());
     };
     let operation = &operation;
@@ -417,9 +421,11 @@ pub(crate) fn validate(
         .first()
         .copied()
         .ok_or_else(|| Fault::invalid(InvalidCode::Sort, at))?;
-    let first_sort = &state.expression(state.occurrence(first)?.expression)?.sort;
+    let first_sort = &state
+        .expression(state.occurrence(first, budget)?.expression, budget)?
+        .sort;
     for input in inputs {
-        let expression = state.expression(state.occurrence(*input)?.expression)?;
+        let expression = state.expression(state.occurrence(*input, budget)?.expression, budget)?;
         budget.work(size(context.header.len(), at)?, at)?;
         if !expression.scope.is_empty()
             || !crate::header::embeds(state, expression.header, context.header_id, budget)?
@@ -499,67 +505,67 @@ fn validate_task(
     let at = Location::new("task validation");
     for reference in task.references() {
         budget.work(1, at)?;
-        let (header, scope) = crate::descriptor::metadata(state, reference.logical_id())?;
+        let (header, scope) = crate::descriptor::metadata(state, reference.logical_id(), budget)?;
         if !scope.is_empty() || !crate::header::embeds(state, header, context.header_id, budget)? {
             return Err(Fault::invalid(InvalidCode::Context, at));
         }
     }
     if let Task::ApplyAt { point, .. } = task {
-        state.expression(point.logical_id())?;
+        state.expression(point.logical_id(), budget)?;
     }
     if let Task::Merge { proposed_value, .. } = task {
-        state.expression(proposed_value.logical_id())?;
+        state.expression(proposed_value.logical_id(), budget)?;
     }
     if let Task::Pair {
         action_mode: crate::task::ActionMode::NearSupport { neighborhood },
         ..
     } = task
     {
-        state.region(neighborhood.logical_id())?;
+        state.region(neighborhood.logical_id(), budget)?;
     }
     match task {
         Task::Equal { domain, .. } | Task::Differentiate { domain, .. } => {
-            state.region(domain.logical_id())?;
+            state.region(domain.logical_id(), budget)?;
             if task.scalar().is_some()
                 && domain.logical_id() != context.admissible
                 && !matches!(task, Task::Differentiate { layer: crate::domain_model::Layer::Pointwise, .. }
-                    if matches!(state.region(domain.logical_id())?.ambient, crate::domain_model::AmbientDomain::Real(_)))
+                    if matches!(state.region(domain.logical_id(), budget)?.ambient, crate::domain_model::AmbientDomain::Real(_)))
             {
                 return Err(Fault::invalid(InvalidCode::Context, at));
             }
         }
         Task::Coverage { domain } | Task::Select { region: domain } => {
-            state.region(domain.logical_id())?;
+            state.region(domain.logical_id(), budget)?;
         }
         Task::Eliminate { regions, .. } | Task::Merge { regions, .. } => {
             budget.check(BudgetKind::CaseArms, size(regions.len(), at)?, at)?;
             for region in regions {
-                state.region(region.logical_id())?;
+                state.region(region.logical_id(), budget)?;
             }
         }
         Task::Limit(germ) => {
-            state.boundary(germ.point.logical_id())?;
+            state.boundary(germ.point.logical_id(), budget)?;
         }
         Task::Series(series) => {
-            state.boundary(series.at.point.logical_id())?;
+            state.boundary(series.at.point.logical_id(), budget)?;
             budget.check(BudgetKind::JetOrder, u64::from(series.order), at)?;
         }
         Task::Boundary { point, .. } => {
-            state.boundary(point.logical_id())?;
+            state.boundary(point.logical_id(), budget)?;
         }
         Task::Pair { space, .. }
         | Task::SmoothMultiply { space }
         | Task::EmbedRegular { space }
         | Task::PrimitiveUnique { space } => {
-            state.space(space.logical_id())?;
+            state.space(space.logical_id(), budget)?;
         }
         Task::Pullback {
             source_space,
             target_space,
             map_kind,
         } => {
-            state.space(source_space.logical_id())?;
-            state.space(target_space.logical_id())?;
+            state.space(source_space.logical_id(), budget)?;
+            state.space(target_space.logical_id(), budget)?;
             crate::pullback_wire::validate_intent(map_kind, budget)?;
         }
         _ => {}
@@ -568,7 +574,12 @@ fn validate_task(
 }
 
 /// Native task arity and root kinds are checked before any executable producer runs.
-fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> Result<(), Fault> {
+fn validate_native_inputs(
+    state: &State,
+    task: &Task,
+    inputs: &[LogicalId],
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
     let at = Location::new("native request inputs");
     let expected = match task {
         Task::PrimitiveUnique { .. }
@@ -596,11 +607,11 @@ fn validate_native_inputs(state: &State, task: &Task, inputs: &[LogicalId]) -> R
         return Err(Fault::invalid(InvalidCode::Sort, at));
     }
     for input in inputs {
-        let root = state.occurrence(*input)?.expression;
+        let root = state.occurrence(*input, budget)?.expression;
         if matches!(task, Task::ElaborateCases) {
-            state.source_form(root)?;
+            state.source_form(root, budget)?;
         } else {
-            state.expression(root)?;
+            state.expression(root, budget)?;
         }
     }
     Ok(())

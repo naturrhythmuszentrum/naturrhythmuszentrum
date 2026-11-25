@@ -67,12 +67,12 @@ pub(super) fn work(replay: bool) -> u64 {
     assert_eq!((syntax, scope, wire), (217_160, 9_924, 10_119));
     let registered = if replay {
         // Reader reads Q bytes, allocates twice the 28-byte name and ten 24-byte handles.
-        345 + (wire + 296) + syntax + scope + 2 * wire + (wire + 1167) + (wire + 3) + 256
+        345 + (wire + 296) + syntax + scope + 2 * wire + (wire + 1167) + (wire + 3) + 256 + 5
     } else {
-        509 + syntax + scope + wire + (wire + 1191) + (wire + 3) + 256
+        509 + syntax + scope + wire + (wire + 1191) + (wire + 3) + 256 + 5
     };
     let total = 821 + rational_pool + rational_match + admission() + registered;
-    assert_eq!(total, if replay { 343_677 } else { 323_331 });
+    assert_eq!(total, if replay { 343_917 } else { 323_571 });
     total
 }
 
@@ -107,8 +107,9 @@ fn admission() -> u64 {
         })
         .sum::<u64>();
     assert_eq!((header, insert, expressions), (13629, 1152, 25718));
-    let total = encoded + 5 * 32 + pending + 256 + 40 + header + insert + expressions;
-    assert_eq!(total, 57567);
+    let local_map = 70 + 80 + 5 + 80;
+    let total = encoded + 5 * 32 + pending + 256 + 40 + header + insert + expressions + local_map;
+    assert_eq!(total, 57802);
     total
 }
 

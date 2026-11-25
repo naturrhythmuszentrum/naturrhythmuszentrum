@@ -79,7 +79,7 @@ fn order_identities(
     region: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let stored = polynomial(&cas.state, &relation.polynomial)?;
+    let stored = polynomial(&cas.state, &relation.polynomial, budget)?;
     let engine = Engine {
         state: &cas.state,
         domain: &stored.domain,
@@ -154,16 +154,18 @@ fn order(
         return Err(invalid());
     }
     let unity = certificate.unity.as_ref().ok_or_else(invalid)?;
-    let expression = cas.state.expression(cas.checked(&order.value)?)?;
+    let expression = cas
+        .state
+        .expression(cas.checked(&order.value, budget)?, budget)?;
     if !matches!((&expression.operator, &expression.attachment), (Operator::RootValue { slot: 0 }, Some(ExpressionAttachment::SelectedRoot(id))) if *id == unity.logical_id())
     {
         return Err(invalid());
     }
-    let selected = super::selected::selection(cas, unity)?;
+    let selected = super::selected::selection(cas, unity, budget)?;
     let [handle] = selected.relations.as_slice() else {
         return Err(invalid());
     };
-    let relation = super::selected::relation(cas, handle)?;
+    let relation = super::selected::relation(cas, handle, budget)?;
     if relation.region != order.region {
         return Err(invalid());
     }
@@ -190,7 +192,10 @@ fn unity(
             && let SolveStatement::RootOrder(value) = statement.as_ref()
             && (&value.region, value.order) == (evaluation.region, order)
         {
-            let expression = evaluation.cas.state.expression(value.value.logical_id())?;
+            let expression = evaluation
+                .cas
+                .state
+                .expression(value.value.logical_id(), budget)?;
             if matches!(&expression.attachment, Some(ExpressionAttachment::SelectedRoot(id)) if *id == selected.logical_id())
             {
                 return evaluation.expression(value.value.logical_id(), true, budget);
@@ -258,8 +263,8 @@ fn coverage(
     let SolveStatement::Coverage(coverage) = statement.as_ref() else {
         return Err(invalid());
     };
-    let original = problem(cas, &coverage.problem)?;
-    super::proof::region(cas, &draft.context, original, &coverage.region)?;
+    let original = problem(cas, &coverage.problem, budget)?;
+    super::proof::region(cas, &draft.context, original, &coverage.region, budget)?;
     super::member::contained(cas, &coverage.region, &original.region, budget)?;
     let evaluation = Evaluation {
         exclusions: &[],
@@ -273,13 +278,16 @@ fn coverage(
         free: &[],
         bound: &[],
     };
-    let selected =
-        super::selected::selection(cas, certificate.selection.as_ref().ok_or_else(invalid)?)?;
+    let selected = super::selected::selection(
+        cas,
+        certificate.selection.as_ref().ok_or_else(invalid)?,
+        budget,
+    )?;
     let [handle] = selected.relations.as_slice() else {
         return Err(invalid());
     };
-    let relation = super::selected::relation(cas, handle)?;
-    let stored = polynomial(&cas.state, &relation.polynomial)?;
+    let relation = super::selected::relation(cas, handle, budget)?;
+    let stored = polynomial(&cas.state, &relation.polynomial, budget)?;
     if stored
         .terms
         .first()
@@ -348,7 +356,7 @@ fn zero(
         budget,
     )?;
     evaluation.zero(&value, budget)?;
-    let original = problem(evaluation.cas, &coverage.problem)?;
+    let original = problem(evaluation.cas, &coverage.problem, budget)?;
     let expected = unknown.pow(certificate.order, &evaluation.engine, budget)?;
     if !super::product::equation(evaluation, original, budget)?.equals(
         &expected,

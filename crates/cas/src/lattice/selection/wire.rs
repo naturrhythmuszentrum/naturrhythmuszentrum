@@ -276,7 +276,7 @@ pub(super) fn payload(
 ) -> Result<u64, Fault> {
     let mut out = Encoder::new(budget, super::AT);
     let mut write = |handle: &Handle, out: &mut Encoder<'_>| {
-        cas.checked(handle)?;
+        cas.checked(handle, out.budget())?;
         crate::statement::handle(handle, out)
     };
     encode(expected, 29, &mut out, &mut write)?;
@@ -299,7 +299,7 @@ pub(crate) fn measure(
 ) -> Result<(), Fault> {
     let mut out = Encoder::new(budget, super::AT);
     certificate(value, &mut out, &mut |handle, out| {
-        cas.checked(handle)?;
+        cas.checked(handle, out.budget())?;
         crate::statement::handle(handle, out)
     })?;
     let bytes = size(out.finish().len(), super::AT)?.saturating_mul(32);
@@ -327,8 +327,8 @@ pub(crate) fn dependencies(
         .map_err(|_| Fault::allocation(super::AT))?;
     budget.with_retained_payload(retained, super::AT, |budget| {
         let mut out = Encoder::new(budget, super::AT);
-        certificate(value, &mut out, &mut |handle, _out| {
-            edges.push((cas.checked(handle)?, Edge::DependsOn));
+        certificate(value, &mut out, &mut |handle, out| {
+            edges.push((cas.checked(handle, out.budget())?, Edge::DependsOn));
             Ok(())
         })
     })

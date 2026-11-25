@@ -51,7 +51,10 @@ fn retained_law_preparation_refusals_return_graph() -> TestResult {
                 &mut account,
             )
             .expect_err("preparation refuses");
-        returned.expression(&root)?;
+        returned.expression(
+            &root,
+            &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+        )?;
         assert_eq!(crate::loan::fault::Injection::attempts(), 0);
         assert_eq!(heap.loans.debits.len(), 0);
         match mode {
@@ -213,6 +216,9 @@ fn retained_law_original_work_prefix() -> TestResult {
         RetainedExpm1Error::Preparation(PreparedExpm1Error::Exact(_))
     ));
     assert_eq!(account.usage().work, 7);
-    returned.expression(&request.original.target)?;
+    returned.expression(
+        &request.original.target,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     Ok(())
 }

@@ -21,13 +21,16 @@ impl Cas {
     pub fn split_certificate(
         &self,
         witness: &crate::proof_model::VerifiedWitness,
+        budget: &mut Budget,
     ) -> Result<&SplitCertificate, Fault> {
-        let crate::graph::Vertex::Proof(application) =
-            self.state.node(self.checked(witness.proof())?)?
+        let crate::graph::Vertex::Proof(application) = self
+            .state
+            .node(self.checked(witness.proof(), budget)?, budget)?
         else {
             return Err(invalid());
         };
-        let crate::graph::Vertex::ScopedApplication(application) = self.state.node(*application)?
+        let crate::graph::Vertex::ScopedApplication(application) =
+            self.state.node(*application, budget)?
         else {
             return Err(invalid());
         };
@@ -58,8 +61,11 @@ pub(crate) fn check(
         return Err(invalid());
     }
     measure(certificate, budget)?;
-    let context = cas.state.context(cas.checked(&draft.context)?)?.admissible;
-    crate::case_check::subset(cas, cas.checked(&value.domain)?, context, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?
+        .admissible;
+    crate::case_check::subset(cas, cas.checked(&value.domain, budget)?, context, budget)?;
     let expected = crate::split_geometry::reconstruct(cas, value, budget)?;
     if certificate.partition != expected.partition
         || certificate.points != expected.points

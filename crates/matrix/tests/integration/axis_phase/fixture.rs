@@ -176,7 +176,10 @@ pub(in crate::integration) fn enclosure(
 ) -> TestResult<RationalEnclosure> {
     let spec = fixture.case.specification();
     let cas = fixture.graph.lock().map_err(|_| "graph poisoned")?;
-    let input_family = cas.admissible_region(&spec.context)?;
+    let input_family = cas.admissible_region(
+        &spec.context,
+        &mut nrz_bindings::Budget::new(nrz_bindings::Limits::default())?,
+    )?;
     drop(cas);
     Ok(RationalEnclosure {
         target: spec.target.clone(),

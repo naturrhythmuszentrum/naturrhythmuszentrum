@@ -165,7 +165,7 @@ fn lc_relation_timing_exact_lifted_cycles() -> TestResult {
     let cycles = vec![number("1")?, number("1")?];
     let mut measured = ledger()?;
     let cover = timing.pairs_cover(cycles.clone(), &pi()?, &mut measured)?;
-    assert_eq!(measured.usage().work, 1_403_296);
+    assert_eq!(measured.usage().work, 1_404_973);
     assert_eq!(cover.cycles(), cycles);
     assert_eq!(cover.rate(), &[number("20/11")?, number("20/9")?]);
     lifted_work_boundaries(&timing, &cover)
@@ -334,30 +334,32 @@ fn check_fibres(cover: &LcTimingCover) -> TestResult {
 fn lifted_work_boundaries(timing: &LcSampleTimes, cover: &LcTimingCover) -> TestResult {
     let cycles = vec![number("1")?, number("1")?];
     let pi = pi()?;
-    for (remaining, succeeds) in [(1_403_296, true), (1_403_295, false)] {
+    for (remaining, succeeds) in [(1_404_973, true), (1_404_972, false)] {
         let mut budget = literal_budget(remaining)?;
         let outcome = timing.pairs_cover(cycles.clone(), &pi, &mut budget);
         assert_eq!(outcome.is_ok(), succeeds);
         if succeeds {
             assert_eq!(outcome?.rate(), cover.rate());
-            assert_eq!(budget.usage().work, 1_403_296 + 17);
+            assert_eq!(budget.usage().work, 1_404_973 + 17);
         } else {
             assert_work_refusal(&outcome);
         }
         assert!(budget.usage().work >= 17);
     }
+    // Each witness adds 316 retained kinds + 105 local kinds + 368 identity
+    // + 368 vertices = 1157 Work. The 17 earlier caller Work is separate.
     for (case, rate, limits) in [
         (
             "minimum rate, fixed phase five",
             "20/11",
-            [895_902, 895_901],
+            [897_059, 897_058],
         ),
         (
             "midpoint rate, fixed phase five",
             "200/99",
-            [898_495, 898_494],
+            [899_652, 899_651],
         ),
-        ("maximum rate, fixed phase five", "20/9", [893_118, 893_117]),
+        ("maximum rate, fixed phase five", "20/9", [894_275, 894_274]),
     ] {
         let parameters = parameters(number(rate)?, number("5")?);
         for (remaining, succeeds) in limits.into_iter().zip([true, false]) {

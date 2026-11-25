@@ -223,7 +223,9 @@ fn factor(
         }),
         &mut ledger()?,
     )?;
-    let domain = frame.cas.admissible_region(&context)?;
+    let domain = frame
+        .cas
+        .admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?;
     let (function, _) = frame.cases(&relation, n.clone())?;
     let [lower, upper] = spec.endpoints;
     let family = IntegerFamily {
@@ -508,7 +510,7 @@ fn bounded(kind: BudgetKind, amount: u64) -> TestResult<Budget> {
         BudgetKind::ConditionAtoms => limits.condition_atoms = amount,
         _ => return Err("unsupported range budget fixture".into()),
     }
-    Ok(Budget::new(limits)?)
+    Ok(nrz_cas::limits::Budget::new(limits)?)
 }
 
 fn boundary(

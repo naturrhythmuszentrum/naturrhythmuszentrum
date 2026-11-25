@@ -27,8 +27,12 @@ fn witnesses(
     let mut values = vector(certificate.witnesses.len(), budget)?;
     for (witness, handle) in certificate.witnesses.iter().zip(&selection.relations) {
         let value = evaluation.expression(witness.logical_id(), true, budget)?;
-        let relation = super::selected::relation(evaluation.cas, handle)?;
-        if evaluation.cas.state.expression(witness.logical_id())?.sort
+        let relation = super::selected::relation(evaluation.cas, handle, budget)?;
+        if evaluation
+            .cas
+            .state
+            .expression(witness.logical_id(), budget)?
+            .sort
             != crate::model::Sort::Value(crate::model::AtomicSort::Scalar(relation.ambient.clone()))
         {
             return Err(invalid());
@@ -50,14 +54,17 @@ fn unique(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     for handle in &selection.relations {
-        let relation = super::selected::relation(evaluation.cas, handle)?;
-        let stored = polynomial(&evaluation.cas.state, &relation.polynomial)?;
+        let relation = super::selected::relation(evaluation.cas, handle, budget)?;
+        let stored = polynomial(&evaluation.cas.state, &relation.polynomial, budget)?;
         let leading = stored.terms.first().ok_or_else(invalid)?;
         if leading.exponents != [1] {
             return Err(invalid());
         }
-        let SolveDraft::CoefficientMap(map) =
-            crate::solving::graph::object(&evaluation.cas.state, relation.map.logical_id())?
+        let SolveDraft::CoefficientMap(map) = crate::solving::graph::object(
+            &evaluation.cas.state,
+            relation.map.logical_id(),
+            budget,
+        )?
         else {
             return Err(invalid());
         };
@@ -87,7 +94,7 @@ pub(crate) fn check(
         }
         let _attribution = crate::work_observation::Scope::phase("existence");
         crate::work_observation::observe!(budget, super::proof::AT, {
-            let selected = super::selected::selection(cas, &certificate.target)?;
+            let selected = super::selected::selection(cas, &certificate.target, budget)?;
             if !matches!(
                 selected.mode,
                 SelectionMode::Any | SelectionMode::Constrained
@@ -99,8 +106,11 @@ pub(crate) fn check(
                 crate::graph::size(selected.relations.len(), super::proof::AT)?,
                 super::proof::AT,
             )?;
-            let first =
-                super::selected::relation(cas, selected.relations.first().ok_or_else(invalid)?)?;
+            let first = super::selected::relation(
+                cas,
+                selected.relations.first().ok_or_else(invalid)?,
+                budget,
+            )?;
             let Statement::Solve(statement) = &draft.conclusion else {
                 return Err(invalid());
             };
@@ -114,7 +124,10 @@ pub(crate) fn check(
                 _ => false,
             };
             if !valid
-                || cas.state.context(cas.checked(&draft.context)?)?.admissible
+                || cas
+                    .state
+                    .context(cas.checked(&draft.context, budget)?, budget)?
+                    .admissible
                     != first.region.logical_id()
             {
                 return Err(invalid());
@@ -122,7 +135,7 @@ pub(crate) fn check(
             for slot in &certificate.compatibility {
                 premise(premises, *slot)?;
             }
-            let stored = polynomial(&cas.state, &first.polynomial)?;
+            let stored = polynomial(&cas.state, &first.polynomial, budget)?;
             let evaluation = Evaluation {
                 exclusions: &[],
                 cas,

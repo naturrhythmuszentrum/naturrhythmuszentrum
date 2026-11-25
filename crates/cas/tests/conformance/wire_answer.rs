@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete-answer replay binds both expected claims and requires actual checked coverage.
 
-use crate::testing::answer::{budget, encoded, prepared, refused};
+use crate::testing::answer::{encoded, fresh_budget, prepared, refused};
 use crate::testing::common::TestResult;
 use nrz_cas::proof::Statement;
 use nrz_cas::solving::{SolveForm, SolveStatement};
@@ -95,11 +95,15 @@ fn complete_answer_requires_coverage_dependency() -> TestResult {
     assert_eq!(step.premises, [1]);
     step.premises.clear();
     assert_eq!(step.premises, [] as [u32; 0]);
-    let witness = source
+    let witness =
+        source
+            .base
+            .cas
+            .check_proof(&source.base.context, &[step], &mut fresh_budget()?)?;
+    let bytes = source
         .base
         .cas
-        .check_proof(&source.base.context, &[step], &mut budget()?)?;
-    let bytes = source.base.cas.export_witness(&witness, &mut budget()?)?;
+        .export_witness(&witness, &mut fresh_budget()?)?;
     let mut receiver = prepared()?;
     refused(&mut receiver, &bytes)
 }
@@ -115,8 +119,11 @@ fn encoded_other_set() -> TestResult<Vec<u8>> {
         source
             .base
             .cas
-            .check_proof(&source.base.context, &source.steps, &mut budget()?)?;
-    Ok(source.base.cas.export_witness(&witness, &mut budget()?)?)
+            .check_proof(&source.base.context, &source.steps, &mut fresh_budget()?)?;
+    Ok(source
+        .base
+        .cas
+        .export_witness(&witness, &mut fresh_budget()?)?)
 }
 
 /// A reachable coverage theorem for a different set cannot satisfy a same-source presentation.
@@ -195,7 +202,7 @@ fn complete_answer_cumulative_ledger() -> TestResult {
     use nrz_cas::limits::{Budget, BudgetKind, Limits};
     let bytes = encoded()?;
     let mut baseline = prepared()?;
-    let mut measured = budget()?;
+    let mut measured = fresh_budget()?;
     baseline.base.cas.replay_answer(
         &bytes,
         &baseline.coverage,

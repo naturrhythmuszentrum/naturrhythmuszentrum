@@ -120,16 +120,18 @@ pub(crate) fn attempt(
 /// Successful receipts at narrowed ceilings differ where existing charges use policy bounds.
 /// The literal checker charges the component ceiling; declaration comparison and admission charge the name ceiling.
 /// Each cold and warm entry was measured separately, including the coupled intermediate policy.
+/// The cold Guarded narrowed successes add 22+2+26+26 = 76 local-entry
+/// Work; cold `Replay` `NameBytes` adds 8+2+12+12 = 34. Warm receipts stay at unchanged operation Work.
 const RECEIPTS: [(Operation, bool, BudgetKind, u64); 8] = [
-    (Operation::Guarded, false, BudgetKind::NameBytes, 104_040),
+    (Operation::Guarded, false, BudgetKind::NameBytes, 104_116),
     (Operation::Guarded, true, BudgetKind::NameBytes, 104_040),
-    (Operation::Guarded, false, BudgetKind::ComponentBits, 90_024),
+    (Operation::Guarded, false, BudgetKind::ComponentBits, 90_100),
     (Operation::Guarded, true, BudgetKind::ComponentBits, 90_024),
     (
         Operation::Guarded,
         false,
         BudgetKind::IntermediateBits,
-        90_024,
+        90_100,
     ),
     (
         Operation::Guarded,
@@ -137,7 +139,7 @@ const RECEIPTS: [(Operation, bool, BudgetKind, u64); 8] = [
         BudgetKind::IntermediateBits,
         90_024,
     ),
-    (Operation::Replay, false, BudgetKind::NameBytes, 66_643),
+    (Operation::Replay, false, BudgetKind::NameBytes, 66_677),
     (Operation::Replay, true, BudgetKind::NameBytes, 66_643),
 ];
 

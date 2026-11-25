@@ -35,7 +35,7 @@ fn roots(
         let expression = interpreter
             .cas
             .state
-            .expression(interpreter.cas.checked(handle)?)?;
+            .expression(interpreter.cas.checked(handle, budget)?, budget)?;
         let Operator::Bound { depth: 0, slot } = expression.operator else {
             return Err(invalid());
         };
@@ -126,7 +126,7 @@ fn coefficient(
     right: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let stored = polynomial(&interpreter.cas.state, &relation.polynomial)?;
+    let stored = polynomial(&interpreter.cas.state, &relation.polynomial, budget)?;
     let leading = stored.terms.first().ok_or_else(invalid)?;
     let order = *leading.exponents.first().ok_or_else(invalid)?;
     let exponent = order
@@ -173,7 +173,7 @@ fn system(
     let frame = interpreter
         .cas
         .state
-        .context(interpreter.cas.checked(context)?)?;
+        .context(interpreter.cas.checked(context, budget)?, budget)?;
     let count = evidence.roots.len();
     if frame.parent.is_none()
         || frame.frame.len() != count
@@ -275,8 +275,11 @@ pub(crate) fn discharge(
         return Ok(());
     };
     let anchor = evidence.vieta.as_ref().ok_or_else(invalid)?;
-    let SolveDraft::RootRelation(relation) =
-        crate::solving::graph::object(&interpreter.cas.state, interpreter.cas.checked(anchor)?)?
+    let SolveDraft::RootRelation(relation) = crate::solving::graph::object(
+        &interpreter.cas.state,
+        interpreter.cas.checked(anchor, budget)?,
+        budget,
+    )?
     else {
         return Err(invalid());
     };
@@ -285,7 +288,7 @@ pub(crate) fn discharge(
     {
         return Err(invalid());
     }
-    let stored = polynomial(&interpreter.cas.state, &relation.polynomial)?;
+    let stored = polynomial(&interpreter.cas.state, &relation.polynomial, budget)?;
     let leading = stored.terms.first().ok_or_else(invalid)?;
     if stored.variables.len() != 1
         || leading.exponents.as_slice()

@@ -33,11 +33,13 @@ fn premises(
     for premise in earlier {
         for reference in &premise.conditions.hypotheses {
             budget.work(1, AT)?;
-            let frame = cas.state.context(cas.checked(&reference.context)?)?;
+            let frame = cas
+                .state
+                .context(cas.checked(&reference.context, budget)?, budget)?;
             let handle = if reference.slot == 0 && frame.parent.is_some() {
                 cas.handle(frame.admissible)
             } else {
-                crate::context_check::predicate(cas, reference)?
+                crate::context_check::predicate(cas, reference, budget)?
             };
             super::independent::object(cas, &handle, scope, budget)?;
         }
@@ -110,17 +112,20 @@ pub(crate) fn check(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let frame = cas.state.context(cas.checked(&draft.context)?)?;
-        let scope = &cas.state.region(frame.admissible)?.scope;
+        let frame = cas
+            .state
+            .context(cas.checked(&draft.context, budget)?, budget)?;
+        let scope = &cas.state.region(frame.admissible, budget)?.scope;
         if scope.is_empty() {
-            if super::formal_close::boundary(cas, draft, earlier)? {
+            if super::formal_close::boundary(cas, draft, earlier, budget)? {
                 return Ok(());
             }
             for premise in earlier {
                 budget.work(1, AT)?;
                 crate::context::require_closed(
                     &cas.state,
-                    cas.checked(&premise.judgment.context)?,
+                    cas.checked(&premise.judgment.context, budget)?,
+                    budget,
                 )?;
             }
             return Ok(());

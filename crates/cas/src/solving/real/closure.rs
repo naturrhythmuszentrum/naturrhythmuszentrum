@@ -54,21 +54,22 @@ pub(crate) fn check<'a>(
         let mut pending = crate::solving::coefficients::storage::vector(0, budget)?;
         let mut seen = Map::new();
         for root in roots {
-            cas.checked(root)?;
+            cas.checked(root, budget)?;
             crate::solving::coefficients::storage::reserve(&mut pending, 1, budget)?;
-            pending.push((
-                *cas.state
-                    .indices
-                    .get(&root.logical_id())
-                    .ok_or_else(invalid)?,
-                1_u64,
-            ));
+            pending.push((cas.state.index(root.logical_id(), budget)?, 1_u64));
         }
-        let forbidden = forbidden.and_then(|handle| cas.state.indices.get(&handle.logical_id()));
+        let forbidden = if let Some(handle) = forbidden {
+            cas.state
+                .indices
+                .get(&handle.logical_id(), 0, budget, AT)?
+                .copied()
+        } else {
+            None
+        };
         while let Some((index, depth)) = pending.pop() {
             budget.work(1, AT)?;
             budget.check(BudgetKind::Depth, depth, AT)?;
-            if Some(&index) == forbidden {
+            if Some(index) == forbidden {
                 return Err(invalid());
             }
             if seen.get(&index, budget, AT)?.is_some() {
@@ -86,10 +87,7 @@ pub(crate) fn check<'a>(
                 for handle in super::closure_evidence::roots(cas, application, budget)? {
                     crate::solving::coefficients::storage::reserve(&mut pending, 1, budget)?;
                     pending.push((
-                        *cas.state
-                            .indices
-                            .get(&handle.logical_id())
-                            .ok_or_else(invalid)?,
+                        cas.state.index(handle.logical_id(), budget)?,
                         depth.saturating_add(1),
                     ));
                 }

@@ -114,7 +114,7 @@ impl Value {
         budget: &mut Budget,
     ) -> Result<Self, Fault> {
         if matches!(
-            crate::solving::coefficients::storage::domain(engine.state, engine.domain)?,
+            crate::solving::coefficients::storage::domain(engine.state, engine.domain, budget)?,
             crate::solving::CoefficientDomainData::Fraction { .. }
         ) && let Some(result) = self.shared_monomial_sum(other, engine, budget)?
         {
@@ -395,7 +395,7 @@ mod tests {
             state: &fixture.cas.state,
             domain: &fixture.algebra,
         };
-        let (_, _, base) = engine.fraction_shape()?;
+        let (_, _, base) = engine.fraction_shape(&mut budget)?;
         // Own the base handle before admitting another graph map.
         let base = base.clone();
         let ground_map = construction.mapping(&mut fixture.cas, &base, &[], &mut budget)?;

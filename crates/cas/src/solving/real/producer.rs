@@ -68,7 +68,7 @@ pub(crate) fn propose(
             SolveReason::CoveragePending,
         ));
     }
-    let original = crate::solving::elementary::proof::problem(cas, &specification.problem)?;
+    let original = crate::solving::elementary::proof::problem(cas, &specification.problem, budget)?;
     let polynomial = crate::solving::solve_search::read::polynomial(cas, original, budget)?;
     let frame = Frame {
         inner: Construction {
@@ -259,7 +259,8 @@ impl Search<'_> {
             false,
             self.budget,
         )?;
-        let original = crate::solving::elementary::proof::problem(self.cas, self.problem)?;
+        let original =
+            crate::solving::elementary::proof::problem(self.cas, self.problem, self.budget)?;
         let coefficients = original.coefficients.clone();
         let count = if mode == PredicateSplitMode::ZeroNonzero {
             2
@@ -398,8 +399,11 @@ impl Search<'_> {
             self.guard(guard, expression, mode, index)?;
             let (proposal, proof) = self.closed(child, index, &branch)?;
             self.guards.pop();
-            let SolveDraft::SolutionSet(set) =
-                crate::solving::graph::object(&self.cas.state, proposal.set.logical_id())?
+            let SolveDraft::SolutionSet(set) = crate::solving::graph::object(
+                &self.cas.state,
+                proposal.set.logical_id(),
+                self.budget,
+            )?
             else {
                 return Err(invalid().into());
             };
@@ -467,9 +471,12 @@ impl Search<'_> {
             }),
             self.budget,
         )?;
-        let region = self
-            .cas
-            .handle(self.cas.state.context(frame.logical_id())?.admissible);
+        let region = self.cas.handle(
+            self.cas
+                .state
+                .context(frame.logical_id(), self.budget)?
+                .admissible,
+        );
         self.frame.context.clone_from(&frame);
         self.frame.region.clone_from(&region);
         let result = branch(self, index);

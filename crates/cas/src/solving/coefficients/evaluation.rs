@@ -30,9 +30,9 @@ impl Engine<'_> {
         budget: &mut Budget,
     ) -> Result<(), CoefficientFailure> {
         begin(budget)?;
-        crate::context::require_closed(self.state, scope.context.logical_id())?;
-        let context = self.state.context(scope.context.logical_id())?;
-        let region = self.state.region(scope.region.logical_id())?;
+        crate::context::require_closed(self.state, scope.context.logical_id(), budget)?;
+        let context = self.state.context(scope.context.logical_id(), budget)?;
+        let region = self.state.region(scope.region.logical_id(), budget)?;
         if context.header_id != region.header || context.admissible != scope.region.logical_id() {
             return Err(invalid().into());
         }
@@ -43,7 +43,7 @@ impl Engine<'_> {
         )?;
         for witness in scope.premises {
             budget.work(1, AT)?;
-            self.state.node(witness.proof().logical_id())?;
+            self.state.node(witness.proof().logical_id(), budget)?;
             if witness.judgment().context != *scope.context {
                 return Err(invalid().into());
             }
@@ -257,7 +257,7 @@ impl Engine<'_> {
         let Value::Fraction(value) = &element.value else {
             return Err(invalid().into());
         };
-        let (_, _, base) = self.fraction_shape()?;
+        let (_, _, base) = self.fraction_shape(budget)?;
         let destination = Engine {
             state: self.state,
             domain: target,
@@ -342,7 +342,7 @@ impl Engine<'_> {
         }
         if map.mode == MapMode::Specialization
             && matches!(
-                domain(self.state, self.domain)?,
+                domain(self.state, self.domain, budget)?,
                 CoefficientDomainData::Fraction { .. }
             )
         {
@@ -429,7 +429,7 @@ impl Engine<'_> {
                 }
             }
             Value::Tower(coefficients) => {
-                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let (_, extension) = crate::solving::towers::arithmetic::level(self, budget)?;
                 let parent = Self {
                     state: self.state,
                     domain: &extension.parent,
@@ -439,7 +439,8 @@ impl Engine<'_> {
                         return Ok(Some(pending));
                     }
                 }
-                let modulus = super::storage::polynomial(self.state, &extension.polynomial)?;
+                let modulus =
+                    super::storage::polynomial(self.state, &extension.polynomial, budget)?;
                 for term in &modulus.terms {
                     let coefficient = parent.read(&term.coefficient, budget)?;
                     if let Some(pending) = parent.defined_value(&coefficient, scope, budget)? {

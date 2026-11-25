@@ -36,7 +36,7 @@ pub(super) fn expression(cas: &Cas, value: &Expression, budget: &mut Budget) -> 
     }
     for operand in &value.operands {
         budget.work(1, AT)?;
-        let child = cas.state.expression(*operand)?;
+        let child = cas.state.expression(*operand, budget)?;
         let valid = if component {
             child.sort == Sort::Value(AtomicSort::Scalar(Field::Complex))
         } else {
@@ -66,6 +66,7 @@ pub(super) fn solve(
                     &cas.state,
                     value.header.logical_id(),
                     &Sort::Value(AtomicSort::Scalar(slot.field.clone())),
+                    budget,
                 )?;
                 if claimed.as_ref().map(Handle::logical_id) != expected {
                     return Err(invalid());
@@ -73,8 +74,8 @@ pub(super) fn solve(
             }
         }
         SolveDraft::CoefficientMap(value) => mapping(cas, value, budget)?,
-        SolveDraft::SpacePlacement(value) => super::registry::placement(&cas.state, value)?,
-        SolveDraft::ScalarPiece(value) => super::incidence::validate(&cas.state, value)?,
+        SolveDraft::SpacePlacement(value) => super::registry::placement(&cas.state, value, budget)?,
+        SolveDraft::ScalarPiece(value) => super::incidence::validate(&cas.state, value, budget)?,
         SolveDraft::FamilyExpression(value) => family(cas, value, budget)?,
         SolveDraft::CoefficientEvaluation(value) => {
             super::admission::check_evaluation(&cas.state, value, budget)?;
@@ -90,15 +91,18 @@ fn family(
     value: &super::FamilyExpressionData<Handle>,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let family = super::admission::family(&cas.state, &value.family)?;
-    super::admission::projection_matches(&cas.state, &value.region, &value.family, None)?;
-    let output = super::field(&cas.state, &value.ambient)?;
+    let family = super::admission::family(&cas.state, &value.family, budget)?;
+    super::admission::projection_matches(&cas.state, &value.region, &value.family, None, budget)?;
+    let output = super::field(&cas.state, &value.ambient, budget)?;
     if value.result != Sort::Value(AtomicSort::Scalar(output)) {
         return Err(invalid());
     }
     for argument in &value.arguments {
         budget.work(1, AT)?;
-        match (argument.role, cas.state.node(argument.value.logical_id())?) {
+        match (
+            argument.role,
+            cas.state.node(argument.value.logical_id(), budget)?,
+        ) {
             (FamilyArgumentRole::Base, Vertex::Expression(term))
                 if term.sort == Sort::Value(AtomicSort::Scalar(Field::Real)) => {}
             (FamilyArgumentRole::Fibre, Vertex::Expression(term))
@@ -131,19 +135,19 @@ fn mapping(
         return Ok(());
     };
     let SolveDraft::CoefficientDomain(source) =
-        crate::solving::graph::object(&cas.state, value.source.logical_id())?
+        crate::solving::graph::object(&cas.state, value.source.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     let coordinates = match source {
         CoefficientDomainData::Fraction { coordinates, .. } => Some(
-            crate::solving::graph::coordinates(&cas.state, coordinates.logical_id())?,
+            crate::solving::graph::coordinates(&cas.state, coordinates.logical_id(), budget)?,
         ),
         _ => None,
     };
     for (position, image) in value.images.iter().enumerate() {
         budget.work(1, AT)?;
-        let expression = cas.state.expression(image.logical_id())?;
+        let expression = cas.state.expression(image.logical_id(), budget)?;
         if expression.sort != Sort::Value(AtomicSort::Scalar(field.clone())) {
             return Err(invalid());
         }

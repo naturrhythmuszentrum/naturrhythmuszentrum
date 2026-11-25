@@ -35,18 +35,19 @@ pub(super) fn check(
         let (kind, arguments) = crate::solving::elementary::evidence::predicate(
             evaluation.cas,
             predicate.logical_id(),
+            budget,
         )?;
         let [argument] = arguments else {
             return Err(invalid());
         };
         if region != evaluation.region
             || *kind != PredicateKind::Defined
-            || !defined_image(evaluation, *argument, binding.image.logical_id())?
+            || !defined_image(evaluation, *argument, binding.image.logical_id(), budget)?
         {
             return Err(invalid());
         }
     }
-    target(evaluation, mapping, &certificate.right)?;
+    target(evaluation, mapping, &certificate.right, budget)?;
     selections(evaluation, mapping, certificate, budget)
 }
 
@@ -55,16 +56,17 @@ fn target(
     evaluation: &Evaluation<'_>,
     mapping: &CoefficientEvaluationData<Handle>,
     right: &Handle,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
     match (
         &mapping.target,
-        evaluation.cas.state.node(right.logical_id())?,
+        evaluation.cas.state.node(right.logical_id(), budget)?,
     ) {
         (EvaluationTarget::Scalar { header, space }, Vertex::Expression(value)) => {
             let region = evaluation
                 .cas
                 .state
-                .region(evaluation.region.logical_id())?;
+                .region(evaluation.region.logical_id(), budget)?;
             if value.header != header.logical_id()
                 || value.ambient != Some(space.logical_id())
                 || value.scope != region.scope
@@ -77,7 +79,7 @@ fn target(
                 return Err(invalid());
             };
             let SolveDraft::SpaceFamily(shape) =
-                crate::solving::graph::object(&evaluation.cas.state, family.logical_id())?
+                crate::solving::graph::object(&evaluation.cas.state, family.logical_id(), budget)?
             else {
                 return Err(invalid());
             };
@@ -157,7 +159,7 @@ fn selected(
         if !visited.insert(id) {
             continue;
         }
-        if let Vertex::Expression(value) = evaluation.cas.state.node(id)?
+        if let Vertex::Expression(value) = evaluation.cas.state.node(id, budget)?
             && let Some(ExpressionAttachment::SelectedRoot(selection)) = &value.attachment
         {
             selections.insert(*selection);
@@ -178,17 +180,18 @@ fn defined_image(
     evaluation: &Evaluation<'_>,
     actual: LogicalId,
     expected: LogicalId,
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, Fault> {
     if actual == expected {
         return Ok(true);
     }
-    let value = evaluation.cas.state.expression(actual)?;
+    let value = evaluation.cas.state.expression(actual, budget)?;
     if value.domain != Some(evaluation.region.logical_id()) {
         return Ok(false);
     }
     let [arm] = value.arms.as_slice() else {
         return Ok(false);
     };
-    let arm = evaluation.cas.state.arm(*arm)?;
+    let arm = evaluation.cas.state.arm(*arm, budget)?;
     Ok(arm.region == evaluation.region.logical_id() && arm.value == expected)
 }

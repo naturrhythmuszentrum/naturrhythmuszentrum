@@ -147,7 +147,10 @@ fn floor(
         frame,
         RegionExpr::Meet(vec![Reference::Existing(lower), Reference::Existing(upper)]),
     )?;
-    let header = frame.cas.context_header(&frame.context)?;
+    let header = frame.cas.context_header(
+        &frame.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let nodes = frame.cas.admit(
         &[
             Draft::CaseArm(CaseArmDraft {
@@ -171,7 +174,10 @@ fn floor(
         function: nodes.last().ok_or("missing cases")?.clone(),
         coordinate: q.clone(),
         index: k,
-        domain: frame.cas.admissible_region(&frame.context)?,
+        domain: frame.cas.admissible_region(
+            &frame.context,
+            &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+        )?,
         lower: None,
         upper: None,
         count: Some(Box::new(IntegerCellRange {
@@ -226,7 +232,10 @@ pub(super) fn term(
     sort: Sort,
     operands: &[Handle],
 ) -> TestResult<Handle> {
-    let header = frame.cas.context_header(&frame.context)?;
+    let header = frame.cas.context_header(
+        &frame.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let draft = Draft::Expression(ExpressionDraft {
         space: None,
         operator,
@@ -245,7 +254,10 @@ pub(super) fn term(
 
 /// Native region under the same complete assignment frame.
 fn region(frame: &mut Fixture, expression: RegionExpr) -> TestResult<Handle> {
-    let header = frame.cas.context_header(&frame.context)?;
+    let header = frame.cas.context_header(
+        &frame.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let draft = Draft::Region(RegionDraft {
         header: Reference::Existing(header),
         scope: Vec::new(),
@@ -261,7 +273,10 @@ fn region(frame: &mut Fixture, expression: RegionExpr) -> TestResult<Handle> {
 
 /// Exact half-open ownership predicates for the existing scalar cover theorem.
 fn guard(frame: &mut Fixture, kind: PredicateKind, value: Handle) -> TestResult<Handle> {
-    let header = frame.cas.context_header(&frame.context)?;
+    let header = frame.cas.context_header(
+        &frame.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     let draft = Draft::Condition {
         header: Reference::Existing(header),
         scope: Vec::new(),
@@ -273,7 +288,10 @@ fn guard(frame: &mut Fixture, kind: PredicateKind, value: Handle) -> TestResult<
         .admit(&[draft], &mut ledger()?)?
         .pop()
         .ok_or("missing guard")?;
-    let base = frame.cas.admissible_region(&frame.context)?;
+    let base = frame.cas.admissible_region(
+        &frame.context,
+        &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?,
+    )?;
     region(
         frame,
         RegionExpr::GuardTrue {

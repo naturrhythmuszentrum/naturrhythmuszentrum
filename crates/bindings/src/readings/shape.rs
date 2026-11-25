@@ -40,7 +40,7 @@ impl ReadingAxis {
         let (sort, operator, _, header) = support::inspect(cas, index, budget)?;
         if sort != Sort::Value(AtomicSort::Integer)
             || !matches!(operator, Operator::Free(_))
-            || header != cas.context_header(context)?
+            || header != cas.context_header(context, budget)?
         {
             return Err(ReadingError::Definition);
         }

@@ -12,6 +12,6 @@ pub(crate) fn policy() -> Limits {
     }
 }
 /// One cumulative operation ledger; fixture declaration scaffolding retains its separate setup costs.
-pub(crate) fn budget() -> TestResult<Budget> {
+pub(crate) fn fresh_budget() -> TestResult<Budget> {
     Ok(Budget::new(policy())?)
 }

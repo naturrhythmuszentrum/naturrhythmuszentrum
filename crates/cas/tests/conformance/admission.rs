@@ -106,7 +106,10 @@ fn invalid_admission_preserves_witness() -> TestResult {
     let actual = cas.admit(&sources(), &mut default_budget()?)?;
     assert_eq!(actual.len(), expected.len());
     for (actual, expected) in actual.iter().zip(&expected) {
-        assert_eq!(cas.source(actual)?, control.source(expected)?);
+        assert_eq!(
+            cas.source(actual, &mut crate::testing::budgets::graph_budget()?)?,
+            control.source(expected, &mut crate::testing::budgets::graph_budget()?)?
+        );
         assert!(actual.logical_id().serial > expected.logical_id().serial);
     }
     assert_eq!(cas.counts(), control.counts());
@@ -151,7 +154,10 @@ fn exhausted_admission_preserves_witness() -> TestResult {
     let actual = cas.admit(&sources(), &mut default_budget()?)?;
     assert_eq!(actual.len(), expected.len());
     for (actual, expected) in actual.iter().zip(&expected) {
-        assert_eq!(cas.source(actual)?, control.source(expected)?);
+        assert_eq!(
+            cas.source(actual, &mut crate::testing::budgets::graph_budget()?)?,
+            control.source(expected, &mut crate::testing::budgets::graph_budget()?)?
+        );
         assert!(actual.logical_id().serial > expected.logical_id().serial);
     }
     assert_eq!(cas.counts(), control.counts());

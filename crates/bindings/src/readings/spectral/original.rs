@@ -22,12 +22,14 @@ pub(super) fn check(
 ) -> Result<[Handle; 2], Error> {
     domain::target(cas, operator, budget)?;
     budget.work(1, AT)?;
-    let SolveView::SolveProblem(problem) = cas.solve_view(coverage.original().problem())? else {
+    let SolveView::SolveProblem(problem) = cas.solve_view(coverage.original().problem(), budget)?
+    else {
         return Err(Error::Structure);
     };
     if problem.ambient != Field::Complex
         || !problem.scope.is_empty()
-        || problem.region != cas.admissible_region(&coverage.original().request().context)?
+        || problem.region
+            != cas.admissible_region(&coverage.original().request().context, budget)?
     {
         return Err(Error::Domain);
     }
@@ -96,7 +98,7 @@ fn roots(
     budget: &mut Budget,
 ) -> Result<[Handle; 2], Error> {
     budget.work(1, AT)?;
-    let SolveView::SolutionSet(set) = cas.solve_view(coverage.set())? else {
+    let SolveView::SolutionSet(set) = cas.solve_view(coverage.set(), budget)? else {
         return Err(Error::Incomplete);
     };
     let [branch] = set.branches.as_slice() else {
@@ -106,7 +108,7 @@ fn roots(
         return Err(Error::Incomplete);
     }
     budget.work(1, AT)?;
-    let SolveView::SolutionBranch(branch) = cas.solve_view(branch)? else {
+    let SolveView::SolutionBranch(branch) = cas.solve_view(branch, budget)? else {
         return Err(Error::Incomplete);
     };
     if branch.problem != set.problem
@@ -139,7 +141,7 @@ fn root(
     budget: &mut Budget,
 ) -> Result<Handle, Error> {
     budget.work(1, AT)?;
-    let SolveView::Tuple(data) = cas.solve_view(tuple)? else {
+    let SolveView::Tuple(data) = cas.solve_view(tuple, budget)? else {
         return Err(Error::Incomplete);
     };
     let [value] = data.entries.as_slice() else {

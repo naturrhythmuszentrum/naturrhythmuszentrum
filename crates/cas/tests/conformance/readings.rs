@@ -330,7 +330,10 @@ fn reading_syntax_portable_closure() -> TestResult {
         Ok((fixture, reading))
     };
     let (mut source, original) = setup()?;
-    let domain = source.cas.admissible_region(&source.context)?;
+    let domain = source.cas.admissible_region(
+        &source.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let step = equality(
         &source.context,
         &domain,
@@ -344,7 +347,10 @@ fn reading_syntax_portable_closure() -> TestResult {
     assert!(witness.is_discharged());
     let bytes = source.cas.export_witness(&witness, &mut ledger()?)?;
     let (mut receiver, reading) = setup()?;
-    let domain = receiver.cas.admissible_region(&receiver.context)?;
+    let domain = receiver.cas.admissible_region(
+        &receiver.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let expected = Judgment {
         context: receiver.context.clone(),
         layer: Layer::Pointwise,

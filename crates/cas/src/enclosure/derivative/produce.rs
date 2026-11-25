@@ -45,7 +45,7 @@ pub(in crate::enclosure) fn produce(
         .map_err(|_| Fault::allocation(AT))?;
     for (index, id) in source.schedule.iter().enumerate() {
         super::super::boundary(budget, interrupt)?;
-        let expression = source.cas.state.expression(*id)?;
+        let expression = source.cas.state.expression(*id, budget)?;
         let right = if expression.operands.is_empty() {
             None
         } else {

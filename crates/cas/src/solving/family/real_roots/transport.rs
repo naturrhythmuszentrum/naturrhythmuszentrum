@@ -22,7 +22,7 @@ fn expression(
     operands: &[Handle],
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let frame = cas.state.region(region.logical_id())?;
+    let frame = cas.state.region(region.logical_id(), budget)?;
     let header = cas.handle(frame.header);
     let scope = frame.scope.clone();
     crate::solving::family::build::expression(
@@ -57,7 +57,8 @@ fn monomial(
         if *exponent == 0 {
             continue;
         }
-        let frame = crate::solving::graph::coordinates(&cas.state, coordinates.logical_id())?;
+        let frame =
+            crate::solving::graph::coordinates(&cas.state, coordinates.logical_id(), budget)?;
         let coordinate = frame.coordinates.get(index).ok_or_else(super::invalid)?;
         budget.work(
             crate::graph::size(coordinate.key.len(), super::super::AT)?,
@@ -90,7 +91,7 @@ pub(super) fn guard(
         return Ok(None);
     };
     let crate::solving::CoefficientDomainData::Fraction { coordinates, .. } =
-        crate::solving::coefficients::storage::domain(&cas.state, &value.domain)?
+        crate::solving::coefficients::storage::domain(&cas.state, &value.domain, budget)?
     else {
         return Ok(None);
     };

@@ -21,7 +21,7 @@ fn setup(keys: &[&str]) -> TestResult<(Cas, Handle, Handle)> {
         Vec::new(),
         &mut default_budget()?,
     )?;
-    let header = cas.context_header(&context)?;
+    let header = cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
     Ok((cas, context, header))
 }
 
@@ -40,7 +40,8 @@ fn request(cas: &Cas, context: &Handle, forms: &[OriginalForm]) -> TestResult<Re
         .collect::<TestResult<_>>()?;
     Ok(Request {
         task: Task::Equal {
-            domain: cas.admissible_region(context)?,
+            domain: cas
+                .admissible_region(context, &mut crate::testing::budgets::graph_budget()?)?,
             domain_contract: DomainContract::DefinedAndEqual,
         },
         context: context.clone(),
@@ -79,14 +80,20 @@ fn assert_nonzero(cas: &Cas, claim: &Judgment, key: &str) -> TestResult {
     assert_eq!(claim.residuals.len(), 1);
     let guard = claim.residuals.first().ok_or("nonzero guard missing")?;
     assert_eq!(
-        cas.predicate_kind(&guard.predicate)?,
+        cas.predicate_kind(
+            &guard.predicate,
+            &mut crate::testing::budgets::graph_budget()?
+        )?,
         &PredicateKind::NonZero
     );
     let arguments = cas.predicate_arguments(&guard.predicate, &mut default_budget()?)?;
     assert_eq!(arguments.len(), 1);
     assert_eq!(
-        cas.expression(arguments.first().ok_or("denominator missing")?)?
-            .0,
+        cas.expression(
+            arguments.first().ok_or("denominator missing")?,
+            &mut crate::testing::budgets::graph_budget()?
+        )?
+        .0,
         &Operator::Free(key.into())
     );
     Ok(())

@@ -36,7 +36,9 @@ fn residual_fixture(
         )?
         .pop()
         .ok_or("frame")?;
-    let region = f.cas.admissible_region(&frame)?;
+    let region = f
+        .cas
+        .admissible_region(&frame, &mut crate::testing::budgets::graph_budget()?)?;
     let fact = Statement::PredicateFact {
         region: region.clone(),
         predicate: predicate.clone(),

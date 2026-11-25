@@ -48,7 +48,7 @@ impl Runner<'_> {
 
     /// Replayed applications certify every earlier application reached through premise edges.
     fn dependencies(&mut self, root: &Handle) -> Result<BTreeSet<LogicalId>, Fault> {
-        let mut pending = vec![self.cas.checked(root)?];
+        let mut pending = vec![self.cas.checked(root, self.generation)?];
         let mut reached = BTreeSet::new();
         while let Some(proof) = pending.pop() {
             self.checker.work(1, AT)?;
@@ -60,10 +60,10 @@ impl Runner<'_> {
             if !reached.insert(proof) {
                 continue;
             }
-            let Vertex::Proof(application) = self.cas.state.node(proof)? else {
+            let Vertex::Proof(application) = self.cas.state.node(proof, self.checker)? else {
                 return Err(invalid());
             };
-            let premises = match self.cas.state.node(*application)? {
+            let premises = match self.cas.state.node(*application, self.checker)? {
                 Vertex::ScopedApplication(value) => &value.premises,
                 Vertex::Application(value) => &value.premises,
                 _ => return Err(invalid()),

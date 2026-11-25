@@ -12,8 +12,8 @@ use crate::solving::numeric::Gaussian;
 use crate::solving::{CoefficientDomainData, CoefficientValueData};
 
 /// Identify a ground field, refusing any implicit fraction field of a quotient.
-pub(crate) fn ground(state: &State, handle: &Handle) -> Result<Ground, Fault> {
-    match domain(state, handle)? {
+pub(crate) fn ground(state: &State, handle: &Handle, budget: &mut Budget) -> Result<Ground, Fault> {
+    match domain(state, handle, budget)? {
         CoefficientDomainData::Rational => Ok(Ground::Rational),
         CoefficientDomainData::Gaussian => Ok(Ground::Gaussian),
         _ => Err(invalid()),
@@ -23,8 +23,8 @@ pub(crate) fn ground(state: &State, handle: &Handle) -> Result<Ground, Fault> {
 /// Copy one ground coefficient using the numeric leaf's fallible adapters.
 pub(crate) fn scalar(state: &State, handle: &Handle, budget: &mut Budget) -> Result<Scalar, Fault> {
     begin(budget)?;
-    let stored = value(state, handle)?;
-    match (&stored.value, ground(state, &stored.domain)?) {
+    let stored = value(state, handle, budget)?;
+    match (&stored.value, ground(state, &stored.domain, budget)?) {
         (CoefficientValueData::Rational { value }, Ground::Rational) => {
             Ok(Scalar::Rational(rational_copy(value, budget)?))
         }
@@ -42,8 +42,8 @@ pub(crate) fn sparse(
     budget: &mut Budget,
 ) -> Result<Polynomial, Fault> {
     begin(budget)?;
-    let value = polynomial(state, handle)?;
-    let field = ground(state, &value.domain)?;
+    let value = polynomial(state, handle, budget)?;
+    let field = ground(state, &value.domain, budget)?;
     let mut terms = vector(value.terms.len(), budget)?;
     for term in &value.terms {
         terms.push(Term {

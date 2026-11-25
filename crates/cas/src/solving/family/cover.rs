@@ -97,14 +97,14 @@ fn pieces(
     let mut result = crate::solving::coefficients::storage::vector(0, budget)?;
     for group in &request.groups {
         for witness in &group.pieces {
-            cas.checked(witness.proof())?;
+            cas.checked(witness.proof(), budget)?;
             let claim = coverage(witness)?;
             if claim.problem != request.problem {
                 return Err(invalid());
             }
             let over = cas
                 .state
-                .region(claim.region.logical_id())?
+                .region(claim.region.logical_id(), budget)?
                 .lies_over
                 .clone()
                 .ok_or_else(invalid)?;

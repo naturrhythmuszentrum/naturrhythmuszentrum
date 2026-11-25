@@ -39,14 +39,14 @@ pub(crate) fn snapshot(
     let default = *policy == CostPolicy::default();
     for id in cas.state.indices.keys() {
         budget.work(32, AT)?;
-        let (proof, cost) = match cas.state.node(*id)? {
+        let (proof, cost) = match cas.state.node(*id, budget)? {
             Vertex::Proof(application) => {
-                if matches!(cas.state.node(*application)?, Vertex::ScopedApplication(value) if
+                if matches!(cas.state.node(*application, budget)?, Vertex::ScopedApplication(value) if
                     value.scalar.is_none())
                 {
                     continue;
                 }
-                let value = crate::proof_storage::application(cas, *id)?;
+                let value = crate::proof_storage::application(cas, *id, budget)?;
                 (*id, policy.weight(value.primitive)?)
             }
             Vertex::Shortcut { proof, cost } if default => (*proof, *cost),
@@ -56,7 +56,7 @@ pub(crate) fn snapshot(
                 policy: identity,
                 ..
             } => {
-                let Vertex::Policy(previous) = cas.state.node(*identity)? else {
+                let Vertex::Policy(previous) = cas.state.node(*identity, budget)? else {
                     return Err(invalid());
                 };
                 if *previous != *policy {
@@ -66,10 +66,10 @@ pub(crate) fn snapshot(
             }
             _ => continue,
         };
-        if native_proof(cas, proof)? {
+        if native_proof(cas, proof, budget)? {
             continue;
         }
-        let value = crate::proof_storage::application(cas, proof)?;
+        let value = crate::proof_storage::application(cas, proof, budget)?;
         if value.context != context || value.relation != Relation::EqualOnDomain {
             continue;
         }
@@ -131,7 +131,7 @@ pub(crate) fn append(
             continue;
         }
         budget.check(BudgetKind::ProofNodes, size(reached.len(), AT)?, AT)?;
-        let value = crate::proof_storage::application(cas, id)?;
+        let value = crate::proof_storage::application(cas, id, budget)?;
         pending
             .try_reserve(value.premises.len())
             .map_err(|_| Fault::allocation(AT))?;
@@ -144,7 +144,7 @@ pub(crate) fn append(
     }
     let mut indices = BTreeMap::new();
     for id in reached {
-        let value = crate::proof_storage::application(cas, id)?;
+        let value = crate::proof_storage::application(cas, id, budget)?;
         let bytes = crate::proof_storage::pending_bytes(value, value.premises.len(), budget)?;
         budget.work(bytes, AT)?;
         let mut premises = Vec::new();
@@ -185,12 +185,16 @@ const fn invalid() -> Fault {
 }
 
 /// Keep every native typed proof out of the scalar projection, including stored shortcuts.
-pub(crate) fn native_proof(cas: &Cas, proof: LogicalId) -> Result<bool, Fault> {
-    let Vertex::Proof(application) = cas.state.node(proof)? else {
+pub(crate) fn native_proof(
+    cas: &Cas,
+    proof: LogicalId,
+    budget: &mut Budget,
+) -> Result<bool, Fault> {
+    let Vertex::Proof(application) = cas.state.node(proof, budget)? else {
         return Err(invalid());
     };
     Ok(
-        matches!(cas.state.node(*application)?, Vertex::ScopedApplication(value) if value.scalar.is_none()),
+        matches!(cas.state.node(*application, budget)?, Vertex::ScopedApplication(value) if value.scalar.is_none()),
     )
 }
 

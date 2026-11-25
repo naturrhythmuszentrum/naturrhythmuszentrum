@@ -175,7 +175,7 @@ fn membership(cas: &Cas, frame: &Handle, option: &Handle) -> TestResult<Applicat
         context: frame.clone(),
         rule: Primitive::ContextHypothesis,
         conclusion: Statement::Subset {
-            subset: cas.admissible_region(frame)?,
+            subset: cas.admissible_region(frame, &mut crate::testing::budgets::graph_budget()?)?,
             superset: option.clone(),
         },
         premises: Vec::new(),
@@ -266,11 +266,11 @@ fn decision_introduction_lifecycle_integer() -> TestResult {
     lifecycle(
         Example::Integer,
         &[
-            ("introduction", 323_376, 2_820, 2_775),
-            ("frame", 1_648, 1_255, 0),
+            ("introduction", 323_417, 2_820, 2_775),
+            ("frame", 1_660, 1_255, 0),
             ("interned", 1_646, 0, 0),
-            ("membership", 113_794, 1_060, 2_927),
-            ("import", 539_100, 33_902, 2_927),
+            ("membership", 113_806, 1_060, 2_927),
+            ("import", 539_524, 33_902, 2_927),
         ],
     )
 }
@@ -282,11 +282,11 @@ fn decision_introduction_lifecycle_sign() -> TestResult {
     lifecycle(
         Example::Sign,
         &[
-            ("introduction", 148_676, 2_640, 1_478),
-            ("frame", 1_648, 1_255, 0),
+            ("introduction", 148_749, 2_640, 1_478),
+            ("frame", 1_660, 1_255, 0),
             ("interned", 1_646, 0, 0),
-            ("membership", 65_237, 1_060, 1_630),
-            ("import", 238_786, 18_368, 1_630),
+            ("membership", 65_249, 1_060, 1_630),
+            ("import", 239_044, 18_368, 1_630),
         ],
     )
 }
@@ -298,11 +298,11 @@ fn decision_introduction_lifecycle_phase() -> TestResult {
     lifecycle(
         Example::Phase,
         &[
-            ("introduction", 196_666, 4_141, 2_255),
-            ("frame", 2_402, 1_426, 0),
+            ("introduction", 196_738, 4_141, 2_255),
+            ("frame", 2_414, 1_426, 0),
             ("interned", 2_400, 0, 0),
-            ("membership", 100_405, 1_111, 2_402),
-            ("import", 360_746, 28_454, 2_402),
+            ("membership", 100_417, 1_111, 2_402),
+            ("import", 361_111, 28_454, 2_402),
         ],
     )
 }
@@ -325,6 +325,6 @@ fn decision_introduction_cycle_refusal() -> TestResult {
         nrz_cas::FaultKind::Invalid(nrz_cas::InvalidCode::UnsupportedCertificate)
     );
     assert_eq!(source.cas.counts(), before);
-    assert_eq!(budget.usage().work, 238_201);
+    assert_eq!(budget.usage().work, 238_265);
     Ok(())
 }

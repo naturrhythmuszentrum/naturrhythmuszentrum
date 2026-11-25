@@ -34,7 +34,7 @@ fn decision_live_lc_costs() -> TestResult {
         .cas
         .check_proof(&source.context, &source.steps, &mut budget)?;
     let selection = budget.usage().work;
-    assert_eq!(selection - capture, 168_544);
+    assert_eq!(selection - capture, 168_637);
     let prepared = heap.prepare_ratio_decision(
         frozen,
         Arc::new(Mutex::new(source.frame.cas)),
@@ -85,8 +85,8 @@ fn decision_live_lc_costs() -> TestResult {
     assert_eq!(publication - admission, 193);
     assert_eq!(materialization - publication, 125);
     assert_eq!(current - materialization, 66);
-    assert_eq!(materialization, 174_305);
-    assert_eq!(current, 174_371);
+    assert_eq!(materialization, 174_398);
+    assert_eq!(current, 174_464);
     Ok(())
 }
 
@@ -399,10 +399,12 @@ fn decision_live_admission_work_boundaries() -> TestResult {
 
 /// Physical source, case, association and every live stage share the original caller allowance.
 /// ´test:integration:decision-live-complete-lc-work-boundaries´
-/// ´claim:matrix:decision-live-complete-lc-work-boundaries´ Frozen input environments and exact count-sign admission reduce complete cumulative LC Work from 282308 to `281_434` with atomic one-below refusal.
+/// ´claim:matrix:decision-live-complete-lc-work-boundaries´ Frozen input environments and exact count-sign admission measure complete cumulative LC Work at `281_749` with atomic one-below refusal.
 #[test]
 fn decision_live_complete_lc_work_boundaries() -> TestResult {
-    for (work, accepted) in [(281_434, true), (281_433, false)] {
+    // Unchanged operation Work 281434 + 76 retained kinds + 27 local kinds + 104 identity
+    // + 104 vertices + 2 Machin checks + 2 scalar records = 281749.
+    for (work, accepted) in [(281_749, true), (281_748, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()
@@ -433,7 +435,7 @@ fn decision_live_complete_lc_work_boundaries() -> TestResult {
         let result = published.count(&heap, 3, &mut budget);
         if accepted {
             assert_eq!(result?.current(&heap, &mut ledger()?)?.value(), 3);
-            assert_eq!(budget.usage().work, 281_434);
+            assert_eq!(budget.usage().work, 281_749);
         } else {
             let Err(LiveDecisionError::Admission(error)) = result else {
                 panic!("one-below complete LC Work must refuse");
@@ -510,16 +512,16 @@ fn lattice_live_scalar_baseline() -> TestResult {
         graph_records
     );
     assert_eq!(heap.provenance_usage(), records);
-    assert_eq!(originals, 107_112);
+    assert_eq!(originals, 107_334);
     assert_eq!(captured - originals, 2952);
-    assert_eq!(selected - captured, 168_544);
+    assert_eq!(selected - captured, 168_637);
     assert_eq!(admitted - selected, 2491);
     assert_eq!(attached - admitted, 193);
     assert_eq!(materialized - attached, 125);
     assert_eq!(current - materialized, 66);
     assert_eq!(retired - current, 34);
     assert_eq!(budget.usage().work - retired, 1);
-    assert_eq!(budget.usage().work, 281_518);
+    assert_eq!(budget.usage().work, 281_833);
     assert_eq!(graph_records.vertices, 36);
     assert_eq!(graph_records.edges, 96);
     assert_eq!(records.records(), 0);

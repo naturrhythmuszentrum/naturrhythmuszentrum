@@ -32,9 +32,10 @@ pub(crate) fn coefficients(
     variable: &str,
     budget: &mut Budget,
 ) -> Result<Polynomial, Fault> {
-    let environment = &cas.state.context(context)?.environment;
-    budget.work(size(cas.state.context(context)?.header.len(), AT)?, AT)?;
-    let source = cas.state.expression(input)?;
+    let environment = &cas.state.context(context, budget)?.environment;
+    let header_len = cas.state.context(context, budget)?.header.len();
+    budget.work(size(header_len, AT)?, AT)?;
+    let source = cas.state.expression(input, budget)?;
     if !matches!(environment.field, Field::Rational | Field::Real)
         || source.sort != Sort::Value(AtomicSort::Scalar(environment.field.clone()))
         || !source.scope.is_empty()
@@ -241,8 +242,13 @@ impl Cas {
     pub fn square_free_certificate(
         &self,
         witness: &VerifiedWitness,
+        budget: &mut Budget,
     ) -> Result<&SquareFreeCertificate, Fault> {
-        let value = crate::proof_storage::application(self, self.checked(witness.proof())?)?;
+        let value = crate::proof_storage::application(
+            self,
+            self.checked(witness.proof(), budget)?,
+            budget,
+        )?;
         value.certificate.as_ref().ok_or_else(invalid)
     }
 }

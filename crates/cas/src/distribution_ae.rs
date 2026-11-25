@@ -22,8 +22,8 @@ pub(crate) fn check(
     let DistributionStatement::Equality { left, right, space } = value.as_ref() else {
         return Err(invalid());
     };
-    let first = representative(cas, left)?;
-    let second = representative(cas, right)?;
+    let first = representative(cas, left, budget)?;
+    let second = representative(cas, right, budget)?;
     crate::distribution_regular::evidence(&first, space, premises)?;
     crate::distribution_regular::evidence(&second, space, premises)?;
     let expected = certificate(cas, &first, &second, space, budget)?;
@@ -41,7 +41,7 @@ pub(crate) fn certificate(
     space: &Handle,
     budget: &mut Budget,
 ) -> Result<DistributionCertificate, Fault> {
-    let definition = cas.state.space(space.logical_id())?.clone();
+    let definition = cas.state.space(space.logical_id(), budget)?.clone();
     let analysis = crate::case_cells::analyze(
         cas,
         left.logical_id(),
@@ -98,8 +98,12 @@ pub(crate) fn certificate(
 }
 
 /// Only regular embeddings can lose finite point information by this rule.
-pub(crate) fn representative(cas: &Cas, value: &Handle) -> Result<Handle, Fault> {
-    let expression = cas.state.expression(value.logical_id())?;
+pub(crate) fn representative(
+    cas: &Cas,
+    value: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<Handle, Fault> {
+    let expression = cas.state.expression(value.logical_id(), budget)?;
     if expression.operator != Operator::RegularEmbed {
         return Err(invalid());
     }

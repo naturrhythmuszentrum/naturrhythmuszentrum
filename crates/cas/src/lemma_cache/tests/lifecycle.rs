@@ -43,6 +43,7 @@ fn lemma_cache_scope_refusal() -> TestResult {
 /// ´test:unit:lemma-cache-owner-refusal´
 #[test]
 fn lemma_cache_owner_refusal() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut first = Cas::new(Limits::default())?;
     let original = proof(&mut first, Change::None)?;
     let mut second = Cas::new(Limits::default())?;
@@ -78,7 +79,7 @@ fn lemma_cache_owner_refusal() -> TestResult {
             )
             .map(|witness| witness.proof().clone())
     })?;
-    second.checked(&result?)?;
+    second.checked(&result?, &mut budget)?;
     assert!(rows.iter().any(|row| row.rule != "replay"));
     assert_eq!(cache.len(), 2);
     assert_eq!(cache.retained_bytes(), 11_728);

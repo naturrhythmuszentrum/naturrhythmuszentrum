@@ -32,7 +32,11 @@ fn compose_centred_identity() -> TestResult {
         let originals = [left.clone(), right.clone(), output.clone()];
         let mut changed = Vec::new();
         for (index, handle) in originals.iter().enumerate() {
-            let object = f.base.cas.series_object(handle)?.clone();
+            let object = f
+                .base
+                .cas
+                .series_object(handle, &mut crate::testing::budgets::graph_budget()?)?
+                .clone();
             changed.push(
                 f.base
                     .cas
@@ -258,7 +262,12 @@ fn compose_refusal_owned_evidence() -> TestResult {
             else {
                 return Err("compose".into());
             };
-            let coefficient = f.base.cas.series_object(&right)?.coefficients[0].clone();
+            let coefficient = f
+                .base
+                .cas
+                .series_object(&right, &mut crate::testing::budgets::graph_budget()?)?
+                .coefficients[0]
+                .clone();
             f.base.cas.compute_series(
                 &nrz_cas::series::SeriesOperation::Truncate {
                     input: left,
@@ -364,7 +373,7 @@ fn compose_import_refusal_identity_reuse() -> TestResult {
     let input_advanced = replacement.logical_id().serial > saved.input.logical_id().serial;
     assert!(input_advanced);
     assert_ne!(replacement.logical_id(), saved.input.logical_id());
-    let object = f.cas.series_object(&replacement)?;
+    let object = f.cas.series_object(&replacement, &mut budget)?;
     assert_eq!(object.order, 1);
     assert_eq!(object.coefficients, [replacement_coefficient]);
     // Only the new handle authenticates that lookup; `SeriesDiagnosticIdentity` cannot

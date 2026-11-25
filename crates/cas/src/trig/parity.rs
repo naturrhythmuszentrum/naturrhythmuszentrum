@@ -32,8 +32,13 @@ fn negation(
     original: &Handle,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let child = crate::rule_check::unary(&cas.state, cas.checked(negated)?, &Operator::Neg)?;
-    if child != cas.checked(original)? {
+    let child = crate::rule_check::unary(
+        &cas.state,
+        cas.checked(negated, budget)?,
+        &Operator::Neg,
+        budget,
+    )?;
+    if child != cas.checked(original, budget)? {
         return Err(invalid());
     }
     frame(cas, negated, original, budget)
@@ -41,8 +46,10 @@ fn negation(
 
 /// Prepay complete metadata comparisons and retain the exact declaration frame, not printed names.
 fn frame(cas: &Cas, value: &Handle, original: &Handle, budget: &mut Budget) -> Result<(), Fault> {
-    let value = cas.state.expression(cas.checked(value)?)?;
-    let original = cas.state.expression(cas.checked(original)?)?;
+    let value = cas.state.expression(cas.checked(value, budget)?, budget)?;
+    let original = cas
+        .state
+        .expression(cas.checked(original, budget)?, budget)?;
     crate::rule_check::prepay_shape(value, budget)?;
     crate::rule_check::prepay_shape(original, budget)?;
     if value.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
@@ -90,7 +97,7 @@ pub(crate) fn check(
         Primitive::AtanOdd => Operator::Arctangent,
         _ => return Err(invalid()),
     };
-    let left_node = cas.state.expression(cas.checked(left)?)?;
+    let left_node = cas.state.expression(cas.checked(left, budget)?, budget)?;
     if left_node.operator != operator {
         return Err(invalid());
     }
@@ -99,6 +106,7 @@ pub(crate) fn check(
         &cas.state,
         negative.logical_id(),
         &Operator::Neg,
+        budget,
     )?);
     negation(cas, &negative, &original, budget)?;
     let function = if draft.rule == Primitive::CosEven {
@@ -106,11 +114,17 @@ pub(crate) fn check(
     } else {
         cas.handle(crate::rule_check::unary(
             &cas.state,
-            cas.checked(right)?,
+            cas.checked(right, budget)?,
             &Operator::Neg,
+            budget,
         )?)
     };
-    if cas.state.expression(function.logical_id())?.operator != operator {
+    if cas
+        .state
+        .expression(function.logical_id(), budget)?
+        .operator
+        != operator
+    {
         return Err(invalid());
     }
     let repeated = defined::operand(cas, &function, budget)?;
@@ -123,7 +137,7 @@ pub(crate) fn check(
     if draft.rule != Primitive::CosEven {
         negation(cas, right, &function, budget)?;
     }
-    definedness(cas, &original, domain, &guard.judgment.statement)?;
+    definedness(cas, &original, domain, &guard.judgment.statement, budget)?;
     let mut conditions = ScopedConditions::default();
     crate::statement::merge(cas, &mut conditions, &guard.conditions, budget)?;
     Ok(conditions)
@@ -145,16 +159,20 @@ impl Cas {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
                 budget.work(1, AT)?;
-                let (rule, operator) =
-                    schema(&cas.state.expression(cas.checked(function)?)?.operator)?;
+                let (rule, operator) = schema(
+                    &cas.state
+                        .expression(cas.checked(function, budget)?, budget)?
+                        .operator,
+                )?;
                 let original = defined::operand(cas, function, budget)?;
-                let proof = crate::proof_view::application(cas, cas.checked(guard)?, budget)?;
+                let proof =
+                    crate::proof_view::application(cas, cas.checked(guard, budget)?, budget)?;
                 let domain = match &proof.judgment.statement {
                     Statement::PredicateFact { region, .. } => region.clone(),
                     Statement::DefinedDomain { domain, .. } => domain.clone(),
                     _ => return Err(invalid()),
                 };
-                definedness(cas, &original, &domain, &proof.judgment.statement)?;
+                definedness(cas, &original, &domain, &proof.judgment.statement, budget)?;
                 let negative = value_term(cas, function, Operator::Neg, vec![original], budget)?;
                 let left = value_term(cas, function, operator, vec![negative], budget)?;
                 let right = if rule == Primitive::CosEven {

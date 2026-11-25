@@ -67,13 +67,15 @@ fn scale_root_reuse_canonical_evidence() -> TestResult {
 /// ´claim:bindings:scale-root-reuse-work-boundaries´ First, repeated, changed-scale and changed-policy roots preserve literal N and N-minus-one Work boundaries with unchanged exact evidence and atomic refusal.
 #[test]
 fn scale_root_reuse_work_boundaries() -> TestResult {
+    // The irrational warm scale-two miss adds 12 retained kind + 6 local kind
+    // + 18 identity + 24 vertex charges - 6 unjournaled inverses = 56_916 Work over unchanged operation Work 56_862.
     for (primed, scale, changed, required) in [
-        (false, 4, false, 17_441),
+        (false, 4, false, 17_472),
         (true, 4, false, 332),
-        (true, 9, false, 17_515),
-        (true, 4, true, 17_512),
+        (true, 9, false, 17_546),
+        (true, 4, true, 17_543),
         (false, 1, false, 176),
-        (true, 2, false, 56_862),
+        (true, 2, false, 56_916),
     ] {
         for admitted in [false, true] {
             let registry = Registry::new(ExponentPolicy::Rational);
@@ -230,14 +232,14 @@ fn scale_root_reuse_expression_content() -> TestResult {
 #[test]
 fn scale_root_reuse_alternation_boundaries() -> TestResult {
     let sequence = [
-        (4, 17_441),
-        (9, 17_515),
+        (4, 17_472),
+        (9, 17_546),
         (4, 332),
         (9, 406),
-        (16, 17_781),
-        (25, 17_855),
-        (36, 17_929),
-        (4, 17_737),
+        (16, 17_812),
+        (25, 17_886),
+        (36, 17_960),
+        (4, 17_768),
     ];
     for (position, (scale, required)) in sequence.iter().enumerate() {
         for admitted in [false, true] {

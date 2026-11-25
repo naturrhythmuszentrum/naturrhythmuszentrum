@@ -38,7 +38,7 @@ pub(crate) fn execute(
         let basis = candidate.handle(
             candidate
                 .state
-                .context(candidate.checked(&request.context)?)?
+                .context(candidate.checked(&request.context, generation)?, generation)?
                 .admissible,
         );
         let domain = crate::split_geometry::domain(candidate, &basis, range, generation)?;
@@ -55,7 +55,7 @@ pub(crate) fn execute(
             value.value = value.value.negated(generation)?;
         }
         let mut plan = Plan::new(policy);
-        let size = candidate.state.expression(*input)?.unfolded;
+        let size = candidate.state.expression(*input, generation)?.unfolded;
         plan.expansion(size, size, generation)?;
         let rule = match kind {
             SplitKind::Integral => Primitive::IntegralCaseSplit,

@@ -25,7 +25,7 @@ fn include(parent: &Dense, engine: &Engine<'_>, budget: &mut Budget) -> Result<D
 
 /// The factor X-t uses the actual child generator, not an unrelated selected expression.
 fn factor(engine: &Engine<'_>, budget: &mut Budget) -> Result<Dense, Fault> {
-    let (_, extension) = super::arithmetic::level(engine).map_err(|error| fault(&error))?;
+    let (_, extension) = super::arithmetic::level(engine, budget).map_err(|error| fault(&error))?;
     let parent = Engine {
         state: engine.state,
         domain: &extension.parent,
@@ -74,12 +74,13 @@ pub(crate) fn check(
         budget.solving(BudgetKind::TowerLevels, depth, AT)?;
         let parent = Dense::read(&cas.state, previous, budget).map_err(|error| fault(&error))?;
         let quotient = Dense::read(&cas.state, next, budget).map_err(|error| fault(&error))?;
-        let CoefficientDomainData::Quotient { level } = domain(&cas.state, &quotient.domain)?
+        let CoefficientDomainData::Quotient { level } =
+            domain(&cas.state, &quotient.domain, budget)?
         else {
             return Err(invalid());
         };
         let SolveDraft::ExtensionLevel(extension) =
-            crate::solving::graph::object(&cas.state, level.logical_id())?
+            crate::solving::graph::object(&cas.state, level.logical_id(), budget)?
         else {
             return Err(invalid());
         };

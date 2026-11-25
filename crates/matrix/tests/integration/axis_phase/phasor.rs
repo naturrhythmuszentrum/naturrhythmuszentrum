@@ -38,7 +38,7 @@ impl<P: Scalar + 'static> BlockCase<P> {
             reactance,
             scalar(radius)?,
             rounded,
-            &mut crate::phasor_solve_testing::budget()?,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
         )?;
         let declaration = AxisPhaseImpedance::new(
             source.case.clone(),
@@ -197,11 +197,11 @@ fn unresolved<P: Scalar + 'static>() -> TestResult {
         );
         let solve = case
             .physical
-            .publication(&mut crate::phasor_solve_testing::budget()?)?;
+            .publication(&mut crate::phasor_solve_testing::resources::fresh_budget()?)?;
         let result = case.physical.heap.publish_phasor_solve(
             &solve,
             &case.context,
-            &mut crate::phasor_solve_testing::budget()?,
+            &mut crate::phasor_solve_testing::resources::fresh_budget()?,
         );
         if expected == AxisPhaseOutcome::Undefined {
             assert!(matches!(result, Err(PhasorError::ZeroImpedance)));
@@ -307,7 +307,7 @@ fn lc_axis_phase_original_block_refusals() -> TestResult {
         -75.0_f64,
         0.25,
         false,
-        &mut crate::phasor_solve_testing::budget()?,
+        &mut crate::phasor_solve_testing::resources::fresh_budget()?,
     )?;
     assert!(
         AxisPhaseImpedance::new(case.source.case.clone(), varying.definition, &mut ledger()?)

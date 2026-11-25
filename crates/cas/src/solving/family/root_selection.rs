@@ -32,7 +32,10 @@ fn unit(cas: &mut Cas, construction: &Construction, budget: &mut Budget) -> Resu
         }),
         budget,
     )?;
-    let region = cas.state.region(construction.region.logical_id())?.clone();
+    let region = cas
+        .state
+        .region(construction.region.logical_id(), budget)?
+        .clone();
     let ambient = admit(
         cas,
         &Draft::Region(crate::domain_model::RegionDraft {

@@ -26,7 +26,9 @@ fn numeric_capability_is_available() {
 fn gaussian_draft_components_are_canonical() -> TestResult {
     let (real, imaginary) = parts("-0/7", "6/9")?;
     let (mut cas, domain, object) = stored(&real, &imaginary)?;
-    let SolveView::CoefficientValue(data) = cas.solve_view(&object)? else {
+    let SolveView::CoefficientValue(data) =
+        cas.solve_view(&object, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("Gaussian payload missing".into());
     };
     let CoefficientValueData::Gaussian { real, imaginary } = &data.value else {

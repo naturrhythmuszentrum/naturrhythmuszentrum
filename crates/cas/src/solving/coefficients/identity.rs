@@ -195,7 +195,7 @@ pub(crate) fn check(
             cas,
             engine: Engine {
                 state: &cas.state,
-                domain: super::transport::domain(cas, map)?,
+                domain: super::transport::domain(cas, map, budget)?,
             },
             map: &certificate.map,
             region: &certificate.region,

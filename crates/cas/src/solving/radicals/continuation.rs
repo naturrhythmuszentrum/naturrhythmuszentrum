@@ -91,7 +91,7 @@ fn prefix(
     let mut assigned = vector(steps.len(), budget)?;
     assigned.resize(steps.len(), None);
     let mut pending = vector(1, budget)?;
-    pending.push((root, cas.checked(coverage.proof())?));
+    pending.push((root, cas.checked(coverage.proof(), budget)?));
     while let Some((index, proof)) = pending.pop() {
         budget.work(1, AT)?;
         let slot = assigned.get_mut(index).ok_or_else(invalid)?;
@@ -133,7 +133,7 @@ fn append(
         let proof = proofs
             .get(usize::try_from(*index).map_err(|_| invalid())?)
             .ok_or_else(invalid)?;
-        let id = cas.checked(proof)?;
+        let id = cas.checked(proof, budget)?;
         ids.push(id);
         earlier.push(crate::proof_view::application(cas, id, budget)?);
     }
@@ -316,6 +316,7 @@ mod tests {
     /// ´test:unit:continuation-failure-retains-coverage´
     #[test]
     fn continuation_failure_retains_coverage() -> TestResult {
+        let mut budget = crate::testing::common::default_budget()?;
         let (mut cas, mut construction, coverage, count) = prepared()?;
         let mut false_step = construction
             .steps
@@ -334,7 +335,7 @@ mod tests {
         assert_ne!(replacement, certificate.form);
         certificate.form = replacement;
         construction.steps.push(false_step);
-        let before = cas.state.proof_count();
+        let before = cas.state.proof_count(&mut budget);
         assert!(
             super::extend(
                 &mut cas,
@@ -345,7 +346,7 @@ mod tests {
             )
             .is_err()
         );
-        assert_eq!(cas.state.proof_count(), before);
+        assert_eq!(cas.state.proof_count(&mut budget), before);
         inspect(&coverage)
     }
 
@@ -353,6 +354,7 @@ mod tests {
     /// ´test:unit:continuation-work-boundary´
     #[test]
     fn continuation_work_boundary() -> TestResult {
+        let mut budget = crate::testing::common::default_budget()?;
         let (mut cas, construction, coverage, count) = prepared()?;
         let mut measured = Budget::new(Limits::blind_cubic())?;
         super::extend(&mut cas, &construction, count, &coverage, &mut measured)?;
@@ -362,7 +364,7 @@ mod tests {
             required.checked_sub(1).ok_or("empty continuation ledger")?,
         ] {
             let (mut cas, construction, coverage, count) = prepared()?;
-            let before = cas.state.proof_count();
+            let before = cas.state.proof_count(&mut budget);
             let mut budget = Budget::new(Limits {
                 work: cap,
                 ..Limits::blind_cubic()
@@ -375,7 +377,7 @@ mod tests {
                 assert!(matches!(error.kind, crate::FaultKind::Exhausted {
                     budget: crate::limits::BudgetKind::Work, limit, needed, ..
                 } if limit == cap && needed > cap));
-                assert_eq!(cas.state.proof_count(), before);
+                assert_eq!(cas.state.proof_count(&mut budget), before);
                 inspect(&coverage)?;
             }
             assert!(budget.usage().work <= cap);

@@ -21,9 +21,9 @@ fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
     let start = budget.usage().work;
     let model = DecisionExpression::declared(Rc::clone(&owner), "model", budget)?;
     assert_eq!(model.exact(), Some(&ExactConstant::one()));
-    assert_eq!(budget.usage().work - start, 34_713);
+    assert_eq!(budget.usage().work - start, 34_756);
     let physical = DecisionExpression::declared(owner, "quotient", budget)?;
-    assert_eq!(budget.usage().work - start, 116_076);
+    assert_eq!(budget.usage().work - start, 116_209);
     let mut source = fixture(false, "3", "10/Pi")?;
     let case = IntegerDecisionCase::declare(
         &source.frame.cas,
@@ -31,16 +31,16 @@ fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
         specification(&source, CountDomain::NONNEGATIVE)?,
         budget,
     )?;
-    assert_eq!(budget.usage().work - start, 148_371);
+    assert_eq!(budget.usage().work - start, 148_558);
     let witness = source
         .frame
         .cas
         .check_proof(&source.context, &source.steps, budget)?;
-    assert_eq!(budget.usage().work - start, 316_915);
+    assert_eq!(budget.usage().work - start, 317_195);
     let graph = Arc::new(Mutex::new(source.frame.cas));
     let before = graph.lock().map_err(|_| "graph owner poisoned")?.counts();
     let result = case.admit(Arc::clone(&graph), witness, case.attachment(), budget)?;
-    assert_eq!(budget.usage().work - start, 317_123);
+    assert_eq!(budget.usage().work - start, 317_403);
     assert_eq!(
         graph.lock().map_err(|_| "graph owner poisoned")?.counts(),
         before
@@ -50,19 +50,19 @@ fn selected(budget: &mut Budget) -> TestResult<SelectedDecision> {
 
 /// The lattice lane remeasures the scalar lifecycle, record closure and original-input association.
 /// ´test:integration:bindings-lattice-scalar-baseline´
-/// ´claim:bindings:lattice-scalar-baseline´ Four shared-signature symbol graphs and supplied-premise sizing account for `361_514` Work through association, with unchanged authentication and witness bytes.
+/// ´claim:bindings:lattice-scalar-baseline´ Four shared-signature symbol graphs and supplied-premise sizing account for `361_974` Work through association, with unchanged authentication and witness bytes.
 #[test]
 fn bindings_lattice_scalar_baseline() -> TestResult {
     let mut budget = ledger()?;
     let selected = selected(&mut budget)?;
     let count = selected.count(3, &mut budget)?;
     assert_eq!(count.value(), 3);
-    assert_eq!(budget.usage().work, 317_182);
+    assert_eq!(budget.usage().work, 317_462);
     assert_eq!(selected.retained_payload_bytes(), 13_842);
     assert_eq!(count.retained_payload_bytes(), 2_068);
     let case = selected.case();
     let associated = case.associate_inputs(&mut budget)?;
-    assert_eq!(budget.usage().work, 361_514);
+    assert_eq!(budget.usage().work, 361_974);
     assert_eq!(associated.retained_payload_bytes(), 17_858);
     let originals = associated
         .operands()
@@ -76,7 +76,7 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
         .map(DecisionOperand::symbols)
         .collect::<Vec<_>>();
     associated.authenticate(case, &symbols, &mut budget)?;
-    assert_eq!(budget.usage().work, 361_528);
+    assert_eq!(budget.usage().work, 361_988);
     let graph = selected.cas()?;
     let before = graph.counts();
     let bytes = graph.export_witness(selected.witness(), &mut ledger()?)?;
@@ -85,7 +85,7 @@ fn bindings_lattice_scalar_baseline() -> TestResult {
     let mut replay = ledger()?;
     let mut receiver = Cas::new(Limits::default())?;
     let witness = receiver.inspect(&bytes, &mut replay)?;
-    assert_eq!(replay.usage().work, 248_957);
+    assert_eq!(replay.usage().work, 249_217);
     assert_eq!(receiver.counts().vertices, 36);
     assert_eq!(witness.hypotheses().len(), 1);
     let error = selected
@@ -117,7 +117,7 @@ fn bindings_lattice_scalar_association_work() -> TestResult {
     let selected = selected(&mut ledger()?)?;
     let case = selected.case();
     let before = case.source().owner().cas()?.counts();
-    for (work, accepted) in [(44_349, true), (44_348, false)] {
+    for (work, accepted) in [(44_529, true), (44_528, false)] {
         let mut budget = prior(work)?;
         let result = case.associate_inputs(&mut budget);
         if accepted {
@@ -158,10 +158,10 @@ fn bindings_lattice_scalar_association_work() -> TestResult {
 
 /// Complete lifecycle exhaustion and fresh replay publish no partial physical or CAS result.
 /// ´test:integration:bindings-lattice-scalar-cumulative-work´
-/// ´claim:bindings:lattice-scalar-cumulative-work´ Against the 364597-Work pre-sharing baseline, shared-signature graphs and supplied-premise sizing require `361_545` Work with intact evidence and atomic one-below refusal.
+/// ´claim:bindings:lattice-scalar-cumulative-work´ Against the 364597-Work pre-sharing baseline, shared-signature graphs and supplied-premise sizing require `362_005` Work with intact evidence and atomic one-below refusal.
 #[test]
 fn bindings_lattice_scalar_cumulative_work() -> TestResult {
-    for (work, accepted) in [(361_545, true), (361_544, false)] {
+    for (work, accepted) in [(362_005, true), (362_004, false)] {
         let mut budget = prior(work)?;
         let selected = selected(&mut budget)?;
         let before = selected.cas()?.counts();
@@ -190,7 +190,7 @@ fn bindings_lattice_scalar_cumulative_work() -> TestResult {
     let bytes = selected
         .cas()?
         .export_witness(selected.witness(), &mut ledger()?)?;
-    for (work, accepted) in [(248_974, true), (248_973, false)] {
+    for (work, accepted) in [(249_234, true), (249_233, false)] {
         let mut receiver = Cas::new(Limits::default())?;
         let before = receiver.counts();
         let snapshot = receiver.canonical_snapshot(&mut ledger()?)?;

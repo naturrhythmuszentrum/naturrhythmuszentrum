@@ -26,6 +26,7 @@ fn solved(sign: i8) -> TestResult<(Fixture, Request, VerifiedWitness)> {
 
 /// Decode returned tuple values directly from the original complete-set theorem.
 fn entries(cas: &Cas, proof: &VerifiedWitness) -> TestResult<Vec<Handle>> {
+    let mut budget = crate::testing::common::default_budget()?;
     let Statement::Solve(statement) = &proof.judgment().statement else {
         return Err("coverage statement".into());
     };
@@ -33,14 +34,14 @@ fn entries(cas: &Cas, proof: &VerifiedWitness) -> TestResult<Vec<Handle>> {
         return Err("coverage claim".into());
     };
     let SolveDraft::SolutionSet(set) =
-        crate::solving::graph::object(&cas.state, value.set.logical_id())?
+        crate::solving::graph::object(&cas.state, value.set.logical_id(), &mut budget)?
     else {
         return Err("solution set".into());
     };
     let mut values = Vec::new();
     for branch in &set.branches {
         let SolveDraft::SolutionBranch(branch) =
-            crate::solving::graph::object(&cas.state, branch.logical_id())?
+            crate::solving::graph::object(&cas.state, branch.logical_id(), &mut budget)?
         else {
             return Err("solution branch".into());
         };
@@ -49,7 +50,7 @@ fn entries(cas: &Cas, proof: &VerifiedWitness) -> TestResult<Vec<Handle>> {
         };
         for tuple in tuples {
             let SolveDraft::Tuple(tuple) =
-                crate::solving::graph::object(&cas.state, tuple.logical_id())?
+                crate::solving::graph::object(&cas.state, tuple.logical_id(), &mut budget)?
             else {
                 return Err("tuple".into());
             };
@@ -63,6 +64,7 @@ fn entries(cas: &Cas, proof: &VerifiedWitness) -> TestResult<Vec<Handle>> {
 /// ´test:crate:mixed-positive-roots-conjugation-fixed´
 #[test]
 fn mixed_positive_roots_conjugation_fixed() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request, proof) = solved(1)?;
     let values = entries(&fixture.cas, &proof)?;
     assert_eq!(values.len(), 2);
@@ -70,7 +72,7 @@ fn mixed_positive_roots_conjugation_fixed() -> TestResult {
         fixture
             .cas
             .state
-            .context(request.context.logical_id())?
+            .context(request.context.logical_id(), &mut budget)?
             .admissible,
     );
     let mut construction = crate::solving::radicals::construction::Construction {
@@ -167,6 +169,7 @@ fn mixed_root_pullback_requires_subset() -> TestResult {
 /// ´test:crate:mixed-negative-piece-rejects-sibling-sign´
 #[test]
 fn mixed_negative_piece_rejects_sibling_sign() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request, proof) = solved(-1)?;
     let mut changed = crate::testing::solve_blind::family_applications(&fixture.cas, &proof)?;
     let sign = changed
@@ -190,7 +193,7 @@ fn mixed_negative_piece_rejects_sibling_sign() -> TestResult {
         fixture
             .cas
             .state
-            .expression(original.logical_id())?
+            .expression(original.logical_id(), &mut budget)?
             .operator,
         crate::model::Operator::Neg
     );
@@ -198,7 +201,7 @@ fn mixed_negative_piece_rejects_sibling_sign() -> TestResult {
         fixture
             .cas
             .state
-            .expression(original.logical_id())?
+            .expression(original.logical_id(), &mut budget)?
             .operands,
         [fixture.real.logical_id()]
     );
@@ -211,6 +214,7 @@ fn mixed_negative_piece_rejects_sibling_sign() -> TestResult {
 /// ´test:crate:mixed-family-map-rejects-sampled-base´
 #[test]
 fn mixed_family_map_rejects_sampled_base() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request, _) = solved(1)?;
     let original = fixture.real.clone();
     let replacement = crate::testing::sorts::expression(
@@ -225,7 +229,7 @@ fn mixed_family_map_rejects_sampled_base() -> TestResult {
         fixture
             .cas
             .state
-            .expression(original.logical_id())?
+            .expression(original.logical_id(), &mut budget)?
             .operator,
         crate::model::Operator::Free("r".into())
     );
@@ -233,21 +237,24 @@ fn mixed_family_map_rejects_sampled_base() -> TestResult {
     let Task::Solve(specification) = &request.task else {
         return Err("solve request".into());
     };
-    let original_problem =
-        crate::solving::graph::problem(&fixture.cas.state, specification.problem.logical_id())?
-            .clone();
+    let original_problem = crate::solving::graph::problem(
+        &fixture.cas.state,
+        specification.problem.logical_id(),
+        &mut budget,
+    )?
+    .clone();
     let region = fixture.cas.handle(
         fixture
             .cas
             .state
-            .context(request.context.logical_id())?
+            .context(request.context.logical_id(), &mut budget)?
             .admissible,
     );
     let family = fixture.cas.handle(
         fixture
             .cas
             .state
-            .region(region.logical_id())?
+            .region(region.logical_id(), &mut budget)?
             .lies_over
             .as_ref()
             .ok_or("family")?
@@ -286,14 +293,18 @@ fn mixed_family_map_rejects_sampled_base() -> TestResult {
 /// ´test:crate:mixed-piece-rejects-whole-region-widening´
 #[test]
 fn mixed_piece_rejects_whole_region_widening() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request, proof) = solved(-1)?;
     let Task::Solve(specification) = &request.task else {
         return Err("solve request".into());
     };
-    let whole =
-        crate::solving::graph::problem(&fixture.cas.state, specification.problem.logical_id())?
-            .region
-            .clone();
+    let whole = crate::solving::graph::problem(
+        &fixture.cas.state,
+        specification.problem.logical_id(),
+        &mut budget,
+    )?
+    .region
+    .clone();
     let mut changed = crate::testing::solve_blind::family_applications(&fixture.cas, &proof)?;
     let step = changed.last_mut().ok_or("coverage application")?;
     let Statement::Solve(statement) = &mut step.conclusion else {
@@ -308,7 +319,7 @@ fn mixed_piece_rejects_whole_region_widening() -> TestResult {
         fixture
             .cas
             .state
-            .context(request.context.logical_id())?
+            .context(request.context.logical_id(), &mut budget)?
             .admissible
     );
     assert_ne!(whole, original);
@@ -322,23 +333,27 @@ fn family_map(
     fixture: &Fixture,
     request: &Request,
 ) -> TestResult<crate::solving::CoefficientMapData> {
+    let mut budget = crate::testing::common::default_budget()?;
     let Task::Solve(specification) = &request.task else {
         return Err("solve request".into());
     };
-    let original =
-        crate::solving::graph::problem(&fixture.cas.state, specification.problem.logical_id())?;
+    let original = crate::solving::graph::problem(
+        &fixture.cas.state,
+        specification.problem.logical_id(),
+        &mut budget,
+    )?;
     let region = fixture.cas.handle(
         fixture
             .cas
             .state
-            .context(request.context.logical_id())?
+            .context(request.context.logical_id(), &mut budget)?
             .admissible,
     );
     let family = fixture.cas.handle(
         fixture
             .cas
             .state
-            .region(region.logical_id())?
+            .region(region.logical_id(), &mut budget)?
             .lies_over
             .as_ref()
             .ok_or("family")?
@@ -394,6 +409,7 @@ fn mixed_map_rejects_scalar_complex_coercion() -> TestResult {
 /// ´test:crate:mixed-map-rejects-changed-family´
 #[test]
 fn mixed_map_rejects_changed_family() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request) = request(1)?;
     let mut map = family_map(&fixture, &request)?;
     admit(
@@ -407,7 +423,7 @@ fn mixed_map_rejects_changed_family() -> TestResult {
         return Err("family target".into());
     };
     let SolveDraft::SpaceFamily(shape) =
-        crate::solving::graph::object(&fixture.cas.state, original.logical_id())?
+        crate::solving::graph::object(&fixture.cas.state, original.logical_id(), &mut budget)?
     else {
         return Err("family shape".into());
     };

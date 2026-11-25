@@ -2,7 +2,7 @@
 //! Fixed affine statistics refuse nonlinear denominators and invented independent voltage copies.
 
 use super::blocks;
-use crate::phasor_solve_testing::{budget, policy};
+use crate::phasor_solve_testing::{policy, resources::fresh_budget};
 use crate::reading_testing::{Fixture, TestResult, matrix, meaning};
 use nrz_bindings::{
     BinaryOp, Budget, ExponentPolicy, Registry,
@@ -18,7 +18,8 @@ use nrz_bindings::{
 fn shared_voltage_phasor_covariance_refuses_unproved_affine_laws() -> TestResult {
     for (reactance, independent) in [(None, false), (Some(0), false), (Some(75), true)] {
         let (fixture, equations, targets) = prepare(reactance, independent)?;
-        let result = PhasorCovarianceLaw::new(&fixture.cas, equations, targets, &mut budget()?);
+        let result =
+            PhasorCovarianceLaw::new(&fixture.cas, equations, targets, &mut fresh_budget()?);
         assert!(matches!(
             result,
             Err(ReadingError::Unsupported | ReadingError::Unrelated)
@@ -41,11 +42,11 @@ fn shared_voltage_phasor_refuses_independent_repeated_entry_covariance() -> Test
             &wrong,
             CompanionReadingKind::Covariance,
             &[voltage.clone(), voltage.clone()],
-            &mut budget()?
+            &mut fresh_budget()?
         )
         .is_err()
     );
-    let law = PhasorCovarianceLaw::new(&fixture.cas, equations, targets, &mut budget()?)?;
+    let law = PhasorCovarianceLaw::new(&fixture.cas, equations, targets, &mut fresh_budget()?)?;
     assert_eq!(law.map().inputs(), 1);
     assert_eq!(law.map().outputs(), 1);
     Ok(())
@@ -82,7 +83,7 @@ fn prepare(reactance: Option<i64>, independent: bool) -> TestResult<ExactCase> {
     let other = blocks::input(&mut fixture, "other", voltage, None, 3)?;
     let first = blocks::output(&mut fixture, "first", current.clone())?;
     let second = blocks::output(&mut fixture, "second", current)?;
-    let mut resources = budget()?;
+    let mut resources = fresh_budget()?;
     let equations = [
         equation(&mut fixture, [&below, &first, &source], &mut resources)?,
         equation(

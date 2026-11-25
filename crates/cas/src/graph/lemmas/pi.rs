@@ -5,6 +5,7 @@ mod index;
 pub(crate) use index::PiIndex;
 
 use super::{AnonymousLemma, Cas, Edge, EdgeIndex, LogicalId, Vertex, VertexKind};
+use crate::budget::Budget;
 use crate::error::{Fault, InvalidCode, Location};
 use crate::pi_bounds::PiBoundCertificate;
 use std::sync::Arc;
@@ -38,13 +39,21 @@ pub(crate) struct PiLemma {
 
 impl Cas {
     /// Authenticate the complete graph statement and its actual incoming evidence edge.
-    pub(crate) fn pi_inventory(&self, id: LogicalId) -> Result<&PiInventory, Fault> {
-        Ok(&self.pi_lemma(id)?.inventory)
+    pub(crate) fn pi_inventory(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&PiInventory, Fault> {
+        Ok(&self.pi_lemma(id, budget)?.inventory)
     }
 
     /// Return only graph-owned authority checked under the current source generation.
-    pub(crate) fn pi_judgment(&self, id: LogicalId) -> Result<Option<u64>, Fault> {
-        let node = self.pi_lemma(id)?;
+    pub(crate) fn pi_judgment(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<Option<u64>, Fault> {
+        let node = self.pi_lemma(id, budget)?;
         let owned = Arc::ptr_eq(&node.owner, &self.memo_owner);
         let current = node.epoch == self.memo_epoch;
         let reusable = self.memo_epoch != u64::MAX;
@@ -52,15 +61,15 @@ impl Cas {
     }
 
     /// Index entries cannot authorize missing or wrongly typed checked evidence.
-    fn pi_lemma(&self, id: LogicalId) -> Result<&PiLemma, Fault> {
-        let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+    fn pi_lemma(&self, id: LogicalId, budget: &mut Budget) -> Result<&PiLemma, Fault> {
+        let Vertex::AnonymousLemma(node) = self.state.node(id, budget)? else {
             return Err(invalid());
         };
         let AnonymousLemma::Pi(node) = node.as_ref() else {
             return Err(invalid());
         };
-        let source = self.state.indices[&node.inventory.original];
-        let target = self.state.indices[&id];
+        let source = self.state.index(node.inventory.original, budget)?;
+        let target = self.state.index(id, budget)?;
         let endpoints = self.state.graph.edge_endpoints(node.citation) == Some((source, target));
         let checked = matches!(
             self.state.graph.edge_weight(node.citation),
@@ -73,8 +82,7 @@ impl Cas {
     }
 
     /// Refresh only after the full finite checker and enclosing receipt both succeeded.
-    pub(super) fn refresh_pi(&mut self, id: LogicalId) {
-        let index = self.state.indices[&id];
+    pub(super) fn refresh_pi(&mut self, index: crate::graph::NodeIndex<u32>) {
         if let Vertex::AnonymousLemma(node) = &mut self.state.graph[index]
             && let AnonymousLemma::Pi(node) = node.as_mut()
         {
@@ -88,9 +96,11 @@ impl Cas {
 }
 
 /// Move the complete preflighted payload into the authoritative graph without a fallible suffix.
-pub(super) fn append(cas: &mut Cas, id: LogicalId, inventory: PiInventory) {
+pub(super) fn append(cas: &mut Cas, inventory: PiInventory, plan: &super::scalar::NewPlan) {
     let state = &mut cas.state;
-    let original = state.indices[&inventory.original];
+    let Some(original) = plan.sources[0] else {
+        unreachable!("preflight resolved Pi original")
+    };
     let certificate = Arc::clone(&inventory.certificate);
     let bytes = inventory.bytes;
     let citation = EdgeIndex::new(state.graph.edge_count() + 1);
@@ -106,10 +116,18 @@ pub(super) fn append(cas: &mut Cas, id: LogicalId, inventory: PiInventory) {
         ))));
     state.graph.add_edge(index, original, Edge::Input(0));
     state.graph.add_edge(original, index, Edge::CheckedEvidence);
-    state.indices.insert(id, index);
-    state.pi_judgments.insert(certificate, id);
+    state
+        .indices
+        .insert_prepared(plan.index_position, plan.id, index);
+    state
+        .pi_judgments
+        .insert_prepared(plan.key_position, certificate, plan.id);
     state.pi_judgments.refresh(&cas.memo_owner, cas.memo_epoch);
-    state.retain(VertexKind::AnonymousLemma);
+    state.retain_prepared(
+        VertexKind::AnonymousLemma,
+        plan.retained_position,
+        plan.retained_next,
+    );
     state.payload = state.payload.saturating_add(bytes);
     state.judgment_bytes = state.judgment_bytes.saturating_add(bytes);
     state.judgment_count += 1;

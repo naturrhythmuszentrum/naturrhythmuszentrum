@@ -87,11 +87,15 @@ pub(crate) fn pending_bytes(
 }
 
 /// Follow only the designated justification role, never arbitrary graph paths.
-pub(crate) fn application(cas: &Cas, proof: LogicalId) -> Result<&CheckedStep, Fault> {
-    let Vertex::Proof(id) = cas.state.node(proof)? else {
+pub(crate) fn application<'a>(
+    cas: &'a Cas,
+    proof: LogicalId,
+    budget: &mut Budget,
+) -> Result<&'a CheckedStep, Fault> {
+    let Vertex::Proof(id) = cas.state.node(proof, budget)? else {
         return Err(mismatch());
     };
-    match cas.state.node(*id)? {
+    match cas.state.node(*id, budget)? {
         Vertex::Application(value) => Ok(value),
         Vertex::ScopedApplication(value) => value.scalar.as_ref().ok_or_else(mismatch),
         _ => Err(mismatch()),
@@ -172,7 +176,8 @@ impl Cas {
                 )?;
                 proofs.push(proof);
             }
-            budget.check(BudgetKind::ProofNodes, staged.proof_count(), AT)?;
+            let proof_count = staged.proof_count(budget)?;
+            budget.check(BudgetKind::ProofNodes, proof_count, AT)?;
             let root = proofs.last().copied().ok_or_else(mismatch)?;
             Ok(cas.handle(root))
         })
@@ -190,11 +195,11 @@ impl Cas {
         for (index, required) in value.conditions.requirements.iter().enumerate() {
             let condition = Condition {
                 kind: required.kind.predicate(),
-                header: state.context(value.context)?.header_id,
-                scope: state.expression(required.term)?.scope.clone(),
+                header: state.context(value.context, budget)?.header_id,
+                scope: state.expression(required.term, budget)?.scope.clone(),
                 arguments: vec![required.term],
             };
-            let condition_header = state.context(value.context)?.header_id;
+            let condition_header = state.context(value.context, budget)?.header_id;
             let condition = self.insert(
                 state,
                 Vertex::Condition(condition),
@@ -224,8 +229,8 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Handle, Fault> {
         self.proof_limits(budget, |cas, budget| {
-            let proof = cas.checked(&witness.proof)?;
-            let checked = application(cas, proof)?;
+            let proof = cas.checked(&witness.proof, budget)?;
+            let checked = application(cas, proof, budget)?;
             if cost == 0 || cost > 1_000_000 {
                 return Err(Fault::invalid(InvalidCode::Policy, AT));
             }
@@ -237,7 +242,7 @@ impl Cas {
             let mut incumbent = checked.cost;
             for id in cas.state.indices.keys() {
                 budget.work(1, AT)?;
-                let (value, weight) = match cas.state.node(*id)? {
+                let (value, weight) = match cas.state.node(*id, budget)? {
                     Vertex::Application(value) => (value, value.cost),
                     Vertex::ScopedApplication(value) => {
                         let Some(checked) = &value.scalar else {
@@ -245,7 +250,7 @@ impl Cas {
                         };
                         (checked, checked.cost)
                     }
-                    Vertex::Shortcut { proof, cost } => (application(cas, *proof)?, *cost),
+                    Vertex::Shortcut { proof, cost } => (application(cas, *proof, budget)?, *cost),
                     _ => continue,
                 };
                 let mut out = Encoder::new(budget, AT);

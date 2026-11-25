@@ -24,7 +24,7 @@ fn generation(work: u64, arithmetic_steps: u64, denominator_factors: u64) -> Bud
 
 fn replay() -> BudgetUsage {
     BudgetUsage {
-        work: 1_417_099,
+        work: 1_417_505,
         arithmetic_steps: 15_576,
         condition_steps: 43,
         case_arms: 1,
@@ -62,7 +62,7 @@ fn lc_original_root_factor_theorem_replays() -> TestResult {
     super::replay::fresh(&source.cas, &answer.set, &bytes, &mut checking)?;
     assert_eq!(
         (usage, checking.usage(), bytes.len()),
-        (generation(823_329, 3_350, 4), replay(), 6_140)
+        (generation(823_812, 3_350, 4), replay(), 6_140)
     );
     Ok(())
 }
@@ -107,9 +107,9 @@ fn lc_root_theorem_separate_ledgers() -> TestResult {
             rules
         ),
         (
-            generation(272_477, 3_346, 2),
+            generation(272_948, 3_346, 2),
             BudgetUsage {
-                work: 1_079_764,
+                work: 1_079_918,
                 arithmetic_steps: 15_810,
                 condition_steps: 53,
                 coefficient_ops: 19_717,

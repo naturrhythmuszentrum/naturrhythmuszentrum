@@ -251,9 +251,9 @@ impl Frame {
             domain,
         };
         let (parent, modulus) =
-            match crate::solving::coefficients::storage::domain(&cas.state, domain)? {
+            match crate::solving::coefficients::storage::domain(&cas.state, domain, budget)? {
                 CoefficientDomainData::Quotient { .. } => {
-                    let (_, level) = arithmetic::level(&engine).map_err(|e| fault(&e))?;
+                    let (_, level) = arithmetic::level(&engine, budget).map_err(|e| fault(&e))?;
                     (level.parent.clone(), Some(level.polynomial.clone()))
                 }
                 _ => (domain.clone(), None),

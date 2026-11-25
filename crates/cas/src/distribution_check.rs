@@ -40,8 +40,14 @@ pub(crate) fn check(
     for premise in premises {
         crate::proof_view::validate_judgment(cas, &premise.judgment, budget)?;
     }
-    let domain = cas.state.space(cas.checked(value.space())?)?.domain;
-    let within = cas.state.context(cas.checked(&draft.context)?)?.admissible;
+    let domain = cas
+        .state
+        .space(cas.checked(value.space(), budget)?, budget)?
+        .domain;
+    let within = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?
+        .admissible;
     crate::case_check::subset(cas, domain, within, budget)?;
     match draft.rule {
         Primitive::DistAffinePullback | Primitive::DistSimpleZeroPullback => {
@@ -120,8 +126,8 @@ pub(crate) fn membership(
         if !seen.insert(id) {
             continue;
         }
-        let value = cas.state.expression(id)?.clone();
-        if value.sort != Sort::Distribution || value.space != Some(cas.checked(space)?) {
+        let value = cas.state.expression(id, budget)?.clone();
+        if value.sort != Sort::Distribution || value.space != Some(cas.checked(space, budget)?) {
             return Err(invalid());
         }
         if known_member(id, space, premises) {
@@ -135,10 +141,10 @@ pub(crate) fn membership(
             }
             Operator::Delta { order } => {
                 budget.specialized(BudgetKind::DeltaOrder, u64::from(order), false, AT)?;
-                let point = rational(cas, *value.operands.first().ok_or_else(invalid)?)?;
+                let point = rational(cas, *value.operands.first().ok_or_else(invalid)?, budget)?;
                 interior(
                     cas,
-                    cas.state.space(space.logical_id())?.domain,
+                    cas.state.space(space.logical_id(), budget)?.domain,
                     point,
                     budget,
                 )?;
@@ -188,8 +194,12 @@ pub(crate) fn interior(
 }
 
 /// Borrow a literal coefficient or location without numerical evaluation.
-pub(crate) fn rational(cas: &Cas, id: LogicalId) -> Result<&crate::number::Rational, Fault> {
-    let Operator::Rational(value) = &cas.state.expression(id)?.operator else {
+pub(crate) fn rational<'a>(
+    cas: &'a Cas,
+    id: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a crate::number::Rational, Fault> {
+    let Operator::Rational(value) = &cas.state.expression(id, budget)?.operator else {
         return Err(Fault::invalid(InvalidCode::PendingPremise, AT));
     };
     Ok(value)
@@ -206,7 +216,7 @@ pub(crate) fn test(
     let mut pending = vec![root];
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let value = cas.state.expression(id)?;
+        let value = cas.state.expression(id, budget)?;
         if value.sort != Sort::Test || value.space != Some(space.logical_id()) {
             return Err(invalid());
         }

@@ -15,7 +15,7 @@ pub(crate) struct AnswerFixture {
     pub(crate) steps: Vec<ApplicationDraft>,
 }
 
-pub(crate) fn budget() -> TestResult<Budget> {
+pub(crate) fn fresh_budget() -> TestResult<Budget> {
     Ok(Budget::new(Limits::blind_cubic())?)
 }
 
@@ -53,18 +53,21 @@ pub(crate) fn prepared() -> TestResult<AnswerFixture> {
 /// The transport contains only the ordinary presentation closure.
 pub(crate) fn encoded() -> TestResult<Vec<u8>> {
     let mut fixture = prepared()?;
-    let witness =
-        fixture
-            .base
-            .cas
-            .check_proof(&fixture.base.context, &fixture.steps, &mut budget()?)?;
-    Ok(fixture.base.cas.export_witness(&witness, &mut budget()?)?)
+    let witness = fixture.base.cas.check_proof(
+        &fixture.base.context,
+        &fixture.steps,
+        &mut fresh_budget()?,
+    )?;
+    Ok(fixture
+        .base
+        .cas
+        .export_witness(&witness, &mut fresh_budget()?)?)
 }
 
 /// Any refusal must roll back all imported graph objects while retaining the spent ledger.
 pub(crate) fn refused(fixture: &mut AnswerFixture, bytes: &[u8]) -> TestResult {
     let before = fixture.base.cas.counts();
-    let mut ledger = budget()?;
+    let mut ledger = fresh_budget()?;
     assert!(
         fixture
             .base

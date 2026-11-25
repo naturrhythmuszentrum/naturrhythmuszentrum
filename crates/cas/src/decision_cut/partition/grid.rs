@@ -127,9 +127,9 @@ fn evaluate(
         budget.work(size(truth.len(), AT)?.saturating_add(1), AT)?;
         let value = if let Some(atom) = program.atoms.get(id) {
             atom_truth(atom, program, position, budget)?
-        } else if let Vertex::Region(value) = cas.state.node(*id)? {
+        } else if let Vertex::Region(value) = cas.state.node(*id, budget)? {
             region(&value.expression, &truth, budget)?
-        } else if let Some((kind, arguments)) = atoms::predicate(cas, *id)? {
+        } else if let Some((kind, arguments)) = atoms::predicate(cas, *id, budget)? {
             match kind {
                 PredicateKind::And => boolean(arguments, &truth, true, budget)?,
                 PredicateKind::Or => boolean(arguments, &truth, false, budget)?,

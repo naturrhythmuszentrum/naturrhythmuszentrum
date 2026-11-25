@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Isolated subscriber controls: every test holds the shared dispatcher guard.
+
 #[path = "../examples/prepared_exponential/support.rs"]
 #[expect(
     clippy::redundant_pub_crate,

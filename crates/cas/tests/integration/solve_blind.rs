@@ -189,13 +189,17 @@ fn blind_zero_polynomial_family() -> TestResult {
             .ok_or("zero family coverage")?
             .is_discharged()
     );
-    let nrz_cas::solving::SolveView::SolutionSet(set) = fixture.cas.solve_view(&answer.set)? else {
+    let nrz_cas::solving::SolveView::SolutionSet(set) = fixture
+        .cas
+        .solve_view(&answer.set, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("zero family set".into());
     };
     assert_eq!(set.branches.len(), 1);
-    let nrz_cas::solving::SolveView::SolutionBranch(branch) = fixture
-        .cas
-        .solve_view(set.branches.first().ok_or("zero family branch")?)?
+    let nrz_cas::solving::SolveView::SolutionBranch(branch) = fixture.cas.solve_view(
+        set.branches.first().ok_or("zero family branch")?,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?
     else {
         return Err("zero family branch".into());
     };

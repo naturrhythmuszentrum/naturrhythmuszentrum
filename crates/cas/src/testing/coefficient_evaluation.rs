@@ -128,11 +128,15 @@ fn step(
     right: Handle,
     evidence: Evidence,
 ) -> TestResult<ApplicationDraft> {
-    let SolveView::CoefficientEvaluation(evaluation) = cas.solve_view(&mapping)? else {
+    let SolveView::CoefficientEvaluation(evaluation) =
+        cas.solve_view(&mapping, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing evaluation".into());
     };
     let region = evaluation.region.clone();
-    let SolveView::Polynomial(polynomial) = cas.solve_view(&left)? else {
+    let SolveView::Polynomial(polynomial) =
+        cas.solve_view(&left, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing finite support".into());
     };
     let support = polynomial
@@ -177,7 +181,7 @@ fn scalar_mapping(
 ) -> TestResult<Handle> {
     let space = base
         .cas
-        .scalar_ambient(image)?
+        .scalar_ambient(image, &mut crate::testing::budgets::graph_budget()?)?
         .ok_or("missing own ambient")?;
     admit(
         &mut base.cas,
@@ -488,7 +492,10 @@ pub(crate) fn family_image() -> TestResult<EvaluationFixture> {
     let shape = fixture.family()?;
     let image = fixture.body(&shape)?;
     let wrapper = wrapped(&mut fixture, &shape, &image)?;
-    let SolveView::SpaceFamily(family) = fixture.cas.solve_view(&shape.handle)? else {
+    let SolveView::SpaceFamily(family) = fixture
+        .cas
+        .solve_view(&shape.handle, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing family".into());
     };
     let source = family.coefficients.clone();

@@ -9,14 +9,18 @@ use crate::{Fault, InvalidCode, Rational};
 use std::cmp::Ordering;
 
 /// A floor is an original free coordinate and a fixed rational or independent parameter.
-pub(super) fn shape(state: &State, operands: &[LogicalId]) -> Result<bool, Fault> {
+pub(super) fn shape(
+    state: &State,
+    operands: &[LogicalId],
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     if operands.len() != 2 {
         return Ok(false);
     }
-    let Operator::Free(x) = &state.expression(operands[0])?.operator else {
+    let Operator::Free(x) = &state.expression(operands[0], budget)?.operator else {
         return Ok(false);
     };
-    Ok(match &state.expression(operands[1])?.operator {
+    Ok(match &state.expression(operands[1], budget)?.operator {
         Operator::Rational(_) => true,
         Operator::Free(wall) => wall != x,
         _ => false,
@@ -32,7 +36,7 @@ pub(super) fn check_value(
     grid: u32,
     budget: &mut Budget,
 ) -> Result<(Rational, Rational), Fault> {
-    if !shape(state, &expression.operands)? {
+    if !shape(state, &expression.operands, budget)? {
         return Err(invalid());
     }
     let lower = if x.lower().compare(wall.lower(), budget)? == Ordering::Greater {
@@ -64,11 +68,11 @@ pub(super) fn source(
     let mut floor = None;
     while let Some(id) = pending.pop() {
         budget.work(1, AT)?;
-        let expression = source.cas.state.expression(id)?;
+        let expression = source.cas.state.expression(id, budget)?;
         match &expression.operator {
             Operator::ClampFloor => {
-                if !shape(&source.cas.state, &expression.operands)?
-                    || !matches!(&source.cas.state.expression(expression.operands[0])?.operator, Operator::Free(name) if name == coordinate)
+                if !shape(&source.cas.state, &expression.operands, budget)?
+                    || !matches!(&source.cas.state.expression(expression.operands[0], budget)?.operator, Operator::Free(name) if name == coordinate)
                 {
                     return Err(invalid());
                 }

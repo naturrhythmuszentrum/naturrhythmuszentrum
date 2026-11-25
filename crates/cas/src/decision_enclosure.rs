@@ -123,11 +123,11 @@ fn validate_inner(
         return Err(unsupported());
     };
     budget.work(4, AT)?;
-    cas.checked(expression)?;
+    cas.checked(expression, budget)?;
     if expression != &contract.target {
         return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
     }
-    identities(cas, contract)?;
+    identities(cas, contract, budget)?;
     let bytes = 384_u64
         .saturating_add(number_bytes(&contract.lower))
         .saturating_add(number_bytes(&contract.upper))
@@ -149,10 +149,18 @@ fn validate_inner(
     clippy::redundant_pub_crate,
     reason = "the sibling closed replay checkers share this validation boundary"
 )]
-pub(super) fn identities(cas: &Cas, contract: &RationalEnclosure) -> Result<(), Fault> {
-    let target = cas.state.expression(cas.checked(&contract.target)?)?;
-    let context = cas.state.context(cas.checked(&contract.context)?)?;
-    let family = cas.checked(&contract.input_family)?;
+pub(super) fn identities(
+    cas: &Cas,
+    contract: &RationalEnclosure,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let target = cas
+        .state
+        .expression(cas.checked(&contract.target, budget)?, budget)?;
+    let context = cas
+        .state
+        .context(cas.checked(&contract.context, budget)?, budget)?;
+    let family = cas.checked(&contract.input_family, budget)?;
     if family != context.admissible {
         return Err(Fault::invalid(InvalidCode::EndpointMismatch, AT));
     }

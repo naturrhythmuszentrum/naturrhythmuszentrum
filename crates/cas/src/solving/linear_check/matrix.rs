@@ -28,7 +28,10 @@ impl Matrix {
         handle: &Handle,
         budget: &mut Budget,
     ) -> Result<Self, Fault> {
-        let stored = evaluation.cas.state.expression(handle.logical_id())?;
+        let stored = evaluation
+            .cas
+            .state
+            .expression(handle.logical_id(), budget)?;
         let Operator::Matrix { rows, columns } = stored.operator else {
             return Err(invalid());
         };

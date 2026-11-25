@@ -22,7 +22,7 @@ fn setup(keys: &[&str]) -> TestResult<(Cas, Handle, Handle)> {
         Vec::new(),
         &mut default_budget()?,
     )?;
-    let header = cas.context_header(&context)?;
+    let header = cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
     Ok((cas, context, header))
 }
 
@@ -143,7 +143,7 @@ fn portable_parse() -> TestResult<(Vec<u8>, Vec<u8>)> {
     let text = " x + 0.5*x ";
     let original = parse_original(&mut cas, "portable", text, &header, &mut default_budget()?)?;
     let snapshot = cas.canonical_snapshot(&mut default_budget()?)?;
-    let domain = cas.admissible_region(&context)?;
+    let domain = cas.admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?;
     let proposal = equality(
         &context,
         &domain,
@@ -168,7 +168,8 @@ fn portable_parse() -> TestResult<(Vec<u8>, Vec<u8>)> {
         statement: Statement::Equality {
             left: expected_form.syntax.clone(),
             right: expected_form.syntax,
-            domain: fresh.admissible_region(&context)?,
+            domain: fresh
+                .admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?,
             domain_contract: DomainContract::DefinedAndEqual,
         },
         residuals: Vec::new(),

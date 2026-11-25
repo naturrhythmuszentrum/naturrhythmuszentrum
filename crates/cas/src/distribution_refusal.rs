@@ -16,16 +16,17 @@ pub(crate) fn multiplier(
     let [first, second] = inputs else {
         return Err(invalid());
     };
-    let (distribution, function) = if cas.state.expression(*first)?.sort == Sort::Distribution {
-        (*first, *second)
-    } else if cas.state.expression(*second)?.sort == Sort::Distribution {
-        (*second, *first)
-    } else {
-        return Ok(());
-    };
+    let (distribution, function) =
+        if cas.state.expression(*first, budget)?.sort == Sort::Distribution {
+            (*first, *second)
+        } else if cas.state.expression(*second, budget)?.sort == Sort::Distribution {
+            (*second, *first)
+        } else {
+            return Ok(());
+        };
     let space = cas.handle(
         cas.state
-            .expression(distribution)?
+            .expression(distribution, budget)?
             .space
             .ok_or_else(invalid)?,
     );
@@ -77,7 +78,7 @@ fn point_mismatch(
     trace: &crate::number::Rational,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let definition = cas.state.space(space.logical_id())?.clone();
+    let definition = cas.state.space(space.logical_id(), budget)?.clone();
     let domain = cas.handle(definition.domain);
     let singleton = crate::boundary_regions::cell(
         cas,

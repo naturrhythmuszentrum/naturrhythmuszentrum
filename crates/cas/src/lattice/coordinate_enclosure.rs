@@ -91,7 +91,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<CheckedLatticeCoordinateEnclosure, Fault> {
         self.validate_lattice_basis(&contract.basis, basis, budget)?;
-        self.checked(&contract.inverse)?;
+        self.checked(&contract.inverse, budget)?;
         if contract.inverse != *basis.inverse().map().expression() {
             return Err(mismatch());
         }
@@ -119,21 +119,23 @@ pub(super) fn validate(
     budget: &mut Budget,
 ) -> Result<u64, Fault> {
     budget.work(4, AT)?;
-    cas.checked(&contract.inverse)?;
+    cas.checked(&contract.inverse, budget)?;
     if contract.coordinates.context != contract.basis.context
         || size(contract.coordinates.coordinates.len(), AT)? != u64::from(dimension)
     {
         return Err(mismatch());
     }
-    let home = cas.state.context(cas.checked(&contract.basis.context)?)?;
-    let target = cas.checked(&contract.target)?;
-    if cas.lattice_rectangle(target, home.header_id)? != (dimension, 1) {
+    let home = cas
+        .state
+        .context(cas.checked(&contract.basis.context, budget)?, budget)?;
+    let target = cas.checked(&contract.target, budget)?;
+    if cas.lattice_rectangle(target, home.header_id, budget)? != (dimension, 1) {
         return Err(Fault::invalid(InvalidCode::ReadingShape, AT));
     }
-    let original = &cas.state.expression(target)?.operands;
+    let original = &cas.state.expression(target, budget)?.operands;
     let inverse = &cas
         .state
-        .expression(cas.checked(&contract.inverse)?)?
+        .expression(cas.checked(&contract.inverse, budget)?, budget)?
         .operands;
     budget.check(BudgetKind::MatrixEntries, size(inverse.len(), AT)?, AT)?;
     let width = original.len().saturating_add(1);
@@ -144,7 +146,7 @@ pub(super) fn validate(
             .ok_or_else(mismatch)?;
         correspondence(
             cas,
-            cas.checked(&coordinate.target)?,
+            cas.checked(&coordinate.target, budget)?,
             coefficients,
             original,
             budget,
@@ -165,14 +167,14 @@ fn correspondence(
     let (offset, linear) = coefficients.split_last().ok_or_else(mismatch)?;
     for (coefficient, target) in linear.iter().zip(original).rev() {
         budget.work(4, AT)?;
-        let sum = cas.state.expression(root)?;
+        let sum = cas.state.expression(root, budget)?;
         let [previous, product] = sum.operands.as_slice() else {
             return Err(mismatch());
         };
         if sum.operator != Operator::Add {
             return Err(mismatch());
         }
-        let product = cas.state.expression(*product)?;
+        let product = cas.state.expression(*product, budget)?;
         if product.operator != Operator::Mul || product.operands != [*coefficient, *target] {
             return Err(mismatch());
         }

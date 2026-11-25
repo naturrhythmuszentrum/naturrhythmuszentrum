@@ -116,6 +116,10 @@ fn reading_jacobian_cache_work_and_payload_boundaries() -> TestResult {
 }
 
 /// Exact pins expose each operation's measured Work and retained payload capacities.
+/// Miss: unchanged operation Work 621,348 +128 retained counts +7 first-kind entries +142
+/// identity entries +142 admissions = 621,767. Hit: unchanged operation Work 2,650 +0.
+/// Composition: unchanged operation Work 781,099 +114 +23 +160 +160 = 781,556. Old/new
+/// lookup floors match; payload capacities remain unchanged.
 /// ´test:integration:reading-jacobian-reuse-resource-measurements´
 #[test]
 fn reading_jacobian_reuse_resource_measurements() -> TestResult {
@@ -141,9 +145,9 @@ fn reading_jacobian_reuse_resource_measurements() -> TestResult {
     assert_eq!(
         measurements,
         [
-            [0, 621_348, 780, 155, 59_268, 21_558, 25_892],
+            [0, 621_767, 780, 155, 59_268, 21_558, 25_892],
             [1, 2_650, 0, 0, 25_892, 0, 25_892],
-            [2, 781_099, 1_428, 171, 78_518, 20_714, 42_728],
+            [2, 781_556, 1_428, 171, 78_518, 20_714, 42_728],
         ]
     );
     Ok(())

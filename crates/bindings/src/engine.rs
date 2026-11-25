@@ -178,7 +178,7 @@ impl Context {
             .engine()
             .map_err(|error| Diagnostic::declaration(error.into()))?;
         let header = cas
-            .context_header(&self.semantic)
+            .context_header(&self.semantic, ledger)
             .map_err(|error| Diagnostic::declaration(error.into()))?;
         parse_original(&mut cas, key, text, &header, ledger)
             .map_err(|error| parse_diagnostic(error, text))
@@ -204,8 +204,9 @@ impl Context {
     pub fn parse(&self, key: &str, text: &str) -> Result<OriginalForm, Diagnostic> {
         let setup = || {
             let cas = self.engine()?;
-            let header = cas.context_header(&self.semantic)?;
-            Ok::<_, Fault>((cas, header, budget()?))
+            let mut ledger = budget()?;
+            let header = cas.context_header(&self.semantic, &mut ledger)?;
+            Ok::<_, Fault>((cas, header, ledger))
         };
         let (mut cas, header, mut ledger) =
             setup().map_err(|error| Diagnostic::declaration(error.into()))?;

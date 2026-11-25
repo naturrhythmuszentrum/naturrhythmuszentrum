@@ -200,6 +200,7 @@ fn edges_coefficient_evaluation(
 pub(crate) fn metadata<'a>(
     state: &'a State,
     value: &'a SolveDraft<Handle>,
+    budget: &mut Budget,
 ) -> Result<Option<(LogicalId, &'a Scope)>, Fault> {
     static EMPTY: Scope = Vec::new();
     let region = match value {
@@ -207,14 +208,14 @@ pub(crate) fn metadata<'a>(
         SolveDraft::ParameterBase(value) => return Ok(Some((value.header.logical_id(), &EMPTY))),
         SolveDraft::SpaceFamily(value) => {
             return Ok(Some((
-                base(state, &value.base)?.header.logical_id(),
+                base(state, &value.base, budget)?.header.logical_id(),
                 &EMPTY,
             )));
         }
         SolveDraft::FamilyExpression(value) => {
-            let shape = family(state, &value.family)?;
+            let shape = family(state, &value.family, budget)?;
             return Ok(Some((
-                base(state, &shape.base)?.header.logical_id(),
+                base(state, &shape.base, budget)?.header.logical_id(),
                 &value.scope,
             )));
         }
@@ -224,7 +225,7 @@ pub(crate) fn metadata<'a>(
         SolveDraft::CoefficientEvaluation(value) => &value.region,
         _ => return Err(invalid()),
     };
-    let region = state.region(region.logical_id())?;
+    let region = state.region(region.logical_id(), budget)?;
     Ok(Some((region.header, &region.scope)))
 }
 
@@ -240,7 +241,7 @@ pub(crate) fn statement(
         match value {
             SolveStatement::CoefficientEvaluation(value) => {
                 let SolveDraft::CoefficientEvaluation(evaluation) =
-                    object(state, &value.evaluation)?
+                    object(state, &value.evaluation, budget)?
                 else {
                     return Err(invalid());
                 };
@@ -249,12 +250,12 @@ pub(crate) fn statement(
                 {
                     return Err(invalid());
                 }
-                crate::descriptor::metadata(state, value.right.logical_id())?;
+                crate::descriptor::metadata(state, value.right.logical_id(), budget)?;
                 Ok(())
             }
             SolveStatement::RealSign(value) => {
-                let term = state.expression(value.subject.logical_id())?;
-                let region = state.region(value.region.logical_id())?;
+                let term = state.expression(value.subject.logical_id(), budget)?;
+                let region = state.region(value.region.logical_id(), budget)?;
                 if term.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
                     || term.header != region.header
                     || term.scope != region.scope
@@ -264,23 +265,27 @@ pub(crate) fn statement(
                 Ok(())
             }
             SolveStatement::RealRootCount(value) => {
-                relation(state, &value.relation, &value.region)?;
+                relation(state, &value.relation, &value.region, budget)?;
                 if value.cells.len() != value.counts.len() {
                     return Err(invalid());
                 }
                 for handle in &value.cells {
-                    if cell(state, handle)?.region != value.region {
+                    if cell(state, handle, budget)?.region != value.region {
                         return Err(invalid());
                     }
                 }
                 Ok(())
             }
             SolveStatement::RealCellExists(value) => {
-                relation(state, &value.relation, &value.region)?;
-                if cell(state, &value.cell)?.region != value.region {
+                relation(state, &value.relation, &value.region, budget)?;
+                if cell(state, &value.cell, budget)?.region != value.region {
                     return Err(invalid());
                 }
-                crate::domain_admission::predicate_context(state, value.predicate.logical_id())?;
+                crate::domain_admission::predicate_context(
+                    state,
+                    value.predicate.logical_id(),
+                    budget,
+                )?;
                 Ok(())
             }
             _ => Err(invalid()),
@@ -289,8 +294,13 @@ pub(crate) fn statement(
 }
 
 /// Require a Real root relation on the exact stated coefficient region.
-fn relation(state: &State, handle: &Handle, region: &Handle) -> Result<(), Fault> {
-    let SolveDraft::RootRelation(value) = object(state, handle)? else {
+fn relation(
+    state: &State,
+    handle: &Handle,
+    region: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let SolveDraft::RootRelation(value) = object(state, handle, budget)? else {
         return Err(invalid());
     };
     if value.ambient != Field::Real || value.region != *region {

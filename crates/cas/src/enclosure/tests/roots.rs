@@ -39,16 +39,29 @@ fn root_policy() -> RefinementPolicy {
 /// ´claim:cas:enclosure-root-exponent-independent´
 #[test]
 fn enclosure_root_exponent_independent() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, request) = root_case(2, 1, false)?;
-    let target = fixture.cas.checked(&request.target)?;
-    let exponent = fixture.cas.state.expression(target)?.operands[1];
-    let index = fixture.cas.state.indices[&exponent];
+    let target = fixture.cas.checked(&request.target, &mut budget)?;
+    let exponent = fixture.cas.state.expression(target, &mut budget)?.operands[1];
+    let index = fixture
+        .cas
+        .state
+        .indices
+        .peek(&exponent)
+        .copied()
+        .ok_or("index missing")?;
     if let crate::graph::Vertex::Expression(value) = &mut fixture.cas.state.graph[index] {
         value.operator = Operator::Rational(number(1, 3)?);
     } else {
         return Err("expression".into());
     }
-    assert!(fixture.cas.state.expression(target)?.supported_enclosure);
+    assert!(
+        fixture
+            .cas
+            .state
+            .expression(target, &mut budget)?
+            .supported_enclosure
+    );
     let scope = scope::key(&fixture.cas, &request, &mut ledger()?)?;
     let forged = producer::generate(
         &fixture.cas,
@@ -451,9 +464,9 @@ fn enclosure_root_work_pins() -> TestResult {
             fourth_cold.work,
             fourth_warm.work
         ),
-        (1_696, 10_368, 63_739, 20_283, 90_467, 23_510)
+        (1_696, 10_368, 63_744, 20_283, 90_472, 23_510)
     );
-    for (fourth, cold, warm) in [(false, 63_739, 20_283), (true, 90_467, 23_510)] {
+    for (fourth, cold, warm) in [(false, 63_744, 20_283), (true, 90_472, 23_510)] {
         request_work_boundary(fourth, false, cold)?;
         request_work_boundary(fourth, true, warm)?;
     }

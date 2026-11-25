@@ -9,7 +9,7 @@ use crate::number::Rational;
 use crate::proof_model::{ApplicationDraft, Certificate, DomainContract, Statement};
 use crate::rule::Primitive;
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture, admit, budget, predicate, term};
+use crate::testing::native::{Fixture, admit, predicate, term};
 
 /// Build the original conditional equality and its guard independently of conversion.
 fn prepared() -> TestResult<(
@@ -21,7 +21,11 @@ fn prepared() -> TestResult<(
     let minus = term(
         &mut f.cas,
         &f.header,
-        Operator::Rational(Rational::from_ratio(-1, 1, &mut budget()?)?),
+        Operator::Rational(Rational::from_ratio(
+            -1,
+            1,
+            &mut crate::testing::native::fresh_budget()?,
+        )?),
         &[],
     )?;
     let quotient = term(
@@ -92,11 +96,22 @@ fn prepared() -> TestResult<(
         substitutions: vec![],
         certificate: Certificate::None,
     };
-    let guard = f.cas.check_proof(&f.context, &[guard], &mut budget()?)?;
-    let equality = f.cas.check_proof(&f.context, &[equality], &mut budget()?)?;
-    let crate::trig::TrigRecipeOutcome::Proved(witness) =
-        f.cas
-            .trig_atan_minus_one(&function, guard.proof(), equality.proof(), &mut budget()?)?
+    let guard = f.cas.check_proof(
+        &f.context,
+        &[guard],
+        &mut crate::testing::native::fresh_budget()?,
+    )?;
+    let equality = f.cas.check_proof(
+        &f.context,
+        &[equality],
+        &mut crate::testing::native::fresh_budget()?,
+    )?;
+    let crate::trig::TrigRecipeOutcome::Proved(witness) = f.cas.trig_atan_minus_one(
+        &function,
+        guard.proof(),
+        equality.proof(),
+        &mut crate::testing::native::fresh_budget()?,
+    )?
     else {
         return Err("conditional recipe".into());
     };
@@ -107,6 +122,7 @@ fn prepared() -> TestResult<(
 /// ´test:crate:trig-minus-one-transport-residual-identity´
 #[test]
 fn trig_minus_one_transport_residual_identity() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (f, witness, nonzero) = prepared()?;
     assert_ne!(witness.judgment().residuals, []);
     assert!(
@@ -116,7 +132,10 @@ fn trig_minus_one_transport_residual_identity() -> TestResult {
             .iter()
             .all(|guarded| guarded.predicate == nonzero)
     );
-    let citations = f.cas.proof_citations(witness.proof(), &mut budget()?)?;
+    let citations = f.cas.proof_citations(
+        witness.proof(),
+        &mut crate::testing::native::fresh_budget()?,
+    )?;
     let close = citations
         .iter()
         .find(|node| {
@@ -130,11 +149,14 @@ fn trig_minus_one_transport_residual_identity() -> TestResult {
         .ok_or("scalar close")?;
     let child = crate::proof_view::application(
         &f.cas,
-        f.cas.checked(&close.premises[0].proof)?,
-        &mut budget()?,
+        f.cas.checked(&close.premises[0].proof, &mut budget)?,
+        &mut crate::testing::native::fresh_budget()?,
     )?;
-    let closed =
-        crate::proof_view::application(&f.cas, f.cas.checked(&close.proof)?, &mut budget()?)?;
+    let closed = crate::proof_view::application(
+        &f.cas,
+        f.cas.checked(&close.proof, &mut budget)?,
+        &mut crate::testing::native::fresh_budget()?,
+    )?;
     for step in [&child, &closed] {
         assert_ne!(step.judgment.residuals, []);
         assert!(
@@ -150,12 +172,16 @@ fn trig_minus_one_transport_residual_identity() -> TestResult {
                 .all(|guarded| guarded.predicate == nonzero)
         );
     }
-    let scalar = crate::proof_view::scalar_application(&f.cas, &child, &mut budget()?)?;
+    let scalar = crate::proof_view::scalar_application(
+        &f.cas,
+        &child,
+        &mut crate::testing::native::fresh_budget()?,
+    )?;
     assert_eq!(
         scalar.conditions.residuals,
         std::collections::BTreeSet::from([Obligation {
             kind: GuardKind::NonZero,
-            term: f.cas.checked(&f.x)?
+            term: f.cas.checked(&f.x, &mut budget)?
         }])
     );
     Ok(())

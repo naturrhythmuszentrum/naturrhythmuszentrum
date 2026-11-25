@@ -99,8 +99,15 @@ fn transaction_rollback() -> TestResult {
 fn draft_refusals() -> TestResult {
     let (mut cas, context) = fixture()?;
     let (other, foreign) = fixture()?;
-    assert!(cas.expression(&foreign).is_err());
-    assert!(other.expression(&context).is_err());
+    assert!(
+        cas.expression(&foreign, &mut crate::testing::budgets::graph_budget()?)
+            .is_err()
+    );
+    assert!(
+        other
+            .expression(&context, &mut crate::testing::budgets::graph_budget()?)
+            .is_err()
+    );
     let before = cas.canonical_snapshot(&mut budget()?)?;
     for reference in [Reference::Existing(foreign), Reference::Local(1)] {
         let draft = Draft::Expression(ExpressionDraft {
@@ -235,7 +242,8 @@ fn simultaneous_substitution() -> TestResult {
 #[test]
 fn bound_instantiation() -> TestResult {
     let (mut cas, context) = fixture()?;
-    let syntax_header = cas.context_header(&context)?;
+    let syntax_header =
+        cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
     let x = expression(&mut cas, &context, Operator::Free("x".into()), real(), &[])?;
     let bound = admit(
         &mut cas,
@@ -295,7 +303,8 @@ fn permanent_storage_limit() -> TestResult {
 #[test]
 fn explicit_contradiction() -> TestResult {
     let (mut cas, context) = fixture()?;
-    let syntax_header = cas.context_header(&context)?;
+    let syntax_header =
+        cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
     let x = expression(&mut cas, &context, Operator::Free("x".into()), real(), &[])?;
     let predicate = expression(
         &mut cas,
@@ -432,7 +441,8 @@ fn field_boundary() -> TestResult {
                 coordinate: "x".into(),
                 order: 1,
                 layer: nrz_cas::domain::Layer::Pointwise,
-                domain: cas.admissible_region(&context)?
+                domain: cas
+                    .admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?
             },
             context,
             inputs: vec![nrz_cas::request::CoveredInput { root, receipt }],
@@ -449,7 +459,8 @@ fn field_boundary() -> TestResult {
 #[test]
 fn outer_frame_lifting() -> TestResult {
     let (mut cas, context) = fixture()?;
-    let syntax_header = cas.context_header(&context)?;
+    let syntax_header =
+        cas.context_header(&context, &mut crate::testing::budgets::graph_budget()?)?;
     let outer = vec![vec![AtomicSort::Scalar(Field::Real)]];
     let replacement = admit(
         &mut cas,
@@ -519,7 +530,8 @@ fn outer_frame_lifting() -> TestResult {
     let operands = cas.operands(&result, &mut budget()?)?;
     let lifted = operands.first().ok_or("sum lost its body")?;
     assert_eq!(
-        cas.expression(lifted)?.0,
+        cas.expression(lifted, &mut crate::testing::budgets::graph_budget()?)?
+            .0,
         &Operator::Bound { depth: 1, slot: 0 }
     );
     Ok(())
@@ -588,7 +600,8 @@ fn equality_target_sort() -> TestResult {
     assert!(matches!(
         cas.run(&Request {
             task: Task::Equal {
-                domain: cas.admissible_region(&context)?,
+                domain: cas
+                    .admissible_region(&context, &mut crate::testing::budgets::graph_budget()?)?,
                 domain_contract: nrz_cas::proof::DomainContract::DefinedAndEqual
             },
             context,

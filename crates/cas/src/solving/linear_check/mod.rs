@@ -34,13 +34,19 @@ pub(crate) const fn schema_availability(tag: u8) -> super::Availability {
 }
 
 /// The statement fixes the coefficient algebra; no floating matrix interpretation is admitted.
-fn domain<'a>(cas: &'a Cas, statement: &'a SolveStatement) -> Result<&'a Handle, Fault> {
+fn domain<'a>(
+    cas: &'a Cas,
+    statement: &'a SolveStatement,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a Handle, Fault> {
     match statement {
         SolveStatement::Rank(value) => Ok(&value.domain),
         SolveStatement::LinearSystem(value) => {
-            Ok(&problem(cas, &value.problem)?.coefficient_domain)
+            Ok(&problem(cas, &value.problem, budget)?.coefficient_domain)
         }
-        SolveStatement::Equivalent(value) => Ok(&problem(cas, &value.source)?.coefficient_domain),
+        SolveStatement::Equivalent(value) => {
+            Ok(&problem(cas, &value.source, budget)?.coefficient_domain)
+        }
         _ => Err(invalid()),
     }
 }
@@ -130,7 +136,9 @@ pub(crate) fn check(
         return Err(invalid());
     };
     let (inherited, _) = conditions(cas, draft, premises, budget)?;
-    let context = cas.state.context(cas.checked(&draft.context)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
     if context.admissible != value.region.logical_id() {
         return Err(invalid());
     }
@@ -139,7 +147,7 @@ pub(crate) fn check(
         cas,
         engine: Engine {
             state: &cas.state,
-            domain: domain(cas, statement)?,
+            domain: domain(cas, statement, budget)?,
         },
         region: &value.region,
         premises,

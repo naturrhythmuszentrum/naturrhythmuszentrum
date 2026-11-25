@@ -54,12 +54,12 @@ pub(crate) fn mapping<'a>(
     crate::work_observation::observe!(budget, AT, {
         budget.work(1, AT)?;
         let SolveDraft::CoefficientMap(map) =
-            crate::solving::graph::object(&cas.state, cas.checked(handle)?)?
+            crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)?
         else {
             return Err(invalid());
         };
-        let frame = cas.state.context(cas.checked(context)?)?;
-        let coefficient_region = cas.state.region(cas.checked(region)?)?;
+        let frame = cas.state.context(cas.checked(context, budget)?, budget)?;
+        let coefficient_region = cas.state.region(cas.checked(region, budget)?, budget)?;
         if map.region != *region
             || frame.header_id != coefficient_region.header
             || frame.admissible != region.logical_id()
@@ -78,7 +78,7 @@ pub(crate) fn ground_map(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         budget.work(1, AT)?;
-        let source = domain(&cas.state, &map.source)?;
+        let source = domain(&cas.state, &map.source, budget)?;
         match &map.target {
             MapTarget::Family { .. } => crate::solving::family::mapping::ground(cas, map, budget),
             MapTarget::CoefficientDomain { domain: target }
@@ -89,7 +89,10 @@ pub(crate) fn ground_map(
             MapTarget::CoefficientDomain { domain: target }
                 if map.images.is_empty()
                     && matches!(source, CoefficientDomainData::Rational)
-                    && matches!(domain(&cas.state, target)?, CoefficientDomainData::Gaussian) =>
+                    && matches!(
+                        domain(&cas.state, target, budget)?,
+                        CoefficientDomainData::Gaussian
+                    ) =>
             {
                 Ok(())
             }
@@ -152,9 +155,10 @@ pub(crate) fn defined(
         pending.push(handle);
         while let Some(current) = pending.pop() {
             budget.work(1, AT)?;
-            match crate::solving::graph::object(&cas.state, cas.checked(current)?)? {
+            match crate::solving::graph::object(&cas.state, cas.checked(current, budget)?, budget)?
+            {
                 SolveDraft::Polynomial(_) => {
-                    let stored = polynomial(&cas.state, current)?;
+                    let stored = polynomial(&cas.state, current, budget)?;
                     super::storage::reserve(&mut pending, stored.terms.len(), budget)?;
                     pending.extend(stored.terms.iter().map(|term| &term.coefficient));
                 }
@@ -168,8 +172,9 @@ pub(crate) fn defined(
                             state: &cas.state,
                             domain: &stored.domain,
                         };
-                        let (_, extension) = crate::solving::towers::arithmetic::level(&engine)
-                            .map_err(|error| fault(&error))?;
+                        let (_, extension) =
+                            crate::solving::towers::arithmetic::level(&engine, budget)
+                                .map_err(|error| fault(&error))?;
                         super::storage::reserve(&mut pending, 1, budget)?;
                         pending.push(&extension.polynomial);
                         super::storage::reserve(&mut pending, coefficients.len(), budget)?;
@@ -228,7 +233,7 @@ impl Engine<'_> {
                 budget,
             )?),
             super::model::Value::Tower(coefficients) => {
-                let (_, extension) = crate::solving::towers::arithmetic::level(self)?;
+                let (_, extension) = crate::solving::towers::arithmetic::level(self, budget)?;
                 let parent = Self {
                     state: self.state,
                     domain: &extension.parent,

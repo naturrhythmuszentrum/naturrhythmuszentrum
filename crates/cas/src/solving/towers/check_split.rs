@@ -62,7 +62,7 @@ fn square_free(
         return Ok(false);
     };
     if unit.region != *region
-        || !matches!(domain(&cas.state, &unit.domain)?, CoefficientDomainData::Quotient { level } if level == extension)
+        || !matches!(domain(&cas.state, &unit.domain, budget)?, CoefficientDomainData::Quotient { level } if level == extension)
     {
         return Ok(false);
     }
@@ -89,10 +89,10 @@ fn parent_reduced(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let mut current = parent;
-    while let CoefficientDomainData::Quotient { level } = domain(&cas.state, current)? {
+    while let CoefficientDomainData::Quotient { level } = domain(&cas.state, current, budget)? {
         budget.work(1, AT)?;
         let SolveDraft::ExtensionLevel(extension) =
-            crate::solving::graph::object(&cas.state, level.logical_id())?
+            crate::solving::graph::object(&cas.state, level.logical_id(), budget)?
         else {
             return Err(invalid());
         };
@@ -202,7 +202,7 @@ fn restriction(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let SolveDraft::CoefficientMap(map) =
-        crate::solving::graph::object(&cas.state, handle.logical_id())?
+        crate::solving::graph::object(&cas.state, handle.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -231,7 +231,8 @@ fn restriction(
         state: &cas.state,
         domain: child,
     };
-    let (_, extension) = super::arithmetic::level(&engine).map_err(|error| fault(&error))?;
+    let (_, extension) =
+        super::arithmetic::level(&engine, budget).map_err(|error| fault(&error))?;
     let parent = Engine {
         state: &cas.state,
         domain: &extension.parent,
@@ -276,8 +277,11 @@ pub(crate) fn check(
 ) -> Result<(), Fault> {
     budget.solving(BudgetKind::ComponentSplits, 1, AT)?;
     budget.solving(BudgetKind::SolutionBranches, 2, AT)?;
-    let SolveDraft::ComponentSplit(split) =
-        crate::solving::graph::object(&cas.state, cas.checked(&certificate.split)?)?
+    let SolveDraft::ComponentSplit(split) = crate::solving::graph::object(
+        &cas.state,
+        cas.checked(&certificate.split, budget)?,
+        budget,
+    )?
     else {
         return Err(invalid());
     };
@@ -289,12 +293,16 @@ pub(crate) fn check(
     };
     if cover.split != certificate.split
         || cover.region != split.region
-        || cas.state.context(cas.checked(&draft.context)?)?.admissible != split.region.logical_id()
+        || cas
+            .state
+            .context(cas.checked(&draft.context, budget)?, budget)?
+            .admissible
+            != split.region.logical_id()
     {
         return Err(invalid());
     }
     let SolveDraft::ExtensionLevel(extension) =
-        crate::solving::graph::object(&cas.state, split.parent.logical_id())?
+        crate::solving::graph::object(&cas.state, split.parent.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -331,12 +339,12 @@ fn localizations(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let SolveDraft::CoefficientMap(left) =
-        crate::solving::graph::object(&cas.state, split.left_map.logical_id())?
+        crate::solving::graph::object(&cas.state, split.left_map.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     let SolveDraft::CoefficientMap(right) =
-        crate::solving::graph::object(&cas.state, split.right_map.logical_id())?
+        crate::solving::graph::object(&cas.state, split.right_map.logical_id(), budget)?
     else {
         return Err(invalid());
     };

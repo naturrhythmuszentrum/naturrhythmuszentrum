@@ -67,9 +67,9 @@ impl Receipt {
     /// The mathematical result is the conditional implication in `SCHEMA`, not a ground bound.
     /// # Errors
     /// Refuses a foreign store, rolled-back identity or missing checked-evidence edge.
-    pub fn request<'a>(&self, cas: &'a Cas) -> Result<&'a Request, Fault> {
+    pub fn request<'a>(&self, cas: &'a Cas, budget: &mut Budget) -> Result<&'a Request, Fault> {
         self.authenticate(cas)?;
-        cas.lc_root_request(&self.judgment)
+        cas.lc_root_request(&self.judgment, budget)
     }
 
     /// A logical-token copy alone cannot import a source store's checked receipt.
@@ -93,7 +93,7 @@ impl Receipt {
     pub fn certificate(&self, cas: &Cas, budget: &mut Budget) -> Result<Certificate, Fault> {
         self.authenticate(cas)?;
         cas.with_retained_graph(budget, |budget| {
-            copy(cas.lc_root_wire(&self.judgment)?, budget).map(Certificate)
+            copy(cas.lc_root_wire(&self.judgment, budget)?, budget).map(Certificate)
         })
     }
 }

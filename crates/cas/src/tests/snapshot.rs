@@ -54,7 +54,7 @@ fn physical_index_independence() -> TestResult {
     let mut remap = BTreeMap::new();
     let mut indices = BTreeMap::new();
     for (id, old_index) in cas.state.indices.iter().rev() {
-        let index = graph.add_node(cas.state.node(*id)?.clone());
+        let index = graph.add_node(cas.state.node(*id, &mut budget)?.clone());
         remap.insert(*old_index, index);
         indices.insert(*id, index);
     }
@@ -69,13 +69,23 @@ fn physical_index_independence() -> TestResult {
             .ok_or("missing edge target")?;
         let _edge = graph.add_edge(source, target, *edge.weight());
     }
-    assert_ne!(cas.state.indices, indices);
+    assert_ne!(
+        cas.state
+            .indices
+            .iter()
+            .map(|(key, value)| (*key, *value))
+            .collect::<Vec<_>>(),
+        indices
+            .iter()
+            .map(|(key, value)| (*key, *value))
+            .collect::<Vec<_>>()
+    );
     cas.state.graph = graph;
-    cas.state.indices = indices;
+    cas.state.indices = indices.into_iter().collect();
     assert_eq!(cas.canonical_snapshot(&mut budget)?, before);
     let expression = handles.last().ok_or("missing expression handle")?;
     assert_eq!(
-        cas.expression(expression)?.0,
+        cas.expression(expression, &mut budget)?.0,
         &Operator::Rational(Rational::one())
     );
     Ok(())
@@ -85,6 +95,7 @@ fn physical_index_independence() -> TestResult {
 /// ´test:crate:scoped-statement-edges´
 #[test]
 fn scoped_statement_edges() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::domain::{AmbientDomain, ContextDraft, HeaderDraft, RegionDraft, RegionExpr};
     use crate::graph::{Edge, Vertex};
     use crate::proof::{ApplicationDraft, Certificate, Primitive, Statement};
@@ -156,13 +167,15 @@ fn scoped_statement_edges() -> TestResult {
             certificate: Certificate::None,
         };
         let witness = cas.check_proof(context, &[step], &mut default_budget()?)?;
-        let Vertex::Proof(application) = cas.state.node(witness.proof().logical_id())? else {
+        let Vertex::Proof(application) =
+            cas.state.node(witness.proof().logical_id(), &mut budget)?
+        else {
             return Err("missing checked application".into());
         };
         let index = *cas
             .state
             .indices
-            .get(application)
+            .peek(application)
             .ok_or("application index")?;
         let mut actual = BTreeMap::new();
         for edge in cas.state.graph.edges(index) {
@@ -177,7 +190,7 @@ fn scoped_statement_edges() -> TestResult {
         }
         let mut expected_indices = BTreeMap::new();
         for (role, id) in expected {
-            expected_indices.insert(role, *cas.state.indices.get(&id).ok_or("target index")?);
+            expected_indices.insert(role, *cas.state.indices.peek(&id).ok_or("target index")?);
         }
         assert_eq!(actual, expected_indices);
     }

@@ -16,6 +16,9 @@ use super::{Ledger, ObserverCost, Report, Row, Transfer};
 /// Fixed vocabulary and bounded fault text keep each retained entry finite.
 const FIELD_BYTES: usize = 512;
 
+/// A phase with no helper operation still has an attributable rule and purpose.
+pub(super) const PHASE_LOCATION: &str = "phase boundary";
+
 /// Refusal formatting stops at the observer's field capacity.
 #[derive(Default)]
 struct BoundedText {
@@ -44,7 +47,7 @@ struct Fields {
     owner: Option<String>,
     /// Causal purpose name.
     phase: Option<String>,
-    /// An absent operation denotes unclassified root work.
+    /// An absent operation with a purpose uses the phase boundary as its location.
     operation: String,
     /// Owner-qualified nonwrapping ledger incarnation.
     ledger: Option<u64>,
@@ -275,7 +278,7 @@ impl State {
         self.result.observer.peak_depth = self.result.observer.peak_depth.max(self.stack.len());
     }
 
-    /// Close against the actual interval forest and aggregate only exclusive named work.
+    /// Close against the actual interval forest and aggregate exclusive phase work.
     fn exit(&mut self, id: u64) {
         if self.stack.pop() != Some(id) {
             self.lost = true;
@@ -326,11 +329,18 @@ impl State {
 
     /// Bound receipt keys independently of the number of historical operations.
     fn receipt(&mut self, ledger: u64, fields: Fields, inclusive: u64, exclusive: u64) {
-        let classified = !fields.operation.is_empty();
+        let classified = !fields.operation.is_empty()
+            || fields
+                .phase
+                .as_deref()
+                .is_some_and(|phase| !phase.is_empty());
+        let phase = fields
+            .phase
+            .unwrap_or_else(|| String::from(if classified { "overhead" } else { "" }));
         let key = (
             ledger,
             fields.rule.unwrap_or_else(|| "replay".into()),
-            fields.phase.unwrap_or_else(|| "overhead".into()),
+            phase,
             fields.operation,
         );
         if !self.result.receipts.contains_key(&key) && self.result.receipts.len() >= self.capacity {
@@ -412,9 +422,14 @@ impl State {
         }
         let mut rows = BTreeMap::new();
         for ((_, rule, phase, location), receipt) in &self.result.receipts {
-            if receipt.exclusive != 0 && !location.is_empty() {
+            if receipt.exclusive != 0 && (!location.is_empty() || !phase.is_empty()) {
+                let rendered_location = if location.is_empty() {
+                    PHASE_LOCATION
+                } else {
+                    location
+                };
                 let value = rows
-                    .entry((rule.clone(), phase.clone(), location.clone()))
+                    .entry((rule.clone(), phase.clone(), rendered_location.to_owned()))
                     .or_insert(0);
                 Self::add(value, receipt.exclusive, &mut self.lost);
             }

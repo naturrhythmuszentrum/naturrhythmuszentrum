@@ -10,7 +10,7 @@ use crate::number::Rational;
 use crate::proof_model::{Certificate, Statement};
 use crate::region_cache::{partition, partition_at};
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture, admit, budget, predicate};
+use crate::testing::native::{Fixture, admit, fresh_budget, predicate};
 
 /// Identical syntax imported with different serials is decided once on the shared ledger.
 /// ´test:crate:portable-ledger-identity´
@@ -22,7 +22,7 @@ fn portable_ledger_identity() -> TestResult {
     empty(&mut second)?;
     let imported = guarded(&mut second, PredicateKind::Positive)?;
     assert_ne!(positive.logical_id(), imported.logical_id());
-    let mut ledger = budget()?;
+    let mut ledger = fresh_budget()?;
     let expected = partition(&first.cas, &[positive.logical_id()], &mut ledger)?;
     assert_eq!(expected.cuts, vec![Rational::zero()]);
     assert_eq!(expected.membership, vec![vec![false, false, true]]);
@@ -33,7 +33,7 @@ fn portable_ledger_identity() -> TestResult {
         expected
     );
     assert_eq!(ledger.usage().condition_steps, consumed);
-    let mut independent = budget()?;
+    let mut independent = fresh_budget()?;
     assert_eq!(
         partition(&second.cas, &[imported.logical_id()], &mut independent)?,
         expected
@@ -49,7 +49,7 @@ fn complete_decision_key() -> TestResult {
     let mut first = Fixture::new()?;
     let positive = guarded(&mut first, PredicateKind::Positive)?;
     let nonnegative = guarded(&mut first, PredicateKind::NonNegative)?;
-    let mut ledger = budget()?;
+    let mut ledger = fresh_budget()?;
     let roots = [positive.logical_id(), nonnegative.logical_id()];
     let direct = partition(&first.cas, &roots, &mut ledger)?;
     assert_eq!(
@@ -93,7 +93,7 @@ fn rechecks_untrusted_certificate() -> TestResult {
         subset: positive.clone(),
         superset: nonnegative.clone(),
     };
-    let mut ledger = budget()?;
+    let mut ledger = fresh_budget()?;
     let evidence = crate::region_check::evidence(&mut fixture.cas, &statement, &mut ledger)?;
     let consumed = ledger.usage().condition_steps;
     crate::region_check::decide(
@@ -140,7 +140,7 @@ fn rechecks_untrusted_certificate() -> TestResult {
 #[test]
 fn storage_and_policy_boundaries() -> TestResult {
     let fixture = Fixture::new()?;
-    let mut ledger = budget()?;
+    let mut ledger = fresh_budget()?;
     partition(&fixture.cas, &[fixture.domain.logical_id()], &mut ledger)?;
     let retained = ledger.region_partitions.bytes;
     assert!(retained > 0);

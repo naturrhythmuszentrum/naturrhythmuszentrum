@@ -23,7 +23,7 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Vec<EntryIndex>, Fault> {
         self.inventory_limits(budget, |budget| {
-            self.checked(&inventory.owner)?;
+            self.checked(&inventory.owner, budget)?;
             let (base, selected) = bases::selection(self, write, budget)?;
             self.intersect_dependencies(inventory, base, selected.indices(), budget)
         })
@@ -44,10 +44,10 @@ impl Cas {
         budget: &mut Budget,
     ) -> Result<Vec<EntryIndex>, Fault> {
         self.inventory_limits(budget, |budget| {
-            self.checked(&inventory.owner)?;
-            let base = self.checked(base)?;
-            bases::declaration(self, base)?;
-            validate_entries(&self.state.expression(base)?.sort, entries, budget)?;
+            self.checked(&inventory.owner, budget)?;
+            let base = self.checked(base, budget)?;
+            bases::declaration(self, base, budget)?;
+            validate_entries(&self.state.expression(base, budget)?.sort, entries, budget)?;
             self.intersect_dependencies(inventory, base, entries, budget)
         })
     }
@@ -101,13 +101,13 @@ impl Cas {
         base: LogicalId,
         budget: &mut Budget,
     ) -> Result<(), Fault> {
-        let declared = bases::declaration(self, base)?;
+        let declared = bases::declaration(self, base, budget)?;
         let Operator::Free(key) = &declared.operator else {
             return Err(invalid(InvalidCode::ReadingDefinition));
         };
         for original in &inventory.bases {
             budget.work(1, AT)?;
-            let other = bases::declaration(self, *original)?;
+            let other = bases::declaration(self, *original, budget)?;
             let Operator::Free(other_key) = &other.operator else {
                 return Err(invalid(InvalidCode::ReadingDefinition));
             };

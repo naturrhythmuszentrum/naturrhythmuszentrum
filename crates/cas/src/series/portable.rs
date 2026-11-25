@@ -26,12 +26,15 @@ pub(crate) struct Claim {
 }
 
 /// Identify the dedicated proof category without copying or traversing ordinary applications.
-pub(crate) fn is_series(cas: &Cas, proof: LogicalId) -> Result<bool, Fault> {
-    let Vertex::Proof(application) = cas.state.node(proof)? else {
+pub(crate) fn is_series(cas: &Cas, proof: LogicalId, budget: &mut Budget) -> Result<bool, Fault> {
+    let Vertex::Proof(application) = cas.state.node(proof, budget)? else {
         return Ok(false);
     };
-    if matches!(cas.state.node(*application)?, Vertex::AnonymousLemma(_)) {
-        cas.series_application(*application)?;
+    if matches!(
+        cas.state.node(*application, budget)?,
+        Vertex::AnonymousLemma(_)
+    ) {
+        cas.series_application(*application, budget)?;
         Ok(true)
     } else {
         Ok(false)
@@ -93,21 +96,15 @@ fn encode_claim(
     let spec = value.primitive().specification();
     out.name(spec.key)?;
     crate::wire::index(spec.version, out)?;
-    reference_out(
-        out,
-        record,
-        Entity::Object(cas.checked(&claim.judgment.context)?),
-    )?;
+    let context = cas.checked(&claim.judgment.context, out.budget())?;
+    reference_out(out, record, Entity::Object(context))?;
     super::codec::statement(value, out, &mut |handle, out| {
         reference_out(out, record, Entity::Object(handle.logical_id()))
     })?;
     out.count(claim.hypotheses.len())?;
     for hypothesis in &claim.hypotheses {
-        reference_out(
-            out,
-            record,
-            Entity::Object(cas.checked(&hypothesis.context)?),
-        )?;
+        let context = cas.checked(&hypothesis.context, out.budget())?;
+        reference_out(out, record, Entity::Object(context))?;
         crate::wire::index(hypothesis.slot, out)?;
     }
     out.count(claim.judgment.residuals.len())?;
@@ -372,7 +369,7 @@ fn decode_certificate(
             | super::SeriesStatement::EvaluatedResidual { .. }
     ) {
         let count = usize::try_from(reader.index()?).map_err(|_| invalid())?;
-        if count != super::check::premise_count(cas, statement)? {
+        if count != super::check::premise_count(cas, statement, reader.budget)? {
             return Err(invalid());
         }
         reader
@@ -387,7 +384,7 @@ fn decode_certificate(
     } else {
         reader.count(BudgetKind::ProofNodes, 4, 512)?
     };
-    if count != super::check::premise_count(cas, statement)? {
+    if count != super::check::premise_count(cas, statement, reader.budget)? {
         return Err(invalid());
     }
     let mut ids = Vec::new();
@@ -400,7 +397,7 @@ fn decode_certificate(
     let mut bytes = 0_u64;
     for index in 0..count {
         let proof = proof(reader, records)?;
-        let id = cas.checked(proof)?;
+        let id = cas.checked(proof, reader.budget)?;
         bytes = bytes
             .checked_add(crate::proof_view::application_bytes(
                 cas,
@@ -463,7 +460,8 @@ fn decode_conclusion(
     {
         return source_conclusion(cas, claim, proof, reader, records, manifest);
     }
-    let application = crate::proof_view::application(cas, cas.checked(proof)?, reader.budget)?;
+    let proof_id = cas.checked(proof, reader.budget)?;
+    let application = crate::proof_view::application(cas, proof_id, reader.budget)?;
     if !matches!(application.judgment.statement, Statement::Series(_)) {
         return Err(invalid());
     }
@@ -472,7 +470,8 @@ fn decode_conclusion(
         return Err(invalid());
     }
     for expected in &application.premises {
-        if cas.checked(self::proof(reader, records)?)? != *expected {
+        let premise = self::proof(reader, records)?;
+        if cas.checked(premise, reader.budget)? != *expected {
             return Err(invalid());
         }
     }
@@ -503,20 +502,23 @@ fn source_conclusion(
     records: &[Decoded],
     manifest: &[Primitive],
 ) -> Result<Decoded, Fault> {
-    let Vertex::Proof(id) = cas.state.node(cas.checked(proof)?)? else {
+    let proof_id = cas.checked(proof, reader.budget)?;
+    let Vertex::Proof(id) = cas.state.node(proof_id, reader.budget)? else {
         return Err(invalid());
     };
-    let application = cas.series_application(*id)?;
+    let application = cas.series_application(*id, reader.budget)?;
     let Statement::Series(statement) = &claim.judgment.statement else {
         return Err(invalid());
     };
     let count = usize::try_from(reader.index()?).map_err(|_| invalid())?;
-    if count != super::check::premise_count(cas, statement)? || count != application.premises.len()
+    if count != super::check::premise_count(cas, statement, reader.budget)?
+        || count != application.premises.len()
     {
         return Err(invalid());
     }
     for expected in &application.premises {
-        if cas.checked(self::proof(reader, records)?)? != *expected {
+        let premise = self::proof(reader, records)?;
+        if cas.checked(premise, reader.budget)? != *expected {
             return Err(invalid());
         }
     }
@@ -541,7 +543,8 @@ fn source_conclusion(
     {
         return Err(invalid());
     }
-    let bytes = crate::proof_view::application_bytes(cas, cas.checked(proof)?, reader.budget)?;
+    let proof_id = cas.checked(proof, reader.budget)?;
+    let bytes = crate::proof_view::application_bytes(cas, proof_id, reader.budget)?;
     reader.budget.with_retained_payload(bytes, AT, |budget| {
         Ok(Decoded::Conclusion(cas.seal_scoped(proof, budget)?))
     })

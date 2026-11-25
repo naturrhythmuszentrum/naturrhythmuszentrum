@@ -73,7 +73,7 @@ fn replay() -> TestResult<Vec<Observation>> {
 
 /// Construct both complete current targets and evaluate all three original-source covariance maps.
 fn vector() -> TestResult<Vec<Observation>> {
-    let mut budget = super::budget()?;
+    let mut budget = super::fresh_budget()?;
     let start = Instant::now();
     let mut case = fixture::vector_case_with_budget::<f64>(&mut budget)?;
     let mut result = vec![Observation {
@@ -131,7 +131,7 @@ fn evaluate(
 
 /// Admission owns a separate request; the numerical lifecycle shares one unchanged default ledger.
 fn driven(policy: nrz_matrix::DependencyPolicy) -> TestResult<Vec<Observation>> {
-    let mut admission = super::budget()?;
+    let mut admission = super::fresh_budget()?;
     let start = Instant::now();
     let mut case = fixture::lifecycle_case(policy, &mut admission)?;
     let mut result = vec![Observation {

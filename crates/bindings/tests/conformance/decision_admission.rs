@@ -141,10 +141,10 @@ fn bindings_decision_admission() -> TestResult {
     assert_eq!(selected.witness().hypotheses().len(), 1);
     assert_eq!(
         (physical_work, case_work, admission_work),
-        (52_584, 32_295, 208)
+        (52_662, 32_349, 208)
     );
-    assert_eq!(proof_end - physical_work - case_work, 168_544);
-    assert_eq!(budget.usage().work, 253_631);
+    assert_eq!(proof_end - physical_work - case_work, 168_637);
+    assert_eq!(budget.usage().work, 253_856);
     assert_eq!(selected.retained_payload_bytes(), 13_842);
     assert_eq!(selected.usage()[1].work - selected.usage()[0].work, 208);
     let mut reused = ledger()?;
@@ -314,7 +314,7 @@ fn bindings_decision_domain_refusals() -> TestResult {
 fn bindings_decision_preparation_boundaries() -> TestResult {
     let owner = physical_source("LC nominal reference", false)?;
     let before = owner.cas()?.counts();
-    for (work, accepted) in [(52_584, true), (52_583, false)] {
+    for (work, accepted) in [(52_662, true), (52_661, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()
@@ -326,7 +326,7 @@ fn bindings_decision_preparation_boundaries() -> TestResult {
     let physical = DecisionExpression::declared(owner, "quotient", &mut ledger()?)?;
     let source = fixture(false, "3", "10/Pi")?;
     let before = source.frame.cas.counts();
-    for (work, accepted) in [(32_295, true), (32_294, false)] {
+    for (work, accepted) in [(32_349, true), (32_348, false)] {
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
             ..nrz_bindings::Limits::default()
@@ -400,7 +400,7 @@ fn bindings_decision_snapshot_boundaries() -> TestResult {
 #[test]
 fn bindings_decision_cumulative_boundary() -> TestResult {
     let owner = physical_source("LC nominal reference", false)?;
-    for (work, accepted) in [(253_648, true), (253_647, false)] {
+    for (work, accepted) in [(253_873, true), (253_872, false)] {
         let mut source = fixture(false, "3", "10/Pi")?;
         let mut budget = nrz_bindings::Budget::new(nrz_bindings::Limits {
             work,
@@ -423,7 +423,7 @@ fn bindings_decision_cumulative_boundary() -> TestResult {
         let result = case.admit(Arc::clone(&graph), witness, case.attachment(), &mut budget);
         assert_eq!(result.is_ok(), accepted);
         if accepted {
-            assert_eq!(budget.usage().work, 253_648);
+            assert_eq!(budget.usage().work, 253_873);
         }
         assert_eq!(
             graph.lock().map_err(|_| "graph owner poisoned")?.counts(),

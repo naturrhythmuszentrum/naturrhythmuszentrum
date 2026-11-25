@@ -159,7 +159,8 @@ pub(super) fn key(
 ) -> Result<Vec<u8>, Fault> {
     let mut out = Encoder::new(budget, AT);
     super::wire::encode(certificate, &mut out, &mut |handle, out| {
-        crate::graph::encode_id(cas.checked(handle)?, out)
+        let id = cas.checked(handle, out.budget())?;
+        crate::graph::encode_id(id, out)
     })?;
     Ok(out.finish())
 }
@@ -170,12 +171,8 @@ pub(super) fn lookup(
     key: &[u8],
     budget: &mut Budget,
 ) -> Result<Option<Arc<Vec<ExactConstant>>>, Fault> {
-    let count = size(cas.state.scalar_judgments.len(), AT)?;
-    budget.work(
-        size(key.len(), AT)?.saturating_mul(u64::from(count.bit_width())),
-        AT,
-    )?;
-    if let Some(values) = cas.scalar_records(key)? {
+    let retained = cas.scalar_records(key, budget)?;
+    if let Some(values) = retained {
         return Ok(Some(values));
     }
     let cache = records(cas)?;
@@ -193,7 +190,7 @@ pub(super) fn lookup(
     for entry in &cache.pending {
         let inventory = match entry {
             PendingJudgment::NewScalar(inventory) => inventory,
-            PendingJudgment::RecheckedScalar(id) => cas.scalar_inventory(*id)?,
+            PendingJudgment::RecheckedScalar(id) => cas.scalar_inventory(*id, budget)?,
             PendingJudgment::NewPi(_)
             | PendingJudgment::RecheckedPi(_)
             | PendingJudgment::NewEnclosure(_)
@@ -220,8 +217,12 @@ pub(super) fn insert(
     if cas.memo_epoch == u64::MAX {
         return Ok(());
     }
-    if let Some(id) = cas.state.scalar_judgments.get(key.as_slice()) {
-        cas.scalar_inventory(*id)?;
+    if let Some(id) = cas
+        .state
+        .scalar_judgments
+        .get(key.as_slice(), 0, budget, AT)?
+    {
+        cas.scalar_inventory(*id, budget)?;
         let mut cache = records(cas)?;
         cache
             .pending
@@ -232,9 +233,9 @@ pub(super) fn insert(
         return Ok(());
     }
     let scope = [
-        cas.checked(&certificate.expression)?,
-        cas.checked(&certificate.context)?,
-        cas.checked(&certificate.input_family)?,
+        cas.checked(&certificate.expression, budget)?,
+        cas.checked(&certificate.context, budget)?,
+        cas.checked(&certificate.input_family, budget)?,
     ];
     let mut bytes = size(key.capacity(), AT)?.saturating_add(256);
     for value in &values {

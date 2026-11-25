@@ -5,7 +5,7 @@ use super::sign::{entails, mask, negate};
 use super::{AT, invalid};
 use crate::budget::Budget;
 use crate::domain_model::RegionExpr;
-use crate::error::Fault;
+use crate::error::{Fault, FaultKind};
 use crate::graph::{Cas, ExpressionAttachment, Handle, LogicalId};
 use crate::model::{Operator, PredicateKind};
 use crate::proof_model::{CheckedApplication, DomainContract, Statement};
@@ -14,8 +14,13 @@ use crate::solving::elementary::{evidence, proof::premise, selected};
 use crate::solving::{RealSignConclusion, RealSignStep, SolveStatement};
 
 /// Interpret only the exact expression, its negation or its equality with literal zero.
-fn predicate_mask(cas: &Cas, predicate: LogicalId, subject: &Handle) -> Result<u8, Fault> {
-    let (kind, arguments) = evidence::predicate(cas, predicate)?;
+fn predicate_mask(
+    cas: &Cas,
+    predicate: LogicalId,
+    subject: &Handle,
+    budget: &mut Budget,
+) -> Result<u8, Fault> {
+    let (kind, arguments) = evidence::predicate(cas, predicate, budget)?;
     match (kind, arguments) {
         (
             PredicateKind::Positive | PredicateKind::NonNegative | PredicateKind::NonZero,
@@ -29,7 +34,7 @@ fn predicate_mask(cas: &Cas, predicate: LogicalId, subject: &Handle) -> Result<u
             if *argument == subject.logical_id() {
                 return Ok(result);
             }
-            let expression = cas.state.expression(*argument)?;
+            let expression = cas.state.expression(*argument, budget)?;
             if expression.operator == Operator::Neg && expression.operands == [subject.logical_id()]
             {
                 return Ok(negate(result));
@@ -43,7 +48,7 @@ fn predicate_mask(cas: &Cas, predicate: LogicalId, subject: &Handle) -> Result<u
             } else {
                 return Err(invalid());
             };
-            if matches!(&cas.state.expression(other)?.operator, Operator::Rational(value) if value.is_zero())
+            if matches!(&cas.state.expression(other, budget)?.operator, Operator::Rational(value) if value.is_zero())
             {
                 return Ok(2);
             }
@@ -63,7 +68,7 @@ pub(super) fn predicate(
 ) -> Result<(), Fault> {
     crate::work_observation::observe!(budget, AT, {
         budget.work(1, AT)?;
-        if actual & !predicate_mask(cas, cas.checked(predicate)?, subject)? != 0 {
+        if actual & !predicate_mask(cas, cas.checked(predicate, budget)?, subject, budget)? != 0 {
             return Err(invalid());
         }
         Ok(())
@@ -71,12 +76,18 @@ pub(super) fn predicate(
 }
 
 /// Read the same stratum only; a supplied sibling fact never qualifies.
-fn fact(cas: &Cas, statement: &Statement, region: &Handle, subject: &Handle) -> Result<u8, Fault> {
+fn fact(
+    cas: &Cas,
+    statement: &Statement,
+    region: &Handle,
+    subject: &Handle,
+    budget: &mut Budget,
+) -> Result<u8, Fault> {
     match statement {
         Statement::PredicateFact {
             region: domain,
             predicate,
-        } if domain == region => predicate_mask(cas, predicate.logical_id(), subject),
+        } if domain == region => predicate_mask(cas, predicate.logical_id(), subject, budget),
         Statement::Solve(statement) => match statement.as_ref() {
             SolveStatement::RealSign(sign)
                 if sign.region == *region && sign.subject == *subject =>
@@ -102,19 +113,26 @@ fn local(
         pending.push(region.logical_id());
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            match &cas.state.region(id)?.expression {
+            match &cas.state.region(id, budget)?.expression {
                 RegionExpr::GuardTrue { base, predicate }
                 | RegionExpr::GuardFalse { base, predicate } => {
-                    if let Ok(mut possible) = predicate_mask(cas, *predicate, subject) {
-                        if matches!(
-                            cas.state.region(id)?.expression,
-                            RegionExpr::GuardFalse { .. }
-                        ) {
-                            possible ^= 7;
+                    match predicate_mask(cas, *predicate, subject, budget) {
+                        Ok(mut possible) => {
+                            if matches!(
+                                cas.state.region(id, budget)?.expression,
+                                RegionExpr::GuardFalse { .. }
+                            ) {
+                                possible ^= 7;
+                            }
+                            if entails(possible, claimed).is_ok() {
+                                return Ok(());
+                            }
                         }
-                        if entails(possible, claimed).is_ok() {
-                            return Ok(());
-                        }
+                        Err(Fault {
+                            kind: FaultKind::Invalid(_),
+                            ..
+                        }) => {}
+                        Err(fault) => return Err(fault),
                     }
                     reserve(&mut pending, 1, budget)?;
                     pending.push(*base);
@@ -152,6 +170,7 @@ pub(super) fn hypothesis(
                 &premise(premises, *slot)?.judgment.statement,
                 region,
                 &step.subject,
+                budget,
             )?,
             step.conclusion,
         );
@@ -171,6 +190,7 @@ pub(super) fn hypothesis(
                 &premise(premises, *slot)?.judgment.statement,
                 region,
                 &step.subject,
+                budget,
             )?,
             step.conclusion,
         ),
@@ -210,7 +230,7 @@ pub(super) fn identity(
     if domain != region || !(forward || backward) {
         return Err(invalid());
     }
-    super::sign::scalar(cas, &source.subject, region)?;
+    super::sign::scalar(cas, &source.subject, region, budget)?;
     entails(mask(source.conclusion), step.conclusion)
 }
 
@@ -228,7 +248,7 @@ pub(super) fn root(
     let [slot] = step.premises.as_slice() else {
         return Err(invalid());
     };
-    let expression = cas.state.expression(step.subject.logical_id())?;
+    let expression = cas.state.expression(step.subject.logical_id(), budget)?;
     let (Operator::RootValue { slot: 0 }, Some(ExpressionAttachment::SelectedRoot(selection))) =
         (&expression.operator, &expression.attachment)
     else {
@@ -242,7 +262,7 @@ pub(super) fn root(
     {
         return Err(invalid());
     }
-    let selection = selected::selection(cas, &cas.handle(*selection))?;
+    let selection = selected::selection(cas, &cas.handle(*selection), budget)?;
     if selection.relations.len() != 1 {
         return Err(invalid());
     }

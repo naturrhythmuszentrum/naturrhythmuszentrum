@@ -105,7 +105,8 @@ fn fixture_context(cas: &mut Cas, header: &Handle, positive: bool) -> TestResult
 }
 
 fn matrix(cas: &mut Cas, context: &Handle, values: &[&str]) -> TestResult<Handle> {
-    let header = cas.context_header(context)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let header = cas.context_header(context, &mut budget)?;
     let mut entries = Vec::new();
     for text in values {
         let value = crate::Rational::parse(text, &mut ledger()?)?;
@@ -115,7 +116,8 @@ fn matrix(cas: &mut Cas, context: &Handle, values: &[&str]) -> TestResult<Handle
 }
 
 fn lc(cas: &mut Cas, context: &Handle) -> TestResult<Handle> {
-    let header = cas.context_header(context)?;
+    let mut budget = crate::testing::common::default_budget()?;
+    let header = cas.context_header(context, &mut budget)?;
     let zero = scalar(
         cas,
         &header,
@@ -144,8 +146,13 @@ fn lc(cas: &mut Cas, context: &Handle) -> TestResult<Handle> {
 }
 
 fn product(cas: &mut Cas, left: &Handle, right: &Handle) -> TestResult<Handle> {
-    let header = cas.state.expression(left.logical_id())?.header;
-    let sort = cas.state.expression(left.logical_id())?.sort.clone();
+    let mut budget = crate::testing::common::default_budget()?;
+    let header = cas.state.expression(left.logical_id(), &mut budget)?.header;
+    let sort = cas
+        .state
+        .expression(left.logical_id(), &mut budget)?
+        .sort
+        .clone();
     let id = cas.generated(
         header,
         Operator::MatrixMultiply,
@@ -187,8 +194,9 @@ fn fixture(matrix: bool) -> TestResult<(Cas, SourceJacobian)> {
 }
 
 fn composition(cas: &mut Cas, original: &SourceJacobian) -> TestResult<super::ComposedJacobian> {
+    let mut budget = crate::testing::common::default_budget()?;
     let context = &original.key.context;
-    let header = cas.context_header(context)?;
+    let header = cas.context_header(context, &mut budget)?;
     let mut values = Vec::new();
     for text in ["2", "3", "5", "7", "11", "13"] {
         let value = crate::Rational::parse(text, &mut ledger()?)?;
@@ -306,12 +314,12 @@ fn expected_rules(index: usize) -> Vec<(String, u64)> {
 
 fn expected_measurements() -> Vec<Measurement> {
     let costs = [
-        [150_049, 299_587, 1_733],
-        [478_594, 910_795, 3_494],
-        [242_789, 457_242, 1_801],
-        [1_326_350, 2_604_067, 8_042],
-        [47_661, 134_022, 828],
-        [262_657, 531_250, 2_137],
+        [150_049, 299_820, 1_733],
+        [478_594, 911_309, 3_494],
+        [242_789, 457_444, 1_801],
+        [1_326_350, 2_605_320, 8_042],
+        [47_661, 134_111, 828],
+        [262_657, 531_495, 2_137],
     ];
     costs
         .into_iter()

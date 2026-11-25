@@ -88,7 +88,7 @@ pub(super) fn expression(
     operands: &[Handle],
     budget: &mut Budget,
 ) -> Result<Handle, ReadingError> {
-    let header = cas.context_header(context)?;
+    let header = cas.context_header(context, budget)?;
     let draft = Draft::Expression(ExpressionDraft {
         operator,
         sort,

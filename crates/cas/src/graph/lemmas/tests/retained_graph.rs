@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Exact graph ownership boundaries preserve all registrations and caller prefixes.
 
-use super::{Budget, BudgetKind, Fault, FaultKind, Fixture, Limits, TestResult, ledger, retained};
+use super::{BudgetKind, Fault, FaultKind, Fixture, Limits, TestResult, ledger, retained};
+use crate::budget::Budget;
 use crate::{Exhaustion, Location};
 
 /// A fresh ledger includes every graph judgment without a registration discount.

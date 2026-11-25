@@ -27,8 +27,8 @@ impl Cas {
     ) -> Result<DependencyInventory, Fault> {
         budget.witness_records.enabled = true;
         self.inventory_limits(budget, |budget| {
-            let id = self.checked(reading)?;
-            if !check::applicable(&self.state, id, id)? {
+            let id = self.checked(reading, budget)?;
+            if !check::applicable(&self.state, id, id, budget)? {
                 return Err(invalid(InvalidCode::ReadingDefinition));
             }
             let table = indexed_table(self, Entity::Object(id), budget)?;
@@ -62,7 +62,7 @@ impl Cas {
         witness: &VerifiedWitness,
         budget: &mut Budget,
     ) -> Result<IndexedTable, Fault> {
-        let id = self.checked(witness.proof())?;
+        let id = self.checked(witness.proof(), budget)?;
         let application = crate::proof_view::application(self, id, budget)?;
         let mut out = Encoder::new(budget, AT);
         crate::statement::judgment(witness.judgment(), &mut out)?;
@@ -78,7 +78,12 @@ impl Cas {
         let Statement::Equality { left, right, .. } = &application.judgment.statement else {
             return Err(invalid(InvalidCode::ReadingDefinition));
         };
-        if !check::applicable(&self.state, self.checked(left)?, self.checked(right)?)? {
+        if !check::applicable(
+            &self.state,
+            self.checked(left, budget)?,
+            self.checked(right, budget)?,
+            budget,
+        )? {
             return Err(invalid(InvalidCode::ReadingDefinition));
         }
         let root = Entity::conclusion(

@@ -149,13 +149,13 @@ impl CountDescriptor {
         };
         if left != &source
             || !witness.is_discharged()
-            || domain != &graph.admissible_region(&witness.judgment().context)?
+            || domain != &graph.admissible_region(&witness.judgment().context, budget)?
         {
             return Err(DecisionError::Case);
         }
         structural(&graph, &witness, budget)?;
-        let (_, original_sort) = graph.expression(&source)?;
-        let (literal, result_sort) = graph.expression(right)?;
+        let (_, original_sort) = graph.expression(&source, budget)?;
+        let (literal, result_sort) = graph.expression(right, budget)?;
         let Operator::Rational(number) = literal else {
             return Err(DecisionError::Case);
         };
@@ -232,12 +232,14 @@ fn structural(
 ) -> Result<(), DecisionError> {
     for citation in graph.proof_citations(witness.proof(), budget)? {
         budget.work(1, storage::AT)?;
-        let numerical = citation.auxiliary_schema(graph)?.is_some_and(|schema| {
-            matches!(
-                schema.name,
-                "decision.enclosure-membership" | "decision.integer-family-selection"
-            )
-        });
+        let numerical = citation
+            .auxiliary_schema(graph, budget)?
+            .is_some_and(|schema| {
+                matches!(
+                    schema.name,
+                    "decision.enclosure-membership" | "decision.integer-family-selection"
+                )
+            });
         if numerical {
             return Err(DecisionError::Case);
         }

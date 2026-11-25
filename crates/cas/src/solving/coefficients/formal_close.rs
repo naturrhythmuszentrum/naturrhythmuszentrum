@@ -24,6 +24,7 @@ pub(crate) fn boundary(
     cas: &Cas,
     draft: &ApplicationDraft,
     earlier: &[CheckedApplication],
+    budget: &mut crate::budget::Budget,
 ) -> Result<bool, Fault> {
     if draft.rule != Primitive::ContextClose {
         return Ok(false);
@@ -31,14 +32,22 @@ pub(crate) fn boundary(
     let Certificate::Close { frame } = &draft.certificate else {
         return Ok(false);
     };
-    let local = cas.state.context(cas.checked(frame)?)?;
-    let scope = &cas.state.region(local.admissible)?.scope;
-    let target = cas.state.context(cas.checked(&draft.context)?)?;
-    if scope.is_empty() || !cas.state.region(target.admissible)?.scope.is_empty() {
+    let local = cas.state.context(cas.checked(frame, budget)?, budget)?;
+    let scope = &cas.state.region(local.admissible, budget)?.scope;
+    let target = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
+    if scope.is_empty()
+        || !cas
+            .state
+            .region(target.admissible, budget)?
+            .scope
+            .is_empty()
+    {
         return Ok(false);
     }
     formal_shape::frame(scope)?;
-    if local.parent != Some(cas.checked(&draft.context)?)
+    if local.parent != Some(cas.checked(&draft.context, budget)?)
         || earlier.len() != 1
         || earlier
             .first()
@@ -111,7 +120,7 @@ fn anchored(
         .ok_or_else(invalid)?;
     let anchor = first.vieta.as_ref().ok_or_else(invalid)?;
     let SolveDraft::RootRelation(relation) =
-        crate::solving::graph::object(&cas.state, cas.checked(anchor)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(anchor, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -166,18 +175,20 @@ fn conditions(
         if used.context == *source
             || !crate::context_check::ancestor(
                 cas,
-                cas.checked(&used.context)?,
-                cas.checked(target)?,
+                cas.checked(&used.context, budget)?,
+                cas.checked(target, budget)?,
                 budget,
             )?
         {
             return Err(invalid());
         }
-        let frame = cas.state.context(cas.checked(&used.context)?)?;
+        let frame = cas
+            .state
+            .context(cas.checked(&used.context, budget)?, budget)?;
         let handle = if used.slot == 0 && frame.parent.is_some() {
             cas.handle(frame.admissible)
         } else {
-            crate::context_check::predicate(cas, used)?
+            crate::context_check::predicate(cas, used, budget)?
         };
         super::independent::object(cas, &handle, scope, budget)?;
     }
@@ -186,8 +197,8 @@ fn conditions(
             if value.home != *source
                 && !crate::context_check::ancestor(
                     cas,
-                    cas.checked(&value.home)?,
-                    cas.checked(target)?,
+                    cas.checked(&value.home, budget)?,
+                    cas.checked(target, budget)?,
                     budget,
                 )?
             {
@@ -217,14 +228,18 @@ pub(crate) fn close(
     earlier: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<ScopedConditions, Fault> {
-    if !boundary(cas, draft, earlier)? {
+    if !boundary(cas, draft, earlier, budget)? {
         return Err(invalid());
     }
     let source = earlier.first().ok_or_else(invalid)?;
-    let local = cas.state.context(cas.checked(&source.judgment.context)?)?;
+    let local = cas
+        .state
+        .context(cas.checked(&source.judgment.context, budget)?, budget)?;
     let region = local.admissible;
-    let scope = cas.state.region(region)?.scope.clone();
-    let parent = cas.state.context(cas.checked(&draft.context)?)?;
+    let scope = cas.state.region(region, budget)?.scope.clone();
+    let parent = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
     if local.header_id != parent.header_id || local.restriction != Some(region) {
         return Err(invalid());
     }
@@ -247,8 +262,8 @@ pub(crate) fn close(
         super::independent::object(cas, left, &scope, budget)?;
         formal_shape::paired(
             &cas.state,
-            cas.checked(left)?,
-            cas.checked(right)?,
+            cas.checked(left, budget)?,
+            cas.checked(right, budget)?,
             &scope,
             budget,
         )?;
@@ -280,13 +295,14 @@ mod tests {
     /// ´test:unit:formal-close-retained-conditions´
     #[test]
     fn formal_close_retained_conditions() -> TestResult {
+        let mut budget = crate::testing::common::default_budget()?;
         for dependent in [false, true] {
             let mut fixture = crate::testing::solve_coefficients::Fixture::new()?;
             let scope = vec![vec![AtomicSort::Scalar(Field::Complex); 3]];
             let ambient = fixture
                 .cas
                 .state
-                .region(fixture.region.logical_id())?
+                .region(fixture.region.logical_id(), &mut budget)?
                 .ambient
                 .clone();
             let region = admit(

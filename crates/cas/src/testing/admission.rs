@@ -71,6 +71,7 @@ impl Fixture {
 
     /// Keep a checked cancellation witness without importing the public-only proof fixtures.
     fn cancellation(&mut self) -> TestResult<VerifiedWitness> {
+        let mut budget = crate::testing::common::default_budget()?;
         let context = self.proof_context()?;
         let draft = expression(
             Reference::Existing(self.header.clone()),
@@ -87,7 +88,7 @@ impl Fixture {
             conclusion: Statement::Equality {
                 left: quotient.clone(),
                 right: self.one.clone(),
-                domain: self.cas.admissible_region(&context)?,
+                domain: self.cas.admissible_region(&context, &mut budget)?,
                 domain_contract: DomainContract::DefinedAndEqual,
             },
             premises: Vec::new(),

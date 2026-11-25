@@ -46,12 +46,13 @@ pub(crate) fn constant(
         state,
         domain: target,
     };
-    let mapped = match domain(state, target)? {
-        CoefficientDomainData::Rational | CoefficientDomainData::Gaussian => Value::Scalar(
-            ground_image(value, super::read::ground(state, target)?, budget)?,
-        ),
+    let mapped = match domain(state, target, budget)? {
+        CoefficientDomainData::Rational | CoefficientDomainData::Gaussian => {
+            let ground = super::read::ground(state, target, budget)?;
+            Value::Scalar(ground_image(value, ground, budget)?)
+        }
         CoefficientDomainData::Fraction { .. } => {
-            let (ground, variables, _) = engine.fraction_shape()?;
+            let (ground, variables, _) = engine.fraction_shape(budget)?;
             let numerator =
                 Polynomial::constant(variables, ground_image(value, ground, budget)?, budget)?;
             let denominator = numerator.one(budget)?;
@@ -135,7 +136,7 @@ pub(crate) fn inclusion(
         state,
         domain: target,
     };
-    let (ground, width, _) = engine.fraction_shape()?;
+    let (ground, width, _) = engine.fraction_shape(budget)?;
     let mut positions = vector(map.images.len(), budget)?;
     for handle in &map.images {
         let image = engine.read(handle, budget)?;
@@ -169,11 +170,11 @@ pub(crate) fn canonical(
     let mut chain = vector(0, budget)?;
     let mut current = target;
     while *current != element.domain {
-        let CoefficientDomainData::Quotient { level } = domain(state, current)? else {
+        let CoefficientDomainData::Quotient { level } = domain(state, current, budget)? else {
             break;
         };
         let crate::solving::SolveDraft::ExtensionLevel(extension) =
-            crate::solving::graph::object(state, level.logical_id())?
+            crate::solving::graph::object(state, level.logical_id(), budget)?
         else {
             return Err(invalid().into());
         };
@@ -247,7 +248,7 @@ pub(crate) fn quotient(
         state,
         domain: &element.domain,
     };
-    let (_, extension) = crate::solving::towers::arithmetic::level(&source)?;
+    let (_, extension) = crate::solving::towers::arithmetic::level(&source, budget)?;
     let destination = Engine {
         state,
         domain: target,
@@ -277,7 +278,7 @@ pub(crate) fn evaluate(
 ) -> Result<Element, CoefficientFailure> {
     begin(budget)?;
     if polynomial.variables != images.len()
-        || polynomial.ground != super::read::ground(state, base)?
+        || polynomial.ground != super::read::ground(state, base, budget)?
     {
         return Err(invalid().into());
     }

@@ -166,7 +166,7 @@ fn source(
         };
         if fixture
             .cas
-            .expression(&visit.expression)
+            .expression(&visit.expression, budget)
             .is_ok_and(|(operator, _)| *operator == Operator::Div)
         {
             let operands = fixture.cas.operands(&visit.expression, budget)?;

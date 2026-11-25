@@ -20,7 +20,7 @@ fn frozen_check_coordinate_ownership() -> Result<(), Box<dyn std::error::Error>>
     let frozen = builder.freeze()?;
     frozen.validate_checked(&checked)?;
     let cas = frozen.cas()?;
-    let (operation, _) = cas.expression(&coordinate)?;
+    let (operation, _) = cas.expression(&coordinate, &mut crate::exact::budget()?)?;
     assert_eq!(operation, &nrz_cas::syntax::Operator::Add);
     let operands = cas.operands(&coordinate, &mut crate::exact::budget()?)?;
     assert_eq!(operands.len(), 2);

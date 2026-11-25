@@ -63,12 +63,13 @@ fn staged(cas: &Cas) -> Vec<PendingJudgment> {
 /// ´test:unit:logical-identity-direct-judgments´
 #[test]
 fn logical_identity_direct_judgments() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = Fixture::new()?;
     let prepared = checked_copy(&f)?;
     let prefix = f.witness.proof().clone();
     let counts = f.cas.counts();
     let before = f.cas.canonical_snapshot(&mut ledger()?)?;
-    let proofs = f.cas.state.proof_count();
+    let proofs = f.cas.state.proof_count(&mut budget)?;
     let mut stale = Vec::new();
     let fault = Fault::invalid(InvalidCode::Rule, AT);
     for _ in 0..3 {
@@ -91,12 +92,12 @@ fn logical_identity_direct_judgments() -> TestResult {
         assert_eq!(f.cas.counts(), counts);
         assert_eq!(f.cas.retained_judgment_count(), 0);
         assert_eq!(f.cas.retained_judgment_bytes(), 0);
-        assert_eq!(f.cas.state.proof_count(), proofs);
+        assert_eq!(f.cas.state.proof_count(&mut budget)?, proofs);
         assert_eq!(f.cas.canonical_snapshot(&mut ledger()?)?, before);
         for handle in &stale {
             assert_eq!(
                 f.cas
-                    .checked(handle)
+                    .checked(handle, &mut budget)
                     .err()
                     .ok_or("discarded judgment survived")?
                     .kind,
@@ -124,7 +125,7 @@ fn logical_identity_direct_judgments() -> TestResult {
         }
         assert_eq!(
             f.cas
-                .checked(handle)
+                .checked(handle, &mut budget)
                 .err()
                 .ok_or("judgment reincarnated")?
                 .kind,
@@ -132,7 +133,7 @@ fn logical_identity_direct_judgments() -> TestResult {
         );
     }
     assert_eq!(f.witness.proof(), &prefix);
-    f.cas.checked(&prefix)?;
+    f.cas.checked(&prefix, &mut budget)?;
     assert_eq!(
         f.cas.export_witness(&f.witness, &mut ledger()?)?,
         f.witness.bytes

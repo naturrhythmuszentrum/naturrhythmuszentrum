@@ -29,8 +29,12 @@ fn condition(value: &Condition) -> Predicate<'_> {
 }
 
 /// View Boolean syntax without turning a declaration into a proof.
-fn expression<'a>(state: &'a State, id: &'a LogicalId) -> Result<Predicate<'a>, Fault> {
-    let value = state.expression(*id)?;
+fn expression<'a>(
+    state: &'a State,
+    id: &'a LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<Predicate<'a>, Fault> {
+    let value = state.expression(*id, budget)?;
     let (kind, arguments) = if let Operator::Predicate(kind) = &value.operator {
         (Some(kind), value.operands.as_slice())
     } else {
@@ -59,14 +63,18 @@ fn atom(value: &Predicate<'_>, budget: &mut Budget) -> Result<Vec<u8>, Fault> {
 }
 
 /// Reject only recognized false positive atoms; all other consistency remains unknown.
-fn literal_false(state: &State, value: &Predicate<'_>) -> Result<bool, Fault> {
+fn literal_false(
+    state: &State,
+    value: &Predicate<'_>,
+    budget: &mut crate::budget::Budget,
+) -> Result<bool, Fault> {
     if value.kind == Some(&PredicateKind::Or) && value.arguments.is_empty() {
         return Ok(true);
     }
     let Some(argument) = value.arguments.first() else {
         return Ok(false);
     };
-    let Operator::Rational(number) = &state.expression(*argument)?.operator else {
+    let Operator::Rational(number) = &state.expression(*argument, budget)?.operator else {
         return Ok(false);
     };
     Ok(match value.kind {
@@ -93,7 +101,7 @@ pub(crate) fn canonical(
             .map_err(|_| Fault::allocation(at))?;
         let mut total_bytes = 0_u64;
         for (name, id) in hypotheses {
-            let Vertex::Condition(value) = state.node(*id)? else {
+            let Vertex::Condition(value) = state.node(*id, budget)? else {
                 return Err(Fault::invalid(InvalidCode::Reference, at));
             };
             let mut pending = vec![condition(value)];
@@ -108,11 +116,11 @@ pub(crate) fn canonical(
                         .try_reserve(value.arguments.len())
                         .map_err(|_| Fault::allocation(at))?;
                     for argument in value.arguments.iter().rev() {
-                        pending.push(expression(state, argument)?);
+                        pending.push(expression(state, argument, budget)?);
                     }
                     continue;
                 }
-                if literal_false(state, &value)? {
+                if literal_false(state, &value, budget)? {
                     return Err(Fault::invalid(InvalidCode::Context, at));
                 }
                 let negative = value.kind == Some(&PredicateKind::Not);
@@ -121,7 +129,7 @@ pub(crate) fn canonical(
                         .arguments
                         .first()
                         .ok_or_else(|| Fault::invalid(InvalidCode::Sort, at))?;
-                    atom(&expression(state, argument)?, budget)?
+                    atom(&expression(state, argument, budget)?, budget)?
                 } else {
                     atom(&value, budget)?
                 };
@@ -166,9 +174,13 @@ pub(crate) fn canonical(
 }
 
 /// Preserve the closed-context precondition at legacy proof, service and scalar-projection boundaries.
-pub(crate) fn require_closed(state: &State, context: LogicalId) -> Result<(), Fault> {
-    let frame = state.context(context)?;
-    if state.region(frame.admissible)?.scope.is_empty() {
+pub(crate) fn require_closed(
+    state: &State,
+    context: LogicalId,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let frame = state.context(context, budget)?;
+    if state.region(frame.admissible, budget)?.scope.is_empty() {
         return Ok(());
     }
     Err(Fault::invalid(

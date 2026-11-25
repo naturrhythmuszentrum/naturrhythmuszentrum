@@ -19,8 +19,9 @@ pub(crate) const fn invalid() -> Fault {
 pub(crate) fn problem<'a>(
     cas: &'a Cas,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a SolveProblemData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::SolveProblem(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -30,16 +31,21 @@ pub(crate) fn problem<'a>(
 pub(crate) fn coordinates<'a>(
     cas: &'a Cas,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a CoordinateSpaceData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::CoordinateSpace(value) => Ok(value),
         _ => Err(invalid()),
     }
 }
 
 /// Borrow a tuple without treating admission as membership.
-pub(crate) fn tuple<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a TupleData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+pub(crate) fn tuple<'a>(
+    cas: &'a Cas,
+    handle: &Handle,
+    budget: &mut crate::budget::Budget,
+) -> Result<&'a TupleData<Handle>, Fault> {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::Tuple(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -49,8 +55,9 @@ pub(crate) fn tuple<'a>(cas: &'a Cas, handle: &Handle) -> Result<&'a TupleData<H
 pub(crate) fn family<'a>(
     cas: &'a Cas,
     handle: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<&'a FamilyMapData<Handle>, Fault> {
-    match crate::solving::graph::object(&cas.state, cas.checked(handle)?)? {
+    match crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)? {
         SolveDraft::FamilyMap(value) => Ok(value),
         _ => Err(invalid()),
     }
@@ -84,7 +91,12 @@ pub(crate) fn conditions(
         let family = product
             && cas
                 .state
-                .region(cas.state.context(cas.checked(&draft.context)?)?.admissible)?
+                .region(
+                    cas.state
+                        .context(cas.checked(&draft.context, budget)?, budget)?
+                        .admissible,
+                    budget,
+                )?
                 .lies_over
                 .is_some();
         let mut result = ScopedConditions::default();
@@ -122,9 +134,10 @@ pub(crate) fn region(
     context: &Handle,
     problem: &SolveProblemData<Handle>,
     region: &Handle,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
-    let frame = cas.state.context(cas.checked(context)?)?;
-    let domain = cas.state.region(cas.checked(region)?)?;
+    let frame = cas.state.context(cas.checked(context, budget)?, budget)?;
+    let domain = cas.state.region(cas.checked(region, budget)?, budget)?;
     if (
         frame.header_id,
         frame.admissible,

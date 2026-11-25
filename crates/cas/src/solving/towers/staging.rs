@@ -51,19 +51,23 @@ fn child(
     budget: &mut Budget,
 ) -> Result<Child, Fault> {
     let SolveDraft::ExtensionLevel(extension) =
-        crate::solving::graph::object(&cas.state, proposal.level.logical_id())?
+        crate::solving::graph::object(&cas.state, proposal.level.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     let variables = materialize::fields(
-        &crate::solving::coefficients::storage::polynomial(&cas.state, &extension.polynomial)?
-            .variables,
+        &crate::solving::coefficients::storage::polynomial(
+            &cas.state,
+            &extension.polynomial,
+            budget,
+        )?
+        .variables,
         budget,
     )?;
     let generator = materialize::generator(&extension.generator, budget)?;
     let square_free = extension.square_free;
     let factor = materialize::polynomial(cas, factor, &variables, budget)?;
-    let parent = crate::solving::coefficients::storage::polynomial(&cas.state, &factor)?
+    let parent = crate::solving::coefficients::storage::polynomial(&cas.state, &factor, budget)?
         .domain
         .clone();
     let level = materialize::admit(
@@ -176,9 +180,9 @@ pub(crate) fn stage(
         crate::graph::size(localization.len(), AT)?,
         AT,
     )?;
-    cas.checked(source)?;
-    cas.checked(region)?;
-    if !matches!(domain(&cas.state, source)?, CoefficientDomainData::Quotient { level } if *level == proposal.level)
+    cas.checked(source, budget)?;
+    cas.checked(region, budget)?;
+    if !matches!(domain(&cas.state, source, budget)?, CoefficientDomainData::Quotient { level } if *level == proposal.level)
     {
         return Err(invalid());
     }
@@ -240,13 +244,17 @@ fn finish(
         budget,
     )?;
     let SolveDraft::ExtensionLevel(extension) =
-        crate::solving::graph::object(&cas.state, proposal.level.logical_id())?
+        crate::solving::graph::object(&cas.state, proposal.level.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     let variables = materialize::fields(
-        &crate::solving::coefficients::storage::polynomial(&cas.state, &extension.polynomial)?
-            .variables,
+        &crate::solving::coefficients::storage::polynomial(
+            &cas.state,
+            &extension.polynomial,
+            budget,
+        )?
+        .variables,
         budget,
     )?;
     let first = materialize::polynomial(cas, &proposal.first, &variables, budget)?;

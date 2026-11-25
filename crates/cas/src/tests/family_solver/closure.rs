@@ -11,6 +11,7 @@ fn expected(
     original: &crate::request::Request,
     set: &crate::Handle,
 ) -> TestResult<(Judgment, Judgment)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let crate::task::Task::Solve(specification) = &original.task else {
         return Err("mixed original request".into());
     };
@@ -18,7 +19,7 @@ fn expected(
         fixture
             .cas
             .state
-            .context(original.context.logical_id())?
+            .context(original.context.logical_id(), &mut budget)?
             .admissible,
     );
     let coverage = Judgment {
@@ -57,7 +58,13 @@ fn replay(
     }
     let set = crate::testing::replay_answer::proposal(&source.cas, &answer.set, &mut receiver.cas)?;
     let (coverage, presentation) = expected(&receiver, &original, &set)?;
-    assert_eq!(receiver.cas.state.proof_count(), 0);
+    assert_eq!(
+        receiver
+            .cas
+            .state
+            .proof_count(&mut crate::testing::common::default_budget()?)?,
+        0
+    );
     let bytes = source.cas.export_witness(
         answer.facts.last().ok_or("mixed presentation")?,
         &mut Budget::new(Limits::blind_cubic())?,
@@ -129,17 +136,18 @@ fn cubic_equation_root(
     cas: &crate::Cas,
     left: &crate::Handle,
 ) -> TestResult<Option<crate::LogicalId>> {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut value = left.logical_id();
     let mut root = None;
     for _ in 0..4 {
-        let addition = cas.state.expression(value)?;
+        let addition = cas.state.expression(value, &mut budget)?;
         if addition.operator != crate::model::Operator::Add {
             return Ok(None);
         }
         let [product, _] = addition.operands.as_slice() else {
             return Ok(None);
         };
-        let multiplication = cas.state.expression(*product)?;
+        let multiplication = cas.state.expression(*product, &mut budget)?;
         if multiplication.operator != crate::model::Operator::Mul {
             return Ok(None);
         }
@@ -152,7 +160,7 @@ fn cubic_equation_root(
         root = Some(*selected);
         value = *previous;
     }
-    let initial = cas.state.expression(value)?;
+    let initial = cas.state.expression(value, &mut budget)?;
     if initial.operator != crate::model::Operator::Rational(crate::Rational::zero()) {
         return Ok(None);
     }
@@ -163,6 +171,7 @@ fn cubic_equation_root(
 /// ´test:crate:mixed-cubic-equation-inventory´
 #[test]
 fn mixed_cubic_equation_inventory() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let (mut fixture, original) = request(4)?;
     let crate::request::Outcome::Solved { answer, .. } = fixture.cas.run(&original) else {
         return Err("mixed cubic inventory answer".into());
@@ -172,7 +181,10 @@ fn mixed_cubic_equation_inventory() -> TestResult {
     let mut roots = std::collections::BTreeSet::new();
     for application in applications {
         if let Statement::Equality { left, right, .. } = application.conclusion {
-            let zero = fixture.cas.state.expression(right.logical_id())?;
+            let zero = fixture
+                .cas
+                .state
+                .expression(right.logical_id(), &mut budget)?;
             if zero.operator == crate::model::Operator::Rational(crate::Rational::zero())
                 && let Some(root) = cubic_equation_root(&fixture.cas, &left)?
             {

@@ -18,8 +18,12 @@ pub(crate) const AT: Location = Location::new("finite split calculus");
 
 /// Validate the named real coordinate, exact finite bounds and scalar function.
 pub(crate) fn validate(cas: &Cas, value: &SplitValue, budget: &mut Budget) -> Result<(), Fault> {
-    let function = cas.state.expression(cas.checked(&value.function)?)?;
-    let domain = cas.state.region(cas.checked(&value.domain)?)?;
+    let function = cas
+        .state
+        .expression(cas.checked(&value.function, budget)?, budget)?;
+    let domain = cas
+        .state
+        .region(cas.checked(&value.domain, budget)?, budget)?;
     if function.sort != Sort::Value(AtomicSort::Scalar(Field::Real))
         || !function.scope.is_empty()
         || function.space.is_some()
@@ -48,7 +52,12 @@ pub(crate) fn domain(
     range: &SplitRange,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let ambient = case_syntax::region(cas, cas.checked(basis)?, RegionExpr::Ambient, budget)?;
+    let ambient = case_syntax::region(
+        cas,
+        cas.checked(basis, budget)?,
+        RegionExpr::Ambient,
+        budget,
+    )?;
     let ambient = cas.handle(ambient);
     let coordinate = crate::boundary_regions::term(
         cas,
@@ -104,8 +113,8 @@ pub(crate) fn reconstruct(
         return Err(invalid());
     }
     crate::boundary_partition::inventory(cas, &value.function, &value.domain, budget)?;
-    let root = cas.checked(&value.function)?;
-    let within = cas.checked(&value.domain)?;
+    let root = cas.checked(&value.function, budget)?;
+    let within = cas.checked(&value.domain, budget)?;
     let analysis = crate::case_cells::analyze(cas, root, root, within, budget)?;
     crate::region_check::measure(&analysis.cells, budget)?;
     let row = analysis

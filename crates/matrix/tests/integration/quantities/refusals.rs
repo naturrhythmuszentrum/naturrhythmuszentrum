@@ -266,7 +266,7 @@ fn quantity_schema_publication_is_atomic() -> TestResult {
     let ordinary = represented(&context, &mut heap, &Descriptor::ratio(), 1.0_f64)?;
     let overflow = represented(&context, &mut heap, &Descriptor::ratio(), f64::MAX)?;
     let stamps = [ordinary.view(&heap)?.stamp(), overflow.view(&heap)?.stamp()];
-    for expected in [10_920, 7_899] {
+    for expected in [10_965, 7_944] {
         let usage = heap.provenance_usage();
         let mut refused = Budget::new(Limits::default())?;
         let Err(QuantityError::Execution(fault)) =

@@ -84,7 +84,7 @@ impl ResidualSolve {
     fn reservation(&self, cas: &Cas, budget: &mut Budget) -> Result<u64, Fault> {
         budget.work(size(self.premises.len(), AT)?, AT)?;
         for proof in &self.premises {
-            cas.checked(proof)?;
+            cas.checked(proof, budget)?;
         }
         // Each slot retains a Handle, its u32 application index and the helper's logical ID.
         // Include slot zero, which is filled with the independently checked residual later.
@@ -180,14 +180,14 @@ fn construct(
         )?);
     }
     let output = super::produce::output(cas, input, coefficients.clone(), budget)?;
-    let basis = cas.series_object(input)?;
-    let context = cas.state.context(basis.context.logical_id())?;
+    let basis = cas.series_object(input, budget)?;
+    let context = cas.state.context(basis.context.logical_id(), budget)?;
     let header = cas.handle(context.header_id);
     let region = cas.handle(context.admissible);
     let field = basis.field.clone();
     let AmbientDomain::Product {
         coordinates: product,
-    } = &cas.state.region(context.admissible)?.ambient
+    } = &cas.state.region(context.admissible, budget)?.ambient
     else {
         return Err(unsupported());
     };
@@ -272,7 +272,7 @@ fn bind(
     budget: &mut Budget,
 ) -> Result<(SolveStatement, SolveCertificate, SolveSchema), Fault> {
     let SolveDraft::SolveProblem(data) =
-        crate::solving::graph::object(&cas.state, problem.logical_id())?
+        crate::solving::graph::object(&cas.state, problem.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -311,11 +311,11 @@ fn bind(
             SolveStatement::LinearSystem(statement),
             SolveCertificate::ExactLinearEquivalence(certificate),
         ) => {
-            let order = cas.series_object(output)?.order;
-            let coefficients = cas.series_object(output)?.coefficients.clone();
+            let order = cas.series_object(output, budget)?.order;
+            let coefficients = cas.series_object(output, budget)?.coefficients.clone();
             let mut entries = Vec::new();
             for coefficient in coefficients {
-                let value = number(cas, &coefficient)?.negated(budget)?;
+                let value = number(cas, &coefficient, budget)?.negated(budget)?;
                 entries.push(super::produce::literal(cas, output, value, budget)?);
             }
             let matrix = expression(
@@ -429,7 +429,7 @@ impl Cas {
                     },
                     _ => return Err(unsupported()),
                 };
-                cas.checked(subject.proof())?;
+                cas.checked(subject.proof(), budget)?;
                 let (derivative_order, order, count) =
                     super::residual::preflight(cas, &subject_value, expression, dependent, budget)?;
                 if count != size(rows.len(), AT)? {
@@ -470,7 +470,7 @@ impl Cas {
                 bytes = bytes
                     .checked_add(crate::proof_view::application_bytes(
                         cas,
-                        cas.checked(subject.proof())?,
+                        cas.checked(subject.proof(), budget)?,
                         budget,
                     )?)
                     .ok_or_else(invalid)?;
@@ -483,7 +483,10 @@ impl Cas {
                         solving.preflight()?;
                     }
                     let (output, problem) = construct(cas, &subject_value, rows, budget)?;
-                    let context = cas.series_object(subject_value.output())?.context.clone();
+                    let context = cas
+                        .series_object(subject_value.output(), budget)?
+                        .context
+                        .clone();
                     let draft = ApplicationDraft {
                         rule: crate::rule::Primitive::SeriesResidual,
                         context: context.clone(),
@@ -571,11 +574,11 @@ impl Cas {
             cas.transaction(budget, |cas, budget| {
                 let solve = crate::wire_decode::inspect(cas, bytes, budget)?;
                 if !matches!(&solve.judgment().statement, Statement::Solve(value) if matches!(value.as_ref(), SolveStatement::Member(_) | SolveStatement::LinearSystem(_))) { return Err(invalid()); }
-                let payload = crate::proof_view::application_bytes(cas, cas.checked(solve.proof())?, budget)?;
+                let payload = crate::proof_view::application_bytes(cas, cas.checked(solve.proof(), budget)?, budget)?;
                 let retained = size(solve.exported_byte_len(), AT)?.checked_add(payload).ok_or_else(invalid)?;
                 budget.with_retained_payload(retained, AT, |budget| {
                     compare(cas, solve_expected, solve.judgment(), budget)?;
-                    let application = crate::proof_view::application(cas, cas.checked(solve.proof())?, budget)?;
+                    let application = crate::proof_view::application(cas, cas.checked(solve.proof(), budget)?, budget)?;
                     let first = application.premises.first().ok_or_else(invalid)?;
                     let residual = cas.seal_scoped(&cas.handle(*first), budget)?;
                     if !matches!(residual.judgment().statement, Statement::Series(ref value) if matches!(value.as_ref(), SeriesStatement::EvaluatedResidual { .. })) { return Err(invalid()); }
@@ -626,7 +629,7 @@ pub(crate) fn gate(
         return Ok(());
     };
     let SolveDraft::SolveProblem(data) =
-        crate::solving::graph::object(&cas.state, problem.logical_id())?
+        crate::solving::graph::object(&cas.state, problem.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -647,7 +650,7 @@ pub(crate) fn gate(
                 return Err(invalid());
             }
             let SolveDraft::Tuple(tuple) =
-                crate::solving::graph::object(&cas.state, statement.tuple.logical_id())?
+                crate::solving::graph::object(&cas.state, statement.tuple.logical_id(), budget)?
             else {
                 return Err(invalid());
             };
@@ -670,8 +673,10 @@ pub(crate) fn gate(
             {
                 return Err(invalid());
             }
-            let output = cas.series_object(output)?;
-            let matrix = cas.state.expression(cas.checked(&certificate.matrix)?)?;
+            let output = cas.series_object(output, budget)?;
+            let matrix = cas
+                .state
+                .expression(cas.checked(&certificate.matrix, budget)?, budget)?;
             if matrix.header != data.header.logical_id()
                 || !matrix.scope.is_empty()
                 || matrix.operator
@@ -684,10 +689,14 @@ pub(crate) fn gate(
                 return Err(invalid());
             }
             for (id, coefficient) in matrix.operands.iter().zip(&output.coefficients) {
-                let Operator::Rational(value) = &cas.state.expression(*id)?.operator else {
+                let Operator::Rational(value) = &cas.state.expression(*id, budget)?.operator else {
                     return Err(invalid());
                 };
-                super::check::equal(value, &number(cas, coefficient)?.negated(budget)?, budget)?;
+                super::check::equal(
+                    value,
+                    &number(cas, coefficient, budget)?.negated(budget)?,
+                    budget,
+                )?;
             }
         }
         _ => return Err(invalid()),

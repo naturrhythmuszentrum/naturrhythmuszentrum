@@ -103,8 +103,14 @@ fn reading_replay_binds_domain() -> TestResult {
 
 fn restrict_domain(case: &mut ReadingCase) -> TestResult {
     let fixture = &mut case.fixture;
-    let header = fixture.cas.context_header(&fixture.context)?;
-    let base = fixture.cas.admissible_region(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
+    let base = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let condition = admit(
         &mut fixture.cas,
         Draft::Condition {
@@ -164,7 +170,10 @@ fn reading_zero_retains_invalid_originals() -> TestResult {
         InvalidCode::ReadingDefinition,
     );
     assert_eq!(fixture.cas.counts(), before);
-    let domain = fixture.cas.admissible_region(&fixture.context)?;
+    let domain = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let step = crate::testing::witness::equality(
         &fixture.context,
         &domain,
@@ -264,7 +273,10 @@ fn reading_matrix_products_remain_ordered() -> TestResult {
         &[first.clone(), second.clone()],
     )?;
     let right = fixture.term(Operator::MatrixMultiply, matrix(2, 2), &[second, first])?;
-    let domain = fixture.cas.admissible_region(&fixture.context)?;
+    let domain = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let step = crate::testing::witness::equality(
         &fixture.context,
         &domain,
@@ -295,10 +307,10 @@ fn native_matrix_product_reflexivity_replays() -> TestResult {
     let expected = source.expected()?;
     let step = crate::testing::witness::equality(
         &source.fixture.context,
-        &source
-            .fixture
-            .cas
-            .admissible_region(&source.fixture.context)?,
+        &source.fixture.cas.admissible_region(
+            &source.fixture.context,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?,
         Primitive::Reflexivity,
         &source.left,
         &source.right,
@@ -364,7 +376,10 @@ fn native_matrix_product_zero_keeps_invalid_original() -> TestResult {
         let node = fixture.term(Operator::MatrixMultiply, matrix(1, 1), &operands)?;
         let step = crate::testing::witness::equality(
             &fixture.context,
-            &fixture.cas.admissible_region(&fixture.context)?,
+            &fixture.cas.admissible_region(
+                &fixture.context,
+                &mut crate::testing::budgets::graph_budget()?,
+            )?,
             Primitive::Reflexivity,
             &node,
             &node,

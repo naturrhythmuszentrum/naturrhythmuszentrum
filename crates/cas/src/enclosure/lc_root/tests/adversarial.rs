@@ -16,7 +16,7 @@ fn lc_root_family_capacity_refusals() -> TestResult {
             1 => p.original.inputs.try_reserve_exact(64)?,
             _ => p.original.constraints.try_reserve_exact(64)?,
         }
-        let mut budget = Budget::new(Limits {
+        let mut budget = crate::budget::Budget::new(Limits {
             staged_payload_bytes: 1408,
             ..Limits::default()
         })?;
@@ -33,7 +33,7 @@ fn lc_root_family_capacity_refusals() -> TestResult {
     }
     let mut request = f.request.clone();
     request.inputs.try_reserve_exact(64)?;
-    let mut budget = Budget::new(Limits {
+    let mut budget = crate::budget::Budget::new(Limits {
         staged_payload_bytes: 1392,
         ..Limits::default()
     })?;
@@ -183,7 +183,7 @@ fn lc_root_family_refusal_boundaries() -> TestResult {
     let mut weak = p;
     weak.premises[2].1 = Relation::AtMost;
     for (limit, invalid, spent) in [(111, true, 111), (110, false, 110)] {
-        let mut budget = Budget::new(Limits {
+        let mut budget = crate::budget::Budget::new(Limits {
             work: limit + 7,
             ..Limits::default()
         })?;
@@ -216,9 +216,17 @@ fn lc_root_family_refusal_boundaries() -> TestResult {
     assert_eq!(budget.usage().work, 1);
     let mut altered = fixture()?;
     let original = proposed(&altered)?;
-    let root = altered.cas.checked(&altered.request.targets[1])?;
-    let exponent = altered.cas.state.expression(root)?.operands[1];
-    let index = altered.cas.state.indices[&exponent];
+    let root = altered
+        .cas
+        .checked(&altered.request.targets[1], &mut budget)?;
+    let exponent = altered.cas.state.expression(root, &mut budget)?.operands[1];
+    let index = altered
+        .cas
+        .state
+        .indices
+        .peek(&exponent)
+        .copied()
+        .ok_or("index missing")?;
     if let crate::graph::Vertex::Expression(value) = &mut altered.cas.state.graph[index] {
         value.operator = Operator::Rational(Rational::from_ratio(1, 3, &mut ledger()?)?);
     } else {

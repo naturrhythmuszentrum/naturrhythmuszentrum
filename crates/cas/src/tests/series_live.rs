@@ -7,7 +7,7 @@ use crate::graph::{Draft, Handle, Reference};
 use crate::proof_model::{ApplicationDraft, VerifiedWitness};
 use crate::series::SeriesOperation as O;
 use crate::testing::common::TestResult;
-use crate::testing::native::{Fixture as Base, admit, budget as default_budget, term};
+use crate::testing::native::{Fixture as Base, admit, fresh_budget as default_budget, term};
 
 struct Fixture {
     base: Base,
@@ -101,13 +101,13 @@ fn series_source_seed_publication_reservation() -> TestResult {
     // Their 171 encoded bytes and 13 rows reserve 4*171 + 256*13 = 4012 bytes.
     // The measured released-certificate minimum is 28256; keeping the evidence
     // through sealing needs 28256 + 4012 = 32268. Thus N-1 would otherwise pass.
-    assert_eq!(seed_publication_attempt(32_268)?, (true, 367_154, None));
-    assert_eq!(seed_publication_attempt(32_332)?, (true, 367_154, None));
+    assert_eq!(seed_publication_attempt(32_268)?, (true, 367_165, None));
+    assert_eq!(seed_publication_attempt(32_332)?, (true, 367_165, None));
     assert_eq!(
         seed_publication_attempt(32_267)?,
         (
             false,
-            363_363,
+            363_374,
             Some(crate::Fault::exhausted(
                 BudgetKind::StagedPayloadBytes,
                 24_655,
@@ -482,7 +482,7 @@ fn source_judgment_reservation(registered: bool, fresh_production: bool) -> Test
                 0,
                 0,
             ),
-            (None, 115_539, 0, 0),
+            (None, 115_551, 0, 0),
         ]
     } else if registered {
         assert_eq!(observations[0].3 * (4096 / 4 + 128), 107_136);
@@ -494,7 +494,7 @@ fn source_judgment_reservation(registered: bool, fresh_production: bool) -> Test
                 93,
             ),
             (exhausted(1_105_380, 1_114_456), 220_761, 0, 93),
-            (None, 560_197, 1_100_774, 188),
+            (None, 560_209, 1_100_774, 188),
         ]
     } else {
         vec![
@@ -1111,6 +1111,7 @@ fn series_as_germ_premise_refused() -> TestResult {
     reason = "The bridge control retains setup, valid evidence and rollback in one place"
 )]
 fn calculus_as_germ_premise(kind: usize) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = fixture(false)?;
     let input = object(&mut f.base, &f.field, &["1", "2"])?;
     let operation = match kind {
@@ -1311,8 +1312,10 @@ fn calculus_as_germ_premise(kind: usize) -> TestResult {
         &mut default_budget()?,
     )?;
     assert_eq!(
-        f.base.cas.checked(&premises[0].judgment.context)?,
-        f.base.cas.checked(&draft.context)?
+        f.base
+            .cas
+            .checked(&premises[0].judgment.context, &mut budget)?,
+        f.base.cas.checked(&draft.context, &mut budget)?
     );
     let fault = crate::scoped_check::check_application(
         &mut f.base.cas,
@@ -1555,6 +1558,7 @@ fn source_defined(f: &mut Fixture, source: &Handle) -> TestResult<VerifiedWitnes
 /// ´test:crate:series-source-enclosure-slot-refused´
 #[test]
 fn series_source_enclosure_slot_refused() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     use crate::enclosure::{EnclosureGoal, EnclosureRequest, RefinementPolicy};
     let mut f = fixture(false)?;
     let request = EnclosureRequest {
@@ -1585,7 +1589,7 @@ fn series_source_enclosure_slot_refused() -> TestResult {
         .keys()
         .filter(|id| {
             matches!(
-                f.base.cas.state.node(**id),
+                f.base.cas.state.node(**id, &mut budget),
                 Ok(crate::graph::Vertex::AnonymousLemma(_))
             )
         })
@@ -2531,6 +2535,7 @@ fn series_source_conclusion_arity() -> TestResult {
 /// ´test:crate:logical-identity-series-publication´
 #[test]
 fn logical_identity_series_publication() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut f = fixture(false)?;
     let input = object(&mut f.base, &f.field, &["1", "2", "3"])?;
     let operation = O::Truncate {
@@ -2539,7 +2544,7 @@ fn logical_identity_series_publication() -> TestResult {
     };
     let before = f.base.cas.canonical_snapshot(&mut default_budget()?)?;
     let counts = f.base.cas.counts();
-    let proof_count = f.base.cas.state.proof_count();
+    let proof_count = f.base.cas.state.proof_count(&mut budget)?;
     let fault = crate::Fault::invalid(
         InvalidCode::Rule,
         crate::Location::new("series identity control"),
@@ -2562,7 +2567,7 @@ fn logical_identity_series_publication() -> TestResult {
             });
     assert_eq!(result.as_ref(), Err(&fault));
     assert_eq!(f.base.cas.counts(), counts);
-    assert_eq!(f.base.cas.state.proof_count(), proof_count);
+    assert_eq!(f.base.cas.state.proof_count(&mut budget)?, proof_count);
     assert_eq!(f.base.cas.retained_judgment_count(), 0);
     assert_eq!(
         f.base.cas.canonical_snapshot(&mut default_budget()?)?,
@@ -2572,7 +2577,7 @@ fn logical_identity_series_publication() -> TestResult {
     assert_eq!(
         f.base
             .cas
-            .checked(stale.proof())
+            .checked(stale.proof(), &mut budget)
             .err()
             .ok_or("discarded series proof")?
             .kind,
@@ -2586,14 +2591,14 @@ fn logical_identity_series_publication() -> TestResult {
     assert_eq!(kept.bytes, stale.bytes);
     assert_ne!(kept.proof(), stale.proof());
     assert!(kept.proof().logical_id().serial > stale.proof().logical_id().serial);
-    assert_eq!(f.base.cas.state.proof_count(), proof_count + 1);
+    assert_eq!(f.base.cas.state.proof_count(&mut budget)?, proof_count + 1);
     assert_eq!(f.base.cas.retained_judgment_count(), 1);
     assert_eq!(abandoned.len(), 1);
     for handle in &abandoned {
         assert_eq!(
             f.base
                 .cas
-                .checked(handle)
+                .checked(handle, &mut budget)
                 .err()
                 .ok_or("series lemma reincarnated")?
                 .kind,
@@ -2609,7 +2614,7 @@ fn logical_identity_series_publication() -> TestResult {
         .find(|id| id.kind == crate::graph::VertexKind::AnonymousLemma)
         .copied()
         .ok_or("retained series lemma")?;
-    f.base.cas.series_application(lemma)?;
+    f.base.cas.series_application(lemma, &mut budget)?;
     assert!(lemma.serial > abandoned[0].logical_id().serial);
     let counts = f.base.cas.counts();
     let again = f
@@ -2618,7 +2623,7 @@ fn logical_identity_series_publication() -> TestResult {
         .compute_series(&operation, &[], &mut default_budget()?)?;
     assert_eq!(again.proof(), kept.proof());
     assert_eq!(f.base.cas.counts(), counts);
-    f.base.cas.checked(&input)?;
+    f.base.cas.checked(&input, &mut budget)?;
     let mut fresh = crate::Cas::new(Limits::default())?;
     let imported = fresh.inspect(&kept.bytes, &mut default_budget()?)?;
     assert_eq!(

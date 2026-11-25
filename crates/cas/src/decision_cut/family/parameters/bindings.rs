@@ -54,20 +54,20 @@ fn resolve<'a>(
         return Ok((None, false));
     };
     budget.work(1, AT)?;
-    let value = cas.state.expression(cas.checked(handle)?)?;
+    let value = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     let (id, used) = match value.operator {
-        Operator::Rational(_) => (cas.checked(handle)?, false),
+        Operator::Rational(_) => (cas.checked(handle, budget)?, false),
         Operator::Free(_) | Operator::Neg | Operator::Add | Operator::Sub | Operator::Mul => {
             let premise = premise.ok_or_else(invalid)?;
             if premise.judgment.context != draft.context || !premise.conditions.residuals.is_empty()
             {
                 return Err(invalid());
             }
-            (binding(cas, draft, handle, premise)?, true)
+            (binding(cas, draft, handle, premise, budget)?, true)
         }
         _ => return Err(crate::decision_cut::unsupported()),
     };
-    let constant = cas.state.expression(id)?;
+    let constant = cas.state.expression(id, budget)?;
     if constant.header != value.header
         || constant.sort != Sort::Value(AtomicSort::Integer)
         || !constant.scope.is_empty()
@@ -92,23 +92,35 @@ fn binding(
     draft: &ApplicationDraft,
     endpoint: &Handle,
     premise: &CheckedApplication,
+    budget: &mut Budget,
 ) -> Result<LogicalId, Fault> {
-    let domain = cas.state.context(cas.checked(&draft.context)?)?.admissible;
+    let domain = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?
+        .admissible;
     match &premise.judgment.statement {
         Statement::Equality {
             left,
             right,
             domain: region,
             domain_contract: DomainContract::DefinedAndEqual,
-        } if left == endpoint && cas.checked(region)? == domain => cas.checked(right),
-        Statement::PredicateFact { region, predicate } if cas.checked(region)? == domain => {
-            let Vertex::Condition(predicate) = cas.state.node(cas.checked(predicate)?)? else {
+        } if left == endpoint && cas.checked(region, budget)? == domain => {
+            cas.checked(right, budget)
+        }
+        Statement::PredicateFact { region, predicate }
+            if cas.checked(region, budget)? == domain =>
+        {
+            let Vertex::Condition(predicate) =
+                cas.state.node(cas.checked(predicate, budget)?, budget)?
+            else {
                 return Err(invalid());
             };
             let [subject, target] = predicate.arguments.as_slice() else {
                 return Err(invalid());
             };
-            if predicate.kind != PredicateKind::Equal || *subject != cas.checked(endpoint)? {
+            if predicate.kind != PredicateKind::Equal
+                || *subject != cas.checked(endpoint, budget)?
+            {
                 return Err(invalid());
             }
             Ok(*target)

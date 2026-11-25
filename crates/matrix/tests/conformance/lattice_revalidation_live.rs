@@ -174,9 +174,9 @@ fn lattice_live_widened_undecided() -> TestResult {
     drop(cas);
     retired(&fixture)?;
     assert_eq!(fixture.heap.provenance_usage(), records);
-    assert_eq!(containment, 27_635);
-    assert_eq!(preparation, 156_853);
-    assert_eq!(budget.usage().work, 328_414);
+    assert_eq!(containment, 27_673);
+    assert_eq!(preparation, 157_002);
+    assert_eq!(budget.usage().work, 328_674);
     Ok(())
 }
 

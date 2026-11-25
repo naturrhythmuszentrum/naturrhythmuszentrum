@@ -278,7 +278,10 @@ fn dependency_composed_proof_retains_union() -> TestResult {
         )?);
     }
     let [first, middle, last]: [Handle; 3] = values.try_into().map_err(|_| "three readings")?;
-    let domain = fixture.cas.admissible_region(&fixture.context)?;
+    let domain = fixture.cas.admissible_region(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let first_step = crate::testing::witness::equality(
         &fixture.context,
         &domain,

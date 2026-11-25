@@ -19,7 +19,10 @@ use nrz_cas::{FaultKind, Handle, InvalidCode, Reference};
 type Case = (Fixture, Vec<ApplicationDraft>);
 
 fn region(fixture: &mut Fixture, expression: RegionExpr<Reference>) -> TestResult<Handle> {
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     admit(
         &mut fixture.cas,
         Draft::Region(RegionDraft {
@@ -38,7 +41,10 @@ fn guard(
     kind: PredicateKind,
     operands: &[Handle],
 ) -> TestResult<Handle> {
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let predicate = admit(
         &mut fixture.cas,
         Draft::Condition {
@@ -106,7 +112,10 @@ fn premise_case() -> TestResult<Case> {
     let mut fixture = Fixture::new()?;
     let subject = fixture.x.clone();
     fixture.assume("positive x", PredicateKind::Positive, &subject)?;
-    let header = fixture.cas.context_header(&fixture.context)?;
+    let header = fixture.cas.context_header(
+        &fixture.context,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?;
     let predicate = admit(
         &mut fixture.cas,
         Draft::Condition {
@@ -590,7 +599,10 @@ fn emptiness_resource_measurements() -> TestResult {
             u64::try_from(bytes.len())?,
             fixture.cas.counts().payload_bytes - before
         ],
-        [5_010, 43_200, 72_682, 789, 789, 3_178]
+        // Unchanged operation Work: [5010, 43200, 72682, 789, 789, 3178].
+        // Check/replay each add 8 retained kinds + 2 local kinds
+        // + 12 identity insertions + 12 vertex admissions = 34 Work.
+        [5_010, 43_234, 72_716, 789, 789, 3_178]
     );
     Ok(())
 }

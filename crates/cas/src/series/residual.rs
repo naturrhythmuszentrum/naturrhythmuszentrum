@@ -27,8 +27,12 @@ struct Frame<'a> {
 
 impl Frame<'_> {
     /// All syntax, including shorter derivative nodes, shares one closed Real header.
-    fn expression(&self, id: LogicalId) -> Result<&crate::graph::Expression, Fault> {
-        let value = self.cas.state.expression(id)?;
+    fn expression(
+        &self,
+        id: LogicalId,
+        budget: &mut crate::budget::Budget,
+    ) -> Result<&crate::graph::Expression, Fault> {
+        let value = self.cas.state.expression(id, budget)?;
         if value.header != self.header
             || !value.scope.is_empty()
             || value.space.is_some()
@@ -44,7 +48,7 @@ impl Frame<'_> {
         let mut order = 0_u32;
         while id != self.dependent.logical_id() {
             budget.work(1, AT)?;
-            let value = self.expression(id)?;
+            let value = self.expression(id, budget)?;
             let Operator::Derivative(key) = &value.operator else {
                 return Err(unsupported());
             };
@@ -69,7 +73,7 @@ impl Frame<'_> {
     ) -> Result<(u32, u64), Fault> {
         budget.work(1, AT)?;
         budget.check(BudgetKind::Depth, depth, AT)?;
-        let value = self.expression(id)?;
+        let value = self.expression(id, budget)?;
         let mut derivative = 0;
         let mut rows = 1_u64;
         match &value.operator {
@@ -102,18 +106,22 @@ fn frame<'a>(
     dependent: &'a Handle,
     budget: &mut Budget,
 ) -> Result<Frame<'a>, Fault> {
-    let input = cas.series_object(subject.output())?;
+    let input = cas.series_object(subject.output(), budget)?;
     input.preflight(budget)?;
-    let context = cas.state.context(cas.checked(&input.context)?)?;
+    let context = cas
+        .state
+        .context(cas.checked(&input.context, budget)?, budget)?;
     if context.environment.field != Field::Real {
         return Err(unsupported());
     }
     let header = context.header_id;
-    let variable = cas.state.expression(cas.checked(&input.variable)?)?;
+    let variable = cas
+        .state
+        .expression(cas.checked(&input.variable, budget)?, budget)?;
     let Operator::Free(key) = &variable.operator else {
         return Err(unsupported());
     };
-    let region = cas.state.region(context.admissible)?;
+    let region = cas.state.region(context.admissible, budget)?;
     if !input.scope.is_empty() || variable.space.is_some() {
         return Err(unsupported());
     }
@@ -124,7 +132,7 @@ fn frame<'a>(
         key,
         header,
     };
-    let y = result.expression(cas.checked(dependent)?)?;
+    let y = result.expression(cas.checked(dependent, budget)?, budget)?;
     if dependent == &input.variable || !matches!(y.operator, Operator::Free(_)) {
         return Err(unsupported());
     }
@@ -134,8 +142,8 @@ fn frame<'a>(
         }
         super::independent(
             &cas.state,
-            cas.checked(&source.source)?,
-            cas.checked(dependent)?,
+            cas.checked(&source.source, budget)?,
+            cas.checked(dependent, budget)?,
             budget,
         )?;
     }
@@ -143,7 +151,7 @@ fn frame<'a>(
         return Err(unsupported());
     };
     let SolveDraft::CoordinateSpace(product) =
-        crate::solving::graph::object(&cas.state, coordinates.logical_id())?
+        crate::solving::graph::object(&cas.state, coordinates.logical_id(), budget)?
     else {
         return Err(unsupported());
     };
@@ -169,7 +177,7 @@ pub(super) fn preflight(
     budget: &mut Budget,
 ) -> Result<(u32, u32, u64), Fault> {
     let frame = frame(cas, subject, dependent, budget)?;
-    let (r, rows) = frame.schedule(cas.checked(expression)?, 1, budget)?;
+    let (r, rows) = frame.schedule(cas.checked(expression, budget)?, 1, budget)?;
     let m = frame
         .input
         .order
@@ -199,8 +207,8 @@ pub(super) fn roles(cas: &Cas, value: &SeriesStatement, budget: &mut Budget) -> 
     if (r, m) != (*derivative_order, *order) {
         return Err(invalid());
     }
-    let input = cas.series_object(subject.output())?;
-    let output = cas.series_object(output)?;
+    let input = cas.series_object(subject.output(), budget)?;
+    let output = cas.series_object(output, budget)?;
     compatible(input, output, budget)?;
     if output.order != m {
         return Err(invalid());
@@ -217,12 +225,12 @@ fn problem_check(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     let SolveDraft::SolveProblem(problem) =
-        crate::solving::graph::object(&cas.state, cas.checked(problem)?)?
+        crate::solving::graph::object(&cas.state, cas.checked(problem, budget)?, budget)?
     else {
         return Err(invalid());
     };
-    let context = cas.state.context(input.context.logical_id())?;
-    let region = cas.state.region(context.admissible)?;
+    let context = cas.state.context(input.context.logical_id(), budget)?;
+    let region = cas.state.region(context.admissible, budget)?;
     if problem.header.logical_id() != context.header_id
         || !problem.scope.is_empty()
         || problem.region.logical_id() != context.admissible
@@ -237,14 +245,14 @@ fn problem_check(
         return Err(invalid());
     }
     let SolveDraft::CoordinateSpace(unknowns) =
-        crate::solving::graph::object(&cas.state, problem.unknowns.logical_id())?
+        crate::solving::graph::object(&cas.state, problem.unknowns.logical_id(), budget)?
     else {
         return Err(invalid());
     };
     if unknowns.header != problem.header || !unknowns.coordinates.is_empty() {
         return Err(invalid());
     }
-    let domain = cas.state.region(problem.domain.logical_id())?;
+    let domain = cas.state.region(problem.domain.logical_id(), budget)?;
     if domain.header != context.header_id
         || !domain.scope.is_empty()
         || domain.ambient
@@ -255,7 +263,8 @@ fn problem_check(
     {
         return Err(invalid());
     }
-    let Vertex::Condition(predicate) = cas.state.node(problem.predicate.logical_id())? else {
+    let Vertex::Condition(predicate) = cas.state.node(problem.predicate.logical_id(), budget)?
+    else {
         return Err(invalid());
     };
     if predicate.header != context.header_id || !predicate.scope.is_empty() {
@@ -274,7 +283,7 @@ fn problem_check(
         }
         for (id, coefficient) in predicate.arguments.iter().zip(&output.coefficients) {
             budget.work(1, AT)?;
-            let expression = cas.state.expression(*id)?;
+            let expression = cas.state.expression(*id, budget)?;
             if expression.operator != Operator::Predicate(PredicateKind::Equal)
                 || expression.header != context.header_id
                 || !expression.scope.is_empty()
@@ -308,8 +317,8 @@ fn equation(
     if *left != coefficient.logical_id() {
         return Err(invalid());
     }
-    let zero = cas.state.expression(*right)?;
-    let expected = cas.state.expression(coefficient.logical_id())?;
+    let zero = cas.state.expression(*right, budget)?;
+    let expected = cas.state.expression(coefficient.logical_id(), budget)?;
     if zero.header != expected.header
         || zero.scope != expected.scope
         || zero.space != expected.space
@@ -389,7 +398,7 @@ impl Trace<'_> {
     fn visit(&mut self, id: LogicalId, budget: &mut Budget) -> Result<Vec<Rational>, Fault> {
         budget.work(1, AT)?;
         let cas = self.frame.cas;
-        let expression = cas.state.expression(id)?;
+        let expression = cas.state.expression(id, budget)?;
         let operator = &expression.operator;
         let mut children = Vec::new();
         children
@@ -403,7 +412,7 @@ impl Trace<'_> {
             Operator::Rational(number) => value[0] = super::produce::copied(number, budget)?,
             Operator::Free(_) if id == self.frame.input.variable.logical_id() => {
                 value[0] = super::produce::copied(
-                    number(self.frame.cas, &self.frame.input.centre)?,
+                    number(self.frame.cas, &self.frame.input.centre, budget)?,
                     budget,
                 )?;
                 if let Some(linear) = value.get_mut(1) {
@@ -509,7 +518,7 @@ pub(super) fn check(
         || premise.rule != subject.statement().primitive()
         || premise.judgment.statement != Statement::Series(Box::new(subject.statement()))
         || premise.judgment.context != draft.context
-        || draft.context != cas.series_object(subject.output())?.context
+        || draft.context != cas.series_object(subject.output(), budget)?.context
     {
         return Err(invalid());
     }
@@ -558,7 +567,7 @@ pub(super) fn check(
                 value,
                 coefficient(
                     cas,
-                    cas.series_object(output)?,
+                    cas.series_object(output, budget)?,
                     u32::try_from(index).map_err(|_| invalid())?,
                     budget,
                 )?,

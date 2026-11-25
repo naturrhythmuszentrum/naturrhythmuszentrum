@@ -25,9 +25,17 @@ const fn invalid() -> Fault {
 }
 
 /// Validate exact typed roles even when the statement is only an explicit hypothesis.
-pub(crate) fn roles(cas: &Cas, family: &IntegerFamily) -> Result<(), Fault> {
-    let function = cas.state.expression(cas.checked(&family.function)?)?;
-    let domain = cas.state.region(cas.checked(&family.domain)?)?;
+pub(crate) fn roles(
+    cas: &Cas,
+    family: &IntegerFamily,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let function = cas
+        .state
+        .expression(cas.checked(&family.function, budget)?, budget)?;
+    let domain = cas
+        .state
+        .region(cas.checked(&family.domain, budget)?, budget)?;
     let integer = Sort::Value(AtomicSort::Integer);
     if function.sort != integer
         || !function.scope.is_empty()
@@ -42,10 +50,11 @@ pub(crate) fn roles(cas: &Cas, family: &IntegerFamily) -> Result<(), Fault> {
         &family.coordinate,
         function.header,
         &Sort::Value(AtomicSort::Scalar(Field::Real)),
+        budget,
     )?;
-    coordinate(cas, &family.index, function.header, &integer)?;
+    coordinate(cas, &family.index, function.header, &integer, budget)?;
     for bound in [&family.lower, &family.upper].into_iter().flatten() {
-        let value = cas.state.expression(cas.checked(bound)?)?;
+        let value = cas.state.expression(cas.checked(bound, budget)?, budget)?;
         if value.header != function.header || value.sort != integer || !value.scope.is_empty() {
             return Err(invalid());
         }
@@ -59,8 +68,14 @@ pub(crate) fn roles(cas: &Cas, family: &IntegerFamily) -> Result<(), Fault> {
 }
 
 /// Both binders refer to actual closed declarations, never an implicit index.
-fn coordinate(cas: &Cas, handle: &Handle, header: LogicalId, sort: &Sort) -> Result<(), Fault> {
-    let value = cas.state.expression(cas.checked(handle)?)?;
+fn coordinate(
+    cas: &Cas,
+    handle: &Handle,
+    header: LogicalId,
+    sort: &Sort,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let value = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     if value.header != header
         || value.sort != *sort
         || !value.scope.is_empty()
@@ -86,9 +101,11 @@ pub(crate) fn check(
     if draft.certificate != Certificate::None || !draft.substitutions.is_empty() {
         return Err(invalid());
     }
-    roles(cas, family)?;
-    let frame = cas.state.context(cas.checked(&draft.context)?)?;
-    if frame.admissible != cas.checked(&family.domain)? {
+    roles(cas, family, budget)?;
+    let frame = cas
+        .state
+        .context(cas.checked(&draft.context, budget)?, budget)?;
+    if frame.admissible != cas.checked(&family.domain, budget)? {
         return Err(invalid());
     }
     if family.count.is_some() || !premises.is_empty() {
@@ -101,14 +118,16 @@ pub(crate) fn check(
 /// The exact native case has one association returning its own bound Integer coordinate.
 fn native(cas: &Cas, family: &IntegerFamily, budget: &mut Budget) -> Result<CaseCut, Fault> {
     budget.work(8, AT)?;
-    let function = cas.state.expression(cas.checked(&family.function)?)?;
+    let function = cas
+        .state
+        .expression(cas.checked(&family.function, budget)?, budget)?;
     let [association] = function.arms.as_slice() else {
         return Err(invalid());
     };
-    let arm = cas.state.arm(*association)?;
+    let arm = cas.state.arm(*association, budget)?;
     if !arm.placements.is_empty()
         || !arm.scope.is_empty()
-        || arm.value != cas.checked(&family.index)?
+        || arm.value != cas.checked(&family.index, budget)?
         || function.domain != Some(arm.region)
     {
         return Err(invalid());
@@ -139,7 +158,7 @@ fn endpoint<'a>(
         return Ok(None);
     };
     budget.work(1, AT)?;
-    let value = cas.state.expression(cas.checked(handle)?)?;
+    let value = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     let Operator::Rational(number) = &value.operator else {
         return Err(super::unsupported());
     };
@@ -170,7 +189,7 @@ fn reconstruct(cas: &Cas, family: &IntegerFamily, budget: &mut Budget) -> Result
         super::Coordinates::Mixed,
         budget,
     )?;
-    let domain = cas.checked(&family.domain)?;
+    let domain = cas.checked(&family.domain, budget)?;
     let roots = [relation[0], domain];
     let order = plan::order(cas, &roots, budget)?;
     let scratch = size(order.len(), AT)?.saturating_mul(256);

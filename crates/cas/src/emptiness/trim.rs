@@ -40,8 +40,8 @@ fn trim(cas: &Cas, input: &EmptinessDag, budget: &mut Budget) -> Result<Emptines
         if !reached.get(index).copied().ok_or_else(invalid)? {
             continue;
         }
-        let region = cas.checked(&node.region)?;
-        cas.state.region(region)?;
+        let region = cas.checked(&node.region, budget)?;
+        cas.state.region(region, budget)?;
         let slot = if let Some(slot) = keys.get(&region.serial, budget, AT)? {
             *slot
         } else {

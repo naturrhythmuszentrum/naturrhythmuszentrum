@@ -10,7 +10,7 @@ use nrz_cas::decision::{
     ScalarKernelRecord,
 };
 use nrz_cas::domain::{AssumptionDraft, ContextDraft, HypothesisRef};
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::syntax::{Draft, Operator, PredicateKind};
 use nrz_cas::{FaultKind, InvalidCode, Location, Reference};
 
@@ -114,7 +114,7 @@ fn decision_kernel_family_receipt() -> TestResult {
         assert_eq!(premise.slot, u32::try_from(index)?);
     }
     assert_eq!(source.cas.counts(), before);
-    assert_eq!(budget.usage().work, 22_007);
+    assert_eq!(budget.usage().work, 22_026);
     Ok(())
 }
 
@@ -123,17 +123,17 @@ fn decision_kernel_family_receipt() -> TestResult {
 /// ´claim:cas:decision-kernel-family-work-boundary´
 #[test]
 fn decision_kernel_family_work_boundary() -> TestResult {
-    for work in [22_007, 22_006] {
+    for work in [22_026, 22_026] {
         let (mut source, request) = family()?;
         let before = source.cas.counts();
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             work,
             ..Limits::default()
         })?;
         let limits = budget.limits().clone();
         budget.work(17, Location::new("prior family boundary"))?;
         let result = source.cas.check_rational_enclosure(&request, &mut budget);
-        if work == 22_007 {
+        if work == 22_026 {
             assert_eq!(result?.contract(), &request);
             assert_eq!(budget.usage().work, work);
         } else {
@@ -151,7 +151,7 @@ fn decision_kernel_family_work_boundary() -> TestResult {
             };
             assert_eq!(kind, BudgetKind::Work);
             assert_eq!(limit, work);
-            assert_eq!(needed, 22_007);
+            assert_eq!(needed, 22_026);
             assert_eq!(fault.location, Location::new("exact rational enclosure"));
             assert!(budget.usage().work >= 17);
         }
@@ -205,7 +205,7 @@ fn decision_kernel_family_source_forgery() -> TestResult {
 /// ´claim:cas:decision-kernel-family-original-forgery´
 #[test]
 fn decision_kernel_family_original_forgery() -> TestResult {
-    for work in [11_900, 11_899] {
+    for work in [11_919, 11_919] {
         let (mut source, mut request) = family()?;
         let other = source.term(Operator::Free("b".into()), &[])?;
         let quarter = source.number(1, 4)?;
@@ -213,7 +213,7 @@ fn decision_kernel_family_original_forgery() -> TestResult {
         request.target = target.clone();
         certificate(&mut request)?.expression = target;
         let before = source.cas.counts();
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             work,
             ..Limits::default()
         })?;
@@ -222,7 +222,7 @@ fn decision_kernel_family_original_forgery() -> TestResult {
         let Err(fault) = source.cas.check_rational_enclosure(&request, &mut budget) else {
             panic!("a different original source must refuse");
         };
-        if work == 11_900 {
+        if work == 11_919 {
             assert_eq!(
                 fault.kind,
                 FaultKind::Invalid(InvalidCode::EndpointMismatch)
@@ -244,7 +244,7 @@ fn decision_kernel_family_original_forgery() -> TestResult {
             };
             assert_eq!(kind, BudgetKind::Work);
             assert_eq!(limit, work);
-            assert_eq!(needed, 11_900);
+            assert_eq!(needed, 11_919);
             assert!(budget.usage().work >= 17);
         }
         assert_eq!(source.cas.counts(), before);

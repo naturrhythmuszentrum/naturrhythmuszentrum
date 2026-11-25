@@ -245,11 +245,17 @@ impl Fixture {
             CertificateMembership, SolveCertificate, SolveSchema, SolveStatement,
             SolveSubstitution, StatementMember,
         };
-        let SolveView::SolveProblem(original) = self.cas.solve_view(problem)? else {
+        let SolveView::SolveProblem(original) = self
+            .cas
+            .solve_view(problem, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing problem".into());
         };
         let coordinates = original.unknowns.clone();
-        let SolveView::CoordinateSpace(space) = self.cas.solve_view(&coordinates)? else {
+        let SolveView::CoordinateSpace(space) = self
+            .cas
+            .solve_view(&coordinates, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing unknowns".into());
         };
         let key = space
@@ -316,7 +322,10 @@ impl Fixture {
         offset: i64,
         key: &str,
     ) -> TestResult<Handle> {
-        let SolveView::SolveProblem(problem) = self.cas.solve_view(target)? else {
+        let SolveView::SolveProblem(problem) = self
+            .cas
+            .solve_view(target, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing target".into());
         };
         let target = problem.unknowns.clone();
@@ -764,7 +773,10 @@ impl Fixture {
     /// Finite solution proposals have no complete bit and include the exact original unknown domain.
     pub(crate) fn finite(&mut self, problem: &Handle, entries: &[Handle]) -> TestResult<Handle> {
         use crate::test_api::solving::{SolutionBranchData, SolutionBranchKind, SolutionSetData};
-        let SolveView::SolveProblem(original) = self.cas.solve_view(problem)? else {
+        let SolveView::SolveProblem(original) = self
+            .cas
+            .solve_view(problem, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing problem".into());
         };
         let coordinates = original.unknowns.clone();
@@ -1255,19 +1267,25 @@ impl BinomialFixture {
 
 /// Public read-only views expose the exact values of a finite proposal.
 fn finite_entries(cas: &Cas, set: &Handle) -> TestResult<Vec<Handle>> {
-    let SolveView::SolutionSet(set) = cas.solve_view(set)? else {
+    let SolveView::SolutionSet(set) =
+        cas.solve_view(set, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing set".into());
     };
     let mut entries = Vec::new();
     for branch in &set.branches {
-        let SolveView::SolutionBranch(branch) = cas.solve_view(branch)? else {
+        let SolveView::SolutionBranch(branch) =
+            cas.solve_view(branch, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing branch".into());
         };
         let crate::test_api::solving::SolutionBranchKind::Finite { tuples } = &branch.kind else {
             return Err("wrong branch".into());
         };
         for tuple in tuples {
-            let SolveView::Tuple(tuple) = cas.solve_view(tuple)? else {
+            let SolveView::Tuple(tuple) =
+                cas.solve_view(tuple, &mut crate::testing::budgets::graph_budget()?)?
+            else {
                 return Err("missing tuple".into());
             };
             entries.push(tuple.entries.first().ok_or("missing value")?.clone());
@@ -1279,7 +1297,10 @@ fn finite_entries(cas: &Cas, set: &Handle) -> TestResult<Vec<Handle>> {
 impl Fixture {
     /// A reverse map binds the exact unknown product and returns the original family product.
     pub(crate) fn recovery(&mut self, family: &Handle, offset: i64) -> TestResult<Handle> {
-        let SolveView::FamilyMap(map) = self.cas.solve_view(family)? else {
+        let SolveView::FamilyMap(map) = self
+            .cas
+            .solve_view(family, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing family".into());
         };
         let source = map.target.clone();
@@ -1315,7 +1336,10 @@ impl Fixture {
     /// An image branch records a proposal, without conferring membership or coverage.
     pub(crate) fn image(&mut self, problem: &Handle, family: &Handle) -> TestResult<Handle> {
         use crate::test_api::solving::{SolutionBranchData, SolutionBranchKind, SolutionSetData};
-        let SolveView::SolveProblem(original) = self.cas.solve_view(problem)? else {
+        let SolveView::SolveProblem(original) = self
+            .cas
+            .solve_view(problem, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing problem".into());
         };
         let domain = original.domain.clone();
@@ -1828,7 +1852,10 @@ fn close_partition_branch(
     let crate::test_api::solving::SolveStatement::Coverage(coverage) = statement.as_ref() else {
         return Err("missing branch coverage".into());
     };
-    let SolveView::SolutionSet(set) = base.cas.solve_view(&coverage.set)? else {
+    let SolveView::SolutionSet(set) = base
+        .cas
+        .solve_view(&coverage.set, &mut crate::testing::budgets::graph_budget()?)?
+    else {
         return Err("missing branch set".into());
     };
     let handle = set.branches.first().ok_or("missing branch")?.clone();
@@ -2012,7 +2039,11 @@ pub(crate) fn sampled_family() -> TestResult<(Fixture, Vec<ApplicationDraft>)> {
     let SolveStatement::FamilyMembership(member) = statement.as_ref() else {
         return Err("wrong membership".into());
     };
-    let SolveView::FamilyMap(map) = base.cas.solve_view(&member.family)? else {
+    let SolveView::FamilyMap(map) = base.cas.solve_view(
+        &member.family,
+        &mut crate::testing::budgets::graph_budget()?,
+    )?
+    else {
         return Err("missing map".into());
     };
     let map = map.clone();
@@ -2190,7 +2221,10 @@ impl Fixture {
         handle: &Handle,
         region: &Handle,
     ) -> TestResult<Handle> {
-        let SolveView::SolveProblem(value) = self.cas.solve_view(handle)? else {
+        let SolveView::SolveProblem(value) = self
+            .cas
+            .solve_view(handle, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing problem".into());
         };
         let value = value.clone();
@@ -2218,13 +2252,19 @@ impl Fixture {
     /// Preserve branch shape while rebinding a proposal to the explicitly changed original problem.
     pub(crate) fn set_problem(&mut self, handle: &Handle, problem: &Handle) -> TestResult<Handle> {
         use crate::test_api::solving::{SolutionBranchData, SolutionBranchKind, SolutionSetData};
-        let SolveView::SolutionSet(value) = self.cas.solve_view(handle)? else {
+        let SolveView::SolutionSet(value) = self
+            .cas
+            .solve_view(handle, &mut crate::testing::budgets::graph_budget()?)?
+        else {
             return Err("missing set".into());
         };
         let members = value.branches.clone();
         let mut branches = Vec::new();
         for member in members {
-            let SolveView::SolutionBranch(value) = self.cas.solve_view(&member)? else {
+            let SolveView::SolutionBranch(value) = self
+                .cas
+                .solve_view(&member, &mut crate::testing::budgets::graph_budget()?)?
+            else {
                 return Err("missing branch".into());
             };
             let value = value.clone();

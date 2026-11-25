@@ -122,8 +122,9 @@ pub(crate) fn jacobian_cells(
     }
     let rows = u32::try_from(originals.len()).map_err(|_| SensitivityError::ResourceLimit)?;
     let columns = u32::try_from(coordinates.len()).map_err(|_| SensitivityError::ResourceLimit)?;
-    if graph.cas.expression(input)?.0 != &(Operator::Matrix { rows, columns: 1 })
-        || graph.cas.expression(output)?.0 != &(Operator::Matrix { rows, columns })
+    if graph.cas.expression(input, &mut graph.budget)?.0 != &(Operator::Matrix { rows, columns: 1 })
+        || graph.cas.expression(output, &mut graph.budget)?.0
+            != &(Operator::Matrix { rows, columns })
     {
         return Err(SensitivityError::WitnessMismatch);
     }

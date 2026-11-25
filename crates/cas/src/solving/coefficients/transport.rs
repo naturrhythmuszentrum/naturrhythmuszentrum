@@ -13,12 +13,13 @@ use crate::solving::{CoefficientDomainData, CoefficientMapData, MapMode, MapTarg
 pub(crate) fn domain<'a>(
     cas: &Cas,
     map: &'a CoefficientMapData<Handle>,
+    budget: &mut Budget,
 ) -> Result<&'a Handle, Fault> {
     if let MapTarget::CoefficientDomain { domain: target } = &map.target
         && map.mode == MapMode::Specialization
         && !map.images.is_empty()
         && matches!(
-            super::storage::domain(&cas.state, &map.source)?,
+            super::storage::domain(&cas.state, &map.source, budget)?,
             CoefficientDomainData::Quotient { .. }
         )
     {
@@ -35,11 +36,11 @@ pub(crate) fn coefficient(
     handle: &Handle,
     budget: &mut Budget,
 ) -> Result<Element, CoefficientFailure> {
-    let stored = value(&cas.state, handle)?;
+    let stored = value(&cas.state, handle, budget)?;
     if stored.domain == *engine.domain {
         return engine.read(handle, budget);
     }
-    if stored.domain != map.source || domain(cas, map)? != engine.domain {
+    if stored.domain != map.source || domain(cas, map, budget)? != engine.domain {
         return Err(invalid().into());
     }
     let source = Engine {
@@ -57,7 +58,7 @@ pub(crate) fn frames(
     certificate: &crate::solving::CertificateCoefficientIdentity,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    if domain(cas, map)? == &map.source {
+    if domain(cas, map, budget)? == &map.source {
         return Ok(());
     }
     let mut frame = None;
@@ -72,7 +73,7 @@ pub(crate) fn frames(
             continue;
         }
         if let SolveDraft::Polynomial(polynomial) =
-            crate::solving::graph::object(&cas.state, cas.checked(handle)?)?
+            crate::solving::graph::object(&cas.state, cas.checked(handle, budget)?, budget)?
         {
             budget.work(
                 crate::graph::size(polynomial.variables.len(), super::storage::AT)?,

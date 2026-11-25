@@ -89,6 +89,11 @@ fn attempt(operation: Operation, kind: BudgetKind, amount: u64) -> TestResult<(b
 }
 
 /// Expectations are sums of independently specified visits, byte lengths and copy allowances.
+/// The supplied operation ledger adds only local receiving-store entries:
+/// Produce adds 15 Work: 3 first-kind entries +6 identity entries +6 vertex
+/// admissions; Check adds 10 = 2+4+4; Replay adds 10 = 2+4+4.
+/// Export performs a zero-cost private node lookup and has unchanged Work. Old
+/// interning lookup floors equal the new map floors (119/90/373 respectively).
 #[test]
 fn defined_total_independent_charge_inventory() -> TestResult {
     let checker = inventory::CHECKER;
@@ -103,10 +108,10 @@ fn defined_total_independent_charge_inventory() -> TestResult {
     let check = 1 + inventory::MEASURE + 256 + checker + inventory::PUBLICATION + seal;
     let bytes = inventory::ENVELOPE + inventory::PAYLOADS.iter().sum::<u64>() + 10 * 11;
     for (operation, cost) in [
-        (Operation::Produce, produce),
-        (Operation::Check, check),
+        (Operation::Produce, produce + 15),
+        (Operation::Check, check + 10),
         (Operation::Export, bytes),
-        (Operation::Replay, inventory::replay_work()),
+        (Operation::Replay, inventory::replay_work() + 10),
     ] {
         assert_eq!(
             attempt(operation, BudgetKind::Work, cost + 37)?,
@@ -163,7 +168,7 @@ fn defined_total_other_existing_ceilings() -> TestResult {
     assert!(!attempt(Operation::Export, BudgetKind::OutputBytes, bytes - 1)?.0);
     assert!(attempt(Operation::Export, BudgetKind::Depth, 0)?.0);
     assert!(attempt(Operation::Export, BudgetKind::ConditionSteps, 0)?.0);
-    let replay = inventory::replay_work();
+    let replay = inventory::replay_work() + 10;
     assert_eq!(
         attempt(Operation::Replay, BudgetKind::ReplayWork, replay)?,
         (true, replay + 37)
@@ -260,7 +265,7 @@ fn depth_boundary(case: DepthCase, needed: u64) -> TestResult {
                         needed,
                     }
                 );
-                // Scope refusal precedes shape encoding: only the checkpoint and,
+                // Scope refusal precedes retained-map maintenance: only the checkpoint and,
                 // for supplied checking, reachability, two measures and five checks.
                 match (operation, case) {
                     (Operation::Produce, DepthCase::Scope) => {

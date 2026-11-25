@@ -63,7 +63,10 @@ impl SplitFixture {
     pub(crate) fn children(&self) -> TestResult<[Handle; 2]> {
         use crate::test_api::solving::SolveView;
         let certificate = self.certificate()?;
-        let SolveView::ComponentSplit(split) = self.unit.base.cas.solve_view(&certificate.split)?
+        let SolveView::ComponentSplit(split) = self.unit.base.cas.solve_view(
+            &certificate.split,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         else {
             return Err("wrong split".into());
         };
@@ -524,12 +527,20 @@ impl SplitFixture {
         use crate::test_api::solving::{CoefficientDomainData, SolveCertificate, SolveView};
         let mut selections = Vec::new();
         for (child, sign) in children.iter().zip([-1, 1]) {
-            let SolveView::CoefficientDomain(CoefficientDomainData::Quotient { level }) =
-                self.unit.base.cas.solve_view(child)?
+            let SolveView::CoefficientDomain(CoefficientDomainData::Quotient { level }) = self
+                .unit
+                .base
+                .cas
+                .solve_view(child, &mut crate::testing::budgets::graph_budget()?)?
             else {
                 return Err("wrong child domain".into());
             };
-            let SolveView::ExtensionLevel(extension) = self.unit.base.cas.solve_view(level)? else {
+            let SolveView::ExtensionLevel(extension) = self
+                .unit
+                .base
+                .cas
+                .solve_view(level, &mut crate::testing::budgets::graph_budget()?)?
+            else {
                 return Err("wrong child level".into());
             };
             let modulus = extension.polynomial.clone();
@@ -594,7 +605,10 @@ impl AdjunctionFixture {
             AdjunctionMode::ComplexFTA,
             None,
         )?;
-        let SolveView::RootRelation(relation) = fixture.base.cas.solve_view(&fixture.relation)?
+        let SolveView::RootRelation(relation) = fixture.base.cas.solve_view(
+            &fixture.relation,
+            &mut crate::testing::budgets::graph_budget()?,
+        )?
         else {
             return Err("wrong root relation".into());
         };

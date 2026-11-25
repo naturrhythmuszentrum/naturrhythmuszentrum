@@ -56,12 +56,15 @@ impl<'a> Graph<'a> {
         limits: &LimitsOverride,
     ) -> Result<Self, SensitivityError> {
         let cas = builder.engine()?;
+        let mut construction_budget = Budget::new(builder.cas_limits.resolve(limits)?)?;
+        let header = cas.context_header(&builder.semantic, &mut construction_budget)?;
+        let domain = cas.admissible_region(&builder.semantic, &mut construction_budget)?;
         Ok(Self {
-            header: cas.context_header(&builder.semantic)?,
-            domain: cas.admissible_region(&builder.semantic)?,
+            header,
+            domain,
             context: builder.semantic.clone(),
             cas,
-            budget: Budget::new(builder.cas_limits.resolve(limits)?)?,
+            budget: construction_budget,
             limits: limits.clone(),
             work: SensitivityWork::default(),
             covered: Vec::new(),

@@ -3,7 +3,7 @@
 
 use crate::testing::common::TestResult;
 use crate::testing::solve_blind::polynomial;
-use nrz_cas::limits::{Budget, BudgetKind, Limits};
+use nrz_cas::limits::{BudgetKind, Limits};
 use nrz_cas::request::Outcome;
 
 /// Identical empty-cache requests have identical canonical coverage bytes under the pinned profile.
@@ -21,7 +21,7 @@ fn blind_pinned_repeat_determinism() -> TestResult {
         work.push(usage.work);
         encoded.push(fixture.cas.export_witness(
             &answer.coverage.ok_or("coverage missing")?,
-            &mut Budget::new(Limits::blind_cubic())?,
+            &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
         )?);
     }
     assert_eq!(encoded.first(), encoded.get(1));
@@ -75,12 +75,15 @@ fn blind_unrelated_store_content() -> TestResult {
         work.push(usage.work);
         encodings.push(fixture.cas.export_witness(
             &answer.coverage.ok_or("coverage missing")?,
-            &mut Budget::new(Limits::blind_cubic())?,
+            &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
         )?);
     }
     assert_eq!(encodings.first(), encodings.get(1));
     let baseline = *work.first().ok_or("baseline missing")?;
-    assert!(*work.get(1).ok_or("unrelated run missing")? <= baseline + 100_000);
+    assert!(
+        *work.get(1).ok_or("unrelated run missing")? <= baseline + 100_000,
+        "blind retained-map locality Work: {work:?}"
+    );
     Ok(())
 }
 
@@ -147,9 +150,10 @@ fn service_boundary(
     let required = usage(&measured);
     assert!(required > 0, "unexercised {kind:?}");
     let coverage = answer.coverage.ok_or("resource baseline coverage")?;
-    let bytes = fixture
-        .cas
-        .export_witness(&coverage, &mut Budget::new(Limits::blind_cubic())?)?;
+    let bytes = fixture.cas.export_witness(
+        &coverage,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
+    )?;
     for cap in [required, required - 1] {
         let (mut fixture, mut request) = factory()?;
         limit(&mut request.limits, cap);
@@ -160,9 +164,10 @@ fn service_boundary(
             };
             let coverage = answer.coverage.ok_or("resource exact coverage")?;
             assert_eq!(
-                fixture
-                    .cas
-                    .export_witness(&coverage, &mut Budget::new(Limits::blind_cubic())?)?,
+                fixture.cas.export_witness(
+                    &coverage,
+                    &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
+                )?,
                 bytes
             );
         } else {
@@ -210,24 +215,23 @@ fn blind_denominator_factor_boundary() -> TestResult {
 #[test]
 fn blind_component_replay_boundary() -> TestResult {
     let mut fixture = crate::testing::solve_coefficients::SplitFixture::new()?;
-    let mut baseline = Budget::new(Limits::blind_cubic())?;
+    let mut baseline = nrz_cas::limits::Budget::new(Limits::blind_cubic())?;
     let witness = fixture.unit.base.cas.check_proof(
         &fixture.unit.base.context,
         &fixture.steps,
         &mut baseline,
     )?;
     assert!(witness.is_discharged());
-    let bytes = fixture
-        .unit
-        .base
-        .cas
-        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let bytes = fixture.unit.base.cas.export_witness(
+        &witness,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
+    )?;
     let required = baseline.usage().component_splits;
     assert!(required > 0);
     for cap in [required, required - 1] {
         let mut fixture = crate::testing::solve_coefficients::SplitFixture::new()?;
         let before = fixture.unit.base.cas.counts();
-        let mut budget = Budget::new(Limits {
+        let mut budget = nrz_cas::limits::Budget::new(Limits {
             component_splits: cap,
             ..Limits::blind_cubic()
         })?;
@@ -239,11 +243,10 @@ fn blind_component_replay_boundary() -> TestResult {
         if cap == required {
             let checked = result?;
             assert_eq!(
-                fixture
-                    .unit
-                    .base
-                    .cas
-                    .export_witness(&checked, &mut Budget::new(Limits::blind_cubic())?)?,
+                fixture.unit.base.cas.export_witness(
+                    &checked,
+                    &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
+                )?,
                 bytes
             );
         } else {
@@ -266,16 +269,17 @@ fn blind_regional_unit_replay() -> TestResult {
     let witness = fixture.cas.check_proof(
         &fixture.context,
         std::slice::from_ref(&step),
-        &mut Budget::new(Limits::blind_cubic())?,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
     )?;
     assert!(witness.is_discharged());
     assert_eq!(
         witness.hypotheses(),
         [] as [nrz_cas::domain::HypothesisRef; 0]
     );
-    let bytes = fixture
-        .cas
-        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let bytes = fixture.cas.export_witness(
+        &witness,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
+    )?;
     let (mut fresh, expected_step) = crate::testing::solve_blind::regional_unit(true)?;
     let expected = nrz_cas::proof::Judgment {
         context: fresh.context.clone(),
@@ -284,14 +288,17 @@ fn blind_regional_unit_replay() -> TestResult {
         residuals: Vec::new(),
         statement: expected_step.conclusion,
     };
-    let replayed = fresh
-        .cas
-        .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    let replayed = fresh.cas.replay(
+        &bytes,
+        &expected,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
+    )?;
     assert!(replayed.is_discharged());
     assert_eq!(
-        fresh
-            .cas
-            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        fresh.cas.export_witness(
+            &replayed,
+            &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
+        )?,
         bytes
     );
     let (mut sibling, changed) = crate::testing::solve_blind::regional_unit(false)?;
@@ -301,7 +308,7 @@ fn blind_regional_unit_replay() -> TestResult {
             .check_proof(
                 &sibling.context,
                 &[changed],
-                &mut Budget::new(Limits::blind_cubic())?
+                &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
             )
             .is_err()
     );
@@ -316,12 +323,13 @@ fn blind_nonzero_consequence_replay() -> TestResult {
     let witness = fixture.cas.check_proof(
         &fixture.context,
         &[step],
-        &mut Budget::new(Limits::blind_cubic())?,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
     )?;
     assert!(witness.is_discharged());
-    let bytes = fixture
-        .cas
-        .export_witness(&witness, &mut Budget::new(Limits::blind_cubic())?)?;
+    let bytes = fixture.cas.export_witness(
+        &witness,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
+    )?;
     let (mut fresh, supplied) = crate::testing::solve_blind::nonzero_consequence(true)?;
     let expected = nrz_cas::proof::Judgment {
         context: fresh.context.clone(),
@@ -330,18 +338,21 @@ fn blind_nonzero_consequence_replay() -> TestResult {
         residuals: Vec::new(),
         statement: supplied.conclusion,
     };
-    let replayed = fresh
-        .cas
-        .replay(&bytes, &expected, &mut Budget::new(Limits::blind_cubic())?)?;
+    let replayed = fresh.cas.replay(
+        &bytes,
+        &expected,
+        &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?,
+    )?;
     assert!(replayed.is_discharged());
     assert_eq!(
         replayed.hypotheses(),
         [] as [nrz_cas::domain::HypothesisRef; 0]
     );
     assert_eq!(
-        fresh
-            .cas
-            .export_witness(&replayed, &mut Budget::new(Limits::blind_cubic())?)?,
+        fresh.cas.export_witness(
+            &replayed,
+            &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
+        )?,
         bytes
     );
     Ok(())
@@ -396,7 +407,7 @@ fn blind_nonzero_consequence_tampering() -> TestResult {
                 .check_proof(
                     &fixture.context,
                     &[step],
-                    &mut Budget::new(Limits::blind_cubic())?
+                    &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
                 )
                 .is_err()
         );
@@ -412,7 +423,7 @@ fn blind_nonzero_consequence_tampering() -> TestResult {
             .check_proof(
                 &sibling.context,
                 &[step],
-                &mut Budget::new(Limits::blind_cubic())?
+                &mut nrz_cas::limits::Budget::new(Limits::blind_cubic())?
             )
             .is_err()
     );

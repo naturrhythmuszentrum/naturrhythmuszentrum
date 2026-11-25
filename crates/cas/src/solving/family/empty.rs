@@ -43,7 +43,7 @@ fn empty_set(
     region: &Handle,
     generation: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let original = crate::solving::elementary::proof::problem(cas, problem)?;
+    let original = crate::solving::elementary::proof::problem(cas, problem, generation)?;
     let branch = SolveDraft::SolutionBranch(SolutionBranchData {
         problem: Reference::Existing(problem.clone()),
         region: Reference::Existing(region.clone()),
@@ -69,7 +69,8 @@ fn produce(
     generation: &mut Budget,
     checker: &mut Budget,
 ) -> Result<FamilyPiece, Fault> {
-    let premise = crate::proof_view::application(cas, cas.checked(empty.proof())?, generation)?;
+    let premise =
+        crate::proof_view::application(cas, cas.checked(empty.proof(), generation)?, generation)?;
     if !premise.conditions.residuals.is_empty() {
         return Err(invalid());
     }
@@ -78,18 +79,18 @@ fn produce(
     };
     let over = cas
         .state
-        .region(cas.checked(region)?)?
+        .region(cas.checked(region, generation)?, generation)?
         .lies_over
         .clone()
         .ok_or_else(invalid)?;
-    let predicate = crate::solving::elementary::proof::problem(cas, problem)?
+    let predicate = crate::solving::elementary::proof::problem(cas, problem, generation)?
         .predicate
         .clone();
     let set = empty_set(cas, problem, region, generation)?;
     let draft = coverage_draft(problem, region, &set, &predicate, &premise.judgment.context);
     let region = region.clone();
     let mut application = crate::scoped_check::check_application(cas, &draft, &[premise], checker)?;
-    application.premises = vec![cas.checked(empty.proof())?];
+    application.premises = vec![cas.checked(empty.proof(), generation)?];
     let proof = cas.publish_scoped(application, checker)?;
     let coverage = cas.seal_scoped(&proof, checker)?;
     let family = cas.handle(over.family);

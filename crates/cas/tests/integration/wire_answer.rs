@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Independently specified complete-answer replay and portable output lifecycle.
 
-use crate::testing::answer::{budget, encoded, prepared};
+use crate::testing::answer::{encoded, fresh_budget, prepared};
 use crate::testing::common::TestResult;
 
 /// One import yields both original expected theorems, each with byte-stable standalone export.
@@ -10,7 +10,7 @@ use crate::testing::common::TestResult;
 fn complete_answer_portable_pair() -> TestResult {
     let bytes = encoded()?;
     let mut receiver = prepared()?;
-    let mut ledger = budget()?;
+    let mut ledger = fresh_budget()?;
     let (coverage, presentation) = receiver.base.cas.replay_answer(
         &bytes,
         &receiver.coverage,
@@ -34,24 +34,24 @@ fn complete_answer_portable_pair() -> TestResult {
         receiver
             .base
             .cas
-            .export_witness(&presentation, &mut budget()?)?,
+            .export_witness(&presentation, &mut fresh_budget()?)?,
         bytes
     );
     let coverage_bytes = receiver
         .base
         .cas
-        .export_witness(&coverage, &mut budget()?)?;
+        .export_witness(&coverage, &mut fresh_budget()?)?;
     let mut independent = prepared()?;
-    let standalone =
-        independent
-            .base
-            .cas
-            .replay(&coverage_bytes, &independent.coverage, &mut budget()?)?;
+    let standalone = independent.base.cas.replay(
+        &coverage_bytes,
+        &independent.coverage,
+        &mut fresh_budget()?,
+    )?;
     assert_eq!(
         independent
             .base
             .cas
-            .export_witness(&standalone, &mut budget()?)?,
+            .export_witness(&standalone, &mut fresh_budget()?)?,
         coverage_bytes
     );
     Ok(())

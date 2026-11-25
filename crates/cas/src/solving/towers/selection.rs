@@ -15,8 +15,9 @@ pub(crate) fn unconstrained(
     budget: &mut Budget,
 ) -> Result<(), Fault> {
     budget.work(1, AT)?;
-    let crate::graph::Vertex::Condition(predicate) =
-        cas.state.node(cas.checked(&selection.predicate)?)?
+    let crate::graph::Vertex::Condition(predicate) = cas
+        .state
+        .node(cas.checked(&selection.predicate, budget)?, budget)?
     else {
         return Err(invalid());
     };
@@ -29,7 +30,7 @@ pub(crate) fn unconstrained(
     if left != right {
         return Err(invalid());
     }
-    let expression = cas.state.expression(*left)?;
+    let expression = cas.state.expression(*left, budget)?;
     if !matches!(
         expression.operator,
         Operator::Bound { depth: 0, slot: 0 } | Operator::Rational(_)

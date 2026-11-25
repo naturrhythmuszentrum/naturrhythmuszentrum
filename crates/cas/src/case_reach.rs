@@ -25,13 +25,13 @@ pub(crate) fn regions(
     }
     for id in order.iter().rev() {
         let active = *reaches.get(id).ok_or_else(invalid)?;
-        let value = cas.state.expression(*id)?.clone();
+        let value = cas.state.expression(*id, budget)?.clone();
         for operand in value.operands {
             add(cas, &mut reaches, operand, active, within, budget)?;
         }
         if let Some(domain) = value.domain {
             for arm in case_syntax::canonical(cas, &value.arms, budget)? {
-                let arm = cas.state.arm(arm)?.clone();
+                let arm = cas.state.arm(arm, budget)?.clone();
                 let region = masked_meet(cas, active, &[domain, arm.region], budget)?;
                 add(cas, &mut reaches, arm.value, region, within, budget)?;
             }

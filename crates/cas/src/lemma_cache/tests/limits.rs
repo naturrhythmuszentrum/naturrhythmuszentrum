@@ -5,7 +5,7 @@ use super::{Change, proof};
 use crate::budget::{Budget, BudgetKind};
 use crate::lemma_cache::AnonymousLemmaCache;
 use crate::testing::common::TestResult;
-use crate::testing::native::budget;
+use crate::testing::native::fresh_budget;
 use crate::{Cas, FaultKind};
 
 /// Both cold checking and warm comparison obey N and N-minus-one cumulative Work ceilings.
@@ -13,13 +13,18 @@ use crate::{Cas, FaultKind};
 #[test]
 fn lemma_cache_work_boundaries() -> TestResult {
     for warm in [false, true] {
-        let mut cas = Cas::new(budget()?.limits().clone())?;
+        let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
         let witness = proof(&mut cas, Change::None)?;
         let mut cache = AnonymousLemmaCache::new();
         if warm {
-            cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut budget()?)?;
+            cache.replay(
+                &mut cas,
+                &witness.bytes,
+                witness.judgment(),
+                &mut fresh_budget()?,
+            )?;
         }
-        let mut ledger = budget()?;
+        let mut ledger = fresh_budget()?;
         cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut ledger)?;
         let required = ledger.usage().work;
         for short in [0, 1] {
@@ -30,14 +35,19 @@ fn lemma_cache_work_boundaries() -> TestResult {
 }
 
 fn work_case(warm: bool, required: u64, short: u64) -> TestResult {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     let witness = proof(&mut cas, Change::None)?;
     let mut cache = AnonymousLemmaCache::new();
     if warm {
-        cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut budget()?)?;
+        cache.replay(
+            &mut cas,
+            &witness.bytes,
+            witness.judgment(),
+            &mut fresh_budget()?,
+        )?;
     }
     let before = cas.counts();
-    let mut limits = budget()?.limits().clone();
+    let mut limits = fresh_budget()?.limits().clone();
     limits.work = required - short;
     let mut ledger = Budget::new(limits)?;
     let result = cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut ledger);
@@ -55,7 +65,12 @@ fn work_case(warm: bool, required: u64, short: u64) -> TestResult {
         ));
         assert_eq!(cache.len(), usize::from(warm));
         assert_eq!(cas.counts(), before);
-        cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut budget()?)?;
+        cache.replay(
+            &mut cas,
+            &witness.bytes,
+            witness.judgment(),
+            &mut fresh_budget()?,
+        )?;
         assert_eq!(cache.len(), 1);
     }
     Ok(())
@@ -65,13 +80,18 @@ fn work_case(warm: bool, required: u64, short: u64) -> TestResult {
 /// ´test:unit:lemma-cache-storage-boundaries´
 #[test]
 fn lemma_cache_storage_boundaries() -> TestResult {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     let witness = proof(&mut cas, Change::None)?;
     let mut cache = AnonymousLemmaCache::new();
-    cache.replay(&mut cas, &witness.bytes, witness.judgment(), &mut budget()?)?;
+    cache.replay(
+        &mut cas,
+        &witness.bytes,
+        witness.judgment(),
+        &mut fresh_budget()?,
+    )?;
     let retained = cache.retained_bytes();
     for short in [0, 1] {
-        let mut limits = budget()?.limits().clone();
+        let mut limits = fresh_budget()?.limits().clone();
         limits.output_bytes = retained - short;
         let result = cache.replay(
             &mut cas,
@@ -83,7 +103,7 @@ fn lemma_cache_storage_boundaries() -> TestResult {
         assert_eq!(cache.len(), 1);
     }
     let mut lower = 0;
-    let mut upper = budget()?.limits().staged_payload_bytes;
+    let mut upper = fresh_budget()?.limits().staged_payload_bytes;
     while lower < upper {
         let middle = lower + (upper - lower) / 2;
         if staged(&mut cache, &mut cas, &witness, middle)? {
@@ -104,7 +124,7 @@ fn staged(
     witness: &crate::proof::VerifiedWitness,
     cap: u64,
 ) -> TestResult<bool> {
-    let mut limits = budget()?.limits().clone();
+    let mut limits = fresh_budget()?.limits().clone();
     limits.staged_payload_bytes = cap;
     let before = cas.counts();
     let result = cache.replay(
@@ -133,7 +153,7 @@ fn staged(
 #[test]
 fn lemma_cache_cold_storage_boundaries() -> TestResult {
     let mut lower = 0;
-    let mut upper = budget()?.limits().staged_payload_bytes;
+    let mut upper = fresh_budget()?.limits().staged_payload_bytes;
     while lower < upper {
         let middle = lower + (upper - lower) / 2;
         if cold_staged(middle)? {
@@ -149,10 +169,10 @@ fn lemma_cache_cold_storage_boundaries() -> TestResult {
 }
 
 fn cold_staged(cap: u64) -> TestResult<bool> {
-    let mut cas = Cas::new(budget()?.limits().clone())?;
+    let mut cas = Cas::new(fresh_budget()?.limits().clone())?;
     let witness = proof(&mut cas, Change::None)?;
     let mut cache = AnonymousLemmaCache::new();
-    let mut limits = budget()?.limits().clone();
+    let mut limits = fresh_budget()?.limits().clone();
     limits.staged_payload_bytes = cap;
     let before = cas.counts();
     match cache.replay(

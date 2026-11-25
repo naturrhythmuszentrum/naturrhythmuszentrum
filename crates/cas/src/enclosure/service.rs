@@ -65,7 +65,9 @@ fn evaluate(
     let Some(mut grid) = preflight(initial, &mut report, start, budget)? else {
         return Ok(report);
     };
-    let target = cas.state.expression(cas.checked(&request.target)?)?;
+    let target = cas
+        .state
+        .expression(cas.checked(&request.target, budget)?, budget)?;
     let mut analytic = super::planning::Plans::new(target, policy)
         .ok_or_else(|| Fault::invalid(InvalidCode::Policy, AT))?
         .at_grid(grid);

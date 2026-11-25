@@ -2,10 +2,11 @@
 //! Complete borrowed Machin byte keys index the authoritative graph without warm allocation.
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode};
+use crate::graph::retained_map::RetainedMap;
 use crate::graph::{Cas, LogicalId};
 use crate::pi_bounds::PiBoundCertificate;
 
@@ -64,7 +65,7 @@ impl Eq for Key<'_> {}
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PiIndex {
     /// Only retained keys own the same immutable certificate allocation as their graph node.
-    entries: BTreeMap<Key<'static>, LogicalId>,
+    entries: RetainedMap<Key<'static>, LogicalId>,
     /// Namespace in which at least one entry has independently checked authority.
     owner: Option<Arc<()>>,
     /// A rollback causes the next citation to run the complete finite checker first.
@@ -90,13 +91,20 @@ impl PiIndex {
     pub(crate) fn entry<'a>(
         &'a self,
         certificate: &'a PiBoundCertificate,
+        floor: u64,
+        budget: &mut Budget,
     ) -> Result<Option<(LogicalId, &'a Arc<PiBoundCertificate>)>, Fault> {
         let _validated = certificate.canonical_key()?;
-        let Some((key, id)) = self
+        let probe = Key(Certificate::Borrowed(certificate));
+        let Some(position) = self
             .entries
-            .get_key_value(&Key(Certificate::Borrowed(certificate)))
+            .find_by(|key| key.cmp(&probe), floor, budget, super::AT)?
+            .ok()
         else {
             return Ok(None);
+        };
+        let Some((key, id)) = self.entries.at(position) else {
+            return Err(Fault::invalid(InvalidCode::Reference, super::AT));
         };
         let Certificate::Owned(fields) = &key.0 else {
             return Err(Fault::invalid(InvalidCode::Reference, super::AT));
@@ -106,19 +114,80 @@ impl PiIndex {
 
     /// Tests inspect the identifier through the same complete canonical lookup.
     #[cfg(test)]
-    pub(crate) fn get(&self, certificate: &PiBoundCertificate) -> Result<Option<LogicalId>, Fault> {
-        Ok(self.entry(certificate)?.map(|(id, _)| id))
+    pub(crate) fn get(
+        &self,
+        certificate: &PiBoundCertificate,
+        budget: &mut Budget,
+    ) -> Result<Option<LogicalId>, Fault> {
+        Ok(self.entry(certificate, 0, budget)?.map(|(id, _)| id))
     }
 
-    /// Publication has already validated the canonical fields and reserved its journal entry.
-    pub(crate) fn insert(&mut self, certificate: Arc<PiBoundCertificate>, id: LogicalId) {
+    /// Plan a complete key after earlier unpublished keys in the same batch.
+    pub(crate) fn prepare_virtual_insert<'a>(
+        &mut self,
+        certificate: &PiBoundCertificate,
+        earlier: impl Iterator<Item = &'a PiBoundCertificate>,
+        journaled: bool,
+        budget: &mut Budget,
+    ) -> Result<usize, Fault> {
+        let _validated = certificate.canonical_key()?;
+        let probe = Key(Certificate::Borrowed(certificate));
+        let Err(base) = self
+            .entries
+            .find_by(|key| key.cmp(&probe), 0, budget, super::AT)?
+        else {
+            return Err(Fault::invalid(InvalidCode::Reference, super::AT));
+        };
+        let mut before = 0_usize;
+        let mut prior = 0_usize;
+        for earlier_certificate in earlier {
+            prior = prior
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, super::AT))?;
+            let staged = Key(Certificate::Borrowed(earlier_certificate));
+            match staged.cmp(&probe) {
+                Ordering::Less => {
+                    before = before
+                        .checked_add(1)
+                        .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, super::AT))?;
+                }
+                Ordering::Equal => return Err(Fault::invalid(InvalidCode::Reference, super::AT)),
+                Ordering::Greater => {}
+            }
+        }
+        let position = base
+            .checked_add(before)
+            .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, super::AT))?;
+        self.entries.prepare_virtual_insert(
+            self.entries
+                .len()
+                .checked_add(prior)
+                .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, super::AT))?,
+            position,
+            journaled,
+            budget,
+            super::AT,
+        )?;
+        Ok(position)
+    }
+
+    /// Publication moves a validated certificate into the prepared sorted position.
+    pub(crate) fn insert_prepared(
+        &mut self,
+        position: usize,
+        certificate: Arc<PiBoundCertificate>,
+        id: LogicalId,
+    ) {
         self.entries
-            .insert(Key(Certificate::Owned(certificate)), id);
+            .insert_prepared(position, Key(Certificate::Owned(certificate)), id);
     }
 
-    /// Journal removal uses only previously validated immutable retained keys.
-    pub(crate) fn remove(&mut self, certificate: Arc<PiBoundCertificate>) {
-        self.entries.remove(&Key(Certificate::Owned(certificate)));
+    /// Journal removal consumes its prepaid inverse and performs no new debit.
+    pub(crate) fn remove_prepaid(&mut self, certificate: Arc<PiBoundCertificate>) {
+        let probe = Key(Certificate::Owned(certificate));
+        let _removed = self
+            .entries
+            .remove_by_prepaid(|candidate| candidate.cmp(&probe));
     }
 
     /// Successful full checking establishes the current namespace without changing key identity.

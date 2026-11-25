@@ -41,7 +41,13 @@ pub(super) fn check(
             },
             C::Integrate { rows, .. },
         ) => {
-            defined(cas, constant, cas.series_object(input)?, premises)?;
+            defined(
+                cas,
+                constant,
+                cas.series_object(input, budget)?,
+                premises,
+                budget,
+            )?;
             integral(cas, input, constant, output, rows, budget)
         }
         _ => Err(invalid()),
@@ -56,8 +62,8 @@ fn derivative(
     rows: &[SeriesDerivativeRow],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let input = cas.series_object(input)?;
-    let output = cas.series_object(output)?;
+    let input = cas.series_object(input, budget)?;
+    let output = cas.series_object(output, budget)?;
     let order = input
         .order
         .checked_sub(1)
@@ -97,15 +103,15 @@ fn integral(
     rows: &[SeriesIntegralRow],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let input = cas.series_object(input)?;
-    let output = cas.series_object(output)?;
+    let input = cas.series_object(input, budget)?;
+    let output = cas.series_object(output, budget)?;
     let order = input.order.checked_add(1).ok_or_else(unsupported)?;
     output.preflight(budget)?;
     if output.order != order || size(rows.len(), AT)? != u64::from(input.order) {
         return Err(invalid());
     }
     equal(
-        number(cas, constant)?,
+        number(cas, constant, budget)?,
         coefficient(cas, output, 0, budget)?,
         budget,
     )?;
@@ -149,7 +155,7 @@ pub(super) fn derive(
         .map_err(|_| Fault::allocation(AT))?;
     for index in 0..order {
         let multiplier = integer(index.checked_add(1).ok_or_else(invalid)?, budget)?;
-        let value = entry(cas, input, index + 1)?;
+        let value = entry(cas, input, index + 1, budget)?;
         let result = value.mul(&multiplier, budget)?;
         rows.push(SeriesDerivativeRow {
             index,
@@ -186,12 +192,12 @@ pub(super) fn integrate(
     values
         .try_reserve_exact(count)
         .map_err(|_| Fault::allocation(AT))?;
-    let initial = copied(number(cas, constant)?, budget)?;
+    let initial = copied(number(cas, constant, budget)?, budget)?;
     values.push(literal(cas, input, initial, budget)?);
     for index in 0..order - 1 {
         let integer = integer(index.checked_add(1).ok_or_else(invalid)?, budget)?;
         let inverse = Rational::one().div(&integer, budget)?;
-        let value = entry(cas, input, index)?;
+        let value = entry(cas, input, index, budget)?;
         let result = value.mul(&inverse, budget)?;
         rows.push(SeriesIntegralRow {
             index,

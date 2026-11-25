@@ -38,7 +38,7 @@ pub(crate) fn check(
         let input = crate::square_free::coefficients(
             cas,
             context,
-            cas.checked(&step.left)?,
+            cas.checked(&step.left, budget)?,
             variable,
             budget,
         )?;
@@ -57,7 +57,7 @@ pub(crate) fn check(
         output(
             cas,
             context,
-            cas.checked(&step.right)?,
+            cas.checked(&step.right, budget)?,
             variable,
             certificate,
             budget,
@@ -170,13 +170,13 @@ fn output(
 ) -> Result<(), Fault> {
     for layer in certificate.layers.iter().rev() {
         budget.work(1, AT)?;
-        let term = cas.state.expression(root)?;
+        let term = cas.state.expression(root, budget)?;
         if term.operator != Operator::Mul {
             return Err(invalid());
         }
         let power = *term.operands.get(1).ok_or_else(invalid)?;
         root = *term.operands.first().ok_or_else(invalid)?;
-        let power = cas.state.expression(power)?;
+        let power = cas.state.expression(power, budget)?;
         let exponent = i64::try_from(layer.multiplicity).map_err(|_| invalid())?;
         if power.operator != Operator::IntegerPower(exponent) {
             return Err(invalid());
@@ -186,7 +186,7 @@ fn output(
         let expected = Polynomial::new(&layer.coefficients, budget)?;
         require_equal(&actual, &expected, budget)?;
     }
-    let Operator::Rational(scalar) = &cas.state.expression(root)?.operator else {
+    let Operator::Rational(scalar) = &cas.state.expression(root, budget)?.operator else {
         return Err(invalid());
     };
     scalar.check(budget, AT)?;

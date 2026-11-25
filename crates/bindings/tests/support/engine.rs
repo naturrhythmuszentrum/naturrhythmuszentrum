@@ -61,15 +61,21 @@ pub(crate) fn prove(
         let guard = judgment.residuals.first().ok_or("missing domain guard")?;
         let cas = context.cas()?;
         assert_eq!(
-            cas.predicate_kind(&guard.predicate)?,
+            cas.predicate_kind(
+                &guard.predicate,
+                &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?
+            )?,
             &PredicateKind::NonZero
         );
         let arguments =
             cas.predicate_arguments(&guard.predicate, &mut Budget::new(Limits::default())?)?;
         assert_eq!(arguments.len(), 1);
         assert_eq!(
-            cas.expression(arguments.first().ok_or("missing guarded value")?)?
-                .0,
+            cas.expression(
+                arguments.first().ok_or("missing guarded value")?,
+                &mut nrz_cas::limits::Budget::new(nrz_cas::limits::Limits::default())?
+            )?
+            .0,
             &Operator::Free(key.into())
         );
     } else {

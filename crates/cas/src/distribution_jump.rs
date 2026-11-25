@@ -33,7 +33,7 @@ pub(crate) fn check(
     else {
         return Err(invalid());
     };
-    let embedded = cas.state.expression(distribution.logical_id())?;
+    let embedded = cas.state.expression(distribution.logical_id(), budget)?;
     if embedded.operator != Operator::RegularEmbed {
         return Err(invalid());
     }
@@ -44,14 +44,14 @@ pub(crate) fn check(
     let mut impulses = Vec::new();
     for (term, coefficient) in terms.values() {
         let term = term.as_ref().ok_or_else(invalid)?;
-        let expression = cas.state.expression(term.logical_id())?;
+        let expression = cas.state.expression(term.logical_id(), budget)?;
         let child = *expression.operands.first().ok_or_else(invalid)?;
         match expression.operator {
             Operator::RegularEmbed if regular.is_none() => {
                 regular = Some((cas.handle(child), coefficient));
             }
             Operator::Delta { order: 0 } => impulses.push((
-                crate::distribution_check::rational(cas, child)?.clone(),
+                crate::distribution_check::rational(cas, child, budget)?.clone(),
                 coefficient.clone(),
             )),
             _ => return Err(invalid()),
@@ -167,9 +167,9 @@ pub(crate) fn regular_output(
     certificate: &RegularCertificate,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let definition = cas.state.space(space.logical_id())?.clone();
+    let definition = cas.state.space(space.logical_id(), budget)?.clone();
     let domain = cas.handle(definition.domain);
-    let header = cas.expression_header(function)?;
+    let header = cas.expression_header(function, budget)?;
     let mut arms = Vec::new();
     let mut common = None;
     let mut same = true;

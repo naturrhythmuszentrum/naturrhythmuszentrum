@@ -53,7 +53,7 @@ pub(super) fn validate(
         }
     }
     for value in &reduction.values {
-        super::literal(cas, value, &selection.cover.index.basis.context)?;
+        super::literal(cas, value, &selection.cover.index.basis.context, budget)?;
     }
     inverse(&reduction.transform, &reduction.inverse, count, budget)?;
     inverse(&reduction.inverse, &reduction.transform, count, budget)?;
@@ -152,13 +152,15 @@ fn candidate(
     for (row, expected) in selection.values.iter().enumerate() {
         let mut value = Rational::zero();
         for (column, reduced) in reduction.values.iter().enumerate() {
-            let reduced = super::literal(cas, reduced, context)?;
+            let reduced = super::literal(cas, reduced, context, budget)?;
             value = value.add(
                 &reduction.transform[row * count + column].mul(reduced, budget)?,
                 budget,
             )?;
         }
-        if value.compare(super::literal(cas, expected, context)?, budget)? != Ordering::Equal {
+        if value.compare(super::literal(cas, expected, context, budget)?, budget)?
+            != Ordering::Equal
+        {
             return Err(invalid());
         }
     }
@@ -176,7 +178,7 @@ pub(super) fn cuts(
     let half = Rational::from_ratio(1, 2, budget)?;
     for (row, selected) in reduction.values.iter().enumerate() {
         let (lower, upper) = bounds(reduction, row, count, budget)?;
-        let value = super::literal(cas, selected, &selection.cover.index.basis.context)?;
+        let value = super::literal(cas, selected, &selection.cover.index.basis.context, budget)?;
         let positive = orientation(&reduction.transform, row, count, budget)?;
         let lower = lower.add(&half, budget)?;
         let upper = upper.add(&half, budget)?;

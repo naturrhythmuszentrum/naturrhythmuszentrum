@@ -67,6 +67,7 @@ fn comparisons(
 
 /// Reordering searches past refused candidates; omitting the actual matches cannot supply completeness.
 fn application(cas: &Cas, checked: &CheckedApplication) -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let Certificate::Solve(certificate) = &checked.certificate else {
         return Err("product certificate".into());
     };
@@ -79,7 +80,8 @@ fn application(cas: &Cas, checked: &CheckedApplication) -> TestResult {
     let SolveStatement::Coverage(coverage) = statement.as_ref() else {
         return Err("product coverage".into());
     };
-    let original = crate::solving::elementary::proof::problem(cas, &certificate.problem)?;
+    let original =
+        crate::solving::elementary::proof::problem(cas, &certificate.problem, &mut budget)?;
     assert_eq!(original.denominators, [] as [crate::Handle; 0]);
     let mut budget = Budget::new(Limits::blind_cubic())?;
     let mut premises = Vec::new();

@@ -11,7 +11,10 @@ use crate::proof_model::{CheckedApplication, GuardedObligation, ScopedConditions
 
 /// Whether exact region syntax or its checked rational partition proves emptiness.
 pub(crate) fn empty(cas: &Cas, region: LogicalId, budget: &mut Budget) -> Result<bool, Fault> {
-    if matches!(cas.state.region(region)?.expression, RegionExpr::Empty) {
+    if matches!(
+        cas.state.region(region, budget)?.expression,
+        RegionExpr::Empty
+    ) {
         return Ok(true);
     }
     let cells = crate::region_cache::partition(cas, &[region], budget)?;
@@ -54,7 +57,7 @@ pub(crate) fn defined(
         if !seen.insert(id) {
             continue;
         }
-        let value = cas.state.expression(id)?.clone();
+        let value = cas.state.expression(id, budget)?.clone();
         let denominator = match value.operator {
             crate::model::Operator::Div => value.operands.get(1).copied(),
             crate::model::Operator::IntegerPower(power) if power <= 0 => {
@@ -85,7 +88,7 @@ pub(crate) fn require(
     result: &mut ScopedConditions,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let (_, scope) = crate::descriptor::metadata(&cas.state, predicate)?;
+    let (_, scope) = crate::descriptor::metadata(&cas.state, predicate, budget)?;
     let obligation = GuardedObligation {
         home: cas.handle(context),
         scope: scope.clone(),

@@ -34,8 +34,8 @@ fn shape(
     {
         return Err(invalid());
     }
-    let input = coordinates(cas, &map.family)?;
-    let original = coordinates(cas, &source.unknowns)?;
+    let input = coordinates(cas, &map.family, budget)?;
+    let original = coordinates(cas, &source.unknowns, budget)?;
     if input.coordinates.len() != original.coordinates.len() {
         return Err(invalid());
     }
@@ -55,11 +55,11 @@ pub(crate) fn unknowns(
     budget: &mut Budget,
 ) -> Result<Vec<Value>, Fault> {
     crate::work_observation::observe!(budget, AT, {
-        let coordinates = coordinates(evaluation.cas, &source.unknowns)?;
+        let coordinates = coordinates(evaluation.cas, &source.unknowns, budget)?;
         let environment = &evaluation
             .cas
             .state
-            .header(source.header.logical_id())?
+            .header(source.header.logical_id(), budget)?
             .environment;
         let mut result = vector(coordinates.coordinates.len(), budget)?;
         for coordinate in &coordinates.coordinates {
@@ -88,7 +88,7 @@ pub(crate) fn apply(
     input: &[Value],
     budget: &mut Budget,
 ) -> Result<Vec<Value>, Fault> {
-    let body = tuple(evaluation.cas, &map.body)?;
+    let body = tuple(evaluation.cas, &map.body, budget)?;
     let mut result = vector(body.entries.len(), budget)?;
     let lifted = Evaluation {
         bound: input,
@@ -113,7 +113,7 @@ fn direction(
     let original = Constraints::problem(evaluation, source, budget)?;
     let input = unknowns(evaluation, source, budget)?;
     let output = apply(evaluation, forward, &input, budget)?;
-    let target_coordinates = coordinates(evaluation.cas, &target.unknowns)?;
+    let target_coordinates = coordinates(evaluation.cas, &target.unknowns, budget)?;
     let mut replacements = vector(output.len(), budget)?;
     for (coordinate, value) in target_coordinates.coordinates.iter().zip(&output) {
         replacements.push((
@@ -160,8 +160,8 @@ pub(crate) fn check(
     premises: &[CheckedApplication],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let source = problem(cas, &certificate.source)?;
-    let target = problem(cas, &certificate.target)?;
+    let source = problem(cas, &certificate.source, budget)?;
+    let target = problem(cas, &certificate.target, budget)?;
     if (
         &source.header,
         &source.coefficients,
@@ -177,7 +177,7 @@ pub(crate) fn check(
     ) {
         return Err(invalid());
     }
-    super::proof::region(cas, &draft.context, source, &certificate.region)?;
+    super::proof::region(cas, &draft.context, source, &certificate.region, budget)?;
     super::member::contained(cas, &certificate.region, &source.region, budget)?;
     super::member::contained(cas, &certificate.region, &target.region, budget)?;
     for slot in certificate
@@ -189,8 +189,8 @@ pub(crate) fn check(
     {
         super::proof::premise(premises, *slot)?;
     }
-    let forward = family(cas, &certificate.forward)?;
-    let backward = family(cas, &certificate.backward)?;
+    let forward = family(cas, &certificate.forward, budget)?;
+    let backward = family(cas, &certificate.backward, budget)?;
     let evaluation = Evaluation {
         exclusions: &[],
         cas,
@@ -280,13 +280,18 @@ fn member(
             break;
         }
     }
-    let supplied = tuple(evaluation.cas, &source.ok_or_else(invalid)?.tuple)?;
+    let supplied = tuple(evaluation.cas, &source.ok_or_else(invalid)?.tuple, budget)?;
     let mut input = vector(supplied.entries.len(), budget)?;
     for entry in &supplied.entries {
         input.push(evaluation.expression(entry.logical_id(), true, budget)?);
     }
-    let output = apply(evaluation, family(evaluation.cas, map)?, &input, budget)?;
-    let claimed = tuple(evaluation.cas, &target.tuple)?;
+    let output = apply(
+        evaluation,
+        family(evaluation.cas, map, budget)?,
+        &input,
+        budget,
+    )?;
+    let claimed = tuple(evaluation.cas, &target.tuple, budget)?;
     if output.len() != claimed.entries.len() {
         return Err(invalid());
     }
@@ -300,7 +305,7 @@ fn member(
             budget,
         )?;
     }
-    let original = problem(evaluation.cas, &target.problem)?;
+    let original = problem(evaluation.cas, &target.problem, budget)?;
     super::product::membership(evaluation, original, &claimed.entries, budget)
 }
 
@@ -331,7 +336,12 @@ fn covered(
     let mut outputs = vector(inputs.len(), budget)?;
     for entry in &inputs {
         let input = [evaluation.expression(entry.logical_id(), true, budget)?];
-        let mut image = apply(evaluation, family(evaluation.cas, map)?, &input, budget)?;
+        let mut image = apply(
+            evaluation,
+            family(evaluation.cas, map, budget)?,
+            &input,
+            budget,
+        )?;
         if image.len() != 1 {
             return Err(invalid());
         }
@@ -345,7 +355,7 @@ fn covered(
     same_values(evaluation, &actual, &outputs, budget)?;
     super::product::membership(
         evaluation,
-        problem(evaluation.cas, &target.problem)?,
+        problem(evaluation.cas, &target.problem, budget)?,
         &targets,
         budget,
     )

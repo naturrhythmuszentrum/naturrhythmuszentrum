@@ -20,7 +20,8 @@ pub(crate) fn canonical_map(
     region: &Handle,
     budget: &mut Budget,
 ) -> Result<bool, Fault> {
-    let SolveDraft::CoefficientMap(mapping) = crate::solving::graph::object(state, map)? else {
+    let SolveDraft::CoefficientMap(mapping) = crate::solving::graph::object(state, map, budget)?
+    else {
         return Err(invalid());
     };
     if mapping.source != *source
@@ -30,7 +31,8 @@ pub(crate) fn canonical_map(
     {
         return Ok(false);
     }
-    let CoefficientDomainData::Fraction { base, coordinates } = domain(state, source)? else {
+    let CoefficientDomainData::Fraction { base, coordinates } = domain(state, source, budget)?
+    else {
         return Ok(false);
     };
     if matches!(mapping.target, MapTarget::Family { .. }) {
@@ -38,7 +40,7 @@ pub(crate) fn canonical_map(
         return Ok(true);
     }
     let SolveDraft::CoordinateSpace(product) =
-        crate::solving::graph::object(state, coordinates.logical_id())?
+        crate::solving::graph::object(state, coordinates.logical_id(), budget)?
     else {
         return Err(invalid());
     };
@@ -51,12 +53,12 @@ pub(crate) fn canonical_map(
     if *header != product.header || mapping.images.len() != product.coordinates.len() {
         return Ok(false);
     }
-    if super::read::ground(state, base)? == Ground::Gaussian && *field != Field::Complex {
+    if super::read::ground(state, base, budget)? == Ground::Gaussian && *field != Field::Complex {
         return Ok(false);
     }
     for (image, coordinate) in mapping.images.iter().zip(&product.coordinates) {
         budget.work(crate::graph::size(coordinate.key.len(), AT)?, AT)?;
-        let expression = state.expression(image.logical_id())?;
+        let expression = state.expression(image.logical_id(), budget)?;
         if expression.header != product.header.logical_id()
             || !matches!(&expression.operator, Operator::Free(key) if key == &coordinate.key)
         {
@@ -74,7 +76,8 @@ fn fraction_factors(
     result: &mut super::nonzero::Factors,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let SolveDraft::CoefficientValue(stored) = crate::solving::graph::object(state, coefficient)?
+    let SolveDraft::CoefficientValue(stored) =
+        crate::solving::graph::object(state, coefficient, budget)?
     else {
         return Err(invalid());
     };
@@ -102,10 +105,10 @@ fn predicate_factors(
     result: &mut super::nonzero::Factors,
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let Vertex::Condition(condition) = state.node(predicate.logical_id())? else {
+    let Vertex::Condition(condition) = state.node(predicate.logical_id(), budget)? else {
         return Err(invalid());
     };
-    let frame = state.region(region.logical_id())?;
+    let frame = state.region(region.logical_id(), budget)?;
     if (condition.header, &condition.scope) != (frame.header, &frame.scope)
         || !matches!(
             condition.kind,
@@ -117,7 +120,7 @@ fn predicate_factors(
     let [argument] = condition.arguments.as_slice() else {
         return Ok(());
     };
-    let expression = state.expression(*argument)?;
+    let expression = state.expression(*argument, budget)?;
     if let (Operator::ExactCoefficient, Some(ExpressionAttachment::ExactCoefficient { value, map })) =
         (&expression.operator, &expression.attachment)
         && canonical_map(state, source, *map, region, budget)?
@@ -175,11 +178,11 @@ pub(crate) fn factors(
     let mut current = source;
     loop {
         at_source(state, current, region, statement, result, budget)?;
-        let CoefficientDomainData::Quotient { level } = domain(state, current)? else {
+        let CoefficientDomainData::Quotient { level } = domain(state, current, budget)? else {
             return Ok(());
         };
         let SolveDraft::ExtensionLevel(extension) =
-            crate::solving::graph::object(state, level.logical_id())?
+            crate::solving::graph::object(state, level.logical_id(), budget)?
         else {
             return Err(invalid());
         };

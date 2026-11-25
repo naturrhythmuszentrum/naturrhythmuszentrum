@@ -23,7 +23,7 @@ pub(super) fn read(
     while let Some((id, expanded, depth)) = pending.pop() {
         budget.work(1, AT)?;
         budget.check(BudgetKind::Depth, depth, AT)?;
-        match evaluation.cas.state.node(id)? {
+        match evaluation.cas.state.node(id, budget)? {
             Vertex::Expression(_) => {
                 reserve(&mut values, 1, budget)?;
                 values.push(evaluation.expression(id, true, budget)?);

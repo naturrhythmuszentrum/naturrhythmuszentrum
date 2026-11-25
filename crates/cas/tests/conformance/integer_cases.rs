@@ -59,7 +59,13 @@ fn integer_case_declared_results() -> TestResult {
         let batch = drafts(&source, sort.clone(), std::slice::from_ref(value))?;
         let admitted = source.cas.admit(&batch, &mut ledger()?)?;
         let function = admitted.last().ok_or("missing case")?;
-        assert_eq!(source.cas.expression(function)?.1, &sort);
+        assert_eq!(
+            source
+                .cas
+                .expression(function, &mut crate::testing::budgets::graph_budget()?)?
+                .1,
+            &sort
+        );
     }
     for sort in [integer(), real()] {
         for values in [
@@ -105,14 +111,22 @@ fn integer_case_declared_results() -> TestResult {
 fn integer_case_literal_contract() -> TestResult {
     let mut source = Fixture::new(Example::Integer)?;
     let count = literal(&mut source, integer(), 3, 1)?;
-    assert_eq!(source.cas.scalar_ambient(&count)?, None);
+    assert_eq!(
+        source
+            .cas
+            .scalar_ambient(&count, &mut crate::testing::budgets::graph_budget()?)?,
+        None
+    );
     let before = source.cas.counts();
     assert!(literal(&mut source, integer(), 3, 2).is_err());
     assert_eq!(source.cas.counts(), before);
     let batch = drafts(&source, integer(), &[count])?;
     let admitted = source.cas.admit(&batch, &mut ledger()?)?;
     assert_eq!(
-        source.cas.scalar_ambient(admitted.last().ok_or("case")?)?,
+        source.cas.scalar_ambient(
+            admitted.last().ok_or("case")?,
+            &mut crate::testing::budgets::graph_budget()?
+        )?,
         None
     );
     Ok(())
@@ -168,18 +182,35 @@ fn bound_case(source: &mut Fixture) -> TestResult<Handle> {
 fn integer_case_bound_result() -> TestResult {
     let mut source = Fixture::new(Example::Integer)?;
     let function = bound_case(&mut source)?;
-    assert_eq!(source.cas.expression(&function)?.1, &integer());
     assert_eq!(
-        source.cas.expression_scope(&function)?,
+        source
+            .cas
+            .expression(&function, &mut crate::testing::budgets::graph_budget()?)?
+            .1,
+        &integer()
+    );
+    assert_eq!(
+        source
+            .cas
+            .expression_scope(&function, &mut crate::testing::budgets::graph_budget()?)?,
         &vec![vec![AtomicSort::Integer]]
     );
     let three = literal(&mut source, integer(), 3, 1)?;
     let instantiated = source
         .cas
         .instantiate_bound(&function, &[three], &mut ledger()?)?;
-    assert_eq!(source.cas.expression(&instantiated)?.1, &integer());
     assert_eq!(
-        source.cas.expression_scope(&instantiated)?.as_slice(),
+        source
+            .cas
+            .expression(&instantiated, &mut crate::testing::budgets::graph_budget()?)?
+            .1,
+        &integer()
+    );
+    assert_eq!(
+        source
+            .cas
+            .expression_scope(&instantiated, &mut crate::testing::budgets::graph_budget()?)?
+            .as_slice(),
         [] as [Vec<AtomicSort>; 0]
     );
     let scalar = literal(&mut source, real(), 3, 1)?;
@@ -204,21 +235,21 @@ fn integer_case_admission_boundaries() -> TestResult {
     let before = source.cas.counts();
     let mut budget = ledger()?;
     source.cas.admit(&batch, &mut budget)?;
-    assert_eq!(budget.usage().work, 1_522);
+    assert_eq!(budget.usage().work, 1_533);
     assert_eq!(
         source.cas.counts().payload_bytes - before.payload_bytes,
         965
     );
     for (kind, amount) in [
-        (BudgetKind::Work, 1_522),
+        (BudgetKind::Work, 1_533),
         (BudgetKind::StagedPayloadBytes, 4_368),
         (BudgetKind::PayloadBytes, 3_311),
     ] {
         assert!(admission_attempt(kind, amount, 0)?);
         assert!(!admission_attempt(kind, amount - 1, 0)?);
     }
-    assert!(admission_attempt(BudgetKind::Work, 1_522 + 37, 37)?);
-    assert!(!admission_attempt(BudgetKind::Work, 1_522 + 36, 37)?);
+    assert!(admission_attempt(BudgetKind::Work, 1_533 + 37, 37)?);
+    assert!(!admission_attempt(BudgetKind::Work, 1_533 + 36, 37)?);
     Ok(())
 }
 

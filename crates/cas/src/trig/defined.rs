@@ -17,7 +17,9 @@ const AT: Location = Location::new("trigonometric totality");
 /// Inspect the closed discriminator before copying any input-controlled metadata.
 pub(super) fn operand(cas: &Cas, function: &Handle, budget: &mut Budget) -> Result<Handle, Fault> {
     budget.work(1, AT)?;
-    let value = cas.state.expression(cas.checked(function)?)?;
+    let value = cas
+        .state
+        .expression(cas.checked(function, budget)?, budget)?;
     if !matches!(
         value.operator,
         Operator::Sine | Operator::Cosine | Operator::Arctangent
@@ -29,7 +31,7 @@ pub(super) fn operand(cas: &Cas, function: &Handle, budget: &mut Budget) -> Resu
     let [child] = value.operands.as_slice() else {
         return Err(invalid());
     };
-    let original = cas.state.expression(*child)?;
+    let original = cas.state.expression(*child, budget)?;
     crate::rule_check::prepay_shape(original, budget)?;
     crate::rule_check::prepay_shape(value, budget)?;
     if original.sort != value.sort
@@ -57,7 +59,8 @@ pub(crate) fn check(
     let Statement::PredicateFact { region, predicate } = &draft.conclusion else {
         return Err(invalid());
     };
-    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate)?)? else {
+    let Vertex::Condition(condition) = cas.state.node(cas.checked(predicate, budget)?, budget)?
+    else {
         return Err(invalid());
     };
     if condition.kind != PredicateKind::Defined {
@@ -70,7 +73,7 @@ pub(crate) fn check(
     if guard.judgment.context != draft.context {
         return Err(invalid());
     }
-    definedness(cas, &original, region, &guard.judgment.statement)?;
+    definedness(cas, &original, region, &guard.judgment.statement, budget)?;
     let mut result = ScopedConditions::default();
     crate::statement::merge(cas, &mut result, &guard.conditions, budget)?;
     Ok(result)
@@ -82,7 +85,9 @@ pub(crate) fn predicate(
     function: &Handle,
     budget: &mut Budget,
 ) -> Result<Handle, Fault> {
-    let value = cas.state.expression(cas.checked(function)?)?;
+    let value = cas
+        .state
+        .expression(cas.checked(function, budget)?, budget)?;
     let header = cas.handle(value.header);
     let bytes = if value.scope.is_empty() {
         0
@@ -95,7 +100,10 @@ pub(crate) fn predicate(
         bytes
     };
     budget.with_retained_payload(bytes, AT, |budget| {
-        let source = &cas.state.expression(cas.checked(function)?)?.scope;
+        let source = &cas
+            .state
+            .expression(cas.checked(function, budget)?, budget)?
+            .scope;
         let mut scope = Vec::new();
         scope
             .try_reserve_exact(source.len())
@@ -137,13 +145,14 @@ impl Cas {
         self.proof_limits(budget, |cas, budget| {
             cas.transaction(budget, |cas, budget| {
                 let original = operand(cas, function, budget)?;
-                let proof = crate::proof_view::application(cas, cas.checked(guard)?, budget)?;
+                let proof =
+                    crate::proof_view::application(cas, cas.checked(guard, budget)?, budget)?;
                 let region = match &proof.judgment.statement {
                     Statement::PredicateFact { region, .. } => region.clone(),
                     Statement::DefinedDomain { domain, .. } => domain.clone(),
                     _ => return Err(invalid()),
                 };
-                definedness(cas, &original, &region, &proof.judgment.statement)?;
+                definedness(cas, &original, &region, &proof.judgment.statement, budget)?;
                 let conclusion = Statement::PredicateFact {
                     region,
                     predicate: predicate(cas, function, budget)?,

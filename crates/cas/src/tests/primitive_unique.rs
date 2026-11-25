@@ -7,7 +7,7 @@ use crate::proof_model::Statement;
 use crate::task::Task;
 use crate::testing::common::TestResult;
 use crate::testing::distribution_native::{Fixture, evidence};
-use crate::testing::native::budget;
+use crate::testing::native::fresh_budget;
 
 /// The uniqueness checker requires both exact first-derivative theorems in the same space.
 /// ´test:crate:primitive-unique-premise-tampering´
@@ -66,7 +66,7 @@ fn primitive_unique_premise_tampering() -> TestResult {
                 &mut fixture.base.cas,
                 &draft,
                 &altered,
-                &mut budget()?
+                &mut fresh_budget()?
             )
             .is_err()
         );

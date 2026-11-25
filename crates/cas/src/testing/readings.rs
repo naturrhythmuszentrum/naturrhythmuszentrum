@@ -142,7 +142,10 @@ impl ReadingCase {
             statement: Statement::Equality {
                 left: self.left.clone(),
                 right: self.right.clone(),
-                domain: self.fixture.cas.admissible_region(&self.fixture.context)?,
+                domain: self.fixture.cas.admissible_region(
+                    &self.fixture.context,
+                    &mut crate::testing::budgets::graph_budget()?,
+                )?,
                 domain_contract: DomainContract::DefinedAndEqual,
             },
             residuals: Vec::new(),

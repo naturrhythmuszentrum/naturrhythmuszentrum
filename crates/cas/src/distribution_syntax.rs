@@ -77,18 +77,18 @@ pub(crate) fn space(
     operands: &[LogicalId],
     budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let definition = state.space(space)?;
+    let definition = state.space(space, budget)?;
     if definition.field != Field::Real {
         return Err(invalid());
     }
     for operand in operands {
-        let child = state.expression(*operand)?;
+        let child = state.expression(*operand, budget)?;
         if crate::header::space_sort(&child.sort) && child.space != Some(space) {
             return Err(invalid());
         }
     }
     if matches!(operator, Operator::DistributionScale) {
-        let coefficient = state.expression(*operands.first().ok_or_else(invalid)?)?;
+        let coefficient = state.expression(*operands.first().ok_or_else(invalid)?, budget)?;
         if !matches!(coefficient.operator, Operator::Rational(_)) || coefficient.space.is_some() {
             return Err(invalid());
         }
@@ -107,28 +107,28 @@ pub(crate) fn space(
 pub(crate) fn statement(
     cas: &Cas,
     value: &DistributionStatement,
-    budget: &Budget,
+    budget: &mut Budget,
 ) -> Result<(), Fault> {
-    let space = cas.checked(value.space())?;
-    cas.state.space(space)?;
+    let space = cas.checked(value.space(), budget)?;
+    cas.state.space(space, budget)?;
     let real = Sort::Value(AtomicSort::Scalar(Field::Real));
     match value {
-        DistributionStatement::Pullback(value) => pullback(cas, value)?,
+        DistributionStatement::Pullback(value) => pullback(cas, value, budget)?,
         DistributionStatement::Regularity { function, .. } => {
-            endpoint(cas, function, &real, None)?;
+            endpoint(cas, function, &real, None, budget)?;
         }
         DistributionStatement::Embedding {
             function,
             embedding,
             ..
         } => {
-            endpoint(cas, function, &real, None)?;
-            endpoint(cas, embedding, &Sort::Distribution, Some(space))?;
+            endpoint(cas, function, &real, None, budget)?;
+            endpoint(cas, embedding, &Sort::Distribution, Some(space), budget)?;
         }
         DistributionStatement::Equality { left, right, .. }
         | DistributionStatement::PrimitiveUnique { left, right, .. } => {
-            endpoint(cas, left, &Sort::Distribution, Some(space))?;
-            endpoint(cas, right, &Sort::Distribution, Some(space))?;
+            endpoint(cas, left, &Sort::Distribution, Some(space), budget)?;
+            endpoint(cas, right, &Sort::Distribution, Some(space), budget)?;
         }
         DistributionStatement::Derivative {
             distribution,
@@ -140,12 +140,12 @@ pub(crate) fn statement(
                 return Err(invalid());
             }
             budget.check(BudgetKind::Depth, u64::from(*order), AT)?;
-            endpoint(cas, distribution, &Sort::Distribution, Some(space))?;
-            endpoint(cas, derivative, &Sort::Distribution, Some(space))?;
+            endpoint(cas, distribution, &Sort::Distribution, Some(space), budget)?;
+            endpoint(cas, derivative, &Sort::Distribution, Some(space), budget)?;
         }
         DistributionStatement::Pairing { pairing, value, .. } => {
-            endpoint(cas, pairing, &real, Some(space))?;
-            let output = cas.state.expression(cas.checked(value)?)?;
+            endpoint(cas, pairing, &real, Some(space), budget)?;
+            let output = cas.state.expression(cas.checked(value, budget)?, budget)?;
             if output.sort != real
                 || !output.scope.is_empty()
                 || output.space.is_some_and(|actual| actual != space)
@@ -159,12 +159,14 @@ pub(crate) fn statement(
             neighborhood,
             ..
         } => {
-            endpoint(cas, distribution, &Sort::Distribution, Some(space))?;
-            endpoint(cas, function, &real, None)?;
-            let region = cas.state.region(cas.checked(neighborhood)?)?;
+            endpoint(cas, distribution, &Sort::Distribution, Some(space), budget)?;
+            endpoint(cas, function, &real, None, budget)?;
+            let region = cas
+                .state
+                .region(cas.checked(neighborhood, budget)?, budget)?;
             if region.ambient
                 != crate::domain_model::AmbientDomain::Real(
-                    cas.state.space(space)?.coordinate.clone(),
+                    cas.state.space(space, budget)?.coordinate.clone(),
                 )
                 || !region.scope.is_empty()
             {
@@ -181,8 +183,9 @@ fn endpoint(
     handle: &crate::graph::Handle,
     sort: &Sort,
     space: Option<LogicalId>,
+    budget: &mut crate::budget::Budget,
 ) -> Result<(), Fault> {
-    let value = cas.state.expression(cas.checked(handle)?)?;
+    let value = cas.state.expression(cas.checked(handle, budget)?, budget)?;
     if value.sort != *sort || value.space != space || !value.scope.is_empty() {
         return Err(invalid());
     }
@@ -190,17 +193,43 @@ fn endpoint(
 }
 
 /// Source and target coordinate roles cannot be exchanged by changing a displayed map.
-fn pullback(cas: &Cas, value: &crate::pullback_model::PullbackValue) -> Result<(), Fault> {
-    let source = cas.checked(&value.source_space)?;
-    let target = cas.checked(&value.target_space)?;
-    endpoint(cas, &value.source, &Sort::Distribution, Some(source))?;
-    endpoint(cas, &value.result, &Sort::Distribution, Some(target))?;
+fn pullback(
+    cas: &Cas,
+    value: &crate::pullback_model::PullbackValue,
+    budget: &mut crate::budget::Budget,
+) -> Result<(), Fault> {
+    let source = cas.checked(&value.source_space, budget)?;
+    let target = cas.checked(&value.target_space, budget)?;
+    endpoint(
+        cas,
+        &value.source,
+        &Sort::Distribution,
+        Some(source),
+        budget,
+    )?;
+    endpoint(
+        cas,
+        &value.result,
+        &Sort::Distribution,
+        Some(target),
+        budget,
+    )?;
     let real = Sort::Value(AtomicSort::Scalar(Field::Real));
-    endpoint(cas, &value.map, &real, None)?;
-    crate::boundary_roles::coordinate(cas, &value.map, &cas.state.space(target)?.coordinate)?;
+    endpoint(cas, &value.map, &real, None, budget)?;
+    crate::boundary_roles::coordinate(
+        cas,
+        &value.map,
+        &cas.state.space(target, budget)?.coordinate,
+        budget,
+    )?;
     if let Some(inverse) = &value.inverse {
-        endpoint(cas, inverse, &real, None)?;
-        crate::boundary_roles::coordinate(cas, inverse, &cas.state.space(source)?.coordinate)?;
+        endpoint(cas, inverse, &real, None, budget)?;
+        crate::boundary_roles::coordinate(
+            cas,
+            inverse,
+            &cas.state.space(source, budget)?.coordinate,
+            budget,
+        )?;
     }
     Ok(())
 }

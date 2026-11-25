@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 //! Complete scalar inventories are staged until their enclosing receipt succeeds.
 
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 use super::{AnonymousLemma, Cas, Edge, EdgeIndex, LogicalId, State, Undo, Vertex, VertexKind};
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, InvalidCode, Location};
 use crate::exact_constant::ExactConstant;
-use crate::graph::{size, storage_check};
+use crate::graph::{NodeIndex, StoredKey, size, storage_check};
 
 /// Preserve the original scalar retention accounting and refusal location.
 const AT: Location = Location::new("checked scalar records");
@@ -59,21 +60,71 @@ pub(crate) struct ScalarLemma {
     citation: EdgeIndex<u32>,
 }
 
+/// Locally, each new ID is larger than earlier IDs of its kind, and each planned
+/// key position includes only preceding keys in this batch. Therefore prepared
+/// insertions replay in plan order without another lookup or a fallible allocation.
+pub(super) struct NewPlan {
+    /// Reserved logical identifier for the new judgment.
+    pub(super) id: LogicalId,
+    /// Prepared position in the graph identifier index.
+    pub(super) index_position: usize,
+    /// Prepared position in the retained-kind count index.
+    pub(super) retained_position: usize,
+    /// Count after publishing this judgment.
+    pub(super) retained_next: u64,
+    /// Prepared position in the judgment key index.
+    pub(super) key_position: usize,
+    /// Resolved graph sources for the judgment.
+    pub(super) sources: [Option<NodeIndex<u32>>; 3],
+    /// Retained key allocation when this judgment interns one.
+    pub(super) intern_key: Option<StoredKey>,
+    /// Prepared inverse insertion credit for rollback.
+    undo: Option<Undo>,
+}
+
+/// Prepared publication action for a new or refreshed judgment.
+enum PublicationPlan {
+    /// Publish a new judgment using the reserved positions.
+    New(NewPlan),
+    /// Refresh an already retained graph node.
+    Refresh(NodeIndex<u32>),
+}
+
+/// Copy an encoded judgment key into a fallibly reserved allocation.
+fn copy_key(bytes: &[u8]) -> Result<StoredKey, Fault> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(bytes.len())
+        .map_err(|_| Fault::allocation(AT))?;
+    copied.extend_from_slice(bytes);
+    Ok(copied.into())
+}
+
 impl Cas {
     /// Authenticate the actual graph payload and its incoming checked-evidence edge.
-    pub(crate) fn scalar_inventory(&self, id: LogicalId) -> Result<&ScalarInventory, Fault> {
-        Ok(&self.scalar_lemma(id)?.inventory)
+    pub(crate) fn scalar_inventory(
+        &self,
+        id: LogicalId,
+        budget: &mut Budget,
+    ) -> Result<&ScalarInventory, Fault> {
+        Ok(&self.scalar_lemma(id, budget)?.inventory)
     }
 
     /// A retained key can authorize reuse only in its independently checked namespace.
     pub(crate) fn scalar_records(
         &self,
         key: &[u8],
+        budget: &mut Budget,
     ) -> Result<Option<Arc<Vec<ExactConstant>>>, Fault> {
-        let Some(id) = self.state.scalar_judgments.get(key) else {
+        let count = size(self.state.scalar_judgments.len(), AT)?;
+        let length = size(key.len(), AT)?;
+        let floor = length
+            .checked_mul(u64::from(count.bit_width()))
+            .ok_or_else(|| Fault::capacity(BudgetKind::Work, AT))?;
+        let Some(id) = self.state.scalar_judgments.get(key, floor, budget, AT)? else {
             return Ok(None);
         };
-        let node = self.scalar_lemma(*id)?;
+        let node = self.scalar_lemma(*id, budget)?;
         if node.inventory.key.as_ref() != key {
             return Err(invalid());
         }
@@ -84,15 +135,15 @@ impl Cas {
     }
 
     /// Complete authentication never substitutes an index entry for the graph's checked edge.
-    fn scalar_lemma(&self, id: LogicalId) -> Result<&ScalarLemma, Fault> {
-        let Vertex::AnonymousLemma(node) = self.state.node(id)? else {
+    fn scalar_lemma(&self, id: LogicalId, budget: &mut Budget) -> Result<&ScalarLemma, Fault> {
+        let Vertex::AnonymousLemma(node) = self.state.node(id, budget)? else {
             return Err(invalid());
         };
         let AnonymousLemma::Scalar(node) = node.as_ref() else {
             return Err(invalid());
         };
-        let original = self.state.indices[&node.inventory.scope[0]];
-        let target = self.state.indices[&id];
+        let original = self.state.index(node.inventory.scope[0], budget)?;
+        let target = self.state.index(id, budget)?;
         let endpoints = self.state.graph.edge_endpoints(node.citation) == Some((original, target));
         let checked = matches!(
             self.state.graph.edge_weight(node.citation),
@@ -136,81 +187,56 @@ impl Cas {
             | PendingJudgment::RecheckedEnclosure(_) => total,
         });
         preflight(self, pending, count, bytes, budget)?;
+        let first =
+            self.token
+                .identities
+                .reserve(VertexKind::AnonymousLemma, size(count, AT)?, AT)?;
+        let mut plan = prepare_publication(self, pending, first, budget)?;
         if let Some(journal) = &mut self.state.journal {
             journal
                 .try_reserve_exact(count)
                 .map_err(|_| Fault::allocation(AT))?;
         }
-        let first =
-            self.token
-                .identities
-                .reserve(VertexKind::AnonymousLemma, size(count, AT)?, AT)?;
-        let mut serial = first;
-        for entry in pending.iter() {
-            let id = LogicalId {
-                kind: VertexKind::AnonymousLemma,
-                serial,
-            };
-            let undo = match entry {
-                PendingJudgment::NewExpm1(inventory) => Undo::Vertex {
-                    id,
-                    key: Some(inventory.key.clone().into()),
-                    policy: None,
-                },
-                PendingJudgment::NewEnclosure(inventory) => Undo::Vertex {
-                    id,
-                    key: Some(inventory.key.clone().into()),
-                    policy: None,
-                },
-                PendingJudgment::NewScalar(inventory) => Undo::ScalarJudgment {
-                    id,
-                    key: Arc::clone(&inventory.key),
-                },
-                PendingJudgment::NewPi(inventory) => Undo::PiJudgment {
-                    id,
-                    certificate: Arc::clone(&inventory.certificate),
-                },
-                PendingJudgment::RecheckedScalar(_)
-                | PendingJudgment::RecheckedPi(_)
-                | PendingJudgment::RecheckedExpm1(_)
-                | PendingJudgment::RecheckedEnclosure(_) => continue,
-            };
-            self.state.record(undo)?;
-            serial += 1;
+        for prepared in &mut plan {
+            if let PublicationPlan::New(prepared) = prepared {
+                self.state
+                    .record(prepared.undo.take().ok_or_else(invalid)?)?;
+            }
         }
-        self.append_staged_judgments(std::mem::take(pending), first);
+        self.append_staged_judgments(std::mem::take(pending), plan);
         Ok(bytes)
     }
 
     /// Publish only the fully reserved and journaled suffix, with no fallible steps remaining.
-    fn append_staged_judgments(&mut self, pending: Vec<PendingJudgment>, mut serial: u64) {
-        for entry in pending {
-            let id = LogicalId {
-                kind: VertexKind::AnonymousLemma,
-                serial,
-            };
-            match entry {
-                PendingJudgment::NewScalar(inventory) => {
-                    append(self, id, inventory);
-                    serial += 1;
+    fn append_staged_judgments(
+        &mut self,
+        pending: Vec<PendingJudgment>,
+        plan: Vec<PublicationPlan>,
+    ) {
+        for (entry, prepared) in pending.into_iter().zip(plan) {
+            match (entry, prepared) {
+                (PendingJudgment::NewScalar(inventory), PublicationPlan::New(plan)) => {
+                    append(self, inventory, &plan);
                 }
-                PendingJudgment::NewPi(inventory) => {
-                    super::pi::append(self, id, inventory);
-                    serial += 1;
+                (PendingJudgment::NewPi(inventory), PublicationPlan::New(plan)) => {
+                    super::pi::append(self, inventory, &plan);
                 }
-                PendingJudgment::NewEnclosure(inventory) => {
-                    super::enclosure::append(self, id, inventory);
-                    serial += 1;
+                (PendingJudgment::NewEnclosure(inventory), PublicationPlan::New(plan)) => {
+                    super::enclosure::append(self, inventory, plan);
                 }
-                PendingJudgment::NewExpm1(inventory) => {
-                    super::prepared_expm1::append(self, id, inventory);
-                    serial += 1;
+                (PendingJudgment::NewExpm1(inventory), PublicationPlan::New(plan)) => {
+                    super::prepared_expm1::append(self, inventory, plan);
                 }
-                PendingJudgment::RecheckedExpm1(id) => self.refresh_expm1(id),
-                PendingJudgment::RecheckedEnclosure(id) => self.refresh_enclosure(id),
-                PendingJudgment::RecheckedPi(id) => self.refresh_pi(id),
-                PendingJudgment::RecheckedScalar(id) => {
-                    let index = self.state.indices[&id];
+                (PendingJudgment::RecheckedExpm1(_), PublicationPlan::Refresh(index)) => {
+                    self.refresh_expm1(index);
+                }
+                (PendingJudgment::RecheckedEnclosure(_), PublicationPlan::Refresh(index)) => {
+                    self.refresh_enclosure(index);
+                }
+                (PendingJudgment::RecheckedPi(_), PublicationPlan::Refresh(index)) => {
+                    self.refresh_pi(index);
+                }
+                (PendingJudgment::RecheckedScalar(_), PublicationPlan::Refresh(index)) => {
                     if let Vertex::AnonymousLemma(node) = &mut self.state.graph[index]
                         && let AnonymousLemma::Scalar(node) = node.as_mut()
                     {
@@ -218,9 +244,216 @@ impl Cas {
                         node.epoch = self.memo_epoch;
                     }
                 }
+                _ => unreachable!("preflight plan follows staged entry order"),
             }
         }
     }
+}
+
+/// Resolve every target and reserve every sorted insertion before publication begins.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one ordered preflight covers all judgment variants and their shared reservations"
+)]
+fn prepare_publication(
+    cas: &mut Cas,
+    pending: &[PendingJudgment],
+    first: u64,
+    budget: &mut Budget,
+) -> Result<Vec<PublicationPlan>, Fault> {
+    let state = &mut cas.state;
+    let mut plans = Vec::new();
+    plans
+        .try_reserve_exact(pending.len())
+        .map_err(|_| Fault::allocation(AT))?;
+    let mut fresh = 0_usize;
+    let mut count_slot = None;
+    for (slot, entry) in pending.iter().enumerate() {
+        let scope: &[LogicalId] = match entry {
+            PendingJudgment::NewScalar(value) => &value.scope,
+            PendingJudgment::NewPi(value) => std::slice::from_ref(&value.original),
+            PendingJudgment::NewEnclosure(value) => &value.scope,
+            PendingJudgment::NewExpm1(value) => &value.scope,
+            PendingJudgment::RecheckedScalar(id)
+            | PendingJudgment::RecheckedPi(id)
+            | PendingJudgment::RecheckedEnclosure(id)
+            | PendingJudgment::RecheckedExpm1(id) => {
+                plans.push(PublicationPlan::Refresh(state.index(*id, budget)?));
+                continue;
+            }
+        };
+        let mut sources = [None; 3];
+        for (target, id) in sources.iter_mut().zip(scope) {
+            *target = Some(state.index(*id, budget)?);
+        }
+        if matches!(entry, PendingJudgment::NewPi(_))
+            && !matches!(
+                sources[0].and_then(|index| state.graph.node_weight(index)),
+                Some(Vertex::Expression(_))
+            )
+        {
+            return Err(invalid());
+        }
+        let key_position = match entry {
+            PendingJudgment::NewScalar(value) => {
+                let Err(base) = state
+                    .scalar_judgments
+                    .find(value.key.as_ref(), 0, budget, AT)?
+                else {
+                    return Err(invalid());
+                };
+                let mut prior = 0_usize;
+                let mut before = 0_usize;
+                for previous in &pending[..slot] {
+                    if let PendingJudgment::NewScalar(previous) = previous {
+                        prior = prior
+                            .checked_add(1)
+                            .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, AT))?;
+                        match previous.key.as_ref().cmp(value.key.as_ref()) {
+                            Ordering::Less => {
+                                before = before
+                                    .checked_add(1)
+                                    .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, AT))?;
+                            }
+                            Ordering::Equal => return Err(invalid()),
+                            Ordering::Greater => {}
+                        }
+                    }
+                }
+                let position = base
+                    .checked_add(before)
+                    .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, AT))?;
+                state.scalar_judgments.prepare_virtual_insert(
+                    state
+                        .scalar_judgments
+                        .len()
+                        .checked_add(prior)
+                        .ok_or_else(|| Fault::capacity(BudgetKind::PayloadBytes, AT))?,
+                    position,
+                    state.journal.is_some(),
+                    budget,
+                    AT,
+                )?;
+                position
+            }
+            PendingJudgment::NewPi(value) => state.pi_judgments.prepare_virtual_insert(
+                &value.certificate,
+                pending[..slot].iter().filter_map(|entry| match entry {
+                    PendingJudgment::NewPi(prior) => Some(prior.certificate.as_ref()),
+                    _ => None,
+                }),
+                state.journal.is_some(),
+                budget,
+            )?,
+            PendingJudgment::NewEnclosure(value) => state.intern.prepare_virtual_insert_bytes(
+                &value.key,
+                pending[..slot].iter().filter_map(|entry| match entry {
+                    PendingJudgment::NewEnclosure(prior) => Some(prior.key.as_slice()),
+                    PendingJudgment::NewExpm1(prior) => Some(prior.key.as_ref()),
+                    _ => None,
+                }),
+                state.journal.is_some(),
+                budget,
+                AT,
+            )?,
+            PendingJudgment::NewExpm1(value) => state.intern.prepare_virtual_insert_bytes(
+                &value.key,
+                pending[..slot].iter().filter_map(|entry| match entry {
+                    PendingJudgment::NewEnclosure(prior) => Some(prior.key.as_slice()),
+                    PendingJudgment::NewExpm1(prior) => Some(prior.key.as_ref()),
+                    _ => None,
+                }),
+                state.journal.is_some(),
+                budget,
+                AT,
+            )?,
+            _ => unreachable!("fresh entry matched above"),
+        };
+        let id = LogicalId {
+            kind: VertexKind::AnonymousLemma,
+            serial: first
+                .checked_add(
+                    u64::try_from(fresh).map_err(|_| Fault::capacity(BudgetKind::Vertices, AT))?,
+                )
+                .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?,
+        };
+        let Err(base) = state.indices.find(&id, 0, budget, AT)? else {
+            return Err(invalid());
+        };
+        let index_position = base
+            .checked_add(fresh)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?;
+        state.indices.prepare_virtual_insert(
+            state
+                .indices
+                .len()
+                .checked_add(fresh)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?,
+            index_position,
+            state.journal.is_some(),
+            budget,
+            AT,
+        )?;
+        let (retained_position, retained_next) = if let Some((position, next)) = count_slot {
+            budget.work(2, AT)?;
+            (position, next)
+        } else {
+            state.prepare_retain(VertexKind::AnonymousLemma, budget)?
+        };
+        count_slot = Some((
+            retained_position,
+            retained_next
+                .checked_add(1)
+                .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?,
+        ));
+        let (intern_key, undo) = match entry {
+            PendingJudgment::NewScalar(value) => (
+                None,
+                Undo::ScalarJudgment {
+                    id,
+                    key: Arc::clone(&value.key),
+                },
+            ),
+            PendingJudgment::NewPi(value) => (
+                None,
+                Undo::PiJudgment {
+                    id,
+                    certificate: Arc::clone(&value.certificate),
+                },
+            ),
+            PendingJudgment::NewEnclosure(value) => (
+                Some(copy_key(&value.key)?),
+                Undo::Vertex {
+                    id,
+                    key: Some(copy_key(&value.key)?),
+                    policy: None,
+                },
+            ),
+            PendingJudgment::NewExpm1(value) => (
+                Some(Arc::clone(&value.key).into()),
+                Undo::Vertex {
+                    id,
+                    key: Some(Arc::clone(&value.key).into()),
+                    policy: None,
+                },
+            ),
+            _ => unreachable!("fresh entry matched above"),
+        };
+        plans.push(PublicationPlan::New(NewPlan {
+            id,
+            index_position,
+            retained_position,
+            retained_next,
+            key_position,
+            sources,
+            intern_key,
+            undo: Some(undo),
+        }));
+        fresh = fresh
+            .checked_add(1)
+            .ok_or_else(|| Fault::capacity(BudgetKind::Vertices, AT))?;
+    }
+    Ok(plans)
 }
 
 /// All fallible bounds and original references precede the first graph edit.
@@ -262,44 +495,27 @@ fn preflight(
     }
     for entry in pending {
         match entry {
-            PendingJudgment::NewEnclosure(inventory) => {
-                for id in inventory.scope {
-                    cas.state.node(id)?;
-                }
+            PendingJudgment::NewEnclosure(_) | PendingJudgment::NewExpm1(_) => {
                 let total = cas.state.judgment_bytes.saturating_add(bytes);
                 budget.check(BudgetKind::OutputBytes, total, AT)?;
                 let unregistered = cas.judgment_reservation(total, budget, AT)?;
                 budget.check(BudgetKind::StagedPayloadBytes, unregistered, AT)?;
             }
             PendingJudgment::RecheckedEnclosure(id) => {
-                cas.enclosure_inventory(*id)?;
-            }
-            PendingJudgment::NewExpm1(inventory) => {
-                for id in inventory.scope {
-                    cas.state.node(id)?;
-                }
-                let total = cas.state.judgment_bytes.saturating_add(bytes);
-                budget.check(BudgetKind::OutputBytes, total, AT)?;
-                let unregistered = cas.judgment_reservation(total, budget, AT)?;
-                budget.check(BudgetKind::StagedPayloadBytes, unregistered, AT)?;
+                cas.enclosure_inventory(*id, budget)?;
             }
             PendingJudgment::RecheckedExpm1(id) => {
-                cas.expm1_inventory(*id)?;
+                cas.expm1_inventory(*id, budget)?;
             }
-            PendingJudgment::NewScalar(inventory) => {
-                for id in inventory.scope {
-                    cas.state.node(id)?;
-                }
-            }
+            PendingJudgment::NewScalar(_) => {}
             PendingJudgment::NewPi(inventory) => {
-                cas.state.expression(inventory.original)?;
                 let _validated = inventory.certificate.canonical_key()?;
             }
             PendingJudgment::RecheckedPi(id) => {
-                cas.pi_inventory(*id)?;
+                cas.pi_inventory(*id, budget)?;
             }
             PendingJudgment::RecheckedScalar(id) => {
-                cas.scalar_lemma(*id)?;
+                cas.scalar_lemma(*id, budget)?;
             }
         }
     }
@@ -307,9 +523,11 @@ fn preflight(
 }
 
 /// The already checked payload moves once into the authoritative graph after complete preflight.
-fn append(cas: &mut Cas, id: LogicalId, inventory: ScalarInventory) {
+fn append(cas: &mut Cas, inventory: ScalarInventory, plan: &NewPlan) {
     let state: &mut State = &mut cas.state;
-    let [original, context, family] = inventory.scope.map(|id| state.indices[&id]);
+    let [Some(original), Some(context), Some(family)] = plan.sources else {
+        unreachable!("preflight resolved scalar scope")
+    };
     let key = Arc::clone(&inventory.key);
     let bytes = inventory.bytes;
     let citation = EdgeIndex::new(state.graph.edge_count() + 3);
@@ -327,9 +545,17 @@ fn append(cas: &mut Cas, id: LogicalId, inventory: ScalarInventory) {
     state.graph.add_edge(index, context, Edge::InContext);
     state.graph.add_edge(index, family, Edge::Input(1));
     state.graph.add_edge(original, index, Edge::CheckedEvidence);
-    state.indices.insert(id, index);
-    state.scalar_judgments.insert(key, id);
-    state.retain(VertexKind::AnonymousLemma);
+    state
+        .indices
+        .insert_prepared(plan.index_position, plan.id, index);
+    state
+        .scalar_judgments
+        .insert_prepared(plan.key_position, key, plan.id);
+    state.retain_prepared(
+        VertexKind::AnonymousLemma,
+        plan.retained_position,
+        plan.retained_next,
+    );
     state.payload = state.payload.saturating_add(bytes);
     state.judgment_bytes = state.judgment_bytes.saturating_add(bytes);
     state.judgment_count += 1;

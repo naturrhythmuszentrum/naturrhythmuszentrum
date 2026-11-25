@@ -42,7 +42,7 @@ impl AxisPhaseCase {
             context: spec.context.clone(),
             rule: Primitive::ContextHypothesis,
             conclusion: Statement::PredicateFact {
-                region: builder.cas.admissible_region(&spec.context)?,
+                region: builder.cas.admissible_region(&spec.context, budget)?,
                 predicate,
             },
             premises: Vec::new(),
@@ -104,10 +104,10 @@ fn check(
     if actual != *expected {
         return Err(DecisionError::Target);
     }
-    let header = cas.context_header(&spec.context)?;
+    let header = cas.context_header(&spec.context, budget)?;
     for term in [&spec.coordinate, &spec.target] {
         let syntax = cas.describe_syntax(term, budget)?;
-        let (_, sort) = cas.expression(term)?;
+        let (_, sort) = cas.expression(term, budget)?;
         if syntax.header != header
             || !syntax.scope.is_empty()
             || syntax.binding.is_some()
@@ -116,7 +116,10 @@ fn check(
             return Err(DecisionError::Case);
         }
     }
-    if !matches!(cas.expression(&spec.coordinate)?.0, Operator::Free(_)) {
+    if !matches!(
+        cas.expression(&spec.coordinate, budget)?.0,
+        Operator::Free(_)
+    ) {
         return Err(DecisionError::Case);
     }
     Ok(())

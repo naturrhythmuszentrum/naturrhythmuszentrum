@@ -17,9 +17,12 @@ use crate::testing::solve_graph::{Fixture, admit, expression};
 /// ´test:crate:elementary-preserves-residuals´
 #[test]
 fn elementary_preserves_residuals() -> TestResult {
+    let mut budget = crate::testing::common::default_budget()?;
     let mut fixture = Fixture::new()?;
     let (cancel_step, one) = cancellation(&mut fixture)?;
-    let region = fixture.cas.admissible_region(&fixture.context)?;
+    let region = fixture
+        .cas
+        .admissible_region(&fixture.context, &mut budget)?;
     let member_step = membership(&mut fixture, one, region)?;
     let checked = fixture.cas.check_proof(
         &fixture.context,
@@ -35,6 +38,7 @@ fn elementary_preserves_residuals() -> TestResult {
 fn cancellation(
     fixture: &mut crate::testing::solve_graph::Fixture,
 ) -> TestResult<(ApplicationDraft, crate::graph::Handle)> {
+    let mut budget = crate::testing::common::default_budget()?;
     let scalar = Sort::Value(AtomicSort::Scalar(Field::Real));
     let x = admit(
         &mut fixture.cas,
@@ -63,7 +67,9 @@ fn cancellation(
             vec![Reference::Existing(x.clone()), Reference::Existing(x)],
         ),
     )?;
-    let region = fixture.cas.admissible_region(&fixture.context)?;
+    let region = fixture
+        .cas
+        .admissible_region(&fixture.context, &mut budget)?;
     let cancellation = ApplicationDraft {
         rule: crate::rule::Primitive::Cancel,
         context: fixture.context.clone(),
@@ -86,7 +92,9 @@ fn membership(
     one: crate::graph::Handle,
     region: crate::graph::Handle,
 ) -> TestResult<ApplicationDraft> {
-    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem)? else {
+    let mut budget = crate::testing::common::default_budget()?;
+    let SolveView::SolveProblem(problem) = fixture.cas.solve_view(&fixture.problem, &mut budget)?
+    else {
         return Err("missing problem".into());
     };
     let coordinates = problem.unknowns.clone();

@@ -184,7 +184,7 @@ fn work_refusal<P: Scalar>(error: &QuantityError<P>, limit: u64, needed: u64) ->
 
 /// Each boundary has a fresh context; warm trials retain one successful import first.
 fn import_boundary<P: Scalar + 'static>() -> TestResult {
-    for (warm, needed) in [(false, 11_016), (true, 7_995)] {
+    for (warm, needed) in [(false, 11_061), (true, 8_040)] {
         for limit in [needed, needed - 1] {
             let context = context()?;
             let source = ratio(&context, 1, 3)?;
@@ -247,7 +247,7 @@ fn import_boundary<P: Scalar + 'static>() -> TestResult {
 fn quantity_count_ratio_materialization_work() -> TestResult {
     import_boundary::<f32>()?;
     import_boundary::<f64>()?;
-    for limit in [7_901, 7_900] {
+    for limit in [7_946, 7_945] {
         let context = context()?;
         let source = ratio(&context, 1, 3)?;
         let mut heap = Heap::new(HeapLimits::new(6, 6, 2))?;
@@ -261,14 +261,14 @@ fn quantity_count_ratio_materialization_work() -> TestResult {
             ..Limits::default()
         })?;
         let result = context.add(&mut heap, &input, &input, &mut budget);
-        if limit == 7_901 {
+        if limit == 7_946 {
             assert_eq!(result?.count_ratio_sources().len(), 2);
-            assert_eq!(budget.usage().work, 7_901);
+            assert_eq!(budget.usage().work, 7_946);
         } else {
             let Err(fault) = result else {
                 panic!("one-below sum Work must refuse");
             };
-            work_refusal(&fault, 7_900, 7_901)?;
+            work_refusal(&fault, 7_945, 7_946)?;
             assert!(budget.usage().work > 0);
             assert!(budget.usage().work <= limit);
             context.add(

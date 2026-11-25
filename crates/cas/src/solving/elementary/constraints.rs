@@ -59,7 +59,7 @@ impl Constraints {
         pending.push(root);
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            let (kind, arguments) = super::evidence::predicate(evaluation.cas, id)?;
+            let (kind, arguments) = super::evidence::predicate(evaluation.cas, id, budget)?;
             match (kind, arguments) {
                 (PredicateKind::And, _) => {
                     reserve(&mut pending, arguments.len(), budget)?;
@@ -107,7 +107,7 @@ impl Constraints {
         pending.push(root);
         while let Some(id) = pending.pop() {
             budget.work(1, AT)?;
-            match &evaluation.cas.state.region(id)?.expression {
+            match &evaluation.cas.state.region(id, budget)?.expression {
                 RegionExpr::Ambient => {}
                 RegionExpr::GuardTrue { base, predicate } => {
                     self.predicate(evaluation, *predicate, budget)?;

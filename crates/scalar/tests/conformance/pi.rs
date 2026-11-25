@@ -10,7 +10,7 @@ use num_traits::{One, Signed, Zero};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
-const fn budget() -> PiBudget {
+const fn fresh_budget() -> PiBudget {
     PiBudget::new(PiLimits {
         work: 100_000,
         steps: 100,
@@ -75,11 +75,11 @@ fn check<P: Binary>(result: PiEnclosure<P>, tolerance: P) {
 fn pi_independent_rational_bounds() -> TestResult {
     let context = ArithmeticContext::new()?;
     for tolerance in [2.0_f32, 0.01, 0.000_001, 0.000_000_3] {
-        let result = PiEnclosure::new(Finite::new(tolerance)?, &context, &mut budget())?;
+        let result = PiEnclosure::new(Finite::new(tolerance)?, &context, &mut fresh_budget())?;
         check(result, tolerance);
     }
     for tolerance in [2.0_f64, 0.01, 1e-12, 1e-14, 5e-16] {
-        let result = PiEnclosure::new(Finite::new(tolerance)?, &context, &mut budget())?;
+        let result = PiEnclosure::new(Finite::new(tolerance)?, &context, &mut fresh_budget())?;
         check(result, tolerance);
     }
     Ok(())
@@ -91,7 +91,7 @@ fn pi_independent_rational_bounds() -> TestResult {
 #[test]
 fn pi_refinement_is_nested() -> TestResult {
     let context = ArithmeticContext::new()?;
-    let mut ledger = budget();
+    let mut ledger = fresh_budget();
     let mut previous = PiEnclosure::new(Finite::new(2.0_f64)?, &context, &mut ledger)?;
     for tolerance in [0.1_f64, 0.001, 1e-8, 1e-12, 5e-16] {
         let result = PiEnclosure::new(Finite::new(tolerance)?, &context, &mut ledger)?;
@@ -115,7 +115,7 @@ fn pi_refinement_is_nested() -> TestResult {
 #[test]
 fn pi_tolerance_refusals_are_atomic() -> TestResult {
     let context = ArithmeticContext::new()?;
-    let mut ledger = budget();
+    let mut ledger = fresh_budget();
     PiEnclosure::new(Finite::new(2.0_f64)?, &context, &mut ledger)?;
     assert_eq!(ledger.usage().work, 151);
     for (tolerance, refusal, work, steps) in [
@@ -159,7 +159,7 @@ fn pi_tolerance_refusals_are_atomic() -> TestResult {
 #[test]
 fn pi_zero_resource_refusals() -> TestResult {
     let context = ArithmeticContext::new()?;
-    let limits = budget().limits();
+    let limits = fresh_budget().limits();
     for (policy, refusal) in [
         (PiLimits { work: 0, ..limits }, PiError::WorkLimit),
         (PiLimits { steps: 0, ..limits }, PiError::StepLimit),

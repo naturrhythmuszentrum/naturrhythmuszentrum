@@ -19,9 +19,13 @@ use crate::solving::{
 impl Leaf<'_> {
     /// The actual original unknown and equation remain the subjects of every coverage identity.
     pub(crate) fn source(&mut self) -> Result<(Handle, Handle), CoefficientFailure> {
-        let original = crate::solving::elementary::proof::problem(self.cas, self.problem)?;
-        let coordinates =
-            crate::solving::elementary::proof::coordinates(self.cas, &original.unknowns)?;
+        let original =
+            crate::solving::elementary::proof::problem(self.cas, self.problem, self.budget)?;
+        let coordinates = crate::solving::elementary::proof::coordinates(
+            self.cas,
+            &original.unknowns,
+            self.budget,
+        )?;
         let [coordinate] = coordinates.coordinates.as_slice() else {
             return Err(invalid().into());
         };
@@ -34,6 +38,7 @@ impl Leaf<'_> {
             crate::solving::elementary::evidence::predicate(
                 self.cas,
                 original.predicate.logical_id(),
+                self.budget,
             )?
         else {
             return Err(invalid().into());
@@ -77,7 +82,8 @@ impl Leaf<'_> {
 
     /// One finite branch retains the original solution domain and exact tuple coordinate frame.
     pub(crate) fn set(&mut self, entries: &[Handle]) -> Result<Handle, CoefficientFailure> {
-        let original = crate::solving::elementary::proof::problem(self.cas, self.problem)?;
+        let original =
+            crate::solving::elementary::proof::problem(self.cas, self.problem, self.budget)?;
         let (coordinates, domain) = (original.unknowns.clone(), original.domain.clone());
         let mut tuples = vector(entries.len(), self.budget)?;
         for entry in entries {
