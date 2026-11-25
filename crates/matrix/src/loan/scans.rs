@@ -447,6 +447,8 @@ impl Heap {
                 }
                 return Ok(());
             }
+            AllocationKind::DyadicOwner { witness, .. } => witness.strong_count() == 0,
+            AllocationKind::DyadicUse(witness) => witness.strong_count() == 0,
             AllocationKind::Constant(witness) => {
                 if debit.owner != DebitOwner::Constant(self.scope)
                     || debit.key == 0
@@ -469,13 +471,28 @@ impl Heap {
             | AllocationKind::Pin
             | AllocationKind::Filled => return Ok(()),
         };
-        let DebitOwner::Prepared(identity) = debit.owner else {
-            return Err(LoanError::WrongLoan);
+        #[expect(
+            clippy::manual_let_else,
+            reason = "explicit kind-owner family pairing is the admission rule"
+        )]
+        let identity = match (&debit.kind, debit.owner) {
+            (
+                AllocationKind::PreparedOwner { .. } | AllocationKind::PreparedUse(_),
+                DebitOwner::Prepared(identity),
+            )
+            | (
+                AllocationKind::DyadicOwner { .. } | AllocationKind::DyadicUse(_),
+                DebitOwner::Dyadic(identity),
+            ) => identity,
+            _ => return Err(LoanError::WrongLoan),
         };
         if identity.scope != self.scope || identity.owner == 0 || identity.account == 0 {
             return Err(LoanError::WrongLoan);
         }
-        if matches!(debit.kind, AllocationKind::PreparedOwner { .. }) && debit.key != identity.owner
+        if matches!(
+            debit.kind,
+            AllocationKind::PreparedOwner { .. } | AllocationKind::DyadicOwner { .. }
+        ) && debit.key != identity.owner
         {
             return Err(LoanError::WrongLoan);
         }

@@ -33,6 +33,7 @@ mod payload;
 pub(crate) mod preparation;
 mod reader;
 mod registry;
+mod retained_dyadic_power;
 mod retained_expm1;
 mod scans;
 
@@ -56,6 +57,9 @@ pub use registry::{
     QualifiedMaskVersion,
 };
 pub(crate) use registry::{ManagedDescriptor, Registry};
+pub use retained_dyadic_power::{
+    RetainedDyadicPower, RetainedDyadicPowerError, RetainedDyadicPowerInventory,
+};
 pub use retained_expm1::{RetainedExpm1, RetainedExpm1Error, RetainedExpm1Inventory};
 pub use scans::{Residence, ScanCursor, ScanOutcome};
 

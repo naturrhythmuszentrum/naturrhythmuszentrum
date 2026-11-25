@@ -80,6 +80,8 @@ impl Heap {
                             | AllocationKind::LcPending { .. }
                             | AllocationKind::LcBundle(_)
                             | AllocationKind::LcUse { .. }
+                            | AllocationKind::DyadicOwner { .. }
+                            | AllocationKind::DyadicUse(_)
                             | AllocationKind::Constant(_) => return Err(LoanError::WrongLoan),
                         };
                         *total = total

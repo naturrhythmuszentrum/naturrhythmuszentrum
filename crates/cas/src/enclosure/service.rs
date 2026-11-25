@@ -175,7 +175,7 @@ fn replay(
         )?;
         let key = retention_key(&prefix, certificate, budget)?;
         boundary(budget, interrupt)?;
-        budget.work(super::footprint(&checked), AT)?;
+        budget.work(checked.retained_bytes(), AT)?;
         cas.retain_enclosure(key, checked.clone(), budget)?;
         Ok((checked, decision))
     });
@@ -376,7 +376,7 @@ fn round(
         let prefix = prefix(&scope, grid, policy.precision + 2, budget)?;
         if let Some(checked) = cas.retained_enclosure(&prefix, budget)? {
             analytic_policy(&checked.certificate, policy, budget)?;
-            let bytes = super::footprint(checked);
+            let bytes = checked.retained_bytes();
             budget.check(BudgetKind::OutputBytes, bytes, AT)?;
             budget.check(BudgetKind::StagedPayloadBytes, bytes.saturating_mul(2), AT)?;
             for record in &checked.certificate.records {
@@ -421,7 +421,7 @@ fn round(
         let decision = decide(&checked, policy.precision, budget)?;
         boundary(budget, interrupt)?;
         let key = retention_key(&prefix, &certificate, budget)?;
-        budget.work(super::footprint(&checked), AT)?;
+        budget.work(checked.retained_bytes(), AT)?;
         cas.retain_enclosure(key, checked.clone(), budget)?;
         Ok((checked, decision))
     })

@@ -1961,6 +1961,8 @@ The LC two/one-term certificate costs 17,502 Work for its first in-place validat
 
 **Rule (Checked decisions and stopping)** · `rule:cas:enclosure-outcomes`
 
+`CheckedEnclosure::retained_bytes` reports the existing CAS `enclosure::footprint` size of the returned checked receipt as data, not inclusion evidence; carrying it adds no traversal or Work charge.
+
 `Cas::enclose` and `Cas::check_enclosure` require mutable CAS access. Proved and Refuted describe a completely checked predicate or its negation; overlapping bounds are Undecided with Straddle, never equality. Width-only success returns Bound without a predicate verdict. `WidthLimit` and `WorkExhausted` preserve an earlier checked bound; exhaustion before one returns Exhausted without evidence. Cooperative interruption is observed at charged boundaries and returns Interrupted without a verdict. Invalid certificates refuse. Reports retain the achieved precision, completed rounds, consumed Work, cumulative ledger and the exact resource fault when a ceiling stops evaluation. A caller with only shared CAS access cannot invoke either entry point; there is no side-table evaluation route (`test:unit:enclosure-honest-outcomes`), (`test:unit:enclosure-interruption-rollback`).
 
 **Theorem (Rational enclosure inclusion)** · `thm:cas:enclosure-rational-inclusion`

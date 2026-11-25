@@ -54,12 +54,14 @@ pub mod benchmark;
 
 mod lc_relation;
 mod prepared_constant;
+pub(crate) mod prepared_dyadic_power;
 #[expect(
     clippy::redundant_pub_crate,
     reason = "owned preparation parts are shared with managed law retention"
 )]
 mod prepared_expm1;
 pub use prepared_constant::{ConstantImport, PreparedConstant, PreparedConstantError};
+pub use prepared_dyadic_power::{DyadicPowerEvaluation, PreparedDyadicPowerError};
 pub use prepared_expm1::{ExpEvaluation, ExpPreparationPolicy, PreparedExp, PreparedExpError};
 pub use prepared_expm1::{Expm1Evaluation, PreparedExpm1, PreparedExpm1Error};
 pub use prepared_expm1::{
@@ -139,6 +141,10 @@ mod loan_twins;
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/retained_expm1_twins.rs"]
 mod retained_expm1_twins;
+
+#[cfg(any(doc, doctest))]
+#[path = "../tests/conformance/retained_dyadic_power_twins.rs"]
+mod retained_dyadic_power_twins;
 
 #[cfg(any(doc, doctest))]
 #[path = "../tests/conformance/type_twins.rs"]
