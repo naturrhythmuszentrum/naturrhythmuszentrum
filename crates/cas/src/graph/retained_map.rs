@@ -8,7 +8,7 @@ use std::mem::size_of;
 use crate::budget::{Budget, BudgetKind};
 use crate::error::{Fault, Location};
 
-/// (`inv:nrz:cas-backend-target-coverage`) requires an installed backing with n
+/// `inv:nrz:cas-backend-target-coverage` requires an installed backing with n
 /// live entries to have capacity at least target(n). An empty vector may have no backing.
 /// Binary search preserves strict sorted uniqueness; every comparator runs only
 /// after the caller's cumulative lookup tariff has been charged.
