@@ -33,6 +33,10 @@ Use one of these nine types:
 
 Generated renders travel with their cause under the cause's type (`rule:nrz:generated-artifacts-with-causes`). Subjects starting with `squash:` never ship; fold working squashes before shipping (`rule:nrz:fold-working-squashes`). The body must remain non-empty after ignoring blank lines and `Co-Authored-By:`, `Signed-off-by:`, and `Reviewed-by:` trailers; trailers alone do not explain why the change is needed.
 
+**Rule (Public text names the work)** · `rule:nrz:public-text-names-work`
+
+Tracked files, commit subjects and bodies, and forge issues, comments and pull requests describe the work itself. Do not carry lane, run, round, step, review-finding, diagnostic-run, gate or candidate identifiers, ordinal schedule codes, or relative pointers to an earlier sweep or a later search effort into those surfaces. Such names become stale when the process advances and give an outside reader scheduling context instead of an enduring explanation, as described by the estate environment rulebook's rule ``rule:environment:process-names-stay-in-process-records`` and principle (`[ORCHESTRATION-prin:environment:timeless-on-its-merits]`). Name a change by what it does, a commit id or a stable label, including a plan's `step:nrz:…` label. Retain a measured result with its scope, date and commit while removing only the process name for its measurement. A name that belongs to the product, such as a program diagnostic code or a fixture named for the behavior it reproduces, remains valid.
+
 **Rule (Generated artifacts accompany their causes)** · `rule:nrz:generated-artifacts-with-causes`
 
 Renders, derived datasets, and the lock file belong in the commit that causes them to change. During import, a server-generated lock file is amended into the commit that changed dependencies. Keeping causes and generated effects together makes each commit reproducible and prevents a later repair commit from supplying evidence missing from its predecessor (`rule:vision:meaningful-commit-series`), (`rule:vision:fixed-point-gate-and-bootstrap`), (`alg:nrz:import-commit-series`).
