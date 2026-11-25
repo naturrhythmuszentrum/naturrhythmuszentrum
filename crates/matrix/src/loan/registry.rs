@@ -166,6 +166,15 @@ pub(super) enum AllocationKind {
     },
     /// Each charged law-use header has its own expiration witness.
     PreparedUse(Weak<super::retained_expm1::PreparedExpm1UseRecord>),
+    /// Unique frozen dyadic-power owner with one combined allowance locator.
+    DyadicOwner {
+        /// Expiration only; no registry path upgrades this witness.
+        witness: Weak<super::retained_dyadic_power::PreparedDyadicPowerOwner>,
+        /// Checked-result allowance plus retained proof and key capacities.
+        allowance: usize,
+    },
+    /// One independently funded dyadic-power use header.
+    DyadicUse(Weak<super::retained_dyadic_power::PreparedDyadicPowerUseRecord>),
     /// Shared source-free numerical constant, observed only for expiration and pointer identity.
     Constant(Weak<dyn std::any::Any>),
     /// Pending LC allocations share the final liveness witness.
@@ -198,6 +207,8 @@ pub(super) enum DebitOwner {
     LcApplication(LcDebitIdentity),
     /// Heap/account/owner identity, without fictitious numerical occupations.
     Prepared(super::retained_expm1::LawIdentity),
+    /// Heap/account/owner identity of a retained dyadic power.
+    Dyadic(super::retained_expm1::LawIdentity),
     /// Heap scope for an adopted immutable numerical constant, without bundle authority.
     Constant(u64),
     /// A funded LC join without a fictitious numerical occupation.

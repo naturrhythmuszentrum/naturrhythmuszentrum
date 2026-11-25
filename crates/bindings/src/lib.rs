@@ -33,6 +33,7 @@ mod declaration;
 mod descriptor;
 mod diagnostic;
 mod dimension;
+mod dyadic_power;
 mod engine;
 mod error;
 #[expect(
@@ -72,6 +73,7 @@ mod registry;
 mod sensitivity;
 
 pub use constants::{ExpressionEnclosure, ExpressionEnclosureError};
+pub use dyadic_power::{DyadicPowerPreparation, DyadicPowerPreparationError};
 pub use nrz_cas::{ExactConstant, PositiveConstant};
 
 pub use nrz_cas::limits::{Budget, Limits, LimitsOverride};

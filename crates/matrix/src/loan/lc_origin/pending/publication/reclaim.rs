@@ -43,6 +43,8 @@ pub(in crate::loan) fn debit(
         | AllocationKind::Filled
         | AllocationKind::PreparedOwner { .. }
         | AllocationKind::PreparedUse(_)
+        | AllocationKind::DyadicOwner { .. }
+        | AllocationKind::DyadicUse(_)
         | AllocationKind::Constant(_)
         | AllocationKind::LcPending { .. }
         | AllocationKind::LcClosure(_)

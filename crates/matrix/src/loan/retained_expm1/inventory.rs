@@ -76,6 +76,8 @@ impl Heap {
                             | AllocationKind::LcPending { .. }
                             | AllocationKind::LcBundle(_)
                             | AllocationKind::LcUse { .. }
+                            | AllocationKind::DyadicOwner { .. }
+                            | AllocationKind::DyadicUse(_)
                             | AllocationKind::Constant(_)
                             | AllocationKind::Numerical
                             | AllocationKind::Tracking
