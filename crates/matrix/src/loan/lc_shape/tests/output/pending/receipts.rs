@@ -168,7 +168,7 @@ pub(super) fn check<P: Scalar + 'static>() -> TestResult {
         s.account.ledger.work(consume, crate::loan::AT)?;
         let before = s.account.usage().work;
         let receipts = Arc::new(Mutex::new(Vec::new()));
-        tracing::subscriber::with_default(
+        crate::observer_dispatch::with_observer(
             Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
             || -> TestResult {
                 let result = prepared.admit(&mut s.heap, selected, &mut s.account);
@@ -257,7 +257,7 @@ fn abandonment<P: Scalar + 'static>(short: bool) -> TestResult {
     let before = s.account.usage().work;
     drop(pending);
     let receipts = Arc::new(Mutex::new(Vec::new()));
-    let outcome = tracing::subscriber::with_default(
+    let outcome = crate::observer_dispatch::with_observer(
         Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
         || s.heap.reconcile_detached(&mut s.account, 1, Some(cursor)),
     );
@@ -308,7 +308,7 @@ pub(in crate::loan::lc_shape::tests::output) fn traversal<T>(
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let [application, before, readiness, evaluation, demanded] = expected;
     let receipts = Arc::new(Mutex::new(Vec::new()));
-    let result = tracing::subscriber::with_default(
+    let result = crate::observer_dispatch::with_observer(
         Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
         run,
     );
@@ -376,7 +376,7 @@ pub(in crate::loan::lc_shape::tests::output) fn publication<T>(
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
     let receipts = Arc::new(Mutex::new(Vec::new()));
-    let result = tracing::subscriber::with_default(
+    let result = crate::observer_dispatch::with_observer(
         Observer(Arc::clone(&receipts), Mutex::new(Vec::new())),
         run,
     );

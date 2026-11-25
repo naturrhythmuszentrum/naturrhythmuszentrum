@@ -13,6 +13,8 @@ use nrz_matrix::{Expm1Evaluation, PreparedExpm1, sampling::*};
 use nrz_scalar::{ArithmeticContext, Expm1Failure, Expm1Input, Expm1Output};
 use std::{cell::Cell, time::Duration};
 use support::{Fixture, TestResult, broad, ledger};
+#[path = "../src/testing/observer_dispatch.rs"]
+mod observer_dispatch;
 
 #[path = "host_sampling/controls.rs"]
 mod controls;

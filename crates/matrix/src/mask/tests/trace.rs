@@ -169,13 +169,14 @@ fn mask_shared_ledger_boundary_receipts() -> TestResult {
     let (mut heap, layout, _, _) = fixture(65)?;
     let state = Arc::new(Mutex::new(State::default()));
     let subscriber = Observer(Arc::clone(&state));
-    let observed_work = tracing::subscriber::with_default(subscriber, || -> TestResult<u64> {
-        let mut budget = Budget::new(Limits::default())?;
-        budget.with_work_phase("cas", "enclosing CAS", |budget| {
-            heap.create_mask(layout, &[1, 64], budget)
+    let observed_work =
+        crate::observer_dispatch::with_observer(subscriber, || -> TestResult<u64> {
+            let mut budget = Budget::new(Limits::default())?;
+            budget.with_work_phase("cas", "enclosing CAS", |budget| {
+                heap.create_mask(layout, &[1, 64], budget)
+            })?;
+            Ok(budget.usage().work)
         })?;
-        Ok(budget.usage().work)
-    })?;
     let state = state
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -233,7 +234,7 @@ fn loan_original_ledger_observation_does_not_change_work() -> TestResult {
     let (mut heap, mut account, declaration) = loan_fixture()?;
     let state = Arc::new(Mutex::new(State::default()));
     let subscriber = Observer(Arc::clone(&state));
-    let observed = tracing::subscriber::with_default(subscriber, || {
+    let observed = crate::observer_dispatch::with_observer(subscriber, || {
         loan_phases(&mut heap, &mut account, declaration)
     })?;
     let state = state
@@ -346,7 +347,7 @@ fn mask_transport_ledger_receipts() -> TestResult {
     )?;
     let state = Arc::new(Mutex::new(State::default()));
     let subscriber = Observer(Arc::clone(&state));
-    tracing::subscriber::with_default(subscriber, || -> TestResult {
+    crate::observer_dispatch::with_observer(subscriber, || -> TestResult {
         let mut budget = Budget::new(Limits::default())?;
         heap.transport_mask(source, target, &mut budget)?;
         // Two authenticators, three occupied slots, two zeroes, two copies, one scan.

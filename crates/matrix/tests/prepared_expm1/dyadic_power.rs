@@ -659,7 +659,7 @@ fn scalar_dyadic_power_observation() -> TestResult {
     static DISPATCHERS: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
     let observer = PowerObserver::default();
-    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+    observer_dispatch::with_observer(observer.clone(), || -> TestResult {
         let context = ArithmeticContext::new()?;
         let ordinary = DyadicPowerProgram::new([f64::MIN_POSITIVE, 2.0], 3, 4, LIMITS, &context)?;
         let costly = DyadicPowerProgram::new(

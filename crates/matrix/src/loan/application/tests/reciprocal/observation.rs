@@ -197,8 +197,9 @@ fn reciprocal_observation_preserves_work_and_native_reuse() -> TestResult {
     crate::loan::fault::reset_reads();
     crate::loan::fault::reset_scalars();
     crate::loan::fault::reset_stores();
-    let owner =
-        tracing::subscriber::with_default(subscriber, || candidate(owner, &mut setup.account))?;
+    let owner = crate::observer_dispatch::with_observer(subscriber, || {
+        candidate(owner, &mut setup.account)
+    })?;
     let observed = (
         setup.account.usage().work - before,
         format!("{:?}", owner.core.evidence.outcomes),

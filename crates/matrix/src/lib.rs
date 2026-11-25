@@ -384,6 +384,10 @@ mod phasor_testing;
 )]
 mod phasor_solve_testing;
 
+#[cfg(test)]
+#[path = "testing/observer_dispatch.rs"]
+mod observer_dispatch;
+
 #[expect(
     clippy::redundant_pub_crate,
     reason = "private allocation authority is shared by numerical kernels and publication"

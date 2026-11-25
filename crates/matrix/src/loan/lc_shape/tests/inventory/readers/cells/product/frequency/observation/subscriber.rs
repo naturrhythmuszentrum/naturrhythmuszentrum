@@ -130,5 +130,8 @@ pub(super) fn measured<T>(enabled: bool, run: impl FnOnce() -> T) -> (T, Arc<Mut
         enabled,
         records: Arc::clone(&records),
     };
-    (tracing::subscriber::with_default(observer, run), records)
+    (
+        crate::observer_dispatch::with_observer(observer, run),
+        records,
+    )
 }

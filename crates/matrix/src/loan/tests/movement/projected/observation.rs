@@ -74,9 +74,10 @@ fn loan_projected_unary_work_phases() -> TestResult {
         };
         let operations = Arc::new(Mutex::new(Operations::default()));
         let before = account.usage().work;
-        let owner = tracing::subscriber::with_default(Observer(Arc::clone(&operations)), || {
-            candidate(owner, &mut account)
-        })?;
+        let owner =
+            crate::observer_dispatch::with_observer(Observer(Arc::clone(&operations)), || {
+                candidate(owner, &mut account)
+            })?;
         assert_eq!(account.usage().work - before, 78);
         let operations = operations
             .lock()
@@ -103,7 +104,7 @@ fn loan_projected_affine_work_phases() -> TestResult {
     let prelude = super::affine::prelude::<f64>(1, &mut account.ledger)?;
     super::affine::operation(&mut request, &prelude)?;
     let admission = Arc::new(Mutex::new(Operations::default()));
-    let result = tracing::subscriber::with_default(Observer(Arc::clone(&admission)), || {
+    let result = crate::observer_dispatch::with_observer(Observer(Arc::clone(&admission)), || {
         heap.request_projected_affine(request, &mut account)
     });
     assert!(
@@ -122,7 +123,7 @@ fn loan_projected_affine_work_phases() -> TestResult {
     };
     let operations = Arc::new(Mutex::new(Operations::default()));
     let before = account.usage().work;
-    let owner = tracing::subscriber::with_default(Observer(Arc::clone(&operations)), || {
+    let owner = crate::observer_dispatch::with_observer(Observer(Arc::clone(&operations)), || {
         candidate(owner, &mut account)
     })?;
     assert_eq!(account.usage().work - before, 115);
@@ -154,20 +155,21 @@ fn loan_affine_prelude_work_phases() -> TestResult {
     let definitions = super::affine::definitions(0)?;
     let operations = Arc::new(Mutex::new(Operations::default()));
     let before = budget.usage().work;
-    let _prelude = tracing::subscriber::with_default(Observer(Arc::clone(&operations)), || {
-        crate::AffinePrelude::new(
-            definitions,
-            &circle,
-            &nrz_bindings::LimitsOverride {
-                staged_payload_bytes: Some(65_536),
-                output_bytes: Some(16_384),
-                ..nrz_bindings::LimitsOverride::default()
-            },
-            nrz_scalar::LiteralLimits::default(),
-            &context,
-            &mut budget,
-        )
-    })?;
+    let _prelude =
+        crate::observer_dispatch::with_observer(Observer(Arc::clone(&operations)), || {
+            crate::AffinePrelude::new(
+                definitions,
+                &circle,
+                &nrz_bindings::LimitsOverride {
+                    staged_payload_bytes: Some(65_536),
+                    output_bytes: Some(16_384),
+                    ..nrz_bindings::LimitsOverride::default()
+                },
+                nrz_scalar::LiteralLimits::default(),
+                &context,
+                &mut budget,
+            )
+        })?;
     assert_eq!(budget.usage().work - before, 156);
     let operations = operations
         .lock()

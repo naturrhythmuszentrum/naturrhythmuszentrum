@@ -52,6 +52,8 @@ impl Callsite {
         {
             // Keep the registry on its multi-dispatcher route while registering. Its sole-dispatcher
             // shortcut otherwise queries this thread even when the sole subscriber lives elsewhere.
+            // As with matrix's scoped-observer test rule, an already-running JustOne
+            // registration can still finish after this dispatcher is installed.
             let _registration_dispatch =
                 tracing::Dispatch::new(tracing::subscriber::NoSubscriber::default());
             tracing::callsite::register(self);

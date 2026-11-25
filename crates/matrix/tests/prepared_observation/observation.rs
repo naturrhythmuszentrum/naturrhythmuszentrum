@@ -29,7 +29,7 @@ fn prepared_exp_observed_reuse() -> TestResult {
     use nrz_scalar::ExpInput;
     let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
     let observer = Observer::default();
-    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+    trace::with_observer(observer.clone(), || -> TestResult {
         let mut f = Fixture::new()?;
         let r = broad(&mut f, 40)?;
         let context = ArithmeticContext::new()?;
@@ -150,7 +150,7 @@ fn owner_sigmoid_observed_reuse() -> TestResult {
     use nrz_scalar::SigmoidInput;
     let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
     let observer = Observer::default();
-    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+    trace::with_observer(observer.clone(), || -> TestResult {
         let mut f = Fixture::new()?;
         let r = sigmoid_request(&mut f)?;
         let context = ArithmeticContext::new()?;
@@ -278,7 +278,7 @@ impl tracing::field::Visit for Expm1Construction {
 fn prepared_expm1_observed_reuse() -> TestResult {
     let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
     let observer = Observer::default();
-    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+    trace::with_observer(observer.clone(), || -> TestResult {
         let mut f = Fixture::new()?;
         let r = broad(&mut f, 40)?;
         let context = ArithmeticContext::new()?;
@@ -353,7 +353,7 @@ fn retained_expm1_observed_preparation_and_reuse() -> TestResult {
     let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
     for warm in [false, true] {
         let observer = Observer::default();
-        tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+        trace::with_observer(observer.clone(), || -> TestResult {
             let mut fixture = Fixture::new()?;
             let request = broad(&mut fixture, 40)?;
             let context = ArithmeticContext::new()?;
@@ -560,7 +560,7 @@ fn scalar_tanh_observation() -> TestResult {
         &context,
     )?;
     let observer = Observer::default();
-    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+    trace::with_observer(observer.clone(), || -> TestResult {
         let program = TanhProgram::new(&basis, [0.0, 1.0], 40)?;
         for x in [0.0, 2.0_f64.powi(-60), f64::from_bits(1)] {
             let _result = program.evaluate(
@@ -599,7 +599,7 @@ fn owner_tanh_observed_reuse() -> TestResult {
     use nrz_scalar::TanhInput;
     let _guard = DISPATCHERS.lock().map_err(|_| "subscriber guard")?;
     let observer = Observer::default();
-    tracing::subscriber::with_default(observer.clone(), || -> TestResult {
+    trace::with_observer(observer.clone(), || -> TestResult {
         let mut f = Fixture::new()?;
         let r = tanh_request(&mut f)?;
         let context = ArithmeticContext::new()?;

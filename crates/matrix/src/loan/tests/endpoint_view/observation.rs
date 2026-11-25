@@ -57,10 +57,13 @@ fn loan_endpoint_view_work_phases() -> TestResult {
     let selected = source.masked_view(heap.mask(mask, mask.layout())?, &mut account)?;
     let operations = Arc::new(Mutex::new(Operations::default()));
     let before = account.usage().work;
-    tracing::subscriber::with_default(Observer(Arc::clone(&operations)), || -> TestResult {
-        let reader = selected.into_endpoint_view(&mut account)?;
-        super::oracle(&reader.read_component(0, 0, &mut account)?, [1.0; 3])
-    })?;
+    crate::observer_dispatch::with_observer(
+        Observer(Arc::clone(&operations)),
+        || -> TestResult {
+            let reader = selected.into_endpoint_view(&mut account)?;
+            super::oracle(&reader.read_component(0, 0, &mut account)?, [1.0; 3])
+        },
+    )?;
     assert_eq!(account.usage().work - before, 38);
     let operations = operations
         .lock()

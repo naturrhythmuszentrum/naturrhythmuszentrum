@@ -15,6 +15,8 @@ use nrz_bindings::readings::algebra::syntax::{
 use nrz_bindings::readings::algebra::syntax::{Draft, ExpressionDraft};
 use nrz_bindings::readings::algebra::{Cas, Fault, FaultKind, Handle, Rational, Reference};
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+#[path = "../src/testing/observer_dispatch.rs"]
+mod observer_dispatch;
 fn ledger() -> Result<Budget, Fault> {
     Budget::new(Limits {
         work: 2_000_000_000,

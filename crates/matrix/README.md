@@ -216,6 +216,10 @@ Cached CAS reading and witness dependency inventories are reused on writes. Dire
 
 ## Testing · `sec:matrix:testing`
 
+**Rule (Scoped observer tests)** · `rule:matrix:scoped-observer-tests`
+
+Matrix observer tests install their observer through the shared helper. The helper forces one process-wide no-op dispatcher before installing the observer, so later callsite registrations use tracing-core's dispatcher registry rather than its sole-dispatcher shortcut. This narrows the exposure to the first installation in each test process; it does not exclude a registration already in flight. A thread on `Rebuilder::JustOne` can push a callsite and load the flag as true, then be descheduled while the no-op dispatcher's registration rebuilds interests under the write lock. It can then store `never` from its own default dispatcher: `JustOne` never synchronises with that lock. CAS's registering-side guard relies on the same property and has the same residual window. The library regression checks a callsite first used on another thread: ``test:unit:observer-callsite-registered-on-another-thread``.
+
 Public conformance tests check exact-rational containment, independent square-root/norm oracles, strict domains, stale/foreign handles, alias selections, publication rollback, numerical coverage and exact `N`/`N−1` capacity/work boundaries in both formats. Compile twins enforce category, precision, borrow and checked-state boundaries. Symbol lifecycle tests cover pending/abandoned outputs, wrong owners, complete companion inventories and repeated copies.
 
 Integration acceptance exercises the physical truss and reduced common-source resistor ladder, restored outputs and cross-point covariance. The full five-by-five statistical ladder remains a symbolic-budget refusal; direct mixed numerical admission also refuses. These tests do not stand in for LC execution. Run `cargo test -p nrz-matrix --test public` for public contracts and lifecycles. `docs/records/matrix-core-acceptance.md` records the acceptance environment, measured costs and limits; `src/solve/mod.rs` retains the measurement commands and coverage details.

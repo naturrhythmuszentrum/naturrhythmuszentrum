@@ -4,8 +4,27 @@
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+#[cfg(test)]
+#[path = "../../src/testing/observer_dispatch.rs"]
+mod dispatch;
 #[path = "trace/subscriber.rs"]
 mod subscriber;
+/// Share the scoped-observer dispatcher with sibling test controls.
+#[cfg(test)]
+#[allow(
+    dead_code,
+    reason = "only integration targets with sibling observers use this wrapper"
+)]
+#[allow(
+    clippy::redundant_pub_crate,
+    reason = "sibling observer controls access this private trace module"
+)]
+pub(super) fn with_observer<T, S>(observer: S, run: impl FnOnce() -> T) -> T
+where
+    S: tracing::Subscriber + Send + Sync + 'static,
+{
+    dispatch::with_observer(observer, run)
+}
 /// An exclusive accounting bucket in the existing fixture vocabulary.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Row {
@@ -114,6 +133,9 @@ pub(crate) fn observed<T>(capacity: usize, run: impl FnOnce() -> T) -> (T, Repor
         state: Arc::clone(&state),
         phases: true,
     };
+    #[cfg(test)]
+    let result = dispatch::with_observer(observer, run);
+    #[cfg(not(test))]
     let result = tracing::subscriber::with_default(observer, run);
     let mut state = state
         .lock()

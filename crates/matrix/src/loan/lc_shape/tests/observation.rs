@@ -87,7 +87,7 @@ fn phases<P: nrz_scalar::Scalar + 'static>() -> TestResult {
         &mut account,
     )?;
     let phases = Arc::new(Mutex::new(Vec::<Phase>::new()));
-    tracing::subscriber::with_default(Observer(Arc::clone(&phases)), || {
+    crate::observer_dispatch::with_observer(Observer(Arc::clone(&phases)), || {
         assert!(matches!(
             crate::LcInputShape::<P>::declare(
                 schema.question().clone(),
@@ -132,7 +132,7 @@ fn inventory_phases<P: nrz_scalar::Scalar + 'static>() -> TestResult {
     let question = fixture::inventory_question(true, true, &mut budget)?;
     let mut account = crate::ExecutionAccount::new(budget)?;
     let phases = Arc::new(Mutex::new(Vec::<Phase>::new()));
-    let inventory = tracing::subscriber::with_default(Observer(Arc::clone(&phases)), || {
+    let inventory = crate::observer_dispatch::with_observer(Observer(Arc::clone(&phases)), || {
         crate::LcInputInventory::<P, 5>::declare(&question, [2, 3, 2], &mut account)
     })?;
     {
@@ -159,7 +159,7 @@ fn inventory_phases<P: nrz_scalar::Scalar + 'static>() -> TestResult {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
-        tracing::subscriber::with_default(Observer(Arc::clone(&phases)), || {
+        crate::observer_dispatch::with_observer(Observer(Arc::clone(&phases)), || {
             schema.check(&heap, &axes, &candidate, &mut account)
         })?;
         {
@@ -225,7 +225,7 @@ fn partial_construction<P: nrz_scalar::Scalar>() -> TestResult {
     let phases = Arc::new(Mutex::new(Vec::<Phase>::new()));
     crate::loan::fault::reset_reads();
     let injection = crate::loan::fault::Injection::after(0);
-    let result = tracing::subscriber::with_default(Observer(Arc::clone(&phases)), || {
+    let result = crate::observer_dispatch::with_observer(Observer(Arc::clone(&phases)), || {
         crate::LcInputInventory::<P, 5>::declare(&question, [2, 3, 2], &mut account)
     });
     assert!(matches!(
@@ -259,7 +259,7 @@ fn partial_construction<P: nrz_scalar::Scalar>() -> TestResult {
 /// Return completed span receipts without exposing the observer's lock or deriving an oracle.
 pub(super) fn recorded<T>(action: impl FnOnce() -> T) -> TestResult<(T, Vec<(String, u64)>)> {
     let phases = Arc::new(Mutex::new(Vec::<Phase>::new()));
-    let result = tracing::subscriber::with_default(Observer(Arc::clone(&phases)), action);
+    let result = crate::observer_dispatch::with_observer(Observer(Arc::clone(&phases)), action);
     let receipts = {
         let phases = phases
             .lock()

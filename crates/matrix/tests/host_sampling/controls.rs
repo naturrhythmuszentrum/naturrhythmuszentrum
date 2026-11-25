@@ -121,7 +121,7 @@ fn exercise_plan(
     let observer = Observer::default();
     for charged in [false, true] {
         let disabled = run_twice(plan, arithmetic, input, charged, false, expected)?;
-        let enabled = tracing::subscriber::with_default(observer.clone(), || {
+        let enabled = observer_dispatch::with_observer(observer.clone(), || {
             run_twice(plan, arithmetic, input, charged, true, expected)
         })?;
         assert_eq!(disabled, enabled);
