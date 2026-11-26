@@ -49,6 +49,12 @@ mod evidence;
 )]
 mod exact;
 mod kind;
+mod lc_containment;
+pub use lc_containment::{
+    LcArithmeticMode, LcContainmentContract, LcContainmentError, LcFace, LcStratum,
+    contains_binary32, contains_binary64, decode_binary32, decode_binary64, outward_total_binary32,
+    outward_total_binary64, underflow_bound_binary32, underflow_bound_binary64,
+};
 mod lc_omega;
 mod lc_relation;
 pub use lc_omega::{
@@ -74,7 +80,7 @@ mod sensitivity;
 
 pub use constants::{ExpressionEnclosure, ExpressionEnclosureError};
 pub use dyadic_power::{DyadicPowerPreparation, DyadicPowerPreparationError};
-pub use nrz_cas::{ExactConstant, PositiveConstant};
+pub use nrz_cas::{ExactConstant, PositiveConstant, Rational};
 
 pub use nrz_cas::limits::{Budget, Limits, LimitsOverride};
 

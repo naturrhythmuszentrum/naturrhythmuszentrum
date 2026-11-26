@@ -252,6 +252,7 @@ pub(in crate::loan) struct LcJoinIdentity {
     pub(in crate::loan) join: u64,
 }
 
+mod containment;
 pub(in crate::loan) mod pending;
 
 #[cfg(test)]

@@ -238,3 +238,117 @@ fn observe<P: Scalar + 'static>(
     }
     Ok(())
 }
+
+/// Current original companions supply the two exact native containment revisions.
+/// ´test:unit:loan-lc-native-containment-original-inputs´
+#[test]
+fn loan_lc_native_containment_original_inputs() -> TestResult {
+    containment32()?;
+    containment64()
+}
+
+fn containment32() -> TestResult {
+    use nrz_bindings::{LcArithmeticMode, LcFace, LcStratum};
+    let (mut heap, mut account, inventory, axes) = setup::<f32>()?;
+    let members = publish(
+        &inventory,
+        &axes,
+        &mut heap,
+        &mut account,
+        &SELECTED.map(Vec::from),
+        1,
+    )?;
+    let references = members.references();
+    let readers = inventory
+        .readers(&heap, &references, &mut account)?
+        .into_cells(&mut account)?;
+    let cell = readers.read_cell(0, &mut account)?;
+    let reading = &cell.readings()[0];
+    let lower = 0.5_f32;
+    let upper = 0.625_f32;
+    let stratum = LcStratum {
+        lower: Some(LcFace {
+            exact: nrz_bindings::Rational::from_ratio(1, 2, &mut account.ledger)?,
+            inward: lower,
+            open: false,
+        }),
+        upper: Some(LcFace {
+            exact: nrz_bindings::Rational::from_ratio(5, 8, &mut account.ledger)?,
+            inward: upper,
+            open: false,
+        }),
+    };
+    assert!(reading.check_containment32(
+        [lower, upper],
+        &stratum,
+        LcArithmeticMode::REQUIRED,
+        &mut account.ledger
+    )?);
+    let strict = LcStratum {
+        lower: Some(LcFace {
+            open: true,
+            ..stratum.lower.ok_or("lower")?
+        }),
+        upper: None,
+    };
+    assert!(!reading.check_containment32(
+        [lower, upper],
+        &strict,
+        LcArithmeticMode::REQUIRED,
+        &mut account.ledger
+    )?);
+    Ok(())
+}
+
+fn containment64() -> TestResult {
+    use nrz_bindings::{LcArithmeticMode, LcFace, LcStratum};
+    let (mut heap, mut account, inventory, axes) = setup::<f64>()?;
+    let members = publish(
+        &inventory,
+        &axes,
+        &mut heap,
+        &mut account,
+        &SELECTED.map(Vec::from),
+        1,
+    )?;
+    let references = members.references();
+    let readers = inventory
+        .readers(&heap, &references, &mut account)?
+        .into_cells(&mut account)?;
+    let cell = readers.read_cell(0, &mut account)?;
+    let reading = &cell.readings()[0];
+    let lower = 0.5_f64;
+    let upper = 0.625_f64;
+    let stratum = LcStratum {
+        lower: Some(LcFace {
+            exact: nrz_bindings::Rational::from_ratio(1, 2, &mut account.ledger)?,
+            inward: lower,
+            open: false,
+        }),
+        upper: Some(LcFace {
+            exact: nrz_bindings::Rational::from_ratio(5, 8, &mut account.ledger)?,
+            inward: upper,
+            open: false,
+        }),
+    };
+    assert!(reading.check_containment64(
+        [lower, upper],
+        &stratum,
+        LcArithmeticMode::REQUIRED,
+        &mut account.ledger
+    )?);
+    let strict = LcStratum {
+        lower: None,
+        upper: Some(LcFace {
+            open: true,
+            ..stratum.upper.ok_or("upper")?
+        }),
+    };
+    assert!(!reading.check_containment64(
+        [lower, upper],
+        &strict,
+        LcArithmeticMode::REQUIRED,
+        &mut account.ledger
+    )?);
+    Ok(())
+}

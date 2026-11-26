@@ -272,3 +272,83 @@ fn bind<'a, P: Scalar + 'static>(reader: &TileReader<'a, P>) -> Result<Bound<'a,
         scope: reader.numerical_error_scope(),
     })
 }
+
+#[cfg(test)]
+mod containment_tests {
+    use super::*;
+    use nrz_bindings::{Budget, LcArithmeticMode, LcContainmentError, LcStratum, Limits};
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    /// A total outer cover remains usable with local numerical error scope.
+    #[test]
+    fn lc_containment_local_total_cover() -> TestResult {
+        let mut budget = Budget::new(Limits::default())?;
+        let stratum32 = LcStratum::<f32> {
+            lower: None,
+            upper: None,
+        };
+        let stratum64 = LcStratum::<f64> {
+            lower: None,
+            upper: None,
+        };
+        for scope in [
+            NumericalErrorScope::PropagatedLocal,
+            NumericalErrorScope::LocalOperation,
+        ] {
+            let single = LcInputReading {
+                values: [0.0_f32, 0.0, 0.0],
+                scope,
+            };
+            let double = LcInputReading {
+                values: [0.0_f64, 0.0, 0.0],
+                scope,
+            };
+            assert!(matches!(
+                single.check_containment32(
+                    [0.0, 0.0],
+                    &stratum32,
+                    LcArithmeticMode::REQUIRED,
+                    &mut budget
+                ),
+                Ok(true)
+            ));
+            assert!(matches!(
+                double.check_containment64(
+                    [0.0, 0.0],
+                    &stratum64,
+                    LcArithmeticMode::REQUIRED,
+                    &mut budget
+                ),
+                Ok(true)
+            ));
+        }
+        let single = LcInputReading {
+            values: [0.0_f32, 0.0, f32::from_bits(1)],
+            scope: NumericalErrorScope::HostInput,
+        };
+        let double = LcInputReading {
+            values: [0.0_f64, 0.0, f64::from_bits(1)],
+            scope: NumericalErrorScope::HostInput,
+        };
+        assert!(matches!(
+            single.check_containment32(
+                [0.0, 0.0],
+                &stratum32,
+                LcArithmeticMode::REQUIRED,
+                &mut budget
+            ),
+            Err(LcContainmentError::InvalidInput)
+        ));
+        assert!(matches!(
+            double.check_containment64(
+                [0.0, 0.0],
+                &stratum64,
+                LcArithmeticMode::REQUIRED,
+                &mut budget
+            ),
+            Err(LcContainmentError::InvalidInput)
+        ));
+        Ok(())
+    }
+}
