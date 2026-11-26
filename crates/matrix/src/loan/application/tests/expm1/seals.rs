@@ -16,7 +16,11 @@ fn alter(
     law: Attachment,
 ) -> TestResult {
     match choice {
-        0 => core.host.retained_law = Some(law),
+        0 => {
+            core.host.retained_law = Some(Box::new(
+                crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(law),
+            ));
+        }
         1 => core.endpoints.as_mut().ok_or("endpoints")?.swap(0, 1),
         2 => {
             let [lower, upper] = core.endpoints.as_mut().ok_or("endpoints")?;
@@ -28,6 +32,11 @@ fn alter(
             operation.binding = super::laws::substituted_environment(operation.binding);
         }
         5 => core.endpoints = None,
+        6 => {
+            core.host.retained_law = Some(Box::new(
+                crate::loan::retained_law::RetainedLawAttachment::empty(),
+            ));
+        }
         _ => return Err("substitution".into()),
     }
     Ok(())
@@ -36,7 +45,7 @@ fn alter(
 #[test]
 fn prepared_detached_pairing_at_evaluation_and_publication() -> TestResult {
     for publish in [false, true] {
-        for substitution in 0..6 {
+        for substitution in 0..7 {
             let Fixture {
                 mut heap,
                 mut account,
@@ -80,7 +89,7 @@ fn prepared_detached_pairing_at_evaluation_and_publication() -> TestResult {
 /// Private current-root substitution leaves all exact debit records valid, isolating the origin gate.
 #[test]
 fn prepared_current_origin_pairing_and_endpoint_authentication() -> TestResult {
-    for substitution in 0..6 {
+    for substitution in 0..7 {
         let Fixture {
             mut heap,
             mut account,
@@ -105,7 +114,16 @@ fn prepared_current_origin_pairing_and_endpoint_authentication() -> TestResult {
             .and_then(|owner| owner.payload.as_mut())
             .ok_or("unique bundle")?;
         match substitution {
-            0 => bundle.retained_law = Some(law),
+            0 => {
+                bundle.retained_law = Some(Box::new(
+                    crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(law),
+                ));
+            }
+            6 => {
+                bundle.retained_law = Some(Box::new(
+                    crate::loan::retained_law::RetainedLawAttachment::empty(),
+                ));
+            }
             1 => bundle.endpoints.as_mut().ok_or("pair")?.swap(0, 1),
             2 => {
                 let [lower, upper] = bundle.endpoints.as_mut().ok_or("pair")?;

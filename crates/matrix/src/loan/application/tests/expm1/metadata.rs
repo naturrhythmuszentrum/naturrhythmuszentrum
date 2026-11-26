@@ -32,15 +32,15 @@ const CHARGES: [u64; 24] = [
     9,
     1,
     21,
-    (36 + 32 + 21 + 27) + (32 + 22 + 4) + 5 * (3 + 1 + 1) + 5 + 3,
+    (36 + 1 + 32 + 21 + 27) + (32 + 22 + 4) + 5 * (3 + 1 + 1) + 5 + 3 + 1,
     6,
 ];
 
 /// No failed metadata prefix can spend a partial prepayment, allocate or consume the original request.
 #[test]
 fn prepared_every_admission_metadata_work_prefix() -> TestResult {
-    assert_eq!(CHARGES.iter().sum::<u64>(), 287);
-    for available in 0..287 {
+    assert_eq!(CHARGES.iter().sum::<u64>(), 289);
+    for available in 0..289 {
         let Fixture {
             mut heap,
             mut account,

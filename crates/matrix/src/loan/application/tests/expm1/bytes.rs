@@ -20,6 +20,7 @@ fn inventory(cells: usize, components: usize) -> [usize; 2] {
         + 8 * q
         + cells * abi::outcome_width()
         + abi::application_headers::<f64>()
+        + abi::retained_law_attachment_bytes()
         + delta;
     let old = 256 + abi::group_row() + 3 * 32 + 9 * 264 + 40;
     let temporary = 23 * 264 + 5 * 16 + 3 * 248 + 2 * 24;
@@ -39,12 +40,12 @@ fn prepared_application_literal_complete_bytes() {
             inventory(65, 3)
         ],
         [
-            [16_552, 31_096],
-            [16_992, 31_536],
-            [17_184, 31_728],
-            [17_216, 31_760],
-            [17_568, 32_112],
-            [26_888, 41_432]
+            [16_552 + 16, 31_096 + 16],
+            [16_992 + 16, 31_536 + 16],
+            [17_184 + 16, 31_728 + 16],
+            [17_216 + 16, 31_760 + 16],
+            [17_568 + 16, 32_112 + 16],
+            [26_888 + 16, 41_432 + 16]
         ]
     );
 }
@@ -226,9 +227,13 @@ fn prepared_application_spare_capacity_bytes_and_scoped_neighbours() -> TestResu
         heap.reclaim(&mut account, 100_000, None),
         crate::ScanOutcome::Complete
     ));
-    let retained = abi::application_headers::<f64>() + 5 * (64 + 8 + 8) + 8 + abi::outcome_width();
+    let retained = abi::application_headers::<f64>()
+        + abi::retained_law_attachment_bytes()
+        + 5 * (64 + 8 + 8)
+        + 8
+        + abi::outcome_width();
     let staged = retained + 23 * 264 + 5 * 16 + 3 * 248 + 2 * 24;
-    assert_eq!([retained, staged], [7480, 14_424]);
+    assert_eq!([retained, staged], [7480 + 16, 14_424 + 16]);
     for staging in [false, true] {
         for short in [0, 1] {
             let required = u64::try_from(if staging { staged } else { retained })?;

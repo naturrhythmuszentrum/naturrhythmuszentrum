@@ -56,7 +56,7 @@ impl Heap {
                 {
                     charge(budget, 1)?;
                     law.validate()?;
-                    result.retained_law = Some(law.owner_identity());
+                    result.retained_law = Some(law.owner_identity()?);
                 }
                 for entry in &self.loans.debits {
                     charge(budget, 1)?;

@@ -174,6 +174,17 @@ fn run<P: Scalar + 'static>(
         core.evidence.law.kind(),
         core.evidence.prepared.as_ref(),
     )?;
+    let retained_expm1 = if matches!(member, Member::PreparedExpm1(..)) {
+        Some(
+            core.host
+                .retained_law
+                .as_ref()
+                .ok_or(LoanError::WrongLoan)?
+                .expm1()?,
+        )
+    } else {
+        None
+    };
     let cells = core.host.declaration.extent.rows();
     let components = core.host.declaration.extent.columns();
     let reader = core
@@ -221,7 +232,7 @@ fn run<P: Scalar + 'static>(
                         reader.as_ref(),
                         right.as_ref(),
                         side.is_some_and(|side| side.source.symbols.bound().is_some()),
-                        core.host.retained_law.as_ref(),
+                        retained_expm1,
                         core.evidence.source.symbols.bound().is_some(),
                         source_cells,
                         component,

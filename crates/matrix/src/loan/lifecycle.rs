@@ -55,7 +55,7 @@ pub struct OwnedLoan<P: Scalar> {
 #[derive(Debug)]
 pub(super) struct HostCore {
     /// A later checked consumer may move one funded law use through every wrapper.
-    pub(super) retained_law: Option<super::retained_expm1::Attachment>,
+    pub(super) retained_law: Option<Box<super::retained_law::RetainedLawAttachment>>,
     /// Complete exact ownership authority.
     pub(super) identity: Identity,
     /// Original binding declaration.

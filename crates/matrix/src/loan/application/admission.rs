@@ -28,7 +28,7 @@ struct Prepared<P: Scalar> {
     layouts: PreparedSlots<Native<LayoutRecord>>,
     /// Reserved native mask occupation.
     masks: PreparedSlots<Native<MaskRecord>>,
-    /// Exact individual allocation records.
+    /// Exact accounting records for the prepared allocations.
     debits: Vec<Debit>,
     /// Disjoint fixed debit destinations.
     debit_slots: [usize; 23],
@@ -119,10 +119,20 @@ pub(super) fn request_expm1(
             });
     match checked {
         Ok(mut prepared) => {
+            let Some(shell) = prepared.core.host.retained_law.as_mut() else {
+                return super::Expm1ApplicationRequest::ApplicationRefused(
+                    LoanError::WrongLoan.into(),
+                    request,
+                );
+            };
+            if shell.require_empty().is_err() {
+                return super::Expm1ApplicationRequest::ApplicationRefused(
+                    LoanError::WrongLoan.into(),
+                    request,
+                );
+            }
             prepared.core.input = Some(request.input);
-            prepared.core.host.retained_law = Some(
-                crate::loan::retained_expm1::Attachment::prepared(request.law),
-            );
+            shell.install_expm1(request.law);
             super::Expm1ApplicationRequest::ApplicationReady(install(heap, prepared))
         }
         Err(error) => super::Expm1ApplicationRequest::ApplicationRefused(error, request),

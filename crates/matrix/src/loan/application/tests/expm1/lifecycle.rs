@@ -6,11 +6,11 @@ use crate::{ApplicationError, ApplicationPublication, Expm1ApplicationRequest, L
 
 /// Every acquisition boundary includes both endpoint slabs and their four tracking backings.
 /// Prefixes 3..9 are the descriptor/layout/mask key and replacement pairs: they map to `Capacity`.
-/// All other 30 sites use the direct typed allocation refusal. Each site asserts its one cause.
+/// All other 31 sites use the direct typed allocation refusal. Each site asserts its one cause.
 #[test]
 fn prepared_allocation_failure_prefixes_and_unwind() -> TestResult {
     for unwind in [false, true] {
-        for prefix in 0..36 {
+        for prefix in 0..37 {
             let Fixture {
                 mut heap,
                 mut account,

@@ -21,13 +21,13 @@ fn admission(cells: usize, components: usize) -> usize {
     let length = cells * components;
     let q = cells.div_ceil(64);
     let t = length.div_ceil(64);
-    let allocations = 19 + 17 * usize::from(cells != 0);
+    let allocations = 19 + 17 * usize::from(cells != 0) + 1;
     let records = 3 + 23 + 6;
     let edges = 3 + 3 + 1 + 7 + 7;
     let checks = 3 + 24 + 1 + (3 + 2 * 3) + 9 + 1 + (1 + 2 + 2 * 9);
     let cleanup = allocations + records + edges + (15 + 4 * 3);
     let prepare = records + edges + 1 + (1 + 1 + 2);
-    checks + cleanup + prepare + 6 + 2 * length + 5 * (length + t + q) + 5 * q + cells
+    checks + cleanup + prepare + 6 + 1 + 2 * length + 5 * (length + t + q) + 5 * q + cells
 }
 /// Five roles, common normalization and outcome gating precede the five selected reading checks.
 fn publication(cells: usize, components: usize, completed: usize) -> usize {

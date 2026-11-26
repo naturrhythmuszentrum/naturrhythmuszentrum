@@ -309,7 +309,7 @@ pub(super) struct BundleOwner {
 #[derive(Debug)]
 pub(super) struct Bundle {
     /// One transferred charged law edge; this is ownership, not completion evidence.
-    pub(super) retained_law: Option<super::retained_expm1::Attachment>,
+    pub(super) retained_law: Option<Box<super::retained_law::RetainedLawAttachment>>,
     /// Producer origin and sealed completion evidence, without a source retaining edge.
     pub(super) origin: super::application::Origin,
     /// Exact original declaration.

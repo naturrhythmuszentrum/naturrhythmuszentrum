@@ -28,15 +28,19 @@ fn host(heap: &mut Heap, account: &mut ExecutionAccount) -> TestResult<OwnedLoan
 }
 /// Capture an exact use before moving it into the detached fixture core.
 fn attach(
-    heap: &Heap,
+    heap: &mut Heap,
     loan: &mut OwnedLoan<f64>,
     law: RetainedExpm1,
     account: &mut ExecutionAccount,
 ) -> TestResult {
     let binding = Binding::of(&law)?;
-    loan.core.retained_law = Some(
-        Attachment::prepare(law, binding, heap, &mut account.ledger).map_err(|(error, _)| error)?,
-    );
+    crate::loan::retained_law::RetainedLawAttachment::account_fixture(heap, &mut loan.core)?;
+    loan.core.retained_law = Some(Box::new(
+        crate::loan::retained_law::RetainedLawAttachment::wrap_expm1(
+            Attachment::prepare(law, binding, heap, &mut account.ledger)
+                .map_err(|(error, _)| error)?,
+        ),
+    ));
     Ok(())
 }
 /// Publish only the ordinary host values; the private law edge is ownership evidence alone.
@@ -59,6 +63,7 @@ fn law(pin: &BundlePin<f64>) -> TestResult<&RetainedExpm1> {
         .and_then(|pin| pin.bundle.payload.as_ref())
         .and_then(|bundle| bundle.retained_law.as_ref())
         .ok_or("retained law attachment")?
+        .expm1()?
         .law)
 }
 /// Both the remaining result pin and a registry-only root retain the exact graph and authority.
@@ -73,7 +78,7 @@ fn retained_law_bundle_pin_root_and_heap_drop() -> TestResult {
         let expected = Binding::of(&moved)?;
         let authority = std::ptr::from_ref(external.authority()?);
         let mut loan = host(&mut heap, &mut account)?;
-        attach(&heap, &mut loan, moved, &mut account)?;
+        attach(&mut heap, &mut loan, moved, &mut account)?;
         let (tile, receipt) = publish(&mut heap, loan, &mut account)?;
         assert_eq!(
             heap.loan_inventory(receipt.ticket(), &mut account)?
@@ -136,7 +141,7 @@ fn retained_law_multiple_bundle_edges() -> TestResult {
     for _ in 0..2 {
         let moved = heap.retain_retained_expm1(&external, &mut account)?;
         let mut loan = host(&mut heap, &mut account)?;
-        attach(&heap, &mut loan, moved, &mut account)?;
+        attach(&mut heap, &mut loan, moved, &mut account)?;
         publications.push(publish(&mut heap, loan, &mut account)?);
     }
     assert_eq!(
@@ -183,7 +188,7 @@ fn retained_law_detached_repair_and_unwind() -> TestResult {
             let moved = fixture::prepare(&mut heap, &mut account)?;
             let binding = Binding::of(&moved)?;
             let mut loan = host(&mut heap, &mut account)?;
-            attach(&heap, &mut loan, moved, &mut account)?;
+            attach(&mut heap, &mut loan, moved, &mut account)?;
             if repair {
                 let injection = crate::loan::fault::Injection::after(0);
                 loan = match heap.handback(loan, &mut account) {
@@ -197,8 +202,9 @@ fn retained_law_detached_repair_and_unwind() -> TestResult {
                 .retained_law
                 .as_ref()
                 .ok_or("detached attachment")?;
-            assert_eq!(Binding::of(&attachment.law)?, binding);
+            assert_eq!(Binding::of(&attachment.expm1()?.law)?, binding);
             attachment
+                .expm1()?
                 .law
                 .evaluate(fixture::point(-1.0), &ArithmeticContext::new()?)?;
             drop(heap);
@@ -317,7 +323,7 @@ fn retained_law_destruction_precedes_witness() -> TestResult {
         let mut account = fixture::account()?;
         let moved = fixture::prepare(&mut heap, &mut account)?;
         let mut loan = host(&mut heap, &mut account)?;
-        attach(&heap, &mut loan, moved, &mut account)?;
+        attach(&mut heap, &mut loan, moved, &mut account)?;
         super::WATCH_WITNESS.set(Some((loan.core.cleanup.identity, DESTROYED.get())));
         super::AT_WITNESS.set(None);
         let work = account.usage().work;
@@ -347,7 +353,7 @@ fn retained_law_current_attachment_repeated_work() -> TestResult {
         let mut original = fixture::account()?;
         let moved = fixture::prepare(&mut heap, &mut original)?;
         let mut loan = host(&mut heap, &mut original)?;
-        attach(&heap, &mut loan, moved, &mut original)?;
+        attach(&mut heap, &mut loan, moved, &mut original)?;
         let (tile, receipt) = publish(&mut heap, loan, &mut original)?;
         assert_eq!([heap.loans.debits.len(), heap.loans.pins.len()], [11, 1]);
         // Ticket authentication 2 + current owner 15; pin preparation visits 1+11+24
@@ -385,7 +391,7 @@ fn retained_law_publication_prefix_cleanup() -> TestResult {
             let moved = fixture::prepare(&mut heap, &mut account)?;
             let binding = Binding::of(&moved)?;
             let mut loan = host(&mut heap, &mut account)?;
-            attach(&heap, &mut loan, moved, &mut account)?;
+            attach(&mut heap, &mut loan, moved, &mut account)?;
             let ticket = loan.ticket();
             let destroyed = DESTROYED.get();
             let injection = if unwind {
@@ -407,8 +413,9 @@ fn retained_law_publication_prefix_cleanup() -> TestResult {
                 };
                 assert_eq!(DESTROYED.get(), destroyed);
                 let attachment = repair.core.retained_law.as_ref().ok_or("law")?;
-                assert_eq!(Binding::of(&attachment.law)?, binding);
+                assert_eq!(Binding::of(&attachment.expm1()?.law)?, binding);
                 attachment
+                    .expm1()?
                     .law
                     .evaluate(fixture::point(-0.5), &ArithmeticContext::new()?)?;
                 drop(repair);
@@ -445,7 +452,7 @@ fn retained_law_published_root_and_pin_unwind() -> TestResult {
         let mut account = fixture::account()?;
         let moved = fixture::prepare(&mut heap, &mut account)?;
         let mut loan = host(&mut heap, &mut account)?;
-        attach(&heap, &mut loan, moved, &mut account)?;
+        attach(&mut heap, &mut loan, moved, &mut account)?;
         let (tile, _) = publish(&mut heap, loan, &mut account)?;
         let destroyed = DESTROYED.get();
         let work = account.usage().work;
