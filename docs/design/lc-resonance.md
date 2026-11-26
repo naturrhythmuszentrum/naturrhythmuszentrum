@@ -168,7 +168,7 @@ LC closing requires the independently reviewed owner inventories and explicit ov
 
 **Claim (Literal whole-attempt resource evidence)** · `claim:nrz:lc-closing-whole-attempt-limits`
 
-LC closing requires the literal whole-attempt limits and both-format exact/one-below/consumed-prefix twins in (`req:nrz:lc-plan-completion-evidence`). A scheduler receipt or publication allowance is insufficient until the owner overlap map is complete. Existing pins remain unchanged and scoped measurements remain distinct from observed capacity or backend allowances (`req:nrz:lc-plan-owner-increments`).
+LC closing requires the literal whole-attempt limits and both-format exact/one-below/consumed-prefix twins in (`req:nrz:lc-plan-completion-evidence`). A scheduler receipt or publication allowance is insufficient until the owner overlap map is complete. Existing pins change only under (`rule:nrz:reviewed-figure-changes`), and scoped measurements remain distinct from observed capacity or backend allowances (`req:nrz:lc-plan-owner-increments`).
 
 **Table (Plan and resource closing evidence)** · `tab:nrz:lc-closing-plan-resources`
 
