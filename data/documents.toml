@@ -345,3 +345,7 @@ requires = ["compute"]
 [[document]]
 output = "docs/compute/provenance.md"
 requires = ["compute"]
+
+[[document]]
+output = "docs/design/fault-injection-concept.md"
+requires = []
