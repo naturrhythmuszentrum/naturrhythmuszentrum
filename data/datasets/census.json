@@ -16,7 +16,8 @@
     "crates/bindings/Cargo.toml",
     "crates/cas/Cargo.toml",
     "crates/bench/Cargo.toml",
-    "crates/compute/Cargo.toml"
+    "crates/compute/Cargo.toml",
+    "crates/engine/Cargo.toml"
   ],
   "labels": [
     "guide:docgen:overview"
@@ -153,6 +154,15 @@
         "thiserror"
       ],
       "path": "crates/compute"
+    },
+    {
+      "build_dependencies": [],
+      "description": "Application-facing facade and command-line program for the Naturrhythmuszentrum engine",
+      "development_dependencies": [],
+      "has_readme_template": true,
+      "name": "nrz",
+      "normal_dependencies": [],
+      "path": "crates/engine"
     }
   ]
 }

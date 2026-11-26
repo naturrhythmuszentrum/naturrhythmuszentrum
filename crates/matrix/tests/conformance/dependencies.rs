@@ -22,7 +22,7 @@ struct Package {
 }
 
 /// New workspace owners or direct edges require deliberate architecture review.
-const PACKAGES: [Package; 8] = [
+const PACKAGES: [Package; 9] = [
     Package {
         name: "nrz-cas",
         manifest: "crates/cas/Cargo.toml",
@@ -106,6 +106,13 @@ const PACKAGES: [Package; 8] = [
         normal: &[],
         build: &[],
         development: &["criterion", "nrz-matrix", "nrz-bindings", "nrz-scalar"],
+    },
+    Package {
+        name: "nrz",
+        manifest: "crates/engine/Cargo.toml",
+        normal: &[],
+        build: &[],
+        development: &[],
     },
 ];
 
@@ -264,7 +271,11 @@ fn negative_twins() -> CheckResult {
             return Err("manifest policy accepted its negative twin".into());
         }
     }
-    for allowed in [PACKAGES[1].normal, &[], PACKAGES[1].development] {
+    let scalar = PACKAGES
+        .iter()
+        .find(|package| package.name == "nrz-scalar")
+        .ok_or("missing scalar package")?;
+    for allowed in [scalar.normal, &[], scalar.development] {
         let mut output = String::from("nrz-scalar v0.1.0\n");
         for name in allowed {
             writeln!(output, "{name} v1.0.0")?;

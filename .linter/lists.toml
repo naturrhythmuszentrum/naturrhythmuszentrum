@@ -3,6 +3,24 @@
 namespace = "class.linter.lists"
 version = [1, 0, 0]
 
+[ENGINE."labels.mints-well-formed"]
+allowances = []
+
+[ENGINE."labels.mints-kind-conform"]
+allowances = []
+
+[ENGINE."labels.mints-unique"]
+allowances = []
+
+[ENGINE."labels.heads-conform"]
+allowances = []
+
+[ENGINE."labels.citations-local-resolve"]
+allowances = []
+
+[ENGINE."owners.reach-conform"]
+allowances = []
+
 [NRZ."labels.mints-well-formed"]
 allowances = []
 

@@ -721,6 +721,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "nrz"
+version = "0.1.0"
+
+[[package]]
 name = "nrz-accuracy"
 version = "0.1.0"
 dependencies = [

@@ -376,6 +376,10 @@ The starting repository is a virtual nightly Cargo workspace with no members, a 
 
 Exemplars: (`ex:exemplars:faer`), (`ex:exemplars:herbie`), (`ex:exemplars:estate-tools-and-templated-documentation`).
 
+**Decision (Early facade entry point)** · `dec:vision:early-facade-entry-point`
+
+The `nrz` package is a standing exception to the admission criterion (`def:vision:baseline-and-proposed-tree`). Entering it early fixes the binary name and workspace entry point, so later commands land in a stable target under the strict lint and documentation gates. This accepts maintenance and documentation obligations before a coherent application responsibility exists; the empty public surface keeps that cost small, and the package README documents its behavior. The package follows the declared dependency direction as supported interfaces are added. Exemplars: none.
+
 **Rule (Layer enforcement)** · `rule:vision:layer-enforcement`
 
 Dependencies flow downward through the declared package graph; scalar and accuracy primitives receive their dimensional and measure meaning from descriptor owners rather than depending back on bindings (`dec:vision:storage-and-scalar-wrapping`). The physics-free nrz-cas package depends on no other engine package. The data-time bindings client depends only on nrz-cas; numerical units integration may later add the declared scalar and accuracy edges. The descriptor experiment is retired; its recorded decision assigns production responsibilities to existing owners (`dec:nrz:descriptor-prototype-promotion`). Scalar primitives remain independent of algebra and bindings. The expression boundary is specified by (`req:vision:expression-and-symbol-contract`). A metadata-based architecture check compares normal, build, development, and feature-dependent edges against the permitted graph because a forbidden dependency remains a coupling even when hidden in tests. Cross-layer integration tests live at an existing upper layer. The facade reexports supported concepts and adds no competing numerical implementation. Exemplars: none.

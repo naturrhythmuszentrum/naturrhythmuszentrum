@@ -1,0 +1,15 @@
+<!-- SPDX-License-Identifier: CC0-1.0 -->
+
+# nrz engine facade · `guide:engine:facade`
+
+## Purpose · `sec:engine:facade-purpose`
+
+`nrz` is the engine's application-facing facade and command-line package. Curated re-exports and commands are still to come.
+
+## Current behavior · `sec:engine:facade-behavior`
+
+The library has no public items yet. The `nrz` command has no dependencies, parses no arguments, prints nothing and exits successfully. It does not yet run the LC calculation.
+
+## Verification · `sec:engine:facade-verification`
+
+Build with `cargo build --locked -p nrz` and run with `cargo run --locked -p nrz`. Workspace formatting, strict clippy and documentation checks cover this package. Code is AGPL-3.0-only; this README is CC0-1.0.

@@ -18,6 +18,7 @@ This set records the adopted scalar, accuracy and documentation-generator surfac
 |`nrz-cas`|Exact graph construction and checked symbolic derivations|num-bigint, num-complex, num-integer, num-rational, num-traits, petgraph, tracing|||
 |`nrz-bench`|Workspace Criterion benchmarks and host sampling comparisons||criterion, nrz-bindings, nrz-matrix, nrz-scalar||
 |`nrz-compute`|Explicit machine compute measurements and exact deterministic summaries|nrz-matrix, serde, serde_json, thiserror||serde_json|
+|`nrz`|Application-facing facade and command-line program for the Naturrhythmuszentrum engine||||
 
 **Argument (Graph currency)** · `arg:nrz:engineering-graph-currency`
 
