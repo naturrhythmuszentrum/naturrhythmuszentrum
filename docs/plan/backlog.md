@@ -172,6 +172,12 @@ Closes (`claim:nrz:lc-closing-scale-measurement`) only with its full evidence. G
 
 Enforces (`rule:nrz:lc-closing-independent-review`) after every closing claim is met, including the actual scale measurement and all four explained-overhead claims (`sec:nrz:lc-closing-certification-cost`). Review the whole repository at candidate main on a model other than the producers', reading the register, backlog, plan, LC designs and cited code/tests. Closing evidence: a recorded candidate commit and explicit `LC DONE` verdict. The alternative is labelled blocking findings that become or update backlog items and affected register standing; resolve them and repeat the independent review before closure. This is the final LC backlog item, not a substitute for any implementation or measurement evidence.
 
+## Native failure investigation outside LC closing · `sec:nrz:backlog-native-failure-investigation`
+
+**Step (Investigate native phase-failure reachability)** · `step:nrz:backlog-native-failure-reachability`
+
+- Low priority: Investigate whether any classified resource, literal, length, environment or policy phase failure is reachable from public inputs after traversal starts under (`dec:nrz:matrix-loans-lc-origin-encoding`). Trace public inputs through admission and execution to each phase-error return, distinguishing reachable cases from defensive encodings; arithmetic-environment admission already precedes traversal. Record the source-backed reachability result without changing the settled cancel-only classification or introducing a fault surface (`dec:nrz:fault-injection-product-choice`), (`dec:nrz:fault-injection-private-evidence`). This factual investigation is outside (`sec:nrz:backlog-lc-closing`) and does not block LC certification.
+
 ## Number design outside LC closing · `sec:nrz:backlog-number-design`
 
 **Step (Design number storage, identity and display contracts)** · `step:nrz:backlog-number-design`
