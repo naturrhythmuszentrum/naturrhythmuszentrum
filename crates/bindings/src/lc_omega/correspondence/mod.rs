@@ -10,7 +10,7 @@ mod translation;
 use crate::{AdmissionError, LcOmegaDeclarationToken};
 use nrz_cas::{
     Cas, Location,
-    enclosure::lc_root,
+    enclosure::{lc_root, lc_source_substitution},
     limits::{Budget, BudgetKind},
 };
 use std::{fmt, rc::Rc};
@@ -87,6 +87,35 @@ impl fmt::Debug for LcOmegaCorrespondence {
 }
 
 impl LcOmegaCorrespondence {
+    /// Compose a positional original-source map with this exact sealed declaration.
+    ///
+    /// The map can use only the already admitted original declaration positions and
+    /// retains every original constraint. It grants a conditional forward theorem,
+    /// not a ground native enclosure or an image converse.
+    /// # Errors
+    /// Refuses a foreign source, missing original condition or unsupported map.
+    pub fn source_substitution(
+        &self,
+        request: &lc_source_substitution::Request,
+        budget: &mut Budget,
+    ) -> Result<lc_source_substitution::Receipt> {
+        let original = self.receipt.request(&self.cas, budget)?;
+        accounting::original(1, budget)?;
+        if request.root != *original
+            || request.context != original.context
+            || request.constraints != original.constraints
+        {
+            return Err(AdmissionError::ValueMismatch);
+        }
+        accounting::original(request.sources.len() as u64, budget)?;
+        if request.sources != original.inputs {
+            return Err(AdmissionError::ValueMismatch);
+        }
+        Ok(self
+            .cas
+            .construct_lc_source_substitution(request, &self.receipt, budget)?)
+    }
+
     /// Construct the registered conditional law from independently translated originals.
     /// The caller reserves original residence minus the captured owner increment.
     /// # Errors

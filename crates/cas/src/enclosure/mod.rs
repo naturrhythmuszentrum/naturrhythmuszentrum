@@ -42,6 +42,7 @@ mod derivative;
 mod exp;
 mod interval;
 pub mod lc_root;
+pub mod lc_source_substitution;
 mod log;
 mod model;
 mod planning;
@@ -218,7 +219,7 @@ pub use model::{
 pub use power::{PowerEvidence, PowerRoute};
 
 /// Closed formal register; no unimplemented analytic schema grants authority.
-pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 11] = [
+pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 12] = [
     crate::emptiness::LemmaSchema {
         name: "enclosure.rational-inclusion",
         label: "thm:cas:enclosure-rational-inclusion",
@@ -293,6 +294,7 @@ pub const ENCLOSURE_SCHEMAS: [crate::emptiness::LemmaSchema; 11] = [
     },
     prepared_expm1::SCHEMA,
     lc_root::SCHEMA,
+    lc_source_substitution::SCHEMA,
 ];
 
 /// Exhaustive interval-law dispatcher; prepared schedule authority has its own checker.

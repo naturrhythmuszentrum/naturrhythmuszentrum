@@ -2223,6 +2223,10 @@ The whole-route Work boundary is an implementation-measured regression pin, dist
 
 ## Conditional LC root family · `sec:cas:lc-positive-root-family`
 
+**Theorem (Conditional LC source substitution)** · `thm:cas:lc-source-substitution`
+
+Formal schema `lc-source-substitution`, version 1. For every assignment to the listed original source declarations in their recorded order (including repeated positions), under the exact root context, admissible region, fibres and retained constraints, simultaneous substitution of the registered positive-root law into the original target DAG preserves its conditional forward enclosure conclusion. Root input binders and endpoint binders retain their original order and remain distinct classes. Required premises: The exact root context and ordered root constraints, source-domain extras, declared source leaves, positional substitution, positive root premises and original native enclosure obligations; no image converse or source independence is inferred from equal numerical values. A bindings consumer checks completeness and order against its physical declaration inventory. This receipt is store-scoped rather than a durable graph judgment. Standing: Lemma; instances are CAS-checked.
+
 **Theorem (Conditional positive LC root composition)** · `thm:cas:lc-positive-root-composition`
 
 Formal schema `lc-positive-root-composition`, version 1. Under the complete original context and conditional premises, the ordered positive product, its original strict-real square root and reciprocal satisfy the retained root and reciprocal brackets and reverse polynomial. Required premises: Original `DomainGuard` and Boolean constraints; `StrictSign` for L, C, product lower and root lower endpoints; ordered square and inverse endpoint inequalities; three native total Enclosure obligations and reciprocal `LocalOperation` interpretation. Standing: Lemma; instances are CAS-checked.

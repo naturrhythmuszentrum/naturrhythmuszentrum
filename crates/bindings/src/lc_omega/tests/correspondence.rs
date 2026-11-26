@@ -5,6 +5,15 @@ mod keys;
 mod oracle;
 mod resources;
 
+/// The conditional map retains the exact original declaration and constraints.
+#[test]
+fn lc_omega_source_map_originals() -> TestResult {
+    let mut budget = Budget::new(Limits::default())?;
+    let f = fixture(&mut budget)?;
+    let declaration = owning::admit(f.request(), &mut budget)?;
+    crate::lc_omega::correspondence::controls::source_map(&declaration, &mut budget)
+}
+
 /// Independent fixtures preserve ordered repeated inputs across fresh-store replay.
 /// ´test:unit:lc-omega-correspondence-construct-replay´
 #[test]

@@ -2,6 +2,50 @@
 //! Private sealing controls exercise failures unavailable through the public constructor.
 use super::*;
 
+/// Bind a source map only to the original sealed declaration and all its conditions.
+pub(in crate::lc_omega) fn source_map(
+    declaration: &LcOmegaDeclarationToken,
+    budget: &mut Budget,
+) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let owner = LcOmegaCorrespondence::construct(declaration, budget)?;
+    let original = owner.receipt.request(&owner.cas, budget)?.clone();
+    let request = lc_source_substitution::Request {
+        root: original.clone(),
+        context: original.context.clone(),
+        sources: original.inputs.clone(),
+        constraints: original.constraints.clone(),
+        substitution: original.inputs.clone(),
+        targets: original.targets,
+        tag: lc_source_substitution::Tag::Box,
+        revision: 1,
+    };
+    let receipt = owner.source_substitution(&request, budget)?;
+    assert_eq!(receipt.request(&owner.cas, budget)?, &request);
+    let mut changed = request.clone();
+    changed.constraints.swap(0, 1);
+    assert!(matches!(
+        owner.source_substitution(&changed, budget),
+        Err(AdmissionError::ValueMismatch)
+    ));
+    for sources in [
+        original.inputs[..original.inputs.len() - 1].to_vec(),
+        original.inputs.iter().rev().cloned().collect(),
+        {
+            let mut duplicated = original.inputs.clone();
+            duplicated.push(original.inputs[0].clone());
+            duplicated
+        },
+    ] {
+        let mut changed = request.clone();
+        changed.sources = sources;
+        assert!(matches!(
+            owner.source_substitution(&changed, budget),
+            Err(AdmissionError::ValueMismatch)
+        ));
+    }
+    Ok(())
+}
+
 /// Foreign owner authentication precedes the complete same-store expected-request comparison.
 pub(in crate::lc_omega) fn identity(
     declaration: &LcOmegaDeclarationToken,
